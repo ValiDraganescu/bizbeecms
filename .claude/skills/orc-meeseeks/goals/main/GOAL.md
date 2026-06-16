@@ -16,6 +16,8 @@ Ship the **ProjectManager** with three working capabilities:
 2. **Site creation** — a Site is a project; one or more PM users can work on the same Site.
 3. **Site deployment** — a Site is a deployment of the CMS to Cloudflare. **The deployment process must work from Cloudflare after the ProjectManager itself is deployed** (i.e. PM running on Cloudflare can trigger a CMS deploy via Cloudflare APIs).
 
+**Localization:** The PM UI must be localized in **English, Finnish, and Estonian**. The CMS UI must support the same three locales, and **additionally** allow configuring an arbitrary set of **user-facing content languages per Site** (content locales are data-driven and distinct from the fixed admin-UI locale set).
+
 The CMS, for now, is just the default Next.js installation in a `CMS/` directory. Deployment must actually spin up a CMS instance on Cloudflare.
 
 ## Stack (north star — confirmed with user)
