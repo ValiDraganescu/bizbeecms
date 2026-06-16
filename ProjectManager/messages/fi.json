@@ -98,8 +98,10 @@
       "role": "Rooli",
       "rolePlaceholder": "Valitse rooli…",
       "country": "Maarajaus",
-      "countryPlaceholder": "Valitse maa…",
+      "countryPlaceholder": "Valitse maita…",
       "globalCountry": "Globaali (ei maata)",
+      "countryHintGlobal": "Valitse yksi tai useampi maa. Jätä tyhjäksi kaikkien maiden osalta (globaali).",
+      "countryHintScoped": "Valitse yksi tai useampi omista maistasi.",
       "submit": "Lähetä kutsu"
     },
     "sent": {

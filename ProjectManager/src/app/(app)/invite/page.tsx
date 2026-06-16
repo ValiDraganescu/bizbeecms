@@ -18,9 +18,9 @@ import {
   TableRow,
 } from "@/components/ui";
 import type { Role } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth/user";
+import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canUserInvite } from "@/lib/invite/authz";
-import { listPendingInvites } from "@/lib/invite/invite";
+import { listPendingInvites, getInviteCountriesMap } from "@/lib/invite/invite";
 import { InviteForm } from "./invite-form";
 
 const roleKey: Record<Role, string> = {
@@ -41,7 +41,9 @@ export default async function InvitePage() {
   const user = (await getCurrentUser())!;
   const allowed = canUserInvite(user);
 
+  const inviterCountries = allowed ? await getUserCountries(user.id) : [];
   const pending = allowed ? await listPendingInvites() : [];
+  const countriesByInvite = await getInviteCountriesMap(pending.map((i) => i.id));
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-10">
@@ -82,7 +84,9 @@ export default async function InvitePage() {
               <CardDescription>{t("form.description")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <InviteForm inviter={{ role: user.role, country: user.country }} />
+              <InviteForm
+                inviter={{ role: user.role, countries: inviterCountries }}
+              />
             </CardContent>
           </Card>
 
@@ -116,7 +120,9 @@ export default async function InvitePage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {inv.country ?? t("pending.global")}
+                          {(countriesByInvite.get(inv.id) ?? []).length > 0
+                            ? countriesByInvite.get(inv.id)!.join(", ")
+                            : t("pending.global")}
                         </TableCell>
                         <TableCell className="tabular-nums text-foreground-muted">
                           {inv.expiresAt.toISOString().slice(0, 10)}

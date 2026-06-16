@@ -98,8 +98,10 @@
       "role": "Roll",
       "rolePlaceholder": "Vali roll…",
       "country": "Riigi ulatus",
-      "countryPlaceholder": "Vali riik…",
+      "countryPlaceholder": "Vali riigid…",
       "globalCountry": "Globaalne (riigita)",
+      "countryHintGlobal": "Vali üks või mitu riiki. Jäta tühjaks kõigi riikide jaoks (globaalne).",
+      "countryHintScoped": "Vali üks või mitu oma riikidest.",
       "submit": "Saada kutse"
     },
     "sent": {

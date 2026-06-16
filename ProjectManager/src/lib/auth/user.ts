@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Role, User } from "@/db/schema";
+import { isCountryCode, type CountryCode } from "./countries";
 import { getSession } from "./session";
 
 /** Total number of registered users. Drives the first-registrant rule. */
@@ -48,11 +49,12 @@ export type CreateUserInput = {
   email: string;
   passwordHash: string;
   role: Role;
-  country?: string | null;
+  /** Country scope set; empty/omitted = global (all countries). */
+  countries?: CountryCode[];
   canInvite?: boolean;
 };
 
-/** Insert a user; the email unique index enforces no duplicates at the DB. */
+/** Insert a user (+ its country-scope rows). Email unique index prevents dupes. */
 export async function createUser(input: CreateUserInput): Promise<User> {
   const db = await getDb();
   const [user] = await db
@@ -62,9 +64,25 @@ export async function createUser(input: CreateUserInput): Promise<User> {
       email: input.email,
       passwordHash: input.passwordHash,
       role: input.role,
-      country: input.country ?? null,
       canInvite: input.canInvite ?? input.role === "SuperAdmin",
     })
     .returning();
+
+  const countries = input.countries ?? [];
+  if (countries.length > 0) {
+    await db
+      .insert(schema.userCountries)
+      .values(countries.map((country) => ({ userId: user.id, country })));
+  }
   return user;
+}
+
+/** A user's country scope set. Empty array = global (all countries). */
+export async function getUserCountries(userId: string): Promise<CountryCode[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({ country: schema.userCountries.country })
+    .from(schema.userCountries)
+    .where(eq(schema.userCountries.userId, userId));
+  return rows.map((r) => r.country).filter(isCountryCode);
 }

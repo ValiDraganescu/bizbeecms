@@ -10,6 +10,7 @@ import {
   Combobox,
   Field,
   FieldError,
+  FieldHint,
   FieldLabel,
   Input,
   type DefaultOption,
@@ -18,20 +19,21 @@ import type { Role } from "@/db/schema";
 import {
   COUNTRY_CODES,
   countryNames,
-  GLOBAL_COUNTRY,
+  type CountryCode,
 } from "@/lib/auth/countries";
 import { INVITABLE_ROLES } from "@/lib/invite/authz";
 import { inviteAction, type InviteState } from "./actions";
 
 const initialState: InviteState = {};
 
-type InviterCtx = { role: Role; country: string | null };
+type InviterCtx = { role: Role; countries: CountryCode[] };
 
 /**
- * Invite form. Role + country are picked via Combobox; the option sets mirror
- * the server-side authz (a country-scoped Admin can only invite into their own
- * country) so the UI doesn't offer choices the action would reject anyway —
- * the action remains the real gate.
+ * Invite form. Role is single-select; country is MULTI-select. The option sets
+ * mirror the server-side authz (a country-scoped Admin can only pick within
+ * their own countries; selecting none means global — allowed only for
+ * SuperAdmin / global Admins) so the UI doesn't offer choices the action would
+ * reject — the action remains the real gate.
  */
 export function InviteForm({ inviter }: { inviter: InviterCtx }) {
   const t = useTranslations("invites");
@@ -52,22 +54,26 @@ export function InviteForm({ inviter }: { inviter: InviterCtx }) {
     [tRoles],
   );
 
-  // Country options: a country-scoped Admin can only target their own country;
-  // SuperAdmin and global Admins get the full list plus "Global".
-  const countryOptions: DefaultOption[] = useMemo(() => {
-    if (inviter.role === "Admin" && inviter.country !== null) {
-      return [{ id: inviter.country, label: inviter.country }];
-    }
-    return [
-      { id: GLOBAL_COUNTRY, label: t("form.globalCountry") },
-      ...COUNTRY_CODES.map((c) => ({ id: c, label: `${c} · ${countryNames[c]}` })),
-    ];
-  }, [inviter, t]);
+  // Country options: a country-scoped Admin (own scope non-empty) can only pick
+  // within their own countries; SuperAdmin and global Admins get the full list.
+  // Leaving the selection empty means "all countries" (global) — only valid for
+  // SuperAdmin / global Admins (the action enforces this).
+  const scopeCodes: CountryCode[] =
+    inviter.role !== "SuperAdmin" && inviter.countries.length > 0
+      ? inviter.countries
+      : [...COUNTRY_CODES];
+
+  const countryOptions: DefaultOption[] = useMemo(
+    () =>
+      scopeCodes.map((c) => ({ id: c, label: `${c} · ${countryNames[c]}` })),
+    [scopeCodes],
+  );
+
+  const canBeGlobal =
+    inviter.role === "SuperAdmin" || inviter.countries.length === 0;
 
   const [role, setRole] = useState<DefaultOption | null>(null);
-  const [country, setCountry] = useState<DefaultOption | null>(
-    countryOptions[0] ?? null,
-  );
+  const [countries, setCountries] = useState<DefaultOption[]>([]);
 
   const fieldError = (key: InviteState["error"]) =>
     state.error === key ? t(`errors.${key}`) : null;
@@ -161,24 +167,29 @@ export function InviteForm({ inviter }: { inviter: InviterCtx }) {
 
       <Field>
         <FieldLabel htmlFor="invite-country">{t("form.country")}</FieldLabel>
-        <Combobox
+        <Combobox<DefaultOption>
           id="invite-country"
+          multiple
           options={countryOptions}
-          value={country}
-          onChange={setCountry}
+          value={countries}
+          onChange={setCountries}
           searchable={countryOptions.length > 6}
           placeholder={t("form.countryPlaceholder")}
         />
-        <input
-          type="hidden"
-          name="country"
-          value={country?.id ?? GLOBAL_COUNTRY}
-        />
+        {/* One hidden input per selected code; none = global (the action reads
+            formData.getAll("country")). */}
+        {countries.map((c) => (
+          <input key={c.id} type="hidden" name="country" value={c.id} />
+        ))}
         {fieldError("countryInvalid") || fieldError("countryNotAllowed") ? (
           <FieldError>
             {fieldError("countryInvalid") ?? fieldError("countryNotAllowed")}
           </FieldError>
-        ) : null}
+        ) : (
+          <FieldHint>
+            {canBeGlobal ? t("form.countryHintGlobal") : t("form.countryHintScoped")}
+          </FieldHint>
+        )}
       </Field>
 
       <Button type="submit" loading={pending} className="w-fit">

@@ -1,16 +1,18 @@
 import type { Role, User } from "@/db/schema";
-import { isCountryCode } from "@/lib/auth/countries";
+import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
 
 /**
- * Server-side authorization rules for inviting users. Enforced in the invite
- * action — never trust the client to have hidden disallowed options.
+ * Server-side authorization for inviting users. Enforced in the invite action —
+ * never trust the client to have hidden disallowed options.
  *
- * Rules:
- *  - SuperAdmin may invite any role (Admin, SiteManager) for any country, or
- *    global (null country).
- *  - An Admin with `canInvite` may invite Admin or SiteManager, but ONLY scoped
- *    to their own country (a country-scoped Admin can't grant global or another
- *    country; a global Admin — country null — may grant any country or global).
+ * Country scope is a SET of country codes; an empty set means GLOBAL (all
+ * countries). Rules:
+ *  - SuperAdmin may invite any invitable role, any country set (incl. global).
+ *  - A global Admin (own scope empty) with `canInvite` may invite Admin or
+ *    SiteManager with any country set, including global.
+ *  - A country-scoped Admin with `canInvite` may invite Admin or SiteManager,
+ *    but the granted set must be a NON-EMPTY SUBSET of the Admin's own
+ *    countries — they can't grant global, nor a country outside their scope.
  *  - SiteManagers (and Admins without canInvite) may not invite at all.
  *  - No one can mint another SuperAdmin via invite (only the first registrant).
  */
@@ -26,37 +28,39 @@ export function canUserInvite(user: User): boolean {
 
 export type InviteAuthzError =
   | "notAllowed" // the inviter may not invite at all
-  | "roleNotAllowed" // SuperAdmin can't be granted; or role outside inviter's grant set
-  | "countryNotAllowed"; // inviter can't scope to this country
+  | "roleNotAllowed" // SuperAdmin can't be granted; or role outside grant set
+  | "countryNotAllowed"; // inviter can't scope to (one of) these countries
 
 /**
- * Validate a proposed (role, country) against the inviter. `country` is the
- * stored value: a CountryCode string or null (global). Returns an error key or
- * null when allowed.
+ * Validate a proposed (role, countries) against the inviter and the inviter's
+ * own country scope. `countries` is the requested set (empty = global). The
+ * inviter's own scope is passed explicitly since it lives in a join table.
+ *
+ * Returns an error key or null when allowed.
  */
 export function authorizeInvite(
   inviter: User,
+  inviterCountries: CountryCode[],
   role: Role,
-  country: string | null,
+  countries: CountryCode[],
 ): InviteAuthzError | null {
   if (!canUserInvite(inviter)) return "notAllowed";
 
   // SuperAdmin is never grantable via invite.
   if (!INVITABLE_ROLES.includes(role)) return "roleNotAllowed";
 
-  // Country must be a known code or global (null).
-  if (country !== null && !isCountryCode(country)) return "countryNotAllowed";
+  // Every requested code must be a known country.
+  if (!countries.every((c) => isCountryCode(c))) return "countryNotAllowed";
 
-  if (inviter.role === "SuperAdmin") {
-    // Any invitable role, any country or global.
+  // SuperAdmin and global Admins (no own scope) may grant any set or global.
+  if (inviter.role === "SuperAdmin" || inviterCountries.length === 0) {
     return null;
   }
 
-  // Admin with canInvite: a country-scoped Admin can only grant their own
-  // country; a global Admin (country null) may grant any country or global.
-  if (inviter.country !== null && country !== inviter.country) {
-    return "countryNotAllowed";
-  }
+  // Country-scoped Admin: must grant a non-empty subset of their own scope.
+  if (countries.length === 0) return "countryNotAllowed"; // can't grant global
+  const allowed = new Set(inviterCountries);
+  if (!countries.every((c) => allowed.has(c))) return "countryNotAllowed";
 
   return null;
 }

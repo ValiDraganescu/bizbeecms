@@ -98,8 +98,10 @@
       "role": "Role",
       "rolePlaceholder": "Pick a role…",
       "country": "Country scope",
-      "countryPlaceholder": "Pick a country…",
+      "countryPlaceholder": "Pick countries…",
       "globalCountry": "Global (no country)",
+      "countryHintGlobal": "Select one or more countries. Leave empty for all countries (global).",
+      "countryHintScoped": "Select one or more of your countries.",
       "submit": "Send invitation"
     },
     "sent": {

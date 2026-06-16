@@ -3,8 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 import type { Role } from "@/db/schema";
-import { GLOBAL_COUNTRY, isCountryCode } from "@/lib/auth/countries";
-import { getCurrentUser, findUserByEmail } from "@/lib/auth/user";
+import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
+import {
+  getCurrentUser,
+  findUserByEmail,
+  getUserCountries,
+} from "@/lib/auth/user";
 import { normalizeEmail, validateEmail } from "@/lib/auth/validation";
 import { authorizeInvite, INVITABLE_ROLES } from "@/lib/invite/authz";
 import { createInvite, hasPendingInvite } from "@/lib/invite/invite";
@@ -29,14 +33,17 @@ export type InviteState = {
   /** Preserve form input on error. */
   email?: string;
   role?: string;
-  country?: string;
 };
 
-/** Map the form's country selection ("GLOBAL" | code) to the stored value. */
-function resolveCountry(raw: string): string | null | "invalid" {
-  if (raw === GLOBAL_COUNTRY || raw === "") return null;
-  if (isCountryCode(raw)) return raw;
-  return "invalid";
+/** Parse + dedupe the selected country codes from the form (empty = global). */
+function parseCountries(raw: string[]): CountryCode[] | "invalid" {
+  const out = new Set<CountryCode>();
+  for (const value of raw) {
+    if (value === "") continue;
+    if (!isCountryCode(value)) return "invalid";
+    out.add(value);
+  }
+  return [...out];
 }
 
 export async function inviteAction(
@@ -48,8 +55,7 @@ export async function inviteAction(
 
   const email = normalizeEmail(String(formData.get("email") ?? ""));
   const role = String(formData.get("role") ?? "") as Role;
-  const countryRaw = String(formData.get("country") ?? "");
-  const echo = { email, role, country: countryRaw };
+  const echo = { email, role };
 
   const emailError = validateEmail(email);
   if (emailError) return { error: emailError, ...echo };
@@ -58,11 +64,13 @@ export async function inviteAction(
     return { error: "roleInvalid", ...echo };
   }
 
-  const country = resolveCountry(countryRaw);
-  if (country === "invalid") return { error: "countryInvalid", ...echo };
+  const countries = parseCountries(formData.getAll("country").map(String));
+  if (countries === "invalid") return { error: "countryInvalid", ...echo };
 
-  // Authorization: who may grant this role + country (server-enforced).
-  const authzError = authorizeInvite(inviter, role, country);
+  // Authorization: who may grant this role + country set (server-enforced),
+  // bounded by the inviter's own country scope.
+  const inviterCountries = await getUserCountries(inviter.id);
+  const authzError = authorizeInvite(inviter, inviterCountries, role, countries);
   if (authzError) return { error: authzError, ...echo };
 
   // Don't invite someone who already has an account or a pending invite.
@@ -75,7 +83,7 @@ export async function inviteAction(
     const invite = await createInvite({
       email,
       role,
-      country,
+      countries,
       invitedBy: inviter.id,
     });
 

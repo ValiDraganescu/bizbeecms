@@ -1,6 +1,7 @@
-import { and, eq, isNull, desc } from "drizzle-orm";
+import { and, eq, isNull, inArray, desc } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Invite, Role, User } from "@/db/schema";
+import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
 import { hashPassword } from "@/lib/auth/password";
 import { createUser, findUserByEmail } from "@/lib/auth/user";
 
@@ -16,11 +17,12 @@ function newInviteToken(): string {
 export type CreateInviteInput = {
   email: string;
   role: Role;
-  country: string | null;
+  /** Country scope set; empty = global (all countries). */
+  countries: CountryCode[];
   invitedBy: string;
 };
 
-/** Create a pending invite and return the row (token included). */
+/** Create a pending invite (+ its country-scope rows). Returns the invite row. */
 export async function createInvite(input: CreateInviteInput): Promise<Invite> {
   const db = await getDb();
   const now = Date.now();
@@ -30,13 +32,53 @@ export async function createInvite(input: CreateInviteInput): Promise<Invite> {
       id: crypto.randomUUID(),
       email: input.email,
       role: input.role,
-      country: input.country,
       invitedBy: input.invitedBy,
       token: newInviteToken(),
       expiresAt: new Date(now + INVITE_TTL_MS),
     })
     .returning();
+
+  if (input.countries.length > 0) {
+    await db
+      .insert(schema.inviteCountries)
+      .values(input.countries.map((country) => ({ inviteId: invite.id, country })));
+  }
   return invite;
+}
+
+/** An invite's country scope set. Empty array = global (all countries). */
+export async function getInviteCountries(
+  inviteId: string,
+): Promise<CountryCode[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({ country: schema.inviteCountries.country })
+    .from(schema.inviteCountries)
+    .where(eq(schema.inviteCountries.inviteId, inviteId));
+  return rows.map((r) => r.country).filter(isCountryCode);
+}
+
+/** Country sets for many invites at once, keyed by invite id (for the list). */
+export async function getInviteCountriesMap(
+  inviteIds: string[],
+): Promise<Map<string, CountryCode[]>> {
+  const map = new Map<string, CountryCode[]>();
+  if (inviteIds.length === 0) return map;
+  const db = await getDb();
+  const rows = await db
+    .select({
+      inviteId: schema.inviteCountries.inviteId,
+      country: schema.inviteCountries.country,
+    })
+    .from(schema.inviteCountries)
+    .where(inArray(schema.inviteCountries.inviteId, inviteIds));
+  for (const row of rows) {
+    if (!isCountryCode(row.country)) continue;
+    const list = map.get(row.inviteId) ?? [];
+    list.push(row.country);
+    map.set(row.inviteId, list);
+  }
+  return map;
 }
 
 /** Pending (not yet accepted) invites, newest first — for the invite list. */
@@ -94,6 +136,7 @@ export async function acceptInvite(
     return { ok: false, reason: "emailTaken" };
   }
 
+  const countries = await getInviteCountries(invite.id);
   const passwordHash = await hashPassword(password);
   let user: User;
   try {
@@ -101,7 +144,7 @@ export async function acceptInvite(
       email: invite.email,
       passwordHash,
       role: invite.role,
-      country: invite.country,
+      countries,
       // Invited users don't get invite rights by default; a SuperAdmin can
       // grant canInvite later when that management UI exists.
       canInvite: false,
