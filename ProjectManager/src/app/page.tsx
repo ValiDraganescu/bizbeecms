@@ -27,6 +27,7 @@ import {
 } from "@/components/ui";
 import type { Role } from "@/db/schema";
 import { getCurrentUser, hasAnyUser } from "@/lib/auth/user";
+import { canUserInvite } from "@/lib/invite/authz";
 
 const roleKey: Record<Role, string> = {
   SuperAdmin: "superAdmin",
@@ -93,7 +94,17 @@ export default async function Home() {
           </span>
           <Badge tone="primary">{tRoles(roleKey[user.role])}</Badge>
         </div>
-        <SignOutButton />
+        <div className="flex items-center gap-2">
+          {canUserInvite(user) ? (
+            <Link
+              href="/invite"
+              className="inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-foreground border border-border bg-surface-muted outline-none hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {t("inviteUsers")}
+            </Link>
+          ) : null}
+          <SignOutButton />
+        </div>
       </div>
 
       <section className="grid gap-6 sm:grid-cols-2">

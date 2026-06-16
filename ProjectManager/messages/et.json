@@ -23,6 +23,7 @@
   "home": {
     "subtitle": "Cloudflare'i-põhine mitme saidi B2B valgesildi sisuhaldussüsteem. Kasutajaliidese vundament: Tailwind, otstarbenimedega hele/tume teema, komponeeritavad komponendid.",
     "openDesignSystem": "Ava disainisüsteem",
+    "inviteUsers": "Kutsu kasutajaid",
     "buttons": {
       "title": "Nupud",
       "description": "Variandid viitavad otstarbemärgenditele.",
@@ -81,6 +82,91 @@
       "emailTaken": "See e-post on juba registreeritud.",
       "invalidCredentials": "Vale e-post või parool.",
       "registrationClosed": "Registreerimine on suletud — administraator on juba olemas.",
+      "unknown": "Midagi läks valesti. Palun proovi uuesti."
+    }
+  },
+  "invites": {
+    "back": "Tagasi",
+    "title": "Kutsu kasutajaid",
+    "subtitle": "Kutsu kolleeg e-posti teel. Kutset vastu võttes määravad nad ise oma parooli.",
+    "notAllowedTitle": "Sa ei saa kasutajaid kutsuda",
+    "notAllowedBody": "Ainult peaadministraatorid ja kutsumisõigusega administraatorid saavad kutseid saata.",
+    "form": {
+      "title": "Uus kutse",
+      "description": "Vali kutsutava kasutaja roll ja riigi ulatus.",
+      "email": "E-post",
+      "role": "Roll",
+      "rolePlaceholder": "Vali roll…",
+      "country": "Riigi ulatus",
+      "countryPlaceholder": "Vali riik…",
+      "globalCountry": "Globaalne (riigita)",
+      "submit": "Saada kutse"
+    },
+    "sent": {
+      "deliveredTitle": "Kutse saadetud aadressile {email}",
+      "deliveredBody": "Nad saavad e-kirja lingiga kutse vastuvõtmiseks ja parooli määramiseks.",
+      "manualTitle": "Kutse loodud aadressile {email}",
+      "manualBody": "E-post pole veel seadistatud, seega jaga seda linki nendega otse. See aegub 7 päevaga.",
+      "linkLabel": "Vastuvõtmise link"
+    },
+    "pending": {
+      "title": "Ootel kutsed",
+      "description": "Kutsed, mida pole veel vastu võetud.",
+      "empty": "Ootel kutseid pole.",
+      "email": "E-post",
+      "role": "Roll",
+      "country": "Riik",
+      "expires": "Aegub",
+      "global": "Globaalne"
+    },
+    "email": {
+      "subject": "Sind on kutsutud bizbeecms ProjectManagerisse",
+      "body": "Sind on kutsutud liituma bizbeecms ProjectManageriga. Võta kutse vastu ja määra oma parool siin:\n\n{url}\n\nSee link aegub 7 päevaga."
+    },
+    "accept": {
+      "title": "Võta oma kutse vastu",
+      "subtitle": "Määra parool kasutajale {email} ({role}), et oma konto loomine lõpetada.",
+      "password": "Parool",
+      "passwordHint": "Vähemalt {min} märki.",
+      "confirmPassword": "Kinnita parool",
+      "submit": "Loo konto",
+      "invalidTitle": "Kutse pole saadaval",
+      "goToSignIn": "Mine sisselogimisse",
+      "status": {
+        "notFound": {
+          "title": "Kutset ei leitud",
+          "body": "See kutselink on kehtetu. Palu administraatoril saata uus."
+        },
+        "expired": {
+          "title": "Kutse aegunud",
+          "body": "See kutse on aegunud. Palu administraatoril saata uus."
+        },
+        "accepted": {
+          "title": "Juba vastu võetud",
+          "body": "See kutse on juba kasutatud. Proovi hoopis sisse logida."
+        }
+      },
+      "errors": {
+        "passwordRequired": "Sisesta parool.",
+        "passwordTooShort": "Parool on liiga lühike.",
+        "passwordMismatch": "Paroolid ei ühti.",
+        "notFound": "See kutse pole enam kehtiv.",
+        "expired": "See kutse on aegunud.",
+        "accepted": "See kutse on juba kasutatud.",
+        "emailTaken": "Selle e-posti jaoks on konto juba olemas.",
+        "unknown": "Midagi läks valesti. Palun proovi uuesti."
+      }
+    },
+    "errors": {
+      "emailRequired": "Sisesta e-posti aadress.",
+      "emailInvalid": "Sisesta kehtiv e-posti aadress.",
+      "roleInvalid": "Vali roll.",
+      "countryInvalid": "Vali kehtiv riik.",
+      "notAllowed": "Sul pole õigust kasutajaid kutsuda.",
+      "roleNotAllowed": "Sa ei saa seda rolli anda.",
+      "countryNotAllowed": "Sa ei saa kutsuda kasutajaid selle riigi jaoks.",
+      "emailTaken": "Selle e-posti jaoks on konto juba olemas.",
+      "alreadyInvited": "Sellel e-postil on juba ootel kutse.",
       "unknown": "Midagi läks valesti. Palun proovi uuesti."
     }
   },

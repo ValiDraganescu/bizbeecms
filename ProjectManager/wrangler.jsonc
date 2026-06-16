@@ -30,4 +30,11 @@
       "id": "00000000000000000000000000000000"
     }
   ]
+  // Email: invite delivery via Cloudflare Email Sending (Beta, Workers Paid).
+  // Uncomment + set a verified `destination_address` to enable env.EMAIL.send()
+  // in src/lib/mail/send-invite.ts. Without this binding the invite flow
+  // degrades to showing the accept link in-app (see send-invite.ts).
+  // "send_email": [
+  //   { "name": "EMAIL", "destination_address": "verified@yourdomain.com" }
+  // ]
 }

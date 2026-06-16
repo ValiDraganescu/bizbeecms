@@ -23,6 +23,7 @@
   "home": {
     "subtitle": "Cloudflare-natiivi monisivustoinen B2B-whitelabel-sisällönhallinta. Käyttöliittymäperusta: Tailwind, tarkoitusnimetyt vaalea/tumma-teema, koostettavat komponentit.",
     "openDesignSystem": "Avaa suunnittelujärjestelmä",
+    "inviteUsers": "Kutsu käyttäjiä",
     "buttons": {
       "title": "Painikkeet",
       "description": "Variantit viittaavat tarkoitustunnisteisiin.",
@@ -81,6 +82,91 @@
       "emailTaken": "Tämä sähköposti on jo rekisteröity.",
       "invalidCredentials": "Väärä sähköposti tai salasana.",
       "registrationClosed": "Rekisteröityminen on suljettu — ylläpitäjä on jo olemassa.",
+      "unknown": "Jokin meni pieleen. Yritä uudelleen."
+    }
+  },
+  "invites": {
+    "back": "Takaisin",
+    "title": "Kutsu käyttäjiä",
+    "subtitle": "Kutsu työtoveri sähköpostitse. He asettavat oman salasanansa hyväksyessään kutsun.",
+    "notAllowedTitle": "Et voi kutsua käyttäjiä",
+    "notAllowedBody": "Vain pääylläpitäjät ja kutsuoikeudet omaavat ylläpitäjät voivat lähettää kutsuja.",
+    "form": {
+      "title": "Uusi kutsu",
+      "description": "Valitse kutsuttavan käyttäjän rooli ja maarajaus.",
+      "email": "Sähköposti",
+      "role": "Rooli",
+      "rolePlaceholder": "Valitse rooli…",
+      "country": "Maarajaus",
+      "countryPlaceholder": "Valitse maa…",
+      "globalCountry": "Globaali (ei maata)",
+      "submit": "Lähetä kutsu"
+    },
+    "sent": {
+      "deliveredTitle": "Kutsu lähetetty osoitteeseen {email}",
+      "deliveredBody": "He saavat sähköpostin, jossa on linkki kutsun hyväksymiseen ja salasanan asettamiseen.",
+      "manualTitle": "Kutsu luotu osoitteelle {email}",
+      "manualBody": "Sähköpostia ei ole vielä määritetty, joten jaa tämä linkki heille suoraan. Se vanhenee 7 päivässä.",
+      "linkLabel": "Hyväksymislinkki"
+    },
+    "pending": {
+      "title": "Odottavat kutsut",
+      "description": "Kutsut, joita ei ole vielä hyväksytty.",
+      "empty": "Ei odottavia kutsuja.",
+      "email": "Sähköposti",
+      "role": "Rooli",
+      "country": "Maa",
+      "expires": "Vanhenee",
+      "global": "Globaali"
+    },
+    "email": {
+      "subject": "Sinut on kutsuttu bizbeecms ProjectManageriin",
+      "body": "Sinut on kutsuttu liittymään bizbeecms ProjectManageriin. Hyväksy kutsusi ja aseta salasanasi täällä:\n\n{url}\n\nTämä linkki vanhenee 7 päivässä."
+    },
+    "accept": {
+      "title": "Hyväksy kutsusi",
+      "subtitle": "Aseta salasana käyttäjälle {email} ({role}) viimeistelläksesi tilisi luonnin.",
+      "password": "Salasana",
+      "passwordHint": "Vähintään {min} merkkiä.",
+      "confirmPassword": "Vahvista salasana",
+      "submit": "Luo tili",
+      "invalidTitle": "Kutsu ei ole käytettävissä",
+      "goToSignIn": "Siirry kirjautumiseen",
+      "status": {
+        "notFound": {
+          "title": "Kutsua ei löytynyt",
+          "body": "Tämä kutsulinkki on virheellinen. Pyydä ylläpitäjää lähettämään uusi."
+        },
+        "expired": {
+          "title": "Kutsu vanhentunut",
+          "body": "Tämä kutsu on vanhentunut. Pyydä ylläpitäjää lähettämään uusi."
+        },
+        "accepted": {
+          "title": "Jo hyväksytty",
+          "body": "Tämä kutsu on jo käytetty. Kokeile kirjautua sisään."
+        }
+      },
+      "errors": {
+        "passwordRequired": "Anna salasana.",
+        "passwordTooShort": "Salasana on liian lyhyt.",
+        "passwordMismatch": "Salasanat eivät täsmää.",
+        "notFound": "Tämä kutsu ei ole enää voimassa.",
+        "expired": "Tämä kutsu on vanhentunut.",
+        "accepted": "Tämä kutsu on jo käytetty.",
+        "emailTaken": "Tälle sähköpostille on jo olemassa tili.",
+        "unknown": "Jokin meni pieleen. Yritä uudelleen."
+      }
+    },
+    "errors": {
+      "emailRequired": "Anna sähköpostiosoite.",
+      "emailInvalid": "Anna kelvollinen sähköpostiosoite.",
+      "roleInvalid": "Valitse rooli.",
+      "countryInvalid": "Valitse kelvollinen maa.",
+      "notAllowed": "Sinulla ei ole oikeutta kutsua käyttäjiä.",
+      "roleNotAllowed": "Et voi myöntää tuota roolia.",
+      "countryNotAllowed": "Et voi kutsua käyttäjiä tuolle maalle.",
+      "emailTaken": "Tälle sähköpostille on jo olemassa tili.",
+      "alreadyInvited": "Tällä sähköpostilla on jo odottava kutsu.",
       "unknown": "Jokin meni pieleen. Yritä uudelleen."
     }
   },

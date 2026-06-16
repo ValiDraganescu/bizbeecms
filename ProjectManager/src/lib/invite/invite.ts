@@ -1,0 +1,135 @@
+import { and, eq, isNull, desc } from "drizzle-orm";
+import { getDb, schema } from "@/db";
+import type { Invite, Role, User } from "@/db/schema";
+import { hashPassword } from "@/lib/auth/password";
+import { createUser, findUserByEmail } from "@/lib/auth/user";
+
+/** Invite lifetime: 7 days from creation. */
+const INVITE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+
+/** Opaque, URL-safe invite token (32 random bytes, hex). */
+function newInviteToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export type CreateInviteInput = {
+  email: string;
+  role: Role;
+  country: string | null;
+  invitedBy: string;
+};
+
+/** Create a pending invite and return the row (token included). */
+export async function createInvite(input: CreateInviteInput): Promise<Invite> {
+  const db = await getDb();
+  const now = Date.now();
+  const [invite] = await db
+    .insert(schema.invites)
+    .values({
+      id: crypto.randomUUID(),
+      email: input.email,
+      role: input.role,
+      country: input.country,
+      invitedBy: input.invitedBy,
+      token: newInviteToken(),
+      expiresAt: new Date(now + INVITE_TTL_MS),
+    })
+    .returning();
+  return invite;
+}
+
+/** Pending (not yet accepted) invites, newest first — for the invite list. */
+export async function listPendingInvites(): Promise<Invite[]> {
+  const db = await getDb();
+  return db
+    .select()
+    .from(schema.invites)
+    .where(isNull(schema.invites.acceptedAt))
+    .orderBy(desc(schema.invites.createdAt));
+}
+
+export async function findInviteByToken(token: string): Promise<Invite | null> {
+  const db = await getDb();
+  const [invite] = await db
+    .select()
+    .from(schema.invites)
+    .where(eq(schema.invites.token, token))
+    .limit(1);
+  return invite ?? null;
+}
+
+export type InviteStatus = "valid" | "notFound" | "expired" | "accepted";
+
+/** Classify an invite token for the accept page (gate before showing the form). */
+export async function checkInvite(
+  token: string,
+): Promise<{ status: InviteStatus; invite: Invite | null }> {
+  const invite = await findInviteByToken(token);
+  if (!invite) return { status: "notFound", invite: null };
+  if (invite.acceptedAt) return { status: "accepted", invite };
+  if (invite.expiresAt.getTime() <= Date.now())
+    return { status: "expired", invite };
+  return { status: "valid", invite };
+}
+
+export type AcceptInviteResult =
+  | { ok: true; user: User }
+  | { ok: false; reason: InviteStatus | "emailTaken" };
+
+/**
+ * Accept an invite: re-validate the token, create the user from the invite's
+ * role/country, and mark the invite accepted. Re-checks status inside here so a
+ * stale page can't accept an expired/used invite. The email-unique index is the
+ * backstop against a duplicate account.
+ */
+export async function acceptInvite(
+  token: string,
+  password: string,
+): Promise<AcceptInviteResult> {
+  const { status, invite } = await checkInvite(token);
+  if (status !== "valid" || !invite) return { ok: false, reason: status };
+
+  if (await findUserByEmail(invite.email)) {
+    return { ok: false, reason: "emailTaken" };
+  }
+
+  const passwordHash = await hashPassword(password);
+  let user: User;
+  try {
+    user = await createUser({
+      email: invite.email,
+      passwordHash,
+      role: invite.role,
+      country: invite.country,
+      // Invited users don't get invite rights by default; a SuperAdmin can
+      // grant canInvite later when that management UI exists.
+      canInvite: false,
+    });
+  } catch {
+    return { ok: false, reason: "emailTaken" };
+  }
+
+  const db = await getDb();
+  await db
+    .update(schema.invites)
+    .set({ acceptedAt: new Date() })
+    .where(
+      and(eq(schema.invites.id, invite.id), isNull(schema.invites.acceptedAt)),
+    );
+
+  return { ok: true, user };
+}
+
+/** True if a pending invite already exists for this email. */
+export async function hasPendingInvite(email: string): Promise<boolean> {
+  const db = await getDb();
+  const [row] = await db
+    .select({ id: schema.invites.id })
+    .from(schema.invites)
+    .where(
+      and(eq(schema.invites.email, email), isNull(schema.invites.acceptedAt)),
+    )
+    .limit(1);
+  return row != null;
+}

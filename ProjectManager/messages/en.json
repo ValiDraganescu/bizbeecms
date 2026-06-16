@@ -23,6 +23,7 @@
   "home": {
     "subtitle": "Cloudflare-native multi-site B2B whitelabel CMS. UI foundation: Tailwind, purpose-named light/dark theme, composable components.",
     "openDesignSystem": "Open the design system",
+    "inviteUsers": "Invite users",
     "buttons": {
       "title": "Buttons",
       "description": "Variants reference purpose tokens.",
@@ -81,6 +82,91 @@
       "emailTaken": "That email is already registered.",
       "invalidCredentials": "Incorrect email or password.",
       "registrationClosed": "Registration is closed — an administrator already exists.",
+      "unknown": "Something went wrong. Please try again."
+    }
+  },
+  "invites": {
+    "back": "Back",
+    "title": "Invite users",
+    "subtitle": "Invite a teammate by email. They set their own password when they accept.",
+    "notAllowedTitle": "You can't invite users",
+    "notAllowedBody": "Only SuperAdmins and Admins with invite rights can send invitations.",
+    "form": {
+      "title": "New invitation",
+      "description": "Choose the role and country scope for the invited user.",
+      "email": "Email",
+      "role": "Role",
+      "rolePlaceholder": "Pick a role…",
+      "country": "Country scope",
+      "countryPlaceholder": "Pick a country…",
+      "globalCountry": "Global (no country)",
+      "submit": "Send invitation"
+    },
+    "sent": {
+      "deliveredTitle": "Invitation sent to {email}",
+      "deliveredBody": "They'll receive an email with a link to accept and set their password.",
+      "manualTitle": "Invitation created for {email}",
+      "manualBody": "Email isn't configured yet, so share this link with them directly. It expires in 7 days.",
+      "linkLabel": "Accept link"
+    },
+    "pending": {
+      "title": "Pending invitations",
+      "description": "Invitations that haven't been accepted yet.",
+      "empty": "No pending invitations.",
+      "email": "Email",
+      "role": "Role",
+      "country": "Country",
+      "expires": "Expires",
+      "global": "Global"
+    },
+    "email": {
+      "subject": "You've been invited to bizbeecms ProjectManager",
+      "body": "You've been invited to join bizbeecms ProjectManager. Accept your invitation and set your password here:\n\n{url}\n\nThis link expires in 7 days."
+    },
+    "accept": {
+      "title": "Accept your invitation",
+      "subtitle": "Set a password for {email} ({role}) to finish creating your account.",
+      "password": "Password",
+      "passwordHint": "At least {min} characters.",
+      "confirmPassword": "Confirm password",
+      "submit": "Create account",
+      "invalidTitle": "Invitation unavailable",
+      "goToSignIn": "Go to sign in",
+      "status": {
+        "notFound": {
+          "title": "Invitation not found",
+          "body": "This invitation link is invalid. Ask your administrator to send a new one."
+        },
+        "expired": {
+          "title": "Invitation expired",
+          "body": "This invitation has expired. Ask your administrator to send a new one."
+        },
+        "accepted": {
+          "title": "Already accepted",
+          "body": "This invitation has already been used. Try signing in instead."
+        }
+      },
+      "errors": {
+        "passwordRequired": "Enter a password.",
+        "passwordTooShort": "Password is too short.",
+        "passwordMismatch": "The passwords don't match.",
+        "notFound": "This invitation is no longer valid.",
+        "expired": "This invitation has expired.",
+        "accepted": "This invitation has already been used.",
+        "emailTaken": "An account for this email already exists.",
+        "unknown": "Something went wrong. Please try again."
+      }
+    },
+    "errors": {
+      "emailRequired": "Enter an email address.",
+      "emailInvalid": "Enter a valid email address.",
+      "roleInvalid": "Choose a role.",
+      "countryInvalid": "Choose a valid country.",
+      "notAllowed": "You're not allowed to invite users.",
+      "roleNotAllowed": "You can't grant that role.",
+      "countryNotAllowed": "You can't invite users for that country.",
+      "emailTaken": "An account for this email already exists.",
+      "alreadyInvited": "This email already has a pending invitation.",
       "unknown": "Something went wrong. Please try again."
     }
   },
