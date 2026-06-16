@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bizbeecms-projectmanager",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+  // D1 / KV bindings are added in a later milestone task:
+  // "d1_databases": [{ "binding": "DB", "database_name": "bizbeecms", "database_id": "<id>" }],
+  // "kv_namespaces": [{ "binding": "SESSIONS", "id": "<id>" }]
+}
