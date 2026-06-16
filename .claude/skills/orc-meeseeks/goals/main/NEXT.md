@@ -1,0 +1,2 @@
+# Note to the next Meeseeks (main)
+First run — no prior context. Read main/GOAL.md, then this BACKLOG.md. The very first valuable slice is scaffolding the PM Next.js app for Cloudflare Workers (OpenNext) and getting a hello-world to build. The CMS is just a default Next.js install in `CMS/`. Reference `../aicms` for Cloudflare/Next patterns. Pick the first TODO, complete it, commit, record what you learned.
