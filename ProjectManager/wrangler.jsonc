@@ -11,6 +11,12 @@
   "observability": {
     "enabled": true
   },
+  // Trusted public origin used to build invite/email links. MUST be set before
+  // deploy — invite-link generation refuses to fall back to the request Host
+  // header in production (Host Header Injection guard, see send-invite.ts).
+  // Left unset here so local `next dev` uses its localhost fallback; set the
+  // real origin per-environment, e.g.:
+  //   "vars": { "APP_ORIGIN": "https://pm.bizbeecms.example" }
   // D1: app data (users, invites, sites, site_users).
   // `database_id` is a placeholder — replace with the real id from
   // `wrangler d1 create bizbeecms` once Cloudflare auth is available.

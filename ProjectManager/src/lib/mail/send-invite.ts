@@ -12,7 +12,8 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
  *
  * TODO(deploy): declare the `send_email` binding in wrangler.jsonc (currently a
  * commented placeholder — needs a verified sender/destination on a Paid plan)
- * and regenerate cloudflare-env.d.ts so `env.EMAIL` is typed.
+ * and regenerate cloudflare-env.d.ts so `env.EMAIL` is typed. Also set the
+ * `APP_ORIGIN` var (see buildAcceptUrl) so invite links use a trusted origin.
  */
 
 // Minimal shape of the Cloudflare send_email binding we rely on. Kept local
@@ -34,12 +35,37 @@ export type SendInviteResult = {
   delivered: boolean;
 };
 
-/** Build the absolute accept-invite URL from the current request's host. */
-async function buildAcceptUrl(token: string): Promise<string> {
-  const h = await headers();
-  const host = h.get("host") ?? "localhost:3601";
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  return `${proto}://${host}/invite/accept/${token}`;
+/**
+ * Build the absolute accept-invite URL.
+ *
+ * SECURITY: the origin must come from trusted configuration, NOT the request's
+ * Host / X-Forwarded-Proto headers — those are client-controllable, so deriving
+ * the link from them is Host Header Injection (an attacker could mint an invite
+ * whose emailed link points at a malicious origin). We use the `APP_ORIGIN`
+ * Cloudflare var/secret. Only in local development do we fall back to the
+ * request host (there it isn't a trust boundary, and it keeps dev frictionless).
+ */
+async function buildAcceptUrl(
+  env: Record<string, unknown>,
+  token: string,
+): Promise<string> {
+  const configured = typeof env.APP_ORIGIN === "string" ? env.APP_ORIGIN : "";
+  if (configured) {
+    return `${configured.replace(/\/+$/, "")}/invite/accept/${token}`;
+  }
+
+  // No trusted origin configured. Allow the request host ONLY in development.
+  if (process.env.NODE_ENV !== "production") {
+    const h = await headers();
+    const host = h.get("host") ?? "localhost:3601";
+    const proto = h.get("x-forwarded-proto") ?? "http";
+    return `${proto}://${host}/invite/accept/${token}`;
+  }
+
+  // In production we refuse to guess the origin from headers.
+  throw new Error(
+    "APP_ORIGIN is not configured; cannot build a trusted invite link.",
+  );
 }
 
 export async function sendInviteEmail(params: {
@@ -48,9 +74,11 @@ export async function sendInviteEmail(params: {
   subject: string;
   body: (acceptUrl: string) => string;
 }): Promise<SendInviteResult> {
-  const acceptUrl = await buildAcceptUrl(params.token);
-
   const { env } = await getCloudflareContext({ async: true });
+  const acceptUrl = await buildAcceptUrl(
+    env as unknown as Record<string, unknown>,
+    params.token,
+  );
   const email = (env as { EMAIL?: EmailBinding }).EMAIL;
 
   if (!email) {
