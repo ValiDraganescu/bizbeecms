@@ -49,6 +49,41 @@
     "admin": "Ylläpitäjä",
     "siteManager": "Sivuston hallinnoija"
   },
+  "auth": {
+    "signOut": "Kirjaudu ulos",
+    "fields": {
+      "email": "Sähköposti",
+      "password": "Salasana",
+      "passwordHint": "Vähintään {min} merkkiä.",
+      "confirmPassword": "Vahvista salasana"
+    },
+    "register": {
+      "title": "Luo tili",
+      "subtitle": "Olet ensimmäinen rekisteröityjä, joten tästä tilistä tulee pääylläpitäjä.",
+      "submit": "Luo tili",
+      "haveAccount": "Onko sinulla jo tili?",
+      "closedSubtitle": "Rekisteröityminen on suljettu.",
+      "closedTitle": "Rekisteröityminen on suljettu",
+      "closedBody": "Ylläpitäjä on jo olemassa. Uudet käyttäjät liittyvät kutsulla."
+    },
+    "login": {
+      "title": "Kirjaudu sisään",
+      "subtitle": "Kirjaudu ProjectManageriin.",
+      "submit": "Kirjaudu sisään",
+      "firstRun": "Eikö sinulla ole vielä tiliä?"
+    },
+    "errors": {
+      "emailRequired": "Anna sähköpostiosoitteesi.",
+      "emailInvalid": "Anna kelvollinen sähköpostiosoite.",
+      "passwordRequired": "Anna salasanasi.",
+      "passwordTooShort": "Salasana on liian lyhyt.",
+      "passwordMismatch": "Salasanat eivät täsmää.",
+      "emailTaken": "Tämä sähköposti on jo rekisteröity.",
+      "invalidCredentials": "Väärä sähköposti tai salasana.",
+      "registrationClosed": "Rekisteröityminen on suljettu — ylläpitäjä on jo olemassa.",
+      "unknown": "Jokin meni pieleen. Yritä uudelleen."
+    }
+  },
   "designSystem": {
     "headerTitle": "Suunnittelujärjestelmä",
     "headerSubtitle": "ProjectManagerin komponenttiviite",

@@ -1,8 +1,11 @@
-import { useTranslations } from "next-intl";
+import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import {
+  Badge,
   Button,
   Card,
   CardHeader,
@@ -22,16 +25,30 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui";
+import type { Role } from "@/db/schema";
+import { getCurrentUser, hasAnyUser } from "@/lib/auth/user";
+
+const roleKey: Record<Role, string> = {
+  SuperAdmin: "superAdmin",
+  Admin: "admin",
+  SiteManager: "siteManager",
+};
 
 /**
- * UI foundation styleguide. This page exists to exercise the theme tokens and
- * composable base components; the real PM pages (auth, sites, …) will be built
- * with these same primitives. All copy is localized (EN/FI/ET).
+ * Authenticated home. Gated: signed-out visitors go to /login (or /register on
+ * first run). The body is still the UI-foundation styleguide that exercises the
+ * theme tokens and base components; the real PM pages will replace it. All copy
+ * is localized (EN/FI/ET).
  */
-export default function Home() {
-  const t = useTranslations("home");
-  const tApp = useTranslations("app");
-  const tRoles = useTranslations("roles");
+export default async function Home() {
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect((await hasAnyUser()) ? "/login" : "/register");
+  }
+
+  const t = await getTranslations("home");
+  const tApp = await getTranslations("app");
+  const tRoles = await getTranslations("roles");
 
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-10">
@@ -68,6 +85,16 @@ export default function Home() {
           <ThemeToggle />
         </div>
       </header>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface-muted px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-medium text-foreground">
+            {user.email}
+          </span>
+          <Badge tone="primary">{tRoles(roleKey[user.role])}</Badge>
+        </div>
+        <SignOutButton />
+      </div>
 
       <section className="grid gap-6 sm:grid-cols-2">
         <Card>

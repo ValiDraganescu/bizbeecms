@@ -49,6 +49,41 @@
     "admin": "Administraator",
     "siteManager": "Saidihaldur"
   },
+  "auth": {
+    "signOut": "Logi välja",
+    "fields": {
+      "email": "E-post",
+      "password": "Parool",
+      "passwordHint": "Vähemalt {min} märki.",
+      "confirmPassword": "Kinnita parool"
+    },
+    "register": {
+      "title": "Loo konto",
+      "subtitle": "Oled esimene registreeruja, seega sellest kontost saab peaadministraator.",
+      "submit": "Loo konto",
+      "haveAccount": "Kas sul on juba konto?",
+      "closedSubtitle": "Registreerimine on suletud.",
+      "closedTitle": "Registreerimine on suletud",
+      "closedBody": "Administraator on juba olemas. Uued kasutajad liituvad kutse kaudu."
+    },
+    "login": {
+      "title": "Logi sisse",
+      "subtitle": "Logi sisse ProjectManagerisse.",
+      "submit": "Logi sisse",
+      "firstRun": "Pole veel kontot?"
+    },
+    "errors": {
+      "emailRequired": "Sisesta oma e-posti aadress.",
+      "emailInvalid": "Sisesta kehtiv e-posti aadress.",
+      "passwordRequired": "Sisesta oma parool.",
+      "passwordTooShort": "Parool on liiga lühike.",
+      "passwordMismatch": "Paroolid ei ühti.",
+      "emailTaken": "See e-post on juba registreeritud.",
+      "invalidCredentials": "Vale e-post või parool.",
+      "registrationClosed": "Registreerimine on suletud — administraator on juba olemas.",
+      "unknown": "Midagi läks valesti. Palun proovi uuesti."
+    }
+  },
   "designSystem": {
     "headerTitle": "Disainisüsteem",
     "headerSubtitle": "ProjectManageri komponentide viide",

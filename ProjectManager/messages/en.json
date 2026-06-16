@@ -49,6 +49,41 @@
     "admin": "Admin",
     "siteManager": "SiteManager"
   },
+  "auth": {
+    "signOut": "Sign out",
+    "fields": {
+      "email": "Email",
+      "password": "Password",
+      "passwordHint": "At least {min} characters.",
+      "confirmPassword": "Confirm password"
+    },
+    "register": {
+      "title": "Create your account",
+      "subtitle": "You're the first to sign up, so this account becomes the SuperAdmin.",
+      "submit": "Create account",
+      "haveAccount": "Already have an account?",
+      "closedSubtitle": "Registration is closed.",
+      "closedTitle": "Registration is closed",
+      "closedBody": "An administrator already exists. New users join by invitation."
+    },
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Sign in to the ProjectManager.",
+      "submit": "Sign in",
+      "firstRun": "No account yet?"
+    },
+    "errors": {
+      "emailRequired": "Enter your email address.",
+      "emailInvalid": "Enter a valid email address.",
+      "passwordRequired": "Enter your password.",
+      "passwordTooShort": "Password is too short.",
+      "passwordMismatch": "The passwords don't match.",
+      "emailTaken": "That email is already registered.",
+      "invalidCredentials": "Incorrect email or password.",
+      "registrationClosed": "Registration is closed — an administrator already exists.",
+      "unknown": "Something went wrong. Please try again."
+    }
+  },
   "designSystem": {
     "headerTitle": "Design System",
     "headerSubtitle": "ProjectManager component reference",
