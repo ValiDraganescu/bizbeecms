@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // The PM provisions one CMS Worker per Site; the deploy task will override
+  // `name` per-Site (e.g. bizbeecms-cms-<site-slug>) via the Cloudflare API.
+  "name": "bizbeecms-cms",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-25",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

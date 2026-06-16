@@ -6,7 +6,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Tasks
 - DONE: Scaffold the PM Next.js app under `ProjectManager/` wired for Cloudflare Workers deployment (OpenNext / wrangler config). Hello-world + /api/health building; `opennextjs-cloudflare build` emits a worker bundle.
-- TODO: Scaffold the default Next.js install under `CMS/`.
+- DONE: Scaffold the default Next.js install under `CMS/` (mirrors PM OpenNext/wrangler wiring; `next build` + `opennextjs-cloudflare build` both pass).
 - TODO: Add Cloudflare D1 binding + initial schema/migrations for users, invites, sites, site_users.
 - TODO: Email+password auth — registration where the FIRST user becomes SuperAdmin; subsequent users do not. Sessions in D1/KV.
 - TODO: Invite flow — SuperAdmin/Admin invite Admin/SiteManager with role + country scoping, enforced server-side.
