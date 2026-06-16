@@ -1,0 +1,230 @@
+{
+  "app": {
+    "name": "bizbeecms",
+    "projectManager": "ProjectManager",
+    "tagline": "Cloudflare'i-põhine mitme saidi B2B valgesildi sisuhaldussüsteem"
+  },
+  "locale": {
+    "label": "Keel",
+    "en": "English",
+    "fi": "Suomi",
+    "et": "Eesti"
+  },
+  "theme": {
+    "label": "Värviteema",
+    "light": "Hele",
+    "system": "Süsteem",
+    "dark": "Tume"
+  },
+  "notFound": {
+    "title": "Lehte ei leitud",
+    "home": "Mine avalehele"
+  },
+  "home": {
+    "subtitle": "Cloudflare'i-põhine mitme saidi B2B valgesildi sisuhaldussüsteem. Kasutajaliidese vundament: Tailwind, otstarbenimedega hele/tume teema, komponeeritavad komponendid.",
+    "openDesignSystem": "Ava disainisüsteem",
+    "buttons": {
+      "title": "Nupud",
+      "description": "Variandid viitavad otstarbemärgenditele.",
+      "save": "Salvesta",
+      "cancel": "Tühista"
+    },
+    "fields": {
+      "title": "Vormiväljad",
+      "description": "Komponeeritud, mitte seadistatud.",
+      "email": "E-post",
+      "emailHint": "Kasutatakse sisselogimiseks ja kutseteks.",
+      "role": "Roll"
+    },
+    "users": {
+      "title": "Kasutajad",
+      "description": "Komponeeritavad tabelielemendid.",
+      "email": "E-post",
+      "role": "Roll",
+      "country": "Riik"
+    }
+  },
+  "roles": {
+    "superAdmin": "Peaadministraator",
+    "admin": "Administraator",
+    "siteManager": "Saidihaldur"
+  },
+  "designSystem": {
+    "headerTitle": "Disainisüsteem",
+    "headerSubtitle": "ProjectManageri komponentide viide",
+    "navHeading": "Komponendid",
+    "title": "Disainisüsteem",
+    "intro": "ProjectManageri ehitusplokid. Iga komponent on näidatud kõigis suurustes, olekutes ja seadistustes. Vaheta ülal teemat, et auditeerida igaüht heledas ja tumedas — kõik värvid tulevad otstarbenimedega märgenditest.",
+    "nav": {
+      "foundations": "Alused",
+      "buttons": "Nupud",
+      "inputs": "Sisendid",
+      "combobox": "Liitvalik",
+      "badges": "Olekumärgid",
+      "alerts": "Teated",
+      "card": "Kaart",
+      "table": "Tabel"
+    },
+    "foundations": {
+      "title": "Alused",
+      "description": "Otstarbenimedega märgendite palett. Komponendid viitavad nendele rolli järgi (bg-primary, text-foreground), mitte kunagi toorvärvi järgi.",
+      "surfaceText": "Pind & tekst",
+      "surfaceTextHint": "Taustad, esiplaani tekst, äärised.",
+      "accentStatus": "Aktsent & olek",
+      "accentStatusHint": "Indigoaktsenti kasutatakse säästlikult. Olekuvärvid käivad alati ikooni või sildiga.",
+      "typeScale": "Kirjaskaala",
+      "typeScaleHint": "Üks grotesk kõigis paksustes; monospace masinandmete jaoks.",
+      "swatch": {
+        "surface": "Pind",
+        "surfaceMuted": "Tuhmistatud pind",
+        "surfaceRaised": "Kõrgendatud pind",
+        "foreground": "Esiplaan",
+        "foregroundMuted": "Tuhmistatud esiplaan",
+        "border": "Ääris",
+        "primary": "Esmane",
+        "success": "Õnnestumine",
+        "warning": "Hoiatus",
+        "danger": "Oht",
+        "info": "Teave"
+      },
+      "type": {
+        "display": "Kuva / lehe pealkiri",
+        "headline": "Pealkiri",
+        "titleRow": "Tiitel",
+        "body": "Põhitekst — vaikesuurus kirjeldustele ja abitekstidele.",
+        "label": "Silt / pildiallkiri"
+      }
+    },
+    "buttons": {
+      "title": "Nupud",
+      "description": "Neli varianti, kolm suurust. Vajutamisel liigub alla; fookus näitab rõngast; laadimine blokeerib kasutuse ja säilitab laiuse.",
+      "variants": "Variandid",
+      "sizes": "Suurused",
+      "sizeSmall": "Väike",
+      "sizeMedium": "Keskmine",
+      "sizeLarge": "Suur",
+      "sizeSm": "sm",
+      "sizeMdDefault": "md (vaikimisi)",
+      "sizeLg": "lg",
+      "states": "Olekud",
+      "statesHint": "Hover ja fookus on interaktiivsed — proovi klaviatuuri.",
+      "stateDefault": "vaikimisi",
+      "stateDisabled": "keelatud",
+      "stateLoading": "laadib",
+      "clickLoading": "klõpsa → laadib",
+      "save": "Salvesta",
+      "deploySite": "Juuruta sait",
+      "withIcon": "Ikooniga",
+      "withIconHint": "Alamelemendid komponeeruvad vabalt.",
+      "continue": "Jätka",
+      "newSite": "Uus sait",
+      "primary": "Esmane",
+      "secondary": "Teisene",
+      "ghost": "Tont",
+      "danger": "Oht"
+    },
+    "inputs": {
+      "title": "Sisendid",
+      "description": "Struktuurselt komponeeritud: Field + Label + Hint/Error. Juhtelemendid jagavad ühte fookusestiili.",
+      "textSelectTextarea": "Tekst, valik, tekstiala",
+      "email": "E-post",
+      "emailHint": "Kasutatakse sisselogimiseks ja kutseteks.",
+      "role": "Roll",
+      "roleHint": "Piirab, mida see kasutaja teha saab.",
+      "notes": "Märkmed",
+      "notesPlaceholder": "Valikuline kontekst…",
+      "states": "Olekud",
+      "disabled": "Keelatud",
+      "disabledHint": "Hallatakse SSO kaudu.",
+      "error": "Viga",
+      "errorMessage": "Tunnus on juba kasutusel.",
+      "inviteEmail": "Kutse e-post",
+      "inviteEmailHint": "Nad saavad kutse selle saidiga liitumiseks.",
+      "inviteEmailError": "Sisesta kehtiv e-posti aadress."
+    },
+    "combobox": {
+      "title": "Liitvalik",
+      "description": "Kohandatud, juhitav, ligipääsetav valik: otsitav, üksik- või mitmikvalik, min/max valitud, kohandatud elemendi kuva, kohandatud otsingupredikaat ja seadistatav valitute eelvaade.",
+      "singleSearchable": "Üksik & otsitav",
+      "singleSearchableHint": "Vaikekujuga {id,label} valikud või kohandatud elemenditüüp aksessorite kaudu.",
+      "multiPreview": "Mitmikvalik eelvaatega",
+      "customPredicate": "Kohandatud predikaat & kuva",
+      "states": "Olekud",
+      "role": "Roll",
+      "rolePlaceholder": "Vali roll…",
+      "roleSingleHint": "Üksikvalik, ilma otsinguta.",
+      "country": "Riik",
+      "countryPlaceholder": "Vali riik…",
+      "searchCountries": "Otsi riike…",
+      "countrySearchHint": "Otsitav, kohandatud elemenditüüp aksessorite kaudu (silt = nimi).",
+      "scopeCountries": "Piira riikidega",
+      "allCountries": "Kõik riigid",
+      "multiHint": "Mitmikvalik. Eelvaade näitab 2 silti, siis „+N”.",
+      "assignedRegions": "Määratud piirkonnad",
+      "minMaxHint": "min 1 · max 3 — proovi eemaldada kõik või lisada neljas.",
+      "richItems": "Riigid (rikkalikud elemendid)",
+      "searchNameCodeRegion": "Otsi nime, koodi või piirkonna järgi…",
+      "customHint": "Kohandatud otsingupredikaat (proovi „bal” või „ee”) + kohandatud kuva.",
+      "inviteAs": "Kutsu rolliga",
+      "disabledOptionHint": "Peaadministraatori valik on keelatud",
+      "disabled": "Keelatud"
+    },
+    "badges": {
+      "title": "Olekumärgid",
+      "description": "Toon + sümbol + silt. Oleku tähendus ei tugine kunagi ainult värvile, nii et värvipime kasutaja loeb selle õigesti.",
+      "siteDeploy": "Saidi & juurutuse olek",
+      "siteDeployHint": "Tuhm variant (vaikimisi).",
+      "live": "Töös",
+      "deploying": "Juurutamine",
+      "needsReview": "Vajab ülevaatust",
+      "failed": "Ebaõnnestus",
+      "current": "Praegune",
+      "draft": "Mustand",
+      "variants": "Variandid",
+      "roles": "Rollid",
+      "rolesHint": "Lihtsad loendid ja sildid kasutavad neutraalset tooni ilma punktita.",
+      "sites": "{count} saiti"
+    },
+    "alerts": {
+      "title": "Teated",
+      "description": "Reasisene tagasiside. Toonitud pind, juhtikoon, pealkiri + tekst. Lame — 1px ääris, ilma varjuta.",
+      "tones": "Toonid",
+      "titleOnly": "Ainult pealkiri",
+      "deployQueuedTitle": "Juurutus järjekorras",
+      "deployQueuedBody": "Workeri ehitus saidile <b>helsinki</b> algas hetk tagasi. See võtab tavaliselt alla minuti.",
+      "publishedTitle": "Sait avaldatud",
+      "publishedBody": "bizbeecms-cms-helsinki on Cloudflare'is töös.",
+      "warningTitle": "D1 sidumine on kohatäide",
+      "warningBody": "Asenda kohatäite andmebaasi tunnus failis wrangler.jsonc enne järgmist tootmisjuurutust.",
+      "failedTitle": "Juurutus ebaõnnestus",
+      "failedBody": "Cloudflare'i API tagastas 403. Logi uuesti sisse ja proovi uuesti.",
+      "pending": "3 kutset on endiselt ootel."
+    },
+    "card": {
+      "title": "Kaart",
+      "description": "Lame konteiner: 1px ääris kõrgendatud pinnal. Päis / sisu / jalus komponeeruvad vajadusel.",
+      "fullComposition": "Täielik kompositsioon",
+      "inviteTitle": "Kutsu tiimikaaslane",
+      "inviteDescription": "Nad saavad e-kirja selle saidiga liitumiseks.",
+      "email": "E-post",
+      "emailPlaceholder": "tiim@agentuur.com",
+      "cancel": "Tühista",
+      "sendInvite": "Saada kutse",
+      "siteMeta": "bizbeecms-cms-helsinki · FI",
+      "siteBody": "Viimati juurutatud 4 minutit tagasi · 2 saidihaldurit.",
+      "open": "Ava",
+      "deploy": "Juuruta"
+    },
+    "table": {
+      "title": "Tabel",
+      "description": "Komponeeritavad tabelielemendid. Read tõstetakse esile; olek loetakse märgi, mitte rea värvi kaudu.",
+      "users": "Kasutajad",
+      "email": "E-post",
+      "role": "Roll",
+      "country": "Riik",
+      "status": "Olek",
+      "active": "Aktiivne",
+      "invited": "Kutsutud"
+    }
+  }
+}

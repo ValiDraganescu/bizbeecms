@@ -1,0 +1,230 @@
+{
+  "app": {
+    "name": "bizbeecms",
+    "projectManager": "ProjectManager",
+    "tagline": "Cloudflare-native multi-site B2B whitelabel CMS"
+  },
+  "locale": {
+    "label": "Language",
+    "en": "English",
+    "fi": "Suomi",
+    "et": "Eesti"
+  },
+  "theme": {
+    "label": "Color theme",
+    "light": "Light",
+    "system": "System",
+    "dark": "Dark"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "home": "Go home"
+  },
+  "home": {
+    "subtitle": "Cloudflare-native multi-site B2B whitelabel CMS. UI foundation: Tailwind, purpose-named light/dark theme, composable components.",
+    "openDesignSystem": "Open the design system",
+    "buttons": {
+      "title": "Buttons",
+      "description": "Variants reference purpose tokens.",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "fields": {
+      "title": "Form fields",
+      "description": "Composed, not configured.",
+      "email": "Email",
+      "emailHint": "Used for sign-in and invites.",
+      "role": "Role"
+    },
+    "users": {
+      "title": "Users",
+      "description": "Composable table primitives.",
+      "email": "Email",
+      "role": "Role",
+      "country": "Country"
+    }
+  },
+  "roles": {
+    "superAdmin": "SuperAdmin",
+    "admin": "Admin",
+    "siteManager": "SiteManager"
+  },
+  "designSystem": {
+    "headerTitle": "Design System",
+    "headerSubtitle": "ProjectManager component reference",
+    "navHeading": "Components",
+    "title": "Design system",
+    "intro": "The building blocks of the ProjectManager. Every component is shown across its sizes, states, and configurations. Toggle the theme above to audit each one in light and dark — all colors resolve from purpose-named tokens.",
+    "nav": {
+      "foundations": "Foundations",
+      "buttons": "Buttons",
+      "inputs": "Inputs",
+      "combobox": "Combobox",
+      "badges": "Status badges",
+      "alerts": "Alerts",
+      "card": "Card",
+      "table": "Table"
+    },
+    "foundations": {
+      "title": "Foundations",
+      "description": "The purpose-named token palette. Components reference these by role (bg-primary, text-foreground), never by raw color.",
+      "surfaceText": "Surface & text",
+      "surfaceTextHint": "Backgrounds, foreground text, borders.",
+      "accentStatus": "Accent & status",
+      "accentStatusHint": "The indigo accent is used sparingly. Status colors always travel with an icon or label.",
+      "typeScale": "Type scale",
+      "typeScaleHint": "One sans across weights; mono for machine data.",
+      "swatch": {
+        "surface": "Surface",
+        "surfaceMuted": "Surface muted",
+        "surfaceRaised": "Surface raised",
+        "foreground": "Foreground",
+        "foregroundMuted": "Foreground muted",
+        "border": "Border",
+        "primary": "Primary",
+        "success": "Success",
+        "warning": "Warning",
+        "danger": "Danger",
+        "info": "Info"
+      },
+      "type": {
+        "display": "Display / page title",
+        "headline": "Headline",
+        "titleRow": "Title",
+        "body": "Body — the default reading size for descriptions and helper copy.",
+        "label": "Label / caption"
+      }
+    },
+    "buttons": {
+      "title": "Buttons",
+      "description": "Four variants, three sizes. Active nudges down; focus shows a ring; loading blocks interaction and keeps its width.",
+      "variants": "Variants",
+      "sizes": "Sizes",
+      "sizeSmall": "Small",
+      "sizeMedium": "Medium",
+      "sizeLarge": "Large",
+      "sizeSm": "sm",
+      "sizeMdDefault": "md (default)",
+      "sizeLg": "lg",
+      "states": "States",
+      "statesHint": "Hover & focus are interactive — try the keyboard.",
+      "stateDefault": "default",
+      "stateDisabled": "disabled",
+      "stateLoading": "loading",
+      "clickLoading": "click → loading",
+      "save": "Save",
+      "deploySite": "Deploy site",
+      "withIcon": "With icon",
+      "withIconHint": "Children compose freely.",
+      "continue": "Continue",
+      "newSite": "New site",
+      "primary": "Primary",
+      "secondary": "Secondary",
+      "ghost": "Ghost",
+      "danger": "Danger"
+    },
+    "inputs": {
+      "title": "Inputs",
+      "description": "Composed structurally with Field + Label + Hint/Error. Controls share one focus treatment.",
+      "textSelectTextarea": "Text, select, textarea",
+      "email": "Email",
+      "emailHint": "Used for sign-in and invites.",
+      "role": "Role",
+      "roleHint": "Scopes what this user can do.",
+      "notes": "Notes",
+      "notesPlaceholder": "Optional context…",
+      "states": "States",
+      "disabled": "Disabled",
+      "disabledHint": "Managed by SSO.",
+      "error": "Error",
+      "errorMessage": "Slug already in use.",
+      "inviteEmail": "Invite email",
+      "inviteEmailHint": "They'll receive an invite to join this Site.",
+      "inviteEmailError": "Enter a valid email address."
+    },
+    "combobox": {
+      "title": "Combobox",
+      "description": "A custom, controlled, accessible select: searchable, single or multiple, min/max selected, custom item UI, custom search predicate, and a configurable selected-items preview.",
+      "singleSearchable": "Single & searchable",
+      "singleSearchableHint": "Default {id,label} options, or a custom item type via accessors.",
+      "multiPreview": "Multiple with preview",
+      "customPredicate": "Custom predicate & item UI",
+      "states": "States",
+      "role": "Role",
+      "rolePlaceholder": "Pick a role…",
+      "roleSingleHint": "Single select, no search.",
+      "country": "Country",
+      "countryPlaceholder": "Pick a country…",
+      "searchCountries": "Search countries…",
+      "countrySearchHint": "Searchable, custom item type via accessors (label = name).",
+      "scopeCountries": "Scope to countries",
+      "allCountries": "All countries",
+      "multiHint": "Multi-select. Preview shows 2 chips, then “+N”.",
+      "assignedRegions": "Assigned regions",
+      "minMaxHint": "min 1 · max 3 — try removing all, or adding a 4th.",
+      "richItems": "Countries (rich items)",
+      "searchNameCodeRegion": "Search name, code, or region…",
+      "customHint": "Custom search predicate (try “bal” or “ee”) + custom item UI.",
+      "inviteAs": "Invite as",
+      "disabledOptionHint": "SuperAdmin option is disabled",
+      "disabled": "Disabled"
+    },
+    "badges": {
+      "title": "Status badges",
+      "description": "Tone + glyph + label. Status meaning never relies on color alone, so a color-blind operator reads it correctly.",
+      "siteDeploy": "Site & deploy status",
+      "siteDeployHint": "Subtle variant (default).",
+      "live": "Live",
+      "deploying": "Deploying",
+      "needsReview": "Needs review",
+      "failed": "Failed",
+      "current": "Current",
+      "draft": "Draft",
+      "variants": "Variants",
+      "roles": "Roles",
+      "rolesHint": "Plain counts and tags use the neutral tone with no dot.",
+      "sites": "{count} sites"
+    },
+    "alerts": {
+      "title": "Alerts",
+      "description": "Inline feedback. Tinted surface, leading icon, title + body. Flat — a 1px border, no shadow.",
+      "tones": "Tones",
+      "titleOnly": "Title only",
+      "deployQueuedTitle": "Deploy queued",
+      "deployQueuedBody": "The Worker build for <b>helsinki</b> started a moment ago. This usually takes under a minute.",
+      "publishedTitle": "Site published",
+      "publishedBody": "bizbeecms-cms-helsinki is live on Cloudflare.",
+      "warningTitle": "D1 binding is a placeholder",
+      "warningBody": "Replace the placeholder database id in wrangler.jsonc before the next production deploy.",
+      "failedTitle": "Deploy failed",
+      "failedBody": "The Cloudflare API returned 403. Re-authenticate and retry.",
+      "pending": "3 invites are still pending."
+    },
+    "card": {
+      "title": "Card",
+      "description": "A flat container: 1px border on a raised surface. Header / content / footer compose as needed.",
+      "fullComposition": "Full composition",
+      "inviteTitle": "Invite a teammate",
+      "inviteDescription": "They'll get an email to join this Site.",
+      "email": "Email",
+      "emailPlaceholder": "teammate@agency.com",
+      "cancel": "Cancel",
+      "sendInvite": "Send invite",
+      "siteMeta": "bizbeecms-cms-helsinki · FI",
+      "siteBody": "Last deployed 4 minutes ago · 2 site managers.",
+      "open": "Open",
+      "deploy": "Deploy"
+    },
+    "table": {
+      "title": "Table",
+      "description": "Composable table primitives. Rows hover; status reads through a badge, not row color.",
+      "users": "Users",
+      "email": "Email",
+      "role": "Role",
+      "country": "Country",
+      "status": "Status",
+      "active": "Active",
+      "invited": "Invited"
+    }
+  }
+}

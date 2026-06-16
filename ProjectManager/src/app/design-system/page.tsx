@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import {
   Alert,
   AlertBody,
@@ -48,28 +51,34 @@ import {
   SingleSelectDemo,
 } from "@/components/design-system/combobox-demos";
 
-export const metadata: Metadata = {
-  title: "Design System — bizbeecms ProjectManager",
-  description:
-    "The bizbeecms ProjectManager component reference: foundations, components, states, and configs.",
-};
-
-const NAV: NavItem[] = [
-  { id: "foundations", label: "Foundations" },
-  { id: "buttons", label: "Buttons" },
-  { id: "inputs", label: "Inputs" },
-  { id: "combobox", label: "Combobox" },
-  { id: "badges", label: "Status badges" },
-  { id: "alerts", label: "Alerts" },
-  { id: "card", label: "Card" },
-  { id: "table", label: "Table" },
-];
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("designSystem");
+  const tApp = await getTranslations("app");
+  return {
+    title: `${t("headerTitle")} — ${tApp("name")} ${tApp("projectManager")}`,
+    description: t("intro"),
+  };
+}
 
 export default function DesignSystemPage() {
+  const t = useTranslations("designSystem");
+  const tApp = useTranslations("app");
+
+  const nav: NavItem[] = [
+    { id: "foundations", label: t("nav.foundations") },
+    { id: "buttons", label: t("nav.buttons") },
+    { id: "inputs", label: t("nav.inputs") },
+    { id: "combobox", label: t("nav.combobox") },
+    { id: "badges", label: t("nav.badges") },
+    { id: "alerts", label: t("nav.alerts") },
+    { id: "card", label: t("nav.card") },
+    { id: "table", label: t("nav.table") },
+  ];
+
   return (
     <div className="min-h-screen bg-surface text-foreground">
-      {/* Page header — sticky so the theme toggle stays reachable while the
-          catalog scrolls. */}
+      {/* Page header — sticky so the controls stay reachable while the catalog
+          scrolls. */}
       <header className="sticky top-0 z-30 border-b border-border bg-surface/85 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
           <div className="flex min-w-0 items-center gap-3">
@@ -78,118 +87,82 @@ export default function DesignSystemPage() {
             </span>
             <div className="flex min-w-0 flex-col leading-tight">
               <span className="truncate text-sm font-semibold">
-                bizbeecms · Design System
+                {tApp("name")} · {t("headerTitle")}
               </span>
               <span className="truncate text-xs text-foreground-muted">
-                ProjectManager component reference
+                {t("headerSubtitle")}
               </span>
             </div>
           </div>
-          <ThemeToggle />
+          <div className="flex flex-wrap items-center gap-2">
+            <LocaleSwitcher />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
       <div className="mx-auto grid max-w-6xl grid-cols-1 gap-10 px-6 py-10 md:grid-cols-[13rem_minmax(0,1fr)]">
         {/* Side menu */}
         <aside className="md:sticky md:top-[4.75rem] md:h-[calc(100vh-6rem)] md:self-start md:overflow-y-auto md:pr-2">
-          <DesignSystemNav items={NAV} />
+          <DesignSystemNav items={nav} heading={t("navHeading")} />
         </aside>
 
         {/* Detail panel */}
         <main className="flex min-w-0 flex-col gap-12">
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">
-              Design system
+              {t("title")}
             </h1>
             <p className="max-w-2xl text-sm text-foreground-muted">
-              The building blocks of the ProjectManager. Every component is
-              shown across its sizes, states, and configurations. Toggle the
-              theme above to audit each one in light and dark — all colors
-              resolve from purpose-named tokens.
+              {t("intro")}
             </p>
           </div>
 
           {/* ---------------------------------------------------------------- */}
           <Section
             id="foundations"
-            title="Foundations"
-            description="The purpose-named token palette. Components reference these by role (bg-primary, text-foreground), never by raw color."
+            title={t("foundations.title")}
+            description={t("foundations.description")}
           >
             <Specimen
-              label="Surface & text"
-              hint="Backgrounds, foreground text, borders."
+              label={t("foundations.surfaceText")}
+              hint={t("foundations.surfaceTextHint")}
             >
-              <Swatch name="Surface" utility="bg-surface" className="bg-surface" ring />
-              <Swatch
-                name="Surface muted"
-                utility="bg-surface-muted"
-                className="bg-surface-muted"
-                ring
-              />
-              <Swatch
-                name="Surface raised"
-                utility="bg-surface-raised"
-                className="bg-surface-raised"
-                ring
-              />
-              <Swatch
-                name="Foreground"
-                utility="bg-foreground"
-                className="bg-foreground"
-              />
-              <Swatch
-                name="Foreground muted"
-                utility="bg-foreground-muted"
-                className="bg-foreground-muted"
-              />
-              <Swatch name="Border" utility="bg-border" className="bg-border" />
+              <Swatch name={t("foundations.swatch.surface")} utility="bg-surface" className="bg-surface" ring />
+              <Swatch name={t("foundations.swatch.surfaceMuted")} utility="bg-surface-muted" className="bg-surface-muted" ring />
+              <Swatch name={t("foundations.swatch.surfaceRaised")} utility="bg-surface-raised" className="bg-surface-raised" ring />
+              <Swatch name={t("foundations.swatch.foreground")} utility="bg-foreground" className="bg-foreground" />
+              <Swatch name={t("foundations.swatch.foregroundMuted")} utility="bg-foreground-muted" className="bg-foreground-muted" />
+              <Swatch name={t("foundations.swatch.border")} utility="bg-border" className="bg-border" />
             </Specimen>
 
             <Specimen
-              label="Accent & status"
-              hint="The indigo accent is used sparingly. Status colors always travel with an icon or label."
+              label={t("foundations.accentStatus")}
+              hint={t("foundations.accentStatusHint")}
             >
-              <Swatch
-                name="Primary"
-                utility="bg-primary"
-                className="bg-primary"
-              />
-              <Swatch
-                name="Success"
-                utility="bg-success"
-                className="bg-success"
-              />
-              <Swatch
-                name="Warning"
-                utility="bg-warning"
-                className="bg-warning"
-              />
-              <Swatch
-                name="Danger"
-                utility="bg-danger"
-                className="bg-danger"
-              />
-              <Swatch name="Info" utility="bg-info" className="bg-info" />
+              <Swatch name={t("foundations.swatch.primary")} utility="bg-primary" className="bg-primary" />
+              <Swatch name={t("foundations.swatch.success")} utility="bg-success" className="bg-success" />
+              <Swatch name={t("foundations.swatch.warning")} utility="bg-warning" className="bg-warning" />
+              <Swatch name={t("foundations.swatch.danger")} utility="bg-danger" className="bg-danger" />
+              <Swatch name={t("foundations.swatch.info")} utility="bg-info" className="bg-info" />
             </Specimen>
 
-            <Specimen label="Type scale" hint="One sans across weights; mono for machine data.">
+            <Specimen label={t("foundations.typeScale")} hint={t("foundations.typeScaleHint")}>
               <div className="flex w-full flex-col gap-3">
                 <p className="text-2xl font-semibold tracking-tight">
-                  Display / page title{" "}
-                  <Mono>text-2xl font-semibold</Mono>
+                  {t("foundations.type.display")} <Mono>text-2xl font-semibold</Mono>
                 </p>
                 <p className="text-xl font-semibold tracking-tight">
-                  Headline <Mono>text-xl font-semibold</Mono>
+                  {t("foundations.type.headline")} <Mono>text-xl font-semibold</Mono>
                 </p>
                 <p className="text-base font-medium">
-                  Title <Mono>text-base font-medium</Mono>
+                  {t("foundations.type.titleRow")} <Mono>text-base font-medium</Mono>
                 </p>
                 <p className="text-sm text-foreground">
-                  Body — the default reading size for descriptions and helper
-                  copy. <Mono>text-sm</Mono>
+                  {t("foundations.type.body")} <Mono>text-sm</Mono>
                 </p>
                 <p className="text-xs text-foreground-muted">
-                  Label / caption <Mono>text-xs text-foreground-muted</Mono>
+                  {t("foundations.type.label")} <Mono>text-xs text-foreground-muted</Mono>
                 </p>
                 <p
                   className="text-sm text-foreground-muted"
@@ -204,73 +177,53 @@ export default function DesignSystemPage() {
           {/* ---------------------------------------------------------------- */}
           <Section
             id="buttons"
-            title="Buttons"
-            description="Four variants, three sizes. Active nudges down; focus shows a ring; loading blocks interaction and keeps its width."
+            title={t("buttons.title")}
+            description={t("buttons.description")}
           >
-            <Specimen label="Variants" hint={<Mono>variant</Mono>}>
-              <Button variant="primary">Primary</Button>
-              <Button variant="secondary">Secondary</Button>
-              <Button variant="ghost">Ghost</Button>
-              <Button variant="danger">Danger</Button>
+            <Specimen label={t("buttons.variants")} hint={<Mono>variant</Mono>}>
+              <Button variant="primary">{t("buttons.primary")}</Button>
+              <Button variant="secondary">{t("buttons.secondary")}</Button>
+              <Button variant="ghost">{t("buttons.ghost")}</Button>
+              <Button variant="danger">{t("buttons.danger")}</Button>
             </Specimen>
 
-            <Specimen label="Sizes" hint={<Mono>size=&quot;sm | md | lg&quot;</Mono>}>
-              <Item label="sm">
-                <Button size="sm">Small</Button>
+            <Specimen label={t("buttons.sizes")} hint={<Mono>size=&quot;sm | md | lg&quot;</Mono>}>
+              <Item label={t("buttons.sizeSm")}>
+                <Button size="sm">{t("buttons.sizeSmall")}</Button>
               </Item>
-              <Item label="md (default)">
-                <Button size="md">Medium</Button>
+              <Item label={t("buttons.sizeMdDefault")}>
+                <Button size="md">{t("buttons.sizeMedium")}</Button>
               </Item>
-              <Item label="lg">
-                <Button size="lg">Large</Button>
+              <Item label={t("buttons.sizeLg")}>
+                <Button size="lg">{t("buttons.sizeLarge")}</Button>
               </Item>
             </Specimen>
 
-            <Specimen label="States" hint="Hover & focus are interactive — try the keyboard.">
-              <Item label="default">
-                <Button>Save</Button>
+            <Specimen label={t("buttons.states")} hint={t("buttons.statesHint")}>
+              <Item label={t("buttons.stateDefault")}>
+                <Button>{t("buttons.save")}</Button>
               </Item>
-              <Item label="disabled">
-                <Button disabled>Save</Button>
+              <Item label={t("buttons.stateDisabled")}>
+                <Button disabled>{t("buttons.save")}</Button>
               </Item>
-              <Item label="loading">
-                <Button loading>Save</Button>
+              <Item label={t("buttons.stateLoading")}>
+                <Button loading>{t("buttons.save")}</Button>
               </Item>
               <LoadingButtonDemo />
             </Specimen>
 
-            <Specimen label="With icon" hint="Children compose freely.">
+            <Specimen label={t("buttons.withIcon")} hint={t("buttons.withIconHint")}>
               <Button variant="primary">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M5 12h14M12 5l7 7-7 7" />
                 </svg>
-                Continue
+                {t("buttons.continue")}
               </Button>
               <Button variant="secondary">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
-                New site
+                {t("buttons.newSite")}
               </Button>
             </Specimen>
           </Section>
@@ -278,38 +231,38 @@ export default function DesignSystemPage() {
           {/* ---------------------------------------------------------------- */}
           <Section
             id="inputs"
-            title="Inputs"
-            description="Composed structurally with Field + Label + Hint/Error. Controls share one focus treatment."
+            title={t("inputs.title")}
+            description={t("inputs.description")}
           >
-            <Specimen label="Text, select, textarea" className="items-start">
+            <Specimen label={t("inputs.textSelectTextarea")} className="items-start">
               <Field className="w-full max-w-xs">
-                <FieldLabel htmlFor="ds-email">Email</FieldLabel>
+                <FieldLabel htmlFor="ds-email">{t("inputs.email")}</FieldLabel>
                 <Input id="ds-email" type="email" placeholder="you@example.com" />
-                <FieldHint>Used for sign-in and invites.</FieldHint>
+                <FieldHint>{t("inputs.emailHint")}</FieldHint>
               </Field>
               <Field className="w-full max-w-xs">
-                <FieldLabel htmlFor="ds-role">Role</FieldLabel>
+                <FieldLabel htmlFor="ds-role">{t("inputs.role")}</FieldLabel>
                 <Select id="ds-role" defaultValue="Admin">
                   <option value="SuperAdmin">SuperAdmin</option>
                   <option value="Admin">Admin</option>
                   <option value="SiteManager">SiteManager</option>
                 </Select>
-                <FieldHint>Scopes what this user can do.</FieldHint>
+                <FieldHint>{t("inputs.roleHint")}</FieldHint>
               </Field>
               <Field className="w-full max-w-xs">
-                <FieldLabel htmlFor="ds-notes">Notes</FieldLabel>
-                <Textarea id="ds-notes" placeholder="Optional context…" />
+                <FieldLabel htmlFor="ds-notes">{t("inputs.notes")}</FieldLabel>
+                <Textarea id="ds-notes" placeholder={t("inputs.notesPlaceholder")} />
               </Field>
             </Specimen>
 
-            <Specimen label="States" className="items-start">
+            <Specimen label={t("inputs.states")} className="items-start">
               <Field className="w-full max-w-xs">
-                <FieldLabel htmlFor="ds-disabled">Disabled</FieldLabel>
+                <FieldLabel htmlFor="ds-disabled">{t("inputs.disabled")}</FieldLabel>
                 <Input id="ds-disabled" value="locked@bizbee.example" disabled readOnly />
-                <FieldHint>Managed by SSO.</FieldHint>
+                <FieldHint>{t("inputs.disabledHint")}</FieldHint>
               </Field>
               <Field className="w-full max-w-xs">
-                <FieldLabel htmlFor="ds-error">Error</FieldLabel>
+                <FieldLabel htmlFor="ds-error">{t("inputs.error")}</FieldLabel>
                 <Input
                   id="ds-error"
                   defaultValue="bad"
@@ -317,7 +270,7 @@ export default function DesignSystemPage() {
                   aria-describedby="ds-error-msg"
                   className="border-danger focus-visible:border-danger focus-visible:ring-danger"
                 />
-                <FieldError id="ds-error-msg">Slug already in use.</FieldError>
+                <FieldError id="ds-error-msg">{t("inputs.errorMessage")}</FieldError>
               </Field>
               <ValidationFieldDemo />
             </Specimen>
@@ -326,12 +279,12 @@ export default function DesignSystemPage() {
           {/* ---------------------------------------------------------------- */}
           <Section
             id="combobox"
-            title="Combobox"
-            description="A custom, controlled, accessible select: searchable, single or multiple, min/max selected, custom item UI, custom search predicate, and a configurable selected-items preview."
+            title={t("combobox.title")}
+            description={t("combobox.description")}
           >
             <Specimen
-              label="Single & searchable"
-              hint="Default {id,label} options, or a custom item type via accessors."
+              label={t("combobox.singleSearchable")}
+              hint={t("combobox.singleSearchableHint")}
               className="items-start"
             >
               <SingleSelectDemo />
@@ -339,7 +292,7 @@ export default function DesignSystemPage() {
             </Specimen>
 
             <Specimen
-              label="Multiple with preview"
+              label={t("combobox.multiPreview")}
               hint={<Mono>multiple · previewCount</Mono>}
               className="items-start"
             >
@@ -348,14 +301,14 @@ export default function DesignSystemPage() {
             </Specimen>
 
             <Specimen
-              label="Custom predicate & item UI"
+              label={t("combobox.customPredicate")}
               hint={<Mono>filterOption · renderOption</Mono>}
               className="items-start"
             >
               <CustomPredicateAndItemDemo />
             </Specimen>
 
-            <Specimen label="States" className="items-start">
+            <Specimen label={t("combobox.states")} className="items-start">
               <DisabledOptionDemo />
               <DisabledComboboxDemo />
             </Specimen>
@@ -364,90 +317,70 @@ export default function DesignSystemPage() {
           {/* ---------------------------------------------------------------- */}
           <Section
             id="badges"
-            title="Status badges"
-            description="Tone + glyph + label. Status meaning never relies on color alone, so a color-blind operator reads it correctly."
+            title={t("badges.title")}
+            description={t("badges.description")}
           >
-            <Specimen label="Site & deploy status" hint="Subtle variant (default).">
-              <Badge tone="success">Live</Badge>
-              <Badge tone="info">Deploying</Badge>
-              <Badge tone="warning">Needs review</Badge>
-              <Badge tone="danger">Failed</Badge>
-              <Badge tone="primary">Current</Badge>
-              <Badge tone="neutral">Draft</Badge>
+            <Specimen label={t("badges.siteDeploy")} hint={t("badges.siteDeployHint")}>
+              <Badge tone="success">{t("badges.live")}</Badge>
+              <Badge tone="info">{t("badges.deploying")}</Badge>
+              <Badge tone="warning">{t("badges.needsReview")}</Badge>
+              <Badge tone="danger">{t("badges.failed")}</Badge>
+              <Badge tone="primary">{t("badges.current")}</Badge>
+              <Badge tone="neutral">{t("badges.draft")}</Badge>
             </Specimen>
 
-            <Specimen label="Variants" hint={<Mono>variant=&quot;subtle | solid | outline&quot;</Mono>}>
+            <Specimen label={t("badges.variants")} hint={<Mono>variant=&quot;subtle | solid | outline&quot;</Mono>}>
               <Item label="subtle">
-                <Badge tone="success" variant="subtle">
-                  Live
-                </Badge>
+                <Badge tone="success" variant="subtle">{t("badges.live")}</Badge>
               </Item>
               <Item label="solid">
-                <Badge tone="success" variant="solid">
-                  Live
-                </Badge>
+                <Badge tone="success" variant="solid">{t("badges.live")}</Badge>
               </Item>
               <Item label="outline">
-                <Badge tone="success" variant="outline">
-                  Live
-                </Badge>
+                <Badge tone="success" variant="outline">{t("badges.live")}</Badge>
               </Item>
             </Specimen>
 
-            <Specimen label="Roles" hint="Plain counts and tags use the neutral tone with no dot.">
-              <Badge tone="primary" dot={false}>
-                SuperAdmin
-              </Badge>
-              <Badge tone="neutral" dot={false}>
-                Admin
-              </Badge>
-              <Badge tone="neutral" dot={false}>
-                SiteManager
-              </Badge>
-              <Badge tone="neutral" dot={false}>
-                12 sites
-              </Badge>
+            <Specimen label={t("badges.roles")} hint={t("badges.rolesHint")}>
+              <Badge tone="primary" dot={false}>SuperAdmin</Badge>
+              <Badge tone="neutral" dot={false}>Admin</Badge>
+              <Badge tone="neutral" dot={false}>SiteManager</Badge>
+              <Badge tone="neutral" dot={false}>{t("badges.sites", { count: 12 })}</Badge>
             </Specimen>
           </Section>
 
           {/* ---------------------------------------------------------------- */}
           <Section
             id="alerts"
-            title="Alerts"
-            description="Inline feedback. Tinted surface, leading icon, title + body. Flat — a 1px border, no shadow."
+            title={t("alerts.title")}
+            description={t("alerts.description")}
           >
-            <Specimen label="Tones" className="flex-col items-stretch">
+            <Specimen label={t("alerts.tones")} className="flex-col items-stretch">
               <Alert tone="info" className="w-full">
-                <AlertTitle>Deploy queued</AlertTitle>
+                <AlertTitle>{t("alerts.deployQueuedTitle")}</AlertTitle>
                 <AlertBody>
-                  The Worker build for <strong>helsinki</strong> started a moment
-                  ago. This usually takes under a minute.
+                  {t.rich("alerts.deployQueuedBody", {
+                    b: (chunks) => <strong>{chunks}</strong>,
+                  })}
                 </AlertBody>
               </Alert>
               <Alert tone="success" className="w-full">
-                <AlertTitle>Site published</AlertTitle>
-                <AlertBody>
-                  bizbeecms-cms-helsinki is live on Cloudflare.
-                </AlertBody>
+                <AlertTitle>{t("alerts.publishedTitle")}</AlertTitle>
+                <AlertBody>{t("alerts.publishedBody")}</AlertBody>
               </Alert>
               <Alert tone="warning" className="w-full">
-                <AlertTitle>D1 binding is a placeholder</AlertTitle>
-                <AlertBody>
-                  Replace the placeholder database id in wrangler.jsonc before
-                  the next production deploy.
-                </AlertBody>
+                <AlertTitle>{t("alerts.warningTitle")}</AlertTitle>
+                <AlertBody>{t("alerts.warningBody")}</AlertBody>
               </Alert>
               <Alert tone="danger" className="w-full">
-                <AlertTitle>Deploy failed</AlertTitle>
-                <AlertBody>
-                  The Cloudflare API returned 403. Re-authenticate and retry.
-                </AlertBody>
+                <AlertTitle>{t("alerts.failedTitle")}</AlertTitle>
+                <AlertBody>{t("alerts.failedBody")}</AlertBody>
               </Alert>
             </Specimen>
 
-            <Specimen label="Title only" className="flex-col items-stretch">
+            <Specimen label={t("alerts.titleOnly")} className="flex-col items-stretch">
               <Alert tone="info" className="w-full">
-                <AlertTitle>3 invites are still pending.</AlertTitle>
+                <AlertTitle>{t("alerts.pending")}</AlertTitle>
               </Alert>
             </Specimen>
           </Section>
@@ -455,32 +388,28 @@ export default function DesignSystemPage() {
           {/* ---------------------------------------------------------------- */}
           <Section
             id="card"
-            title="Card"
-            description="A flat container: 1px border on a raised surface. Header / content / footer compose as needed."
+            title={t("card.title")}
+            description={t("card.description")}
           >
-            <Specimen label="Full composition" className="items-stretch">
+            <Specimen label={t("card.fullComposition")} className="items-stretch">
               <Card className="w-full max-w-sm">
                 <CardHeader>
-                  <CardTitle>Invite a teammate</CardTitle>
-                  <CardDescription>
-                    They&apos;ll get an email to join this Site.
-                  </CardDescription>
+                  <CardTitle>{t("card.inviteTitle")}</CardTitle>
+                  <CardDescription>{t("card.inviteDescription")}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
                   <Field>
-                    <FieldLabel htmlFor="ds-card-email">Email</FieldLabel>
+                    <FieldLabel htmlFor="ds-card-email">{t("card.email")}</FieldLabel>
                     <Input
                       id="ds-card-email"
                       type="email"
-                      placeholder="teammate@agency.com"
+                      placeholder={t("card.emailPlaceholder")}
                     />
                   </Field>
                 </CardContent>
                 <CardFooter className="justify-end">
-                  <Button variant="ghost" size="sm">
-                    Cancel
-                  </Button>
-                  <Button size="sm">Send invite</Button>
+                  <Button variant="ghost" size="sm">{t("card.cancel")}</Button>
+                  <Button size="sm">{t("card.sendInvite")}</Button>
                 </CardFooter>
               </Card>
 
@@ -488,22 +417,16 @@ export default function DesignSystemPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle>helsinki</CardTitle>
-                    <Badge tone="success">Live</Badge>
+                    <Badge tone="success">{t("badges.live")}</Badge>
                   </div>
-                  <CardDescription>bizbeecms-cms-helsinki · FI</CardDescription>
+                  <CardDescription>{t("card.siteMeta")}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-foreground-muted">
-                    Last deployed 4 minutes ago · 2 site managers.
-                  </p>
+                  <p className="text-sm text-foreground-muted">{t("card.siteBody")}</p>
                 </CardContent>
                 <CardFooter>
-                  <Button variant="secondary" size="sm">
-                    Open
-                  </Button>
-                  <Button variant="ghost" size="sm">
-                    Deploy
-                  </Button>
+                  <Button variant="secondary" size="sm">{t("card.open")}</Button>
+                  <Button variant="ghost" size="sm">{t("card.deploy")}</Button>
                 </CardFooter>
               </Card>
             </Specimen>
@@ -512,54 +435,48 @@ export default function DesignSystemPage() {
           {/* ---------------------------------------------------------------- */}
           <Section
             id="table"
-            title="Table"
-            description="Composable table primitives. Rows hover; status reads through a badge, not row color."
+            title={t("table.title")}
+            description={t("table.description")}
           >
-            <Specimen label="Users" className="block p-0">
+            <Specimen label={t("table.users")} className="block p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Country</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{t("table.email")}</TableHead>
+                    <TableHead>{t("table.role")}</TableHead>
+                    <TableHead>{t("table.country")}</TableHead>
+                    <TableHead>{t("table.status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <TableRow>
                     <TableCell>ada@bizbee.example</TableCell>
                     <TableCell>
-                      <Badge tone="primary" dot={false}>
-                        SuperAdmin
-                      </Badge>
+                      <Badge tone="primary" dot={false}>SuperAdmin</Badge>
                     </TableCell>
                     <TableCell>FI</TableCell>
                     <TableCell>
-                      <Badge tone="success">Active</Badge>
+                      <Badge tone="success">{t("table.active")}</Badge>
                     </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>liis@bizbee.example</TableCell>
                     <TableCell>
-                      <Badge tone="neutral" dot={false}>
-                        Admin
-                      </Badge>
+                      <Badge tone="neutral" dot={false}>Admin</Badge>
                     </TableCell>
                     <TableCell>EE</TableCell>
                     <TableCell>
-                      <Badge tone="success">Active</Badge>
+                      <Badge tone="success">{t("table.active")}</Badge>
                     </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>juhan@bizbee.example</TableCell>
                     <TableCell>
-                      <Badge tone="neutral" dot={false}>
-                        SiteManager
-                      </Badge>
+                      <Badge tone="neutral" dot={false}>SiteManager</Badge>
                     </TableCell>
                     <TableCell>EE</TableCell>
                     <TableCell>
-                      <Badge tone="info">Invited</Badge>
+                      <Badge tone="info">{t("table.invited")}</Badge>
                     </TableCell>
                   </TableRow>
                 </TableBody>

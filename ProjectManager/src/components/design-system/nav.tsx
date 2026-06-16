@@ -16,7 +16,13 @@ export type NavItem = { id: string; label: string };
  * scroll/resize with rAF throttling — simpler and more reliable than mapping
  * IntersectionObserver ratios across wildly different section heights.
  */
-export function DesignSystemNav({ items }: { items: NavItem[] }) {
+export function DesignSystemNav({
+  items,
+  heading = "Components",
+}: {
+  items: NavItem[];
+  heading?: string;
+}) {
   const [active, setActive] = useState<string>(items[0]?.id ?? "");
 
   useEffect(() => {
@@ -67,7 +73,7 @@ export function DesignSystemNav({ items }: { items: NavItem[] }) {
   return (
     <nav aria-label="Components" className="flex flex-col gap-0.5">
       <p className="px-3 pb-2 text-xs font-medium tracking-wide text-foreground-muted">
-        Components
+        {heading}
       </p>
       {items.map((item) => {
         const isActive = active === item.id;

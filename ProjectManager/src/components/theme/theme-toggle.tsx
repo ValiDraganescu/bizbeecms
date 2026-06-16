@@ -1,36 +1,34 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button } from "../ui/button";
 import { useTheme, type Theme } from "./theme-provider";
 
-const OPTIONS: { value: Theme; label: string }[] = [
-  { value: "light", label: "Light" },
-  { value: "system", label: "System" },
-  { value: "dark", label: "Dark" },
-];
+const THEMES: Theme[] = ["light", "system", "dark"];
 
 /**
  * Segmented light / system / dark switch. "System" follows the OS preference;
- * the active option is highlighted with the primary token.
+ * the active option is highlighted with the primary token. Labels are localized.
  */
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+  const t = useTranslations("theme");
 
   return (
     <div
       role="group"
-      aria-label="Color theme"
+      aria-label={t("label")}
       className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface-muted p-1"
     >
-      {OPTIONS.map((opt) => (
+      {THEMES.map((value) => (
         <Button
-          key={opt.value}
+          key={value}
           size="sm"
-          variant={theme === opt.value ? "primary" : "ghost"}
-          aria-pressed={theme === opt.value}
-          onClick={() => setTheme(opt.value)}
+          variant={theme === value ? "primary" : "ghost"}
+          aria-pressed={theme === value}
+          onClick={() => setTheme(value)}
         >
-          {opt.label}
+          {t(value)}
         </Button>
       ))}
     </div>

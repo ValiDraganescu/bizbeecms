@@ -1,0 +1,230 @@
+{
+  "app": {
+    "name": "bizbeecms",
+    "projectManager": "ProjectManager",
+    "tagline": "Cloudflare-natiivi monisivustoinen B2B-whitelabel-sisällönhallinta"
+  },
+  "locale": {
+    "label": "Kieli",
+    "en": "English",
+    "fi": "Suomi",
+    "et": "Eesti"
+  },
+  "theme": {
+    "label": "Väriteema",
+    "light": "Vaalea",
+    "system": "Järjestelmä",
+    "dark": "Tumma"
+  },
+  "notFound": {
+    "title": "Sivua ei löytynyt",
+    "home": "Siirry etusivulle"
+  },
+  "home": {
+    "subtitle": "Cloudflare-natiivi monisivustoinen B2B-whitelabel-sisällönhallinta. Käyttöliittymäperusta: Tailwind, tarkoitusnimetyt vaalea/tumma-teema, koostettavat komponentit.",
+    "openDesignSystem": "Avaa suunnittelujärjestelmä",
+    "buttons": {
+      "title": "Painikkeet",
+      "description": "Variantit viittaavat tarkoitustunnisteisiin.",
+      "save": "Tallenna",
+      "cancel": "Peruuta"
+    },
+    "fields": {
+      "title": "Lomakekentät",
+      "description": "Koostettu, ei konfiguroitu.",
+      "email": "Sähköposti",
+      "emailHint": "Käytetään kirjautumiseen ja kutsuihin.",
+      "role": "Rooli"
+    },
+    "users": {
+      "title": "Käyttäjät",
+      "description": "Koostettavat taulukkoelementit.",
+      "email": "Sähköposti",
+      "role": "Rooli",
+      "country": "Maa"
+    }
+  },
+  "roles": {
+    "superAdmin": "Pääylläpitäjä",
+    "admin": "Ylläpitäjä",
+    "siteManager": "Sivuston hallinnoija"
+  },
+  "designSystem": {
+    "headerTitle": "Suunnittelujärjestelmä",
+    "headerSubtitle": "ProjectManagerin komponenttiviite",
+    "navHeading": "Komponentit",
+    "title": "Suunnittelujärjestelmä",
+    "intro": "ProjectManagerin rakennuspalikat. Jokainen komponentti näytetään kaikissa kokoisuuksissaan, tiloissaan ja konfiguraatioissaan. Vaihda teemaa yltä tarkastellaksesi kutakin vaaleana ja tummana — kaikki värit tulevat tarkoitusnimetyistä tunnisteista.",
+    "nav": {
+      "foundations": "Perusteet",
+      "buttons": "Painikkeet",
+      "inputs": "Syöttökentät",
+      "combobox": "Yhdistelmävalinta",
+      "badges": "Tilamerkit",
+      "alerts": "Ilmoitukset",
+      "card": "Kortti",
+      "table": "Taulukko"
+    },
+    "foundations": {
+      "title": "Perusteet",
+      "description": "Tarkoitusnimetty tunnistepaletti. Komponentit viittaavat näihin roolin mukaan (bg-primary, text-foreground), ei koskaan raakavärillä.",
+      "surfaceText": "Pinta & teksti",
+      "surfaceTextHint": "Taustat, tekstiväri, reunat.",
+      "accentStatus": "Korostus & tila",
+      "accentStatusHint": "Indigokorostusta käytetään säästeliäästi. Tilavärit kulkevat aina kuvakkeen tai tekstin kanssa.",
+      "typeScale": "Typografia-asteikko",
+      "typeScaleHint": "Yksi groteski kaikilla paksuuksilla; tasalevyinen konedatalle.",
+      "swatch": {
+        "surface": "Pinta",
+        "surfaceMuted": "Vaimennettu pinta",
+        "surfaceRaised": "Korotettu pinta",
+        "foreground": "Etuala",
+        "foregroundMuted": "Vaimennettu etuala",
+        "border": "Reuna",
+        "primary": "Ensisijainen",
+        "success": "Onnistuminen",
+        "warning": "Varoitus",
+        "danger": "Vaara",
+        "info": "Tieto"
+      },
+      "type": {
+        "display": "Näyttö / sivun otsikko",
+        "headline": "Pääotsikko",
+        "titleRow": "Otsikko",
+        "body": "Leipäteksti — oletuskoko kuvauksille ja ohjeteksteille.",
+        "label": "Nimike / kuvateksti"
+      }
+    },
+    "buttons": {
+      "title": "Painikkeet",
+      "description": "Neljä varianttia, kolme kokoa. Painalluksessa siirtyy alas; tarkennus näyttää renkaan; lataus estää käytön ja säilyttää leveytensä.",
+      "variants": "Variantit",
+      "sizes": "Koot",
+      "sizeSmall": "Pieni",
+      "sizeMedium": "Keskikoko",
+      "sizeLarge": "Suuri",
+      "sizeSm": "sm",
+      "sizeMdDefault": "md (oletus)",
+      "sizeLg": "lg",
+      "states": "Tilat",
+      "statesHint": "Hover ja tarkennus ovat interaktiivisia — kokeile näppäimistöä.",
+      "stateDefault": "oletus",
+      "stateDisabled": "ei käytössä",
+      "stateLoading": "lataa",
+      "clickLoading": "klikkaa → lataa",
+      "save": "Tallenna",
+      "deploySite": "Julkaise sivusto",
+      "withIcon": "Kuvakkeella",
+      "withIconHint": "Lapsielementit koostuvat vapaasti.",
+      "continue": "Jatka",
+      "newSite": "Uusi sivusto",
+      "primary": "Ensisijainen",
+      "secondary": "Toissijainen",
+      "ghost": "Haamu",
+      "danger": "Vaara"
+    },
+    "inputs": {
+      "title": "Syöttökentät",
+      "description": "Koostettu rakenteellisesti: Field + Label + Hint/Error. Kontrollit jakavat saman tarkennuskäsittelyn.",
+      "textSelectTextarea": "Teksti, valinta, tekstialue",
+      "email": "Sähköposti",
+      "emailHint": "Käytetään kirjautumiseen ja kutsuihin.",
+      "role": "Rooli",
+      "roleHint": "Rajaa, mitä tämä käyttäjä voi tehdä.",
+      "notes": "Muistiinpanot",
+      "notesPlaceholder": "Vapaaehtoinen konteksti…",
+      "states": "Tilat",
+      "disabled": "Ei käytössä",
+      "disabledHint": "Hallinnoidaan SSO:n kautta.",
+      "error": "Virhe",
+      "errorMessage": "Tunnus on jo käytössä.",
+      "inviteEmail": "Kutsusähköposti",
+      "inviteEmailHint": "He saavat kutsun liittyä tähän sivustoon.",
+      "inviteEmailError": "Anna kelvollinen sähköpostiosoite."
+    },
+    "combobox": {
+      "title": "Yhdistelmävalinta",
+      "description": "Mukautettu, hallittu, saavutettava valinta: haettava, yksittäis- tai monivalinta, min/max valittuja, mukautettu kohteen käyttöliittymä, mukautettu hakupredikaatti ja konfiguroitava esikatselu valituista.",
+      "singleSearchable": "Yksittäinen & haettava",
+      "singleSearchableHint": "Oletusmuotoiset {id,label} -vaihtoehdot tai mukautettu kohdetyyppi käsittelijöiden kautta.",
+      "multiPreview": "Monivalinta esikatselulla",
+      "customPredicate": "Mukautettu predikaatti & käyttöliittymä",
+      "states": "Tilat",
+      "role": "Rooli",
+      "rolePlaceholder": "Valitse rooli…",
+      "roleSingleHint": "Yksittäisvalinta, ei hakua.",
+      "country": "Maa",
+      "countryPlaceholder": "Valitse maa…",
+      "searchCountries": "Hae maita…",
+      "countrySearchHint": "Haettava, mukautettu kohdetyyppi käsittelijöiden kautta (nimike = nimi).",
+      "scopeCountries": "Rajaa maihin",
+      "allCountries": "Kaikki maat",
+      "multiHint": "Monivalinta. Esikatselu näyttää 2 merkkiä, sitten ”+N”.",
+      "assignedRegions": "Määritetyt alueet",
+      "minMaxHint": "min 1 · max 3 — kokeile poistaa kaikki tai lisätä neljäs.",
+      "richItems": "Maat (rikkaat kohteet)",
+      "searchNameCodeRegion": "Hae nimellä, koodilla tai alueella…",
+      "customHint": "Mukautettu hakupredikaatti (kokeile ”bal” tai ”ee”) + mukautettu käyttöliittymä.",
+      "inviteAs": "Kutsu roolilla",
+      "disabledOptionHint": "Pääylläpitäjä-vaihtoehto ei ole käytössä",
+      "disabled": "Ei käytössä"
+    },
+    "badges": {
+      "title": "Tilamerkit",
+      "description": "Sävy + symboli + teksti. Tilan merkitys ei koskaan perustu pelkkään väriin, joten värisokea käyttäjä lukee sen oikein.",
+      "siteDeploy": "Sivuston & julkaisun tila",
+      "siteDeployHint": "Vaimea variantti (oletus).",
+      "live": "Käytössä",
+      "deploying": "Julkaistaan",
+      "needsReview": "Vaatii tarkistuksen",
+      "failed": "Epäonnistui",
+      "current": "Nykyinen",
+      "draft": "Luonnos",
+      "variants": "Variantit",
+      "roles": "Roolit",
+      "rolesHint": "Pelkät lukumäärät ja tunnisteet käyttävät neutraalia sävyä ilman pistettä.",
+      "sites": "{count} sivustoa"
+    },
+    "alerts": {
+      "title": "Ilmoitukset",
+      "description": "Upotettu palaute. Sävytetty pinta, johtava kuvake, otsikko + teksti. Litteä — 1px reuna, ei varjoa.",
+      "tones": "Sävyt",
+      "titleOnly": "Vain otsikko",
+      "deployQueuedTitle": "Julkaisu jonossa",
+      "deployQueuedBody": "Workerin koonti sivustolle <b>helsinki</b> alkoi hetki sitten. Tämä kestää yleensä alle minuutin.",
+      "publishedTitle": "Sivusto julkaistu",
+      "publishedBody": "bizbeecms-cms-helsinki on käytössä Cloudflaressa.",
+      "warningTitle": "D1-sidonta on paikkamerkki",
+      "warningBody": "Korvaa paikkamerkkitietokannan tunnus tiedostossa wrangler.jsonc ennen seuraavaa tuotantojulkaisua.",
+      "failedTitle": "Julkaisu epäonnistui",
+      "failedBody": "Cloudflaren API palautti virheen 403. Kirjaudu uudelleen ja yritä uudestaan.",
+      "pending": "3 kutsua on yhä odottamassa."
+    },
+    "card": {
+      "title": "Kortti",
+      "description": "Litteä säiliö: 1px reuna korotetulla pinnalla. Otsikko / sisältö / alatunniste koostuvat tarpeen mukaan.",
+      "fullComposition": "Täysi koostumus",
+      "inviteTitle": "Kutsu tiimiläinen",
+      "inviteDescription": "He saavat sähköpostin liittyäkseen tähän sivustoon.",
+      "email": "Sähköposti",
+      "emailPlaceholder": "tiimi@toimisto.com",
+      "cancel": "Peruuta",
+      "sendInvite": "Lähetä kutsu",
+      "siteMeta": "bizbeecms-cms-helsinki · FI",
+      "siteBody": "Viimeksi julkaistu 4 minuuttia sitten · 2 sivuston hallinnoijaa.",
+      "open": "Avaa",
+      "deploy": "Julkaise"
+    },
+    "table": {
+      "title": "Taulukko",
+      "description": "Koostettavat taulukkoelementit. Rivit korostuvat; tila näkyy merkin kautta, ei rivin värin.",
+      "users": "Käyttäjät",
+      "email": "Sähköposti",
+      "role": "Rooli",
+      "country": "Maa",
+      "status": "Tila",
+      "active": "Aktiivinen",
+      "invited": "Kutsuttu"
+    }
+  }
+}
