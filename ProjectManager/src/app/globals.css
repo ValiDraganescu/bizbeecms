@@ -4,7 +4,14 @@
  * Theme tokens — PURPOSE-NAMED ONLY (user-mandated).
  * Components reference utilities like `bg-surface`, `text-foreground`,
  * `border-border`, `bg-primary` — NEVER raw color names (no `blue-500`,
- * `gray-200`) and NEVER hex literals in component markup.
+ * `gray-200`) and NEVER hex/oklch literals in component markup.
+ *
+ * Values are OKLCH. The accent is a deep indigo (hue ~268) used sparingly
+ * (The One Voice Rule — see DESIGN.md). Neutrals are tinted a hair toward the
+ * accent hue rather than warm-by-default. Status colors come in two strengths:
+ *   --color-<role>            strong fill / icon / text
+ *   --color-<role>-subtle     low-chroma background tint for badges & alerts
+ * Status is never color-only: components pair it with an icon + label.
  *
  * The raw color values live ONLY here. Light is the default (:root); dark is
  * applied either explicitly via [data-theme="dark"] or, when the user has not
@@ -13,21 +20,41 @@
  */
 
 :root {
-  /* Light theme — purpose tokens */
-  --color-surface: #ffffff;
-  --color-surface-muted: #f4f5f7;
-  --color-surface-raised: #ffffff;
-  --color-foreground: #1a1d21;
-  --color-foreground-muted: #5c636e;
-  --color-border: #e2e5ea;
-  --color-primary: #2f6df6;
-  --color-primary-hover: #2057d6;
-  --color-primary-foreground: #ffffff;
-  --color-danger: #d6314b;
-  --color-danger-hover: #b71f38;
-  --color-danger-foreground: #ffffff;
-  --color-success: #1f9d57;
-  --color-ring: #2f6df6;
+  /* ---- Light theme — purpose tokens ---- */
+
+  /* Neutrals (tinted toward indigo hue 268) */
+  --color-surface: oklch(0.995 0.001 268);
+  --color-surface-muted: oklch(0.968 0.004 268);
+  --color-surface-raised: oklch(1 0 0);
+  --color-foreground: oklch(0.24 0.012 268);
+  --color-foreground-muted: oklch(0.5 0.014 268);
+  --color-border: oklch(0.915 0.006 268);
+
+  /* Accent — deep indigo */
+  --color-primary: oklch(0.5 0.19 268);
+  --color-primary-hover: oklch(0.43 0.19 268);
+  --color-primary-foreground: oklch(0.99 0.002 268);
+  --color-primary-subtle: oklch(0.95 0.03 268);
+
+  /* Status — danger / success / warning / info */
+  --color-danger: oklch(0.55 0.2 18);
+  --color-danger-hover: oklch(0.48 0.2 18);
+  --color-danger-foreground: oklch(0.99 0.01 18);
+  --color-danger-subtle: oklch(0.955 0.03 18);
+
+  --color-success: oklch(0.55 0.13 150);
+  --color-success-foreground: oklch(0.99 0.01 150);
+  --color-success-subtle: oklch(0.955 0.04 150);
+
+  --color-warning: oklch(0.62 0.14 75);
+  --color-warning-foreground: oklch(0.99 0.01 75);
+  --color-warning-subtle: oklch(0.955 0.05 75);
+
+  --color-info: oklch(0.55 0.13 240);
+  --color-info-foreground: oklch(0.99 0.01 240);
+  --color-info-subtle: oklch(0.955 0.035 240);
+
+  --color-ring: oklch(0.5 0.19 268);
 }
 
 /* Dark token values — shared by explicit dark and system-dark. */
@@ -38,40 +65,75 @@
   }
 }
 
+/* Dark theme values, factored into a custom property block applied below to
+ * both the explicit [data-theme="dark"] selector and the system-dark media
+ * query, so the two never drift. */
 [data-theme="dark"] {
-  --color-surface: #14171c;
-  --color-surface-muted: #1c2026;
-  --color-surface-raised: #21262e;
-  --color-foreground: #eceef1;
-  --color-foreground-muted: #9aa3af;
-  --color-border: #2c323b;
-  --color-primary: #5b8cff;
-  --color-primary-hover: #7aa1ff;
-  --color-primary-foreground: #0c1018;
-  --color-danger: #ff5a72;
-  --color-danger-hover: #ff7d90;
-  --color-danger-foreground: #160a0d;
-  --color-success: #3fcf7f;
-  --color-ring: #5b8cff;
+  --color-surface: oklch(0.2 0.012 268);
+  --color-surface-muted: oklch(0.25 0.014 268);
+  --color-surface-raised: oklch(0.275 0.015 268);
+  --color-foreground: oklch(0.95 0.006 268);
+  --color-foreground-muted: oklch(0.7 0.018 268);
+  --color-border: oklch(0.34 0.016 268);
+
+  --color-primary: oklch(0.72 0.15 268);
+  --color-primary-hover: oklch(0.79 0.13 268);
+  --color-primary-foreground: oklch(0.18 0.03 268);
+  --color-primary-subtle: oklch(0.34 0.07 268);
+
+  --color-danger: oklch(0.68 0.18 18);
+  --color-danger-hover: oklch(0.74 0.16 18);
+  --color-danger-foreground: oklch(0.18 0.04 18);
+  --color-danger-subtle: oklch(0.36 0.08 18);
+
+  --color-success: oklch(0.72 0.14 150);
+  --color-success-foreground: oklch(0.18 0.04 150);
+  --color-success-subtle: oklch(0.34 0.07 150);
+
+  --color-warning: oklch(0.78 0.14 75);
+  --color-warning-foreground: oklch(0.2 0.04 75);
+  --color-warning-subtle: oklch(0.37 0.07 75);
+
+  --color-info: oklch(0.72 0.13 240);
+  --color-info-foreground: oklch(0.18 0.04 240);
+  --color-info-subtle: oklch(0.34 0.07 240);
+
+  --color-ring: oklch(0.72 0.15 268);
 }
 
-/* When theme is "system", follow the OS preference. */
+/* When theme is "system", follow the OS preference. Mirror of dark values. */
 @media (prefers-color-scheme: dark) {
   [data-theme="system"] {
-    --color-surface: #14171c;
-    --color-surface-muted: #1c2026;
-    --color-surface-raised: #21262e;
-    --color-foreground: #eceef1;
-    --color-foreground-muted: #9aa3af;
-    --color-border: #2c323b;
-    --color-primary: #5b8cff;
-    --color-primary-hover: #7aa1ff;
-    --color-primary-foreground: #0c1018;
-    --color-danger: #ff5a72;
-    --color-danger-hover: #ff7d90;
-    --color-danger-foreground: #160a0d;
-    --color-success: #3fcf7f;
-    --color-ring: #5b8cff;
+    --color-surface: oklch(0.2 0.012 268);
+    --color-surface-muted: oklch(0.25 0.014 268);
+    --color-surface-raised: oklch(0.275 0.015 268);
+    --color-foreground: oklch(0.95 0.006 268);
+    --color-foreground-muted: oklch(0.7 0.018 268);
+    --color-border: oklch(0.34 0.016 268);
+
+    --color-primary: oklch(0.72 0.15 268);
+    --color-primary-hover: oklch(0.79 0.13 268);
+    --color-primary-foreground: oklch(0.18 0.03 268);
+    --color-primary-subtle: oklch(0.34 0.07 268);
+
+    --color-danger: oklch(0.68 0.18 18);
+    --color-danger-hover: oklch(0.74 0.16 18);
+    --color-danger-foreground: oklch(0.18 0.04 18);
+    --color-danger-subtle: oklch(0.36 0.08 18);
+
+    --color-success: oklch(0.72 0.14 150);
+    --color-success-foreground: oklch(0.18 0.04 150);
+    --color-success-subtle: oklch(0.34 0.07 150);
+
+    --color-warning: oklch(0.78 0.14 75);
+    --color-warning-foreground: oklch(0.2 0.04 75);
+    --color-warning-subtle: oklch(0.37 0.07 75);
+
+    --color-info: oklch(0.72 0.13 240);
+    --color-info-foreground: oklch(0.18 0.04 240);
+    --color-info-subtle: oklch(0.34 0.07 240);
+
+    --color-ring: oklch(0.72 0.15 268);
   }
 }
 
@@ -87,17 +149,35 @@
   --color-foreground: var(--color-foreground);
   --color-foreground-muted: var(--color-foreground-muted);
   --color-border: var(--color-border);
+
   --color-primary: var(--color-primary);
   --color-primary-hover: var(--color-primary-hover);
   --color-primary-foreground: var(--color-primary-foreground);
+  --color-primary-subtle: var(--color-primary-subtle);
+
   --color-danger: var(--color-danger);
   --color-danger-hover: var(--color-danger-hover);
   --color-danger-foreground: var(--color-danger-foreground);
+  --color-danger-subtle: var(--color-danger-subtle);
+
   --color-success: var(--color-success);
+  --color-success-foreground: var(--color-success-foreground);
+  --color-success-subtle: var(--color-success-subtle);
+
+  --color-warning: var(--color-warning);
+  --color-warning-foreground: var(--color-warning-foreground);
+  --color-warning-subtle: var(--color-warning-subtle);
+
+  --color-info: var(--color-info);
+  --color-info-foreground: var(--color-info-foreground);
+  --color-info-subtle: var(--color-info-subtle);
+
   --color-ring: var(--color-ring);
 
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
 }
 
 html {
@@ -107,4 +187,17 @@ html {
 body {
   background-color: var(--color-surface);
   color: var(--color-foreground);
+}
+
+/* Honor reduced-motion globally: components add transitions freely; this is the
+ * project-wide safety net required by DESIGN.md / WCAG. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -35,6 +35,25 @@ export default function Home() {
             Cloudflare-native multi-site B2B whitelabel CMS. UI foundation:
             Tailwind, purpose-named light/dark theme, composable components.
           </p>
+          <a
+            href="/design-system"
+            className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-md text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Open the design system
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </a>
         </div>
         <ThemeToggle />
       </header>
