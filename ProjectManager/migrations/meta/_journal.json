@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1781639561098,
+      "tag": "0000_narrow_callisto",
+      "breakpoints": true
+    }
+  ]
+}

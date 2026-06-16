@@ -1,16 +1,15 @@
 # Note to the next Meeseeks (main)
 
-Both apps are now scaffolded and building:
-- `ProjectManager/` — PM (Next.js 16 + OpenNext Cloudflare). `/` + `GET /api/health`. dev port 3601.
-- `CMS/` — default Next install (Next.js 16 + OpenNext Cloudflare). `/` + `GET /api/health`. dev port 3602.
-Both pass `npm run build` and `npx opennextjs-cloudflare build`.
+State of the world:
+- `ProjectManager/` (PM, dev 3601) and `CMS/` (dev 3602) both scaffolded + building (next build + opennextjs-cloudflare build).
+- **D1 is now wired in PM.** drizzle-orm/d1 schema at `ProjectManager/src/db/schema.ts` (users/invites/sites/site_users), client `getDb()` at `src/db/index.ts`, migration `migrations/0000_narrow_callisto.sql` generated, `DB`+`SESSIONS` bindings in `wrangler.jsonc` (placeholder ids — no CF auth here).
 
-**Next valuable slice (BACKLOG order):** Add the Cloudflare **D1 binding + initial schema/migrations** to the **PM app** (`ProjectManager/`) for: `users`, `invites`, `sites`, `site_users`.
-- In `ProjectManager/wrangler.jsonc` the D1/KV bindings are stubbed as a commented TODO — uncomment `d1_databases` (binding `DB`) and `kv_namespaces` (binding `SESSIONS`); leave the `database_id`/`id` as placeholders (no Cloudflare auth in this env to create real ones — note that).
-- Recommended: drizzle-orm with the **`drizzle-orm/d1`** driver (NOT pg — aicms uses pg, ignore that for infra). Add `drizzle-kit` for migration generation. Put schema in e.g. `ProjectManager/src/db/schema.ts` and migrations in `ProjectManager/migrations/` or `drizzle/`.
-- Schema sketch: users(id, email unique, password_hash, role[SuperAdmin|Admin|SiteManager], country nullable, can_invite, created_at); invites(id, email, role, country, invited_by, token, accepted_at, expires_at); sites(id, name, slug unique, status, created_by, worker_name, created_at); site_users(site_id, user_id, PK both).
-- Access D1 in routes via `getCloudflareContext().env.DB` (OpenNext). Verify with `npm run build` + `opennextjs-cloudflare build` — real D1 query needs `wrangler dev`/auth, so just verify it compiles + the migration SQL is generated.
+**Next valuable slice (BACKLOG order): UI FOUNDATION — do this BEFORE any auth/site pages.**
+- In `ProjectManager/`: set up **Tailwind CSS**, a **light+dark theme** using **purpose-named tokens** (surface, surface-muted, foreground, foreground-muted, border, primary, primary-foreground, danger, …) as CSS vars / Tailwind theme — NEVER raw color names or hex in components.
+- Add a theme toggle/provider that respects system preference (prefers-color-scheme) and persists choice.
+- Build a small set of **composable** base components (composition over props): `<Table>/<TableHeader>/<TableBody>/<TableRow>/<TableCell>`, `<Button>`, `<Card>`, form fields. See CAVEATS "UI design rules" — these are user-mandated and binding.
+- Verify with `npm run build` + `npx opennextjs-cloudflare build`.
 
-**After that (BACKLOG order):** email+password auth (first user → SuperAdmin), then invite flow, Site CRUD, Site deployment via Cloudflare API.
+**After UI foundation (BACKLOG order):** email+password auth (FIRST registrant → SuperAdmin, later ones not; sessions in KV `SESSIONS`) — build its pages with the new composable components/theme. Then invite flow, Site CRUD, Site deployment via Cloudflare API.
 
-**Gotchas:** run each app's commands from inside its own dir (PM and CMS are separate packages). No Cloudflare auth here — verify via local build, not deploy.
+**Gotchas:** run commands inside each app's own dir (separate packages). No Cloudflare auth → verify via build, not deploy. Use `getDb()` for D1 access in routes/server actions. Regenerate `cloudflare-env.d.ts` via `npm run cf-typegen` after wrangler.jsonc changes.

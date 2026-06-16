@@ -10,8 +10,24 @@
   },
   "observability": {
     "enabled": true
-  }
-  // D1 / KV bindings are added in a later milestone task:
-  // "d1_databases": [{ "binding": "DB", "database_name": "bizbeecms", "database_id": "<id>" }],
-  // "kv_namespaces": [{ "binding": "SESSIONS", "id": "<id>" }]
+  },
+  // D1: app data (users, invites, sites, site_users).
+  // `database_id` is a placeholder — replace with the real id from
+  // `wrangler d1 create bizbeecms` once Cloudflare auth is available.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bizbeecms",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // KV: auth sessions. `id` is a placeholder — replace with the real id
+  // from `wrangler kv namespace create SESSIONS` once auth is available.
+  "kv_namespaces": [
+    {
+      "binding": "SESSIONS",
+      "id": "00000000000000000000000000000000"
+    }
+  ]
 }

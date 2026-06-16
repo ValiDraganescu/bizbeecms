@@ -7,7 +7,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 - DONE: Scaffold the PM Next.js app under `ProjectManager/` wired for Cloudflare Workers deployment (OpenNext / wrangler config). Hello-world + /api/health building; `opennextjs-cloudflare build` emits a worker bundle.
 - DONE: Scaffold the default Next.js install under `CMS/` (mirrors PM OpenNext/wrangler wiring; `next build` + `opennextjs-cloudflare build` both pass).
-- DOING: Add Cloudflare D1 binding + initial schema/migrations for users, invites, sites, site_users.
+- DONE: Add Cloudflare D1 binding + initial schema/migrations for users, invites, sites, site_users. (drizzle-orm/d1; schema in src/db/schema.ts, migration 0000 generated; DB+SESSIONS bindings in wrangler.jsonc with placeholder ids.)
 - TODO: **UI foundation (do BEFORE building any auth/site pages)** — set up Tailwind CSS in `ProjectManager/`, a light+dark theme using purpose-named color tokens (CSS vars / Tailwind theme: surface, foreground, border, primary, danger, etc. — never raw color names), a theme toggle/provider respecting system preference, and a small set of composable base components (e.g. `<Table>` family, `<Button>`, `<Card>`, form fields) demonstrating composition-over-props. See CAVEATS "UI design rules".
 - TODO: Email+password auth — registration where the FIRST user becomes SuperAdmin; subsequent users do not. Sessions in D1/KV. (Build the auth UI with the composable components + theme from the UI foundation task.)
 - TODO: Invite flow — SuperAdmin/Admin invite Admin/SiteManager with role + country scoping, enforced server-side.
