@@ -59,7 +59,10 @@ export default {
       const siteId = String(body.siteId ?? "").trim();
       const ref =
         body.ref && /^[\w.\-/]+$/.test(body.ref) ? body.ref : "main";
-      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !siteId) {
+      if (
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ||
+        !/^[A-Za-z0-9_-]+$/.test(siteId)
+      ) {
         return Response.json({ error: "badRequest" }, { status: 400 });
       }
 
@@ -90,52 +93,40 @@ async function startDeploy(
   const workerName = `${WORKER_PREFIX}${input.slug}`.slice(0, 63);
   const sandbox = getSandbox(env.Sandbox, `deploy-${input.slug}`);
 
-  const script = buildScript({
-    repoUrl: env.REPO_URL,
-    ref: input.ref,
-    workerName,
-    siteId: input.siteId,
-    callbackUrl: env.PM_CALLBACK_ORIGIN
-      ? `${env.PM_CALLBACK_ORIGIN.replace(/\/+$/, "")}/api/deploy-callback`
-      : "",
-  });
-
-  // Write the script + run it detached. Secrets are passed via the process env
-  // (never interpolated into the script text), so they don't land in the file,
-  // argv, or any log.
-  await sandbox.writeFile("/workspace/deploy.sh", script);
+  // The script is fully STATIC — no caller-controlled value is interpolated
+  // into it. Everything (secrets AND the non-secret per-deploy values) is
+  // passed via the process env and referenced as $VARS, so nothing can break
+  // out of the shell or land in the script file. See buildScript().
+  await sandbox.writeFile("/workspace/deploy.sh", buildScript());
   await sandbox.startProcess("bash /workspace/deploy.sh", {
     env: {
       GITHUB_TOKEN: env.GITHUB_TOKEN ?? "",
       CLOUDFLARE_API_TOKEN: env.CF_API_TOKEN,
       CLOUDFLARE_ACCOUNT_ID: env.CF_ACCOUNT_ID,
       DEPLOYER_SECRET: env.DEPLOYER_SECRET,
+      REPO_URL: env.REPO_URL,
+      REF: input.ref,
+      WORKER_NAME: workerName,
+      SITE_ID: input.siteId,
+      CALLBACK_URL: env.PM_CALLBACK_ORIGIN
+        ? `${env.PM_CALLBACK_ORIGIN.replace(/\/+$/, "")}/api/deploy-callback`
+        : "",
     },
   });
 }
 
 /**
- * The self-contained build script. Runs in the container with secrets supplied
- * via env (referenced as $VARS, never inlined). Always POSTs a status callback
- * to the PM on exit. Auth for the private clone goes through an Authorization
- * header from $GITHUB_TOKEN, so the token never appears in argv or the remote
- * URL.
+ * The self-contained build script. Fully STATIC — every value it needs
+ * (secrets AND the per-deploy values SITE_ID/WORKER_NAME/CALLBACK_URL/REF/
+ * REPO_URL) is supplied via the process env and referenced as $VARS, never
+ * inlined. Nothing caller-controlled is interpolated into this string, so
+ * there is no shell-injection surface. Always POSTs a status callback to the
+ * PM on exit. Auth for the private clone goes through an Authorization header
+ * from $GITHUB_TOKEN, so the token never appears in argv or the remote URL.
  */
-function buildScript(p: {
-  repoUrl: string;
-  ref: string;
-  workerName: string;
-  siteId: string;
-  callbackUrl: string;
-}): string {
-  // Note: values below (repoUrl, ref, workerName, siteId, callbackUrl) are
-  // server-controlled and already validated; they are NOT secrets.
+function buildScript(): string {
   return `#!/usr/bin/env bash
 set -uo pipefail
-
-SITE_ID="${p.siteId}"
-WORKER_NAME="${p.workerName}"
-CALLBACK_URL="${p.callbackUrl}"
 
 report() {
   # $1=status (deployed|failed) ; $2=optional error
@@ -170,7 +161,7 @@ rm -rf /workspace/src
 export GIT_CONFIG_COUNT=1
 export GIT_CONFIG_KEY_0="http.extraHeader"
 export GIT_CONFIG_VALUE_0="Authorization: Basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\\n')"
-git clone --depth 1 --branch "${p.ref}" "${p.repoUrl}" /workspace/src
+git clone --depth 1 --branch "$REF" "$REPO_URL" /workspace/src
 clone_rc=$?
 unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
 if [ $clone_rc -ne 0 ]; then report failed "git clone failed"; exit 1; fi
