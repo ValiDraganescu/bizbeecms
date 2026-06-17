@@ -1,0 +1,3 @@
+- The ProjectManager project runs at https://bizbee.localhost
+- Use `npm run dev` (port 3601) when iterating — it hot-reloads, no build or `rm -rf .next` needed.
+- Use `npx opennextjs-cloudflare build` (the deploy gate; runs `next build` internally) only as a pre-commit check, and never while `npm run dev` is running (it corrupts `.next` and 500s the server) — stop dev first, then build.

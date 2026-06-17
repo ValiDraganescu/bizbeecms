@@ -13,10 +13,17 @@ import {
   findSiteById,
   isSlugTaken,
   isValidSlug,
+  isUserAssignedToSite,
   listAssignableUsers,
   setSiteUsers,
   updateSite,
 } from "@/lib/site/site";
+import {
+  buildCmsBundle,
+  canStartDeploy,
+  deploySite,
+  type DeployErrorKey,
+} from "@/lib/deploy";
 
 export type SiteErrorKey =
   | "nameRequired"
@@ -169,4 +176,50 @@ export async function assignUsersAction(
   } catch {
     return { error: "unknown" };
   }
+}
+
+export type DeployState = {
+  /** A deploy.engine error key, or "notAllowed"/"bundleMissing" gate errors. */
+  error?: DeployErrorKey | "notAllowed" | "bundleMissing";
+  /** Set on a successful deploy. */
+  deployed?: boolean;
+  /** The provisioned Worker name on success. */
+  workerName?: string;
+};
+
+/**
+ * Trigger a deploy of a Site's CMS Worker. Authz: the actor must be able to
+ * MANAGE the Site — country-reach (SuperAdmin/global → all; scoped Admin → their
+ * countries) OR a `site_users` assignment (SiteManagers). Re-enforced here;
+ * never trust the client. The CMS bundle is the committed pre-built artifact.
+ */
+export async function deploySiteAction(
+  siteId: string,
+  _prev: DeployState,
+  _formData: FormData,
+): Promise<DeployState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "notAllowed" };
+
+  const site = await findSiteById(siteId);
+  if (!site) return { error: "notFound" };
+
+  // Reach = country-reach OR assignment. Either grants manage/deploy rights.
+  const actorCountries = await getUserCountries(user.id);
+  const reachable =
+    canManageSiteByCountry(user, actorCountries, site) ||
+    (await isUserAssignedToSite(user.id, site.id));
+  if (!reachable) return { error: "notAllowed" };
+
+  if (!canStartDeploy(site)) return { error: "alreadyDeploying" };
+
+  const bundle = await buildCmsBundle();
+  if (!bundle) return { error: "bundleMissing" };
+
+  const result = await deploySite({ siteId, bundle });
+  revalidatePath(`/sites/${siteId}`);
+  revalidatePath("/sites");
+
+  if (!result.ok) return { error: result.reason };
+  return { deployed: true, workerName: result.site.workerName ?? undefined };
 }

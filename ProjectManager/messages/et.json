@@ -235,6 +235,24 @@
       "save": "Salvesta määramised",
       "saved": "Määramised uuendatud."
     },
+    "deploy": {
+      "title": "Juurutamine",
+      "cardDescription": "Loo või uuenda selle saidi CMS-Worker Cloudflare'is.",
+      "description": "Juurutab CMS-i selle saidi enda Cloudflare Workerina.",
+      "deploy": "Juuruta",
+      "redeploy": "Juuruta uuesti",
+      "deployed": "Juurutamine õnnestus.",
+      "deployedWorker": "Juurutatud nimega {worker}.",
+      "errors": {
+        "notAllowed": "Sul pole õigust seda saiti juurutada.",
+        "notFound": "Saiti ei leitud.",
+        "alreadyDeploying": "Juurutamine on juba pooleli.",
+        "notConfigured": "Cloudflare'i juurutamise mandaadid pole seadistatud.",
+        "uploadFailed": "Workeri üleslaadimine ebaõnnestus. Proovi uuesti.",
+        "bundleMissing": "CMS-i komplekti pole ehitatud.",
+        "unknown": "Midagi läks valesti. Proovi uuesti."
+      }
+    },
     "created": "Sait loodud.",
     "updated": "Sait uuendatud.",
     "errors": {

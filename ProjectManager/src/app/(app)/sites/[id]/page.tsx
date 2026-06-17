@@ -20,8 +20,9 @@ import {
   isUserAssignedToSite,
   listAssignableUsers,
 } from "@/lib/site/site";
-import { assignUsersAction, updateSiteAction } from "../actions";
+import { assignUsersAction, deploySiteAction, updateSiteAction } from "../actions";
 import { AssignForm } from "../assign-form";
+import { DeployForm } from "../deploy-form";
 import { SiteForm } from "../site-form";
 
 const statusTone: Record<SiteStatus, BadgeTone> = {
@@ -114,6 +115,19 @@ export default async function SiteDetailPage({
               </span>
             </Detail>
           </dl>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("deploy.title")}</CardTitle>
+          <CardDescription>{t("deploy.cardDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DeployForm
+            action={deploySiteAction.bind(null, site.id)}
+            status={site.status}
+          />
         </CardContent>
       </Card>
 

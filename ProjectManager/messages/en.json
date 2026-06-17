@@ -235,6 +235,24 @@
       "save": "Save assignments",
       "saved": "Assignments updated."
     },
+    "deploy": {
+      "title": "Deployment",
+      "cardDescription": "Provision or update this Site's CMS Worker on Cloudflare.",
+      "description": "Deploys the CMS as this Site's own Cloudflare Worker.",
+      "deploy": "Deploy",
+      "redeploy": "Redeploy",
+      "deployed": "Deploy succeeded.",
+      "deployedWorker": "Deployed as {worker}.",
+      "errors": {
+        "notAllowed": "You're not allowed to deploy this Site.",
+        "notFound": "Site not found.",
+        "alreadyDeploying": "A deploy is already in progress.",
+        "notConfigured": "Cloudflare deploy credentials aren't configured.",
+        "uploadFailed": "The Worker upload failed. Please try again.",
+        "bundleMissing": "The CMS bundle hasn't been built.",
+        "unknown": "Something went wrong. Please try again."
+      }
+    },
     "created": "Site created.",
     "updated": "Site updated.",
     "errors": {

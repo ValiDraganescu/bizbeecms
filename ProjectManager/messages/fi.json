@@ -235,6 +235,24 @@
       "save": "Tallenna liitokset",
       "saved": "Liitokset päivitetty."
     },
+    "deploy": {
+      "title": "Julkaisu",
+      "cardDescription": "Luo tai päivitä tämän sivuston CMS-Worker Cloudflaressa.",
+      "description": "Julkaisee CMS:n tämän sivuston omana Cloudflare-Workerina.",
+      "deploy": "Julkaise",
+      "redeploy": "Julkaise uudelleen",
+      "deployed": "Julkaisu onnistui.",
+      "deployedWorker": "Julkaistu nimellä {worker}.",
+      "errors": {
+        "notAllowed": "Sinulla ei ole oikeutta julkaista tätä sivustoa.",
+        "notFound": "Sivustoa ei löytynyt.",
+        "alreadyDeploying": "Julkaisu on jo käynnissä.",
+        "notConfigured": "Cloudflaren julkaisutunnuksia ei ole määritetty.",
+        "uploadFailed": "Workerin lataus epäonnistui. Yritä uudelleen.",
+        "bundleMissing": "CMS-pakettia ei ole rakennettu.",
+        "unknown": "Jotain meni pieleen. Yritä uudelleen."
+      }
+    },
     "created": "Sivusto luotu.",
     "updated": "Sivusto päivitetty.",
     "errors": {
