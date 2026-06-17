@@ -42,5 +42,17 @@
     "saving": "Saving…",
     "saved": "Content languages saved.",
     "error": "Error: {message}"
+  },
+  "media": {
+    "title": "Media library",
+    "subtitle": "Upload images to this site and reference them in components by their URL.",
+    "uploadLabel": "Upload an image",
+    "uploadHint": "JPEG, PNG, WebP, GIF or SVG, up to {max}MB.",
+    "uploadFailed": "Upload failed.",
+    "deleteFailed": "Could not delete the file.",
+    "empty": "No media yet. Upload an image to get started.",
+    "copyUrl": "Copy URL",
+    "copied": "Copied!",
+    "delete": "Delete"
   }
 }

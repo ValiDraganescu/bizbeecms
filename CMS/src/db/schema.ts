@@ -106,8 +106,35 @@ export const siteSettings = sqliteTable("site_settings", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+/**
+ * Asset — metadata for a media file stored in the per-Site R2 bucket (the
+ * `MEDIA` binding; Milestone 2, epic D1). The bytes live in R2 under `key`;
+ * this row lets the gallery list assets without an R2 LIST call and gives the
+ * AI/user a stable public URL (`/_assets/<key>`, served by the worker) to
+ * reference in component artifacts. R2 is Workers-native, so no presigning /
+ * AWS creds (unlike aicms, which runs off-Cloudflare).
+ */
+export const asset = sqliteTable(
+  "asset",
+  {
+    id: text("id").primaryKey(),
+    // R2 object key (also the public URL segment). Unique per Site.
+    key: text("key").notNull(),
+    // Original upload filename (for display in the gallery).
+    filename: text("filename").notNull(),
+    contentType: text("content_type").notNull(),
+    size: integer("size").notNull().default(0),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [uniqueIndex("asset_key_unique").on(t.key)],
+);
+
 export type Component = typeof component.$inferSelect;
 export type NewComponent = typeof component.$inferInsert;
 export type Page = typeof page.$inferSelect;
 export type NewPage = typeof page.$inferInsert;
 export type SiteSetting = typeof siteSettings.$inferSelect;
+export type Asset = typeof asset.$inferSelect;
+export type NewAsset = typeof asset.$inferInsert;

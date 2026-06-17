@@ -29,6 +29,16 @@
   "ai": {
     "binding": "AI"
   },
+  // Per-Site R2 bucket for media assets (Milestone 2, epic D1). The upload
+  // route writes bytes here; `/media/<key>` streams them back. Each deployed
+  // CMS Worker gets its OWN bucket (the bucket IS the Site boundary). The PM
+  // deploy step provisions a real bucket per Site and overrides bucket_name.
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "bizbeecms-cms-media"
+    }
+  ],
   "vars": {
     "AI_GATEWAY": "bizbeecms-cms"
   },

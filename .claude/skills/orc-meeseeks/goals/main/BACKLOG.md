@@ -60,7 +60,7 @@ States: TODO | DOING | DONE | BLOCKED. Each is ONE provable capability. Order is
 - TODO: **C3 — section/block editing UI.** Visual compose/reorder of the block tree (the non-AI editor counterpart to B3).
 
 **D. Assets**
-- TODO: **D1 — R2 asset upload + gallery.** R2 bucket binding + upload route + media library UI. (R2 IS Workers-native — the aicms `node:fs`/pg caveats don't apply; aws4fetch/presign or the R2 binding directly.) Proves: upload an image, get a CDN URL, use it in a component.
+- DONE: **D1 — R2 asset upload + gallery (offline core).** Native R2 binding `MEDIA` (no presigning — aicms presigns only because it runs off-CF). PURE `CMS/src/lib/render/asset.ts` (validate type+size, collision-resistant key, traversal-guard, `assetUrl`→`/media/<key>`); `asset` D1 metadata table (migration 0002) for listing; `db/asset-store.ts` (R2+D1 list/put/delete/get); REST `api/assets/route.ts` (GET/POST-multipart/DELETE); serve route `app/media/[...key]/route.ts` (streams R2, immutable cache); admin `app/admin/media/page.tsx` + client `components/media/media-gallery.tsx` (upload/grid/copy-URL/delete); `media` i18n EN/FI/ET. CMS 139/139 (+9 `asset.test.mjs`), tsc + opennext gate (3 routes registered); PM bundle regen 5269KB + 32/32 + selfcheck. Live R2/D1 → HITL P1 (provision per-Site bucket + apply migration 0002). See JOURNAL 2026-06-17 22:20.
 - TODO: **D2 — Cloudflare Images transforms (optional).** Resize/format on serve. Defer until D1 lands.
 
 **E. Settings & theming**

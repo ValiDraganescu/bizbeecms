@@ -42,5 +42,17 @@
     "saving": "Tallennetaan…",
     "saved": "Sisältökielet tallennettu.",
     "error": "Virhe: {message}"
+  },
+  "media": {
+    "title": "Mediakirjasto",
+    "subtitle": "Lataa kuvia tälle sivustolle ja viittaa niihin komponenteissa niiden URL-osoitteella.",
+    "uploadLabel": "Lataa kuva",
+    "uploadHint": "JPEG, PNG, WebP, GIF tai SVG, enintään {max} Mt.",
+    "uploadFailed": "Lataus epäonnistui.",
+    "deleteFailed": "Tiedostoa ei voitu poistaa.",
+    "empty": "Ei vielä mediaa. Aloita lataamalla kuva.",
+    "copyUrl": "Kopioi URL",
+    "copied": "Kopioitu!",
+    "delete": "Poista"
   }
 }

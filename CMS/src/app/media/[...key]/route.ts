@@ -1,0 +1,43 @@
+/**
+ * CMS media serve route (Milestone 2, epic D1) — streams asset bytes from the
+ * per-Site R2 bucket. `/media/<key>` → the `MEDIA` R2 object.
+ *
+ * An explicit route (beats the public `[[...slug]]` catch-all). Components
+ * reference `assetUrl(key)` = `/media/<key>` to load images. The key is
+ * validated against `isValidAssetKey` so it can't be used for traversal /
+ * to read arbitrary R2 objects.
+ *
+ * REST route handler (no server action). Live R2 needs a real binding (HITL).
+ */
+import { getAssetObject } from "@/db/asset-store";
+import { isValidAssetKey } from "@/lib/render/asset";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ key: string[] }> },
+): Promise<Response> {
+  const { key: segments } = await params;
+  const key = (segments ?? []).join("/");
+  if (!isValidAssetKey(key)) {
+    return new Response("not found", { status: 404 });
+  }
+
+  let object: Awaited<ReturnType<typeof getAssetObject>>;
+  try {
+    object = await getAssetObject(key);
+  } catch {
+    return new Response("media binding unavailable", { status: 503 });
+  }
+  if (!object) {
+    return new Response("not found", { status: 404 });
+  }
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("etag", object.httpEtag);
+  // Assets are content-addressed (key has a timestamp+rand), so cache hard.
+  headers.set("cache-control", "public, max-age=31536000, immutable");
+  return new Response(object.body, { headers });
+}

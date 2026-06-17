@@ -42,5 +42,17 @@
     "saving": "Salvestan…",
     "saved": "Sisukeeled salvestatud.",
     "error": "Viga: {message}"
+  },
+  "media": {
+    "title": "Meediateek",
+    "subtitle": "Laadi sellele saidile pilte üles ja viita neile komponentides nende URL-i kaudu.",
+    "uploadLabel": "Laadi pilt üles",
+    "uploadHint": "JPEG, PNG, WebP, GIF või SVG, kuni {max} MB.",
+    "uploadFailed": "Üleslaadimine ebaõnnestus.",
+    "deleteFailed": "Faili ei õnnestunud kustutada.",
+    "empty": "Meediat veel pole. Alusta pildi üleslaadimisega.",
+    "copyUrl": "Kopeeri URL",
+    "copied": "Kopeeritud!",
+    "delete": "Kustuta"
   }
 }
