@@ -43,7 +43,8 @@
       "email": "Email",
       "role": "Role",
       "country": "Country"
-    }
+    },
+    "manageSites": "Manage Sites"
   },
   "roles": {
     "superAdmin": "SuperAdmin",
@@ -169,6 +170,82 @@
       "countryNotAllowed": "You can't invite users for that country.",
       "emailTaken": "An account for this email already exists.",
       "alreadyInvited": "This email already has a pending invitation.",
+      "unknown": "Something went wrong. Please try again."
+    }
+  },
+  "sites": {
+    "back": "Back",
+    "title": "Sites",
+    "subtitle": "Create and manage whitelabel Sites. Each Site deploys as its own CMS.",
+    "notAllowedTitle": "You can't create Sites",
+    "notAllowedBody": "Only SuperAdmins and Admins can create Sites. You can manage Sites you're assigned to.",
+    "new": "New Site",
+    "status": {
+      "draft": "Draft",
+      "deploying": "Deploying",
+      "deployed": "Deployed",
+      "failed": "Failed"
+    },
+    "list": {
+      "title": "All Sites",
+      "description": "Sites you can see based on your role and country scope.",
+      "empty": "No Sites yet.",
+      "emptyAssigned": "You haven't been assigned to any Sites yet.",
+      "name": "Name",
+      "slug": "Slug",
+      "country": "Country",
+      "status": "Status",
+      "global": "Global",
+      "view": "View"
+    },
+    "form": {
+      "createTitle": "New Site",
+      "createDescription": "Name the Site and choose its country scope.",
+      "editTitle": "Edit Site",
+      "editDescription": "Update the Site's name, slug, and country.",
+      "name": "Name",
+      "namePlaceholder": "Acme Finland",
+      "slug": "Slug",
+      "slugHint": "Lowercase letters, numbers, and hyphens. Used in the Site's URL.",
+      "country": "Country",
+      "countryPlaceholder": "Pick a country…",
+      "globalCountry": "Global (all countries)",
+      "countryHintGlobal": "Pick a country, or leave as Global for all countries.",
+      "countryHintScoped": "Pick one of your countries.",
+      "create": "Create Site",
+      "save": "Save changes",
+      "cancel": "Cancel"
+    },
+    "detail": {
+      "overview": "Overview",
+      "createdBy": "Created by",
+      "createdAt": "Created",
+      "workerName": "Worker name",
+      "workerNamePending": "Not deployed yet",
+      "country": "Country",
+      "global": "Global"
+    },
+    "assign": {
+      "title": "Assigned users",
+      "description": "Users who can manage this Site. Country scope limits who's eligible.",
+      "label": "Users",
+      "placeholder": "Pick users…",
+      "empty": "No users assigned.",
+      "noneAssignable": "No eligible users for this Site's country.",
+      "save": "Save assignments",
+      "saved": "Assignments updated."
+    },
+    "created": "Site created.",
+    "updated": "Site updated.",
+    "errors": {
+      "nameRequired": "Enter a name.",
+      "slugRequired": "Enter a slug.",
+      "slugInvalid": "Use lowercase letters, numbers, and hyphens only.",
+      "slugTaken": "That slug is already in use.",
+      "countryInvalid": "Choose a valid country.",
+      "notAllowed": "You're not allowed to do that.",
+      "countryNotAllowed": "You can't create a Site for that country.",
+      "notFound": "Site not found.",
       "unknown": "Something went wrong. Please try again."
     }
   },

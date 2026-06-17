@@ -43,7 +43,8 @@
       "email": "Sähköposti",
       "role": "Rooli",
       "country": "Maa"
-    }
+    },
+    "manageSites": "Hallitse sivustoja"
   },
   "roles": {
     "superAdmin": "Pääylläpitäjä",
@@ -170,6 +171,82 @@
       "emailTaken": "Tälle sähköpostille on jo olemassa tili.",
       "alreadyInvited": "Tällä sähköpostilla on jo odottava kutsu.",
       "unknown": "Jokin meni pieleen. Yritä uudelleen."
+    }
+  },
+  "sites": {
+    "back": "Takaisin",
+    "title": "Sivustot",
+    "subtitle": "Luo ja hallitse whitelabel-sivustoja. Jokainen sivusto julkaistaan omana CMS:nään.",
+    "notAllowedTitle": "Et voi luoda sivustoja",
+    "notAllowedBody": "Vain pääkäyttäjät ja ylläpitäjät voivat luoda sivustoja. Voit hallita sivustoja, joihin sinut on lisätty.",
+    "new": "Uusi sivusto",
+    "status": {
+      "draft": "Luonnos",
+      "deploying": "Julkaistaan",
+      "deployed": "Julkaistu",
+      "failed": "Epäonnistui"
+    },
+    "list": {
+      "title": "Kaikki sivustot",
+      "description": "Sivustot, jotka näet roolisi ja maa-alueesi perusteella.",
+      "empty": "Ei vielä sivustoja.",
+      "emptyAssigned": "Sinua ei ole vielä lisätty yhteenkään sivustoon.",
+      "name": "Nimi",
+      "slug": "Tunnus",
+      "country": "Maa",
+      "status": "Tila",
+      "global": "Globaali",
+      "view": "Näytä"
+    },
+    "form": {
+      "createTitle": "Uusi sivusto",
+      "createDescription": "Nimeä sivusto ja valitse sen maa-alue.",
+      "editTitle": "Muokkaa sivustoa",
+      "editDescription": "Päivitä sivuston nimi, tunnus ja maa.",
+      "name": "Nimi",
+      "namePlaceholder": "Acme Suomi",
+      "slug": "Tunnus",
+      "slugHint": "Pieniä kirjaimia, numeroita ja väliviivoja. Käytetään sivuston osoitteessa.",
+      "country": "Maa",
+      "countryPlaceholder": "Valitse maa…",
+      "globalCountry": "Globaali (kaikki maat)",
+      "countryHintGlobal": "Valitse maa tai jätä globaaliksi kaikille maille.",
+      "countryHintScoped": "Valitse yksi maistasi.",
+      "create": "Luo sivusto",
+      "save": "Tallenna muutokset",
+      "cancel": "Peruuta"
+    },
+    "detail": {
+      "overview": "Yleiskatsaus",
+      "createdBy": "Luonut",
+      "createdAt": "Luotu",
+      "workerName": "Worker-nimi",
+      "workerNamePending": "Ei vielä julkaistu",
+      "country": "Maa",
+      "global": "Globaali"
+    },
+    "assign": {
+      "title": "Liitetyt käyttäjät",
+      "description": "Käyttäjät, jotka voivat hallita tätä sivustoa. Maa-alue rajaa, ketkä ovat valittavissa.",
+      "label": "Käyttäjät",
+      "placeholder": "Valitse käyttäjiä…",
+      "empty": "Ei liitettyjä käyttäjiä.",
+      "noneAssignable": "Ei sopivia käyttäjiä tämän sivuston maalle.",
+      "save": "Tallenna liitokset",
+      "saved": "Liitokset päivitetty."
+    },
+    "created": "Sivusto luotu.",
+    "updated": "Sivusto päivitetty.",
+    "errors": {
+      "nameRequired": "Anna nimi.",
+      "slugRequired": "Anna tunnus.",
+      "slugInvalid": "Käytä vain pieniä kirjaimia, numeroita ja väliviivoja.",
+      "slugTaken": "Tunnus on jo käytössä.",
+      "countryInvalid": "Valitse kelvollinen maa.",
+      "notAllowed": "Sinulla ei ole oikeutta tehdä tätä.",
+      "countryNotAllowed": "Et voi luoda sivustoa tälle maalle.",
+      "notFound": "Sivustoa ei löytynyt.",
+      "unknown": "Jotain meni pieleen. Yritä uudelleen."
     }
   },
   "designSystem": {

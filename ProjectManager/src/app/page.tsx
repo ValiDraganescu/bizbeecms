@@ -95,6 +95,12 @@ export default async function Home() {
           <Badge tone="primary">{tRoles(roleKey[user.role])}</Badge>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/sites"
+            className="inline-flex h-8 items-center rounded-md px-3 text-sm font-medium text-foreground border border-border bg-surface-muted outline-none hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {t("manageSites")}
+          </Link>
           {canUserInvite(user) ? (
             <Link
               href="/invite"

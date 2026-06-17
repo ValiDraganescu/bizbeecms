@@ -43,7 +43,8 @@
       "email": "E-post",
       "role": "Roll",
       "country": "Riik"
-    }
+    },
+    "manageSites": "Halda saite"
   },
   "roles": {
     "superAdmin": "Peaadministraator",
@@ -170,6 +171,82 @@
       "emailTaken": "Selle e-posti jaoks on konto juba olemas.",
       "alreadyInvited": "Sellel e-postil on juba ootel kutse.",
       "unknown": "Midagi läks valesti. Palun proovi uuesti."
+    }
+  },
+  "sites": {
+    "back": "Tagasi",
+    "title": "Saidid",
+    "subtitle": "Loo ja halda whitelabel-saite. Iga sait avaldatakse oma CMS-ina.",
+    "notAllowedTitle": "Sa ei saa saite luua",
+    "notAllowedBody": "Ainult superadminid ja adminid saavad saite luua. Saad hallata saite, kuhu oled määratud.",
+    "new": "Uus sait",
+    "status": {
+      "draft": "Mustand",
+      "deploying": "Avaldamisel",
+      "deployed": "Avaldatud",
+      "failed": "Ebaõnnestus"
+    },
+    "list": {
+      "title": "Kõik saidid",
+      "description": "Saidid, mida näed oma rolli ja riigi ulatuse põhjal.",
+      "empty": "Saite veel pole.",
+      "emptyAssigned": "Sind pole veel ühelegi saidile määratud.",
+      "name": "Nimi",
+      "slug": "Tunnus",
+      "country": "Riik",
+      "status": "Olek",
+      "global": "Globaalne",
+      "view": "Vaata"
+    },
+    "form": {
+      "createTitle": "Uus sait",
+      "createDescription": "Anna saidile nimi ja vali selle riigi ulatus.",
+      "editTitle": "Muuda saiti",
+      "editDescription": "Uuenda saidi nime, tunnust ja riiki.",
+      "name": "Nimi",
+      "namePlaceholder": "Acme Eesti",
+      "slug": "Tunnus",
+      "slugHint": "Väiketähed, numbrid ja sidekriipsud. Kasutatakse saidi aadressis.",
+      "country": "Riik",
+      "countryPlaceholder": "Vali riik…",
+      "globalCountry": "Globaalne (kõik riigid)",
+      "countryHintGlobal": "Vali riik või jäta globaalseks kõigi riikide jaoks.",
+      "countryHintScoped": "Vali üks oma riikidest.",
+      "create": "Loo sait",
+      "save": "Salvesta muudatused",
+      "cancel": "Tühista"
+    },
+    "detail": {
+      "overview": "Ülevaade",
+      "createdBy": "Looja",
+      "createdAt": "Loodud",
+      "workerName": "Workeri nimi",
+      "workerNamePending": "Veel avaldamata",
+      "country": "Riik",
+      "global": "Globaalne"
+    },
+    "assign": {
+      "title": "Määratud kasutajad",
+      "description": "Kasutajad, kes saavad seda saiti hallata. Riigi ulatus piirab, kes on sobivad.",
+      "label": "Kasutajad",
+      "placeholder": "Vali kasutajaid…",
+      "empty": "Määratud kasutajaid pole.",
+      "noneAssignable": "Selle saidi riigi jaoks sobivaid kasutajaid pole.",
+      "save": "Salvesta määramised",
+      "saved": "Määramised uuendatud."
+    },
+    "created": "Sait loodud.",
+    "updated": "Sait uuendatud.",
+    "errors": {
+      "nameRequired": "Sisesta nimi.",
+      "slugRequired": "Sisesta tunnus.",
+      "slugInvalid": "Kasuta ainult väiketähti, numbreid ja sidekriipse.",
+      "slugTaken": "See tunnus on juba kasutusel.",
+      "countryInvalid": "Vali kehtiv riik.",
+      "notAllowed": "Sul pole õigust seda teha.",
+      "countryNotAllowed": "Sa ei saa luua saiti sellele riigile.",
+      "notFound": "Saiti ei leitud.",
+      "unknown": "Midagi läks valesti. Proovi uuesti."
     }
   },
   "designSystem": {

@@ -1,0 +1,247 @@
+import { and, desc, eq, inArray, or, isNull } from "drizzle-orm";
+import { getDb, schema } from "@/db";
+import type { Site, SiteStatus, User } from "@/db/schema";
+import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
+import { getUserCountries } from "@/lib/auth/user";
+import { hasGlobalScope } from "./authz";
+
+// Pure slug helpers live in ./slug (client-safe). Re-export for existing callers.
+export { slugify, isValidSlug } from "./slug";
+
+/** True if another Site already uses this slug (optionally excluding one id). */
+export async function isSlugTaken(
+  slug: string,
+  excludeSiteId?: string,
+): Promise<boolean> {
+  const db = await getDb();
+  const [row] = await db
+    .select({ id: schema.sites.id })
+    .from(schema.sites)
+    .where(eq(schema.sites.slug, slug))
+    .limit(1);
+  if (!row) return false;
+  return excludeSiteId ? row.id !== excludeSiteId : true;
+}
+
+export async function findSiteById(id: string): Promise<Site | null> {
+  const db = await getDb();
+  const [site] = await db
+    .select()
+    .from(schema.sites)
+    .where(eq(schema.sites.id, id))
+    .limit(1);
+  return site ?? null;
+}
+
+export type CreateSiteInput = {
+  name: string;
+  slug: string;
+  /** Single country, or null for global (all countries). */
+  country: CountryCode | null;
+  createdBy: string;
+};
+
+/**
+ * Insert a Site (status defaults to `draft`) and auto-assign its creator as a
+ * manager (a `site_users` row), so the "managed by" list is never empty and the
+ * creator can immediately reach the Site by assignment. Slug unique index guards
+ * dupes. The creator row is a plain assignment — removable later like any other.
+ */
+export async function createSite(input: CreateSiteInput): Promise<Site> {
+  const db = await getDb();
+  const [site] = await db
+    .insert(schema.sites)
+    .values({
+      id: crypto.randomUUID(),
+      name: input.name,
+      slug: input.slug,
+      country: input.country,
+      createdBy: input.createdBy,
+    })
+    .returning();
+
+  await db
+    .insert(schema.siteUsers)
+    .values({ siteId: site.id, userId: input.createdBy });
+
+  return site;
+}
+
+export type UpdateSiteInput = {
+  name: string;
+  slug: string;
+  country: CountryCode | null;
+};
+
+/** Update a Site's editable fields. Status/workerName are managed elsewhere. */
+export async function updateSite(
+  id: string,
+  input: UpdateSiteInput,
+): Promise<Site | null> {
+  const db = await getDb();
+  const [site] = await db
+    .update(schema.sites)
+    .set({ name: input.name, slug: input.slug, country: input.country })
+    .where(eq(schema.sites.id, id))
+    .returning();
+  return site ?? null;
+}
+
+/**
+ * Sites visible to `user`, newest first.
+ *  - SuperAdmin / global Admin: every Site.
+ *  - Country-scoped Admin: Sites whose country is in their scope.
+ *  - SiteManager (and as a union for scoped Admins): Sites they're assigned to
+ *    via site_users.
+ */
+export async function listSitesForUser(user: User): Promise<Site[]> {
+  const db = await getDb();
+  const countries = await getUserCountries(user.id);
+
+  if (hasGlobalScope(user, countries) && user.role !== "SiteManager") {
+    return db
+      .select()
+      .from(schema.sites)
+      .orderBy(desc(schema.sites.createdAt));
+  }
+
+  // Scoped reach: by country (Admins only) UNION by assignment (anyone).
+  const assignedIds = await getAssignedSiteIds(user.id);
+
+  const byCountry =
+    user.role === "Admin" && countries.length > 0
+      ? inArray(schema.sites.country, countries)
+      : undefined;
+  const byAssignment =
+    assignedIds.length > 0 ? inArray(schema.sites.id, assignedIds) : undefined;
+
+  const clauses = [byCountry, byAssignment].filter(Boolean);
+  if (clauses.length === 0) return [];
+
+  return db
+    .select()
+    .from(schema.sites)
+    .where(clauses.length === 1 ? clauses[0] : or(...clauses))
+    .orderBy(desc(schema.sites.createdAt));
+}
+
+/** Site ids this user is assigned to (via site_users). */
+async function getAssignedSiteIds(userId: string): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({ siteId: schema.siteUsers.siteId })
+    .from(schema.siteUsers)
+    .where(eq(schema.siteUsers.userId, userId));
+  return rows.map((r) => r.siteId);
+}
+
+/** Whether `user` is assigned to `siteId`. */
+export async function isUserAssignedToSite(
+  userId: string,
+  siteId: string,
+): Promise<boolean> {
+  const db = await getDb();
+  const [row] = await db
+    .select({ siteId: schema.siteUsers.siteId })
+    .from(schema.siteUsers)
+    .where(
+      and(
+        eq(schema.siteUsers.siteId, siteId),
+        eq(schema.siteUsers.userId, userId),
+      ),
+    )
+    .limit(1);
+  return row != null;
+}
+
+/** User ids assigned to a Site. */
+export async function getSiteUserIds(siteId: string): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({ userId: schema.siteUsers.userId })
+    .from(schema.siteUsers)
+    .where(eq(schema.siteUsers.siteId, siteId));
+  return rows.map((r) => r.userId);
+}
+
+/**
+ * Replace a Site's assigned users with exactly `userIds`. Diffs against the
+ * current set so we only insert/delete what changed (the join PK rejects dupes).
+ */
+export async function setSiteUsers(
+  siteId: string,
+  userIds: string[],
+): Promise<void> {
+  const db = await getDb();
+  const current = new Set(await getSiteUserIds(siteId));
+  const next = new Set(userIds);
+
+  const toAdd = [...next].filter((id) => !current.has(id));
+  const toRemove = [...current].filter((id) => !next.has(id));
+
+  if (toAdd.length > 0) {
+    await db
+      .insert(schema.siteUsers)
+      .values(toAdd.map((userId) => ({ siteId, userId })));
+  }
+  if (toRemove.length > 0) {
+    await db
+      .delete(schema.siteUsers)
+      .where(
+        and(
+          eq(schema.siteUsers.siteId, siteId),
+          inArray(schema.siteUsers.userId, toRemove),
+        ),
+      );
+  }
+}
+
+export type AssignableUser = { id: string; email: string };
+
+/**
+ * Users that may be assigned to a Site of the given country, for the "managed
+ * by" list. The candidate pool is every role (SuperAdmin, Admin, SiteManager)
+ * bounded by country: a user with global scope (no rows — every SuperAdmin, and
+ * global Admins) fits any Site; a country-scoped user fits only Sites in their
+ * scope; a global Site accepts only globally-scoped users.
+ */
+export async function listAssignableUsers(
+  siteCountry: CountryCode | null,
+): Promise<AssignableUser[]> {
+  const db = await getDb();
+  const users = await db
+    .select({ id: schema.users.id, email: schema.users.email })
+    .from(schema.users)
+    .orderBy(schema.users.email);
+
+  // Pull every user's country scope once, then filter in memory (small admin set).
+  const scopeRows = await db
+    .select({
+      userId: schema.userCountries.userId,
+      country: schema.userCountries.country,
+    })
+    .from(schema.userCountries);
+
+  const scopeByUser = new Map<string, CountryCode[]>();
+  for (const row of scopeRows) {
+    if (!isCountryCode(row.country)) continue;
+    const list = scopeByUser.get(row.userId) ?? [];
+    list.push(row.country);
+    scopeByUser.set(row.userId, list);
+  }
+
+  return users.filter((u) => {
+    const scope = scopeByUser.get(u.id) ?? [];
+    if (scope.length === 0) return true; // global user fits any Site
+    if (siteCountry === null) return false; // global Site needs a global user
+    return scope.includes(siteCountry);
+  });
+}
+
+/** Statuses a Site can hold (re-exported for the UI badge map). */
+export const SITE_STATUSES: SiteStatus[] = [
+  "draft",
+  "deploying",
+  "deployed",
+  "failed",
+];
