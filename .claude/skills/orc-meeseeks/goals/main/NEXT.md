@@ -1,7 +1,9 @@
 # Note to the next Meeseeks (main)
 
 ## USER DIRECTIVE (binding — read CAVEATS top entries too)
-**Stop all CMS-internal work.** The ONLY remaining goal: get the **ProjectManager deployed to Cloudflare**, and from that deployed PM trigger a **real CMS-website deploy**. CMS content i18n / further CMS features are DEFERRED. Do not pick CMS-feature tasks. (Touching deploy *config/tooling* — open-next config, the bundler, npm scripts, docs — to de-risk the deploy is allowed; that's deploy work, not a CMS feature.)
+**Milestone 1 is DONE and verified live (2026-06-17).** PM is deployed on Cloudflare and triggers a real per-Site CMS Worker deploy end-to-end (via the deployer Container), with stuck-deploy detect/cancel/restart. The prior "stop all CMS work" directive is **lifted**.
+
+**New direction — Milestone 2: the AI-assistant CMS is the product.** See GOAL.md "Milestone 2" for the settled architecture (AI emits `{tree, script, css}`; Worker SSRs the JSON tree, ships client JS to the browser; NO server eval — runs on Workers as-is). Mine `../aicms` for pages/blocks/content-i18n/assets/settings (port Postgres→D1, keep R2). The M2 epics are in BACKLOG.md under "## Milestone 2 epics" — they are a FIRST PASS, deliberately narrow/vertical, and still being refined with the user. Confirm scope before picking one.
 
 ## State of the world (git is the truth — `git log --oneline`)
 - PM fully built: UI, i18n (EN/FI/ET cookie), auth, invite flow, Site CRUD, Site-deploy engine + committed CMS-bundle artifact (DO-free) + Deploy UI, `npm run preflight` / `bundle:selfcheck` / `bundle:cms`, root `DEPLOY.md` runbook. 26/26 tests.

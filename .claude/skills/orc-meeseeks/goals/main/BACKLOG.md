@@ -26,4 +26,62 @@ Task states: TODO | DOING | DONE | BLOCKED.
 - DONE: Wire preflight into a `predeploy` npm hook — `"predeploy": "npm run preflight"` in ProjectManager/package.json; npm auto-runs it before `deploy` and a non-zero exit aborts the build/upload, so `npm run deploy` can't ship placeholder ids / a stale bundle. Plus froze deploy error-path i18n parity with a regression test (`scripts/deploy-i18n-parity.test.mjs`) that derives the error-key set from source (DeployErrorKey ∪ gate keys) and asserts EN/FI/ET catalogs match exactly. Verified: 26/26 tests; preflight exit-1 propagates through predeploy. DEPLOY.md step 8/9 updated. No app source touched.
 - DONE: Audit Script-Upload metadata (bindings/assets) vs the DO-free bundle (NEXT slice 1) — confirmed compat-date/flags/main_module correct for a no-DO worker; FOUND the static-assets blocker: the worker serves `_next/static`/CSS/JS-chunks/public via `env.ASSETS.fetch` (Workers Static-Assets binding) but `buildScriptUploadForm` sends no `assets` metadata/ASSETS binding + the committed artifact ships no static files → a live upload boots with `env.ASSETS` undefined → static assets 404 (unstyled/dead pages). Added bundle-selfcheck check #4 (warning) + 2 unit tests + integration guard (28/28); DEPLOY.md step 11 🚧 callout + troubleshooting row; CAVEAT. `env.IMAGES` is optional (worker degrades gracefully). No app source touched.
 - TODO (next deploy slice — BLOCKS a functional live deploy): **Upload CMS static assets alongside the worker.** The worker `env.ASSETS.fetch`-es `.open-next/assets` (14 files, ~700KB) but the deploy uploads only the JS module → assets 404 on a live deploy. Implement Cloudflare's **Workers Assets API**: create an upload session (`POST .../workers/scripts/{name}/assets-upload-session` with a manifest of file hashes+sizes) → PUT the missing files in buckets → receive a completion JWT → pass it as `metadata.assets.jwt` (+`config`) in `buildScriptUploadForm`. Needs the asset bytes available at deploy time — extend `build-cms-bundle.mjs` to also emit the assets (hash+content) into the committed artifact (or a sibling), since deploy runs from the deployed PM and can't read `.open-next/`. Verify request-building offline (unit-test the manifest/metadata shape); the live PUT needs a CF account. Alternative: switch deploy to wrangler's assets-aware upload. See DEPLOY.md step 11 🚧 + CAVEAT "static-assets gap".
-- TODO: CMS content localization — allow configuring an arbitrary set of user-facing **content** languages per Site (data-driven, distinct from the fixed EN/FI/ET admin-UI locales), and serve/render published content in the configured content locales.
+- SUPERSEDED (M1 deploy now works live via the deployer Container, not Script-Upload — these Script-Upload/asset-upload tasks are moot): the two "Upload CMS static assets via Workers Assets API" / "real end-to-end deploy" TODOs above. The container path (`opennextjs build && wrangler deploy`) handles assets+bindings natively. See memory `pm-cms-deploy-via-container`.
+- DONE: Stuck-deploy detect/cancel/restart — `deploy_started_at` column + `isDeployStuck` (10-min threshold) + stale-aware `canStartDeploy` + `/deploy/cancel` route + UI badge/Cancel/Redeploy. Pure state predicates extracted to `deploy-state.ts` (4 tests). PM 0.2.0, live (commit `37e7717`).
+
+## Milestone 2 epics — AI-assistant CMS (FIRST PASS, narrow/vertical, still refining with user)
+States: TODO | DOING | DONE | BLOCKED. Each is ONE provable capability. Order is rough dependency order, not commitment. Discuss scope before picking.
+
+**A. Rendering foundation (no AI yet — make the artifact model real)**
+- TODO: **A1 — D1 schema for components + pages.** Tables: `component` (name, tree JSON, script, css, propsSchema, createdAt) and `page` (slug, status, blocks JSON tree, per-locale meta, createdAt). Drizzle migration. No UI yet. Proves: the `{tree,script,css}` artifact + page-block tree persist per-site in D1.
+- TODO: **A2 — block-tree renderer + public page route.** A `[[...slug]]` route that loads a page from D1, walks its block tree, SSRs each component's `tree`, ships its `script`. Productionizes the `/test` proof into real data-driven pages. Proves: a page authored as data renders + hydrates from D1.
+- TODO: **A3 — precompiled Tailwind utility sheet.** Build-time-generate a bounded token+utility CSS sheet (solves the runtime-class-not-scanned gap); ship it on public pages. Define the AI's allowed class vocabulary. Proves: a component class the build never saw still styles correctly.
+
+**B. The AI assistant (the core)**
+- TODO: **B1 — chat endpoint + streaming (no tools).** AI provider = **Cloudflare** (RESOLVED): **Workers AI** (`env.AI` binding — no API key, billed via CF) **behind AI Gateway** (caching, per-Site spend caps, analytics, provider fallback). Reuse aicms's SSE-loop *shape* but swap the OpenRouter `fetch` for the Workers-AI binding through the gateway. Conversation state client-side. Proves: streaming chat works on a deployed CMS Worker via the CF AI stack.
+  - ⚠️ RISK (carry into B2): the agentic tool loop needs strong **tool-calling**. Workers AI supports function calling, but its open models are weaker at multi-step tool use than frontier models. AI Gateway makes this swappable (point at Workers AI OR Anthropic OR fallback, same code) — so if Workers-AI tool-calling can't reliably emit `{tree,script,css}` + chain tools, route that path to a stronger model via the gateway WITHOUT re-architecting. Decide empirically at B2.
+- TODO: **B2 — tool: create/update component.** First tool — AI emits `{tree,script,css}`, validated + written to D1 (A1). Proves: the AI can author a custom component that then renders via A2.
+- TODO: **B3 — tool: create/compose page.** AI assembles components into a page block tree (A2). Proves: end-to-end "ask AI for a page → it renders live."
+- TODO: **B4 — tool: translate.** Port the AI translate tool against per-Site content locales (C1). Proves: AI fills per-locale content.
+
+**No entity types — content is generic.** A "blog post" is just a Page; a "blog" is a Page that lists other Pages. No blog/product/artwork/order tables or CRUD. The only blog-specific thing is a premade component set (G1).
+
+**Do NOT port any aicms ENTITIES.** Mining `../aicms` is for the generic *mechanics* — page/block tree, content-i18n resolution, R2 upload, settings KV pattern — NEVER its domain tables (artwork/product/blogPost/discount/order) or their tools. bizbeecms content is generic Pages + components; everything domain-specific is composed, not modeled.
+
+**C. Content depth (mine from aicms)**
+- TODO: **C1 — per-Site content locales.** Data-driven content-language set (distinct from EN/FI/ET admin UI); locale-object storage + render-time resolution w/ fallback. (GOAL's original "CMS content localization" task, now scoped under M2.)
+- TODO: **C2 — page management UI.** Slugs, publish status, per-locale SEO/meta, hierarchy/nav menus, redirects. Mine aicms `site_tree_service`.
+- TODO: **C3 — section/block editing UI.** Visual compose/reorder of the block tree (the non-AI editor counterpart to B3).
+
+**D. Assets**
+- TODO: **D1 — R2 asset upload + gallery.** R2 bucket binding + upload route + media library UI. (R2 IS Workers-native — the aicms `node:fs`/pg caveats don't apply; aws4fetch/presign or the R2 binding directly.) Proves: upload an image, get a CDN URL, use it in a component.
+- TODO: **D2 — Cloudflare Images transforms (optional).** Resize/format on serve. Defer until D1 lands.
+
+**E. Settings & theming**
+- TODO: **E1 — per-Site theme overrides.** DB-backed CSS-var overrides injected as inline `<style>` after globals (deferred aicms pattern). Proves: a Site re-themes token colors without rebuild.
+- TODO: **E2 — site settings (brand identity / design system / AI persona).** Key-value settings table; brand+design serialized into the AI system prompt. Mine aicms settings modules.
+
+**F. Fleet ops (PM side)**
+- TODO: **F1 — deploy fleet view.** PM dashboard listing all Sites' deploy status + stuck flags at a glance (extends the per-site stuck detection we shipped to fleet-wide). Proves: an operator spots every stuck/failed deploy on one screen.
+
+**H. Component portability (export/import across Sites)**
+> Architecture fit: a component is already pure data (`{tree,script,css,propsSchema}` — no eval, no binary), so export = serialize a D1 row to JSON, import = insert into another Site. The no-server-eval decision is what makes this trivial. Premade kits (G) are just curated import bundles — same machinery.
+- TODO: **H1 — export a component.** Serialize one (or many) components from a Site's library to a portable JSON bundle (versioned schema + the `{tree,script,css,propsSchema,name}`). Download from the CMS admin. Proves: a component leaves a Site as a file.
+- TODO: **H2 — import a component.** Upload a bundle into another Site → validate (schema version, name collision, malformed tree/script) → insert into D1. Proves: a component built on Site A renders on Site B.
+- TODO: **H3 — dependency handling.** A component's `script`/`tree` may reference slots/other components or asset URLs. Export must be self-contained OR declare deps; import resolves/warns on missing deps + rebinds/flags asset URLs (assets live in each Site's own R2). The one real design wrinkle — scope after H1/H2 prove the happy path.
+- (vision) business developers managing many client sites build a personal/shared library and import their components into each new Site. A future shared registry is the natural extension (defer).
+
+**G. Premade component kits (starter library)**
+> Built on H — a kit is a curated, versioned export bundle the CMS ships with and can import into any Site.
+- TODO: **G1 — blog component kit.** A set of premade `{tree,script,css}` components for quickly building blog pages: PostList (lists child pages — title/excerpt/date/link), PostHeader (title + meta), PostBody (rich content), maybe TagFilter. Seeded into a Site's component library so the AI/user composes a blog from them instead of authoring from scratch. Builds ON A1/A2 + the H import format. Proves: "build me a blog" → a working blog from premade parts in minutes.
+- (later) Gxx — other kits (landing/marketing, docs, portfolio) follow the same pattern once G1 validates the approach.
+
+**Z. Future / parked (TBD — not scoped, just don't forget)**
+- TBD: **Z1 — shop / product management.** E-commerce: products, cart, checkout, orders. Explicitly deferred — revisit after the core AI-CMS (A–H) proves out. When picked up, decide whether it's first-class entities (the one place real domain tables might be justified) or still composed from generic content + components. No design yet.
+
+### Open questions to discuss before committing the backlog
+- Sequencing: do A (rendering) fully before B (AI), or interleave A1→A2→B1→B2 as one vertical thread?
+- ~~entity types~~ RESOLVED: no entities — content is generic Pages; "blog" = a page that lists pages + the G1 premade component kit.
+- "PostList lists child pages" — how does a page know it's a blog post? A tag/type field on `page`, or just parent-child hierarchy (children of the blog page = posts)? (affects A1 schema + G1)
+- ~~AI provider~~ RESOLVED: Cloudflare-native — Workers AI (`env.AI`) behind AI Gateway; swappable to a stronger model via the gateway if tool-calling needs it (see B1 risk).
+- Is the non-AI manual editor (C2/C3) needed for v1, or is the AI the only authoring path initially?

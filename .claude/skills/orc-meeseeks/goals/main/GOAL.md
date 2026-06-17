@@ -5,7 +5,28 @@ bizbeecms is a multi-site **B2B whitelabel CMS**, fully **Cloudflare-native** (o
 - **ProjectManager (PM)** — a Next.js app where users manage other users, create Sites, and deploy them.
 - **CMS** — a Next.js app (initially the default Next.js install in `CMS/`) that gets deployed per-Site to Cloudflare.
 
-## This milestone
+## Milestone 1 — ProjectManager + bootstrap CMS deploy ✅ DONE (verified live 2026-06-17)
+
+PM is deployed on Cloudflare and can trigger a real per-Site CMS Worker deploy end-to-end. User mgmt (SuperAdmin/Admin/SiteManager, country scope), invite flow, Site CRUD, and the deploy pipeline all work. The deploy runs `opennextjs build && wrangler deploy` inside a Cloudflare **Container** (the `bizbeecms-deployer` Worker), with stuck-deploy detection + cancel/restart. PM + CMS UI localized EN/FI/ET. M1's capability spec is preserved below for reference.
+
+## Milestone 2 — the AI-assistant CMS as the product (CURRENT)
+
+The CMS is **no longer "just the default Next.js install"** — it is the product. Each per-Site CMS embeds an **AI assistant** that builds the site: creates content, **authors custom UI components**, composes pages from them, and translates — all from a chat.
+
+**Settled architecture (verified this session — runs on Cloudflare Workers, no migration off CF):**
+- The AI emits a component artifact **`{ tree, script, css }`**, NOT JSX source to eval.
+  - `tree` — a JSON/YAML element tree the Worker renders to HTML **server-side** via `React.createElement` (a data walk, NOT `eval`/`Function` — those are permanently blocked on Workers).
+  - `script` — AI-authored client JS shipped to the browser as a `<script>` string; the Worker forwards it as data, the **browser** executes it. This is how custom *interactive* components work without server eval.
+  - `css` — Tailwind classes resolve against a **precompiled utility sheet** (the build-time scanner can't see runtime artifact classes); rare custom values use inline `style`. Per-site theme via DB-backed CSS-var overrides.
+- Security boundary moved server→browser: never interpolate end-user data into `script`; per-site isolation + (later) CSP.
+- Proof: `CMS/src/app/test/page.tsx` — JSON-tree SSR + token Tailwind + client-script increment, live on a deployed CMS Worker.
+- See memory `pm-ai-assistant-runtime-decision` for the full reasoning trail.
+
+**Reference (`../aicms`) — mine these solved features (Postgres→D1, keep R2):** hierarchical pages (slugs, publish status, per-locale SEO, redirects, templates, nav menus), section/block trees + custom components, per-Site **content locales** (data-driven, distinct from admin UI), AI translate tool, R2 asset gallery (upload + CDN serve), and site settings (brand identity, design system, AI persona, theme).
+
+---
+
+## Milestone 1 capability spec (reference)
 
 Ship the **ProjectManager** with three working capabilities:
 
