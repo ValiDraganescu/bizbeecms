@@ -81,29 +81,46 @@ async function runDeploy(
   // One sandbox per Site deploy; id is stable so concurrent re-clicks coalesce.
   const sandbox = getSandbox(env.Sandbox, `deploy-${input.slug}`);
 
+  // Secrets that must never appear in logs or the status callback.
+  const secrets = [env.GITHUB_TOKEN, env.CF_API_TOKEN].filter(
+    (s): s is string => !!s,
+  );
+  const redact = (s: string): string => {
+    let out = s;
+    for (const secret of secrets) out = out.split(secret).join("***");
+    return out;
+  };
+
   const log: string[] = [];
   const run = async (cmd: string, opts?: { env?: Record<string, string> }) => {
     const res = await sandbox.exec(cmd, opts);
-    log.push(`$ ${cmd}\n${res.stdout}\n${res.stderr}`);
+    // Redact defensively even though we avoid putting secrets in cmd/output.
+    log.push(redact(`$ ${cmd}\n${res.stdout}\n${res.stderr}`));
     if (!res.success) {
-      throw new Error(`command failed (${res.exitCode}): ${cmd}\n${res.stderr}`);
+      throw new Error(redact(`command failed (${res.exitCode}): ${cmd}`));
     }
     return res;
   };
 
   try {
     const ref = input.ref && /^[\w.\-/]+$/.test(input.ref) ? input.ref : "main";
-    const cloneUrl = env.GITHUB_TOKEN
-      ? env.REPO_URL.replace(
-          "https://",
-          `https://x-access-token:${env.GITHUB_TOKEN}@`,
-        )
-      : env.REPO_URL;
+
+    // Auth the clone WITHOUT putting the token in the URL or command string:
+    // pass it as an Authorization header via git's config, sourced from an env
+    // var so it never lands in argv, the command log, or the repo's remote URL.
+    const cloneEnv: Record<string, string> = {};
+    let authFlag = "";
+    if (env.GITHUB_TOKEN) {
+      const basic = btoa(`x-access-token:${env.GITHUB_TOKEN}`);
+      cloneEnv.GIT_AUTH_HEADER = `Authorization: Basic ${basic}`;
+      authFlag = `-c http.extraHeader="$GIT_AUTH_HEADER"`;
+    }
 
     // Fresh checkout each deploy (shallow for speed).
     await run(`rm -rf /workspace/src`);
     await run(
-      `git clone --depth 1 --branch ${ref} ${cloneUrl} /workspace/src`,
+      `git ${authFlag} clone --depth 1 --branch ${ref} ${env.REPO_URL} /workspace/src`,
+      { env: cloneEnv },
     );
 
     // Install + build + deploy the CMS as this Site's own Worker. The OpenNext
@@ -131,11 +148,14 @@ async function runDeploy(
       workerName,
     });
   } catch (err) {
+    // Redact secrets from anything sent back to the PM. The full (already
+    // redacted) command log stays in the deployer's own observability logs.
+    const rawMsg = err instanceof Error ? err.message : String(err);
+    console.error("deploy failed", redact(rawMsg), redact(log.join("\n---\n")));
     await report(env, {
       siteId: input.siteId,
       status: "failed",
-      error: err instanceof Error ? err.message : String(err),
-      log: log.join("\n---\n").slice(-4000),
+      error: redact(rawMsg).slice(0, 500),
     });
   } finally {
     try {
@@ -154,7 +174,6 @@ async function report(
     status: "deployed" | "failed";
     workerName?: string;
     error?: string;
-    log?: string;
   },
 ): Promise<void> {
   if (!env.PM_CALLBACK_ORIGIN) return;
