@@ -24,6 +24,10 @@ import {
 } from "@/lib/render/tree";
 import { renderPlans } from "@/lib/render/react";
 import { resolveSlugPath } from "@/lib/render/slug";
+import { generateUtilityCss } from "@/lib/render/utility-css";
+
+// Precompiled once per worker instance — pure, deterministic, bounded vocabulary.
+const UTILITY_CSS = generateUtilityCss();
 
 type RouteParams = { slug?: string[] };
 
@@ -124,6 +128,14 @@ export default async function PublicPage({
   const { plan } = loaded;
   return (
     <>
+      {/*
+        Precompiled utility sheet (epic A3). The build-time Tailwind scanner
+        never sees runtime artifact `className`s (they live in D1), so we ship a
+        bounded, AI-allowed utility vocabulary inline here. Inline <style> = part
+        of the SSR'd HTML, so it needs no static-asset upload (sidesteps the open
+        ASSETS deploy gap). See lib/render/utility-css.ts.
+      */}
+      <style dangerouslySetInnerHTML={{ __html: UTILITY_CSS }} />
       {renderPlans(plan.root)}
       {/*
         Ship each used component's AI-authored client script to the browser.
