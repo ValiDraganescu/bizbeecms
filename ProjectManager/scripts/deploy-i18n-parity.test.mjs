@@ -19,15 +19,14 @@ function unionKeys(file, typeName) {
   return new Set([...m[1].matchAll(/"([a-zA-Z]+)"/g)].map((x) => x[1]));
 }
 
-// DeployErrorKey union (engine) ∪ the gate-only errors the action's
-// DeployState.error type adds on top of it.
+// DeployErrorKey union (engine) ∪ the gate-only errors the deploy route's
+// DeployError type adds on top of it. (Auth/CRUD moved from server actions to
+// REST route handlers — server actions 500 on OpenNext/Workers.)
 const engineKeys = unionKeys("src/lib/deploy/deploy.ts", "DeployErrorKey");
-const gateExtra = (() => {
-  const src = readFileSync(join(root, "src/app/(app)/sites/actions.ts"), "utf8");
-  const m = src.match(/error\?:\s*DeployErrorKey([^;]*);/);
-  assert.ok(m, "actions.ts: could not find DeployState.error type");
-  return new Set([...m[1].matchAll(/"([a-zA-Z]+)"/g)].map((x) => x[1]));
-})();
+const gateExtra = unionKeys(
+  "src/app/api/sites/[id]/deploy/route.ts",
+  "DeployError",
+);
 
 const expected = new Set([...engineKeys, ...gateExtra]);
 

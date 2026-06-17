@@ -20,9 +20,16 @@ export type WorkerScriptUpload = {
   compatibilityFlags?: string[];
 };
 
-/** Default compat date matching both apps' wrangler.jsonc. */
-export const DEFAULT_COMPAT_DATE = "2025-03-25";
-/** Default compat flags matching both apps' wrangler.jsonc. */
+/**
+ * Default compat date for the uploaded CMS Worker. Must be on/after
+ * 2025-09-01: the OpenNext bundle imports `node:http`/`node:https`, whose
+ * `nodejs_compat` polyfills only activate from that date (an older date →
+ * `No such module "node:http"` and Cloudflare rejects the Script-Upload with
+ * HTTP 400). This is the compat date of the *uploaded* Worker, independent of
+ * the PM's own wrangler.jsonc date.
+ */
+export const DEFAULT_COMPAT_DATE = "2025-09-01";
+/** Default compat flags for the uploaded CMS Worker. */
 export const DEFAULT_COMPAT_FLAGS = [
   "nodejs_compat",
   "global_fetch_strictly_public",
