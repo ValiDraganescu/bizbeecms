@@ -8,18 +8,20 @@
  * the upstream provider's wire format (swappable via the gateway — see B1 risk
  * note in BACKLOG):
  *
- *   event: token   data: {"text": "<delta>"}     (0..N, the streamed tokens)
- *   event: done    data: {}                       (exactly once, at the end)
- *   event: error   data: {"message": "<reason>"}  (instead of done, on failure)
+ *   event: token   data: {"text": "<delta>"}              (0..N, streamed tokens)
+ *   event: tool    data: {"name", "ok", action|errors}    (0..N, B2 tool results)
+ *   event: done    data: {}                                (exactly once, at the end)
+ *   event: error   data: {"message": "<reason>"}           (instead of done, on failure)
  *
  * This module is PURE (no CF/React/network imports) so it's unit-testable with
  * dep-free `node --test` (project convention; see CAVEATS). The route owns the
  * actual `ReadableStream`/`fetch`; here we own only the parsing + framing.
  */
 
-/** A parsed upstream event: a text delta, the terminal marker, or nothing useful. */
+/** A parsed upstream event: a text delta, a tool-call fragment, or the terminal marker. */
 export type UpstreamEvent =
   | { type: "delta"; text: string }
+  | { type: "tool_call"; index: number; name?: string; argsFragment?: string }
   | { type: "done" };
 
 /**
@@ -78,9 +80,87 @@ export function parseLine(line: string): UpstreamEvent | null {
   } catch {
     return null; // tolerate keep-alives / partial garbage rather than 500
   }
+  // A streaming chunk carries EITHER a text delta OR a tool-call fragment (B2),
+  // never both in the same delta. Check tool-calls first.
+  const tool = extractToolCall(chunk);
+  if (tool) return tool;
   const text = extractDelta(chunk);
   if (text === null || text === "") return null;
   return { type: "delta", text };
+}
+
+/**
+ * Pull a tool-call fragment out of an OpenAI-style streaming chunk (B2).
+ *
+ * Tool calls stream as `choices[0].delta.tool_calls[]`, each entry keyed by
+ * `index`; the `function.name` arrives once (in the opening fragment) and
+ * `function.arguments` arrives as a string assembled across many chunks. We
+ * surface ONE fragment per call (first tool_call in the delta — open models
+ * emit one at a time); `ToolCallAccumulator` reassembles them by index.
+ *
+ * Returns null when the chunk has no tool-call delta.
+ */
+export function extractToolCall(chunk: unknown): UpstreamEvent | null {
+  if (typeof chunk !== "object" || chunk === null) return null;
+  const choices = (chunk as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || choices.length === 0) return null;
+  const delta = (choices[0] as { delta?: unknown }).delta;
+  if (typeof delta !== "object" || delta === null) return null;
+  const calls = (delta as { tool_calls?: unknown }).tool_calls;
+  if (!Array.isArray(calls) || calls.length === 0) return null;
+  const call = calls[0] as {
+    index?: unknown;
+    function?: { name?: unknown; arguments?: unknown };
+  };
+  const index = typeof call.index === "number" ? call.index : 0;
+  const fn = call.function;
+  const name =
+    fn && typeof fn.name === "string" && fn.name !== "" ? fn.name : undefined;
+  const argsFragment =
+    fn && typeof fn.arguments === "string" ? fn.arguments : undefined;
+  if (name === undefined && argsFragment === undefined) return null;
+  return { type: "tool_call", index, name, argsFragment };
+}
+
+/**
+ * Reassemble streamed `tool_call` fragments (by index) into complete calls.
+ * The model emits a tool call's `arguments` as JSON-string fragments across
+ * many SSE chunks; feed each `tool_call` event here, then `finish()` to get the
+ * collected calls (name + concatenated raw argument string). PURE.
+ */
+export class ToolCallAccumulator {
+  private calls = new Map<number, { name: string; args: string }>();
+
+  /** Add one streamed tool-call fragment. */
+  add(ev: { index: number; name?: string; argsFragment?: string }): void {
+    const cur = this.calls.get(ev.index) ?? { name: "", args: "" };
+    if (ev.name) cur.name = ev.name;
+    if (ev.argsFragment) cur.args += ev.argsFragment;
+    this.calls.set(ev.index, cur);
+  }
+
+  /** Any tool calls seen yet? */
+  get size(): number {
+    return this.calls.size;
+  }
+
+  /**
+   * Return the assembled calls in index order, each with the raw concatenated
+   * `args` string parsed to JSON (or `null` if the model emitted invalid JSON).
+   */
+  finish(): { name: string; args: unknown }[] {
+    return [...this.calls.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, c]) => {
+        let args: unknown = null;
+        try {
+          args = c.args === "" ? {} : JSON.parse(c.args);
+        } catch {
+          args = null;
+        }
+        return { name: c.name, args };
+      });
+  }
 }
 
 /**
@@ -100,7 +180,7 @@ export function extractDelta(chunk: unknown): string | null {
 
 /** Serialize one of our client-protocol events into an SSE frame string. */
 export function frameEvent(
-  event: "token" | "done" | "error",
+  event: "token" | "tool" | "done" | "error",
   data: Record<string, unknown>,
 ): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
