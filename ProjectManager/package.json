@@ -12,6 +12,7 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "test": "node --test 'src/lib/**/*.test.ts' 'scripts/**/*.test.mjs'",
     "preflight": "node scripts/preflight-deploy.mjs",
+    "bundle:selfcheck": "node scripts/bundle-selfcheck.mjs",
     "bundle:cms": "node scripts/build-cms-bundle.mjs --opennext",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "wrangler d1 migrations apply bizbeecms --remote",

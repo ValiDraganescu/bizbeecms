@@ -16,6 +16,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { validateBundleSource } from "./bundle-selfcheck.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -106,6 +107,12 @@ try {
       `cms-bundle.generated.js: worker.js source is only ${src.length} bytes — looks broken/partial. ` +
         `Re-run \`npm run bundle:cms\`.`
     );
+  } else {
+    // Structural boot self-check: entry contract, DO-binding gap, leftover bare
+    // imports. The one link no other offline check covers.
+    const r = validateBundleSource(mod.mainModule, src);
+    errors.push(...r.errors);
+    warnings.push(...r.warnings);
   }
   if (!mod.builtAt) warnings.push(`cms-bundle.generated.js: no builtAt timestamp.`);
 } catch (e) {
