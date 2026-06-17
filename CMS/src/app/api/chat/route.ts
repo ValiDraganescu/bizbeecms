@@ -30,8 +30,14 @@ import {
   validateComponentArtifact,
 } from "@/lib/chat/component-tool";
 import { CREATE_PAGE_TOOL, validatePageInput } from "@/lib/chat/page-tool";
+import {
+  CREATE_TRANSLATION_TOOL,
+  validateTranslationInput,
+} from "@/lib/chat/translate-tool";
 import { upsertComponent } from "@/db/component-store";
 import { missingComponents, upsertPage } from "@/db/page-store";
+import { applyTranslation } from "@/db/translate-store";
+import { getContentLocales } from "@/db/settings-store";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +45,9 @@ export const dynamic = "force-dynamic";
 // point at a stronger model without re-architecting if tool-calling needs it.
 const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
-// The tools the model may call this turn (B2 create_component, B3 create_page).
-const TOOLS = [CREATE_COMPONENT_TOOL, CREATE_PAGE_TOOL];
+// The tools the model may call this turn (B2 create_component, B3 create_page,
+// B4 translate).
+const TOOLS = [CREATE_COMPONENT_TOOL, CREATE_PAGE_TOOL, CREATE_TRANSLATION_TOOL];
 
 // AI Gateway slug. Override at deploy time via the AI_GATEWAY env var; falls
 // back to the default gateway name so a freshly-provisioned Site still works.
@@ -177,6 +184,8 @@ async function runTools(
         await handleCreateComponent(call.args, emit);
       } else if (call.name === CREATE_PAGE_TOOL.function.name) {
         await handleCreatePage(call.args, emit);
+      } else if (call.name === CREATE_TRANSLATION_TOOL.function.name) {
+        await handleTranslate(call.args, emit);
       } else {
         emit({ name: call.name, ok: false, errors: [`unknown tool: ${call.name}`] });
       }
@@ -234,5 +243,35 @@ async function handleCreatePage(
     emit({ name, ok: true, action: res.action, page: res.slug });
   } catch (err) {
     emit({ name, ok: false, errors: [`failed to save page: ${(err as Error).message}`] });
+  }
+}
+
+async function handleTranslate(
+  args: unknown,
+  emit: (data: Record<string, unknown>) => void,
+): Promise<void> {
+  const name = CREATE_TRANSLATION_TOOL.function.name;
+  // Constrain the model to the Site's configured content locales (C1), so it
+  // can't invent locales the Site doesn't serve.
+  let allowedLocales: string[] | undefined;
+  try {
+    allowedLocales = (await getContentLocales()).locales;
+  } catch {
+    allowedLocales = undefined; // settings unreadable → accept any valid code
+  }
+  const valid = validateTranslationInput(args, { allowedLocales });
+  if (!valid.ok) {
+    emit({ name, ok: false, errors: valid.errors });
+    return;
+  }
+  try {
+    const res = await applyTranslation(valid.input);
+    if (!res.ok) {
+      emit({ name, ok: false, errors: res.errors });
+      return;
+    }
+    emit({ name, ok: true, action: res.action, target: res.target, fields: res.fields });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to translate: ${(err as Error).message}`] });
   }
 }
