@@ -1,25 +1,26 @@
 # Note to the next Meeseeks (main)
 
 ## USER DIRECTIVE (binding — read CAVEATS top entries too)
-**Milestone 1 is DONE and verified live (2026-06-17).** PM is deployed on Cloudflare and triggers a real per-Site CMS Worker deploy end-to-end (via the deployer Container), with stuck-deploy detect/cancel/restart. The prior "stop all CMS work" directive is **lifted**.
+**Milestone 1 is DONE and verified live (2026-06-17).** PM is deployed on Cloudflare and triggers a real per-Site CMS Worker deploy end-to-end (via the deployer Container), with stuck-deploy detect/cancel/restart.
 
-**New direction — Milestone 2: the AI-assistant CMS is the product.** See GOAL.md "Milestone 2" for the settled architecture (AI emits `{tree, script, css}`; Worker SSRs the JSON tree, ships client JS to the browser; NO server eval — runs on Workers as-is). Mine `../aicms` for pages/blocks/content-i18n/assets/settings (port Postgres→D1, keep R2). The M2 epics are in BACKLOG.md under "## Milestone 2 epics" — they are a FIRST PASS, deliberately narrow/vertical, and still being refined with the user. Confirm scope before picking one.
+**Direction — Milestone 2: the AI-assistant CMS is the product.** See GOAL.md "Milestone 2" for the settled architecture (AI emits `{tree, script, css}`; Worker SSRs the JSON tree, ships client JS to the browser; NO server eval — runs on Workers as-is). Mine `../aicms` for the generic *mechanics* (pages/blocks/content-i18n/assets/settings); port Postgres→D1, keep R2. NEVER port aicms entity tables (artwork/product/order/…). The M2 epics are in BACKLOG.md "## Milestone 2 epics" — narrow vertical slices, still being refined with the user.
+
+## Loop mode (from driver hint)
+We plow continuously, NO stopping for human action. If your task needs the human (live CF auth, manual browser test, a secret, an external account action, a subjective call) → append a line to repo-root `HITL.md` under `## Open`, commit it, then pick the most valuable slice you CAN finish OFFLINE and do that. Prefer offline-verifiable M2 slices.
 
 ## State of the world (git is the truth — `git log --oneline`)
-- PM fully built: UI, i18n (EN/FI/ET cookie), auth, invite flow, Site CRUD, Site-deploy engine + committed CMS-bundle artifact (DO-free) + Deploy UI, `npm run preflight` / `bundle:selfcheck` / `bundle:cms`, root `DEPLOY.md` runbook. 26/26 tests.
-- **NEW this run:** `npm run deploy` is now **footgun-proofed** — `"predeploy": "npm run preflight"` is an npm pre-script, so a failing preflight (placeholder ids / missing compat flags / stale bundle) aborts the build/upload. Verified exit-1 propagates predeploy→deploy abort. Also FROZE deploy error-path i18n parity: `scripts/deploy-i18n-parity.test.mjs` derives the error-key set from source and asserts EN/FI/ET `sites.deploy.errors.*` match exactly — adding a new DeployErrorKey without all 3 catalog strings now fails the suite.
-- The whole PM→Cloudflare→CMS deploy path is code-complete + offline-validated EXCEPT the live network call (no CF auth in this env). All documented first-deploy footguns are now closed and gated.
+- PM fully built + live (M1 done). Deploy via the deployer Container.
+- **NEW this run (M2 A1 DONE):** the CMS app now has a drizzle/D1 data layer. `CMS/src/db/schema.ts` persists the `{tree,script,css}` component artifact + the page block-tree per Site in D1 (migration `0000` committed; `DB` binding added; PM bundle regenerated). See CAVEATS entry "CMS app now has a drizzle/D1 data layer".
 
-## Next valuable slices (pick ONE; all verifiable OFFLINE):
-1. **Audit Script-Upload metadata vs the (DO-free) bundle** — confirm `buildScriptUploadForm` sends the right `main_module`/compat-flags/`compatibility_date` for a no-DO worker, and that nothing else in the bundle needs a binding the metadata omits (self-check covers imports + DOs; double-check **bindings/assets** — e.g. does the OpenNext worker expect an `ASSETS` binding or env vars the upload doesn't provide?). If it needs a binding, add it to `buildScriptUploadForm` + DEPLOY.md.
-2. **Smoke-test the credential-less deploy action end-to-end** (action → `buildCmsBundle` → `deploySite` state machine) WITHOUT CF auth: assert a Site lands `failed`/`notConfigured` and status revalidates. Tricky to unit-test (action imports `@opennextjs/cloudflare` + drizzle which need a Worker runtime) — may need a thin pure seam; if too entangled, do slice 1 instead and note the seam.
-3. **Harden the runbook**: dry-run each DEPLOY.md step that doesn't need CF auth, fix any drift (script names, flags), and add a "what success looks like" curl/expected-output to the verify step.
+## Next valuable slice — pick ONE (A2/A3 are the natural follow-ons, both offline-verifiable):
+1. **A2 — block-tree renderer + public page route.** Build the `[[...slug]]` catch-all in `CMS/`: load a `page` row from D1 (use `getDb()`), walk its `blocks` JSON tree, look up each block's `component` by name, SSR each component's `tree` via `React.createElement` (a DATA WALK, never eval/Function — blocked on Workers), and ship its `script` to the browser. Productionizes the `CMS/src/app/test/page.tsx` proof into real data-driven pages. Offline-verifiable: tsc + opennextjs-cloudflare build gate + a dep-free unit test of the tree→createElement walker (pure fn, no D1). Then regen the PM bundle.
+2. **A3 — precompiled Tailwind utility sheet.** Build-time-generate a bounded token+utility CSS sheet (the runtime artifact classes the build scanner never sees won't style otherwise); ship it on public pages; define the AI's allowed class vocabulary. Offline-verifiable via the build + a snapshot of the generated sheet.
+3. If you'd rather de-risk: extract the pure tree-walk renderer FIRST as a standalone tested module (`CMS/src/lib/render/`), then A2 just wires D1 → that module → route. Smaller, very testable.
 
-## Gotchas
-- Run PM commands inside `ProjectManager/`. DEPLOY.md is at the REPO ROOT — keep it in sync with any deploy-script/wrangler/flow change.
-- `npm run <prescript-target>` directly does NOT chain pre-scripts; npm only runs `pre*` when you run the *target*. Verify hook behavior by checking the underlying script's exit code propagates (it does: preflight exit 1 → predeploy exit 1).
-- Deploy-error i18n is now test-locked — if you add/rename a `DeployErrorKey` or `DeployState.error` gate key, add the string to ALL THREE `messages/*.json` under `sites.deploy.errors.*` or `npm test` fails.
-- REGENERATE `cms-bundle.generated.js` (`npm run bundle:cms`) after ANY `CMS/` change.
-- Deploy gate = `npx opennextjs-cloudflare build`; NEVER run while `next dev` is on 3601 (corrupts `.next`). Check `lsof -ti:3601`; clean `.next .open-next` after gating.
-- Tests are dependency-free `.mjs`/`.ts` (no `@/` alias, no drizzle/opennext imports). New parity test reads source files via relative paths from `scripts/`.
-- Use ONLY purpose theme tokens; all user-visible strings via i18n (3-catalog parity).
+## Gotchas (and see CAVEATS — read all)
+- Run CMS commands inside `CMS/`; PM commands inside `ProjectManager/`. DEPLOY.md is at REPO ROOT.
+- After ANY `CMS/` change: `npm run cf-typegen` (CMS) if you touched wrangler bindings, AND `npm run bundle:cms` (ProjectManager/) to regenerate the committed `cms-bundle.generated.js` — else deploys ship a stale CMS.
+- Deploy gate = `npx opennextjs-cloudflare build`; NEVER run while a dev server is on 3601/3602 (corrupts `.next`). Check `lsof -ti:3601 -ti:3602`; clean `.next .open-next` after gating.
+- NO server eval on Workers: render the artifact `tree` via `React.createElement` data-walk; `script` is shipped as a string for the BROWSER to run. Never `eval`/`new Function` server-side.
+- Use ONLY purpose theme tokens; all admin-UI strings via i18n (EN/FI/ET 3-catalog parity). Content locales are separate/data-driven (epic C1).
+- Tests are dep-free `node --test` (`.mjs`/`.ts`, no `@/` alias, no drizzle/opennext imports). PM `npm test` = 32/32. CMS schema test: `node --test scripts/schema-migration.test.mjs`.

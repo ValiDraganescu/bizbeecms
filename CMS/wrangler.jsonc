@@ -10,6 +10,18 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  // Per-Site D1 database. Each deployed CMS Worker gets its OWN D1 (the database
+  // IS the Site boundary). `database_id` is a placeholder zero-id here — the PM
+  // deploy step provisions a real D1 per Site and overrides it. Run migrations
+  // with `wrangler d1 migrations apply <name>` after creation.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bizbeecms-cms",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
   "observability": {
     "enabled": true
   }
