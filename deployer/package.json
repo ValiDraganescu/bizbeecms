@@ -1,0 +1,17 @@
+{
+  "name": "bizbeecms-deployer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@cloudflare/sandbox": "0.12.1"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Alert, AlertBody, Button } from "@/components/ui";
@@ -8,11 +8,11 @@ import type { SiteStatus } from "@/db/schema";
 import type { DeployError } from "@/app/api/sites/[id]/deploy/route";
 
 /**
- * Deploy trigger for a Site. POSTs to `/api/sites/<siteId>/deploy` (server
- * actions 500 on OpenNext/Workers); the route re-enforces authz and provisions
- * the Site's CMS Worker via the engine. Disabled while a deploy is in flight
- * (`deploying`) — the engine also guards `alreadyDeploying`. Errors map the
- * engine's `DeployError` keys to localized messages.
+ * Deploy trigger for a Site (async). POSTs to `/api/sites/<siteId>/deploy`,
+ * which latches the Site to `deploying` and hands the real build off to the
+ * deployer Worker's container. The build finishes out-of-band (the deployer
+ * calls back to set deployed/failed), so while `status === "deploying"` this
+ * form polls by refreshing the route until the status resolves.
  */
 export function DeployForm({
   siteId,
@@ -24,16 +24,22 @@ export function DeployForm({
   const t = useTranslations("sites.deploy");
   const router = useRouter();
   const [error, setError] = useState<DeployError | null>(null);
-  const [deployed, setDeployed] = useState(false);
-  const [workerName, setWorkerName] = useState<string | undefined>(undefined);
+  const [started, setStarted] = useState(false);
   const [pending, setPending] = useState(false);
 
   const inFlight = status === "deploying" || pending;
 
+  // While a deploy is in flight, poll for the resolved status.
+  useEffect(() => {
+    if (status !== "deploying") return;
+    const id = setInterval(() => router.refresh(), 5000);
+    return () => clearInterval(id);
+  }, [status, router]);
+
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    setDeployed(false);
+    setStarted(false);
     setPending(true);
     try {
       const res = await fetch(`/api/sites/${siteId}/deploy`, {
@@ -41,12 +47,10 @@ export function DeployForm({
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: DeployError;
-        deployed?: boolean;
-        workerName?: string;
+        accepted?: boolean;
       };
-      if (res.ok && data.deployed) {
-        setDeployed(true);
-        setWorkerName(data.workerName);
+      if (res.ok && data.accepted) {
+        setStarted(true);
         router.refresh();
         return;
       }
@@ -62,13 +66,19 @@ export function DeployForm({
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       <p className="text-sm text-foreground-muted">{t("description")}</p>
 
-      {deployed ? (
+      {status === "deploying" ? (
+        <Alert tone="info">
+          <AlertBody>{t("inProgress")}</AlertBody>
+        </Alert>
+      ) : status === "deployed" && started ? (
         <Alert tone="success">
-          <AlertBody>
-            {workerName
-              ? t("deployedWorker", { worker: workerName })
-              : t("deployed")}
-          </AlertBody>
+          <AlertBody>{t("deployed")}</AlertBody>
+        </Alert>
+      ) : null}
+
+      {status === "failed" && started ? (
+        <Alert tone="danger">
+          <AlertBody>{t("errors.uploadFailed")}</AlertBody>
         </Alert>
       ) : null}
 

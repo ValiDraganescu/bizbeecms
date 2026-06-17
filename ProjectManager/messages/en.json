@@ -251,9 +251,10 @@
         "alreadyDeploying": "A deploy is already in progress.",
         "notConfigured": "Cloudflare deploy credentials aren't configured.",
         "uploadFailed": "The Worker upload failed. Please try again.",
-        "bundleMissing": "The CMS bundle hasn't been built.",
-        "unknown": "Something went wrong. Please try again."
-      }
+        "unknown": "Something went wrong. Please try again.",
+        "deployerUnreachable": "The deploy service is unreachable. Please try again."
+      },
+      "inProgress": "Deploy in progress… this can take a couple of minutes."
     },
     "created": "Site created.",
     "updated": "Site updated.",

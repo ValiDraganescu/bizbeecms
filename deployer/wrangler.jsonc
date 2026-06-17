@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bizbeecms-deployer",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // The on-demand container that runs the real CMS build + wrangler deploy.
+  // Managed as a Durable Object (the Sandbox class) per the Sandbox SDK.
+  "containers": [
+    {
+      "class_name": "Sandbox",
+      "image": "./Dockerfile",
+      // CMS build (next build + opennext + wrangler deploy) is heavy; give it
+      // a larger instance. Bump if builds OOM.
+      "instance_type": "standard-1",
+      "max_instances": 3
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "class_name": "Sandbox", "name": "Sandbox" }]
+  },
+  "migrations": [{ "new_sqlite_classes": ["Sandbox"], "tag": "v1" }]
+
+  // Secrets (set via `wrangler secret put`, NOT committed):
+  //   CF_API_TOKEN       — Workers Scripts: Edit, to deploy the CMS Worker
+  //   CF_ACCOUNT_ID      — the account that owns the CMS Workers
+  //   DEPLOYER_SECRET    — shared bearer secret the PM uses to call this Worker
+  //   REPO_URL           — https clone URL of the source repo
+  //   GITHUB_TOKEN       — PAT to clone the private repo (if private)
+  //   PM_CALLBACK_ORIGIN — PM origin to POST deploy status back to
+}

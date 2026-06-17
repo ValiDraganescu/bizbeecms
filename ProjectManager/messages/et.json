@@ -251,9 +251,10 @@
         "alreadyDeploying": "Juurutamine on juba pooleli.",
         "notConfigured": "Cloudflare'i juurutamise mandaadid pole seadistatud.",
         "uploadFailed": "Workeri üleslaadimine ebaõnnestus. Proovi uuesti.",
-        "bundleMissing": "CMS-i komplekti pole ehitatud.",
-        "unknown": "Midagi läks valesti. Proovi uuesti."
-      }
+        "unknown": "Midagi läks valesti. Proovi uuesti.",
+        "deployerUnreachable": "Juurutusteenus pole kättesaadav. Proovi uuesti."
+      },
+      "inProgress": "Juurutamine käib… see võib võtta paar minutit."
     },
     "created": "Sait loodud.",
     "updated": "Sait uuendatud.",

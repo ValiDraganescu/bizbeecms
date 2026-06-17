@@ -12,7 +12,8 @@
     "enabled": true
   },
   "vars": {
-    "APP_ORIGIN": "https://bizbeecms-projectmanager.vali-draganescu88.workers.dev"
+    "APP_ORIGIN": "https://bizbeecms-projectmanager.vali-draganescu88.workers.dev",
+    "DEPLOYER_URL": "https://bizbeecms-deployer.vali-draganescu88.workers.dev"
   },
   // Trusted public origin used to build invite/email links. MUST be set before
   // deploy — invite-link generation refuses to fall back to the request Host

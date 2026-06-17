@@ -19,19 +19,21 @@ function unionKeys(file, typeName) {
   return new Set([...m[1].matchAll(/"([a-zA-Z]+)"/g)].map((x) => x[1]));
 }
 
-// DeployErrorKey union (engine) ∪ the gate-only errors the deploy route's
-// DeployError type adds on top of it. (Auth/CRUD moved from server actions to
-// REST route handlers — server actions 500 on OpenNext/Workers.)
-const engineKeys = unionKeys("src/lib/deploy/deploy.ts", "DeployErrorKey");
-const gateExtra = unionKeys(
+// The deploy UI can show: every key in the route's `DeployError` union, plus
+// `uploadFailed` (shown by the form for a `failed` Site status reported via the
+// async deploy callback). The build now runs in the deployer Worker's container
+// (real opennextjs build + wrangler deploy), so the old in-Worker engine keys
+// no longer drive the UI.
+const routeKeys = unionKeys(
   "src/app/api/sites/[id]/deploy/route.ts",
   "DeployError",
 );
+const formExtra = new Set(["uploadFailed"]);
 
-const expected = new Set([...engineKeys, ...gateExtra]);
+const expected = new Set([...routeKeys, ...formExtra]);
 
 test("sanity: extracted the known deploy error keys", () => {
-  for (const k of ["notFound", "notConfigured", "uploadFailed", "notAllowed", "bundleMissing"]) {
+  for (const k of ["notFound", "notConfigured", "uploadFailed", "notAllowed", "deployerUnreachable"]) {
     assert.ok(expected.has(k), `expected to extract "${k}" from source`);
   }
 });

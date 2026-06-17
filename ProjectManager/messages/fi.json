@@ -251,9 +251,10 @@
         "alreadyDeploying": "Julkaisu on jo käynnissä.",
         "notConfigured": "Cloudflaren julkaisutunnuksia ei ole määritetty.",
         "uploadFailed": "Workerin lataus epäonnistui. Yritä uudelleen.",
-        "bundleMissing": "CMS-pakettia ei ole rakennettu.",
-        "unknown": "Jotain meni pieleen. Yritä uudelleen."
-      }
+        "unknown": "Jotain meni pieleen. Yritä uudelleen.",
+        "deployerUnreachable": "Julkaisupalveluun ei saada yhteyttä. Yritä uudelleen."
+      },
+      "inProgress": "Julkaisu käynnissä… tämä voi kestää pari minuuttia."
     },
     "created": "Sivusto luotu.",
     "updated": "Sivusto päivitetty.",
