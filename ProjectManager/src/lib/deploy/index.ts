@@ -14,3 +14,5 @@ export {
 } from "./cloudflare";
 export type { CfApiResult, CfApiError } from "./cloudflare";
 export type { WorkerScriptUpload } from "./script-upload";
+export { buildCmsBundle, cmsBundleBuiltAt } from "./cms-bundle";
+export type { CmsBundle } from "./cms-bundle";
