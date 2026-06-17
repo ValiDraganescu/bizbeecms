@@ -29,7 +29,9 @@ import {
   CREATE_COMPONENT_TOOL,
   validateComponentArtifact,
 } from "@/lib/chat/component-tool";
+import { CREATE_PAGE_TOOL, validatePageInput } from "@/lib/chat/page-tool";
 import { upsertComponent } from "@/db/component-store";
+import { missingComponents, upsertPage } from "@/db/page-store";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +39,8 @@ export const dynamic = "force-dynamic";
 // point at a stronger model without re-architecting if tool-calling needs it.
 const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
-// The tools the model may call this turn (B2: just create_component for now).
-const TOOLS = [CREATE_COMPONENT_TOOL];
+// The tools the model may call this turn (B2 create_component, B3 create_page).
+const TOOLS = [CREATE_COMPONENT_TOOL, CREATE_PAGE_TOOL];
 
 // AI Gateway slug. Override at deploy time via the AI_GATEWAY env var; falls
 // back to the default gateway name so a freshly-provisioned Site still works.
@@ -156,60 +158,81 @@ function reframe(upstream: ReadableStream<Uint8Array>): ReadableStream<Uint8Arra
 }
 
 /**
- * Run the accumulated tool calls and frame a `tool` event per call. Only
- * `create_component` is wired (B2). Each result is `{name, ok, action|errors}`.
- * Failures (validation or D1) are surfaced as `ok:false` events, never thrown —
- * one bad tool call must not kill the stream.
+ * Run the accumulated tool calls and frame a `tool` event per call. Dispatches
+ * by tool name (B2 `create_component`, B3 `create_page`). Each result is
+ * `{name, ok, action|errors|...}`. Failures (validation or D1) are surfaced as
+ * `ok:false` events, never thrown — one bad tool call must not kill the stream.
  */
 async function runTools(
   tools: ToolCallAccumulator,
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
 ): Promise<void> {
+  const emit = (data: Record<string, unknown>) =>
+    controller.enqueue(encoder.encode(frameEvent("tool", data)));
+
   for (const call of tools.finish()) {
-    if (call.name !== CREATE_COMPONENT_TOOL.function.name) {
-      controller.enqueue(
-        encoder.encode(
-          frameEvent("tool", {
-            name: call.name,
-            ok: false,
-            errors: [`unknown tool: ${call.name}`],
-          }),
-        ),
-      );
-      continue;
-    }
-    const valid = validateComponentArtifact(call.args);
-    if (!valid.ok) {
-      controller.enqueue(
-        encoder.encode(
-          frameEvent("tool", { name: call.name, ok: false, errors: valid.errors }),
-        ),
-      );
-      continue;
-    }
     try {
-      const res = await upsertComponent(valid.artifact);
-      controller.enqueue(
-        encoder.encode(
-          frameEvent("tool", {
-            name: call.name,
-            ok: true,
-            action: res.action,
-            component: res.name,
-          }),
-        ),
-      );
+      if (call.name === CREATE_COMPONENT_TOOL.function.name) {
+        await handleCreateComponent(call.args, emit);
+      } else if (call.name === CREATE_PAGE_TOOL.function.name) {
+        await handleCreatePage(call.args, emit);
+      } else {
+        emit({ name: call.name, ok: false, errors: [`unknown tool: ${call.name}`] });
+      }
     } catch (err) {
-      controller.enqueue(
-        encoder.encode(
-          frameEvent("tool", {
-            name: call.name,
-            ok: false,
-            errors: [`failed to save component: ${(err as Error).message}`],
-          }),
-        ),
-      );
+      emit({ name: call.name, ok: false, errors: [(err as Error).message] });
     }
+  }
+}
+
+async function handleCreateComponent(
+  args: unknown,
+  emit: (data: Record<string, unknown>) => void,
+): Promise<void> {
+  const name = CREATE_COMPONENT_TOOL.function.name;
+  const valid = validateComponentArtifact(args);
+  if (!valid.ok) {
+    emit({ name, ok: false, errors: valid.errors });
+    return;
+  }
+  try {
+    const res = await upsertComponent(valid.artifact);
+    emit({ name, ok: true, action: res.action, component: res.name });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to save component: ${(err as Error).message}`] });
+  }
+}
+
+async function handleCreatePage(
+  args: unknown,
+  emit: (data: Record<string, unknown>) => void,
+): Promise<void> {
+  const name = CREATE_PAGE_TOOL.function.name;
+  const valid = validatePageInput(args);
+  if (!valid.ok) {
+    emit({ name, ok: false, errors: valid.errors });
+    return;
+  }
+  try {
+    // The blocks reference component names — verify they exist before writing,
+    // so the model learns to create_component first (not silent placeholders).
+    const missing = await missingComponents(valid.componentNames);
+    if (missing.length > 0) {
+      emit({
+        name,
+        ok: false,
+        errors: [`unknown components (create them first): ${missing.join(", ")}`],
+      });
+      return;
+    }
+    const res = await upsertPage(valid.page);
+    if (!res.ok) {
+      emit({ name, ok: false, errors: res.errors });
+      return;
+    }
+    emit({ name, ok: true, action: res.action, page: res.slug });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to save page: ${(err as Error).message}`] });
   }
 }
