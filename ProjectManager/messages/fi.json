@@ -196,7 +196,8 @@
       "country": "Maa",
       "status": "Tila",
       "global": "Globaali",
-      "view": "Näytä"
+      "view": "Näytä",
+      "open": "Avaa"
     },
     "form": {
       "createTitle": "Uusi sivusto",
@@ -222,6 +223,7 @@
       "createdAt": "Luotu",
       "workerName": "Worker-nimi",
       "workerNamePending": "Ei vielä julkaistu",
+      "url": "Osoite",
       "country": "Maa",
       "global": "Globaali"
     },

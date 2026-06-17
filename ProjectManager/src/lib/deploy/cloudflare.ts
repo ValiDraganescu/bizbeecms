@@ -126,7 +126,65 @@ export async function uploadWorkerScript(
     };
   }
 
+  // The Script-Upload creates the Worker but does NOT route it. Enable its
+  // workers.dev subdomain so the deployed CMS is actually reachable at
+  // https://<name>.<account-subdomain>.workers.dev (otherwise every request
+  // 404s with no route attached).
+  const sub = await enableWorkerSubdomain(creds, upload.scriptName);
+  if (!sub.ok) return sub;
+
   return { ok: true, result: { scriptName: upload.scriptName } };
+}
+
+/**
+ * Enable the `workers.dev` subdomain for a script:
+ * `POST /accounts/{account}/workers/scripts/{name}/subdomain` with
+ * `{ enabled: true }`. Required after an API Script-Upload — uploading alone
+ * leaves the Worker unrouted (every request 404s). Never throws.
+ */
+async function enableWorkerSubdomain(
+  creds: CloudflareCreds,
+  scriptName: string,
+): Promise<CfApiResult<{ scriptName: string }>> {
+  const url = `${CF_API_BASE}/accounts/${creds.accountId}/workers/scripts/${scriptName}/subdomain`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${creds.apiToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ enabled: true }),
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      reason: "networkError",
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  let envelope: CfEnvelope<unknown> | null = null;
+  try {
+    envelope = (await res.json()) as CfEnvelope<unknown>;
+  } catch {
+    // Non-JSON body.
+  }
+
+  if (!res.ok || !envelope?.success) {
+    return {
+      ok: false,
+      reason: "httpError",
+      detail: `Cloudflare subdomain API returned ${res.status}`,
+      errors: envelope?.errors?.map(
+        (e) => e.message ?? `code ${e.code ?? "?"}`,
+      ),
+    };
+  }
+
+  return { ok: true, result: { scriptName } };
 }
 
 /** Re-exported for callers that want the base URL (tests / diagnostics). */

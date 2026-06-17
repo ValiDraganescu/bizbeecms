@@ -22,6 +22,7 @@ import type { SiteStatus } from "@/db/schema";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canUserCreateSite } from "@/lib/site/authz";
 import { listSitesForUser } from "@/lib/site/site";
+import { cmsWorkerUrl } from "@/lib/deploy/worker-url";
 import { SiteForm } from "./site-form";
 
 const statusTone: Record<SiteStatus, BadgeTone> = {
@@ -44,6 +45,15 @@ export default async function SitesPage() {
   const canCreate = canUserCreateSite(user);
   const actorCountries = canCreate ? await getUserCountries(user.id) : [];
   const sites = await listSitesForUser(user);
+
+  // Public CMS URL per deployed Site (derived from APP_ORIGIN), for the Open link.
+  const urls = new Map<string, string>();
+  for (const site of sites) {
+    if (site.status === "deployed" && site.workerName) {
+      const url = await cmsWorkerUrl(site.workerName);
+      if (url) urls.set(site.id, url);
+    }
+  }
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-10">
@@ -109,6 +119,7 @@ export default async function SitesPage() {
                   <TableHead>{t("list.slug")}</TableHead>
                   <TableHead>{t("list.country")}</TableHead>
                   <TableHead>{t("list.status")}</TableHead>
+                  <TableHead className="text-right">{t("list.open")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -132,6 +143,35 @@ export default async function SitesPage() {
                       <Badge tone={statusTone[site.status]}>
                         {t(`status.${site.status}`)}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {urls.get(site.id) ? (
+                        <a
+                          href={urls.get(site.id)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-md text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {t("list.open")}
+                          <svg
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <path d="M15 3h6v6" />
+                            <path d="M10 14 21 3" />
+                          </svg>
+                        </a>
+                      ) : (
+                        <span className="text-foreground-muted">—</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

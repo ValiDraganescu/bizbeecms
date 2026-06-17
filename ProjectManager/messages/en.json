@@ -196,7 +196,8 @@
       "country": "Country",
       "status": "Status",
       "global": "Global",
-      "view": "View"
+      "view": "View",
+      "open": "Open"
     },
     "form": {
       "createTitle": "New Site",
@@ -222,6 +223,7 @@
       "createdAt": "Created",
       "workerName": "Worker name",
       "workerNamePending": "Not deployed yet",
+      "url": "URL",
       "country": "Country",
       "global": "Global"
     },

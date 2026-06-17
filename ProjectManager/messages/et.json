@@ -196,7 +196,8 @@
       "country": "Riik",
       "status": "Olek",
       "global": "Globaalne",
-      "view": "Vaata"
+      "view": "Vaata",
+      "open": "Ava"
     },
     "form": {
       "createTitle": "Uus sait",
@@ -222,6 +223,7 @@
       "createdAt": "Loodud",
       "workerName": "Workeri nimi",
       "workerNamePending": "Veel avaldamata",
+      "url": "URL",
       "country": "Riik",
       "global": "Globaalne"
     },

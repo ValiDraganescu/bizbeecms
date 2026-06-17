@@ -14,6 +14,7 @@ import type { CountryCode } from "@/lib/auth/countries";
 import type { SiteStatus } from "@/db/schema";
 import { findUserById, getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canManageSiteByCountry } from "@/lib/site/authz";
+import { cmsWorkerUrl } from "@/lib/deploy/worker-url";
 import {
   findSiteById,
   getSiteUserIds,
@@ -58,6 +59,12 @@ export default async function SiteDetailPage({
 
   const creator = await findUserById(site.createdBy);
 
+  // Public URL of the deployed CMS Worker (derived from APP_ORIGIN), if deployed.
+  const workerUrl =
+    site.status === "deployed" && site.workerName
+      ? await cmsWorkerUrl(site.workerName)
+      : null;
+
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-10">
       <header className="flex flex-col gap-1">
@@ -100,6 +107,22 @@ export default async function SiteDetailPage({
             </Detail>
             <Detail label={t("detail.workerName")}>
               {site.workerName ?? (
+                <span className="text-foreground-muted">
+                  {t("detail.workerNamePending")}
+                </span>
+              )}
+            </Detail>
+            <Detail label={t("detail.url")}>
+              {workerUrl ? (
+                <a
+                  href={workerUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-sm text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                >
+                  {workerUrl}
+                </a>
+              ) : (
                 <span className="text-foreground-muted">
                   {t("detail.workerNamePending")}
                 </span>
