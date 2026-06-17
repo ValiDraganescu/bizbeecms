@@ -16,6 +16,8 @@
  *    (shipped to the browser, run there — never on the server).
  */
 
+import { resolveLocalized } from "./localize.ts";
+
 // ── Component element tree (what `component.tree` holds, parsed) ─────────────
 export type TreeNode =
   | string
@@ -61,17 +63,31 @@ export type RenderPlan = {
   scripts: string[];
 };
 
+/**
+ * Optional content-locale context (epic C1). When present, every prop value
+ * that is a "locale object" ({ en: "...", fi: "..." }, at any depth) is
+ * resolved to the active locale (fallback → default → first present) as the
+ * tree is walked. Absent = no resolution (props pass through verbatim).
+ */
+export type LocaleContext = { locale: string; fallback: string };
+
 /** Walk one component element tree into element plans. */
-export function planTree(node: TreeNode): ElementPlan {
+export function planTree(node: TreeNode, locale?: LocaleContext): ElementPlan {
   if (typeof node === "string") return { kind: "text", text: node };
   if (node == null || typeof node !== "object" || typeof node.tag !== "string") {
     throw new Error(`Invalid tree node: ${JSON.stringify(node)}`);
   }
+  const props = node.props ?? {};
   return {
     kind: "element",
     tag: node.tag,
-    props: node.props ?? {},
-    children: (node.children ?? []).map(planTree),
+    props: locale
+      ? (resolveLocalized(props, locale.locale, locale.fallback) as Record<
+          string,
+          unknown
+        >)
+      : props,
+    children: (node.children ?? []).map((c) => planTree(c, locale)),
   };
 }
 
@@ -91,6 +107,7 @@ export function planTree(node: TreeNode): ElementPlan {
 export function planPage(
   blocks: Block[],
   components: Map<string, ComponentArtifact>,
+  locale?: LocaleContext,
 ): RenderPlan {
   const scripts: string[] = [];
   const seenScripts = new Set<string>();
@@ -106,7 +123,7 @@ export function planPage(
       scripts.push(artifact.script);
     }
 
-    const el = planTree(artifact.tree);
+    const el = planTree(artifact.tree, locale);
     const childPlans = (block.children ?? []).map(planBlock);
     if (childPlans.length === 0) return el;
     if (el.kind !== "element") {

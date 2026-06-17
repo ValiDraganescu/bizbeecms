@@ -89,7 +89,25 @@ export const page = sqliteTable(
   (t) => [uniqueIndex("page_parent_slug_unique").on(t.parentPageId, t.slug)],
 );
 
+/**
+ * Site settings — a generic key→value (JSON text) store for per-Site config
+ * that isn't pages or components (Milestone 2, epic C1+). First use: the
+ * data-driven content-locale set (`content_locales`, distinct from the fixed
+ * EN/FI/ET admin UI). Also the home for later E1/E2 (theme overrides, brand
+ * identity, AI persona). Lives in the per-Site D1 — the DB IS the Site boundary,
+ * so settings aren't site-scoped. Mined from aicms `siteSettings`.
+ */
+export const siteSettings = sqliteTable("site_settings", {
+  key: text("key").primaryKey(),
+  // JSON string. Parse defensively at read time (see settings-store).
+  value: text("value").notNull().default("{}"),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
 export type Component = typeof component.$inferSelect;
 export type NewComponent = typeof component.$inferInsert;
 export type Page = typeof page.$inferSelect;
 export type NewPage = typeof page.$inferInsert;
+export type SiteSetting = typeof siteSettings.$inferSelect;

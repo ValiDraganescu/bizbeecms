@@ -18,6 +18,7 @@ import type { Page } from "@/db/schema";
 import {
   type Block,
   type ComponentArtifact,
+  type LocaleContext,
   type TreeNode,
   parseJsonColumn,
   planPage,
@@ -25,6 +26,8 @@ import {
 import { renderPlans } from "@/lib/render/react";
 import { resolveSlugPath } from "@/lib/render/slug";
 import { generateUtilityCss } from "@/lib/render/utility-css";
+import { getContentLocales } from "@/db/settings-store";
+import { resolveLocalized } from "@/lib/render/localize";
 
 // Precompiled once per worker instance — pure, deterministic, bounded vocabulary.
 const UTILITY_CSS = generateUtilityCss();
@@ -93,14 +96,28 @@ async function loadPlan(params: RouteParams) {
     }
   }
 
-  const plan = planPage(blocks, components);
-  return { page: pageRow, plan };
+  // Per-Site content locales (epic C1): resolve localized prop values in
+  // artifact trees to the active content locale, falling back to the site
+  // default. The requested locale follows the admin/UI locale (cookie/Accept-
+  // Language) but resolves against this Site's own data-driven content set.
+  const contentLocales = await getContentLocales();
+  const requested = await getLocale();
+  const locale: LocaleContext = {
+    locale: contentLocales.locales.includes(requested)
+      ? requested
+      : contentLocales.default,
+    fallback: contentLocales.default,
+  };
+
+  const plan = planPage(blocks, components, locale);
+  return { page: pageRow, plan, locale };
 }
 
 /** Resolve a per-locale JSON map (e.g. metaTitle) to the active locale w/ fallback. */
-function localized(raw: string, locale: string): string | undefined {
-  const map = parseJsonColumn<Record<string, string>>(raw, {});
-  return map[locale] ?? map.en ?? Object.values(map)[0];
+function localized(raw: string, locale: LocaleContext): string | undefined {
+  const map = parseJsonColumn<unknown>(raw, {});
+  const resolved = resolveLocalized(map, locale.locale, locale.fallback);
+  return typeof resolved === "string" && resolved !== "" ? resolved : undefined;
 }
 
 export async function generateMetadata({
@@ -110,10 +127,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const loaded = await loadPlan(await params);
   if (!loaded) return {};
-  const locale = await getLocale();
   return {
-    title: localized(loaded.page.metaTitle, locale),
-    description: localized(loaded.page.metaDescription, locale),
+    title: localized(loaded.page.metaTitle, loaded.locale),
+    description: localized(loaded.page.metaDescription, loaded.locale),
   };
 }
 
