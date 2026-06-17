@@ -22,6 +22,16 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Workers AI binding for the per-Site AI assistant (Milestone 2, epic B1).
+  // No API key — billed via Cloudflare. The chat route calls `env.AI.run(...)`
+  // through AI Gateway (caching / per-Site spend caps / analytics / fallback).
+  // The gateway slug is read from the AI_GATEWAY var (code has a fallback).
+  "ai": {
+    "binding": "AI"
+  },
+  "vars": {
+    "AI_GATEWAY": "bizbeecms-cms"
+  },
   "observability": {
     "enabled": true
   }
