@@ -1,0 +1,15 @@
+{
+  "app": {
+    "name": "bizbeecms",
+    "cms": "CMS",
+    "description": "Cloudflare-native multi-site B2B whitelabel CMS — per-Site CMS instance"
+  },
+  "home": {
+    "title": "bizbeecms · CMS",
+    "intro": "A whitelabel CMS instance. The ProjectManager deploys one of these per Site to Cloudflare. For now this is the default Next.js install.",
+    "stack": "Running on Next.js + Cloudflare Workers (OpenNext)."
+  },
+  "locale": {
+    "label": "Language"
+  }
+}

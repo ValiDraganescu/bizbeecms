@@ -1,4 +1,8 @@
-export default function Home() {
+import { getTranslations } from "next-intl/server";
+import { LocaleSwitcher } from "@/components/locale-switcher";
+
+export default async function Home() {
+  const t = await getTranslations("home");
   return (
     <main
       style={{
@@ -12,14 +16,12 @@ export default function Home() {
         textAlign: "center",
       }}
     >
-      <h1 style={{ fontSize: "2rem", margin: 0 }}>bizbeecms · CMS</h1>
-      <p style={{ color: "#666", maxWidth: "32rem" }}>
-        A whitelabel CMS instance. The ProjectManager deploys one of these per
-        Site to Cloudflare. For now this is the default Next.js install.
-      </p>
-      <p style={{ color: "#999", fontSize: "0.85rem" }}>
-        Running on Next.js + Cloudflare Workers (OpenNext).
-      </p>
+      <div style={{ position: "absolute", top: "1rem", right: "1rem" }}>
+        <LocaleSwitcher />
+      </div>
+      <h1 style={{ fontSize: "2rem", margin: 0 }}>{t("title")}</h1>
+      <p style={{ color: "#666", maxWidth: "32rem" }}>{t("intro")}</p>
+      <p style={{ color: "#999", fontSize: "0.85rem" }}>{t("stack")}</p>
     </main>
   );
 }

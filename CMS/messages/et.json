@@ -1,0 +1,15 @@
+{
+  "app": {
+    "name": "bizbeecms",
+    "cms": "CMS",
+    "description": "Cloudflare-põhine mitme saidiga B2B valgemärgisega CMS — saidipõhine CMS-i instants"
+  },
+  "home": {
+    "title": "bizbeecms · CMS",
+    "intro": "Valgemärgisega CMS-i instants. ProjectManager juurutab neist ühe iga saidi kohta Cloudflare'i. Praegu on see vaikimisi Next.js paigaldus.",
+    "stack": "Töötab Next.js + Cloudflare Workers (OpenNext) platvormil."
+  },
+  "locale": {
+    "label": "Keel"
+  }
+}

@@ -1,14 +1,22 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getTranslations } from "next-intl/server";
 
-export const metadata: Metadata = {
-  title: "bizbeecms — CMS",
-  description: "Cloudflare-native multi-site B2B whitelabel CMS — per-Site CMS instance",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("app");
+  return {
+    title: `${t("name")} — ${t("cms")}`,
+    description: t("description"),
+  };
+}
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Locale comes from the cookie/Accept-Language resolver in i18n/request.ts.
+  const locale = await getLocale();
+
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body
         style={{
           margin: 0,
@@ -16,7 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
         }}
       >
-        {children}
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>
     </html>
   );

@@ -1,0 +1,15 @@
+{
+  "app": {
+    "name": "bizbeecms",
+    "cms": "CMS",
+    "description": "Cloudflare-natiivi monisivustoinen B2B-whitelabel-CMS — sivustokohtainen CMS-instanssi"
+  },
+  "home": {
+    "title": "bizbeecms · CMS",
+    "intro": "Whitelabel-CMS-instanssi. ProjectManager julkaisee yhden näistä jokaista sivustoa kohden Cloudflareen. Toistaiseksi tämä on oletusarvoinen Next.js-asennus.",
+    "stack": "Toimii Next.js + Cloudflare Workers (OpenNext) -alustalla."
+  },
+  "locale": {
+    "label": "Kieli"
+  }
+}
