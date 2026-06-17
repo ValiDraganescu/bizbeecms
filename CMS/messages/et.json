@@ -11,5 +11,21 @@
   },
   "locale": {
     "label": "Keel"
+  },
+  "chat": {
+    "title": "Tehisintellekti assistent",
+    "subtitle": "Kirjelda, mida soovid, ja assistent ehitab selle — komponendid, lehed, tõlked.",
+    "empty": "Palu assistendil luua komponent või koostada leht.",
+    "placeholder": "Kirjelda komponenti või lehte…",
+    "send": "Saada",
+    "sending": "Saadan…",
+    "thinking": "Mõtlen…",
+    "you": "Sina",
+    "assistant": "Assistent",
+    "error": "Viga: {message}",
+    "tool": {
+      "ok": "{name}: {action} {subject}",
+      "fail": "{name} ebaõnnestus"
+    }
   }
 }

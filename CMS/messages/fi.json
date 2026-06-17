@@ -11,5 +11,21 @@
   },
   "locale": {
     "label": "Kieli"
+  },
+  "chat": {
+    "title": "Tekoälyavustaja",
+    "subtitle": "Kuvaile mitä haluat, niin avustaja rakentaa sen — komponentit, sivut ja käännökset.",
+    "empty": "Pyydä avustajaa luomaan komponentti tai kokoamaan sivu.",
+    "placeholder": "Kuvaile komponentti tai sivu…",
+    "send": "Lähetä",
+    "sending": "Lähetetään…",
+    "thinking": "Mietitään…",
+    "you": "Sinä",
+    "assistant": "Avustaja",
+    "error": "Virhe: {message}",
+    "tool": {
+      "ok": "{name}: {action} {subject}",
+      "fail": "{name} epäonnistui"
+    }
   }
 }

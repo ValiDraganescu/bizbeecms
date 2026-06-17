@@ -11,5 +11,21 @@
   },
   "locale": {
     "label": "Language"
+  },
+  "chat": {
+    "title": "AI Assistant",
+    "subtitle": "Describe what you want and the assistant builds it — components, pages, translations.",
+    "empty": "Ask the assistant to create a component or compose a page.",
+    "placeholder": "Describe a component or page…",
+    "send": "Send",
+    "sending": "Sending…",
+    "thinking": "Thinking…",
+    "you": "You",
+    "assistant": "Assistant",
+    "error": "Error: {message}",
+    "tool": {
+      "ok": "{name}: {action} {subject}",
+      "fail": "{name} failed"
+    }
   }
 }
