@@ -13,6 +13,10 @@ Task states: TODO | DOING | DONE | BLOCKED.
 - DONE: Email+password auth — first registrant → SuperAdmin; subsequent don't; sessions in KV (commit `d5cd3a0`). See CAVEATS "PM auth".
 - DONE: Invite flow — SuperAdmin/`canInvite` Admins invite by email+role+country; accept-invite page; multi-country scope (empty=global); origin hardened (commits `0ce61d4`/`ea92ebf`/`cf4c245`).
 - DONE: Site CRUD — create/list/detail/edit Sites + assign PM users; country-scoped authz enforced server-side (`src/lib/site/`, `src/app/(app)/sites/`). Verified tsc + opennextjs-cloudflare build.
-- TODO: Site deployment — PM calls Cloudflare API to provision a CMS Worker per Site; report deploy status. Must work from the deployed PM.
+- DOING: Site deployment — PM calls Cloudflare API to provision a CMS Worker per Site; report deploy status. Must work from the deployed PM.
+  - DONE (engine core): `lib/deploy/` Cloudflare Workers Script-Upload API client + deploy orchestration state-machine (draft→deploying→deployed/failed) + data-layer `setSiteDeployStatus`. Pure parts unit-tested (`npm test`, 6/6); tsc + opennextjs-cloudflare build clean. No live CF auth → live upload not exercised.
+  - TODO (next): **CMS bundle production** — produce the CMS Worker bundle to upload (run OpenNext over `CMS/` and read `.open-next/worker.js` + chunk files into the `bundle` input `deploySite` expects). Decide build-on-demand vs. a pre-bundled committed artifact.
+  - TODO (next): deploy UI — `deploySiteAction` server action (authz-gated via `lib/site/authz` — only Site managers), a "Deploy" button + status indicator on the Site detail page wired through `deploySite`; i18n `sites.deploy.*` in EN/FI/ET.
+  - TODO (next): real end-to-end deploy against a live Cloudflare account/token (set `CF_API_TOKEN`/`CF_ACCOUNT_ID` secrets; needs auth in env).
 - TODO: CMS UI i18n — localize the CMS admin/UI chrome in English, Finnish, Estonian (same fixed set + approach as PM). See CAVEATS "Localization rules".
 - TODO: CMS content localization — allow configuring an arbitrary set of user-facing **content** languages per Site (data-driven, distinct from the fixed EN/FI/ET admin-UI locales), and serve/render published content in the configured content locales.

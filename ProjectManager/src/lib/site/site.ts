@@ -238,6 +238,28 @@ export async function listAssignableUsers(
   });
 }
 
+/**
+ * Update a Site's deploy status (the deploy state-machine writes through here).
+ * Optionally set/clear the Cloudflare Worker name in the same update — pass it
+ * when a deploy succeeds (the provisioned Worker name) so the row reflects the
+ * live deployment. Returns the updated row, or null if the Site is gone.
+ */
+export async function setSiteDeployStatus(
+  id: string,
+  status: SiteStatus,
+  workerName?: string | null,
+): Promise<Site | null> {
+  const db = await getDb();
+  const patch: { status: SiteStatus; workerName?: string | null } = { status };
+  if (workerName !== undefined) patch.workerName = workerName;
+  const [site] = await db
+    .update(schema.sites)
+    .set(patch)
+    .where(eq(schema.sites.id, id))
+    .returning();
+  return site ?? null;
+}
+
 /** Statuses a Site can hold (re-exported for the UI badge map). */
 export const SITE_STATUSES: SiteStatus[] = [
   "draft",
