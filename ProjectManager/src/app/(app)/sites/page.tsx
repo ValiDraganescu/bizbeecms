@@ -22,7 +22,6 @@ import type { SiteStatus } from "@/db/schema";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canUserCreateSite } from "@/lib/site/authz";
 import { listSitesForUser } from "@/lib/site/site";
-import { createSiteAction } from "./actions";
 import { SiteForm } from "./site-form";
 
 const statusTone: Record<SiteStatus, BadgeTone> = {
@@ -80,7 +79,6 @@ export default async function SitesPage() {
           </CardHeader>
           <CardContent>
             <SiteForm
-              action={createSiteAction}
               actor={{ role: user.role, countries: actorCountries }}
               mode="create"
             />

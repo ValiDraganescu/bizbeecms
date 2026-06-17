@@ -20,7 +20,6 @@ import {
   isUserAssignedToSite,
   listAssignableUsers,
 } from "@/lib/site/site";
-import { assignUsersAction, deploySiteAction, updateSiteAction } from "../actions";
 import { AssignForm } from "../assign-form";
 import { DeployForm } from "../deploy-form";
 import { SiteForm } from "../site-form";
@@ -124,10 +123,7 @@ export default async function SiteDetailPage({
           <CardDescription>{t("deploy.cardDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <DeployForm
-            action={deploySiteAction.bind(null, site.id)}
-            status={site.status}
-          />
+          <DeployForm siteId={site.id} status={site.status} />
         </CardContent>
       </Card>
 
@@ -140,7 +136,7 @@ export default async function SiteDetailPage({
             </CardHeader>
             <CardContent>
               <SiteForm
-                action={updateSiteAction.bind(null, site.id)}
+                siteId={site.id}
                 actor={{ role: user.role, countries: actorCountries }}
                 mode="edit"
                 initial={{
@@ -159,7 +155,7 @@ export default async function SiteDetailPage({
             </CardHeader>
             <CardContent>
               <AssignForm
-                action={assignUsersAction.bind(null, site.id)}
+                siteId={site.id}
                 assignable={await listAssignableUsers(
                   site.country as CountryCode | null,
                 )}

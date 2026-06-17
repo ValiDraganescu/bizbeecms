@@ -43,6 +43,19 @@ test("exported Durable Object classes raise a (non-blocking) warning", () => {
   assert.ok(warnings.some((w) => /DOQueueHandler/.test(w)));
 });
 
+test("a worker that serves assets via env.ASSETS.fetch raises a (non-blocking) warning", () => {
+  const src = `export default { async fetch(req, env){ return env.ASSETS.fetch(req); } };`;
+  const { errors, warnings } = validateBundleSource("worker.js", src);
+  assert.deepEqual(errors, [], "assets gap must be a warning, not a hard error");
+  assert.ok(warnings.some((w) => /Static-Assets|env\.ASSETS/.test(w)));
+});
+
+test("a worker with no env.ASSETS.fetch does not raise the assets warning", () => {
+  const src = `export default { async fetch(){ return new Response("ok"); } };`;
+  const { warnings } = validateBundleSource("worker.js", src);
+  assert.ok(!warnings.some((w) => /Static-Assets/.test(w)));
+});
+
 test("a leftover bare app import is a blocking error; node:/cloudflare: stay external", () => {
   const src =
     `\nimport x from "node:async_hooks";\n` +
@@ -82,5 +95,13 @@ test("the committed CMS bundle passes the entry contract (no blocking errors)", 
   assert.ok(
     !warnings.some((w) => OPENNEXT_DO_CLASSES.some((c) => w.includes(c))),
     `committed bundle unexpectedly still exports a Durable Object class — the DO strip in build-cms-bundle.mjs regressed:\n${warnings.join("\n")}`,
+  );
+  // The committed OpenNext worker serves static files via env.ASSETS.fetch but
+  // the Script-Upload ships no assets — a known live-deploy blocker. Guard that
+  // the warning keeps firing so this de-risk signal can't silently regress (and
+  // so a future Meeseeks doesn't think the deploy path is asset-complete).
+  assert.ok(
+    warnings.some((w) => /Static-Assets/.test(w)),
+    `expected the static-assets gap warning to fire for the real bundle (env.ASSETS.fetch must be present):\n${warnings.join("\n")}`,
   );
 });

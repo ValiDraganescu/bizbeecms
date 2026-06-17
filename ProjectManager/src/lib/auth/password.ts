@@ -10,7 +10,12 @@
  *   pbkdf2$<iterations>$<saltB64>$<hashB64>
  */
 
-const ITERATIONS = 210_000; // OWASP 2023 floor for PBKDF2-HMAC-SHA-256
+// Cloudflare Workers' Web Crypto caps PBKDF2 at 100_000 iterations (requesting
+// more throws NotSupportedError at runtime), so we pin the max it allows. Below
+// the OWASP 2023 floor (210_000), but it's the platform ceiling; the hash string
+// records its own iteration count, so this can be raised later without
+// invalidating existing hashes if the runtime limit ever lifts.
+const ITERATIONS = 100_000;
 const KEY_LENGTH = 32; // bytes (256-bit derived key)
 const SALT_LENGTH = 16; // bytes
 const PREFIX = "pbkdf2";

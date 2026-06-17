@@ -1,17 +1,36 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui";
-import { logoutAction } from "@/lib/auth/logout-action";
 
-/** Sign-out control: posts to the logout server action. */
+/** Sign-out control: POSTs to the REST endpoint `/api/auth/logout`. */
 export function SignOutButton() {
   const t = useTranslations("auth");
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+
+  async function onSignOut() {
+    setPending(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Ignore — fall through to redirect; a stale cookie is cleared next visit.
+    }
+    router.push("/login");
+    router.refresh();
+  }
+
   return (
-    <form action={logoutAction}>
-      <Button type="submit" variant="secondary" size="sm">
-        {t("signOut")}
-      </Button>
-    </form>
+    <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      loading={pending}
+      onClick={onSignOut}
+    >
+      {t("signOut")}
+    </Button>
   );
 }

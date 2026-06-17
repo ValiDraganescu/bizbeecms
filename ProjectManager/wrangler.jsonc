@@ -11,6 +11,9 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "APP_ORIGIN": "https://bizbeecms-projectmanager.vali-draganescu88.workers.dev"
+  },
   // Trusted public origin used to build invite/email links. MUST be set before
   // deploy — invite-link generation refuses to fall back to the request Host
   // header in production (Host Header Injection guard, see send-invite.ts).
@@ -24,7 +27,7 @@
     {
       "binding": "DB",
       "database_name": "bizbeecms",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "69cda498-69e6-44ce-9814-826afffa4a1a",
       "migrations_dir": "migrations"
     }
   ],
@@ -33,7 +36,7 @@
   "kv_namespaces": [
     {
       "binding": "SESSIONS",
-      "id": "00000000000000000000000000000000"
+      "id": "f400b577848f4e4aa6845d2fb46a601e"
     }
   ]
   // Email: invite delivery via Cloudflare Email Sending (Beta, Workers Paid).

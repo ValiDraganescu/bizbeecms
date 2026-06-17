@@ -26,6 +26,17 @@
 //      `import ... from "<bare app/npm specifier>"` — only node:/cloudflare:
 //      builtins are allowed external. A leftover bare import = a broken esbuild
 //      bundle that will fail to instantiate on the Worker.
+//   4. STATIC-ASSETS GAP (warning): OpenNext's worker serves `_next/static/*`,
+//      CSS, client JS chunks and public/ files by delegating to the Workers
+//      Static-Assets binding (`env.ASSETS.fetch(...)`). The committed artifact
+//      ships ONLY the worker JS module and `buildScriptUploadForm` sends no
+//      `assets` metadata + no ASSETS binding, so a live `PUT workers/scripts`
+//      upload would boot a worker whose `env.ASSETS` is undefined → every static
+//      asset 404s (unstyled, non-interactive pages). Surfaced loudly so the
+//      live-deploy step handles it (upload the assets via Cloudflare's Workers
+//      Assets API + reference the completion token in the script-upload metadata,
+//      or otherwise make ASSETS resolvable). See DEPLOY.md / CAVEATS "static
+//      assets gap".
 //
 // Run: `npm run bundle:selfcheck` (from ProjectManager/). Pure read-only.
 // Also imported by preflight so `npm run preflight` runs it automatically.
@@ -116,6 +127,24 @@ export function validateBundleSource(mainModule, source) {
       `bundle: ${bareImports.size} unresolved external import(s) remain in the bundled worker ` +
         `(e.g. ${list}) — only node:/cloudflare: builtins may stay external. The esbuild bundle ` +
         `is incomplete; re-run \`npm run bundle:cms\`.`,
+    );
+  }
+
+  // 4. Static-assets gap: the worker delegates static-file requests to the
+  //    Workers Static-Assets binding (`env.ASSETS.fetch(...)`). Our upload ships
+  //    only the JS module and declares no `assets`/ASSETS binding, so a live
+  //    upload boots a worker with `env.ASSETS` undefined → static assets 404.
+  //    Match the `env.ASSETS.fetch(` call (not just any `ASSETS` mention) so a
+  //    stray string literal can't trip it.
+  if (/\benv\.ASSETS\.fetch\b/.test(source)) {
+    warnings.push(
+      `bundle: worker serves static files via the Workers Static-Assets binding ` +
+        `(env.ASSETS.fetch) but the Script-Upload sends no \`assets\` metadata/ASSETS binding ` +
+        `and the committed artifact ships only the JS module. A LIVE upload of this bundle ` +
+        `would boot with env.ASSETS undefined → _next/static, CSS and client JS chunks all 404 ` +
+        `(unstyled, non-interactive pages). Resolve at the live-deploy step: upload the ` +
+        `.open-next/assets via Cloudflare's Workers Assets API and reference the completion ` +
+        `token in buildScriptUploadForm's metadata. See CAVEATS "static assets gap" / DEPLOY.md.`,
     );
   }
 

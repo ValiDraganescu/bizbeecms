@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   Alert,
@@ -14,34 +15,67 @@ import {
   Input,
 } from "@/components/ui";
 import { MIN_PASSWORD_LENGTH } from "@/lib/auth/validation";
-import { registerAction, type RegisterState } from "./actions";
-
-const initialState: RegisterState = {};
+import type { RegisterError } from "@/app/api/auth/register/route";
 
 /**
- * First-registrant form. On submit it calls the register server action; field
- * and form errors come back as stable keys resolved against `auth.errors.*`.
+ * First-registrant form. Submits to the REST endpoint `/api/auth/register`
+ * (server actions 500 on OpenNext/Workers). Field and form errors come back as
+ * stable keys resolved against `auth.errors.*`; on success the client redirects
+ * to the home page.
  */
 export function RegisterForm() {
   const t = useTranslations("auth");
-  const [state, formAction, pending] = useActionState(
-    registerAction,
-    initialState,
-  );
+  const router = useRouter();
+  const [error, setError] = useState<RegisterError | null>(null);
+  const [email, setEmail] = useState("");
+  const [pending, setPending] = useState(false);
 
-  const fieldError = (key: RegisterState["error"]) =>
-    state.error === key ? t(`errors.${key}`) : null;
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const payload = {
+      email: String(form.get("email") ?? ""),
+      password: String(form.get("password") ?? ""),
+      confirmPassword: String(form.get("confirmPassword") ?? ""),
+    };
+    setEmail(payload.email);
+    setError(null);
+    setPending(true);
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        router.push("/");
+        router.refresh();
+        return;
+      }
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: RegisterError;
+      };
+      setError(data.error ?? "unknown");
+    } catch {
+      setError("unknown");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const fieldError = (key: RegisterError) =>
+    error === key ? t(`errors.${key}`) : null;
 
   // A whole-form (non field-specific) error renders in a banner above.
   const formError =
-    state.error === "registrationClosed" ||
-    state.error === "emailTaken" ||
-    state.error === "unknown"
-      ? t(`errors.${state.error}`)
+    error === "registrationClosed" ||
+    error === "emailTaken" ||
+    error === "unknown"
+      ? t(`errors.${error}`)
       : null;
 
   return (
-    <form action={formAction} className="flex flex-col gap-4" noValidate>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       {formError ? (
         <Alert tone="danger">
           <AlertBody>{formError}</AlertBody>
@@ -56,10 +90,8 @@ export function RegisterForm() {
           type="email"
           autoComplete="email"
           required
-          defaultValue={state.email ?? ""}
-          aria-invalid={
-            state.error === "emailRequired" || state.error === "emailInvalid"
-          }
+          defaultValue={email}
+          aria-invalid={error === "emailRequired" || error === "emailInvalid"}
         />
         {fieldError("emailRequired") || fieldError("emailInvalid") ? (
           <FieldError>
@@ -77,8 +109,7 @@ export function RegisterForm() {
           autoComplete="new-password"
           required
           aria-invalid={
-            state.error === "passwordRequired" ||
-            state.error === "passwordTooShort"
+            error === "passwordRequired" || error === "passwordTooShort"
           }
         />
         {fieldError("passwordRequired") || fieldError("passwordTooShort") ? (
@@ -102,7 +133,7 @@ export function RegisterForm() {
           type="password"
           autoComplete="new-password"
           required
-          aria-invalid={state.error === "passwordMismatch"}
+          aria-invalid={error === "passwordMismatch"}
         />
         {fieldError("passwordMismatch") ? (
           <FieldError>{fieldError("passwordMismatch")}</FieldError>

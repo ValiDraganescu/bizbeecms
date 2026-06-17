@@ -197,6 +197,21 @@ A 200 with the default Next.js CMS page = success.
 > + `npm run preflight` no longer warn about DOs. (The strip self-guards: if a future OpenNext
 > rename re-introduces a DO export, the build throws and the self-check test fails.)
 >
+> 🚧 **KNOWN BLOCKER — static assets are not uploaded yet.** The OpenNext worker serves
+> `_next/static/*`, CSS, client JS chunks and `public/` files by delegating to the Workers
+> **Static-Assets binding** (`env.ASSETS.fetch(...)`; the CMS `wrangler.jsonc` declares
+> `assets.binding = "ASSETS"` over `.open-next/assets`). But the PM deploy uses the plain
+> `PUT /workers/scripts/{name}` Script-Upload, and `buildScriptUploadForm` sends **only the JS
+> module** — no `assets` metadata, no ASSETS binding, and the committed artifact bundles no
+> static files. So a live upload boots a worker whose `env.ASSETS` is **undefined**: the page
+> HTML renders but every static asset **404s** → unstyled, non-interactive pages.
+> `npm run bundle:selfcheck` / `npm run preflight` now surface this as a ⚠️ warning.
+> **To resolve at the live-deploy step:** upload `CMS/.open-next/assets` (14 files, ~700 KB)
+> via Cloudflare's **Workers Assets API** (create an upload session → PUT the file manifest →
+> get a completion JWT) and pass that token in the Script-Upload `metadata.assets`, OR switch
+> the deploy to wrangler's own assets-aware upload. This needs a live CF account to fully
+> verify, so it's the next deploy slice; the request-building seam is `script-upload.ts`.
+>
 > ⚠️ **The one remaining unverified link:** the committed CMS bundle is produced by **plain
 > esbuild** over OpenNext's `worker.js`, not by wrangler's own OpenNext plugin (wasm/loaders).
 > It is shape- **and structure**-verified (the bundle self-check, step 8) but **never booted on
@@ -238,3 +253,4 @@ npm run deploy
 | Site deploy → `failed`, reason `httpError` | Token scope wrong (needs Workers Scripts: Edit) or account id mismatch. Check `wrangler whoami`. |
 | Site deploy → `failed`, `httpError`, CF error mentions Durable Objects / migrations | Should be fixed — `build-cms-bundle.mjs` strips OpenNext's DO re-exports (step 11 ✅). If it recurs, the committed bundle is stale: re-run `npm run bundle:cms` and confirm `npm run bundle:selfcheck` shows no DO warning. |
 | CMS Worker uploaded but 500s on open | The esbuild-vs-wrangler bundling gap (step 11 ⚠️). Adjust `scripts/build-cms-bundle.mjs` esbuild opts. |
+| CMS page loads but is **unstyled / no JS / images broken** (assets 404) | The static-assets blocker (step 11 🚧). `env.ASSETS` is unbound because the deploy uploads no assets. Upload `.open-next/assets` via the Workers Assets API and reference the token in `buildScriptUploadForm`'s metadata. |

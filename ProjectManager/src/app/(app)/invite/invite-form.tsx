@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   Alert,
@@ -22,9 +22,7 @@ import {
   type CountryCode,
 } from "@/lib/auth/countries";
 import { INVITABLE_ROLES } from "@/lib/invite/authz";
-import { inviteAction, type InviteState } from "./actions";
-
-const initialState: InviteState = {};
+import type { InviteErrorKey, InviteSuccess } from "@/app/api/invite/route";
 
 type InviterCtx = { role: Role; countries: CountryCode[] };
 
@@ -38,10 +36,10 @@ type InviterCtx = { role: Role; countries: CountryCode[] };
 export function InviteForm({ inviter }: { inviter: InviterCtx }) {
   const t = useTranslations("invites");
   const tRoles = useTranslations("roles");
-  const [state, formAction, pending] = useActionState(
-    inviteAction,
-    initialState,
-  );
+  const [error, setError] = useState<InviteErrorKey | null>(null);
+  const [success, setSuccess] = useState<InviteSuccess | null>(null);
+  const [emailEcho, setEmailEcho] = useState("");
+  const [pending, setPending] = useState(false);
 
   const roleOptions: DefaultOption[] = useMemo(
     () =>
@@ -75,40 +73,73 @@ export function InviteForm({ inviter }: { inviter: InviterCtx }) {
   const [role, setRole] = useState<DefaultOption | null>(null);
   const [countries, setCountries] = useState<DefaultOption[]>([]);
 
-  const fieldError = (key: InviteState["error"]) =>
-    state.error === key ? t(`errors.${key}`) : null;
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") ?? "");
+    setEmailEcho(email);
+    setError(null);
+    setPending(true);
+    try {
+      const res = await fetch("/api/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          role: role?.id ?? "",
+          countries: countries.map((c) => String(c.id)),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: InviteErrorKey;
+        success?: InviteSuccess;
+      };
+      if (res.ok && data.success) {
+        setSuccess(data.success);
+        return;
+      }
+      setError(data.error ?? "unknown");
+    } catch {
+      setError("unknown");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const fieldError = (key: InviteErrorKey) =>
+    error === key ? t(`errors.${key}`) : null;
 
   const formError =
-    state.error &&
+    error &&
     ["notAllowed", "roleNotAllowed", "emailTaken", "alreadyInvited", "unknown"].includes(
-      state.error,
+      error,
     )
-      ? t(`errors.${state.error}`)
+      ? t(`errors.${error}`)
       : null;
 
-  if (state.success) {
+  if (success) {
     return (
       <div className="flex flex-col gap-4">
         <Alert tone="success">
           <AlertTitle>
-            {state.success.delivered
-              ? t("sent.deliveredTitle", { email: state.success.email })
-              : t("sent.manualTitle", { email: state.success.email })}
+            {success.delivered
+              ? t("sent.deliveredTitle", { email: success.email })
+              : t("sent.manualTitle", { email: success.email })}
           </AlertTitle>
           <AlertBody>
-            {state.success.delivered
+            {success.delivered
               ? t("sent.deliveredBody")
               : t("sent.manualBody")}
           </AlertBody>
         </Alert>
 
-        {!state.success.delivered ? (
+        {!success.delivered ? (
           <Field>
             <FieldLabel htmlFor="invite-link">{t("sent.linkLabel")}</FieldLabel>
             <Input
               id="invite-link"
               readOnly
-              value={state.success.acceptUrl}
+              value={success.acceptUrl}
               onFocus={(e) => e.currentTarget.select()}
               className="font-mono text-xs"
             />
@@ -119,7 +150,7 @@ export function InviteForm({ inviter }: { inviter: InviterCtx }) {
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-4" noValidate>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       {formError ? (
         <Alert tone="danger">
           <AlertBody>{formError}</AlertBody>
@@ -134,9 +165,9 @@ export function InviteForm({ inviter }: { inviter: InviterCtx }) {
           type="email"
           autoComplete="off"
           required
-          defaultValue={state.email ?? ""}
+          defaultValue={emailEcho}
           aria-invalid={
-            state.error === "emailRequired" || state.error === "emailInvalid"
+            error === "emailRequired" || error === "emailInvalid"
           }
         />
         {fieldError("emailRequired") || fieldError("emailInvalid") ? (
@@ -156,8 +187,6 @@ export function InviteForm({ inviter }: { inviter: InviterCtx }) {
           searchable={false}
           placeholder={t("form.rolePlaceholder")}
         />
-        {/* Submit the selected role via a hidden input the action reads. */}
-        <input type="hidden" name="role" value={role?.id ?? ""} />
         {fieldError("roleInvalid") || fieldError("roleNotAllowed") ? (
           <FieldError>
             {fieldError("roleInvalid") ?? fieldError("roleNotAllowed")}
@@ -176,11 +205,6 @@ export function InviteForm({ inviter }: { inviter: InviterCtx }) {
           searchable={countryOptions.length > 6}
           placeholder={t("form.countryPlaceholder")}
         />
-        {/* One hidden input per selected code; none = global (the action reads
-            formData.getAll("country")). */}
-        {countries.map((c) => (
-          <input key={c.id} type="hidden" name="country" value={c.id} />
-        ))}
         {fieldError("countryInvalid") || fieldError("countryNotAllowed") ? (
           <FieldError>
             {fieldError("countryInvalid") ?? fieldError("countryNotAllowed")}

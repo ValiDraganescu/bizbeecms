@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -24,9 +23,7 @@ import {
   type CountryCode,
 } from "@/lib/auth/countries";
 import { slugify } from "@/lib/site/slug";
-import type { SiteFormState } from "./actions";
-
-const initialState: SiteFormState = {};
+import type { SiteErrorKey } from "@/app/api/sites/route";
 
 type ActorCtx = { role: User["role"]; countries: CountryCode[] };
 
@@ -38,28 +35,32 @@ export type SiteFormValues = {
 };
 
 /**
- * Shared create/edit Site form. `action` is the server action already bound to
- * a site id when editing. Country is single-select: SuperAdmin / global Admins
+ * Shared create/edit Site form. Submits to the REST endpoints (server actions
+ * 500 on OpenNext/Workers): create → POST `/api/sites`; edit → PATCH
+ * `/api/sites/<siteId>`. Country is single-select: SuperAdmin / global Admins
  * also get a Global option (null); a country-scoped Admin gets only their own
- * countries and no Global (the action re-enforces this).
+ * countries and no Global (the route re-enforces this).
  *
  * Slug auto-derives from name until the user edits the slug field, then it stays
  * put. On success the form navigates to the saved Site's detail page.
  */
 export function SiteForm({
-  action,
+  siteId,
   actor,
   mode,
   initial,
 }: {
-  action: (state: SiteFormState, formData: FormData) => Promise<SiteFormState>;
+  /** Required in edit mode — the Site being updated. */
+  siteId?: string;
   actor: ActorCtx;
   mode: "create" | "edit";
   initial?: SiteFormValues;
 }) {
   const t = useTranslations("sites");
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const [error, setError] = useState<SiteErrorKey | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   const canBeGlobal = actor.role === "SuperAdmin" || actor.countries.length === 0;
   const scopeCodes: CountryCode[] = canBeGlobal
@@ -96,25 +97,60 @@ export function SiteForm({
 
   // On success, go to the saved Site's detail page.
   useEffect(() => {
-    if (state.savedId) router.push(`/sites/${state.savedId}`);
-  }, [state.savedId, router]);
-
-  const fieldError = (key: SiteFormState["error"]) =>
-    state.error === key ? t(`errors.${key}`) : null;
-
-  const formError =
-    state.error &&
-    ["notAllowed", "countryNotAllowed", "notFound", "unknown"].includes(
-      state.error,
-    )
-      ? t(`errors.${state.error}`)
-      : null;
+    if (savedId) {
+      router.push(`/sites/${savedId}`);
+      router.refresh();
+    }
+  }, [savedId, router]);
 
   const countryValue =
     country?.id === GLOBAL_COUNTRY ? "GLOBAL" : (country?.id ?? "");
 
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setPending(true);
+    const payload = { name, slug, country: countryValue };
+    try {
+      const res =
+        mode === "edit"
+          ? await fetch(`/api/sites/${siteId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            })
+          : await fetch("/api/sites", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: SiteErrorKey;
+        savedId?: string;
+      };
+      if (res.ok && data.savedId) {
+        setSavedId(data.savedId);
+        return;
+      }
+      setError(data.error ?? "unknown");
+    } catch {
+      setError("unknown");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const fieldError = (key: SiteErrorKey) =>
+    error === key ? t(`errors.${key}`) : null;
+
+  const formError =
+    error &&
+    ["notAllowed", "countryNotAllowed", "notFound", "unknown"].includes(error)
+      ? t(`errors.${error}`)
+      : null;
+
   return (
-    <form action={formAction} className="flex flex-col gap-4" noValidate>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       {formError ? (
         <Alert tone="danger">
           <AlertBody>{formError}</AlertBody>
@@ -130,7 +166,7 @@ export function SiteForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("form.namePlaceholder")}
-          aria-invalid={state.error === "nameRequired"}
+          aria-invalid={error === "nameRequired"}
         />
         {fieldError("nameRequired") ? (
           <FieldError>{fieldError("nameRequired")}</FieldError>
@@ -150,9 +186,9 @@ export function SiteForm({
           }}
           className="font-mono text-sm"
           aria-invalid={
-            state.error === "slugRequired" ||
-            state.error === "slugInvalid" ||
-            state.error === "slugTaken"
+            error === "slugRequired" ||
+            error === "slugInvalid" ||
+            error === "slugTaken"
           }
         />
         {fieldError("slugRequired") ||

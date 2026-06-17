@@ -1,49 +1,80 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Alert, AlertBody, Button } from "@/components/ui";
 import type { SiteStatus } from "@/db/schema";
-import type { DeployState } from "./actions";
-
-const initialState: DeployState = {};
+import type { DeployError } from "@/app/api/sites/[id]/deploy/route";
 
 /**
- * Deploy trigger for a Site. The button provisions/updates the Site's CMS
- * Worker via the engine; authz is re-enforced server-side in `deploySiteAction`.
- * Disabled while a deploy is in flight (`deploying`) — the engine also guards
- * `alreadyDeploying`. Errors map the engine's `DeployErrorKey` (+ gate keys) to
- * localized messages.
+ * Deploy trigger for a Site. POSTs to `/api/sites/<siteId>/deploy` (server
+ * actions 500 on OpenNext/Workers); the route re-enforces authz and provisions
+ * the Site's CMS Worker via the engine. Disabled while a deploy is in flight
+ * (`deploying`) — the engine also guards `alreadyDeploying`. Errors map the
+ * engine's `DeployError` keys to localized messages.
  */
 export function DeployForm({
-  action,
+  siteId,
   status,
 }: {
-  action: (state: DeployState, formData: FormData) => Promise<DeployState>;
+  siteId: string;
   status: SiteStatus;
 }) {
   const t = useTranslations("sites.deploy");
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const router = useRouter();
+  const [error, setError] = useState<DeployError | null>(null);
+  const [deployed, setDeployed] = useState(false);
+  const [workerName, setWorkerName] = useState<string | undefined>(undefined);
+  const [pending, setPending] = useState(false);
 
   const inFlight = status === "deploying" || pending;
 
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setDeployed(false);
+    setPending(true);
+    try {
+      const res = await fetch(`/api/sites/${siteId}/deploy`, {
+        method: "POST",
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: DeployError;
+        deployed?: boolean;
+        workerName?: string;
+      };
+      if (res.ok && data.deployed) {
+        setDeployed(true);
+        setWorkerName(data.workerName);
+        router.refresh();
+        return;
+      }
+      setError(data.error ?? "unknown");
+    } catch {
+      setError("unknown");
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="flex flex-col gap-4" noValidate>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       <p className="text-sm text-foreground-muted">{t("description")}</p>
 
-      {state.deployed ? (
+      {deployed ? (
         <Alert tone="success">
           <AlertBody>
-            {state.workerName
-              ? t("deployedWorker", { worker: state.workerName })
+            {workerName
+              ? t("deployedWorker", { worker: workerName })
               : t("deployed")}
           </AlertBody>
         </Alert>
       ) : null}
 
-      {state.error ? (
+      {error ? (
         <Alert tone="danger">
-          <AlertBody>{t(`errors.${state.error}`)}</AlertBody>
+          <AlertBody>{t(`errors.${error}`)}</AlertBody>
         </Alert>
       ) : null}
 

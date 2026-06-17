@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   Alert,
@@ -13,34 +14,69 @@ import {
   Input,
 } from "@/components/ui";
 import { MIN_PASSWORD_LENGTH } from "@/lib/auth/validation";
-import { acceptInviteAction, type AcceptState } from "./actions";
+import type { AcceptError } from "@/app/api/invite/accept/[token]/route";
 
-const initialState: AcceptState = {};
-
-/** Set-password form for accepting an invite. Token is bound from the route. */
+/**
+ * Set-password form for accepting an invite. Submits to the REST endpoint
+ * `/api/invite/accept/<token>` (server actions 500 on OpenNext/Workers). Token
+ * is bound from the route; on success the client redirects to the home page.
+ */
 export function AcceptForm({ token }: { token: string }) {
   const t = useTranslations("invites.accept");
-  const action = acceptInviteAction.bind(null, token);
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const router = useRouter();
+  const [error, setError] = useState<AcceptError | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const payload = {
+      password: String(form.get("password") ?? ""),
+      confirmPassword: String(form.get("confirmPassword") ?? ""),
+    };
+    setError(null);
+    setPending(true);
+    try {
+      const res = await fetch(
+        `/api/invite/accept/${encodeURIComponent(token)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      if (res.ok) {
+        router.push("/");
+        router.refresh();
+        return;
+      }
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: AcceptError;
+      };
+      setError(data.error ?? "unknown");
+    } catch {
+      setError("unknown");
+    } finally {
+      setPending(false);
+    }
+  }
 
   const passwordFieldError =
-    state.error === "passwordRequired" || state.error === "passwordTooShort"
-      ? t(`errors.${state.error}`)
+    error === "passwordRequired" || error === "passwordTooShort"
+      ? t(`errors.${error}`)
       : null;
   const confirmFieldError =
-    state.error === "passwordMismatch" ? t("errors.passwordMismatch") : null;
+    error === "passwordMismatch" ? t("errors.passwordMismatch") : null;
 
   // Invite-level failures (expired/used/taken between page load and submit).
   const formError =
-    state.error &&
-    ["notFound", "expired", "accepted", "emailTaken", "unknown"].includes(
-      state.error,
-    )
-      ? t(`errors.${state.error}`)
+    error &&
+    ["notFound", "expired", "accepted", "emailTaken", "unknown"].includes(error)
+      ? t(`errors.${error}`)
       : null;
 
   return (
-    <form action={formAction} className="flex flex-col gap-4" noValidate>
+    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       {formError ? (
         <Alert tone="danger">
           <AlertBody>{formError}</AlertBody>
