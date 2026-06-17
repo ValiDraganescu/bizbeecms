@@ -1,17 +1,21 @@
 # Note to the next Meeseeks (main)
 
-State of the world (verify against `git log --oneline` + filesystem — files are truth):
-- `ProjectManager/` (PM, dev 3601) + `CMS/` (dev 3602) — both scaffolded, building on Cloudflare/OpenNext. D1 + drizzle in PM.
-- **DONE so far (build-gate verified):** PM UI foundation (Tailwind v4, purpose tokens, theme, `@/components/ui`); design-system page; PM i18n (next-intl v4, cookie EN/FI/ET); auth (email+password, first→SuperAdmin, KV sessions); invite flow (role+multi-country); Site CRUD; Site-deploy ENGINE; CMS bundle (committed `cms-bundle.generated.js` + `buildCmsBundle()`); Deploy UI; **CMS UI i18n (NEW — next-intl v4 cookie EN/FI/ET in `CMS/`)**. See CAVEATS for each.
+## USER DIRECTIVE (binding — read CAVEATS top entry too)
+**Stop all CMS-internal work.** The ONLY remaining goal: get the **ProjectManager deployed to Cloudflare**, and from that deployed PM trigger a **real CMS-website deploy**. CMS content i18n / further CMS features are DEFERRED. Do not pick CMS tasks.
 
-**Both the Site-deployment slice (engine+bundle+UI) AND CMS UI i18n are DONE in code. The two remaining big things are: (a) the live end-to-end deploy (needs CF auth this env lacks), and (b) CMS CONTENT localization (a whole new track).**
+## State of the world (all code-complete + build-gated; git is the truth — `git log --oneline`)
+- PM: UI foundation, i18n (EN/FI/ET cookie-based), email+password auth (first user→SuperAdmin), invite flow, Site CRUD, **Site-deploy engine + CMS-bundle artifact + Deploy UI** all DONE.
+- The deploy path is **code-complete end-to-end** EXCEPT the live network call: `deploySiteAction` → `buildCmsBundle()` (committed ~4.2MB artifact) → `deploySite` → Cloudflare Workers Script-Upload API. It returns `notConfigured` (graceful, marks Site `failed`) without `CF_API_TOKEN`+`CF_ACCOUNT_ID`.
+- **Blocker for the LIVE deploy:** no Cloudflare account/auth in this env. Real `wrangler deploy` of PM, real D1/KV creation (placeholder zero-ids in `wrangler.jsonc`), and the real Script-Upload are ALL unexercised.
 
-Pick ONE of these (top is the natural next un-blocked slice):
+## Next valuable slices — all aimed at de-risking/enabling the live deploy (pick ONE, verifiable without CF auth):
+1. **Deploy runbook / DEPLOY.md** — exact ordered steps to take PM live: `wrangler login`, `wrangler d1 create bizbeecms` + `kv namespace create SESSIONS` → paste real ids into `wrangler.jsonc` (replace zero-id placeholders), `wrangler d1 migrations apply bizbeecms --remote`, set `CF_API_TOKEN`(scoped Workers Scripts:Edit)+`CF_ACCOUNT_ID` as PM Worker secrets, `npm run bundle:cms`, `npx opennextjs-cloudflare build`, `wrangler deploy`. Then the in-app PM→CMS deploy flow. The single most valuable next artifact — the user needs it to actually go live.
+2. **Pre-deploy validation script** — a checked-in script that fails LOUDLY if `wrangler.jsonc` still has placeholder zero-ids, if `cms-bundle.generated.js` is missing/stale, or if required compat flags (`nodejs_compat`, `global_fetch_strictly_public`) are absent. De-risks a botched first deploy.
+3. **Bundle-boot self-check** — validate the committed CMS bundle's shape/integrity (entry `worker.js` present, expected exports, non-empty) as a test, since live boot is the one unverified link (esbuild vs wrangler's own OpenNext bundler — see CAVEATS "CMS bundle production").
+4. **Smoke-test the credential-less deploy flow** end-to-end (action→bundle→engine→state machine) so a deploy with no CF auth produces the correct UX (Site → `failed` + right i18n error), and verify `deploy.errors.*` key parity across EN/FI/ET.
 
-1. **CMS content localization (BIG — flag to driver as its own subgoal).** Configure an arbitrary set of user-facing **content** languages PER SITE (data-driven, distinct from the fixed EN/FI/ET admin-UI locales just built) and serve/render published content in them. This is a coherent body of work — do a fitting first slice this run (e.g. the per-Site content-locales data model + a config UI) and **flag the new track in your `result`** so the driver can carve out a subgoal. Where the data lives: per-Site config likely needs the CMS to gain D1/KV bindings (its `wrangler.jsonc` deliberately has none yet — the PM deploy step overrides the Worker name per-Site; you'd need to decide how per-Site config reaches each CMS Worker: env vars at deploy, or a shared store). Mine `../aicms` for content-model/rendering patterns (it's Postgres, NOT a deploy ref — patterns only).
-
-2. **Real end-to-end deploy (user-driven, needs auth).** Set `CF_API_TOKEN` (Workers Scripts: Edit) + `CF_ACCOUNT_ID` secrets on the deployed PM, click Deploy on a Site. THIS first validates the committed CMS artifact actually BOOTS on a Worker — our plain esbuild bundle may need tuning (loaders/defines/DO+wasm) vs wrangler's bundler. See CAVEATS "CMS bundle".
-
-3. **CMS UI foundation/design-system parity** (optional polish): the CMS is still the default inline-styled Next page. If content-loc work needs admin screens, port PM's Tailwind v4 tokens + `@/components/ui` into `CMS/` first (then the `LocaleSwitcher` can use a real `<Combobox>` instead of the native `<select>`).
-
-**Gotchas (see CAVEATS for full text):** PM and CMS are SEPARATE npm packages — run each app's commands inside its own dir. **After ANY `CMS/` change run `npm run bundle:cms` in `ProjectManager/`** or deploys ship a stale CMS. Kill stray `next dev` on 3601/3602 before `opennextjs-cloudflare build` (corrupts `.next`); `rm -rf .next .open-next` then build. No CF auth → verify via tsc + `npm test` + build, never a real deploy/D1/KV. CMS i18n is cookie-based (copy PM exactly); keep en/fi/et key parity; use `getTranslations`/`useTranslations` for all CMS copy.
+## Gotchas
+- Run PM commands inside `ProjectManager/`. Per the directive, avoid changing `CMS/` source.
+- Deploy gate = `npx opennextjs-cloudflare build`; NEVER run it while `next dev` is on 3601 (corrupts `.next`). Check `lsof -ti:3601`.
+- Use ONLY purpose theme tokens in any markup; all user-visible strings via i18n (3-catalog parity).
+- Tests: `npm test` (`node --test`, dependency-free, relative `.ts` imports, no `@/` alias).
