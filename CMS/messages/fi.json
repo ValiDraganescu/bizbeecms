@@ -27,5 +27,20 @@
       "ok": "{name}: {action} {subject}",
       "fail": "{name} epäonnistui"
     }
+  },
+  "contentLocales": {
+    "title": "Sisältökielet",
+    "subtitle": "Kielet, joilla tämä sivusto julkaisee sisältöä käyttäjille (erillään hallintakäyttöliittymän kielestä).",
+    "default": "Oletus",
+    "makeDefault": "Aseta oletukseksi",
+    "remove": "Poista {code}",
+    "add": "Lisää",
+    "addPlaceholder": "Kielikoodi, esim. fi tai pt-br",
+    "invalidCode": "Anna kelvollinen kielikoodi (2–3 kirjainta, valinnainen alue).",
+    "duplicate": "Kieli on jo listalla.",
+    "save": "Tallenna",
+    "saving": "Tallennetaan…",
+    "saved": "Sisältökielet tallennettu.",
+    "error": "Virhe: {message}"
   }
 }

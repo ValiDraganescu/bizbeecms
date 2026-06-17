@@ -27,5 +27,20 @@
       "ok": "{name}: {action} {subject}",
       "fail": "{name} ebaõnnestus"
     }
+  },
+  "contentLocales": {
+    "title": "Sisukeeled",
+    "subtitle": "Keeled, milles see sait avaldab kasutajatele sisu (eraldi haldusliidese keelest).",
+    "default": "Vaikimisi",
+    "makeDefault": "Määra vaikimisi",
+    "remove": "Eemalda {code}",
+    "add": "Lisa",
+    "addPlaceholder": "Keelekood, nt fi või pt-br",
+    "invalidCode": "Sisesta kehtiv keelekood (2–3 tähte, valikuline piirkond).",
+    "duplicate": "See keel on juba loendis.",
+    "save": "Salvesta",
+    "saving": "Salvestan…",
+    "saved": "Sisukeeled salvestatud.",
+    "error": "Viga: {message}"
   }
 }

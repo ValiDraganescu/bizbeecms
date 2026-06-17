@@ -27,5 +27,20 @@
       "ok": "{name}: {action} {subject}",
       "fail": "{name} failed"
     }
+  },
+  "contentLocales": {
+    "title": "Content languages",
+    "subtitle": "The user-facing languages this site publishes content in (separate from the admin UI language).",
+    "default": "Default",
+    "makeDefault": "Make default",
+    "remove": "Remove {code}",
+    "add": "Add",
+    "addPlaceholder": "Language code, e.g. fi or pt-br",
+    "invalidCode": "Enter a valid language code (2–3 letters, optional region).",
+    "duplicate": "That language is already in the list.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Content languages saved.",
+    "error": "Error: {message}"
   }
 }
