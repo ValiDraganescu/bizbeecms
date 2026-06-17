@@ -116,6 +116,11 @@ stale CMS.
 ```bash
 npm run preflight       # = node scripts/preflight-deploy.mjs
 ```
+> **Automatic in step 9:** `predeploy` (`npm run predeploy` → `npm run preflight`) is an npm
+> pre-script of `deploy`, so `npm run deploy` runs preflight first and **aborts the build/upload
+> if it exits non-zero** — you can't deploy with placeholder ids / a stale bundle. Running it
+> here is still useful to see failures early, but it can no longer be skipped.
+
 Read-only, no extra auth. It must exit `0`. It blocks on:
 - placeholder zero-ids in `wrangler.jsonc` (steps 1–3 fix this),
 - missing compat flags (`nodejs_compat`, `global_fetch_strictly_public`),
@@ -136,9 +141,10 @@ self-check no longer warns and a live upload won't be rejected for undeclared DO
 > and `rm -rf .next .open-next` before building.
 
 ```bash
-npm run deploy          # = opennextjs-cloudflare build && opennextjs-cloudflare deploy
+npm run deploy          # = (predeploy: preflight) → opennextjs-cloudflare build && opennextjs-cloudflare deploy
 ```
-`opennextjs-cloudflare build` emits `.open-next/worker.js`; `deploy` runs `wrangler deploy`
+npm runs the `predeploy` pre-script (preflight) first; a non-zero preflight aborts here before any
+build/upload. `opennextjs-cloudflare build` emits `.open-next/worker.js`; `deploy` runs `wrangler deploy`
 under the hood, uploading the PM Worker + assets and binding D1/KV per `wrangler.jsonc`.
 
 Confirm it's live:
