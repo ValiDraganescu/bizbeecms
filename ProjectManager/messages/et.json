@@ -254,7 +254,9 @@
         "unknown": "Midagi läks valesti. Proovi uuesti.",
         "deployerUnreachable": "Juurutusteenus pole kättesaadav. Proovi uuesti."
       },
-      "inProgress": "Juurutamine käib… see võib võtta paar minutit."
+      "inProgress": "Juurutamine käib… see võib võtta paar minutit.",
+      "stuck": "See juurutamine on kestnud liiga kaua ja on tõenäoliselt kinni jäänud. Saad selle tühistada või alustada uut.",
+      "cancel": "Tühista juurutamine"
     },
     "created": "Sait loodud.",
     "updated": "Sait uuendatud.",

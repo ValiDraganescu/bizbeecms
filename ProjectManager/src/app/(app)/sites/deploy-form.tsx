@@ -17,24 +17,43 @@ import type { DeployError } from "@/app/api/sites/[id]/deploy/route";
 export function DeployForm({
   siteId,
   status,
+  stuck = false,
 }: {
   siteId: string;
   status: SiteStatus;
+  /** Server-computed: a `deploying` Site that's been in-flight too long. */
+  stuck?: boolean;
 }) {
   const t = useTranslations("sites.deploy");
   const router = useRouter();
   const [error, setError] = useState<DeployError | null>(null);
   const [started, setStarted] = useState(false);
   const [pending, setPending] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
-  const inFlight = status === "deploying" || pending;
+  // A stuck deploy is no longer really in flight — let the operator act on it.
+  const inFlight = (status === "deploying" && !stuck) || pending;
 
-  // While a deploy is in flight, poll for the resolved status.
+  // While a deploy is genuinely in flight, poll for the resolved status. A stuck
+  // deploy won't resolve on its own, so stop polling and surface the controls.
   useEffect(() => {
-    if (status !== "deploying") return;
+    if (status !== "deploying" || stuck) return;
     const id = setInterval(() => router.refresh(), 5000);
     return () => clearInterval(id);
-  }, [status, router]);
+  }, [status, stuck, router]);
+
+  async function onCancel() {
+    setError(null);
+    setCancelling(true);
+    try {
+      await fetch(`/api/sites/${siteId}/deploy/cancel`, { method: "POST" });
+      router.refresh();
+    } catch {
+      setError("unknown");
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -66,7 +85,11 @@ export function DeployForm({
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       <p className="text-sm text-foreground-muted">{t("description")}</p>
 
-      {status === "deploying" ? (
+      {status === "deploying" && stuck ? (
+        <Alert tone="warning">
+          <AlertBody>{t("stuck")}</AlertBody>
+        </Alert>
+      ) : status === "deploying" ? (
         <Alert tone="info">
           <AlertBody>{t("inProgress")}</AlertBody>
         </Alert>
@@ -88,11 +111,25 @@ export function DeployForm({
         </Alert>
       ) : null}
 
-      <Button type="submit" loading={inFlight} disabled={inFlight} className="w-fit">
-        {status === "deployed" || status === "failed"
-          ? t("redeploy")
-          : t("deploy")}
-      </Button>
+      <div className="flex gap-3">
+        <Button type="submit" loading={inFlight} disabled={inFlight} className="w-fit">
+          {status === "deployed" || status === "failed" || stuck
+            ? t("redeploy")
+            : t("deploy")}
+        </Button>
+        {status === "deploying" && stuck ? (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCancel}
+            loading={cancelling}
+            disabled={cancelling || pending}
+            className="w-fit"
+          >
+            {t("cancel")}
+          </Button>
+        ) : null}
+      </div>
     </form>
   );
 }

@@ -254,7 +254,9 @@
         "unknown": "Jotain meni pieleen. Yritä uudelleen.",
         "deployerUnreachable": "Julkaisupalveluun ei saada yhteyttä. Yritä uudelleen."
       },
-      "inProgress": "Julkaisu käynnissä… tämä voi kestää pari minuuttia."
+      "inProgress": "Julkaisu käynnissä… tämä voi kestää pari minuuttia.",
+      "stuck": "Tämä julkaisu on kestänyt liian kauan ja on todennäköisesti jumissa. Voit peruuttaa sen tai aloittaa uuden.",
+      "cancel": "Peruuta julkaisu"
     },
     "created": "Sivusto luotu.",
     "updated": "Sivusto päivitetty.",

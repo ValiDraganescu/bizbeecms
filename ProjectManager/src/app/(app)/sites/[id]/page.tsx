@@ -23,6 +23,7 @@ import {
 } from "@/lib/site/site";
 import { AssignForm } from "../assign-form";
 import { DeployForm } from "../deploy-form";
+import { isDeployStuck } from "@/lib/deploy";
 import { SiteForm } from "../site-form";
 
 const statusTone: Record<SiteStatus, BadgeTone> = {
@@ -146,7 +147,11 @@ export default async function SiteDetailPage({
           <CardDescription>{t("deploy.cardDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <DeployForm siteId={site.id} status={site.status} />
+          <DeployForm
+            siteId={site.id}
+            status={site.status}
+            stuck={isDeployStuck(site)}
+          />
         </CardContent>
       </Card>
 

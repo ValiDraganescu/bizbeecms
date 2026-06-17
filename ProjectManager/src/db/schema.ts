@@ -64,6 +64,10 @@ export const sites = sqliteTable(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     status: text("status").notNull().$type<SiteStatus>().default("draft"),
+    // When the current/last deploy was latched to `deploying`. Lets the UI flag
+    // a deploy as stuck (deploying too long → container likely died, callback
+    // never fired) and lets a stale deploy be restarted. Null = never deployed.
+    deployStartedAt: integer("deploy_started_at", { mode: "timestamp_ms" }),
     // Cloudflare Worker name this Site's CMS is/will be deployed as.
     workerName: text("worker_name"),
     country: text("country"),

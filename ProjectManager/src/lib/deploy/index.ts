@@ -1,6 +1,11 @@
 // Public surface of the Site-deploy engine. The deploy UI action (next slice)
 // imports from here.
-export { deploySite, canStartDeploy } from "./deploy";
+export {
+  deploySite,
+  canStartDeploy,
+  isDeployStuck,
+  STUCK_AFTER_MS,
+} from "./deploy";
 export type { DeployResult, DeployErrorKey, DeploySiteInput } from "./deploy";
 export {
   workerNameForSlug,

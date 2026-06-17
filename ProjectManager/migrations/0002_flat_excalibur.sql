@@ -1,0 +1,1 @@
+ALTER TABLE `sites` ADD `deploy_started_at` integer;

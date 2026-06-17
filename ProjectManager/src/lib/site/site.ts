@@ -250,8 +250,14 @@ export async function setSiteDeployStatus(
   workerName?: string | null,
 ): Promise<Site | null> {
   const db = await getDb();
-  const patch: { status: SiteStatus; workerName?: string | null } = { status };
+  const patch: {
+    status: SiteStatus;
+    workerName?: string | null;
+    deployStartedAt?: Date;
+  } = { status };
   if (workerName !== undefined) patch.workerName = workerName;
+  // Stamp the start time when a deploy is latched, so staleness is measurable.
+  if (status === "deploying") patch.deployStartedAt = new Date();
   const [site] = await db
     .update(schema.sites)
     .set(patch)

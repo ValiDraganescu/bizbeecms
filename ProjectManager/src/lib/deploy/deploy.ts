@@ -1,7 +1,11 @@
-import type { Site, SiteStatus } from "@/db/schema";
+import type { Site } from "@/db/schema";
 import { findSiteById, setSiteDeployStatus } from "@/lib/site/site";
 import { uploadWorkerScript, type WorkerScriptUpload } from "./cloudflare";
 import { workerNameForSlug } from "./worker-name";
+import { canStartDeploy, isDeployStuck, STUCK_AFTER_MS } from "./deploy-state";
+
+// Re-export the pure state predicates so the barrel + callers keep one import site.
+export { canStartDeploy, isDeployStuck, STUCK_AFTER_MS };
 
 /**
  * Site deploy orchestration — the status state-machine.
@@ -20,9 +24,6 @@ import { workerNameForSlug } from "./worker-name";
  * touching the orchestration.
  */
 
-/** Statuses from which a deploy may be (re)started. */
-const DEPLOYABLE_FROM: SiteStatus[] = ["draft", "deployed", "failed"];
-
 export type DeployErrorKey =
   | "notFound"
   | "alreadyDeploying"
@@ -33,11 +34,6 @@ export type DeployErrorKey =
 export type DeployResult =
   | { ok: true; site: Site }
   | { ok: false; reason: DeployErrorKey; detail?: string };
-
-/** Whether a Site is in a state a deploy can start from. */
-export function canStartDeploy(site: Pick<Site, "status">): boolean {
-  return DEPLOYABLE_FROM.includes(site.status);
-}
 
 export type DeploySiteInput = {
   siteId: string;
@@ -57,11 +53,9 @@ export async function deploySite(input: DeploySiteInput): Promise<DeployResult> 
   const site = await findSiteById(input.siteId);
   if (!site) return { ok: false, reason: "notFound" };
 
-  if (site.status === "deploying") {
-    return { ok: false, reason: "alreadyDeploying" };
-  }
   if (!canStartDeploy(site)) {
-    return { ok: false, reason: "unknown" };
+    // In `deploying` but not yet stale → a real deploy is in flight.
+    return { ok: false, reason: "alreadyDeploying" };
   }
 
   const workerName = workerNameForSlug(site.slug);

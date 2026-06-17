@@ -254,7 +254,9 @@
         "unknown": "Something went wrong. Please try again.",
         "deployerUnreachable": "The deploy service is unreachable. Please try again."
       },
-      "inProgress": "Deploy in progress… this can take a couple of minutes."
+      "inProgress": "Deploy in progress… this can take a couple of minutes.",
+      "stuck": "This deploy has been running too long and is likely stuck. You can cancel it or start a new one.",
+      "cancel": "Cancel deploy"
     },
     "created": "Site created.",
     "updated": "Site updated.",
