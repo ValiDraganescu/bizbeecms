@@ -32,7 +32,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
@@ -59,6 +59,30 @@ function runOpenNext() {
   });
 }
 
+// OpenNext's worker entry ALWAYS re-exports three Durable Object classes
+// (DOQueueHandler / DOShardedTagCache / BucketCachePurge), regardless of the
+// cache config — they back the incremental-cache / tag-cache / queue overrides.
+// The milestone CMS uses dummy (no-op) caches (CMS/open-next.config.ts), so these
+// DOs are never instantiated at runtime. But the PM Script-Upload path
+// (src/lib/deploy/script-upload.ts) sends NO durable_objects/migrations metadata,
+// and Cloudflare REJECTS a Worker that exports DO classes without matching
+// migrations. So we strip these dead re-exports from the entry before bundling.
+// Matches both `export { X } from "..."` and `export { X as Y } from "..."`.
+const DO_EXPORT_RE =
+  /^[ \t]*export\s*\{\s*(?:DOQueueHandler|DOShardedTagCache|BucketCachePurge)\b[^}]*\}\s*from\s*["'][^"']*["'];?[ \t]*$/gm;
+
+function stripDoExports(src) {
+  const out = src.replace(DO_EXPORT_RE, "");
+  // ponytail: assert the strip worked — a future OpenNext rename would silently
+  // re-introduce the DO exports and break the live upload again.
+  if (/\bexport\s*\{[^}]*\b(?:DOQueueHandler|DOShardedTagCache|BucketCachePurge)\b/.test(out)) {
+    throw new Error(
+      "stripDoExports: a Durable Object re-export survived — OpenNext entry shape changed; update DO_EXPORT_RE.",
+    );
+  }
+  return out;
+}
+
 async function bundleWorker() {
   if (!existsSync(CMS_WORKER_ENTRY)) {
     throw new Error(
@@ -67,9 +91,18 @@ async function bundleWorker() {
     );
   }
 
-  log("esbuild-bundling", CMS_WORKER_ENTRY);
+  const entrySource = stripDoExports(readFileSync(CMS_WORKER_ENTRY, "utf8"));
+
+  log("esbuild-bundling", CMS_WORKER_ENTRY, "(DO re-exports stripped)");
   const result = await esbuild({
-    entryPoints: [CMS_WORKER_ENTRY],
+    // Feed the DO-stripped entry via stdin; resolveDir keeps the worker's
+    // ~980 relative chunk imports resolving against CMS/.open-next/.
+    stdin: {
+      contents: entrySource,
+      resolveDir: CMS_OPEN_NEXT,
+      sourcefile: "worker.js",
+      loader: "js",
+    },
     bundle: true,
     format: "esm",
     platform: "node",

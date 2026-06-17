@@ -75,10 +75,12 @@ test("the committed CMS bundle passes the entry contract (no blocking errors)", 
     [],
     `real bundle has blocking issues:\n${errors.join("\n")}`,
   );
-  // The real OpenNext bundle is KNOWN to export DOs → expect the documented
-  // warning to fire, so this de-risk signal can't silently regress away.
+  // build-cms-bundle.mjs now STRIPS OpenNext's DO re-exports (the milestone CMS
+  // uses dummy caches, so those DOs are dead) so the Script-Upload — which sends
+  // no durable_objects/migrations — is no longer rejected by Cloudflare. Guard
+  // that the strip stays effective: the committed bundle must export NO DO class.
   assert.ok(
-    warnings.some((w) => OPENNEXT_DO_CLASSES.some((c) => w.includes(c))),
-    "expected the DO-binding-gap warning on the real OpenNext bundle",
+    !warnings.some((w) => OPENNEXT_DO_CLASSES.some((c) => w.includes(c))),
+    `committed bundle unexpectedly still exports a Durable Object class — the DO strip in build-cms-bundle.mjs regressed:\n${warnings.join("\n")}`,
   );
 });

@@ -125,9 +125,9 @@ Read-only, no extra auth. It must exit `0`. It blocks on:
   `worker.js` as entry, expose a `default` export + `fetch` handler, and contain **no
   unresolved bare imports** (only `node:`/`cloudflare:` may stay external).
 
-`APP_ORIGIN`-unset is a WARNING only. **So is the Durable Object gap** (see ⚠️ below):
-the self-check WARNs that the OpenNext bundle exports DO classes the Script-Upload metadata
-doesn't yet declare — read it, it's the most likely first-deploy failure.
+`APP_ORIGIN`-unset is a WARNING only. The **Durable Object gap is now RESOLVED**
+(see ✅ in step 11): `build-cms-bundle.mjs` strips OpenNext's DO re-exports, so the
+self-check no longer warns and a live upload won't be rejected for undeclared DOs.
 
 ## 9. Build and deploy the PM Worker
 
@@ -180,26 +180,22 @@ curl -sS https://bizbeecms-cms-<slug>.<your-workers-subdomain>.workers.dev/
 ```
 A 200 with the default Next.js CMS page = success.
 
-> ⚠️ **The one unverified link — and its now-known specific risk:** the committed CMS bundle
-> is produced by **plain esbuild** over OpenNext's `worker.js`, not by wrangler's own OpenNext
-> plugin (which wires wasm/Durable-Objects/loaders). It is shape- **and structure**-verified
-> (the bundle self-check, step 8) but **never booted on a live Worker** in any env here.
+> ✅ **Durable Object gap — RESOLVED.** OpenNext's `worker.js` always re-exports three DO
+> classes (`DOQueueHandler`, `DOShardedTagCache`, `BucketCachePurge` — incremental-cache /
+> tag-cache / queue), and `buildScriptUploadForm` (`src/lib/deploy/script-upload.ts`) sends
+> **no `durable_objects`/`migrations`** metadata, so a live upload of a DO-exporting worker
+> would be **rejected by Cloudflare**. The CMS uses **dummy (no-op) caches**
+> (`CMS/open-next.config.ts`), so those DOs are never instantiated — they are dead exports.
+> `scripts/build-cms-bundle.mjs` now **strips the three DO re-exports** from the entry before
+> esbuild, so the committed bundle exports only `default`/`fetch`. `npm run bundle:selfcheck`
+> + `npm run preflight` no longer warn about DOs. (The strip self-guards: if a future OpenNext
+> rename re-introduces a DO export, the build throws and the self-check test fails.)
 >
-> **The most likely failure is Durable Objects.** The OpenNext worker `export`s DO classes —
-> `DOQueueHandler`, `DOShardedTagCache`, `BucketCachePurge` (incremental-cache / tag-cache /
-> queue) — but `buildScriptUploadForm` (`src/lib/deploy/script-upload.ts`) currently sends
-> **no `durable_objects` bindings and no `migrations`** in the upload metadata. A live
-> Script-Upload of a worker that exports DO classes without declaring matching migrations is
-> **rejected by the Cloudflare API** (or boots with the DOs unbound). `npm run preflight`
-> WARNs about exactly this. **Resolution at this step (needs the live account):** either
-> (a) add `durable_objects.bindings` + a `migrations` tag (`new_classes` / `new_sqlite_classes`)
-> to the metadata in `buildScriptUploadForm`, or (b) configure OpenNext to disable the DO-based
-> caches for the CMS (`@opennextjs/cloudflare` open-next config: dummy/regional cache) so the
-> worker stops exporting them — the milestone CMS is the default Next install and doesn't need
-> incremental cache. Then re-run `npm run bundle:cms` + `npm run preflight`.
->
-> Other boot failures (wasm/loaders/defines) are fixed in `scripts/build-cms-bundle.mjs`
-> esbuild options — see the "CMS bundle production" caveat in
+> ⚠️ **The one remaining unverified link:** the committed CMS bundle is produced by **plain
+> esbuild** over OpenNext's `worker.js`, not by wrangler's own OpenNext plugin (wasm/loaders).
+> It is shape- **and structure**-verified (the bundle self-check, step 8) but **never booted on
+> a live Worker** in any env here. Boot failures (wasm/loaders/defines) are fixed in
+> `scripts/build-cms-bundle.mjs` esbuild options — see the "CMS bundle production" caveat in
 > `.claude/skills/orc-meeseeks/goals/main/CAVEATS.md`. Treat step 11's curl as the real
 > end-to-end acceptance test.
 
@@ -234,5 +230,5 @@ npm run deploy
 | Invite links missing/broken | `APP_ORIGIN` not set (step 6). |
 | Site deploy → `failed` immediately, reason `notConfigured` | `CF_API_TOKEN` and/or `CF_ACCOUNT_ID` secret missing (step 5). |
 | Site deploy → `failed`, reason `httpError` | Token scope wrong (needs Workers Scripts: Edit) or account id mismatch. Check `wrangler whoami`. |
-| Site deploy → `failed`, `httpError`, CF error mentions Durable Objects / migrations | The OpenNext worker exports DO classes the upload metadata doesn't declare (step 11 ⚠️; preflight WARNs). Add `durable_objects` + `migrations` to `buildScriptUploadForm`, or disable OpenNext's DO caches, then `npm run bundle:cms`. |
+| Site deploy → `failed`, `httpError`, CF error mentions Durable Objects / migrations | Should be fixed — `build-cms-bundle.mjs` strips OpenNext's DO re-exports (step 11 ✅). If it recurs, the committed bundle is stale: re-run `npm run bundle:cms` and confirm `npm run bundle:selfcheck` shows no DO warning. |
 | CMS Worker uploaded but 500s on open | The esbuild-vs-wrangler bundling gap (step 11 ⚠️). Adjust `scripts/build-cms-bundle.mjs` esbuild opts. |
