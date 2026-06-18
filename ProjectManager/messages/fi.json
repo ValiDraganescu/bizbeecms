@@ -270,6 +270,27 @@
       "countryNotAllowed": "Et voi luoda sivustoa tälle maalle.",
       "notFound": "Sivustoa ei löytynyt.",
       "unknown": "Jotain meni pieleen. Yritä uudelleen."
+    },
+    "customDomain": {
+      "title": "Mukautettu verkkotunnus",
+      "cardDescription": "Osoita asiakkaan oma verkkotunnus tähän sivustoon.",
+      "description": "Rekisteröi asiakkaan verkkotunnus. Asiakas lisää alla olevat DNS-tietueet rekisteröijällään; Cloudflare myöntää HTTPS-varmenteen automaattisesti.",
+      "label": "Asiakkaan verkkotunnus",
+      "hint": "Verkkotunnus, jota asiakas hallitsee, esim. restovista.com",
+      "attach": "Lisää verkkotunnus",
+      "notDeployed": "Julkaise sivusto ensin — mukautettu verkkotunnus tarvitsee toimivan Workerin kohteekseen.",
+      "added": "{hostname} rekisteröity.",
+      "dnsIntro": "Pyydä asiakasta lisäämään nämä tietueet DNS-palveluntarjoajallaan:",
+      "certPending": "Varmenne pysyy odottavana, kunnes asiakas lisää TXT-tietueen. Juuriverkkotunnukset, jotka eivät voi käyttää CNAMEa, käyttävät A-tietuetta Cloudflaren IP-osoitteisiin.",
+      "errors": {
+        "notAllowed": "Sinulla ei ole oikeutta hallita tätä sivustoa.",
+        "notFound": "Sivustoa ei löytynyt.",
+        "notDeployed": "Julkaise sivusto ennen mukautetun verkkotunnuksen lisäämistä.",
+        "badRequest": "Tämä ei näytä kelvolliselta verkkotunnukselta.",
+        "notConfigured": "Mukautetun verkkotunnuksen tukea ei ole määritetty julkaisijassa.",
+        "deployerUnreachable": "Julkaisupalveluun ei saada yhteyttä. Yritä uudelleen.",
+        "unknown": "Jokin meni pieleen. Yritä uudelleen."
+      }
     }
   },
   "designSystem": {

@@ -189,7 +189,7 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
     // What the customer adds at their registrar. Apex domains that can't CNAME
     // use an A record to CF's anycast IPs instead — the PM UI shows both.
     dns: {
-      cname: { name: hostname, value: "saas.bizbeecms.com" },
+      cname: { name: hostname, value: "cf.bizbeecms.com" },
       txt: record?.ssl?.txt_name
         ? { name: record.ssl.txt_name, value: record.ssl.txt_value }
         : null,

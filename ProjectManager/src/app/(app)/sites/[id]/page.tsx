@@ -23,6 +23,7 @@ import {
 } from "@/lib/site/site";
 import { AssignForm } from "../assign-form";
 import { DeployForm } from "../deploy-form";
+import { CustomDomainForm } from "../custom-domain-form";
 import { isDeployStuck } from "@/lib/deploy";
 import { SiteForm } from "../site-form";
 
@@ -157,6 +158,19 @@ export default async function SiteDetailPage({
 
       {canManage ? (
         <>
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("customDomain.title")}</CardTitle>
+              <CardDescription>{t("customDomain.cardDescription")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CustomDomainForm
+                siteId={site.id}
+                deployed={site.status === "deployed"}
+              />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>{t("form.editTitle")}</CardTitle>

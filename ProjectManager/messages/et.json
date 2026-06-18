@@ -270,6 +270,27 @@
       "countryNotAllowed": "Sa ei saa luua saiti sellele riigile.",
       "notFound": "Saiti ei leitud.",
       "unknown": "Midagi läks valesti. Proovi uuesti."
+    },
+    "customDomain": {
+      "title": "Kohandatud domeen",
+      "cardDescription": "Suuna kliendi enda domeen sellele saidile.",
+      "description": "Registreeri kliendi domeen. Klient lisab allolevad DNS-kirjed oma registripidaja juures; Cloudflare väljastab HTTPS-sertifikaadi automaatselt.",
+      "label": "Kliendi domeen",
+      "hint": "Domeen, mida klient haldab, nt restovista.com",
+      "attach": "Lisa domeen",
+      "notDeployed": "Juuruta sait esmalt — kohandatud domeen vajab sihtmärgiks töötavat Workerit.",
+      "added": "{hostname} registreeritud.",
+      "dnsIntro": "Palu kliendil lisada need kirjed oma DNS-teenusepakkuja juures:",
+      "certPending": "Sertifikaat jääb ootele, kuni klient lisab TXT-kirje. Juurdomeenid, mis ei saa CNAMEt kasutada, peaksid kasutama A-kirjet Cloudflare'i IP-aadressidele.",
+      "errors": {
+        "notAllowed": "Teil pole õigust seda saiti hallata.",
+        "notFound": "Saiti ei leitud.",
+        "notDeployed": "Juuruta sait enne kohandatud domeeni lisamist.",
+        "badRequest": "See ei tundu kehtiv domeen olevat.",
+        "notConfigured": "Kohandatud domeeni tugi pole juurutajas seadistatud.",
+        "deployerUnreachable": "Juurutusteenus pole kättesaadav. Proovige uuesti.",
+        "unknown": "Midagi läks valesti. Proovige uuesti."
+      }
     }
   },
   "designSystem": {

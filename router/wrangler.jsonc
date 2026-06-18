@@ -11,7 +11,7 @@
   // via the HOST_MAP KV and proxies. The route is a wildcard so EVERY custom
   // hostname registered against the zone lands here.
   "routes": [
-    { "pattern": "saas.bizbeecms.com/*", "zone_name": "bizbeecms.com" }
+    { "pattern": "cf.bizbeecms.com/*", "zone_name": "bizbeecms.com" }
     // After the fallback origin is set + the first custom hostname is live,
     // widen to "*/*" (zone_name bizbeecms.com) so customer apex domains match.
   ],

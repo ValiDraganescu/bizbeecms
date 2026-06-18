@@ -270,6 +270,27 @@
       "countryNotAllowed": "You can't create a Site for that country.",
       "notFound": "Site not found.",
       "unknown": "Something went wrong. Please try again."
+    },
+    "customDomain": {
+      "title": "Custom domain",
+      "cardDescription": "Point a customer's own domain at this Site.",
+      "description": "Register a customer domain. They add the DNS records below at their registrar; Cloudflare issues the HTTPS certificate automatically.",
+      "label": "Customer domain",
+      "hint": "A domain the customer controls, e.g. restovista.com",
+      "attach": "Add domain",
+      "notDeployed": "Deploy this Site first — a custom domain needs a live Worker to point at.",
+      "added": "{hostname} registered.",
+      "dnsIntro": "Ask the customer to add these records at their DNS provider:",
+      "certPending": "The certificate stays pending until the customer adds the TXT record. Apex domains that can't use a CNAME should use an A record to Cloudflare's IPs instead.",
+      "errors": {
+        "notAllowed": "You're not allowed to manage this Site.",
+        "notFound": "Site not found.",
+        "notDeployed": "Deploy this Site before adding a custom domain.",
+        "badRequest": "That doesn't look like a valid domain.",
+        "notConfigured": "Custom-domain support isn't configured on the deployer.",
+        "deployerUnreachable": "The deploy service is unreachable. Please try again.",
+        "unknown": "Something went wrong. Please try again."
+      }
     }
   },
   "designSystem": {
