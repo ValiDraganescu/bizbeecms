@@ -85,3 +85,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   (`injected ?? await getX()`) so all existing call sites are untouched (zero behavior change — verify
   with a grep of every caller). The Storage fake is trivial: an in-memory `Map` matching put/get/delete
   (no node:sqlite needed for the R2 side). See `scripts/asset-store.test.mjs`.
+- **TRIFECTA COMPLETE.** All 3 ports are now proven against mocked ports IN A BUSINESS MODULE:
+  Db (page/settings/component stores), Storage (asset-store), and **Ai** (the chat `reframe`
+  streaming consumer — `scripts/reframe.test.mjs`). Don't redo this; INVENT the next slice (rule 3).
+- **To unit-test the Ai-port STREAMING consumer, extract the stream stage, don't test the route.**
+  `route.ts` is `@/`-aliased + pulls CF-coupled tool/store imports → not node-loadable. The pure
+  consume/forward logic now lives in `lib/chat/reframe.ts` as `reframe(upstream, runTools)` with the
+  CF tool dispatch INJECTED (mirrors `injectedDb?`/`injectedStorage?`). Fake the Ai port as a
+  `ReadableStream<Uint8Array>` that enqueues SSE byte pieces one pull at a time — that's the exact
+  `Ai.chat()` return shape. SPLIT a `data:` line mid-JSON across two pieces to actually exercise the
+  cross-chunk buffering (a single-blob fake proves nothing about streaming).
+- **A reframe `pull()` that parses only a PARTIAL line must NOT return without re-reading.** node's
+  ReadableStream does NOT reliably re-call `pull()` after a no-enqueue resolve → the consumer's
+  `read()` hangs forever (Workers' impl happened to re-pull, hiding it in prod). `reframe` now LOOPs
+  `reader.read()` inside `pull()` until it emits ≥1 frame or closes. If you touch reframe, keep that
+  loop or the streaming tests (and possibly prod under load) will hang.

@@ -5,6 +5,18 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-18): Mocked-Ai-port unit test for the chat STREAMING consume/forward path — COMPLETES
+  the Db+Storage+Ai trifecta (Ai was the last unproven port in a business module). Extracted
+  `reframe(upstream, runTools)` from `app/api/chat/route.ts` into node-loadable `lib/chat/reframe.ts`
+  (route now delegates; `runTools` injected → pure, no CF imports). New `scripts/reframe.test.mjs` (6)
+  drives REAL reframe over a FAKE Ai-port `ReadableStream<Uint8Array>` emitting multi-chunk streamed SSE
+  (one delta line SPLIT mid-JSON across two chunks; tool-call args streamed as 4 fragments). Honest
+  asserts on the re-framed client protocol: assembled "streamed-token" across chunks, ONE assembled
+  create_page call with PARSED args (not 4 fragments/raw string), interleaved token-then-tool ordering,
+  mid-stream error→error event, keep-alive tolerance. Found+fixed a latent node hang: a pull() that
+  parsed only a partial line emitted nothing and left read() pending forever — reframe now LOOPs reads
+  until it emits a frame or closes (identical output frames/order; robustness fix, not behavior change).
+  264 green (+6) + build green.
 - DONE (2026-06-18): Define the `Storage` port over `CMS/src/db/asset-store.ts` (only the R2 methods
   actually called) + a `CfStorage` adapter wrapping `env.MEDIA`; route asset-store callers through it.
   → `CMS/src/lib/ports/storage.ts` + `scripts/storage-port.test.mjs`. `getStorage()` is now the sole

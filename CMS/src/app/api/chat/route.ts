@@ -19,12 +19,8 @@
  * gateway (HITL — can't be exercised offline).
  */
 import { getAi, getGatewayId } from "@/lib/ports/ai";
-import {
-  SseDeltaParser,
-  ToolCallAccumulator,
-  frameEvent,
-  parseChatBody,
-} from "@/lib/chat/sse";
+import { ToolCallAccumulator, frameEvent, parseChatBody } from "@/lib/chat/sse";
+import { reframe } from "@/lib/chat/reframe";
 import {
   CREATE_COMPONENT_TOOL,
   validateComponentArtifact,
@@ -108,7 +104,7 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const stream = reframe(upstream);
+  const stream = reframe(upstream, runTools);
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",
@@ -149,65 +145,6 @@ async function withSystemPrompt(messages: ChatMessage[]): Promise<ChatMessage[]>
     utilityClasses: [...allowedClasses()].sort(),
   });
   return [{ role: "system", content: system }, ...messages];
-}
-
-/**
- * Pipe the upstream OpenAI-style SSE stream through the pure parser and emit our
- * client protocol. Keeps the network/stream wiring thin; all decisions live in
- * the unit-tested `SseDeltaParser` / `ToolCallAccumulator` / validator.
- *
- * B2: as the model streams, text deltas frame as `token`. Tool-call fragments
- * (`create_component`) accumulate; when the stream ends we assemble each call,
- * VALIDATE the artifact (pure), write it to D1, and frame a `tool` result event
- * (`{name, ok, action|errors}`) so the client can show "created PricingCard" or
- * the validation errors. This is a SINGLE tool round — feeding the tool result
- * back for a follow-up model turn (the full agentic loop) needs the live model
- * and is deferred to the live path (HITL). A reframe with no tool call behaves
- * exactly like B1 (token… done).
- */
-function reframe(upstream: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
-  const decoder = new TextDecoder();
-  const encoder = new TextEncoder();
-  const parser = new SseDeltaParser();
-  const tools = new ToolCallAccumulator();
-  const reader = upstream.getReader();
-
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      try {
-        const { done, value } = await reader.read();
-        const events = done
-          ? parser.flush()
-          : parser.push(decoder.decode(value, { stream: true }));
-        let sawDone = false;
-        for (const ev of events) {
-          if (ev.type === "delta") {
-            controller.enqueue(encoder.encode(frameEvent("token", { text: ev.text })));
-          } else if (ev.type === "tool_call") {
-            tools.add(ev);
-          } else {
-            sawDone = true;
-          }
-        }
-        if (done || sawDone) {
-          // Execute any tool calls the model made before closing.
-          if (tools.size > 0) {
-            await runTools(tools, controller, encoder);
-          }
-          controller.enqueue(encoder.encode(frameEvent("done", {})));
-          controller.close();
-        }
-      } catch (err) {
-        controller.enqueue(
-          encoder.encode(frameEvent("error", { message: (err as Error).message })),
-        );
-        controller.close();
-      }
-    },
-    cancel(reason) {
-      reader.cancel(reason).catch(() => {});
-    },
-  });
 }
 
 /**

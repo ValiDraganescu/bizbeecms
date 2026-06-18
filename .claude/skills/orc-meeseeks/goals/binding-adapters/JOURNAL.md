@@ -179,3 +179,31 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   no-injection signature (optional params → zero behavior change). `npm test` 258 green (was 252);
   `npx opennextjs-cloudflare build` green (deploy gate; no dev on 3601/3602 first).
 - **Files:** CMS/scripts/asset-store.test.mjs (new), CMS/src/db/asset-store.ts (seam + relative imports).
+
+## 2026-06-18 19:33 — Mocked-Ai-port test for the chat STREAMING consume/forward path (trifecta complete)
+- **Status:** DONE
+- **What I did:** Closed the last unproven seam — the **Ai port consumed by a business
+  module under streaming**. Db & Storage were already proven against mocked ports; the
+  only Ai coverage was `ai-port.test.mjs` (the adapter's pass-through), never the CONSUMER.
+  Extracted the inline `reframe()` out of `src/app/api/chat/route.ts` into a new
+  node-loadable `src/lib/chat/reframe.ts` as `reframe(upstream, runTools)` — the CF-coupled
+  tool dispatch (`runTools`, which does D1/R2 writes) is now INJECTED, so the module is pure
+  (imports only `./sse.ts`). The route imports `reframe` from the new module and passes its
+  existing `runTools` — delegation, same frames/order. New `scripts/reframe.test.mjs` (6 tests)
+  drives the REAL reframe over a FAKE Ai port: a `ReadableStream<Uint8Array>` that emits
+  multi-chunk streamed OpenAI-style SSE, deliberately splitting one `data:` line MID-JSON across
+  two chunks (proves cross-chunk token assembly, not a single blob) and streaming a tool call's
+  args as 4 separate fragments (proves `ToolCallAccumulator` reassembly → ONE call with PARSED
+  args). Honest assertions on the re-framed client protocol output (event names + parsed JSON):
+  assembled "streamed-token", a single create_page call with `{slug,title}`, interleaved
+  token-then-tool ordering, mid-stream upstream error → `error` event (not `done`), keep-alive
+  line tolerance. No `was-called` tautologies — the captured `tools.finish()` IS the real parse.
+- **Verified:** `node --test scripts/reframe.test.mjs` 6/6 green; full `npm test` 264 green (was
+  258, +6); `npx opennextjs-cloudflare build` green (deploy gate; ports 3601/3602 free first).
+  Found+fixed a latent hang surfaced only by node's stream impl: a `pull()` whose chunk parsed to
+  only a partial line emitted zero frames and didn't close, leaving the consumer's `read()` pending
+  forever. Fixed by looping reads inside `pull()` until a frame is emitted or the stream closes —
+  identical output frames & order (the original relied on the runtime re-pulling on no-enqueue,
+  which Workers' ReadableStream does but node's left pending). Robustness fix, not a behavior change.
+- **Files:** CMS/src/lib/chat/reframe.ts (new), CMS/scripts/reframe.test.mjs (new),
+  CMS/src/app/api/chat/route.ts (delegates to extracted reframe; inline copy removed).

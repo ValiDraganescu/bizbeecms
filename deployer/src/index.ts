@@ -267,8 +267,11 @@ report() {
     body="{\\"siteId\\":\\"$SITE_ID\\",\\"status\\":\\"deployed\\",\\"workerName\\":\\"$WORKER_NAME\\"}"
   else
     # keep error short + JSON-safe
-    err=$(printf '%s' "\${2:-}" | tr '"\\n' '  ' | cut -c1-300)
-    body="{\\"siteId\\":\\"$SITE_ID\\",\\"status\\":\\"failed\\",\\"error\\":\\"$err\\"}"
+    # Include the tail of the build log so the failure is self-explanatory in PM,
+    # not just a step name. JSON-escape: strip quotes/newlines/backslashes/tabs.
+    tail_log=$(tail -n 25 /workspace/build.log 2>/dev/null | tr '"\\\\\\n\\t' '    ' | cut -c1-1500)
+    err=$(printf '%s' "\${2:-}" | tr '"\\n' '  ' | cut -c1-200)
+    body="{\\"siteId\\":\\"$SITE_ID\\",\\"status\\":\\"failed\\",\\"error\\":\\"$err\\",\\"log\\":\\"$tail_log\\"}"
   fi
   curl -sS -X POST "$CALLBACK_URL" \
     -H "Authorization: Bearer $DEPLOYER_SECRET" \
@@ -285,6 +288,12 @@ run() {
 }
 
 set +e
+
+# Capture all build output to a logfile so a failing step's REAL error (not just
+# its name) can be sent back in the callback. tee keeps it on the container's
+# stdout too (visible via the Sandbox process logs).
+exec > >(tee /workspace/build.log) 2>&1
+
 rm -rf /workspace/src
 
 # Auth the private clone via a git config Authorization header sourced from env,

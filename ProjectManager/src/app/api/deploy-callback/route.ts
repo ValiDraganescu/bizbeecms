@@ -45,6 +45,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "notFound" }, { status: 404 });
   }
 
+  // On failure, log the deployer's reported error + build-log tail so it's
+  // visible in `wrangler tail` (the Site row only stores status, not the error).
+  // ponytail: log-only, no error column — add one if failures need to persist in the UI.
+  if (status === "failed") {
+    console.error(
+      `[deploy-callback] site=${siteId} FAILED: ${String(body.error ?? "(no error)")} | log: ${String((body as { log?: unknown }).log ?? "(none)")}`,
+    );
+  }
+
   const workerName =
     status === "deployed" && typeof body.workerName === "string"
       ? body.workerName
