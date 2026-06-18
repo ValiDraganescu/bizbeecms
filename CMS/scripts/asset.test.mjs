@@ -17,6 +17,7 @@ import {
   buildAssetKey,
   isValidAssetKey,
   assetUrl,
+  assetServeHeaders,
 } from "../src/lib/render/asset.ts";
 
 // ── validateAsset ─────────────────────────────────────────────────────────────
@@ -78,6 +79,29 @@ test("isValidAssetKey: rejects traversal / foreign keys", () => {
 // ── assetUrl ──────────────────────────────────────────────────────────────────
 test("assetUrl: prefixes /media/", () => {
   assert.equal(assetUrl("assets/x_1_y.png"), "/media/assets/x_1_y.png");
+});
+
+// ── assetServeHeaders (stored-XSS guard) ──────────────────────────────────────
+test("assetServeHeaders: always sets nosniff", () => {
+  for (const t of ["image/png", "image/jpeg", "image/svg+xml"]) {
+    assert.equal(assetServeHeaders(t)["x-content-type-options"], "nosniff", t);
+  }
+});
+
+test("assetServeHeaders: SVG forced to sandbox + download (no inline script exec)", () => {
+  for (const t of ["image/svg+xml", "image/SVG+XML", "image/svg"]) {
+    const h = assetServeHeaders(t);
+    assert.equal(h["content-security-policy"], "default-src 'none'; sandbox", t);
+    assert.equal(h["content-disposition"], "attachment", t);
+  }
+});
+
+test("assetServeHeaders: raster images are NOT sandboxed/forced-download", () => {
+  for (const t of ["image/png", "image/jpeg", "image/webp", "image/gif"]) {
+    const h = assetServeHeaders(t);
+    assert.equal(h["content-security-policy"], undefined, t);
+    assert.equal(h["content-disposition"], undefined, t);
+  }
 });
 
 // ── i18n parity ───────────────────────────────────────────────────────────────

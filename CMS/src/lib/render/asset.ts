@@ -89,3 +89,22 @@ export function isValidAssetKey(key: string): boolean {
 export function assetUrl(key: string): string {
   return ASSET_URL_PREFIX + key;
 }
+
+/**
+ * Security headers the serve route adds for a given content type.
+ *
+ * `nosniff` is always set so the browser can't MIME-sniff an upload into an
+ * active type. SVG is an active document (it can carry `<script>`), so a
+ * user-uploaded one served inline same-origin could run in the CMS origin and
+ * reach admin cookies — for SVG we add a locked-down CSP sandbox and force it
+ * to download (it still renders fine inside an `<img src>`, just can't execute
+ * scripts as a top-level document). Pure so it is node-testable.
+ */
+export function assetServeHeaders(contentType: string): Record<string, string> {
+  const headers: Record<string, string> = { "x-content-type-options": "nosniff" };
+  if ((contentType ?? "").toLowerCase().includes("svg")) {
+    headers["content-security-policy"] = "default-src 'none'; sandbox";
+    headers["content-disposition"] = "attachment";
+  }
+  return headers;
+}

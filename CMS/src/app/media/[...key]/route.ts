@@ -10,7 +10,7 @@
  * REST route handler (no server action). Live R2 needs a real binding (HITL).
  */
 import { getAssetObject } from "@/db/asset-store";
-import { isValidAssetKey } from "@/lib/render/asset";
+import { assetServeHeaders, isValidAssetKey } from "@/lib/render/asset";
 
 export const dynamic = "force-dynamic";
 
@@ -39,5 +39,11 @@ export async function GET(
   headers.set("etag", object.httpEtag);
   // Assets are content-addressed (key has a timestamp+rand), so cache hard.
   headers.set("cache-control", "public, max-age=31536000, immutable");
+  // Security headers (nosniff always; SVG → CSP sandbox + force-download so a
+  // user-uploaded SVG with embedded <script> can't run in the CMS origin and
+  // reach admin cookies). Pure decision lives in `assetServeHeaders` (tested).
+  for (const [k, v] of Object.entries(assetServeHeaders(headers.get("content-type") ?? ""))) {
+    headers.set(k, v);
+  }
   return new Response(object.body, { headers });
 }

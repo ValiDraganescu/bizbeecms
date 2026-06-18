@@ -34,10 +34,16 @@ import {
   CREATE_TRANSLATION_TOOL,
   validateTranslationInput,
 } from "@/lib/chat/translate-tool";
+import {
+  LIST_ASSETS_TOOL,
+  coerceLimit,
+  formatAssetList,
+} from "@/lib/chat/list-assets-tool";
 import { upsertComponent } from "@/db/component-store";
 import { missingComponents, upsertPage } from "@/db/page-store";
 import { applyTranslation } from "@/db/translate-store";
 import { getContentLocales } from "@/db/settings-store";
+import { listAssets } from "@/db/asset-store";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +53,12 @@ const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
 // The tools the model may call this turn (B2 create_component, B3 create_page,
 // B4 translate).
-const TOOLS = [CREATE_COMPONENT_TOOL, CREATE_PAGE_TOOL, CREATE_TRANSLATION_TOOL];
+const TOOLS = [
+  CREATE_COMPONENT_TOOL,
+  CREATE_PAGE_TOOL,
+  CREATE_TRANSLATION_TOOL,
+  LIST_ASSETS_TOOL,
+];
 
 // AI Gateway slug. Override at deploy time via the AI_GATEWAY env var; falls
 // back to the default gateway name so a freshly-provisioned Site still works.
@@ -186,6 +197,8 @@ async function runTools(
         await handleCreatePage(call.args, emit);
       } else if (call.name === CREATE_TRANSLATION_TOOL.function.name) {
         await handleTranslate(call.args, emit);
+      } else if (call.name === LIST_ASSETS_TOOL.function.name) {
+        await handleListAssets(call.args, emit);
       } else {
         emit({ name: call.name, ok: false, errors: [`unknown tool: ${call.name}`] });
       }
@@ -273,5 +286,24 @@ async function handleTranslate(
     emit({ name, ok: true, action: res.action, target: res.target, fields: res.fields });
   } catch (err) {
     emit({ name, ok: false, errors: [`failed to translate: ${(err as Error).message}`] });
+  }
+}
+
+/**
+ * Read-only: list the Site's uploaded media so the model can reference real
+ * `/media/<key>` URLs in components/pages (closes the D1 upload→AI-use loop).
+ * No untrusted artifact to validate — just clamp the limit and shape the rows.
+ */
+async function handleListAssets(
+  args: unknown,
+  emit: (data: Record<string, unknown>) => void,
+): Promise<void> {
+  const name = LIST_ASSETS_TOOL.function.name;
+  try {
+    const rows = await listAssets();
+    const assets = formatAssetList(rows, coerceLimit(args));
+    emit({ name, ok: true, assets });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to list assets: ${(err as Error).message}`] });
   }
 }

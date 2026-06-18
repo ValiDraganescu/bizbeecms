@@ -40,6 +40,8 @@ export interface ToolResult {
   target?: string;
   /** translate success: the count/list of translated fields. */
   fields?: unknown;
+  /** list_assets success: the available assets ({url,filename,...}). */
+  assets?: unknown[];
   /** On failure: validation / D1 error messages. */
   errors?: string[];
 }
@@ -141,6 +143,7 @@ function toToolResult(data: Record<string, unknown>): ToolResult {
     page: typeof data.page === "string" ? data.page : undefined,
     target: typeof data.target === "string" ? data.target : undefined,
     fields: data.fields,
+    assets: Array.isArray(data.assets) ? data.assets : undefined,
     errors,
   };
 }
