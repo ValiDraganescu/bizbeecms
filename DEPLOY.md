@@ -1,5 +1,11 @@
 # Deploy runbook — ProjectManager → Cloudflare → CMS Worker
 
+> ⚠️ **Architecture note (2026-06-18):** steps 0–10 (deploying **PM itself**) are current. But
+> **step 11 + the lower troubleshooting rows describe the OLD in-PM Script-Upload CMS deploy**
+> (`buildScriptUploadForm` / `PUT /workers/scripts` / DO-strip / assets-404). That path is
+> **superseded** by the PM → deployer-Worker → Container `wrangler deploy` path. For the current
+> deploy relations + env-var/secret status, read **`DEPLOY-ARCHITECTURE.md`** first.
+
 The single ordered procedure to take **bizbeecms ProjectManager (PM)** live on Cloudflare
 Workers, and from that deployed PM trigger a **real CMS website deploy** (a per-Site CMS
 Worker uploaded via the Cloudflare API).
