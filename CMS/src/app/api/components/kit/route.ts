@@ -16,7 +16,7 @@
  *
  * REST-only (no server actions). Live D1 write needs a real binding (HITL).
  */
-import { upsertImportedComponent } from "@/db/component-store";
+import { missingComponentNames, upsertImportedComponent } from "@/db/component-store";
 import { parsePortableComponent } from "@/lib/components/portable";
 import { BLOG_KIT_ID, blogKit, blogKitNames } from "@/lib/components/blog-kit";
 
@@ -50,6 +50,7 @@ export async function POST(request: Request): Promise<Response> {
   //    single bad bundle fails the whole install before any partial write.
   const validated = [];
   const assetDeps = new Set<string>();
+  const componentDeps = new Set<string>();
   for (const b of blogKit()) {
     const parsed = parsePortableComponent(b);
     if (!parsed.ok) {
@@ -59,6 +60,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     for (const k of parsed.assets) assetDeps.add(k);
+    for (const d of parsed.componentDeps) componentDeps.add(d);
     validated.push(parsed.component);
   }
 
@@ -70,9 +72,22 @@ export async function POST(request: Request): Promise<Response> {
     }
     const created = results.filter((r) => r.action === "created").length;
     const updated = results.filter((r) => r.action === "updated").length;
+    // Component deps the kit references but does NOT install itself (H3b), still
+    // missing from this Site → warn (don't auto-install). Names the kit installs
+    // are satisfied by this very install, so exclude them.
+    const installedNames = new Set(validated.map((c) => c.name));
+    const externalDeps = [...componentDeps].filter((n) => !installedNames.has(n));
+    const missingComponents = await missingComponentNames(externalDeps);
     // Asset deps the kit references (H3) — empty for the blog kit, but surfaced
     // so a future media-bearing kit tells the user what to upload.
-    return Response.json({ id, installed: results, created, updated, assets: [...assetDeps] });
+    return Response.json({
+      id,
+      installed: results,
+      created,
+      updated,
+      assets: [...assetDeps],
+      missingComponents,
+    });
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to install kit" },

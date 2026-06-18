@@ -51,6 +51,26 @@ const MEDIA_URL_RE = new RegExp(
 // can't smuggle a multi-MB blob; it's never eval'd, only stored + shown.
 const MAX_PROPS_SCHEMA_BYTES = 16 * 1024;
 
+/**
+ * H3b — nested-component dependency handling.
+ *
+ * A component's tree can reference ANOTHER component by name. The JSX/React
+ * convention (and what the renderer's React adapter honours): a `tag` that
+ * starts with an UPPERCASE letter is a component reference; a lowercase `tag`
+ * is a plain HTML element. So a bundle whose tree contains `{ tag: "AuthorCard" }`
+ * depends on a component named `AuthorCard` existing in the target Site.
+ *
+ * H3 handled ASSET-URL deps; this is the component→component dep gap. We only
+ * enumerate the KNOWN-SAFE component-name shape (`COMPONENT_TAG_RE`, the same
+ * PascalCase identifier `validateComponentArtifact` accepts as a `name`) so the
+ * warning can't be poisoned by an odd tag value. We DON'T auto-install — we just
+ * surface missing deps so the human installs them first (matching the asset-dep
+ * posture: warn, don't act).
+ */
+// A `tag` that names another component: starts uppercase, identifier shape.
+// Mirrors the component NAME_RE in component-tool.ts (PascalCase-ish identifier).
+const COMPONENT_TAG_RE = /^[A-Z][A-Za-z0-9_-]{0,63}$/;
+
 /** A self-contained, portable component bundle. */
 export interface PortableComponent {
   format: typeof PORTABLE_FORMAT;
@@ -64,6 +84,13 @@ export interface PortableComponent {
    * export time; advisory — the source of truth is always a fresh enumeration.
    */
   assets: string[];
+  /**
+   * Nested-component deps (H3b): the distinct names of OTHER components this
+   * bundle's tree renders (a `tag` in PascalCase = a component reference). The
+   * importer warns when any are missing from the target Site so the human
+   * installs them first (we never auto-install). Self-references are excluded.
+   */
+  componentDeps: string[];
   component: {
     name: string;
     tree: TreeNode;
@@ -103,6 +130,24 @@ export function enumerateAssetDeps(parts: {
   if (parts.script) scan(parts.script);
   if (parts.css) scan(parts.css);
   return [...keys].sort();
+}
+
+/**
+ * Enumerate the distinct, sorted component NAMES a tree references (H3b). A node
+ * whose `tag` matches `COMPONENT_TAG_RE` (PascalCase identifier) is a nested
+ * component dep. PURE — text nodes and lowercase HTML tags are ignored.
+ */
+export function enumerateComponentDeps(tree: TreeNode): string[] {
+  const names = new Set<string>();
+  const walk = (node: TreeNode) => {
+    if (typeof node === "string") return;
+    if (typeof node.tag === "string" && COMPONENT_TAG_RE.test(node.tag)) {
+      names.add(node.tag);
+    }
+    for (const child of node.children ?? []) walk(child);
+  };
+  walk(tree);
+  return [...names].sort();
 }
 
 /**
@@ -176,6 +221,8 @@ export function serializeComponent(
     version: PORTABLE_VERSION,
     ...(meta ? { meta } : {}),
     assets: enumerateAssetDeps({ tree, script, css }),
+    // Other components this one renders, minus a self-reference.
+    componentDeps: enumerateComponentDeps(tree).filter((n) => n !== row.name),
     component: {
       name: row.name,
       tree,
@@ -212,14 +259,16 @@ export interface ParseOptions {
  * never writes. This is the IMPORT trust boundary.
  *
  * On success it also returns `assets`: the `/media/<key>` deps the (rebound)
- * component still references, so the caller can warn the importer about assets
- * the target Site is missing.
+ * component still references, and `componentDeps`: the names of OTHER components
+ * its tree references — so the caller can warn the importer about assets OR
+ * components the target Site is missing. Both are re-enumerated from the
+ * VALIDATED artifact, never trusted from the envelope.
  */
 export function parsePortableComponent(
   raw: unknown,
   opts: ParseOptions = {},
 ):
-  | { ok: true; component: ImportedComponent; assets: string[] }
+  | { ok: true; component: ImportedComponent; assets: string[]; componentDeps: string[] }
   | { ok: false; errors: string[] } {
   // Accept a JSON string (file/paste) or an already-parsed object.
   let obj: unknown = raw;
@@ -294,6 +343,10 @@ export function parsePortableComponent(
     component: { ...v.artifact, propsSchema },
     // Deps remaining AFTER any rebind — what the target Site must actually have.
     assets: enumerateAssetDeps(v.artifact),
+    // Other components this one renders, minus a self-reference (H3b).
+    componentDeps: enumerateComponentDeps(v.artifact.tree).filter(
+      (n) => n !== v.artifact.name,
+    ),
   };
 }
 

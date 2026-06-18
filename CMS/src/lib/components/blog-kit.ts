@@ -30,6 +30,7 @@ import {
   PORTABLE_FORMAT,
   PORTABLE_VERSION,
   enumerateAssetDeps,
+  enumerateComponentDeps,
   type PortableComponent,
 } from "./portable.ts";
 
@@ -45,6 +46,13 @@ function bundle(component: PortableComponent["component"]): PortableComponent {
     // Kit components are self-contained (no media refs) → empty deps, but
     // enumerate so a future kit that references an asset declares it correctly.
     assets: enumerateAssetDeps(component),
+    // Nested-component deps this bundle renders (H3b), minus a self-reference.
+    // PostList renders PostListItem, so it declares that dep — the install
+    // satisfies it from within the same kit (the kit route excludes self-kit
+    // names before warning).
+    componentDeps: enumerateComponentDeps(component.tree).filter(
+      (n) => n !== component.name,
+    ),
     component,
   };
 }

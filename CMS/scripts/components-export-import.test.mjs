@@ -17,6 +17,7 @@ import {
   PORTABLE_FORMAT,
   PORTABLE_VERSION,
   enumerateAssetDeps,
+  enumerateComponentDeps,
   parsePortableComponent,
   serializeComponent,
 } from "../src/lib/components/portable.ts";
@@ -178,4 +179,70 @@ test("H3: no-rebind parse still reports the deps it carries", () => {
   const parsed = parsePortableComponent(bundle);
   assert.ok(parsed.ok);
   assert.deepEqual(parsed.assets, [KEY_B, KEY_A].sort());
+});
+
+// ── H3b: nested-component dependency handling ───────────────────────────────
+// A `tag` in PascalCase = a reference to another component (the JSX convention).
+// A bundle that renders <AuthorCard/> + <PostListItem/> depends on those.
+const nestedRow = {
+  name: "PostList",
+  tree: JSON.stringify({
+    tag: "section",
+    props: { className: "p-4" },
+    children: [
+      { tag: "PostListItem", props: {}, children: [] },
+      { tag: "div", props: {}, children: [{ tag: "AuthorCard", props: {}, children: [] }] },
+      // self-reference + duplicate should NOT inflate the dep set
+      { tag: "PostListItem", props: {}, children: [] },
+      { tag: "PostList", props: {}, children: [] },
+    ],
+  }),
+  script: "",
+  css: "",
+  propsSchema: null,
+};
+
+test("H3b: enumerateComponentDeps collects PascalCase tags, ignores HTML tags", () => {
+  const tree = JSON.parse(nestedRow.tree);
+  // PostList itself is included by the pure fn (self-filter happens at export).
+  assert.deepEqual(enumerateComponentDeps(tree), ["AuthorCard", "PostList", "PostListItem"]);
+  // A leaf with only HTML tags has no component deps.
+  assert.deepEqual(
+    enumerateComponentDeps({ tag: "div", props: {}, children: ["text", { tag: "span" }] }),
+    [],
+  );
+});
+
+test("H3b: export enumerates nested-component deps, excluding self-reference", () => {
+  const bundle = serializeComponent(nestedRow);
+  // Distinct, sorted, and PostList (self) removed.
+  assert.deepEqual(bundle.componentDeps, ["AuthorCard", "PostListItem"]);
+  // A component with no nested refs declares an empty list.
+  assert.deepEqual(serializeComponent(goodRow).componentDeps, []);
+});
+
+test("H3b: parse re-enumerates component deps from the validated artifact", () => {
+  const bundle = serializeComponent(nestedRow);
+  const parsed = parsePortableComponent(bundle);
+  assert.ok(parsed.ok, parsed.ok ? "" : parsed.errors.join("; "));
+  assert.deepEqual(parsed.componentDeps, ["AuthorCard", "PostListItem"]);
+});
+
+// The route flags deps NOT present in the target Site (a set-difference, which
+// db `missingComponentNames` computes against D1). Verify that pure logic here.
+function missingAgainst(deps, present) {
+  const have = new Set(present);
+  return deps.filter((n) => !have.has(n));
+}
+
+test("H3b: a missing nested dep is flagged on import", () => {
+  const deps = parsePortableComponent(serializeComponent(nestedRow)).componentDeps;
+  // Target Site has AuthorCard but NOT PostListItem.
+  assert.deepEqual(missingAgainst(deps, ["AuthorCard"]), ["PostListItem"]);
+});
+
+test("H3b: a present nested dep is NOT flagged on import", () => {
+  const deps = parsePortableComponent(serializeComponent(nestedRow)).componentDeps;
+  // Target Site has both deps installed → nothing flagged.
+  assert.deepEqual(missingAgainst(deps, ["AuthorCard", "PostListItem"]), []);
 });

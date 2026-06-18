@@ -161,6 +161,8 @@
     "installBlogKit": "Asenna blogipaketti",
     "kitInstalled": "Blogipaketti asennettu: {created} luotu, {updated} päivitetty.",
     "assetDepsTitle": "Mediariippuvuudet",
-    "assetDepsHint": "Tämä komponentti viittaa alla oleviin mediatiedostoihin. Varmista, että ne ovat tällä sivustolla (lataa ne, muuten ne näkyvät rikkinäisinä)."
+    "assetDepsHint": "Tämä komponentti viittaa alla oleviin mediatiedostoihin. Varmista, että ne ovat tällä sivustolla (lataa ne, muuten ne näkyvät rikkinäisinä).",
+    "componentDepsTitle": "Puuttuvat komponenttiriippuvuudet",
+    "componentDepsHint": "Tämä komponentti käyttää alla olevia komponentteja, joita ei ole asennettu tälle sivustolle. Tuo ne ensin, muuten ne näkyvät piilotettuina paikkamerkkeinä."
   }
 }

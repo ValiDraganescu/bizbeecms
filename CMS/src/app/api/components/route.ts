@@ -18,6 +18,7 @@
 import {
   getComponentByName,
   listComponents,
+  missingComponentNames,
   upsertImportedComponent,
 } from "@/db/component-store";
 import { parsePortableComponent, serializeComponent } from "@/lib/components/portable";
@@ -81,9 +82,12 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const res = await upsertImportedComponent(parsed.component);
     // Surface the asset deps the imported component still references so the UI
-    // can warn about assets the target Site may be missing (H3).
+    // can warn about assets the target Site may be missing (H3). And surface the
+    // NESTED-COMPONENT deps that aren't installed here (H3b) — we don't auto-
+    // install; the human must import those components first.
+    const missingComponents = await missingComponentNames(parsed.componentDeps);
     return Response.json(
-      { ...res, assets: parsed.assets },
+      { ...res, assets: parsed.assets, missingComponents },
       { status: res.action === "created" ? 201 : 200 },
     );
   } catch (err) {

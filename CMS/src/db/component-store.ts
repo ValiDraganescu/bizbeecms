@@ -9,7 +9,7 @@
  *
  * Build-verified only: the live D1 write needs a real binding (HITL).
  */
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "./index";
 import type { ComponentArtifactInput } from "@/lib/chat/component-tool";
 import type { ComponentRow, ImportedComponent } from "@/lib/components/portable";
@@ -44,6 +44,21 @@ export async function listComponents(): Promise<ComponentRow[]> {
     })
     .from(schema.component);
   return rows.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Of the given component names, return the subset that DON'T exist in this Site
+ * (H3b — nested-component dep warning on import). Empty input → empty result.
+ */
+export async function missingComponentNames(names: string[]): Promise<string[]> {
+  if (names.length === 0) return [];
+  const db = await getDb();
+  const rows = await db
+    .select({ name: schema.component.name })
+    .from(schema.component)
+    .where(inArray(schema.component.name, names));
+  const present = new Set(rows.map((r) => r.name));
+  return names.filter((n) => !present.has(n));
 }
 
 /** Fetch one component's portable columns by unique name (export), or null. */

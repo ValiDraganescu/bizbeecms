@@ -33,6 +33,8 @@ export function ComponentsManager({
   // H3: /media/<key> asset deps the just-imported bundle references — the target
   // Site must have these uploaded or the references dangle.
   const [assetDeps, setAssetDeps] = useState<string[]>([]);
+  // H3b: nested-component refs the import/kit needs that aren't installed here.
+  const [missingComponents, setMissingComponents] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -44,6 +46,7 @@ export function ComponentsManager({
     setError(null);
     setNotice(null);
     setAssetDeps([]);
+    setMissingComponents([]);
     try {
       const res = await fetch(`/api/components?name=${encodeURIComponent(name)}`);
       if (!res.ok) {
@@ -67,6 +70,7 @@ export function ComponentsManager({
     setError(null);
     setNotice(null);
     setAssetDeps([]);
+    setMissingComponents([]);
     if (text.trim() === "") {
       setError(t("importEmpty"));
       return;
@@ -86,6 +90,7 @@ export function ComponentsManager({
         action: "created" | "updated";
         name: string;
         assets?: string[];
+        missingComponents?: string[];
       };
       setNotice(
         j.action === "created"
@@ -93,6 +98,7 @@ export function ComponentsManager({
           : t("updated", { name: j.name }),
       );
       setAssetDeps(j.assets ?? []);
+      setMissingComponents(j.missingComponents ?? []);
       setPaste("");
       if (fileRef.current) fileRef.current.value = "";
       await refresh();
@@ -116,6 +122,7 @@ export function ComponentsManager({
     setError(null);
     setNotice(null);
     setAssetDeps([]);
+    setMissingComponents([]);
     setBusy(true);
     try {
       const res = await fetch("/api/components/kit", {
@@ -127,9 +134,15 @@ export function ComponentsManager({
         setError(await errorOf(res));
         return;
       }
-      const j = (await res.json()) as { created: number; updated: number; assets?: string[] };
+      const j = (await res.json()) as {
+        created: number;
+        updated: number;
+        assets?: string[];
+        missingComponents?: string[];
+      };
       setNotice(t("kitInstalled", { created: j.created, updated: j.updated }));
       setAssetDeps(j.assets ?? []);
+      setMissingComponents(j.missingComponents ?? []);
       await refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -167,6 +180,22 @@ export function ComponentsManager({
             {assetDeps.map((k) => (
               <li key={k} className="truncate font-mono text-sm text-foreground-muted">
                 /media/{k}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {missingComponents.length > 0 && (
+        <div
+          role="alert"
+          className="flex flex-col gap-1 rounded-md border border-danger bg-danger-subtle px-3 py-2"
+        >
+          <span className="text-sm font-medium text-danger">{t("componentDepsTitle")}</span>
+          <span className="text-sm text-danger">{t("componentDepsHint")}</span>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {missingComponents.map((n) => (
+              <li key={n} className="truncate font-mono text-sm text-danger">
+                {n}
               </li>
             ))}
           </ul>

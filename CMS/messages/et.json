@@ -161,6 +161,8 @@
     "installBlogKit": "Paigalda blogipakett",
     "kitInstalled": "Blogipakett paigaldatud: {created} loodud, {updated} uuendatud.",
     "assetDepsTitle": "Meediasõltuvused",
-    "assetDepsHint": "See komponent viitab allolevatele meediafailidele. Veendu, et need on sellel saidil olemas (laadi need üles, muidu kuvatakse need katkistena)."
+    "assetDepsHint": "See komponent viitab allolevatele meediafailidele. Veendu, et need on sellel saidil olemas (laadi need üles, muidu kuvatakse need katkistena).",
+    "componentDepsTitle": "Puuduvad komponendisõltuvused",
+    "componentDepsHint": "See komponent renderdab allolevaid komponente, mida pole sellele saidile paigaldatud. Impordi need esmalt, muidu kuvatakse need peidetud kohatäidetena."
   }
 }
