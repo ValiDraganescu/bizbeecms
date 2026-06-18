@@ -29,7 +29,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
   (+ram), polls every 5s while status=deploying, stops on deployed/failed; mounted in a Card on the
   Site detail page. Localized EN/FI/ET (`sites.timeline`). 2 new fake-D1 tests (order+filter SQL,
   row mapping) → 42 pass. Gate: opennextjs build green. (2026-06-18)
-- TODO (nice-to-have): **Container RAM during build.** Sample `/proc/meminfo` MemAvailable (or `free -m`)
-  around `next build` and send it as the build event's `ramAvailableMb`; show it in the UI timeline.
+- DONE (nice-to-have): **Container RAM during build.** `read_ram_mb()` reads `/proc/meminfo`
+  MemAvailable (kB→MB, portable Linux); `emit_event` appends `ramAvailableMb` only when the module
+  var `STEP_RAM_MB` is non-empty. The build step samples it before+after `next build`; `step_start`
+  clears it so no other step reports ram. Best-effort: MemAvailable absent → no field. STATIC, env
+  $VARS only, never fatal. Verified by render-eval + `bash -n` + a 5-case functional harness, plus
+  deployer `wrangler deploy --dry-run` + PM `npm test` (42). UI/schema/parse already accept ram. (2026-06-18)
 - TODO: **Verify end-to-end.** `npx opennextjs-cloudflare build` green; a real deploy produces a full
   ordered trail with timings; a forced step failure records the error; emit failure does not break deploy.

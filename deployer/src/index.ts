@@ -293,6 +293,10 @@ report() {
 # matching step_ok/step_fail can compute durationMs without repeating the name.
 STEP_NAME=""
 STEP_START_MS=0
+# Set non-empty (by read_ram_mb, around the OOM-prone build step) to attach
+# ramAvailableMb to the in-flight step's ok/fail event. Cleared by step_start so
+# only the step that explicitly samples it reports a value.
+STEP_RAM_MB=""
 
 emit_event() {
   # $1=step $2=status(started|ok|failed) $3=optional startedAt(ms) $4=optional durationMs $5=optional error
@@ -305,6 +309,9 @@ emit_event() {
     e=$(printf '%s' "$5" | tr '"\\n' '  ' | cut -c1-200)
     extra="$extra,\\"error\\":\\"$e\\""
   fi
+  # ramAvailableMb (nice-to-have): only when a step sampled it. parseDeployEvent
+  # coerces the quoted integer string to a number.
+  if [ -n "$STEP_RAM_MB" ]; then extra="$extra,\\"ramAvailableMb\\":\\"$STEP_RAM_MB\\""; fi
   local body="{\\"siteId\\":\\"$SITE_ID\\",\\"step\\":\\"$1\\",\\"status\\":\\"$2\\"$extra}"
   curl -sS -X POST "$EVENTS_URL" \
     -H "Authorization: Bearer $DEPLOYER_SECRET" \
@@ -314,10 +321,20 @@ emit_event() {
 
 now_ms() { date +%s%3N; }
 
+# Best-effort container free RAM in MB from /proc/meminfo (portable Linux source;
+# the Sandbox container is Linux per Dockerfile). Prints nothing if MemAvailable
+# is absent — caller leaves STEP_RAM_MB empty and no ram field is emitted.
+read_ram_mb() {
+  local kb
+  kb=$(grep -m1 '^MemAvailable:' /proc/meminfo 2>/dev/null | awk '{print $2}')
+  if [ -n "$kb" ]; then echo $(( kb / 1024 )); fi
+}
+
 step_start() {
   # $1=step name. Records start time + emits a started event.
   STEP_NAME="$1"
   STEP_START_MS=$(now_ms)
+  STEP_RAM_MB=""
   emit_event "$STEP_NAME" started "$STEP_START_MS"
 }
 
@@ -369,8 +386,14 @@ if [ $? -ne 0 ]; then step_fail "npm install failed"; report failed "npm install
 step_ok
 
 step_start build
+# Sample free RAM (best-effort) for the OOM-prone build step; reported on the
+# build event as ramAvailableMb (instance was bumped standard-1->standard-2 here).
+STEP_RAM_MB=$(read_ram_mb)
 npx opennextjs-cloudflare build
-if [ $? -ne 0 ]; then step_fail "opennext build failed"; report failed "opennext build failed"; exit 1; fi
+build_rc=$?
+# Re-sample after the build so the reported value reflects post-build headroom.
+STEP_RAM_MB=$(read_ram_mb)
+if [ $build_rc -ne 0 ]; then step_fail "opennext build failed"; report failed "opennext build failed"; exit 1; fi
 step_ok
 
 # --- Per-Site infra provisioning (idempotent) -------------------------------

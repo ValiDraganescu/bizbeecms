@@ -95,3 +95,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** ProjectManager/src/app/api/sites/[id]/deploy-events/route.ts,
   src/app/(app)/sites/deploy-timeline.tsx, src/app/(app)/sites/[id]/page.tsx,
   src/lib/deploy/deploy-events.ts, src/lib/deploy/deploy-events.test.ts, messages/{en,fi,et}.json
+
+## 2026-06-18 20:00 — Slice 5 (nice-to-have): container RAM during build
+- **Status:** DONE
+- **What I did:**
+  - `deployer/src/index.ts` `buildScript()`: new `read_ram_mb()` — reads `/proc/meminfo`
+    MemAvailable (`grep -m1 '^MemAvailable:' | awk '{print $2}'`, kB) and echoes `kb/1024` MB.
+    Portable Linux source (container is Linux per Dockerfile); prints NOTHING if MemAvailable
+    absent (best-effort — caller leaves the var empty, no field emitted, never breaks the deploy).
+  - New module shell var `STEP_RAM_MB`. `emit_event` appends `"ramAvailableMb":"$STEP_RAM_MB"`
+    ONLY when non-empty (parseDeployEvent coerces the quoted int string). `step_start` clears it
+    so only a step that explicitly samples it reports ram.
+  - The `build` step sets `STEP_RAM_MB=$(read_ram_mb)` before `npx opennextjs-cloudflare build`,
+    captures `build_rc=$?`, re-samples after (post-build headroom), then `step_ok`/`step_fail`
+    carry the ram value. The OOM-prone step is exactly why this slice exists (standard-1→standard-2).
+  - Honored CAVEATS: STATIC (env $VARS only, no caller interpolation); `now_ms`/`date +%s%3N`
+    left GNU-only as-is; emit stays `curl ... || true`. No PM-side changes — slice-1 schema/parse
+    + slice-4 UI (`· {mb} MB free`) already accept `ramAvailableMb`.
+- **Verified:** Render the template literal via node `eval` (no stray JS `${}`) → `bash -n` OK.
+  Functional harness (stubbed curl/now_ms, fake meminfo): (1) non-build step emits NO ram,
+  (2) build ok carries `"ramAvailableMb":"8192"`, (3) build fail carries ram + error, (4) step
+  after build has ram cleared, (5) MemAvailable absent → no ram field. ALL PASS. Gates: deployer
+  `npx wrangler deploy --dry-run` green (TS bundles + container image builds); PM `npm test` → 42
+  pass (no PM code changed). Dev confirmed NOT on 3601/3602. NOT deployed live.
+- **Files:** deployer/src/index.ts

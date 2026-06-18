@@ -60,3 +60,9 @@ Read every line before working. Each entry was learned the hard way by a previou
   Worker (no Next). Dry-run bundles the TS + builds the Sandbox container image = full validation.
 - **Slice 2 emits `step_fail` BEFORE the existing `report failed`** on each checkpoint, so both the
   per-step trail and the final single callback fire. Don't remove either; they serve different sinks.
+- **ramAvailableMb rides on the shared `STEP_RAM_MB` shell var, not a 6th emit_event arg.** `emit_event`
+  appends the field only when `STEP_RAM_MB` is non-empty; `step_start` clears it every step so ONLY the
+  build step (which sets `STEP_RAM_MB=$(read_ram_mb)`) reports ram. If you add ram to another step, set
+  the var after that step's `step_start`. Source is `/proc/meminfo` MemAvailable (kB→MB); absent → empty
+  → no field (best-effort, never fatal). Container is Linux so `/proc/meminfo` exists; don't use `free -m`
+  (extra parsing, same data).
