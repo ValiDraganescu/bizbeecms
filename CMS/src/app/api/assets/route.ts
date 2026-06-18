@@ -13,10 +13,13 @@
  */
 import { deleteAsset, listAssets, putAsset } from "@/db/asset-store";
 import { assetUrl, buildAssetKey, isValidAssetKey, validateAsset } from "@/lib/render/asset";
+import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   try {
     const assets = await listAssets();
     return Response.json(assets.map((a) => ({ ...a, url: assetUrl(a.key) })));
@@ -29,6 +32,8 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   let form: FormData;
   try {
     form = await request.formData();
@@ -60,6 +65,8 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function DELETE(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   const key = new URL(request.url).searchParams.get("key") ?? "";
   if (!isValidAssetKey(key)) {
     return Response.json({ error: "invalid key" }, { status: 400 });

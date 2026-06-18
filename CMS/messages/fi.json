@@ -164,5 +164,9 @@
     "assetDepsHint": "Tämä komponentti viittaa alla oleviin mediatiedostoihin. Varmista, että ne ovat tällä sivustolla (lataa ne, muuten ne näkyvät rikkinäisinä).",
     "componentDepsTitle": "Puuttuvat komponenttiriippuvuudet",
     "componentDepsHint": "Tämä komponentti käyttää alla olevia komponentteja, joita ei ole asennettu tälle sivustolle. Tuo ne ensin, muuten ne näkyvät piilotettuina paikkamerkkeinä."
+  },
+  "adminAuth": {
+    "forbiddenTitle": "Pääsy estetty",
+    "forbiddenBody": "Olet kirjautunut sisään, mutta tililläsi ei ole oikeuksia hallita tätä sivustoa. Pyydä sivuston ylläpitäjää myöntämään sinulle pääsy."
   }
 }

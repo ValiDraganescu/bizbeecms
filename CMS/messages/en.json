@@ -164,5 +164,9 @@
     "assetDepsHint": "This component references the media assets below. Make sure they exist on this site (upload them, or they will appear broken).",
     "componentDepsTitle": "Missing component dependencies",
     "componentDepsHint": "This component renders the components below, which are not installed on this site. Import them first, or they will render as hidden placeholders."
+  },
+  "adminAuth": {
+    "forbiddenTitle": "Access denied",
+    "forbiddenBody": "You're signed in, but your account doesn't have access to manage this site. Ask a site administrator to grant you access."
   }
 }

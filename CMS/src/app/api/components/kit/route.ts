@@ -19,9 +19,12 @@
 import { missingComponentNames, upsertImportedComponent } from "@/db/component-store";
 import { parsePortableComponent } from "@/lib/components/portable";
 import { BLOG_KIT_ID, blogKit, blogKitNames } from "@/lib/components/blog-kit";
+import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
+// The kit manifest is a STATIC list of what kits exist (no Site data, no D1) —
+// the install POST below is the privileged, gated write path.
 export function GET(): Response {
   // Only the blog kit exists today; the shape is a list so more kits can be
   // added without changing the contract.
@@ -31,6 +34,8 @@ export function GET(): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   // Optional { id } selects a kit; default = the blog kit (the only one).
   let id = BLOG_KIT_ID;
   try {

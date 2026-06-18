@@ -46,6 +46,7 @@ import { getContentLocales, getSiteIdentity } from "@/db/settings-store";
 import { listAssets } from "@/db/asset-store";
 import { buildSystemPrompt } from "@/lib/settings/site-settings";
 import { allowedClasses } from "@/lib/render/utility-css";
+import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,8 @@ function gatewayId(env: CloudflareEnv): string {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   let body: unknown;
   try {
     body = await request.json();

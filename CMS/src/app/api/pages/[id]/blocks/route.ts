@@ -15,13 +15,16 @@
  */
 import { getPageBlocks, missingComponents, setPageBlocks } from "@/db/page-store";
 import { validateBlocks } from "@/lib/pages/page-blocks";
+import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   const { id } = await params;
   try {
     const page = await getPageBlocks(id);
@@ -39,6 +42,8 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   const { id } = await params;
   let body: Record<string, unknown>;
   try {

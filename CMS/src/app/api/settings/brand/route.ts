@@ -14,10 +14,13 @@
  * normalize/validate path is exercisable here.
  */
 import { getSiteIdentity, setSiteIdentity } from "@/db/settings-store";
+import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   try {
     return Response.json(await getSiteIdentity());
   } catch (err) {
@@ -29,6 +32,8 @@ export async function GET(): Promise<Response> {
 }
 
 export async function PUT(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   let body: unknown;
   try {
     body = await request.json();

@@ -164,5 +164,9 @@
     "assetDepsHint": "See komponent viitab allolevatele meediafailidele. Veendu, et need on sellel saidil olemas (laadi need üles, muidu kuvatakse need katkistena).",
     "componentDepsTitle": "Puuduvad komponendisõltuvused",
     "componentDepsHint": "See komponent renderdab allolevaid komponente, mida pole sellele saidile paigaldatud. Impordi need esmalt, muidu kuvatakse need peidetud kohatäidetena."
+  },
+  "adminAuth": {
+    "forbiddenTitle": "Juurdepääs keelatud",
+    "forbiddenBody": "Olete sisse logitud, kuid teie kontol pole õigust seda saiti hallata. Paluge saidi administraatoril teile juurdepääs anda."
   }
 }

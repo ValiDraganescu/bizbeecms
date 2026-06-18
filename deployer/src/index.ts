@@ -11,6 +11,12 @@ type Env = {
   REPO_URL: string;
   GITHUB_TOKEN?: string;
   PM_CALLBACK_ORIGIN?: string;
+  // CMS admin-auth bridge (Sec1): injected into each deployed CMS Worker as
+  // plain Worker vars so its requireAdmin guard can call PM's cms-validate.
+  // CMS_AUTH_SECRET is the shared bearer PM checks; PM_ORIGIN is where
+  // /api/auth/cms-validate lives (falls back to PM_CALLBACK_ORIGIN).
+  CMS_AUTH_SECRET?: string;
+  PM_ORIGIN?: string;
 };
 
 type DeployBody = { siteId?: string; slug?: string; ref?: string };
@@ -111,6 +117,10 @@ async function startDeploy(
       CALLBACK_URL: env.PM_CALLBACK_ORIGIN
         ? `${env.PM_CALLBACK_ORIGIN.replace(/\/+$/, "")}/api/deploy-callback`
         : "",
+      // Sec1 CMS admin-auth wiring → injected into the CMS Worker as vars.
+      CMS_AUTH_SECRET: env.CMS_AUTH_SECRET ?? "",
+      // The CMS guard calls PM at PM_ORIGIN; default to the callback origin.
+      PM_ORIGIN: (env.PM_ORIGIN ?? env.PM_CALLBACK_ORIGIN ?? "").replace(/\/+$/, ""),
     },
   });
 }
@@ -174,7 +184,14 @@ if [ $? -ne 0 ]; then report failed "npm install failed"; exit 1; fi
 npx opennextjs-cloudflare build
 if [ $? -ne 0 ]; then report failed "opennext build failed"; exit 1; fi
 
-npx wrangler deploy --name "$WORKER_NAME" --compatibility-date 2025-09-01
+# Inject the Sec1 CMS admin-auth vars (SITE_ID lets the guard run PM's reach
+# check; PM_ORIGIN/CMS_AUTH_SECRET let it CALL PM). --var sets plain Worker vars,
+# overriding the empty placeholders in CMS/wrangler.jsonc. Values come from the
+# process env (never inlined), so nothing caller-controlled reaches the shell.
+npx wrangler deploy --name "$WORKER_NAME" --compatibility-date 2025-09-01 \
+  --var "SITE_ID:$SITE_ID" \
+  --var "PM_ORIGIN:$PM_ORIGIN" \
+  --var "CMS_AUTH_SECRET:$CMS_AUTH_SECRET"
 if [ $? -ne 0 ]; then report failed "wrangler deploy failed"; exit 1; fi
 
 report deployed

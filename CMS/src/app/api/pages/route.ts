@@ -15,10 +15,13 @@
  */
 import { deletePage, listPages, upsertPageMeta } from "@/db/page-store";
 import { validatePageMeta } from "@/lib/pages/page-meta";
+import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   try {
     return Response.json(await listPages());
   } catch (err) {
@@ -30,10 +33,14 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   return write(request, null);
 }
 
 export async function PUT(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;
@@ -46,6 +53,8 @@ export async function PUT(request: Request): Promise<Response> {
 }
 
 export async function DELETE(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return Response.json({ error: "id query param is required" }, { status: 400 });
   try {

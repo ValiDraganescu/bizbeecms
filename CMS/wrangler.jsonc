@@ -40,7 +40,20 @@
     }
   ],
   "vars": {
-    "AI_GATEWAY": "bizbeecms-cms"
+    "AI_GATEWAY": "bizbeecms-cms",
+    // CMS admin-auth bridge (Sec1). The deployer OVERRIDES these per-Site at
+    // `wrangler deploy` time (via --var); the placeholders here just declare the
+    // shape and let the build/typegen see them.
+    //  - SITE_ID: this CMS's Site id (the PM cms-validate reach check is run
+    //    against it). Empty placeholder = guard treats the CMS as unconfigured
+    //    and DENIES all admin access (fail-closed) until the deployer sets it.
+    //  - PM_ORIGIN: the ProjectManager origin that hosts /api/auth/cms-validate.
+    //  - CMS_AUTH_SECRET: shared bearer PM checks (peer of DEPLOYER_SECRET). It's
+    //    a secret in practice — the deployer injects the real value; never commit
+    //    a real one here.
+    "SITE_ID": "",
+    "PM_ORIGIN": "",
+    "CMS_AUTH_SECRET": ""
   },
   "observability": {
     "enabled": true
