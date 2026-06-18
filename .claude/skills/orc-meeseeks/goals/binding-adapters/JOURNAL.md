@@ -54,3 +54,25 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (was 223). Deploy gate `npx opennextjs-cloudflare build` succeeded.
 - **Files:** `CMS/src/lib/ports/db.ts` (new), `CMS/src/db/index.ts` (now re-export),
   `CMS/scripts/db-port.test.mjs` (new)
+
+## 2026-06-18 18:52 — Unified adapter factory (env → {db,storage,ai})
+- **Status:** DONE
+- **What I did:** Created `CMS/src/lib/ports/index.ts` — `getPorts()`, the single
+  place that reads the Cloudflare context ONCE and hands back all three ports as
+  `{ db, storage, ai }`. Thin: it composes the existing `cfDb`/`CfStorage`/`CfAi`
+  adapter classes over one resolved `env` (no second env read, no re-implementing
+  the per-binding factories). Split into a binding-shaped `cfPorts(env)` seam
+  (testable) + the `getPorts()` context wrapper. Preserved EVERY contract: `db` =
+  exact `cfDb(env.DB)` drizzle; `storage` = `CfStorage(env.MEDIA)`, throws if MEDIA
+  unbound (matches `getStorage()`); `ai` = `CfAi(env.AI)` OR `null` when AI is
+  absent (getAi nullability preserved). The individual `getDb/getStorage/getAi`
+  are untouched for single-binding callers. Extract/compose only — zero behavior
+  change; no caller rewired (no module currently needs all three at once).
+- **Verified:** New `scripts/ports-factory.test.mjs` (4 tests) drives the REAL
+  imported `cfPorts` against fake bindings: composes the real CfStorage
+  (contentType->httpMetadata), real drizzle `db` (a `db.query.page.findFirst()`
+  prepares SQL hitting the `page` table on the fake D1), real CfAi (streaming
+  inputs reach the binding), `ai === null` when AI unbound, and throws when MEDIA
+  unbound. Full suite 231 green (was 227). Deploy gate `npx opennextjs-cloudflare
+  build` succeeded.
+- **Files:** `CMS/src/lib/ports/index.ts` (new), `CMS/scripts/ports-factory.test.mjs` (new)

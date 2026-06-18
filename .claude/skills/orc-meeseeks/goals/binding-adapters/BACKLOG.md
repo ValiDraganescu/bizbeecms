@@ -16,6 +16,9 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `chat(messages, {model,tools,gatewayId})` method, `CfAi` adapter wrapping `ai.run`, `getAi()` =
   SOLE `env.AI` reader, `getGatewayId()` = sole `AI_GATEWAY` reader). Chat route routed through it;
   streaming + OpenAI shape + AI Gateway preserved. `scripts/ai-port.test.mjs`. 227 green + build.
-- TODO: Add an adapter factory (`env` → `{ db, storage, ai }`) — the single place that reads bindings.
+- DONE (2026-06-18): Unified adapter factory `CMS/src/lib/ports/index.ts` — `getPorts()` reads the CF
+  context ONCE → `{ db, storage, ai }`, composing the existing `cfDb`/`CfStorage`/`CfAi` adapters.
+  Testable `cfPorts(env)` seam; preserves getStorage's throw-on-missing-MEDIA + getAi's `ai|null`.
+  Test `scripts/ports-factory.test.mjs` (4). 231 green + build.
 - TODO: One unit test exercising a CMS module against a mocked port (prove the seam; honest assertions).
 - TODO: Verify zero behavior change — `npx opennextjs-cloudflare build` green + existing tests pass.

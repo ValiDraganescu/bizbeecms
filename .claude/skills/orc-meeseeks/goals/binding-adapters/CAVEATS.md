@@ -41,3 +41,9 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **drizzle-d1 selects call `stmt.bind(...).raw()`, not `.all()`.** A fake `D1Database` used in a
   port test must expose `raw()` on the prepared statement (returns rows-as-arrays) or the select
   throws `this.stmt.bind(...).raw is not a function`. Inserts use `.run()`. See `db-port.test.mjs`.
+- **`npx opennextjs-cloudflare build` resets the shell working directory** (subsequent Bash calls
+  land back at repo root, not `CMS/`). After a build, use absolute paths or re-`cd` for memory-file
+  writes — a relative-path heredoc append silently failed ("no such file or directory").
+- **The unified factory `getPorts()` lives in `lib/ports/index.ts`** and COMPOSES the three existing
+  adapters over ONE `getCloudflareContext` read. Don't re-implement per-binding logic there. The
+  `cfPorts(env)` half is the test seam; `getPorts()` is the thin context wrapper. `ai` is `Ai|null`.
