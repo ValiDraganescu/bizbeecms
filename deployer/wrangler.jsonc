@@ -19,7 +19,11 @@
       // build step — if a heavier Site shows a low free number / OOMs, bump to
       // standard-2 (6 GiB) then standard-3 (8 GiB).
       "instance_type": "standard-1",
-      "max_instances": 3
+      // Concurrent build slots — one per in-flight Site deploy. Account pools
+      // (1,500 vCPU / 6 TiB mem on Workers Paid) allow far more; 10 is a
+      // practical queue cap so simultaneous deploys don't serialize. Scale-to-
+      // zero: idle slots cost nothing.
+      "max_instances": 10
     }
   ],
   "durable_objects": {
