@@ -21,11 +21,20 @@
   "durable_objects": {
     "bindings": [{ "class_name": "Sandbox", "name": "Sandbox" }]
   },
-  "migrations": [{ "new_sqlite_classes": ["Sandbox"], "tag": "v1" }]
+  "migrations": [{ "new_sqlite_classes": ["Sandbox"], "tag": "v1" }],
+
+  // Host -> Site slug map for the custom-domain (/attach-domain) endpoint. Same
+  // KV namespace the bizbeecms-router Worker binds as HOST_MAP — the deployer
+  // writes it, the router reads it.
+  "kv_namespaces": [
+    { "binding": "HOST_MAP", "id": "1c276b01cd5a41f0b8c98ace07b4c064" }
+  ]
 
   // Secrets (set via `wrangler secret put`, NOT committed):
-  //   CF_API_TOKEN       — Workers Scripts: Edit, to deploy the CMS Worker
+  //   CF_API_TOKEN       — Workers Scripts: Edit + SSL and Certificates: Edit
+  //                        (the latter for /attach-domain custom_hostnames)
   //   CF_ACCOUNT_ID      — the account that owns the CMS Workers
+  //   CF_ZONE_ID         — bizbeecms.com zone id (custom_hostnames target)
   //   DEPLOYER_SECRET    — shared bearer secret the PM uses to call this Worker
   //   REPO_URL           — https clone URL of the source repo
   //   GITHUB_TOKEN       — PAT to clone the private repo (if private)

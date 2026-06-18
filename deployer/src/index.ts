@@ -17,11 +17,21 @@ type Env = {
   // /api/auth/cms-validate lives (falls back to PM_CALLBACK_ORIGIN).
   CMS_AUTH_SECRET?: string;
   PM_ORIGIN?: string;
+  // Custom-domain attach (Cloudflare for SaaS): the zone whose custom_hostnames
+  // API we register against, and the Host->slug map the router reads. CF_API_TOKEN
+  // must additionally hold "SSL and Certificates: Edit" for the custom_hostnames call.
+  CF_ZONE_ID?: string;
+  HOST_MAP?: KVNamespace;
 };
 
 type DeployBody = { siteId?: string; slug?: string; ref?: string };
+type AttachBody = { slug?: string; hostname?: string };
 
 const WORKER_PREFIX = "bizbeecms-cms-";
+
+// Hostname: lowercase DNS label-dotted, no scheme/path. Conservative on purpose —
+// it goes straight into the CF API body and the KV key.
+const HOSTNAME_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
 /**
  * bizbeecms-deployer — a standalone Worker that owns an on-demand build
@@ -83,8 +93,119 @@ export default {
       return Response.json({ accepted: true, slug });
     }
 
+    if (url.pathname === "/attach-domain" && request.method === "POST") {
+      const auth = request.headers.get("authorization") ?? "";
+      const token = auth.replace(/^Bearer\s+/i, "");
+      if (!env.DEPLOYER_SECRET || token !== env.DEPLOYER_SECRET) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+      return attachDomain(request, env);
+    }
+
     return new Response("Not found", { status: 404 });
   },
+};
+
+/**
+ * Register a customer custom hostname (Cloudflare for SaaS) against the
+ * bizbeecms.com zone and record Host->slug in the router's KV. CF issues + auto-
+ * renews the cert. Returns the DNS records the customer must add at THEIR
+ * registrar (CNAME to the fallback origin + a TXT for DV validation), plus the
+ * current cert status so the PM can poll.
+ *
+ * Idempotent: re-attaching an already-registered hostname returns its existing
+ * record rather than erroring, so the PM can safely retry.
+ */
+async function attachDomain(request: Request, env: Env): Promise<Response> {
+  if (!env.CF_ZONE_ID || !env.HOST_MAP) {
+    return Response.json({ error: "notConfigured" }, { status: 503 });
+  }
+
+  let body: AttachBody;
+  try {
+    body = (await request.json()) as AttachBody;
+  } catch {
+    return Response.json({ error: "badRequest" }, { status: 400 });
+  }
+
+  const slug = String(body.slug ?? "").trim();
+  const hostname = String(body.hostname ?? "").trim().toLowerCase();
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !HOSTNAME_RE.test(hostname)) {
+    return Response.json({ error: "badRequest" }, { status: 400 });
+  }
+
+  const api = `https://api.cloudflare.com/client/v4/zones/${env.CF_ZONE_ID}/custom_hostnames`;
+  const cfHeaders = {
+    Authorization: `Bearer ${env.CF_API_TOKEN}`,
+    "Content-Type": "application/json",
+  };
+
+  const res = await fetch(api, {
+    method: "POST",
+    headers: cfHeaders,
+    body: JSON.stringify({
+      hostname,
+      ssl: { method: "txt", type: "dv" },
+    }),
+  });
+  const json = (await res.json()) as {
+    success: boolean;
+    result?: CfCustomHostname;
+    errors?: { code: number; message: string }[];
+  };
+
+  let record = json.result;
+  if (!json.success) {
+    // 1406 = hostname already exists on this zone → fetch and reuse it.
+    const dup = json.errors?.some((e) => e.code === 1406);
+    if (!dup) {
+      return Response.json(
+        { error: "cfError", detail: json.errors?.slice(0, 3) },
+        { status: 502 },
+      );
+    }
+    const look = await fetch(`${api}?hostname=${encodeURIComponent(hostname)}`, {
+      headers: cfHeaders,
+    });
+    const lookJson = (await look.json()) as {
+      success: boolean;
+      result?: CfCustomHostname[];
+    };
+    record = lookJson.result?.[0];
+    if (!record) {
+      return Response.json({ error: "cfLookupFailed" }, { status: 502 });
+    }
+  }
+
+  // Record the route mapping so the router can resolve this Host to the Site.
+  await env.HOST_MAP.put(hostname, slug);
+
+  return Response.json({
+    ok: true,
+    hostname,
+    slug,
+    status: record?.status ?? "pending",
+    ssl: record?.ssl?.status ?? "pending",
+    // What the customer adds at their registrar. Apex domains that can't CNAME
+    // use an A record to CF's anycast IPs instead — the PM UI shows both.
+    dns: {
+      cname: { name: hostname, value: "saas.bizbeecms.com" },
+      txt: record?.ssl?.txt_name
+        ? { name: record.ssl.txt_name, value: record.ssl.txt_value }
+        : null,
+    },
+  });
+}
+
+type CfCustomHostname = {
+  id: string;
+  hostname: string;
+  status: string;
+  ssl?: {
+    status?: string;
+    txt_name?: string;
+    txt_value?: string;
+  };
 };
 
 /**

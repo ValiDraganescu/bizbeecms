@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bizbeecms-router",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // All customer custom hostnames (Cloudflare for SaaS) terminate at the
+  // bizbeecms.com zone and hit this Worker. It maps Host -> per-Site CMS Worker
+  // via the HOST_MAP KV and proxies. The route is a wildcard so EVERY custom
+  // hostname registered against the zone lands here.
+  "routes": [
+    { "pattern": "saas.bizbeecms.com/*", "zone_name": "bizbeecms.com" }
+    // After the fallback origin is set + the first custom hostname is live,
+    // widen to "*/*" (zone_name bizbeecms.com) so customer apex domains match.
+  ],
+
+  "kv_namespaces": [
+    // Host -> per-Site slug map. Written by the deployer on /attach-domain.
+    { "binding": "HOST_MAP", "id": "1c276b01cd5a41f0b8c98ace07b4c064" }
+  ],
+
+  "vars": {
+    // Per-Site CMS Workers live at https://bizbeecms-cms-<slug>.<SUBDOMAIN>.workers.dev
+    "WORKERS_SUBDOMAIN": "vali-draganescu88"
+  }
+}
