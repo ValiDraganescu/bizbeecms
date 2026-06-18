@@ -75,3 +75,8 @@ Read every line before working. Each entry was learned the hard way by a previou
   and the matcher has a trailing `\b` so `env.AI_GATEWAY` (config) is excluded — don't widen the regex
   to bare `env.AI` or you'll re-catch the gateway config var. The guard is text-based (lexer-lite), not
   AST: it can't see `const x = "env"; (globalThis as any)[x].DB` — fine, nobody writes that; YAGNI.
+- **Stores that import the `./index` barrel also need the relative-`.ts` switch for node --test.**
+  `component-store.ts` imported `{getDb,schema}` from `./index` (which re-exports from
+  `@/lib/ports/db`). node strip-only can't resolve the barrel's `@/` re-export, so switch the
+  store's value import to `../lib/ports/db.ts` directly (page-store already does). It's a
+  re-export, so prod behavior is identical — zero behavior change.

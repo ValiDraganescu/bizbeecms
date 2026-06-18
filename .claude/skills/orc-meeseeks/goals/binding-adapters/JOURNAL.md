@@ -140,3 +140,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `db/asset-store.ts:59` exactly; reverted → green (`src/` clean via git status). Full suite
   244 green (was 241, +3). Deploy gate `npx opennextjs-cloudflare build` succeeded (dev off first).
 - **Files:** CMS/scripts/ports-sole-reader.guard.test.mjs (new)
+
+## 2026-06-18 19:12 — Mocked-Db-port unit test for component-store.ts
+- **Status:** DONE
+- **What I did:** Added the `injectedDb?: Db` seam (`injectedDb ?? await getDb()`) to
+  `upsertComponent`, `upsertImportedComponent`, and `missingComponentNames` in
+  `CMS/src/db/component-store.ts`, and switched its `getDb/schema` value import from
+  `./index` → `../lib/ports/db.ts` (node-loadable; index just re-exports the port, so
+  zero behavior change). New `CMS/scripts/component-store.test.mjs` (8 tests) drives the
+  real store via `cfDb()` over a node:sqlite fake D1 (real `component` DDL incl. the
+  UNIQUE name index). Covers: upsertComponent insert (props_schema stays NULL on the AI
+  path) vs update-in-place (no dup, same id); upsertImportedComponent insert/update DOES
+  persist props_schema + JSON-serializes tree; AI-authored→re-imported name keys on the
+  UNIQUE name (one row, props_schema filled in); missingComponentNames subset/all-present/
+  empty-input. Honest assertions on returned `{action,name}` + rows read straight from
+  sqlite — no "was-called".
+- **Verified:** `node --test scripts/component-store.test.mjs` 8/8 green; full `npm test`
+  252 green (was 244); `npx opennextjs-cloudflare build` green (deploy gate). Ports
+  free 3601/3602 before build.
+- **Files:** CMS/scripts/component-store.test.mjs (new), CMS/src/db/component-store.ts (seam + import).

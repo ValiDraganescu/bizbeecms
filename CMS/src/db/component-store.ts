@@ -10,7 +10,7 @@
  * Build-verified only: the live D1 write needs a real binding (HITL).
  */
 import { eq, inArray } from "drizzle-orm";
-import { getDb, schema } from "./index";
+import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import type { ComponentArtifactInput } from "@/lib/chat/component-tool";
 import type { ComponentRow, ImportedComponent } from "@/lib/components/portable";
 
@@ -50,9 +50,12 @@ export async function listComponents(): Promise<ComponentRow[]> {
  * Of the given component names, return the subset that DON'T exist in this Site
  * (H3b — nested-component dep warning on import). Empty input → empty result.
  */
-export async function missingComponentNames(names: string[]): Promise<string[]> {
+export async function missingComponentNames(
+  names: string[],
+  injectedDb?: Db,
+): Promise<string[]> {
   if (names.length === 0) return [];
-  const db = await getDb();
+  const db = injectedDb ?? (await getDb());
   const rows = await db
     .select({ name: schema.component.name })
     .from(schema.component)
@@ -86,8 +89,9 @@ export async function getComponentByName(name: string): Promise<ComponentRow | n
  */
 export async function upsertImportedComponent(
   c: ImportedComponent,
+  injectedDb?: Db,
 ): Promise<{ action: "created" | "updated"; name: string }> {
-  const db = await getDb();
+  const db = injectedDb ?? (await getDb());
   const now = new Date();
 
   const existing = await db
@@ -124,8 +128,9 @@ export async function upsertImportedComponent(
  */
 export async function upsertComponent(
   artifact: ComponentArtifactInput,
+  injectedDb?: Db,
 ): Promise<{ action: "created" | "updated"; name: string }> {
-  const db = await getDb();
+  const db = injectedDb ?? (await getDb());
   const now = new Date();
 
   const existing = await db
