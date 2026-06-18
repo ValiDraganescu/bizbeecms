@@ -3,3 +3,6 @@ node_modules/
 .env
 .env.local
 *.log
+
+# wrangler local cache/state (per-machine)
+.wrangler/
