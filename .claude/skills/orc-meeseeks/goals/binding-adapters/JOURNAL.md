@@ -76,3 +76,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   unbound. Full suite 231 green (was 227). Deploy gate `npx opennextjs-cloudflare
   build` succeeded.
 - **Files:** `CMS/src/lib/ports/index.ts` (new), `CMS/scripts/ports-factory.test.mjs` (new)
+
+## 2026-06-18 18:58 — CMS module against a mocked Db port (the seam's payoff)
+- **Status:** DONE
+- **What I did:** Proved the ports seam earns its keep with a real-business-logic
+  unit test of `upsertPage` (`CMS/src/db/page-store.ts`). Added a tiny
+  zero-behavior-change injection seam: `upsertPage(page, injectedDb?: Db)` —
+  prod path unchanged (`injectedDb ?? await getDb()`), tests pass a fake. New
+  `scripts/page-store.test.mjs` (5 tests) builds a `Db` via the REAL `cfDb`
+  adapter over an in-memory `node:sqlite` fake D1 (a thin `prepare/bind/run/all/
+  raw` shim) with the REAL migration `page` DDL — so queries compile to real SQL,
+  hit a real table, rows really persist. Honest assertions on RETURNED data +
+  persisted rows: (1) create persists the row with JSON-serialized blocks/meta,
+  (2) update-in-place on (parent,slug) — no duplicate, same id, status changed,
+  (3) parentSlug→parentPageId resolution for a child, (4) missing-parent
+  rejection (`errors:['parent page "ghost" not found']`, nothing written),
+  (5) same slug coexists under two different parents (the unique key is
+  (parent,slug)). No tautological "was-called" / `toHaveBeenCalledWith`.
+- **To make page-store node-loadable** I switched its runtime VALUE imports off
+  the `@/` alias to relative `.ts` (`../lib/ports/db.ts`, `../lib/render/tree.ts`)
+  — the project convention for any module a node --test imports (see other test
+  headers: "no @/ alias"). Type-only `@/` imports stay (erased by strip-only).
+  Same `getDb`/`schema` source `db/index.ts` re-exports — zero behavior change.
+- **Verified:** `node --test scripts/page-store.test.mjs` 5/5 green. Full suite
+  236 green (was 231). Deploy gate `npx opennextjs-cloudflare build` succeeded.
+- **Files:** `CMS/src/db/page-store.ts` (+`injectedDb` param, relative value
+  imports), `CMS/scripts/page-store.test.mjs` (new)

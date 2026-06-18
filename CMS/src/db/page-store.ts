@@ -12,11 +12,11 @@
  * Build-verified only: the live D1 read/write needs a real binding (HITL).
  */
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
-import { getDb, schema } from "./index";
+import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import type { PageInput } from "@/lib/chat/page-tool";
 import type { PageMetaInput } from "@/lib/pages/page-meta";
-import { parseJsonColumn, type Block } from "@/lib/render/tree";
-import type { Page } from "./schema";
+import { parseJsonColumn, type Block } from "../lib/render/tree.ts";
+import type { Page } from "./schema.ts";
 
 /** Return the subset of `names` that have no matching `component.name` in D1. */
 export async function missingComponents(names: string[]): Promise<string[]> {
@@ -37,11 +37,12 @@ export async function missingComponents(names: string[]): Promise<string[]> {
  */
 export async function upsertPage(
   page: PageInput,
+  injectedDb?: Db,
 ): Promise<
   | { ok: true; action: "created" | "updated"; slug: string }
   | { ok: false; errors: string[] }
 > {
-  const db = await getDb();
+  const db = injectedDb ?? (await getDb());
   const now = new Date();
 
   // Resolve parent slug → id (top-level parents only; one level of lookup).

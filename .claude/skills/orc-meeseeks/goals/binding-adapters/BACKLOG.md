@@ -20,5 +20,10 @@ Task states: TODO | DOING | DONE | BLOCKED.
   context ONCE → `{ db, storage, ai }`, composing the existing `cfDb`/`CfStorage`/`CfAi` adapters.
   Testable `cfPorts(env)` seam; preserves getStorage's throw-on-missing-MEDIA + getAi's `ai|null`.
   Test `scripts/ports-factory.test.mjs` (4). 231 green + build.
-- TODO: One unit test exercising a CMS module against a mocked port (prove the seam; honest assertions).
-- TODO: Verify zero behavior change — `npx opennextjs-cloudflare build` green + existing tests pass.
+- DONE (2026-06-18): One CMS module against a MOCKED Db port — `scripts/page-store.test.mjs` (5)
+  drives the REAL `upsertPage` via a new `injectedDb?: Db` seam against the REAL `cfDb` over an
+  in-memory `node:sqlite` fake D1 (real SQL, real `page` table). Honest assertions on returned
+  `{action,slug}`/errors + persisted rows: create, update-in-place (no dup), parentSlug→id resolution,
+  missing-parent rejection, same-slug-different-parent. 236 green + build. Proves the seam pays off.
+- DONE (2026-06-18): Zero-behavior-change verified — `npx opennextjs-cloudflare build` green + 236
+  tests pass. binding-adapters CORE SCOPE COMPLETE (3 ports + unified factory + mocked-port unit test).

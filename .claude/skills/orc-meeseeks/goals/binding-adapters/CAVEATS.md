@@ -47,3 +47,18 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **The unified factory `getPorts()` lives in `lib/ports/index.ts`** and COMPOSES the three existing
   adapters over ONE `getCloudflareContext` read. Don't re-implement per-binding logic there. The
   `cfPorts(env)` half is the test seam; `getPorts()` is the thin context wrapper. `ai` is `Ai|null`.
+- **To unit-test a `*-store.ts` module, two things are needed:** (1) inject the Db — add a tiny
+  `injectedDb?: Db` param, `injectedDb ?? await getDb()` (prod path unchanged, zero behavior change);
+  (2) make the module node-loadable — switch its runtime VALUE `@/...` imports to relative `.ts`
+  (`../lib/ports/db.ts`, `../lib/render/tree.ts`). The PROJECT CONVENTION is that any module a
+  `node --test` loads avoids the `@/` alias (node doesn't resolve tsconfig paths). Type-only `@/`
+  imports are fine (strip-only erases them). Don't rewrite the whole file — just the value imports.
+- **A REAL fake D1 is easy with `node:sqlite` (built in, no dep).** `DatabaseSync(":memory:")`, run the
+  migration DDL, then shim drizzle-orm/d1's surface: `prepare(sql)` → `{ bind(...p) }` → `{ run, all,
+  raw }`. drizzle SELECT calls `.bind(...).raw()` (rows-as-ARRAYS in column order — use
+  `stmt.columns().map(c=>c.name)` to order); writes call `.run()`; `all()` returns `{results:[objs]}`.
+  This gives real SQL → real storage → real rows, so store tests assert REAL returned/persisted data,
+  not "was-called". See `scripts/page-store.test.mjs`. Far cleaner than parsing drizzle predicate objects.
+- **CORE SCOPE IS COMPLETE.** All 3 ports (Db/Storage/Ai) + unified `getPorts()` factory + a
+  mocked-port store unit test all DONE & build-green. There is no second adapter (CF-only — see top
+  caveat). Further runs must INVENT the next valuable seam slice (rule 3), not redo these.
