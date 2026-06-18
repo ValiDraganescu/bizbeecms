@@ -113,6 +113,7 @@ async function startDeploy(
       REPO_URL: env.REPO_URL,
       REF: input.ref,
       WORKER_NAME: workerName,
+      SLUG: input.slug,
       SITE_ID: input.siteId,
       CALLBACK_URL: env.PM_CALLBACK_ORIGIN
         ? `${env.PM_CALLBACK_ORIGIN.replace(/\/+$/, "")}/api/deploy-callback`
@@ -184,10 +185,40 @@ if [ $? -ne 0 ]; then report failed "npm install failed"; exit 1; fi
 npx opennextjs-cloudflare build
 if [ $? -ne 0 ]; then report failed "opennext build failed"; exit 1; fi
 
+# --- Per-Site infra provisioning (idempotent) -------------------------------
+# Each Site gets its OWN D1 + R2 bucket (the DB/bucket IS the Site boundary).
+# CMS/wrangler.jsonc ships placeholder bindings (zero-id D1, generic bucket);
+# wrangler REJECTS the upload against those, so we create the real resources and
+# patch the (ephemeral, cloned) wrangler.jsonc with their identifiers before
+# deploy. $SLUG is regex-validated in the Worker (^[a-z0-9](-[a-z0-9])*$), so it
+# is shell-safe to interpolate into resource names.
+DB_NAME="bizbeecms-cms-$SLUG"
+BUCKET_NAME="bizbeecms-cms-media-$SLUG"
+
+# D1: create if absent, then resolve its id (create is not idempotent — it errors
+# if the db exists — so we always read the id back from \`d1 info\`).
+npx wrangler d1 create "$DB_NAME" >/dev/null 2>&1 || true
+DB_ID=$(npx wrangler d1 info "$DB_NAME" --json 2>/dev/null | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
+if [ -z "$DB_ID" ]; then report failed "d1 provision failed for $DB_NAME"; exit 1; fi
+
+# R2: create if absent (errors harmlessly if it already exists).
+npx wrangler r2 bucket create "$BUCKET_NAME" >/dev/null 2>&1 || true
+
+# Patch the cloned CMS/wrangler.jsonc: real D1 id + per-Site bucket name. The
+# placeholders are fixed known strings, so a literal substitution is safe.
+sed -i "s/00000000-0000-0000-0000-000000000000/$DB_ID/" wrangler.jsonc
+sed -i "s/\\"bucket_name\\": \\"bizbeecms-cms-media\\"/\\"bucket_name\\": \\"$BUCKET_NAME\\"/" wrangler.jsonc
+
+# Apply CMS migrations to the (now real) per-Site D1.
+npx wrangler d1 migrations apply "$DB_NAME" --remote
+if [ $? -ne 0 ]; then report failed "d1 migrations failed for $DB_NAME"; exit 1; fi
+# ----------------------------------------------------------------------------
+
 # Inject the Sec1 CMS admin-auth vars (SITE_ID lets the guard run PM's reach
 # check; PM_ORIGIN/CMS_AUTH_SECRET let it CALL PM). --var sets plain Worker vars,
 # overriding the empty placeholders in CMS/wrangler.jsonc. Values come from the
 # process env (never inlined), so nothing caller-controlled reaches the shell.
+# The D1/R2 bindings now come from the patched wrangler.jsonc above.
 npx wrangler deploy --name "$WORKER_NAME" --compatibility-date 2025-09-01 \
   --var "SITE_ID:$SITE_ID" \
   --var "PM_ORIGIN:$PM_ORIGIN" \
