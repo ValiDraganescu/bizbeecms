@@ -168,5 +168,23 @@
   "adminAuth": {
     "forbiddenTitle": "Pääsy estetty",
     "forbiddenBody": "Olet kirjautunut sisään, mutta tililläsi ei ole oikeuksia hallita tätä sivustoa. Pyydä sivuston ylläpitäjää myöntämään sinulle pääsy."
+  },
+  "adminNav": {
+    "brand": "CMS-hallinta",
+    "home": "Etusivu",
+    "chat": "Tekoälyavustaja",
+    "pages": "Sivut",
+    "components": "Komponentit",
+    "media": "Media",
+    "settings": "Asetukset",
+    "indexTitle": "CMS-hallinta",
+    "indexSubtitle": "Hallitse tämän sivuston sisältöä, komponentteja ja asetuksia.",
+    "desc": {
+      "chat": "Kuvaile haluamasi, niin tekoälyavustaja rakentaa komponentit, sivut ja käännökset.",
+      "pages": "Luo ja hallitse sivuja — polkutunnus, hierarkia, julkaisutila ja kielikohtainen SEO.",
+      "components": "Vie komponentteja siirrettävinä paketteina, tuo niitä tai asenna aloituspaketteja.",
+      "media": "Lataa kuvia tälle sivustolle ja viittaa niihin komponenteissa URL-osoitteella.",
+      "settings": "Sisältökielet, teeman väriasetukset sekä brändi ja tekoälypersoona."
+    }
   }
 }

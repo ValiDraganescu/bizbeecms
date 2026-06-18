@@ -168,5 +168,23 @@
   "adminAuth": {
     "forbiddenTitle": "Access denied",
     "forbiddenBody": "You're signed in, but your account doesn't have access to manage this site. Ask a site administrator to grant you access."
+  },
+  "adminNav": {
+    "brand": "CMS admin",
+    "home": "Home",
+    "chat": "AI Assistant",
+    "pages": "Pages",
+    "components": "Components",
+    "media": "Media",
+    "settings": "Settings",
+    "indexTitle": "CMS admin",
+    "indexSubtitle": "Manage this site's content, components and configuration.",
+    "desc": {
+      "chat": "Describe what you want and the AI assistant builds components, pages and translations.",
+      "pages": "Create and manage pages — slug, hierarchy, publish status and per-language SEO.",
+      "components": "Export components as portable bundles, import them, or install starter kits.",
+      "media": "Upload images to this site and reference them in components by URL.",
+      "settings": "Content languages, theme color overrides, and brand & AI persona."
+    }
   }
 }

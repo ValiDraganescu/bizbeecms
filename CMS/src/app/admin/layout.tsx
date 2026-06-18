@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getTranslations } from "next-intl/server";
 import { checkAdminFromHeaders } from "@/lib/auth/guard";
+import { AdminNav } from "@/components/admin-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,14 @@ export const dynamic = "force-dynamic";
  */
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const decision = await checkAdminFromHeaders();
-  if (decision.allow) return <>{children}</>;
+  if (decision.allow) {
+    return (
+      <>
+        <AdminNav />
+        {children}
+      </>
+    );
+  }
 
   if (decision.reason === "denied") {
     const t = await getTranslations("adminAuth");

@@ -168,5 +168,23 @@
   "adminAuth": {
     "forbiddenTitle": "Juurdepääs keelatud",
     "forbiddenBody": "Olete sisse logitud, kuid teie kontol pole õigust seda saiti hallata. Paluge saidi administraatoril teile juurdepääs anda."
+  },
+  "adminNav": {
+    "brand": "CMS-i haldus",
+    "home": "Avaleht",
+    "chat": "Tehisintellekti abiline",
+    "pages": "Lehed",
+    "components": "Komponendid",
+    "media": "Meedia",
+    "settings": "Seaded",
+    "indexTitle": "CMS-i haldus",
+    "indexSubtitle": "Halda selle saidi sisu, komponente ja seadeid.",
+    "desc": {
+      "chat": "Kirjelda, mida soovid, ja tehisintellekti abiline ehitab komponendid, lehed ja tõlked.",
+      "pages": "Loo ja halda lehti — kärbis, hierarhia, avaldamise olek ja keelepõhine SEO.",
+      "components": "Ekspordi komponente teisaldatavate pakettidena, impordi neid või paigalda stardikomplekte.",
+      "media": "Laadi sellele saidile pilte üles ja viita neile komponentides URL-i kaudu.",
+      "settings": "Sisukeeled, teema värvialistamised ning bränd ja tehisintellekti persoon."
+    }
   }
 }
