@@ -16,3 +16,20 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `npx opennextjs-cloudflare build` succeeded.
 - **Files:** `CMS/src/lib/ports/storage.ts` (new), `CMS/src/db/asset-store.ts`,
   `CMS/scripts/storage-port.test.mjs` (new)
+
+## 2026-06-18 — Db port + cfDb adapter
+- **Status:** DONE
+- **What I did:** Created `CMS/src/lib/ports/db.ts` — the `Db` port. Drizzle is
+  already the layer, so the port is thin: `Db` = the drizzle-D1 client type,
+  `cfDb(d1)` = the exact `drizzle(env.DB, {schema})` construction, and `getDb()`
+  is now the SOLE reader of `env.DB`. Re-homed `src/db/index.ts` to a 2-line
+  re-export from the port, so all ~6 `@/db` caller modules (page/component/
+  settings/translate-store, `[[...slug]]/page.tsx`) are UNCHANGED. Extract only,
+  zero behavior change.
+- **Verified:** New `scripts/db-port.test.mjs` (2 tests) drives the REAL imported
+  `cfDb` against an in-memory fake D1 that records prepared SQL+params, asserting
+  the real schema → real SQLite SQL wiring (hits `"page"` table, parameterised
+  where, real columns on insert) — not "was drizzle called". Full suite 225 green
+  (was 223). Deploy gate `npx opennextjs-cloudflare build` succeeded.
+- **Files:** `CMS/src/lib/ports/db.ts` (new), `CMS/src/db/index.ts` (now re-export),
+  `CMS/scripts/db-port.test.mjs` (new)

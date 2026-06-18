@@ -9,8 +9,9 @@ Task states: TODO | DOING | DONE | BLOCKED.
   actually called) + a `CfStorage` adapter wrapping `env.MEDIA`; route asset-store callers through it.
   → `CMS/src/lib/ports/storage.ts` + `scripts/storage-port.test.mjs`. `getStorage()` is now the sole
   reader of `env.MEDIA`. Build + 223 tests green.
-- TODO: Define the `Db` port over `CMS/src/db/index.ts` (the drizzle factory) + a `CfDb` adapter;
-  make the adapter factory the only reader of `env.DB`.
+- DONE (2026-06-18): `Db` port over the drizzle factory → `CMS/src/lib/ports/db.ts` (`Db` type +
+  `cfDb` adapter + `getDb()`, the SOLE `env.DB` reader). `src/db/index.ts` re-exports it so every
+  `@/db` caller is unchanged. Test `scripts/db-port.test.mjs` (real schema → real SQL). 225 green + build.
 - TODO: Define the `Ai` port over `env.AI.run` (preserve streaming + OpenAI-compatible shape) +
   a `CfAi` adapter; route `CMS/src/lib/chat/*` + chat route through it.
 - TODO: Add an adapter factory (`env` → `{ db, storage, ai }`) — the single place that reads bindings.

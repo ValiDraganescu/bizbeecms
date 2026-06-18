@@ -25,3 +25,11 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **Pattern for the next ports:** interface = only the methods actually called; adapter wraps the
   binding 1:1; a `getX()` factory is the SOLE `env.X` reader. asset-store dropped its `getBucket()`
   + `getCloudflareContext` import entirely — do the same for the Db/Ai seams.
+- **Relative imports inside a port that node --test must load need the `.ts` extension.**
+  `db.ts` imports `../../db/schema.ts` (not extensionless) — node strip-only mode resolves real
+  paths, not tsconfig `bundler` resolution. The build is fine with it (`allowImportingTsExtensions`
+  is on, and `src/lib/**` already imports `.ts` everywhere). Storage didn't hit this — it imports
+  no relative sibling.
+- **drizzle-d1 selects call `stmt.bind(...).raw()`, not `.all()`.** A fake `D1Database` used in a
+  port test must expose `raw()` on the prepared statement (returns rows-as-arrays) or the select
+  throws `this.stmt.bind(...).raw is not a function`. Inserts use `.run()`. See `db-port.test.mjs`.
