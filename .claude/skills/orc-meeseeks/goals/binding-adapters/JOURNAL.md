@@ -17,6 +17,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** `CMS/src/lib/ports/storage.ts` (new), `CMS/src/db/asset-store.ts`,
   `CMS/scripts/storage-port.test.mjs` (new)
 
+## 2026-06-18 18:48 — Ai port + CfAi adapter
+- **Status:** DONE
+- **What I did:** Created `CMS/src/lib/ports/ai.ts` — the `Ai` port. The chat
+  route was the only real `env.AI` reader (the `lib/chat/*` mentions are just doc
+  comments). Port = one method `chat(messages, {model, tools?, gatewayId?})` →
+  `ReadableStream`; `CfAi` wraps `ai.run(model, {messages, stream:true, tools},
+  {gateway:{id}})` 1:1 — streaming + OpenAI message/tool shape + AI Gateway all
+  preserved. `getAi()` is the SOLE `env.AI` reader (returns null when unbound, so
+  the route still answers 503 not 500); `getGatewayId()` is the sole `AI_GATEWAY`
+  reader (moved the in-route `gatewayId()` helper into the port). Route now calls
+  `await ai.chat(...)`, dropping the `getCloudflareContext` import + the
+  `Parameters<Ai["run"]>` casts. Extract only, zero behavior change.
+- **Verified:** New `scripts/ai-port.test.mjs` (2 tests) drives the REAL imported
+  `CfAi` against a fake `env.AI` binding, asserting the real call shape (model +
+  `{messages, stream:true, tools}` + `{gateway:{id}}`) AND that the upstream
+  stream is returned as-is (sentinel identity check — NOT buffered), plus that
+  tools/gateway are omitted when absent. Full suite 227 green (was 225). Deploy
+  gate `npx opennextjs-cloudflare build` succeeded.
+- **Files:** `CMS/src/lib/ports/ai.ts` (new), `CMS/src/app/api/chat/route.ts`,
+  `CMS/scripts/ai-port.test.mjs` (new)
+
 ## 2026-06-18 — Db port + cfDb adapter
 - **Status:** DONE
 - **What I did:** Created `CMS/src/lib/ports/db.ts` — the `Db` port. Drizzle is

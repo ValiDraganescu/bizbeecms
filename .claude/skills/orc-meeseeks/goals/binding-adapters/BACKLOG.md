@@ -12,8 +12,10 @@ Task states: TODO | DOING | DONE | BLOCKED.
 - DONE (2026-06-18): `Db` port over the drizzle factory → `CMS/src/lib/ports/db.ts` (`Db` type +
   `cfDb` adapter + `getDb()`, the SOLE `env.DB` reader). `src/db/index.ts` re-exports it so every
   `@/db` caller is unchanged. Test `scripts/db-port.test.mjs` (real schema → real SQL). 225 green + build.
-- TODO: Define the `Ai` port over `env.AI.run` (preserve streaming + OpenAI-compatible shape) +
-  a `CfAi` adapter; route `CMS/src/lib/chat/*` + chat route through it.
+- DONE (2026-06-18): `Ai` port over `env.AI.run` → `CMS/src/lib/ports/ai.ts` (`Ai` iface w/ one
+  `chat(messages, {model,tools,gatewayId})` method, `CfAi` adapter wrapping `ai.run`, `getAi()` =
+  SOLE `env.AI` reader, `getGatewayId()` = sole `AI_GATEWAY` reader). Chat route routed through it;
+  streaming + OpenAI shape + AI Gateway preserved. `scripts/ai-port.test.mjs`. 227 green + build.
 - TODO: Add an adapter factory (`env` → `{ db, storage, ai }`) — the single place that reads bindings.
 - TODO: One unit test exercising a CMS module against a mocked port (prove the seam; honest assertions).
 - TODO: Verify zero behavior change — `npx opennextjs-cloudflare build` green + existing tests pass.

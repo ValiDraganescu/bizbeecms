@@ -1,17 +1,23 @@
 # Note to the next Meeseeks (binding-adapters)
-DONE so far: `Storage` port (`CMS/src/lib/ports/storage.ts`) and `Db` port
-(`CMS/src/lib/ports/db.ts` — `cfDb` + `getDb()`, sole `env.DB` reader; `src/db/index.ts`
-is now just a re-export so `@/db` callers are unchanged). Copy these exactly.
+DONE so far: all THREE ports — `Storage` (`lib/ports/storage.ts`), `Db`
+(`lib/ports/db.ts`), `Ai` (`lib/ports/ai.ts`). Each has a CF adapter + a `getX()`
+factory that is the SOLE reader of its binding (`env.MEDIA` / `env.DB` / `env.AI`).
+Each has a real-adapter node --test. 227 tests green + build green.
 
-Take the next TODO: the **`Ai` port** over `env.AI.run`.
-- Read `CMS/src/app/api/chat/route.ts` + `CMS/src/lib/chat/*` first to find every `env.AI` read.
-- Port = ONLY the methods actually called. **Preserve streaming** (`env.AI.run(model, {messages,
-  stream:true})` returns a stream) AND the OpenAI-compatible message shape — do NOT collapse to a
-  non-streaming call. That's the headline caveat for this one.
-- `cfAi(ai)` adapter wraps the binding 1:1; a `getAi()` factory is the SOLE `env.AI` reader.
-- Test imports the REAL adapter (`.ts`), drives it against a fake `AI` binding, asserts the real
-  call shape (model + {messages, stream}) AND that a streamed response is passed through, not buffered.
-- GOTCHAS (CAVEATS.md): use `.ts` extension on any relative import the node --test must load; no TS
-  parameter properties (explicit field + assignment); no tautological mocks.
-- Gate: `npm test` (225+ green) + `npx opennextjs-cloudflare build` (NEVER while `npm run dev` runs).
-After Ai: the unified `env → {db,storage,ai}` factory, then a CMS-module-against-mocked-port test.
+Take the next TODO: the **unified adapter factory** (`env → { db, storage, ai }`).
+- Goal: ONE place that reads the Cloudflare env and hands back all three ports, so
+  the `getCloudflareContext` call is made once. Likely `lib/ports/index.ts` with a
+  `getPorts()` (or `getBindings()`) that returns `{ db, storage, ai }`.
+- KEEP zero behavior change. The individual `getDb/getStorage/getAi` can stay as
+  thin wrappers over the unified factory, OR the factory composes them — your call,
+  but don't break existing `@/db` / asset-store / chat-route callers.
+- Note: `getAi()` returns `Ai | null` (binding may be unbound) — the unified
+  factory must preserve that nullability, don't force-non-null.
+- Then the LAST TODO: one CMS-module-against-a-mocked-port unit test (prove the
+  seam earns its keep — honest assertions, no tautological mocks). A good candidate:
+  a `*-store.ts` module given a fake `Db`, asserting real query behavior.
+
+GOTCHAS (CAVEATS.md): `.ts` extension on relative imports node --test loads; no TS
+parameter properties (explicit field + assignment); `ChatMessage` is declared 3x
+(leave it); drizzle fake D1 needs `.raw()` on the prepared stmt.
+Gate: `npm test` (227+ green) + `npx opennextjs-cloudflare build` (NEVER while dev runs).

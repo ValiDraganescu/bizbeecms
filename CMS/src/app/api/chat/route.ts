@@ -18,7 +18,7 @@
  * (`scripts/chat-sse.test.mjs`); the live model call needs a real `AI` binding +
  * gateway (HITL — can't be exercised offline).
  */
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getAi, getGatewayId } from "@/lib/ports/ai";
 import {
   SseDeltaParser,
   ToolCallAccumulator,
@@ -63,12 +63,6 @@ const TOOLS = [
   LIST_ASSETS_TOOL,
 ];
 
-// AI Gateway slug. Override at deploy time via the AI_GATEWAY env var; falls
-// back to the default gateway name so a freshly-provisioned Site still works.
-function gatewayId(env: CloudflareEnv): string {
-  return (env as unknown as { AI_GATEWAY?: string }).AI_GATEWAY ?? "bizbeecms-cms";
-}
-
 export async function POST(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);
   if (denied) return denied;
@@ -84,8 +78,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: parsed.error }, { status: 400 });
   }
 
-  const { env } = await getCloudflareContext({ async: true });
-  const ai = (env as unknown as { AI?: Ai }).AI;
+  const ai = await getAi();
   if (!ai) {
     // Binding missing (not yet provisioned for this Site). Don't 500 silently.
     return Response.json(
@@ -102,14 +95,12 @@ export async function POST(request: Request): Promise<Response> {
 
   let upstream: ReadableStream<Uint8Array>;
   try {
-    // OpenAI-compatible streaming call through AI Gateway.
-    upstream = (await ai.run(
-      DEFAULT_MODEL as Parameters<Ai["run"]>[0],
-      { messages, stream: true, tools: TOOLS } as Parameters<
-        Ai["run"]
-      >[1],
-      { gateway: { id: gatewayId(env) } } as Parameters<Ai["run"]>[2],
-    )) as unknown as ReadableStream<Uint8Array>;
+    // OpenAI-compatible streaming call through AI Gateway (via the Ai port).
+    upstream = await ai.chat(messages, {
+      model: DEFAULT_MODEL,
+      tools: TOOLS,
+      gatewayId: await getGatewayId(),
+    });
   } catch (err) {
     return Response.json(
       { error: `AI request failed: ${(err as Error).message}` },

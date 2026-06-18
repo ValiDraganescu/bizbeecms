@@ -30,6 +30,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   paths, not tsconfig `bundler` resolution. The build is fine with it (`allowImportingTsExtensions`
   is on, and `src/lib/**` already imports `.ts` everywhere). Storage didn't hit this — it imports
   no relative sibling.
+- **`ChatMessage` is declared in three places** (`lib/chat/sse.ts`, `app/api/chat/route.ts` local,
+  and now `lib/ports/ai.ts`), all structurally `{role:string,content:string}` so TS is happy and
+  the build passes. Don't try to unify them as part of the extract — that's a separate cleanup; the
+  port just declares its own minimal shape, consistent with how Db/Storage stayed self-contained.
+- **The `Ai` port is a behavioral method (`chat`), not a type-alias** (unlike `Db` which IS the
+  drizzle client). The binding's `run` overloads are messy (forced `Parameters<Ai["run"]>` casts in
+  the old route), so the adapter takes a narrow `AiBinding = { run(model, inputs, options?) }` and
+  the port exposes one clean `chat()` — that's what let the route drop all the casts.
 - **drizzle-d1 selects call `stmt.bind(...).raw()`, not `.all()`.** A fake `D1Database` used in a
   port test must expose `raw()` on the prepared statement (returns rows-as-arrays) or the select
   throws `this.stmt.bind(...).raw is not a function`. Inserts use `.run()`. See `db-port.test.mjs`.
