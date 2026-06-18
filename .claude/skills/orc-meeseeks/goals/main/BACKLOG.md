@@ -65,7 +65,7 @@ States: TODO | DOING | DONE | BLOCKED. Each is ONE provable capability. Order is
 - TODO: **D2 — Cloudflare Images transforms (optional).** Resize/format on serve. Defer until D1 lands.
 
 **E. Settings & theming**
-- TODO: **E1 — per-Site theme overrides.** DB-backed CSS-var overrides injected as inline `<style>` after globals (deferred aicms pattern). Proves: a Site re-themes token colors without rebuild.
+- DONE: **E1 — per-Site theme overrides.** DB-backed CSS-var overrides injected as inline `<style>` after globals on the public route. PURE `CMS/src/lib/render/theme.ts` (token allowlist `THEME_TOKENS` synced to globals.css `--color-*` + narrow color-value grammar `isSafeColorValue` = SECURITY boundary since values go into an inline `<style>` + `normalizeThemeOverrides`/`themeOverridesToCss`); `db/settings-store.ts` `getThemeOverrides`/`setThemeOverrides` (key `theme_overrides`, reuses new shared `upsertSetting`); REST `api/settings/theme/route.ts` (GET/PUT); public `[[...slug]]` injects `themeCss` `<style>` after UTILITY_CSS; admin `/admin/settings/theme` page + `components/settings/theme-editor.tsx` (color swatch + text field per token); `theme` i18n EN/FI/ET. CMS 161/161 (+7 `theme.test.mjs`), tsc + opennext gate (2 routes registered); PM bundle regen 5591KB + 32/32 + selfcheck. Live D1 → HITL P1. See JOURNAL 2026-06-18.
 - TODO: **E2 — site settings (brand identity / design system / AI persona).** Key-value settings table; brand+design serialized into the AI system prompt. Mine aicms settings modules.
 
 **Sec. Security (cross-cutting)**

@@ -43,6 +43,18 @@
     "saved": "Sisukeeled salvestatud.",
     "error": "Viga: {message}"
   },
+  "theme": {
+    "title": "Teema",
+    "subtitle": "Asenda avaldatud saidi värvitunnused ilma uuesti ehitamata. Vaikeväärtuse kasutamiseks jäta väli tühjaks. Lubatud on hex (#1a2b3c) või oklch()/rgb()/hsl() väärtused.",
+    "placeholder": "nt #1a2b3c või oklch(0.5 0.19 268)",
+    "swatchLabel": "Värvinäidis tunnusele {token}",
+    "valueLabel": "Värviväärtus tunnusele {token}",
+    "reset": "Lähtesta",
+    "save": "Salvesta",
+    "saving": "Salvestan…",
+    "saved": "Teema salvestatud.",
+    "invalidValue": "Vigane värv tunnusele {token}: {value}"
+  },
   "media": {
     "title": "Meediateek",
     "subtitle": "Laadi sellele saidile pilte üles ja viita neile komponentides nende URL-i kaudu.",

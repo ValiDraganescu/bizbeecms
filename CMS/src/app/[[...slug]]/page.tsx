@@ -26,8 +26,9 @@ import {
 import { renderPlans } from "@/lib/render/react";
 import { resolveSlugPath } from "@/lib/render/slug";
 import { generateUtilityCss } from "@/lib/render/utility-css";
-import { getContentLocales } from "@/db/settings-store";
+import { getContentLocales, getThemeOverrides } from "@/db/settings-store";
 import { resolveLocalized } from "@/lib/render/localize";
+import { themeOverridesToCss } from "@/lib/render/theme";
 
 // Precompiled once per worker instance — pure, deterministic, bounded vocabulary.
 const UTILITY_CSS = generateUtilityCss();
@@ -141,6 +142,17 @@ export default async function PublicPage({
   const loaded = await loadPlan(await params);
   if (!loaded) notFound();
 
+  // Per-Site theme overrides (epic E1): re-theme the purpose color tokens
+  // without a rebuild. Validated server-side (only known tokens + safe colors);
+  // injected AFTER globals so the cascade lets them win. Defensive: a missing
+  // D1 binding (offline) just means no overrides.
+  let themeCss = "";
+  try {
+    themeCss = themeOverridesToCss(await getThemeOverrides());
+  } catch {
+    /* unbound D1 in this env — no per-Site theme */
+  }
+
   const { plan } = loaded;
   return (
     <>
@@ -152,6 +164,13 @@ export default async function PublicPage({
         ASSETS deploy gap). See lib/render/utility-css.ts.
       */}
       <style dangerouslySetInnerHTML={{ __html: UTILITY_CSS }} />
+      {/*
+        Per-Site theme token overrides (epic E1). After UTILITY_CSS (and after
+        the build-bundled globals.css) so its :root declarations win. The values
+        are allowlisted by lib/render/theme.ts to a narrow color grammar, so they
+        can't break out of this <style> — end-user/free text never reaches here.
+      */}
+      {themeCss && <style dangerouslySetInnerHTML={{ __html: themeCss }} />}
       {renderPlans(plan.root)}
       {/*
         Ship each used component's AI-authored client script to the browser.

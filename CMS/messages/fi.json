@@ -43,6 +43,18 @@
     "saved": "Sisältökielet tallennettu.",
     "error": "Virhe: {message}"
   },
+  "theme": {
+    "title": "Teema",
+    "subtitle": "Korvaa julkaistun sivuston väritunnukset ilman uudelleenkäännöstä. Jätä kenttä tyhjäksi käyttääksesi oletusta. Hyväksyy hex (#1a2b3c) tai oklch()/rgb()/hsl() -arvot.",
+    "placeholder": "esim. #1a2b3c tai oklch(0.5 0.19 268)",
+    "swatchLabel": "Värinäyte tunnukselle {token}",
+    "valueLabel": "Väriarvo tunnukselle {token}",
+    "reset": "Palauta",
+    "save": "Tallenna",
+    "saving": "Tallennetaan…",
+    "saved": "Teema tallennettu.",
+    "invalidValue": "Virheellinen väri tunnukselle {token}: {value}"
+  },
   "media": {
     "title": "Mediakirjasto",
     "subtitle": "Lataa kuvia tälle sivustolle ja viittaa niihin komponenteissa niiden URL-osoitteella.",

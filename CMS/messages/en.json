@@ -43,6 +43,18 @@
     "saved": "Content languages saved.",
     "error": "Error: {message}"
   },
+  "theme": {
+    "title": "Theme",
+    "subtitle": "Override the published site's color tokens without a rebuild. Leave a field empty to use the default. Accepts hex (#1a2b3c) or oklch()/rgb()/hsl() values.",
+    "placeholder": "e.g. #1a2b3c or oklch(0.5 0.19 268)",
+    "swatchLabel": "Color swatch for {token}",
+    "valueLabel": "Color value for {token}",
+    "reset": "Reset",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Theme saved.",
+    "invalidValue": "Invalid color for {token}: {value}"
+  },
   "media": {
     "title": "Media library",
     "subtitle": "Upload images to this site and reference them in components by their URL.",

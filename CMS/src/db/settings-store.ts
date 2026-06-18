@@ -15,8 +15,36 @@ import {
   defaultContentLocales,
   normalizeContentLocales,
 } from "@/lib/render/localize";
+import {
+  type ThemeOverrides,
+  emptyThemeOverrides,
+  normalizeThemeOverrides,
+} from "@/lib/render/theme";
 
 const CONTENT_LOCALES_KEY = "content_locales";
+const THEME_OVERRIDES_KEY = "theme_overrides";
+
+/** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
+async function upsertSetting(key: string, value: string): Promise<void> {
+  const db = await getDb();
+  const now = new Date();
+  const existing = await db
+    .select({ key: schema.siteSettings.key })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, key))
+    .limit(1);
+
+  if (existing.length > 0) {
+    await db
+      .update(schema.siteSettings)
+      .set({ value, updatedAt: now })
+      .where(eq(schema.siteSettings.key, key));
+  } else {
+    await db
+      .insert(schema.siteSettings)
+      .values({ key, value, updatedAt: now });
+  }
+}
 
 /** Read the per-Site content-locale config, or the safe default if unset. */
 export async function getContentLocales(): Promise<ContentLocales> {
@@ -40,26 +68,34 @@ export async function getContentLocales(): Promise<ContentLocales> {
 export async function setContentLocales(
   config: ContentLocales,
 ): Promise<ContentLocales> {
-  const db = await getDb();
   const normalized = normalizeContentLocales(config);
-  const value = JSON.stringify(normalized);
-  const now = new Date();
+  await upsertSetting(CONTENT_LOCALES_KEY, JSON.stringify(normalized));
+  return normalized;
+}
 
-  const existing = await db
-    .select({ key: schema.siteSettings.key })
+/** Read the per-Site theme overrides (token→color), or `{}` if unset/garbage. */
+export async function getThemeOverrides(): Promise<ThemeOverrides> {
+  const db = await getDb();
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
     .from(schema.siteSettings)
-    .where(eq(schema.siteSettings.key, CONTENT_LOCALES_KEY))
+    .where(eq(schema.siteSettings.key, THEME_OVERRIDES_KEY))
     .limit(1);
 
-  if (existing.length > 0) {
-    await db
-      .update(schema.siteSettings)
-      .set({ value, updatedAt: now })
-      .where(eq(schema.siteSettings.key, CONTENT_LOCALES_KEY));
-  } else {
-    await db
-      .insert(schema.siteSettings)
-      .values({ key: CONTENT_LOCALES_KEY, value, updatedAt: now });
+  const raw = rows[0]?.value;
+  if (!raw) return emptyThemeOverrides();
+  try {
+    return normalizeThemeOverrides(JSON.parse(raw));
+  } catch {
+    return emptyThemeOverrides();
   }
+}
+
+/** Upsert the theme overrides (normalized — only known tokens + safe colors). */
+export async function setThemeOverrides(
+  overrides: unknown,
+): Promise<ThemeOverrides> {
+  const normalized = normalizeThemeOverrides(overrides);
+  await upsertSetting(THEME_OVERRIDES_KEY, JSON.stringify(normalized));
   return normalized;
 }
