@@ -123,6 +123,55 @@ export function buildFailedCallbackEvent(
 }
 
 /**
+ * One collapsed timeline row: the per-step pair (started + ok/failed) folded
+ * into a single entry the UI renders once. `status` is the latest seen for the
+ * step (started → still Running; ok/failed → finished). `durationMs` comes from
+ * the terminal event if it carried one, else falls back to the started event's.
+ */
+export type TimelineRow = {
+  id: string;
+  step: string;
+  status: DeployEventStatus;
+  startedAt: string;
+  durationMs: number | null;
+  error: string | null;
+  ramAvailableMb: number | null;
+};
+
+/**
+ * Collapse the raw chronological event trail (two rows per step: a `started`
+ * then an `ok`/`failed`) into one row per `step`, fixing the bug where the
+ * timeline rendered each step twice. Pure — no I/O — so it's node-testable.
+ *
+ * - Events MUST arrive oldest-first (the read API orders by startedAt,createdAt).
+ * - Step order is preserved by first-seen.
+ * - Within a step, later events overwrite status/duration/error/ram, but a null
+ *   value never clobbers a previously-set one (the `started` row's startedAt/ram
+ *   survives when the terminal row omits them).
+ * - `id` is the first event's id (stable React key across polls).
+ */
+export function collapseDeployEvents(events: readonly TimelineRow[]): TimelineRow[] {
+  const byStep = new Map<string, TimelineRow>();
+  for (const e of events) {
+    const prev = byStep.get(e.step);
+    if (!prev) {
+      byStep.set(e.step, { ...e });
+      continue;
+    }
+    byStep.set(e.step, {
+      id: prev.id,
+      step: prev.step,
+      startedAt: prev.startedAt,
+      status: e.status,
+      durationMs: e.durationMs ?? prev.durationMs,
+      error: e.error ?? prev.error,
+      ramAvailableMb: e.ramAvailableMb ?? prev.ramAvailableMb,
+    });
+  }
+  return [...byStep.values()];
+}
+
+/**
  * Insert one validated deploy event. `injectedDb` is the test seam; production
  * callers omit it and get the live D1-bound drizzle client.
  */

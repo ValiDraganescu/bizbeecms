@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Badge, type BadgeTone } from "@/components/ui";
 import type { DeployEventStatus, SiteStatus } from "@/db/schema";
+import { collapseDeployEvents } from "@/lib/deploy/deploy-events";
 
 /** A deploy event as it arrives over JSON (Date columns serialize to ISO strings). */
 type WireEvent = {
@@ -85,9 +86,12 @@ export function DeployTimeline({
     return <p className="text-sm text-foreground-muted">{t("empty")}</p>;
   }
 
+  // Each step emits two raw events (started + ok/failed); collapse to one row.
+  const rows = collapseDeployEvents(events);
+
   return (
     <ol className="flex flex-col gap-3">
-      {events.map((e) => {
+      {rows.map((e) => {
         const duration = fmtDuration(e.durationMs);
         return (
           <li

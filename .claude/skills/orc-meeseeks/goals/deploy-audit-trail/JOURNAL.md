@@ -119,3 +119,20 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `npx wrangler deploy --dry-run` green (TS bundles + container image builds); PM `npm test` → 42
   pass (no PM code changed). Dev confirmed NOT on 3601/3602. NOT deployed live.
 - **Files:** deployer/src/index.ts
+
+## 2026-06-18 — BUG FIX [P2]: timeline rendered each step twice
+- **Task:** Priority-0 human-reported bug. `deploy-timeline.tsx` mapped one row per RAW event;
+  each step emits a `started` then an `ok`/`failed`, so every step showed twice (Running + Done).
+- **Fix (client-side only, no schema/API/bash change — both raw rows stay persisted):**
+  - New pure `collapseDeployEvents(events: TimelineRow[])` in `lib/deploy/deploy-events.ts`: groups by
+    `step` (Map, insertion order = first-seen = step order), latest status wins, duration/error/ram from
+    the terminal row with `?? prev` so a null never clobbers a set value (started row's startedAt/id/ram
+    survive). `id` = first event's id (stable React key across polls).
+  - `deploy-timeline.tsx` now maps `collapseDeployEvents(events)` instead of `events`. The empty-state
+    guard still checks raw `events.length` (correct — no events = nothing to collapse).
+- **Test (pure, no mocks):** 4 node --test cases — started+ok→one ok row w/ duration; started-only→
+  Running; started+failed→failed+error kept; first-seen startedAt/id/ram preserved across the pair.
+- **Verified:** PM `npm test` → 46 pass (was 42, +4). `npx opennextjs-cloudflare build` green. Dev
+  confirmed OFF (3601/3602 free) before build; did NOT touch deployer/container (real deploy in flight).
+- **Files:** ProjectManager/src/lib/deploy/deploy-events.ts (+collapseDeployEvents, TimelineRow),
+  deploy-events.test.ts (+4), src/app/(app)/sites/deploy-timeline.tsx (import + use collapsed rows).

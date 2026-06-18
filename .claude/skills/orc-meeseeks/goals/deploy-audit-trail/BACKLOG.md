@@ -3,6 +3,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
+- DONE: BUG [P2]: deploy timeline showed each step TWICE (Running row + Done row) — reported 2026-06-18. Fixed CLIENT-SIDE only: new pure `collapseDeployEvents(events)` helper in `lib/deploy/deploy-events.ts` folds the started+ok/failed pair into one row per `step` (latest status, duration from the terminal row, first-seen startedAt/id/ram preserved, failed error kept). `deploy-timeline.tsx` maps the collapsed `rows` instead of raw `events`. No schema/API/bash change — both raw rows stay persisted. 4 new pure unit tests (46 pass). Gate: npm test + opennextjs build green. (2026-06-18)
 
 ## Tasks
 (Vertical slices, ordered so each leaves the deploy working. Core trail first, RAM last.)

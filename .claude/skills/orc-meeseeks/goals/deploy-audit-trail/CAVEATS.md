@@ -66,3 +66,9 @@ Read every line before working. Each entry was learned the hard way by a previou
   the var after that step's `step_start`. Source is `/proc/meminfo` MemAvailable (kB→MB); absent → empty
   → no field (best-effort, never fatal). Container is Linux so `/proc/meminfo` exists; don't use `free -m`
   (extra parsing, same data).
+
+- **The timeline collapses raw events CLIENT-SIDE — keep BOTH rows persisted.** Each step emits a
+  `started` then `ok`/`failed` (two `deploy_events` rows); the duration is computed from that pair.
+  `collapseDeployEvents()` (pure, in `lib/deploy/deploy-events.ts`) folds them into one UI row.
+  Never "fix" the double-row by dropping the `started` emit or merging at ingest — that breaks the
+  duration computation and the persisted trail. The fix is render-time only.

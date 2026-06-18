@@ -13,6 +13,8 @@ import {
   insertDeployEvent,
   buildFailedCallbackEvent,
   listDeployEventsForSite,
+  collapseDeployEvents,
+  type TimelineRow,
 } from "./deploy-events.ts";
 import * as schema from "../../db/schema.ts";
 
@@ -266,4 +268,61 @@ test("isAuthorized: matches only a non-empty secret equal to the bearer token", 
   assert.equal(isAuthorized("", ""), false);
   assert.equal(isAuthorized(undefined, ""), false);
   assert.equal(isAuthorized(undefined, "anything"), false);
+});
+
+const row = (o: Partial<TimelineRow> & { step: string; status: TimelineRow["status"] }): TimelineRow => ({
+  id: `${o.step}-${o.status}`,
+  startedAt: "2026-06-18T10:00:00.000Z",
+  durationMs: null,
+  error: null,
+  ramAvailableMb: null,
+  ...o,
+});
+
+test("collapseDeployEvents folds each step's started+ok pair into one finished row", () => {
+  const rows = collapseDeployEvents([
+    row({ step: "clone", status: "started" }),
+    row({ step: "clone", status: "ok", durationMs: 1200 }),
+    row({ step: "build", status: "started" }),
+    row({ step: "build", status: "ok", durationMs: 4200 }),
+  ]);
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map((r) => r.step), ["clone", "build"]);
+  assert.deepEqual(rows.map((r) => r.status), ["ok", "ok"]);
+  assert.equal(rows[0].durationMs, 1200);
+  assert.equal(rows[1].durationMs, 4200);
+});
+
+test("collapseDeployEvents leaves an in-flight step (started only) as Running", () => {
+  const rows = collapseDeployEvents([
+    row({ step: "clone", status: "started" }),
+    row({ step: "clone", status: "ok", durationMs: 1200 }),
+    row({ step: "build", status: "started" }),
+  ]);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1].step, "build");
+  assert.equal(rows[1].status, "started");
+  assert.equal(rows[1].durationMs, null);
+});
+
+test("collapseDeployEvents keeps the failed status + error on the collapsed row", () => {
+  const rows = collapseDeployEvents([
+    row({ step: "build", status: "started", startedAt: "2026-06-18T10:00:00.000Z" }),
+    row({ step: "build", status: "failed", error: "OOM killed", durationMs: 5000 }),
+  ]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].status, "failed");
+  assert.equal(rows[0].error, "OOM killed");
+  assert.equal(rows[0].durationMs, 5000);
+});
+
+test("collapseDeployEvents preserves first-seen startedAt, id, and ram from the started row", () => {
+  const rows = collapseDeployEvents([
+    row({ id: "first", step: "build", status: "started", startedAt: "2026-06-18T10:00:00.000Z", ramAvailableMb: 900 }),
+    row({ id: "second", step: "build", status: "ok", startedAt: "2026-06-18T10:05:00.000Z", durationMs: 4200 }),
+  ]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].id, "first");
+  assert.equal(rows[0].startedAt, "2026-06-18T10:00:00.000Z");
+  assert.equal(rows[0].ramAvailableMb, 900);
 });
