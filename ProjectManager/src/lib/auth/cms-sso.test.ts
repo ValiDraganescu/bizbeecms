@@ -33,9 +33,20 @@ test("classifyCmsReturnUrl rejects http, malformed, and empty", () => {
 
 test("safeCmsReturnUrl only passes statically-known hosts (custom domain → null)", () => {
   assert.ok(
-    safeCmsReturnUrl("https://bizbeecms-cms-a.x.workers.dev/api/auth/sso-callback"),
+    safeCmsReturnUrl(
+      "https://bizbeecms-cms-a.vali-draganescu88.workers.dev/api/auth/sso-callback",
+    ),
   );
   assert.equal(safeCmsReturnUrl("https://restovista.com/api/auth/sso-callback"), null);
+});
+
+test("a bizbeecms-cms-* worker on ANOTHER account is NOT a static CMS host (nonce-capture guard)", () => {
+  // The allowlist must anchor to OUR account suffix, not bare .workers.dev —
+  // else an attacker's worker named bizbeecms-cms-* would capture the SSO nonce.
+  const r = classifyCmsReturnUrl(
+    "https://bizbeecms-cms-evil.attacker.workers.dev/api/auth/sso-callback",
+  );
+  assert.deepEqual(r, { host: "bizbeecms-cms-evil.attacker.workers.dev" });
 });
 
 test("a non-CMS workers.dev host is NOT accepted as a static CMS host", () => {

@@ -13,6 +13,16 @@ export const SSO_NONCE_PREFIX = "sso:";
 /** Nonces are short-lived — just long enough for the browser round-trip. */
 export const SSO_NONCE_TTL_SECONDS = 60;
 
+/**
+ * Our Cloudflare account's workers.dev subdomain. CMS Workers live at
+ * `bizbeecms-cms-<slug>.<this>`. The allowlist MUST anchor to this, NOT to the
+ * bare `.workers.dev` public suffix — otherwise ANY account's worker named
+ * `bizbeecms-cms-*` (e.g. on an attacker's account) would pass, letting them
+ * capture the one-time SSO nonce via the redirect. Mirrors the router's
+ * WORKERS_SUBDOMAIN.
+ */
+export const CMS_WORKER_SUFFIX = ".vali-draganescu88.workers.dev";
+
 /** A random, URL-safe one-time nonce. */
 export function newSsoNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
@@ -42,7 +52,7 @@ export function classifyCmsReturnUrl(
   if (u.protocol !== "https:") return null;
   const host = u.hostname;
   const isCmsWorker =
-    host.startsWith("bizbeecms-cms-") && host.endsWith(".workers.dev");
+    host.startsWith("bizbeecms-cms-") && host.endsWith(CMS_WORKER_SUFFIX);
   const isOwnZone = host === "bizbeecms.com" || host.endsWith(".bizbeecms.com");
   if (isCmsWorker || isOwnZone) return { url: u.toString() };
   return { host };
