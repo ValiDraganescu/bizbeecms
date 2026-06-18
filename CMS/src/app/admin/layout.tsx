@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getTranslations } from "next-intl/server";
 import { checkAdminFromHeaders } from "@/lib/auth/guard";
@@ -42,8 +43,21 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     );
   }
 
-  // Not signed in (or misconfigured / PM unreachable) → send to PM login.
+  // Not signed in. PM's session cookie lives on a DIFFERENT host (and *.workers.dev
+  // is on the Public Suffix List, so it can't be shared), so we can't just read it
+  // here. Kick off the SSO handoff: send the user to PM's cms-sso, which (once it
+  // confirms they're signed into PM) bounces back to our sso-callback with a
+  // one-time nonce we exchange for a session cookie on THIS host.
   const { env } = await getCloudflareContext({ async: true });
   const pmOrigin = (env as unknown as { PM_ORIGIN?: string }).PM_ORIGIN;
-  redirect(pmOrigin ? `${pmOrigin.replace(/\/+$/, "")}/login` : "/");
+  if (!pmOrigin) redirect("/");
+
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const returnUrl = `${proto}://${host}/api/auth/sso-callback`;
+  const ssoUrl =
+    `${pmOrigin.replace(/\/+$/, "")}/api/auth/cms-sso` +
+    `?return=${encodeURIComponent(returnUrl)}`;
+  redirect(ssoUrl);
 }

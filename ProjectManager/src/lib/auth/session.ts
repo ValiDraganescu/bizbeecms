@@ -57,6 +57,15 @@ export async function createSession(userId: string): Promise<void> {
   });
 }
 
+/**
+ * The raw session id from the cookie (the opaque KV key), or null if absent.
+ * Used by the CMS SSO handoff to transport a valid session id to the CMS host.
+ * Does NOT validate against KV — callers that need a live session use getSession.
+ */
+export async function getSessionId(): Promise<string | null> {
+  return (await cookies()).get(SESSION_COOKIE)?.value ?? null;
+}
+
 /** Read the current session record from KV, or null if absent/expired. */
 export async function getSession(): Promise<SessionRecord | null> {
   const id = (await cookies()).get(SESSION_COOKIE)?.value;

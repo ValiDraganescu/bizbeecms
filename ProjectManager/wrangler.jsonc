@@ -38,6 +38,13 @@
     {
       "binding": "SESSIONS",
       "id": "f400b577848f4e4aa6845d2fb46a601e"
+    },
+    // Host -> Site slug map written by the deployer's /attach-domain and read by
+    // the bizbeecms-router. PM reads it in the CMS SSO open-redirect guard to
+    // allow a Site's registered custom domain as a valid sso `return` host.
+    {
+      "binding": "HOST_MAP",
+      "id": "1c276b01cd5a41f0b8c98ace07b4c064"
     }
   ]
   // Email: invite delivery via Cloudflare Email Sending (Beta, Workers Paid).

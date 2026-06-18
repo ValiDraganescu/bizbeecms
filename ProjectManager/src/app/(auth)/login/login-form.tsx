@@ -21,7 +21,13 @@ import type { LoginError } from "@/app/api/auth/login/route";
  * generic `invalidCredentials` banner so the form never reveals which accounts
  * exist; on success the client redirects to the home page.
  */
-export function LoginForm({ firstRun }: { firstRun: boolean }) {
+export function LoginForm({
+  firstRun,
+  next = "/",
+}: {
+  firstRun: boolean;
+  next?: string;
+}) {
   const t = useTranslations("auth");
   const router = useRouter();
   const [error, setError] = useState<LoginError | null>(null);
@@ -45,6 +51,12 @@ export function LoginForm({ firstRun }: { firstRun: boolean }) {
         body: JSON.stringify(payload),
       });
       if (res.ok) {
+        // `next` may be an API route that 302s elsewhere (the CMS SSO handoff),
+        // so do a full navigation rather than client-side router.push.
+        if (next !== "/") {
+          window.location.assign(next);
+          return;
+        }
         router.push("/");
         router.refresh();
         return;
