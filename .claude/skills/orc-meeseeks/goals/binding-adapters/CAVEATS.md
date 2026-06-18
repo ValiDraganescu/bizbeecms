@@ -80,3 +80,8 @@ Read every line before working. Each entry was learned the hard way by a previou
   `@/lib/ports/db`). node strip-only can't resolve the barrel's `@/` re-export, so switch the
   store's value import to `../lib/ports/db.ts` directly (page-store already does). It's a
   re-export, so prod behavior is identical — zero behavior change.
+- **A module that spans TWO ports (asset-store: Storage+Db) takes BOTH injected params.** Order them
+  by the call order in the fn (`putAsset(input, injectedStorage?, injectedDb?)`), keep them OPTIONAL
+  (`injected ?? await getX()`) so all existing call sites are untouched (zero behavior change — verify
+  with a grep of every caller). The Storage fake is trivial: an in-memory `Map` matching put/get/delete
+  (no node:sqlite needed for the R2 side). See `scripts/asset-store.test.mjs`.

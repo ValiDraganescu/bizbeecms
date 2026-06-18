@@ -36,3 +36,10 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `CMS/src/lib/ports/`. Lexer-lite comment-strip (chat-route JSDoc mentions env.AI), `\b`-bounded
   matcher excludes config vars (AI_GATEWAY/PM_ORIGIN/SITE_ID). Passes now; proven to fail on a stray
   `env.DB` read (injected→red, reverted→green). 244 green (+3) + build. Test-only, no app code.
+- DONE (2026-06-18): Mocked-STORAGE-port test against a CMS MODULE (broadens proven seam beyond D1 to
+  R2) — `scripts/asset-store.test.mjs` (6). asset-store spans BOTH ports; added `injectedStorage?: Storage`
+  + `injectedDb?: Db` seams (mirror page-store) and switched its value imports `./index`/`@/...`→relative
+  `../lib/ports/{db,storage}.ts` for node --test. Drives REAL putAsset/listAssets/getAssetObject/deleteAsset
+  against an in-memory fake Storage (put/get/delete) + cfDb over node:sqlite. Honest asserts: derived
+  size=byteLength, contentType→storage, real id, R2↔D1 round-trip, delete from BOTH, key-scoped delete.
+  Zero behavior change (new params optional; all 6 callers unchanged). 258 green + build.

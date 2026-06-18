@@ -159,3 +159,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   252 green (was 244); `npx opennextjs-cloudflare build` green (deploy gate). Ports
   free 3601/3602 before build.
 - **Files:** CMS/scripts/component-store.test.mjs (new), CMS/src/db/component-store.ts (seam + import).
+
+## 2026-06-18 19:16 — Mocked-Storage-port unit test for the asset-store module (D1→R2 coverage)
+- **Status:** DONE
+- **What I did:** Broadened proven mocked-port coverage from D1 to **R2**. asset-store is the
+  one CMS module spanning BOTH ports (R2 bytes + D1 metadata row). Added an injected-Storage seam
+  mirroring `injectedDb?`: `putAsset(input, injectedStorage?, injectedDb?)`,
+  `deleteAsset(key, injectedStorage?, injectedDb?)`, `getAssetObject(key, injectedStorage?)`,
+  `listAssets(injectedDb?)` — all params OPTIONAL so prod path (`injected ?? await getX()`) is
+  unchanged. Switched the module's value imports `./index`→`../lib/ports/db.ts` and
+  `@/lib/ports/storage`→`../lib/ports/storage.ts` (node --test can't resolve the `@/` alias /
+  `./index` barrel re-export; index just re-exports, zero behavior change). New test
+  `scripts/asset-store.test.mjs` (6) drives the REAL store fns against an in-memory fake Storage
+  (Map: put/get/delete) + `cfDb` over a `node:sqlite` fake D1 (real asset DDL, real SQL).
+- **Verified:** HONEST assertions — derived `size = bytes.byteLength` (not from input),
+  contentType carried to storage, a real id, R2↔D1 round-trip on put, getAssetObject returns the
+  exact stored bytes / null when absent, deleteAsset removes from BOTH R2 and the D1 row, delete is
+  key-scoped (keeps the other). No `was-called` tautologies. All 6 callers verified to use the
+  no-injection signature (optional params → zero behavior change). `npm test` 258 green (was 252);
+  `npx opennextjs-cloudflare build` green (deploy gate; no dev on 3601/3602 first).
+- **Files:** CMS/scripts/asset-store.test.mjs (new), CMS/src/db/asset-store.ts (seam + relative imports).

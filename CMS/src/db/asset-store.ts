@@ -9,27 +9,31 @@
  * R2 binding is native: `env.MEDIA.put/get/delete`, no presigning.
  */
 import { desc, eq } from "drizzle-orm";
-import { getDb, schema } from "./index";
+import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import type { Asset } from "./schema";
-import { getStorage } from "@/lib/ports/storage";
+import { getStorage, type Storage } from "../lib/ports/storage.ts";
 
 /** List asset metadata, newest first. */
-export async function listAssets(): Promise<Asset[]> {
-  const db = await getDb();
+export async function listAssets(injectedDb?: Db): Promise<Asset[]> {
+  const db = injectedDb ?? (await getDb());
   return db.select().from(schema.asset).orderBy(desc(schema.asset.createdAt));
 }
 
 /** Store bytes in R2 + a metadata row in D1, then return the row. */
-export async function putAsset(input: {
-  key: string;
-  filename: string;
-  contentType: string;
-  bytes: ArrayBuffer;
-}): Promise<Asset> {
-  const storage = await getStorage();
+export async function putAsset(
+  input: {
+    key: string;
+    filename: string;
+    contentType: string;
+    bytes: ArrayBuffer;
+  },
+  injectedStorage?: Storage,
+  injectedDb?: Db,
+): Promise<Asset> {
+  const storage = injectedStorage ?? (await getStorage());
   await storage.put(input.key, input.bytes, { contentType: input.contentType });
 
-  const db = await getDb();
+  const db = injectedDb ?? (await getDb());
   const row: Asset = {
     id: crypto.randomUUID(),
     key: input.key,
@@ -43,15 +47,22 @@ export async function putAsset(input: {
 }
 
 /** Delete an asset from R2 + D1 (best-effort R2; D1 row is the source of truth). */
-export async function deleteAsset(key: string): Promise<void> {
-  const storage = await getStorage();
+export async function deleteAsset(
+  key: string,
+  injectedStorage?: Storage,
+  injectedDb?: Db,
+): Promise<void> {
+  const storage = injectedStorage ?? (await getStorage());
   await storage.delete(key);
-  const db = await getDb();
+  const db = injectedDb ?? (await getDb());
   await db.delete(schema.asset).where(eq(schema.asset.key, key));
 }
 
 /** Fetch raw bytes for the serve route. Returns null if absent. */
-export async function getAssetObject(key: string): Promise<R2ObjectBody | null> {
-  const storage = await getStorage();
+export async function getAssetObject(
+  key: string,
+  injectedStorage?: Storage,
+): Promise<R2ObjectBody | null> {
+  const storage = injectedStorage ?? (await getStorage());
   return storage.get(key);
 }
