@@ -67,3 +67,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   the `DB`/`MEDIA`/`AI` BINDINGS this goal scopes. The sole-reader invariant is "the factory is the only
   reader of env.DB|MEDIA|AI", and that holds. Don't build a Config/Env port for these — scope creep on a
   CF-only goal. grep for `env\.DB|env\.MEDIA|env\.AI` specifically, not all `getCloudflareContext`.
+- **The sole-reader invariant is now FROZEN BY CI** — `scripts/ports-sole-reader.guard.test.mjs` scans
+  `CMS/src` and fails if any real `env.DB|MEDIA|AI` BINDING read appears outside `CMS/src/lib/ports/`.
+  If you ADD a new port that reads a binding, it lives under `lib/ports/` (already allowlisted — the
+  whole dir is). If you legitimately move a binding read elsewhere, update the guard's `ALLOWLIST_DIR`.
+  The guard strips `//`+block comments first (chat-route JSDoc says `env.AI` ~6×; those are NOT reads)
+  and the matcher has a trailing `\b` so `env.AI_GATEWAY` (config) is excluded — don't widen the regex
+  to bare `env.AI` or you'll re-catch the gateway config var. The guard is text-based (lexer-lite), not
+  AST: it can't see `const x = "env"; (globalThis as any)[x].DB` — fine, nobody writes that; YAGNI.

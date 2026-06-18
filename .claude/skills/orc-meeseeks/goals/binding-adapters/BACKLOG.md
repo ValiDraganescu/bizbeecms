@@ -31,3 +31,8 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `getContentLocales`/`setContentLocales` via `injectedDb?: Db` seam over `cfDb`+`node:sqlite` fake D1.
   Covers safe-default, normalize/persist/read round-trip, key-keyed update-in-place, + defensive
   bad-JSON & wrong-shape fallbacks. 241 green + build.
+- DONE (2026-06-18): GREP-GUARD freezing the sole-reader invariant — `scripts/ports-sole-reader.guard.test.mjs`
+  (3) scans `CMS/src`, FAILS if any real `env.DB|MEDIA|AI` BINDING read appears OUTSIDE
+  `CMS/src/lib/ports/`. Lexer-lite comment-strip (chat-route JSDoc mentions env.AI), `\b`-bounded
+  matcher excludes config vars (AI_GATEWAY/PM_ORIGIN/SITE_ID). Passes now; proven to fail on a stray
+  `env.DB` read (injected→red, reverted→green). 244 green (+3) + build. Test-only, no app code.

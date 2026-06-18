@@ -121,3 +121,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   holds (admin/layout + auth/guard read CONFIG vars PM_ORIGIN/CMS_AUTH_SECRET/SITE_ID, not the bindings,
   so out of this goal's scope).
 - **Files:** CMS/scripts/settings-store.test.mjs (new), CMS/src/db/settings-store.ts (injectedDb seam + relative imports)
+
+## 2026-06-18 19:06 — GREP-GUARD freezing the sole-reader invariant
+- **Status:** DONE
+- **What I did:** Added `CMS/scripts/ports-sole-reader.guard.test.mjs` — a structural
+  guard that scans `CMS/src` and FAILS if any real `env.DB`/`env.MEDIA`/`env.AI`
+  BINDING read appears OUTSIDE the allowlisted port dir (`CMS/src/lib/ports/`). Protects
+  the whole seam the prior 6 workers built: future code that bypasses the ports breaks CI.
+  Three tests: (1) the guard (no violations outside ports), (2) a non-vacuous check (the
+  ports dir DOES contain >=1 real read, so green means "none outside", not "matcher
+  broken"), (3) a direct unit of the comment-stripper + matcher. Key design: a lexer-lite
+  `stripComments` removes `//` and block comments (the chat route's JSDoc mentions `env.AI`
+  all over — those must NOT trip the guard), and the matcher is `\benv\.(DB|MEDIA|AI)\b`
+  with a trailing word boundary so config vars `env.AI_GATEWAY`/`PM_ORIGIN`/`SITE_ID` are
+  deliberately excluded (per CAVEATS: bindings ≠ config vars). Test-only, no app code touched.
+- **Verified:** PASSES NOW (invariant holds per #6). PROVED it fails on a stray read:
+  injected `const __stray = env.DB;` into `src/db/asset-store.ts` → guard went red naming
+  `db/asset-store.ts:59` exactly; reverted → green (`src/` clean via git status). Full suite
+  244 green (was 241, +3). Deploy gate `npx opennextjs-cloudflare build` succeeded (dev off first).
+- **Files:** CMS/scripts/ports-sole-reader.guard.test.mjs (new)
