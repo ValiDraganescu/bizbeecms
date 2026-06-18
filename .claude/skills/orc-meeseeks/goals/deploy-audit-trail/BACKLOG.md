@@ -12,10 +12,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
   injected-Db `insertDeployEvent`, fake-D1 unit tests (37 pass). (2026-06-18)
   NOTE: migration 0003 NOT yet applied to live D1 — HITL `wrangler d1 migrations apply bizbeecms`
   before the slice-2 bash-script emit hits a live PM (else the ingest 500s on a missing table).
-- TODO: **Emit per-step events from the bash script.** In `buildScript()`, wrap each step (clone, npm,
-  build, provision, migrate, deploy) so it records start epoch, runs, then curls `POST /api/deploy-events`
-  with {siteId, step, status, startedAt, durationMs, error?} — best-effort (`|| true`), values via env
-  $VARS only. Reuse the existing step names. Pass the events URL like CALLBACK_URL.
+- DONE: **Emit per-step events from the bash script.** `buildScript()` now wraps all 6 steps
+  (clone/npm/build/provision/migrate/deploy) with `step_start`/`step_ok`/`step_fail` → best-effort
+  (`curl ... || true`) POST to `$EVENTS_URL` (passed via env like CALLBACK_URL) of started/ok/failed
+  events {siteId, step, status, startedAt, durationMs?, error?}. STATIC, env $VARS only. Validated by
+  `wrangler deploy --dry-run` + `npm test` (37). (2026-06-18)
 - TODO: **Surface errors.** On a failed step, capture the stderr/log tail into the event's `error`
   field (and keep the final deploy-callback). Resolve the existing `ponytail:` TODO in
   deploy-callback/route.ts (persist the error rather than console.error-only).

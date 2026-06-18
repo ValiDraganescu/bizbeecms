@@ -27,3 +27,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   migrations/0003_curvy_dragon_man.sql (+ meta/0003_snapshot.json, _journal.json),
   src/lib/deploy/deploy-events.ts, src/lib/deploy/deploy-events.test.ts,
   src/app/api/deploy-events/route.ts
+
+## 2026-06-18 19:48 — Slice 2: per-step events emitted from the deployer bash script
+- **Status:** DONE
+- **What I did:**
+  - `deployer/src/index.ts` `startDeploy()` env block: added `EVENTS_URL` (PM_CALLBACK_ORIGIN
+    + `/api/deploy-events`, empty if no origin), built exactly like the existing `CALLBACK_URL`.
+  - `buildScript()`: added best-effort `emit_event()` (mirrors `report()`: `curl ... || true`,
+    NEVER fatal; no-ops when `$EVENTS_URL` empty), `now_ms()` (`date +%s%3N`, GNU/Linux container),
+    and `step_start`/`step_ok`/`step_fail` helpers that track `STEP_NAME`/`STEP_START_MS` shell
+    state. Wrapped all 6 steps — clone, npm, build, provision, migrate, deploy — to POST
+    `started` (with startedAt ms) then `ok` (+durationMs) or `failed` (+durationMs +sanitized
+    error). Step names reuse the existing `report failed "<step>"` labels' intent. `step_fail`
+    runs *before* the existing `report failed` on each checkpoint so both the trail and the final
+    callback fire. Error text sanitized like report() (`tr '"\n' '  '`, cut 200).
+  - JSON bodies match slice-1 `parseDeployEvent` contract `{siteId, step, status, startedAt,
+    durationMs?, error?}`; numbers emitted as quoted strings (parseDeployEvent coerces). Fully
+    STATIC — all values via process env $VARS, no caller interpolation (shell-injection guard).
+- **Verified:** Rendered the template literal via node `eval` (proves no stray JS interpolation),
+  `bash -n` syntax-OK. Functional harness with a stubbed curl + deterministic now_ms: started/ok/
+  failed emit valid JSON, error sanitization works, empty EVENTS_URL no-ops cleanly. Gate:
+  `npx wrangler deploy --dry-run` green (deployer is a plain Worker — TS bundles + container
+  builds); PM `npm test` → 37 pass. Dev confirmed NOT on 3601/3602 first. NOT deployed live; NOT
+  applied migration 0003 (still HITL).
+- **Files:** deployer/src/index.ts

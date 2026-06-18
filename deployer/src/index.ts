@@ -239,6 +239,12 @@ async function startDeploy(
       CALLBACK_URL: env.PM_CALLBACK_ORIGIN
         ? `${env.PM_CALLBACK_ORIGIN.replace(/\/+$/, "")}/api/deploy-callback`
         : "",
+      // Per-step audit-trail ingest (deploy-audit-trail): best-effort POSTs of
+      // started/ok/failed events for each step. Same origin + DEPLOYER_SECRET
+      // as the final callback; empty string = no emit (script no-ops on it).
+      EVENTS_URL: env.PM_CALLBACK_ORIGIN
+        ? `${env.PM_CALLBACK_ORIGIN.replace(/\/+$/, "")}/api/deploy-events`
+        : "",
       // Sec1 CMS admin-auth wiring → injected into the CMS Worker as vars.
       CMS_AUTH_SECRET: env.CMS_AUTH_SECRET ?? "",
       // The CMS guard calls PM at PM_ORIGIN; default to the callback origin.
@@ -279,6 +285,52 @@ report() {
     --data "$body" || true
 }
 
+# --- Per-step audit trail (deploy-audit-trail) -----------------------------
+# Best-effort, NEVER fatal — mirrors report() exactly (curl ... || true). The
+# ingest contract (validated by PM parseDeployEvent, which coerces these quoted
+# shell strings to ints): {siteId, step, status, startedAt, durationMs?, error?}.
+# STEP_NAME/STEP_START_MS are module-level shell state set by step_start so the
+# matching step_ok/step_fail can compute durationMs without repeating the name.
+STEP_NAME=""
+STEP_START_MS=0
+
+emit_event() {
+  # $1=step $2=status(started|ok|failed) $3=optional startedAt(ms) $4=optional durationMs $5=optional error
+  if [ -z "$EVENTS_URL" ]; then return; fi
+  local extra=""
+  if [ -n "\${3:-}" ]; then extra="$extra,\\"startedAt\\":\\"$3\\""; fi
+  if [ -n "\${4:-}" ]; then extra="$extra,\\"durationMs\\":\\"$4\\""; fi
+  if [ -n "\${5:-}" ]; then
+    local e
+    e=$(printf '%s' "$5" | tr '"\\n' '  ' | cut -c1-200)
+    extra="$extra,\\"error\\":\\"$e\\""
+  fi
+  local body="{\\"siteId\\":\\"$SITE_ID\\",\\"step\\":\\"$1\\",\\"status\\":\\"$2\\"$extra}"
+  curl -sS -X POST "$EVENTS_URL" \
+    -H "Authorization: Bearer $DEPLOYER_SECRET" \
+    -H "Content-Type: application/json" \
+    --data "$body" || true
+}
+
+now_ms() { date +%s%3N; }
+
+step_start() {
+  # $1=step name. Records start time + emits a started event.
+  STEP_NAME="$1"
+  STEP_START_MS=$(now_ms)
+  emit_event "$STEP_NAME" started "$STEP_START_MS"
+}
+
+step_ok() {
+  emit_event "$STEP_NAME" ok "$STEP_START_MS" "$(( $(now_ms) - STEP_START_MS ))"
+}
+
+step_fail() {
+  # $1=optional error text. Emits the failed event for the in-flight step.
+  emit_event "$STEP_NAME" failed "$STEP_START_MS" "$(( $(now_ms) - STEP_START_MS ))" "\${1:-}"
+}
+# ----------------------------------------------------------------------------
+
 run() {
   echo "+ $*"
   if ! "$@"; then
@@ -296,6 +348,7 @@ exec > >(tee /workspace/build.log) 2>&1
 
 rm -rf /workspace/src
 
+step_start clone
 # Auth the private clone via a git config Authorization header sourced from env,
 # so the token never appears in argv/ps or the stored remote URL. GIT_CONFIG_*
 # lets git read config keys from the environment (value is pre-expanded here).
@@ -305,15 +358,20 @@ export GIT_CONFIG_VALUE_0="Authorization: Basic $(printf 'x-access-token:%s' "$G
 git clone --depth 1 --branch "$REF" "$REPO_URL" /workspace/src
 clone_rc=$?
 unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
-if [ $clone_rc -ne 0 ]; then report failed "git clone failed"; exit 1; fi
+if [ $clone_rc -ne 0 ]; then step_fail "git clone failed"; report failed "git clone failed"; exit 1; fi
+step_ok
 
 cd /workspace/src/CMS || { report failed "CMS dir missing"; exit 1; }
 
+step_start npm
 npm ci || npm install
-if [ $? -ne 0 ]; then report failed "npm install failed"; exit 1; fi
+if [ $? -ne 0 ]; then step_fail "npm install failed"; report failed "npm install failed"; exit 1; fi
+step_ok
 
+step_start build
 npx opennextjs-cloudflare build
-if [ $? -ne 0 ]; then report failed "opennext build failed"; exit 1; fi
+if [ $? -ne 0 ]; then step_fail "opennext build failed"; report failed "opennext build failed"; exit 1; fi
+step_ok
 
 # --- Per-Site infra provisioning (idempotent) -------------------------------
 # Each Site gets its OWN D1 + R2 bucket (the DB/bucket IS the Site boundary).
@@ -325,14 +383,16 @@ if [ $? -ne 0 ]; then report failed "opennext build failed"; exit 1; fi
 DB_NAME="bizbeecms-cms-$SLUG"
 BUCKET_NAME="bizbeecms-cms-media-$SLUG"
 
+step_start provision
 # D1: create if absent, then resolve its id (create is not idempotent — it errors
 # if the db exists — so we always read the id back from \`d1 info\`).
 npx wrangler d1 create "$DB_NAME" >/dev/null 2>&1 || true
 DB_ID=$(npx wrangler d1 info "$DB_NAME" --json 2>/dev/null | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
-if [ -z "$DB_ID" ]; then report failed "d1 provision failed for $DB_NAME"; exit 1; fi
+if [ -z "$DB_ID" ]; then step_fail "d1 provision failed for $DB_NAME"; report failed "d1 provision failed for $DB_NAME"; exit 1; fi
 
 # R2: create if absent (errors harmlessly if it already exists).
 npx wrangler r2 bucket create "$BUCKET_NAME" >/dev/null 2>&1 || true
+step_ok
 
 # Patch the cloned CMS/wrangler.jsonc: real D1 id + per-Site bucket name. The
 # placeholders are fixed known strings, so a literal substitution is safe.
@@ -343,8 +403,10 @@ sed -i "s/\\"bucket_name\\": \\"bizbeecms-cms-media\\"/\\"bucket_name\\": \\"$BU
 # (not $DB_NAME) — \`migrations apply\` resolves the target from wrangler.jsonc,
 # which we just patched with the real id; the generic database_name doesn't match
 # the per-Site db, but the DB binding now points at it.
+step_start migrate
 npx wrangler d1 migrations apply DB --remote
-if [ $? -ne 0 ]; then report failed "d1 migrations failed for $DB_NAME"; exit 1; fi
+if [ $? -ne 0 ]; then step_fail "d1 migrations failed for $DB_NAME"; report failed "d1 migrations failed for $DB_NAME"; exit 1; fi
+step_ok
 # ----------------------------------------------------------------------------
 
 # Inject the Sec1 CMS admin-auth vars (SITE_ID lets the guard run PM's reach
@@ -352,11 +414,13 @@ if [ $? -ne 0 ]; then report failed "d1 migrations failed for $DB_NAME"; exit 1;
 # overriding the empty placeholders in CMS/wrangler.jsonc. Values come from the
 # process env (never inlined), so nothing caller-controlled reaches the shell.
 # The D1/R2 bindings now come from the patched wrangler.jsonc above.
+step_start deploy
 npx wrangler deploy --name "$WORKER_NAME" --compatibility-date 2025-09-01 \
   --var "SITE_ID:$SITE_ID" \
   --var "PM_ORIGIN:$PM_ORIGIN" \
   --var "CMS_AUTH_SECRET:$CMS_AUTH_SECRET"
-if [ $? -ne 0 ]; then report failed "wrangler deploy failed"; exit 1; fi
+if [ $? -ne 0 ]; then step_fail "wrangler deploy failed"; report failed "wrangler deploy failed"; exit 1; fi
+step_ok
 
 report deployed
 echo "DONE"

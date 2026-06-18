@@ -36,3 +36,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   `parseDeployEvent` coerces shell strings → ints, so curl emitting numbers as quoted strings is fine.
 - **Apply migration 0003 to live D1 (HITL)** before slice 2 emits to a deployed PM, or the ingest
   POST 500s on a missing `deploy_events` table.
+- **`date +%s%3N` is GNU-only.** Slice 2's `now_ms()` uses it; works in the Linux container but
+  prints a literal `N` on macOS/BSD — so the bash emit helpers can only be functionally tested on
+  Linux (or with a stubbed `now_ms`). Don't "fix" it for macOS; the container is GNU/Linux.
+- **Render-then-bash-check the deployer script offline:** the build script is a JS template literal.
+  `node -e` to `eval` the literal (proves no stray un-escaped `${}` JS interpolation) → write to a
+  file → `bash -n` for syntax. Real `${}` shell refs must be written `\${...}` in the .ts source.
+- **Deployer gate is `npx wrangler deploy --dry-run`, NOT opennextjs build.** The deployer is a plain
+  Worker (no Next). Dry-run bundles the TS + builds the Sandbox container image = full validation.
+- **Slice 2 emits `step_fail` BEFORE the existing `report failed`** on each checkpoint, so both the
+  per-step trail and the final single callback fire. Don't remove either; they serve different sinks.
