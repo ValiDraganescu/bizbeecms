@@ -90,7 +90,8 @@
     "save": "Salvesta",
     "saving": "Salvestan…",
     "cancel": "Tühista",
-    "invalidSlug": "Sisesta kehtiv kärgtunnus: väiketähed, numbrid ja sidekriipsud."
+    "invalidSlug": "Sisesta kehtiv kärgtunnus: väiketähed, numbrid ja sidekriipsud.",
+    "editBlocks": "Muuda plokke"
   },
   "brand": {
     "title": "Bränd & AI persoona",
@@ -119,5 +120,21 @@
     "save": "Salvesta",
     "saving": "Salvestamine…",
     "saved": "Brändiseaded salvestatud."
+  },
+  "pageBlocks": {
+    "title": "Muuda plokke",
+    "subtitle": "Koosta ja järjesta selle lehe plokid:",
+    "backToPages": "← Tagasi lehtede juurde",
+    "component": "Komponent",
+    "noComponents": "Komponente veel pole. Loo esmalt üks AI-vestluses.",
+    "addBlock": "Lisa plokk",
+    "empty": "Plokke veel pole. Lisa üks ülaltoodud paletist.",
+    "remove": "Eemalda",
+    "removeOne": "Eemalda plokk {component}",
+    "moveUp": "Liiguta {component} üles",
+    "moveDown": "Liiguta {component} alla",
+    "save": "Salvesta plokid",
+    "saving": "Salvestan…",
+    "saved": "Plokid salvestatud."
   }
 }

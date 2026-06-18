@@ -170,6 +170,12 @@ export function PagesManager({
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                <a
+                  href={`/admin/pages/${encodeURIComponent(p.id)}/blocks`}
+                  className="rounded border border-border px-2 py-1 text-foreground-muted hover:text-foreground"
+                >
+                  {t("editBlocks")}
+                </a>
                 <button
                   type="button"
                   className="rounded border border-border px-2 py-1 text-foreground-muted hover:text-foreground disabled:opacity-40"

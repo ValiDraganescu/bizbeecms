@@ -90,7 +90,8 @@
     "save": "Tallenna",
     "saving": "Tallennetaan…",
     "cancel": "Peruuta",
-    "invalidSlug": "Anna kelvollinen polkutunnus: pieniä kirjaimia, numeroita ja väliviivoja."
+    "invalidSlug": "Anna kelvollinen polkutunnus: pieniä kirjaimia, numeroita ja väliviivoja.",
+    "editBlocks": "Muokkaa lohkoja"
   },
   "brand": {
     "title": "Brändi & tekoälyn persoona",
@@ -119,5 +120,21 @@
     "save": "Tallenna",
     "saving": "Tallennetaan…",
     "saved": "Brändiasetukset tallennettu."
+  },
+  "pageBlocks": {
+    "title": "Muokkaa lohkoja",
+    "subtitle": "Kokoa ja järjestä tämän sivun lohkot:",
+    "backToPages": "← Takaisin sivuihin",
+    "component": "Komponentti",
+    "noComponents": "Ei komponentteja vielä. Luo ensin yksi tekoälykeskustelussa.",
+    "addBlock": "Lisää lohko",
+    "empty": "Ei lohkoja vielä. Lisää yksi yllä olevasta paletista.",
+    "remove": "Poista",
+    "removeOne": "Poista lohko {component}",
+    "moveUp": "Siirrä {component} ylös",
+    "moveDown": "Siirrä {component} alas",
+    "save": "Tallenna lohkot",
+    "saving": "Tallennetaan…",
+    "saved": "Lohkot tallennettu."
   }
 }

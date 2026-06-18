@@ -15,6 +15,7 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "./index";
 import type { PageInput } from "@/lib/chat/page-tool";
 import type { PageMetaInput } from "@/lib/pages/page-meta";
+import { parseJsonColumn, type Block } from "@/lib/render/tree";
 import type { Page } from "./schema";
 
 /** Return the subset of `names` that have no matching `component.name` in D1. */
@@ -252,6 +253,62 @@ export async function upsertPageMeta(
     updatedAt: now,
   });
   return { ok: true, id: newId, action: "created" };
+}
+
+// ── C3 block-tree editing (non-AI visual compose/reorder) ────────────────────
+
+/**
+ * Read one page's block tree for the visual editor (C3). Returns the page slug
+ * (for the header) + its parsed blocks, or null if the page is gone. Distinct
+ * read for C3 since `getPageById`/`PageSummary` deliberately omit blocks.
+ */
+export async function getPageBlocks(
+  id: string,
+): Promise<{ id: string; slug: string; blocks: Block[] } | null> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: schema.page.id, slug: schema.page.slug, blocks: schema.page.blocks })
+    .from(schema.page)
+    .where(eq(schema.page.id, id))
+    .limit(1);
+  if (rows.length === 0) return null;
+  return {
+    id: rows[0].id,
+    slug: rows[0].slug,
+    blocks: parseJsonColumn<Block[]>(rows[0].blocks, []),
+  };
+}
+
+/**
+ * Persist a page's block tree (C3) WITHOUT touching its metadata — the inverse
+ * of `upsertPageMeta` (which preserves blocks). This is C3's dedicated write
+ * contract; do NOT route block edits through upsertPageMeta or the AI's
+ * `upsertPage`. Blocks are already shape-validated by `validateBlocks` (pure);
+ * the caller verifies referenced components exist. Returns ok or "page not found".
+ */
+export async function setPageBlocks(
+  id: string,
+  blocks: Block[],
+): Promise<{ ok: true } | { ok: false; errors: string[] }> {
+  const db = await getDb();
+  const existing = await db
+    .select({ id: schema.page.id })
+    .from(schema.page)
+    .where(eq(schema.page.id, id))
+    .limit(1);
+  if (existing.length === 0) return { ok: false, errors: ["page not found"] };
+  await db
+    .update(schema.page)
+    .set({ blocks: JSON.stringify(blocks), updatedAt: new Date() })
+    .where(eq(schema.page.id, id));
+  return { ok: true };
+}
+
+/** List the Site's component names for the C3 block palette (sorted). */
+export async function listComponentNamesForPalette(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db.select({ name: schema.component.name }).from(schema.component);
+  return rows.map((r) => r.name).sort((a, b) => a.localeCompare(b));
 }
 
 /** Delete a page. Refuses if it still has children (avoid orphaning the tree). */

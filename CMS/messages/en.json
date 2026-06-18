@@ -90,7 +90,8 @@
     "save": "Save",
     "saving": "Saving…",
     "cancel": "Cancel",
-    "invalidSlug": "Enter a valid slug: lowercase letters, digits and hyphens."
+    "invalidSlug": "Enter a valid slug: lowercase letters, digits and hyphens.",
+    "editBlocks": "Edit blocks"
   },
   "brand": {
     "title": "Brand & AI persona",
@@ -119,5 +120,21 @@
     "save": "Save",
     "saving": "Saving…",
     "saved": "Brand settings saved."
+  },
+  "pageBlocks": {
+    "title": "Edit blocks",
+    "subtitle": "Compose and reorder the blocks on this page:",
+    "backToPages": "← Back to pages",
+    "component": "Component",
+    "noComponents": "No components yet. Create one in the AI chat first.",
+    "addBlock": "Add block",
+    "empty": "No blocks yet. Add one from the palette above.",
+    "remove": "Remove",
+    "removeOne": "Remove {component} block",
+    "moveUp": "Move {component} up",
+    "moveDown": "Move {component} down",
+    "save": "Save blocks",
+    "saving": "Saving…",
+    "saved": "Blocks saved."
   }
 }
