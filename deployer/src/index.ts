@@ -277,9 +277,15 @@ report() {
     body="{\\"siteId\\":\\"$SITE_ID\\",\\"deployId\\":\\"$DEPLOY_ID\\",\\"status\\":\\"deployed\\",\\"workerName\\":\\"$WORKER_NAME\\"}"
   else
     # keep error short + JSON-safe
-    # Include the tail of the build log so the failure is self-explanatory in PM,
-    # not just a step name. JSON-escape: strip quotes/newlines/backslashes/tabs.
-    tail_log=$(tail -n 25 /workspace/build.log 2>/dev/null | tr '"\\\\\\n\\t' '    ' | cut -c1-1500)
+    # Include the build log so the failure is self-explanatory in PM. A plain
+    # tail is useless when esbuild's Go runtime panics — it dumps hundreds of
+    # goroutine frames that push the REAL error (the "✘ [ERROR]" / resolve /
+    # syntax line) out of the tail. So grep the meaningful error lines FIRST,
+    # then append a short tail for context. JSON-escape: strip quotes/newlines/
+    # backslashes/tabs.
+    err_lines=$(grep -aE '✘|\\[ERROR\\]|Could not resolve|error:|Error:|Unexpected|Cannot find|Module not found|SyntaxError' /workspace/build.log 2>/dev/null | head -n 20)
+    tail_lines=$(tail -n 15 /workspace/build.log 2>/dev/null)
+    tail_log=$(printf '%s\\n--- tail ---\\n%s' "$err_lines" "$tail_lines" | tr '"\\\\\\n\\t' '    ' | cut -c1-1800)
     err=$(printf '%s' "\${2:-}" | tr '"\\n' '  ' | cut -c1-200)
     body="{\\"siteId\\":\\"$SITE_ID\\",\\"deployId\\":\\"$DEPLOY_ID\\",\\"status\\":\\"failed\\",\\"error\\":\\"$err\\",\\"log\\":\\"$tail_log\\"}"
   fi
@@ -388,6 +394,14 @@ step_start npm
 npm ci || npm install
 if [ $? -ne 0 ]; then step_fail "npm install failed"; report failed "npm install failed"; exit 1; fi
 step_ok
+
+# Regenerate cloudflare-env.d.ts (the typed \`CloudflareEnv\` + Workers runtime
+# globals like R2ObjectBody). It is .gitignored, so a fresh clone lacks it and
+# \`opennextjs-cloudflare build\` (which runs tsc) fails with "Cannot find name
+# 'R2ObjectBody'" / "Property 'DB' does not exist on type 'CloudflareEnv'".
+# \`wrangler types\` derives it deterministically from CMS/wrangler.jsonc.
+npm run cf-typegen
+if [ $? -ne 0 ]; then step_fail "cf-typegen failed"; report failed "cf-typegen failed"; exit 1; fi
 
 step_start build
 # Sample free RAM (best-effort) for the OOM-prone build step; reported on the

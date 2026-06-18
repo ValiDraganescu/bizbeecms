@@ -11,6 +11,12 @@
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
+    "types": [
+      "node",
+      "react",
+      "react-dom",
+      "@cloudflare/workers-types"
+    ],
     "module": "esnext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
