@@ -209,8 +209,11 @@ npx wrangler r2 bucket create "$BUCKET_NAME" >/dev/null 2>&1 || true
 sed -i "s/00000000-0000-0000-0000-000000000000/$DB_ID/" wrangler.jsonc
 sed -i "s/\\"bucket_name\\": \\"bizbeecms-cms-media\\"/\\"bucket_name\\": \\"$BUCKET_NAME\\"/" wrangler.jsonc
 
-# Apply CMS migrations to the (now real) per-Site D1.
-npx wrangler d1 migrations apply "$DB_NAME" --remote
+# Apply CMS migrations to the (now real) per-Site D1. Use the BINDING name "DB"
+# (not $DB_NAME) — \`migrations apply\` resolves the target from wrangler.jsonc,
+# which we just patched with the real id; the generic database_name doesn't match
+# the per-Site db, but the DB binding now points at it.
+npx wrangler d1 migrations apply DB --remote
 if [ $? -ne 0 ]; then report failed "d1 migrations failed for $DB_NAME"; exit 1; fi
 # ----------------------------------------------------------------------------
 
