@@ -5,6 +5,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE: **C3 follow-on: block-prop → component-prop binding (G1's missing half).** `lib/render/tree.ts` now binds a block's DECLARED props into `{{prop}}` slots (text nodes + string prop values) of the referenced component's tree before planning. Allowlist = component's `propsSchema` keys; undeclared block props AND undeclared `{{slots}}` are dropped to ""; locale-object values resolved first; bound values land as plain text/data (React escapes downstream — no HTML injection, no eval). Route maps `propsSchema` into the component map. Blog-kit components rewritten to use `{{slots}}`. 6 new node tests (binds / undeclared dropped / undeclared slot empty / unsafe escaped / no-schema passthrough / locale resolve). CMS 193/193, PM 32/32, tsc clean, opennext build gate (via bundle:cms) clean, bundle regenerated.
 - DONE: Scaffold the PM Next.js app under `ProjectManager/` wired for Cloudflare Workers deployment (OpenNext / wrangler config). Hello-world + /api/health building; `opennextjs-cloudflare build` emits a worker bundle.
 - DONE: Scaffold the default Next.js install under `CMS/` (mirrors PM OpenNext/wrangler wiring; `next build` + `opennextjs-cloudflare build` both pass).
 - DONE: Add Cloudflare D1 binding + initial schema/migrations for users, invites, sites, site_users. (drizzle-orm/d1; schema in src/db/schema.ts, migration 0000 generated; DB+SESSIONS bindings in wrangler.jsonc with placeholder ids.)

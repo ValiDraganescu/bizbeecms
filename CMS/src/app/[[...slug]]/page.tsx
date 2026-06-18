@@ -93,6 +93,7 @@ async function loadPlan(params: RouteParams) {
         name: row.name,
         tree: parseJsonColumn<TreeNode>(row.tree, ""),
         script: row.script || undefined,
+        propsSchema: row.propsSchema,
       });
     }
   }

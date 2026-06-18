@@ -124,6 +124,109 @@ test("planPage: children of a text-root component surface a placeholder", () => 
   assert.match(root[0].props["data-render-error"], /cannot host children/);
 });
 
+// ── block-prop → component-prop binding (G1 follow-on) ───────────────────────
+
+// A component with `{{slot}}`s in text + a string prop, declaring its props.
+const bindable = {
+  name: "Hero",
+  tree: {
+    tag: "a",
+    props: { href: "{{href}}", className: "hero" },
+    children: [
+      { tag: "h1", children: ["{{title}}"] },
+      { tag: "p", children: ["{{subtitle}}"] },
+    ],
+  },
+  propsSchema: JSON.stringify({
+    title: { type: "string", default: "T" },
+    subtitle: { type: "string", default: "" },
+    href: { type: "string", default: "#" },
+  }),
+};
+
+// Find a text plan by walking the plan tree (helper for assertions).
+function texts(plan, out = []) {
+  if (plan.kind === "text") out.push(plan.text);
+  else for (const c of plan.children) texts(c, out);
+  return out;
+}
+
+test("planPage binding: a declared prop binds into its slot (text + prop value)", () => {
+  const { root } = planPage(
+    [
+      {
+        id: "1",
+        component: "Hero",
+        props: { title: "Hello", subtitle: "World", href: "/post/1" },
+      },
+    ],
+    mapOf(bindable),
+  );
+  assert.equal(root[0].props.href, "/post/1");
+  assert.deepEqual(texts(root[0]), ["Hello", "World"]);
+});
+
+test("planPage binding: an UNDECLARED block prop is dropped (never reaches the tree)", () => {
+  // `evil` is not in propsSchema and has no slot; `title` binds normally.
+  const { root } = planPage(
+    [{ id: "1", component: "Hero", props: { title: "Hi", evil: "PWNED" } }],
+    mapOf(bindable),
+  );
+  const all = JSON.stringify(root[0]);
+  assert.ok(!all.includes("PWNED"), "undeclared prop must not appear anywhere");
+  assert.deepEqual(texts(root[0]), ["Hi", ""]); // subtitle unbound → ""
+});
+
+test("planPage binding: an undeclared {{slot}} resolves to empty, not the literal", () => {
+  const comp = {
+    name: "Leaky",
+    tree: { tag: "p", children: ["{{secret}}"] },
+    // secret is NOT declared
+    propsSchema: JSON.stringify({ title: { type: "string" } }),
+  };
+  const { root } = planPage(
+    [{ id: "1", component: "Leaky", props: { secret: "x" } }],
+    mapOf(comp),
+  );
+  assert.deepEqual(texts(root[0]), [""]);
+});
+
+test("planPage binding: an unsafe value stays plain text (no HTML injection)", () => {
+  // The bound value is placed as plain text/prop DATA — the plan never holds
+  // raw HTML; React escapes it downstream. We assert the value is the LITERAL
+  // string (so React renders &lt;script&gt;, not a live <script>).
+  const { root } = planPage(
+    [
+      {
+        id: "1",
+        component: "Hero",
+        props: { title: "<script>alert(1)</script>", href: "javascript:1" },
+      },
+    ],
+    mapOf(bindable),
+  );
+  assert.deepEqual(texts(root[0])[0], "<script>alert(1)</script>");
+  assert.equal(root[0].props.href, "javascript:1"); // verbatim data, React-escaped on render
+});
+
+test("planPage binding: no propsSchema → nothing binds, slots pass through verbatim", () => {
+  const comp = { name: "Raw", tree: { tag: "p", children: ["{{x}}"] } };
+  const { root } = planPage(
+    [{ id: "1", component: "Raw", props: { x: "v" } }],
+    mapOf(comp),
+  );
+  assert.deepEqual(texts(root[0]), ["{{x}}"]); // undeclared component = no binding
+});
+
+test("planPage binding: locale-object prop value resolves before binding", () => {
+  const { root } = planPage(
+    [{ id: "1", component: "Hero", props: { title: { en: "Hi", fi: "Moi" } } }],
+    mapOf(bindable),
+    { locale: "fi", fallback: "en" },
+  );
+  assert.equal(texts(root[0])[0], "Moi");
+});
+
 // ── parseJsonColumn ───────────────────────────────────────────────────────────
 
 test("parseJsonColumn: parses valid JSON", () => {

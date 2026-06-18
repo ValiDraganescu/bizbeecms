@@ -50,9 +50,12 @@ function bundle(component: PortableComponent["component"]): PortableComponent {
  * state) so an install can't be corrupted by a previous one. Order is the
  * natural compose order (header → body → author → list item → list).
  *
- * Props are plain placeholders here (the AI/user binds real content/page-block
- * props later). Block-prop → component-prop binding is a separate epic; these
- * render with their authored defaults until then.
+ * Each component declares its props in `propsSchema` AND marks where that content
+ * goes with `{{propName}}` slots in the tree text (block-prop → component-prop
+ * binding, the G1 follow-on). A page block supplies values via `block.props`;
+ * the renderer (`planPage` → `bindTree`) substitutes declared slots and escapes
+ * the values. Unbound slots render as "" (so a block with no props shows a clean
+ * shell rather than `{{title}}` literals). Only props in `propsSchema` bind.
  */
 export function blogKit(): PortableComponent[] {
   return [
@@ -66,12 +69,12 @@ export function blogKit(): PortableComponent[] {
           {
             tag: "h1",
             props: { className: "text-4xl font-bold text-foreground leading-tight" },
-            children: ["Post title"],
+            children: ["{{title}}"],
           },
           {
             tag: "p",
             props: { className: "text-sm text-foreground-muted" },
-            children: ["January 1, 2026 · By Author"],
+            children: ["{{date}} · By {{author}}"],
           },
         ],
       },
@@ -94,10 +97,7 @@ export function blogKit(): PortableComponent[] {
           {
             tag: "p",
             props: { className: "text-base" },
-            children: [
-              "Write your post here. This component is a comfortable reading column; " +
-                "compose paragraphs, headings and images inside it.",
-            ],
+            children: ["{{body}}"],
           },
         ],
       },
@@ -126,12 +126,12 @@ export function blogKit(): PortableComponent[] {
           {
             tag: "span",
             props: { className: "text-lg font-semibold text-foreground" },
-            children: ["Author Name"],
+            children: ["{{name}}"],
           },
           {
             tag: "p",
             props: { className: "text-sm text-foreground-muted" },
-            children: ["A short author bio goes here."],
+            children: ["{{bio}}"],
           },
         ],
       },
@@ -149,7 +149,7 @@ export function blogKit(): PortableComponent[] {
       tree: {
         tag: "a",
         props: {
-          href: "#",
+          href: "{{href}}",
           className:
             "flex flex-col gap-1 rounded border border-border bg-surface-raised p-4",
         },
@@ -157,17 +157,17 @@ export function blogKit(): PortableComponent[] {
           {
             tag: "span",
             props: { className: "text-xl font-semibold text-primary" },
-            children: ["Post title"],
+            children: ["{{title}}"],
           },
           {
             tag: "span",
             props: { className: "text-xs text-foreground-muted" },
-            children: ["January 1, 2026"],
+            children: ["{{date}}"],
           },
           {
             tag: "p",
             props: { className: "text-sm text-foreground-muted" },
-            children: ["A one-line excerpt of the post goes here."],
+            children: ["{{excerpt}}"],
           },
         ],
       },
@@ -191,7 +191,7 @@ export function blogKit(): PortableComponent[] {
           {
             tag: "h2",
             props: { className: "text-2xl font-bold text-foreground" },
-            children: ["Latest posts"],
+            children: ["{{heading}}"],
           },
           {
             tag: "div",

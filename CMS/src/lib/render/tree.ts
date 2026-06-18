@@ -41,6 +41,10 @@ export type ComponentArtifact = {
   name: string;
   tree: TreeNode;
   script?: string;
+  // The component's declared props, a JSON string `{ name: { type, default } }`
+  // (B2/H2 `propsSchema` column). Only props DECLARED here can be bound from a
+  // page block — it is the allowlist for the `{{prop}}` slot binding below.
+  propsSchema?: string | null;
 };
 
 /**
@@ -91,6 +95,90 @@ export function planTree(node: TreeNode, locale?: LocaleContext): ElementPlan {
   };
 }
 
+// ── Block-prop → component-prop binding (epic G1 follow-on) ──────────────────
+//
+// A component author marks where page content goes with `{{propName}}` slots in
+// the tree's text nodes and STRING prop values. A page block supplies values via
+// `block.props`. Binding substitutes each slot with the block's value — but only
+// for props DECLARED in the component's `propsSchema` (the allowlist). This is a
+// SECURITY/CORRECTNESS boundary:
+//   - Only declared props bind. A `{{undeclared}}` slot is dropped to "" and an
+//     undeclared key in `block.props` is ignored (never reaches the tree).
+//   - Bound values are placed as plain text / plain prop DATA in the ElementPlan,
+//     so the existing plan→React adapter escapes them exactly like any other tree
+//     text. No HTML is interpolated, nothing is eval'd. An unsafe value like
+//     `<script>` ends up as the literal text `<script>` in the DOM.
+//   - Non-string block values are coerced to a string for substitution (objects/
+//     functions never reach the tree); locale objects are resolved first.
+
+/** Slot syntax: `{{ propName }}` — identifier only, optional inner whitespace. */
+const SLOT_RE = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
+
+/** Parse a component's propsSchema JSON into the set of declared prop names. */
+function declaredProps(propsSchema: string | null | undefined): Set<string> {
+  if (!propsSchema) return new Set();
+  try {
+    const parsed = JSON.parse(propsSchema);
+    if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return new Set();
+    }
+    return new Set(Object.keys(parsed as Record<string, unknown>));
+  } catch {
+    return new Set();
+  }
+}
+
+/** Coerce a bound value to the string that replaces a slot. */
+function slotString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  // Objects/arrays/functions are not valid slot content — drop to "".
+  return "";
+}
+
+/**
+ * Replace every `{{prop}}` slot in `text` using `values`, but only for props in
+ * `declared`. An undeclared slot (or a declared prop the block didn't supply) →
+ * "". The output is plain text; React escapes it downstream (no injection).
+ */
+function bindSlots(
+  text: string,
+  values: Record<string, unknown>,
+  declared: Set<string>,
+): string {
+  return text.replace(SLOT_RE, (_m, name: string) =>
+    declared.has(name) ? slotString(values[name]) : "",
+  );
+}
+
+/** Recursively bind block props into one component tree node (returns a new node). */
+function bindTree(
+  node: TreeNode,
+  values: Record<string, unknown>,
+  declared: Set<string>,
+): TreeNode {
+  if (typeof node === "string") return bindSlots(node, values, declared);
+  if (node == null || typeof node !== "object" || typeof node.tag !== "string") {
+    return node;
+  }
+  const props = node.props;
+  let boundProps = props;
+  if (props && typeof props === "object") {
+    boundProps = {};
+    for (const [k, v] of Object.entries(props)) {
+      boundProps[k] = typeof v === "string" ? bindSlots(v, values, declared) : v;
+    }
+  }
+  return {
+    tag: node.tag,
+    ...(boundProps ? { props: boundProps } : {}),
+    ...(node.children
+      ? { children: node.children.map((c) => bindTree(c, values, declared)) }
+      : {}),
+  };
+}
+
 /**
  * Resolve a page's block tree against a component map into a render plan.
  *
@@ -123,7 +211,24 @@ export function planPage(
       scripts.push(artifact.script);
     }
 
-    const el = planTree(artifact.tree, locale);
+    // Bind the block's DECLARED props into the component tree's `{{prop}}` slots
+    // before planning. Only props in the component's propsSchema bind; locale
+    // objects in the supplied values resolve to the active locale first.
+    let tree = artifact.tree;
+    if (block.props && typeof block.props === "object") {
+      const declared = declaredProps(artifact.propsSchema);
+      if (declared.size > 0) {
+        const values = locale
+          ? (resolveLocalized(block.props, locale.locale, locale.fallback) as Record<
+              string,
+              unknown
+            >)
+          : block.props;
+        tree = bindTree(tree, values, declared);
+      }
+    }
+
+    const el = planTree(tree, locale);
     const childPlans = (block.children ?? []).map(planBlock);
     if (childPlans.length === 0) return el;
     if (el.kind !== "element") {
