@@ -57,11 +57,33 @@ test("a non-CMS workers.dev host is NOT accepted as a static CMS host", () => {
   assert.deepEqual(r, { host: "bizbeecms-projectmanager.vali-draganescu88.workers.dev" });
 });
 
+test("classifyCmsReturnUrl rejects sub-subdomain squatting on our suffix", () => {
+  // endsWith(suffix) alone would pass this; the 4-label check rejects it.
+  const r = classifyCmsReturnUrl(
+    "https://bizbeecms-cms-x.evil.vali-draganescu88.workers.dev/api/auth/sso-callback",
+  );
+  assert.deepEqual(r, {
+    host: "bizbeecms-cms-x.evil.vali-draganescu88.workers.dev",
+  });
+});
+
 test("safeNextPath allows same-origin paths, rejects absolute + protocol-relative", () => {
   assert.equal(safeNextPath("/api/auth/cms-sso?return=x"), "/api/auth/cms-sso?return=x");
   assert.equal(safeNextPath("https://evil.com"), "/");
   assert.equal(safeNextPath("//evil.com"), "/");
   assert.equal(safeNextPath(null), "/");
+});
+
+test("safeNextPath rejects backslash, encoded-slash, and control-char bypasses", () => {
+  assert.equal(safeNextPath("/\\evil.com"), "/");
+  assert.equal(safeNextPath("/\\/evil.com"), "/");
+  assert.equal(safeNextPath("/%2fevil.com"), "/");
+  assert.equal(safeNextPath("/%5cevil.com"), "/");
+  assert.equal(safeNextPath("/%2Fevil.com"), "/"); // case-insensitive
+  assert.equal(safeNextPath("/\tevil"), "/"); // tab stripped during parse
+  assert.equal(safeNextPath("/\nevil"), "/"); // newline stripped during parse
+  // A legit nested path still survives.
+  assert.equal(safeNextPath("/sites/abc/deploy"), "/sites/abc/deploy");
 });
 
 test("newSsoNonce is 64 hex chars and unique per call", () => {
