@@ -16,4 +16,7 @@ export async function getDb() {
   return drizzle(env.DB, { schema });
 }
 
+/** The drizzle-D1 client type, schema-bound. Used as the injected-Db test seam. */
+export type Db = ReturnType<typeof drizzle<typeof schema>>;
+
 export { schema };

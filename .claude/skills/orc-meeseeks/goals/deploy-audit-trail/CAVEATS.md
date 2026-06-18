@@ -23,3 +23,16 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **Testing discipline enforced** (orc-test-review): no tautological mocks, no `toHaveBeenCalledWith`
   on internal collaborators. Test real event ordering/persistence against a fake D1, like the
   binding-adapters store tests.
+- **PM `node --test` can't resolve the `@/` alias** (CMS pattern: import via relative `.ts`). But the
+  **Next bundler** then rejected `.ts` import extensions until I added `allowImportingTsExtensions:
+  true` to PM tsconfig (CMS already had it). So PM lib code that's also unit-tested must use relative
+  `.ts` imports AND that tsconfig flag must stay set.
+- **Don't import PM `src/db/index.ts` at module top in a node-testable lib** — it pulls in
+  `@opennextjs/cloudflare` and has extensionless re-exports node can't resolve. Import `schema` from
+  `../../db/schema.ts` directly, import the `Db` *type* type-only (erased), and lazy `await import`
+  the index for `getDb()` only on the non-injected (production) path. See `lib/deploy/deploy-events.ts`.
+- **Reuse the slice-1 ingest contract in slice 2**: the bash script must POST
+  `{siteId, step, status: started|ok|failed, startedAt (ms epoch), durationMs?, error?, ramAvailableMb?}`.
+  `parseDeployEvent` coerces shell strings → ints, so curl emitting numbers as quoted strings is fine.
+- **Apply migration 0003 to live D1 (HITL)** before slice 2 emits to a deployed PM, or the ingest
+  POST 500s on a missing `deploy_events` table.

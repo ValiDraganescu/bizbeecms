@@ -7,10 +7,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 (Vertical slices, ordered so each leaves the deploy working. Core trail first, RAM last.)
 
-- TODO: **Schema + ingest API.** Add a `deploy_events` table to PM (Drizzle migration): id, siteId
-  (FK→sites), step, status (started|ok|failed), startedAt (ms), durationMs (nullable), error (nullable),
-  ramAvailableMb (nullable). Add PM `POST /api/deploy-events` (Bearer DEPLOYER_SECRET, mirrors
-  deploy-callback) that inserts one event. Unit-test insert + auth-reject against a fake D1.
+- DONE: **Schema + ingest API.** `deploy_events` table + migration `0003_curvy_dragon_man.sql`,
+  `POST /api/deploy-events` (Bearer DEPLOYER_SECRET), pure `parseDeployEvent`/`isAuthorized` +
+  injected-Db `insertDeployEvent`, fake-D1 unit tests (37 pass). (2026-06-18)
+  NOTE: migration 0003 NOT yet applied to live D1 — HITL `wrangler d1 migrations apply bizbeecms`
+  before the slice-2 bash-script emit hits a live PM (else the ingest 500s on a missing table).
 - TODO: **Emit per-step events from the bash script.** In `buildScript()`, wrap each step (clone, npm,
   build, provision, migrate, deploy) so it records start epoch, runs, then curls `POST /api/deploy-events`
   with {siteId, step, status, startedAt, durationMs, error?} — best-effort (`|| true`), values via env

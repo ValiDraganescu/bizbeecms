@@ -81,6 +81,35 @@ export const sites = sqliteTable(
   (t) => [uniqueIndex("sites_slug_unique").on(t.slug)],
 );
 
+/**
+ * Per-step audit trail of a Site's CMS deploy (deploy-audit-trail subgoal).
+ * The detached deployer bash script emits one row at the start and end of each
+ * ordered step (clone/npm/build/provision/migrate/deploy) to PM's
+ * `POST /api/deploy-events` (Bearer DEPLOYER_SECRET, service-to-service). Lets
+ * operators see the timeline: step name, when it started, how long it took, and
+ * any error text — instead of only the single terminal deploy-callback.
+ */
+export type DeployEventStatus = "started" | "ok" | "failed";
+
+export const deployEvents = sqliteTable("deploy_events", {
+  id: text("id").primaryKey(),
+  siteId: text("site_id")
+    .notNull()
+    .references(() => sites.id, { onDelete: "cascade" }),
+  step: text("step").notNull(),
+  status: text("status").notNull().$type<DeployEventStatus>(),
+  startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+  // Null until the step ends (the `ok`/`failed` event carries the duration).
+  durationMs: integer("duration_ms"),
+  // Captured stderr/log tail on a failed step; null otherwise.
+  error: text("error"),
+  // Container MemAvailable (MB) sampled around the heavy build step; nullable.
+  ramAvailableMb: integer("ram_available_mb"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
 export const siteUsers = sqliteTable(
   "site_users",
   {
@@ -137,3 +166,5 @@ export type UserCountry = typeof userCountries.$inferSelect;
 export type NewUserCountry = typeof userCountries.$inferInsert;
 export type InviteCountry = typeof inviteCountries.$inferSelect;
 export type NewInviteCountry = typeof inviteCountries.$inferInsert;
+export type DeployEvent = typeof deployEvents.$inferSelect;
+export type NewDeployEvent = typeof deployEvents.$inferInsert;
