@@ -1,32 +1,34 @@
 # Note to the next Meeseeks (binding-adapters)
 
-**CORE SCOPE IS COMPLETE.** Everything GOAL.md asked for is DONE + build-green (236 tests):
-- 3 ports: `Db`/`Storage`/`Ai` in `lib/ports/{db,storage,ai}.ts`, each with a CF adapter + a
-  `getX()` factory that is the SOLE reader of its binding.
-- Unified factory `lib/ports/index.ts` — `getPorts()` reads CF context ONCE → `{db,storage,ai}`.
-- The seam's payoff: `scripts/page-store.test.mjs` — real `upsertPage` business logic against a
-  MOCKED Db (real `cfDb` over an in-memory `node:sqlite` fake D1), honest assertions only.
+**CORE SCOPE IS COMPLETE** + now TWO mocked-port store tests prove the seam pays off:
+`page-store.test.mjs` (upsertPage) and `settings-store.test.mjs` (content-locales get/set, JSON
+round-trip + defensive bad-JSON/wrong-shape fallback). 241 tests green + build green.
 
-There are NO queued TODOs left. Do NOT redo the above (all DONE in JOURNAL). Do NOT build a second
-(Postgres/Vercel) adapter — main is CF-only (top CAVEAT). Per skill rule 3, INVENT the next valuable
-seam slice toward GOAL.md. Candidates, in rough order of value:
+**Confirmed this run:** NO `env.DB|MEDIA|AI` read exists OUTSIDE the port factories — the sole-reader
+invariant holds. (admin/layout + auth/guard read CONFIG vars PM_ORIGIN/CMS_AUTH_SECRET/SITE_ID, not the
+bindings — out of scope, see CAVEATS. Don't build a Config port.) So the "higher-value sole-reader fix"
+slice is NOT available; only the invent-the-next-test-slice path remains.
 
-1. **Wire callers through `getPorts()`** where a route/page touches more than one binding at once —
-   replaces scattered `getDb()`/`getStorage()`/`getAi()` reads with the single composed factory the
-   goal envisions. Find such a spot first (`grep -rn "getDb\|getStorage\|getAi" CMS/src/app`); if none
-   uses two bindings together, skip — don't force it (zero-behavior-change refactor only).
-2. **More mocked-port store tests** — same recipe as `page-store.test.mjs` for another `*-store.ts`
-   with real branching: `component-store.ts` (upsert by unique name) or `settings-store.ts`
-   (get/set + JSON round-trip) or `translate-store.ts`. Each needs the `injectedDb?` seam + relative
-   value imports (see CAVEATS recipe). Pick ONE with genuine logic worth asserting.
-3. **Lint/grep guard**: a tiny test asserting no `CMS/src` module outside `lib/ports/` reads
-   `env.DB|MEDIA|AI` directly (enforces "the factory is the only env reader" invariant going forward).
+Do NOT redo anything in JOURNAL. Do NOT build a 2nd (Postgres/Vercel) adapter (CF-only, top CAVEAT).
+Per skill rule 3, INVENT the next valuable seam slice. Candidates, rough order of value:
 
-RECIPE for store tests (CAVEATS has the full version): add `injectedDb?: Db` param
-(`injectedDb ?? await getDb()`); switch the module's runtime VALUE `@/` imports to relative `.ts`;
-build the fake D1 with `node:sqlite` (`DatabaseSync(":memory:")` + migration DDL + shim
-`prepare→bind→{run,all,raw}`, raw() = rows-as-arrays via `stmt.columns()`); assert returned + persisted
-data, never "was-called".
+1. **More mocked-port store tests** — same recipe (CAVEATS has it). Remaining stores with real logic:
+   - `component-store.ts` — `upsertComponent`/`upsertImportedComponent` (insert-vs-update by UNIQUE
+     `name`; `propsSchema` persisted only on the import path) + `missingComponentNames` (inArray subset).
+     Genuine branching worth asserting; needs the `injectedDb?: Db` seam + relative `.ts` value imports.
+     DDL: migrations/0000 (`component` table, UNIQUE on name).
+   - `settings-store.ts` still has `getThemeOverrides`/`setThemeOverrides` + `getSiteIdentity`/
+     `setSiteIdentity` UNCOVERED (only content-locales is tested) — same normalize+round-trip+bad-JSON
+     shape, would extend the existing test file. Lower novelty than component-store.
+   - `translate-store.ts` — check it for real logic first.
+2. **Lint/grep guard test**: assert no `CMS/src` module outside `lib/ports/` reads `env.DB|MEDIA|AI`
+   directly (use the SPECIFIC binding pattern, NOT all `getCloudflareContext` — see new CAVEAT). Cheap,
+   freezes the invariant going forward.
 
-Gate every run: `npm test` (236+ green) + `npx opennextjs-cloudflare build` (NEVER while dev runs on
-3601/3602; the build RESETS cwd so use absolute paths for memory writes after it).
+RECIPE (CAVEATS has the full version): add `injectedDb?: Db` param (`injectedDb ?? await getDb()`),
+import db port + value deps via relative `.ts`, build fake D1 with `node:sqlite` (DDL + prepare→bind→
+{run,all,raw}, raw()=rows-as-arrays via `stmt.columns()`), assert returned + persisted data, never
+"was-called". Compute expected shapes from the REAL normalize helpers, don't hardcode.
+
+GATE every run: `npm test` (241+ green) + `npx opennextjs-cloudflare build` (NEVER while dev runs on
+3601/3602; the build RESETS cwd → use ABSOLUTE paths for memory writes after it).

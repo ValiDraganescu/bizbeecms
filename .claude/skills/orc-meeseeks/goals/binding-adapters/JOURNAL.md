@@ -102,3 +102,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   236 green (was 231). Deploy gate `npx opennextjs-cloudflare build` succeeded.
 - **Files:** `CMS/src/db/page-store.ts` (+`injectedDb` param, relative value
   imports), `CMS/scripts/page-store.test.mjs` (new)
+
+## 2026-06-18 19:03 — Mocked-Db unit test of settings-store (content-locales)
+- **Status:** DONE
+- **What I did:** Added a second mocked-port store test, `scripts/settings-store.test.mjs` (5),
+  driving the REAL `getContentLocales`/`setContentLocales` via a new `injectedDb?: Db` seam against
+  the REAL `cfDb` over an in-memory `node:sqlite` fake D1 (real `site_settings` table). Honest
+  assertions on persisted rows + returned config: safe-default-when-unset (no write on read),
+  normalize→persist→read round-trip, key-keyed upsert (update-in-place, no dup row), AND the two
+  defensive read branches page-store lacks — present-but-garbage JSON and valid-JSON-wrong-shape both
+  fall back to `defaultContentLocales()` without throwing. Expected shapes come from the REAL
+  `normalizeContentLocales`/`defaultContentLocales` (not hardcoded), so a regression in store OR
+  normalizer is caught. Threaded `injectedDb` through `upsertSetting` + the content-locale accessors;
+  switched settings-store's runtime VALUE `@/` imports to relative `.ts` (db port + localize/theme/
+  site-settings) so node --test can load it — zero behavior change (prod path = `injectedDb ?? await getDb()`).
+- **Verified:** `npm test` 241 green (was 236, +5); `npx opennextjs-cloudflare build` green (deploy gate).
+  Confirmed no env.DB/MEDIA/AI read exists OUTSIDE the port factories — the sole-reader invariant still
+  holds (admin/layout + auth/guard read CONFIG vars PM_ORIGIN/CMS_AUTH_SECRET/SITE_ID, not the bindings,
+  so out of this goal's scope).
+- **Files:** CMS/scripts/settings-store.test.mjs (new), CMS/src/db/settings-store.ts (injectedDb seam + relative imports)

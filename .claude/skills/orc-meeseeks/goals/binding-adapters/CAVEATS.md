@@ -62,3 +62,8 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **CORE SCOPE IS COMPLETE.** All 3 ports (Db/Storage/Ai) + unified `getPorts()` factory + a
   mocked-port store unit test all DONE & build-green. There is no second adapter (CF-only — see top
   caveat). Further runs must INVENT the next valuable seam slice (rule 3), not redo these.
+- **`getCloudflareContext().env` reads OUTSIDE lib/ports are NOT all violations.** `admin/layout.tsx`
+  and `lib/auth/guard.ts` read `env.PM_ORIGIN`/`CMS_AUTH_SECRET`/`SITE_ID` — those are CONFIG VARS, not
+  the `DB`/`MEDIA`/`AI` BINDINGS this goal scopes. The sole-reader invariant is "the factory is the only
+  reader of env.DB|MEDIA|AI", and that holds. Don't build a Config/Env port for these — scope creep on a
+  CF-only goal. grep for `env\.DB|env\.MEDIA|env\.AI` specifically, not all `getCloudflareContext`.

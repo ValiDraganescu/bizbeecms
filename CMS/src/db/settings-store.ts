@@ -9,30 +9,34 @@
  * needs a real binding (HITL).
  */
 import { eq } from "drizzle-orm";
-import { getDb, schema } from "./index";
+import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import {
   type ContentLocales,
   defaultContentLocales,
   normalizeContentLocales,
-} from "@/lib/render/localize";
+} from "../lib/render/localize.ts";
 import {
   type ThemeOverrides,
   emptyThemeOverrides,
   normalizeThemeOverrides,
-} from "@/lib/render/theme";
+} from "../lib/render/theme.ts";
 import {
   type SiteIdentity,
   emptySiteIdentity,
   normalizeSiteIdentity,
-} from "@/lib/settings/site-settings";
+} from "../lib/settings/site-settings.ts";
 
 const CONTENT_LOCALES_KEY = "content_locales";
 const THEME_OVERRIDES_KEY = "theme_overrides";
 const SITE_IDENTITY_KEY = "site_identity";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
-async function upsertSetting(key: string, value: string): Promise<void> {
-  const db = await getDb();
+async function upsertSetting(
+  key: string,
+  value: string,
+  injectedDb?: Db,
+): Promise<void> {
+  const db = injectedDb ?? (await getDb());
   const now = new Date();
   const existing = await db
     .select({ key: schema.siteSettings.key })
@@ -53,8 +57,10 @@ async function upsertSetting(key: string, value: string): Promise<void> {
 }
 
 /** Read the per-Site content-locale config, or the safe default if unset. */
-export async function getContentLocales(): Promise<ContentLocales> {
-  const db = await getDb();
+export async function getContentLocales(
+  injectedDb?: Db,
+): Promise<ContentLocales> {
+  const db = injectedDb ?? (await getDb());
   const rows = await db
     .select({ value: schema.siteSettings.value })
     .from(schema.siteSettings)
@@ -73,9 +79,10 @@ export async function getContentLocales(): Promise<ContentLocales> {
 /** Upsert the content-locale config (normalized before write). */
 export async function setContentLocales(
   config: ContentLocales,
+  injectedDb?: Db,
 ): Promise<ContentLocales> {
   const normalized = normalizeContentLocales(config);
-  await upsertSetting(CONTENT_LOCALES_KEY, JSON.stringify(normalized));
+  await upsertSetting(CONTENT_LOCALES_KEY, JSON.stringify(normalized), injectedDb);
   return normalized;
 }
 

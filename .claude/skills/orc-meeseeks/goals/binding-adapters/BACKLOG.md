@@ -27,3 +27,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
   missing-parent rejection, same-slug-different-parent. 236 green + build. Proves the seam pays off.
 - DONE (2026-06-18): Zero-behavior-change verified — `npx opennextjs-cloudflare build` green + 236
   tests pass. binding-adapters CORE SCOPE COMPLETE (3 ports + unified factory + mocked-port unit test).
+- DONE (2026-06-18): 2nd mocked-Db store test — `scripts/settings-store.test.mjs` (5) drives REAL
+  `getContentLocales`/`setContentLocales` via `injectedDb?: Db` seam over `cfDb`+`node:sqlite` fake D1.
+  Covers safe-default, normalize/persist/read round-trip, key-keyed update-in-place, + defensive
+  bad-JSON & wrong-shape fallbacks. 241 green + build.
