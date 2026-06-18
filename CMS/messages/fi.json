@@ -54,5 +54,30 @@
     "copyUrl": "Kopioi URL",
     "copied": "Kopioitu!",
     "delete": "Poista"
+  },
+  "pages": {
+    "title": "Sivut",
+    "subtitle": "Luo ja hallitse sivustosi sivuja — polkutunnus, hierarkia, julkaisutila ja kielikohtainen SEO.",
+    "new": "Uusi sivu",
+    "newTitle": "Uusi sivu",
+    "editTitle": "Muokkaa sivua",
+    "empty": "Ei sivuja vielä. Luo ensimmäinen sivusi.",
+    "slug": "Polkutunnus",
+    "slugPlaceholder": "esim. pricing tai home",
+    "parent": "Yläsivu",
+    "noParent": "Ei mitään (ylätaso)",
+    "status": "Tila",
+    "draft": "Luonnos",
+    "published": "Julkaistu",
+    "seo": "SEO-tiedot",
+    "metaTitle": "SEO-otsikko",
+    "metaDescription": "SEO-kuvaus",
+    "edit": "Muokkaa",
+    "delete": "Poista",
+    "deleteOne": "Poista sivu {slug}",
+    "save": "Tallenna",
+    "saving": "Tallennetaan…",
+    "cancel": "Peruuta",
+    "invalidSlug": "Anna kelvollinen polkutunnus: pieniä kirjaimia, numeroita ja väliviivoja."
   }
 }

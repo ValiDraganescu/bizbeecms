@@ -54,5 +54,30 @@
     "copyUrl": "Copy URL",
     "copied": "Copied!",
     "delete": "Delete"
+  },
+  "pages": {
+    "title": "Pages",
+    "subtitle": "Create and manage your site pages — slug, hierarchy, publish status, and per-language SEO.",
+    "new": "New page",
+    "newTitle": "New page",
+    "editTitle": "Edit page",
+    "empty": "No pages yet. Create your first page.",
+    "slug": "Slug",
+    "slugPlaceholder": "e.g. pricing or home",
+    "parent": "Parent page",
+    "noParent": "None (top-level)",
+    "status": "Status",
+    "draft": "Draft",
+    "published": "Published",
+    "seo": "SEO metadata",
+    "metaTitle": "SEO title",
+    "metaDescription": "SEO description",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteOne": "Delete page {slug}",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "invalidSlug": "Enter a valid slug: lowercase letters, digits and hyphens."
   }
 }

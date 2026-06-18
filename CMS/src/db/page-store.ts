@@ -11,9 +11,11 @@
  *
  * Build-verified only: the live D1 read/write needs a real binding (HITL).
  */
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "./index";
 import type { PageInput } from "@/lib/chat/page-tool";
+import type { PageMetaInput } from "@/lib/pages/page-meta";
+import type { Page } from "./schema";
 
 /** Return the subset of `names` that have no matching `component.name` in D1. */
 export async function missingComponents(names: string[]): Promise<string[]> {
@@ -98,4 +100,173 @@ export async function upsertPage(
     updatedAt: now,
   });
   return { ok: true, action: "created", slug: page.slug };
+}
+
+// ── C2 page-management UI (non-AI authoring of page metadata) ────────────────
+
+/** A page row for the admin list/editor (blocks omitted — C3 edits those). */
+export interface PageSummary {
+  id: string;
+  slug: string;
+  parentPageId: string | null;
+  parentSlug: string | null;
+  publishStatus: string;
+  metaTitle: Record<string, string>;
+  metaDescription: Record<string, string>;
+  updatedAt: number;
+}
+
+function parseMap(json: string): Record<string, string> {
+  try {
+    const v = JSON.parse(json);
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const out: Record<string, string> = {};
+      for (const [k, val] of Object.entries(v)) if (typeof val === "string") out[k] = val;
+      return out;
+    }
+  } catch {
+    /* corrupt JSON → empty map */
+  }
+  return {};
+}
+
+function toSummary(row: Page, idToSlug: Map<string, string>): PageSummary {
+  return {
+    id: row.id,
+    slug: row.slug,
+    parentPageId: row.parentPageId,
+    parentSlug: row.parentPageId ? idToSlug.get(row.parentPageId) ?? null : null,
+    publishStatus: row.publishStatus,
+    metaTitle: parseMap(row.metaTitle),
+    metaDescription: parseMap(row.metaDescription),
+    updatedAt: row.updatedAt.getTime(),
+  };
+}
+
+/** List all pages (parent slug resolved) ordered by parent then displayOrder/slug. */
+export async function listPages(): Promise<PageSummary[]> {
+  const db = await getDb();
+  const rows = await db
+    .select()
+    .from(schema.page)
+    .orderBy(asc(schema.page.parentPageId), asc(schema.page.displayOrder), asc(schema.page.slug));
+  const idToSlug = new Map(rows.map((r) => [r.id, r.slug]));
+  return rows.map((r) => toSummary(r, idToSlug));
+}
+
+/** One page by id, or null. */
+export async function getPageById(id: string): Promise<PageSummary | null> {
+  const db = await getDb();
+  const rows = await db.select().from(schema.page).where(eq(schema.page.id, id)).limit(1);
+  if (rows.length === 0) return null;
+  const idToSlug = new Map<string, string>();
+  if (rows[0].parentPageId) {
+    const p = await db
+      .select({ id: schema.page.id, slug: schema.page.slug })
+      .from(schema.page)
+      .where(eq(schema.page.id, rows[0].parentPageId))
+      .limit(1);
+    if (p.length) idToSlug.set(p[0].id, p[0].slug);
+  }
+  return toSummary(rows[0], idToSlug);
+}
+
+/**
+ * Create a page from metadata (empty block tree) OR update the metadata of an
+ * existing page (`id` set) WITHOUT touching its blocks. Resolves `parentSlug`,
+ * enforces UNIQUE(parent, slug), and rejects parent cycles. Shape already
+ * validated by `validatePageMeta`.
+ */
+export async function upsertPageMeta(
+  meta: PageMetaInput,
+  id: string | null,
+): Promise<{ ok: true; id: string; action: "created" | "updated" } | { ok: false; errors: string[] }> {
+  const db = await getDb();
+  const now = new Date();
+
+  // Resolve parent slug → id (top-level parent; one lookup level, mirrors upsertPage).
+  let parentPageId: string | null = null;
+  if (meta.parentSlug !== null) {
+    const parent = await db
+      .select({ id: schema.page.id })
+      .from(schema.page)
+      .where(and(eq(schema.page.slug, meta.parentSlug), isNull(schema.page.parentPageId)))
+      .limit(1);
+    if (parent.length === 0) {
+      return { ok: false, errors: [`parent page "${meta.parentSlug}" not found`] };
+    }
+    parentPageId = parent[0].id;
+    if (id !== null && parentPageId === id) {
+      return { ok: false, errors: ["a page cannot be its own parent"] };
+    }
+  }
+
+  const metaTitle = JSON.stringify(meta.metaTitle);
+  const metaDescription = JSON.stringify(meta.metaDescription);
+
+  // Guard the UNIQUE(parent, slug) before writing so we report a friendly error.
+  const parentMatch =
+    parentPageId === null
+      ? isNull(schema.page.parentPageId)
+      : eq(schema.page.parentPageId, parentPageId);
+  const clash = await db
+    .select({ id: schema.page.id })
+    .from(schema.page)
+    .where(and(eq(schema.page.slug, meta.slug), parentMatch))
+    .limit(1);
+  if (clash.length > 0 && clash[0].id !== id) {
+    return { ok: false, errors: [`a sibling page already uses slug "${meta.slug}"`] };
+  }
+
+  if (id !== null) {
+    const existing = await db
+      .select({ id: schema.page.id })
+      .from(schema.page)
+      .where(eq(schema.page.id, id))
+      .limit(1);
+    if (existing.length === 0) return { ok: false, errors: ["page not found"] };
+    await db
+      .update(schema.page)
+      .set({
+        slug: meta.slug,
+        parentPageId,
+        publishStatus: meta.publishStatus,
+        metaTitle,
+        metaDescription,
+        updatedAt: now,
+      })
+      .where(eq(schema.page.id, id));
+    return { ok: true, id, action: "updated" };
+  }
+
+  const newId = crypto.randomUUID();
+  await db.insert(schema.page).values({
+    id: newId,
+    slug: meta.slug,
+    parentPageId,
+    publishStatus: meta.publishStatus,
+    blocks: "[]",
+    metaTitle,
+    metaDescription,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return { ok: true, id: newId, action: "created" };
+}
+
+/** Delete a page. Refuses if it still has children (avoid orphaning the tree). */
+export async function deletePage(
+  id: string,
+): Promise<{ ok: true } | { ok: false; errors: string[] }> {
+  const db = await getDb();
+  const children = await db
+    .select({ id: schema.page.id })
+    .from(schema.page)
+    .where(eq(schema.page.parentPageId, id))
+    .limit(1);
+  if (children.length > 0) {
+    return { ok: false, errors: ["delete or reparent this page's child pages first"] };
+  }
+  await db.delete(schema.page).where(eq(schema.page.id, id));
+  return { ok: true };
 }

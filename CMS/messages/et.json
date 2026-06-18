@@ -54,5 +54,30 @@
     "copyUrl": "Kopeeri URL",
     "copied": "Kopeeritud!",
     "delete": "Kustuta"
+  },
+  "pages": {
+    "title": "Lehed",
+    "subtitle": "Loo ja halda oma saidi lehti — kärgtunnus, hierarhia, avaldamise olek ja keelepõhine SEO.",
+    "new": "Uus leht",
+    "newTitle": "Uus leht",
+    "editTitle": "Muuda lehte",
+    "empty": "Lehti veel pole. Loo oma esimene leht.",
+    "slug": "Kärgtunnus",
+    "slugPlaceholder": "nt pricing või home",
+    "parent": "Ülemleht",
+    "noParent": "Puudub (ülemtase)",
+    "status": "Olek",
+    "draft": "Mustand",
+    "published": "Avaldatud",
+    "seo": "SEO-andmed",
+    "metaTitle": "SEO-pealkiri",
+    "metaDescription": "SEO-kirjeldus",
+    "edit": "Muuda",
+    "delete": "Kustuta",
+    "deleteOne": "Kustuta leht {slug}",
+    "save": "Salvesta",
+    "saving": "Salvestan…",
+    "cancel": "Tühista",
+    "invalidSlug": "Sisesta kehtiv kärgtunnus: väiketähed, numbrid ja sidekriipsud."
   }
 }
