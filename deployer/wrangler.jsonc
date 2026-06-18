@@ -12,12 +12,13 @@
     {
       "class_name": "Sandbox",
       "image": "./Dockerfile",
-      // CMS build (next build + opennext + wrangler deploy) is heavy; give it
-      // a larger instance. standard-1 (4 GiB) OOM'd: the deploy-audit trail
-      // caught esbuild crashing with only 3741 MB available during `next build`.
-      // standard-3 = 8 GiB / 2 vCPU gives real headroom. Bump to standard-4
-      // (12 GiB) if builds still OOM.
-      "instance_type": "standard-3",
+      // CMS build instance. The earlier "OOM at 3741 MB" was a RED HERRING — the
+      // real failure was a TS type error, not memory; a proven-green build on
+      // standard-3 sampled 7469 MB free (sub-1 GiB used). Right-sized back to
+      // standard-1 (4 GiB). The deploy-audit trail reports ramAvailableMb on the
+      // build step — if a heavier Site shows a low free number / OOMs, bump to
+      // standard-2 (6 GiB) then standard-3 (8 GiB).
+      "instance_type": "standard-1",
       "max_instances": 3
     }
   ],
