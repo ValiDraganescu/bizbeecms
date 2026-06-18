@@ -136,5 +136,25 @@
     "save": "Save blocks",
     "saving": "Saving…",
     "saved": "Blocks saved."
+  },
+  "components": {
+    "title": "Components",
+    "subtitle": "Export a component as a portable bundle, or import one into this site.",
+    "listTitle": "Your components",
+    "empty": "No components yet. Create one in the AI chat, then export it here.",
+    "export": "Export",
+    "flagScript": "has script",
+    "flagCss": "has CSS",
+    "flagStatic": "static",
+    "importTitle": "Import a component",
+    "importHint": "Paste a component bundle JSON, or upload a .json file. Imported components are validated before saving.",
+    "uploadLabel": "Upload bundle (.json)",
+    "pasteLabel": "Or paste bundle JSON",
+    "pastePlaceholder": "{ \"format\": \"bizbeecms.component\", \"version\": 1, ... }",
+    "import": "Import",
+    "importing": "Importing…",
+    "importEmpty": "Paste a bundle or choose a file first.",
+    "imported": "Imported “{name}”.",
+    "updated": "Updated “{name}”."
   }
 }

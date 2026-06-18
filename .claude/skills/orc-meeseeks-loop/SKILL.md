@@ -48,6 +48,8 @@ Workers never create or restructure goals; if a worker's `result` says the work 
 ## Operating rules
 
 - **Sequential.** Exactly **one** Meeseeks terminal alive at a time. The goal's memory has no lock; two in parallel risk grabbing the same task. Wait for one to finish before summoning the next.
+- **Event-driven, never scheduled.** The loop advances by reacting to each worker's `result` channel message, immediately summoning the next — **not** by `/loop`, `ScheduleWakeup`, or any timer. Never set a timer of any kind; one would race the `result` notification and desync the loop.
+- **Time-aware.** Print the wall-clock (`date '+%Y-%m-%d %H:%M:%S'`) at the start of every cycle so you don't lose your sense of time passing across a long session.
 - **Never stop on your own.** There is always meaningful work toward a standing goal. Keep the loop running until the **user** tells you to stop.
 - **You don't do task work.** You spawn, wait, close, repeat. You write only two kinds of file: **goal-structure files** (creating/seeding a subgoal, `SUBGOALS.md`, a `GOAL.md`) and **bug intake** into a goal's `BACKLOG.md`. Never code, never the worker's diffs.
 - **You are a thin spawner.** Keep your own context lean: don't read the worker's diffs or the whole journal each cycle. A one-line peek at the goal's `NEXT.md` between cycles is enough to narrate progress.
@@ -123,9 +125,22 @@ You do **not** fix the bug yourself and do **not** interrupt a mid-task Meeseeks
    - Commit the freshly-seeded structure before summoning the first worker, so the worker reads a coherent tree from disk.
 4. Note your own address — you are `{{MANAGER_ADDRESS}}` from the worker's perspective; the worker auto-receives it. You'll watch your channel inbox for the worker's `result`.
 
+## How the loop actually advances — react, never schedule
+
+**Do NOT use `/loop` or `ScheduleWakeup` at all.** The loop is purely event-driven: you summon a worker, then you **wait for its `result` channel message** and react to it by closing the worker and summoning the next. The worker telling you it's done is your only cadence — there is no interval, no timer, no `/loop /orc-meeseeks`. One worker finishing immediately triggers the next. This back-to-back, message-driven rhythm is the whole loop.
+
+**Why no timer — this is a hard rule, not a preference.** A scheduled wake-up (`/loop` tick or `ScheduleWakeup`) fires *between* turns — but between turns is exactly when the driver is sitting idle waiting for the worker's `result` notification. A timer firing there **races the `result`**: it can re-enter you running watchdog/recovery logic at the moment the worker actually just finished, making you close a healthy worker or summon a second one while the first `result` is still in flight — two workers alive, which breaks the one-at-a-time invariant. (This has bitten a real run: a `/loop` tick landed mid-cycle and desynced the loop.) So: no timer of any kind drives this loop. You wait; the channel wakes you.
+
+## Keep your sense of time — print the clock before every summon
+
+A long-running driver loses track of how much wall-clock has passed. **Before each Meeseeks summon, run `date '+%Y-%m-%d %H:%M:%S'` and print the timestamp** as the first thing in that cycle's narration (e.g. `[2026-06-18 14:32:07] summoning meeseeks #7 for goal: main`). This anchors you in real time so you can tell whether a worker is taking minutes or has silently wedged for far too long, and gives the user a timeline of the session.
+
 ## The loop (repeat forever)
 
 Each cycle:
+
+### 0. Stamp the time
+Run `date '+%Y-%m-%d %H:%M:%S'` and lead this cycle's narration with the timestamp. Do this **every** cycle — it's how you keep your sense of time passing across a long session.
 
 ### 1. Summon a fresh Meeseeks
 ```
@@ -153,10 +168,10 @@ send_message({
 })
 ```
 
-### 3. Wait for the worker's `result`
-Worker output arrives as `notifications/claude/channel` events — **do not poll** `get_messages` in a busy loop. A task can take a while (build + test + commit). Wait for a `result`-typed message from the worker's UUID.
+### 3. Wait for the worker's `result` — this is your cadence
+Worker output arrives as `notifications/claude/channel` events — **do not poll** `get_messages` in a busy loop, and **do not set a `/loop` timer to come back and check**. You simply wait; the worker's `result` message is what advances the loop. A task can take a while (build + test + commit). When the `result`-typed message from the worker's UUID arrives, react to it (steps 4–6). That reaction — not a clock — is what drives the next cycle.
 
-- **Silent-completion safety net:** if silent ~10 min (no `status`, no `result`), send one `send_message({ to: "<uuid>", type: "question", content: "status check — still working? reply with status or result." })`. If still nothing after a few more minutes, assume wedged: `close_terminal` and move on (next Meeseeks picks up from disk; partial uncommitted work may be lost, which is acceptable — note it).
+- **Silent-completion safety net (no timer — you act when next awake):** you have no scheduled wake-up, so you can only notice silence the next time the channel or the user wakes you. When you *are* awake and a worker has been silent for a long while (≈10 min+, judged from the timestamp you stamped at summon vs. `date` now), send one `send_message({ to: "<uuid>", type: "question", content: "status check — still working? reply with status or result." })`. If still nothing on a later wake, assume wedged: `close_terminal` and summon the next (it picks up from disk; partial uncommitted work may be lost, which is acceptable — note it). If you're genuinely never woken because the worker is silently wedged, the loop simply waits — the user can poke you to recover it. **Do not "fix" this by scheduling a timer**; a timer reintroduces the result-race that breaks the cycle.
 
 ### 4. Close the worker
 The moment its `result` arrives:
@@ -183,9 +198,14 @@ A worker may report that the work it found is really its own sizeable track, not
 
 You never stop yourself — **goals never end**, so there is no completion condition. The loop runs until the **user** tells you to stop. When they do, close any open worker terminal you spawned and report a short tally: how many Meeseeks ran this session, for which goal, on which model, what shipped, and any subgoals you created.
 
-## Pairing with /loop (optional)
+## Never use /loop or ScheduleWakeup
 
-If the user wants you re-invoked automatically (so the driver survives a context reset), they can run `/loop /orc-meeseeks-loop <goal> [model=<id>]`. Each driver invocation then runs one (or a few) cycles and yields. The natural mode is: invoke `/orc-meeseeks-loop <goal> [model=<id>]` once and let it run cycles back-to-back until the user stops it.
+The loop runs **inside this one invocation**: you summon a worker, wait for its `result`, react, summon the next — back-to-back, message-driven, forever. You never need a timer to advance cycles, and you must not set one:
+
+- `/loop` re-invoking `/orc-meeseeks-loop` would spin up overlapping drivers and break the "exactly one worker alive" invariant.
+- Any timer (`/loop` tick or `ScheduleWakeup`) fires while you're idle waiting for a `result` — racing that notification, so you can wake into recovery logic just as the worker finished, and close a healthy worker or summon a duplicate. This actually broke a real run.
+
+The cycle is driven entirely by worker `result` messages arriving on the channel. If a worker truly wedges and never reports, the loop waits until the channel or the user wakes you — recover it then (step 3's net). That's the accepted trade for never desyncing the loop.
 
 ---
 

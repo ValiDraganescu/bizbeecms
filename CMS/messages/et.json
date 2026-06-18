@@ -136,5 +136,25 @@
     "save": "Salvesta plokid",
     "saving": "Salvestan…",
     "saved": "Plokid salvestatud."
+  },
+  "components": {
+    "title": "Komponendid",
+    "subtitle": "Ekspordi komponent teisaldatava paketina või impordi komponent sellele saidile.",
+    "listTitle": "Sinu komponendid",
+    "empty": "Komponente veel pole. Loo komponent AI-vestluses ja ekspordi see siit.",
+    "export": "Ekspordi",
+    "flagScript": "sisaldab skripti",
+    "flagCss": "sisaldab CSS-i",
+    "flagStatic": "staatiline",
+    "importTitle": "Impordi komponent",
+    "importHint": "Kleebi komponendipaketi JSON või lae üles .json-fail. Imporditud komponendid valideeritakse enne salvestamist.",
+    "uploadLabel": "Lae üles pakett (.json)",
+    "pasteLabel": "Või kleebi paketi JSON",
+    "pastePlaceholder": "{ \"format\": \"bizbeecms.component\", \"version\": 1, ... }",
+    "import": "Impordi",
+    "importing": "Impordin…",
+    "importEmpty": "Kleebi pakett või vali esmalt fail.",
+    "imported": "Imporditud „{name}”.",
+    "updated": "Uuendatud „{name}”."
   }
 }

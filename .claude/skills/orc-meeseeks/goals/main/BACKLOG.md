@@ -77,8 +77,8 @@ States: TODO | DOING | DONE | BLOCKED. Each is ONE provable capability. Order is
 
 **H. Component portability (export/import across Sites)**
 > Architecture fit: a component is already pure data (`{tree,script,css,propsSchema}` — no eval, no binary), so export = serialize a D1 row to JSON, import = insert into another Site. The no-server-eval decision is what makes this trivial. Premade kits (G) are just curated import bundles — same machinery.
-- TODO: **H1 — export a component.** Serialize one (or many) components from a Site's library to a portable JSON bundle (versioned schema + the `{tree,script,css,propsSchema,name}`). Download from the CMS admin. Proves: a component leaves a Site as a file.
-- TODO: **H2 — import a component.** Upload a bundle into another Site → validate (schema version, name collision, malformed tree/script) → insert into D1. Proves: a component built on Site A renders on Site B.
+- DONE (2026-06-18): **H1 — export a component.** PURE versioned format `lib/components/portable.ts` (`PORTABLE_FORMAT="bizbeecms.component"` v1; `serializeComponent(row)`). REST `GET /api/components?name=X` downloads the bundle; `/admin/components` "Export" button per component.
+- DONE (2026-06-18): **H2 — import a component.** `parsePortableComponent` is the import TRUST BOUNDARY — re-runs the AI path's `validateComponentArtifact` gate (renderable tree, allowed-class allowlist, bounded script, safe name) + envelope/version + propsSchema-JSON bound. REST `POST /api/components` validates → `upsertImportedComponent` (by unique name, also persists propsSchema). `/admin/components` paste + .json upload UI.
 - TODO: **H3 — dependency handling.** A component's `script`/`tree` may reference slots/other components or asset URLs. Export must be self-contained OR declare deps; import resolves/warns on missing deps + rebinds/flags asset URLs (assets live in each Site's own R2). The one real design wrinkle — scope after H1/H2 prove the happy path.
 - (vision) business developers managing many client sites build a personal/shared library and import their components into each new Site. A future shared registry is the natural extension (defer).
 

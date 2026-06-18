@@ -136,5 +136,25 @@
     "save": "Tallenna lohkot",
     "saving": "Tallennetaan…",
     "saved": "Lohkot tallennettu."
+  },
+  "components": {
+    "title": "Komponentit",
+    "subtitle": "Vie komponentti siirrettävänä pakettina tai tuo komponentti tähän sivustoon.",
+    "listTitle": "Komponenttisi",
+    "empty": "Ei vielä komponentteja. Luo komponentti tekoälychatissa ja vie se tästä.",
+    "export": "Vie",
+    "flagScript": "sisältää skriptin",
+    "flagCss": "sisältää CSS:n",
+    "flagStatic": "staattinen",
+    "importTitle": "Tuo komponentti",
+    "importHint": "Liitä komponenttipaketin JSON tai lataa .json-tiedosto. Tuodut komponentit tarkistetaan ennen tallennusta.",
+    "uploadLabel": "Lataa paketti (.json)",
+    "pasteLabel": "Tai liitä paketin JSON",
+    "pastePlaceholder": "{ \"format\": \"bizbeecms.component\", \"version\": 1, ... }",
+    "import": "Tuo",
+    "importing": "Tuodaan…",
+    "importEmpty": "Liitä paketti tai valitse tiedosto ensin.",
+    "imported": "Tuotiin ”{name}”.",
+    "updated": "Päivitettiin ”{name}”."
   }
 }
