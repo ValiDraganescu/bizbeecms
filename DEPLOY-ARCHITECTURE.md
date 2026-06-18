@@ -1,16 +1,15 @@
-# Deploy architecture — current state (authoritative)
+# Deploy architecture & runbook — current state (authoritative)
 
-> **Future agents: read THIS before investigating deploy.** It is the current, verified
-> map of how PM, the deployer, and per-Site CMS Workers relate, plus the exact env-var /
-> secret status. It exists so you don't re-run a blind multi-file search. Last verified
-> **2026-06-18** against the live `wrangler whoami` account + a real PM deploy.
+> **Future agents: read THIS before investigating deploy.** It is the current, verified map of
+> how PM, the deployer, and per-Site CMS Workers relate, the exact env-var / secret status, and
+> the ordered procedure to deploy. It exists so you don't re-run a blind multi-file search.
+> Last verified **2026-06-18** against the live account via `wrangler whoami` / `secret list` /
+> `deployments list`.
 >
-> If something here contradicts `DEPLOY.md`: **this file wins on architecture.** `DEPLOY.md`'s
-> step 11 + lower troubleshooting describe the OLD in-PM Script-Upload path (`buildScriptUploadForm`,
-> `PUT /workers/scripts`, the DO-strip + assets-404 blockers). That path is **superseded** by the
-> deployer-Container path below — wrangler inside the container handles DOs and static assets
-> natively, so those blockers no longer apply. `DEPLOY.md` steps 0–10 (PM's own deploy) are still
-> accurate.
+> Supersedes the old `DEPLOY.md` (deleted). The CMS deploy path is now **PM → deployer Worker →
+> Sandbox Container running `wrangler deploy`** — wrangler handles Durable Objects and static
+> assets natively, so the old in-PM Script-Upload blockers (DO-strip, assets-404) **no longer
+> apply** and are not repeated here.
 
 ---
 
@@ -25,8 +24,8 @@
   ┌─────────────────────────┐         POST /deploy                ┌──────────────────────────┐
   │  ProjectManager (PM)    │   Bearer DEPLOYER_SECRET            │  deployer Worker         │
   │  Worker — DEPLOYED ✅   │   body {siteId, slug}               │  + Sandbox Container     │
-  │                         │ ──────────────────────────────────▶│  status: code-complete,  │
-  │  bizbeecms-             │                                     │  DEPLOY STATE UNKNOWN ❔  │
+  │                         │ ──────────────────────────────────▶│  DEPLOYED ✅ (2026-06-17)│
+  │  bizbeecms-             │                                     │  bizbeecms-deployer      │
   │  projectmanager         │◀────────────────────────────────── │                          │
   │  .vali-draganescu88     │   POST /api/deploy-callback         │  runs in-container:      │
   │  .workers.dev           │   (status back to PM)               │   git clone REPO_URL     │
@@ -42,7 +41,7 @@
             ▲                                                     ┌──────────────────────────┐
             │  POST /api/auth/cms-validate                        │  per-Site CMS Worker     │
             │  Bearer CMS_AUTH_SECRET                              │  bizbeecms-cms-<slug>    │
-            │  + forwarded bizbee_session cookie + {siteId}        │  NONE DEPLOYED YET ❔     │
+            │  + forwarded bizbee_session cookie + {siteId}        │  NONE DEPLOYED YET       │
             │  → {ok, userId}                                      │                          │
             └──────────────────────────────────────────────────── │  bindings (per-Site):    │
               (CMS requireAdmin guard calls PM to authorize        │   DB    (per-Site D1) ❌ │
@@ -65,7 +64,7 @@
 3. In-container: `git clone REPO_URL` → `npm ci` → `opennextjs-cloudflare build` over `CMS/` →
    `npx wrangler deploy --name bizbeecms-cms-<slug> --var SITE_ID:… --var PM_ORIGIN:… --var CMS_AUTH_SECRET:…`
    (`deployer/src/index.ts:191-194`). **wrangler deploys natively** → DOs + `.open-next/assets`
-   handled correctly (this is why the old DO-strip / assets-404 blockers are moot here).
+   handled correctly.
 4. Deployer POSTs status back to PM at `${PM_CALLBACK_ORIGIN}/api/deploy-callback`; PM sets
    Site `status=deployed` (+ `worker_name`) or `failed`.
 5. Once live, every CMS admin request runs `requireAdmin` → CMS forwards the `bizbee_session`
@@ -73,59 +72,110 @@
    which resolves the PM session and runs PM's site-reach check. **Any PM user with access to the
    Site is a CMS admin.** (See `pm-cms-auth-decision` memory + `HITL.md` Done P0.)
 
-## Env-var / secret status
+## Env-var / secret status (verified live 2026-06-18)
 
 | Where | Name | Purpose | Status |
 |---|---|---|---|
-| **PM Worker** | `DB` (D1 `bizbeecms`, id `69cda498…`) | PM data (users/sites/sessions-meta) | ✅ provisioned + migrated |
-| PM Worker | `SESSIONS` (KV, id `f400b577…`) | session records keyed `session:<id>` | ✅ provisioned |
-| PM Worker | `ASSETS` | PM static assets | ✅ live |
-| PM Worker | `APP_ORIGIN` | invite/accept link origin (Host-injection guard) | ✅ set (`https://bizbeecms-projectmanager…workers.dev`) |
-| PM Worker | `DEPLOYER_URL` | where PM POSTs Site deploys | ✅ set → `https://bizbeecms-deployer.vali-draganescu88.workers.dev` |
-| PM Worker | `DEPLOYER_SECRET` | bearer PM→deployer | ❔ **must be set as a secret** on PM (shared w/ deployer) |
-| PM Worker | `CMS_AUTH_SECRET` | bearer CMS→PM `/api/auth/cms-validate` accepts | ❔ **must be set** on PM (shared w/ deployer's value) |
-| PM Worker | `CF_API_TOKEN`, `CF_ACCOUNT_ID` | (old Script-Upload path only) | ⚠️ not needed by the container path; deployer holds CF creds now |
-| **deployer Worker** | `CF_API_TOKEN` | Workers Scripts: Edit — deploys the CMS Worker | ❔ **set before first CMS deploy** |
-| deployer | `CF_ACCOUNT_ID` | account owning CMS Workers (`f510a160…`) | ❔ **set** |
-| deployer | `DEPLOYER_SECRET` | bearer it requires from PM | ❔ **set** (= PM's value) |
-| deployer | `REPO_URL` | https clone URL of this repo | ❔ **set** |
-| deployer | `GITHUB_TOKEN` | PAT, only if repo private | ❔ optional |
-| deployer | `PM_CALLBACK_ORIGIN` | PM origin for status callback | ❔ **set** = PM URL |
-| deployer | `CMS_AUTH_SECRET` | passed to each CMS via `--var` | ❔ **set** (= PM's value) — **without it CMS auth fails closed → every admin route 401s** |
-| deployer | `PM_ORIGIN` | passed to each CMS via `--var` (where `/api/auth/cms-validate` lives) | ❔ **set** = PM URL |
-| **CMS Worker** (per-Site) | `SITE_ID` / `PM_ORIGIN` / `CMS_AUTH_SECRET` | injected by deployer `--var` | auto on deploy (empty placeholders in `CMS/wrangler.jsonc`) |
-| CMS Worker | `DB` (per-Site D1) | the Site's content | ❌ **NOT auto-created** — manual `wrangler d1 create` + migrations |
-| CMS Worker | `MEDIA` (R2 bucket) | media library | ❌ **NOT auto-created** — manual `wrangler r2 bucket create` |
-| CMS Worker | `AI` (Workers AI) + AI Gateway `bizbeecms-cms` | chat / AI tools | ❌ gateway is a manual dashboard step; binding works once gateway exists |
+| **PM Worker** ✅ deployed | `DB` (D1 `bizbeecms`, id `69cda498…`) | PM data (users/sites) | ✅ provisioned + migrated |
+| PM | `SESSIONS` (KV, id `f400b577…`) | session records keyed `session:<id>` | ✅ provisioned |
+| PM | `ASSETS` | PM static assets | ✅ live |
+| PM | `APP_ORIGIN` (var) | invite/accept link origin (Host-injection guard) | ✅ `https://bizbeecms-projectmanager…workers.dev` |
+| PM | `DEPLOYER_URL` (var) | where PM POSTs Site deploys | ✅ `https://bizbeecms-deployer.vali-draganescu88.workers.dev` |
+| PM | `DEPLOYER_SECRET` (secret) | bearer PM→deployer | ✅ set |
+| PM | `CMS_AUTH_SECRET` (secret) | bearer PM's `/api/auth/cms-validate` checks incoming CMS requests against | ✅ **set 2026-06-18** (= deployer's value) |
+| PM | `CF_API_TOKEN`, `CF_ACCOUNT_ID` (secrets) | legacy Script-Upload path | ⚠️ set but unused by the container path |
+| **deployer Worker** ✅ deployed (2026-06-17) | `CF_API_TOKEN` (secret) | Workers Scripts: Edit — deploys the CMS Worker | ✅ set |
+| deployer | `CF_ACCOUNT_ID` (secret) | account owning CMS Workers (`f510a160…`) | ✅ set |
+| deployer | `DEPLOYER_SECRET` (secret) | bearer it requires from PM | ✅ set (= PM's value) |
+| deployer | `REPO_URL` (secret) | https clone URL of this repo | ✅ set |
+| deployer | `GITHUB_TOKEN` (secret) | PAT to clone (if repo private) | ✅ set |
+| deployer | `PM_CALLBACK_ORIGIN` (secret) | PM origin for status callback **+ fallback for PM_ORIGIN** | ✅ set |
+| deployer | `CMS_AUTH_SECRET` (secret) | passed to each CMS via `--var`; **without it CMS auth fails closed → every admin route 401s** | ✅ **set 2026-06-18** (= PM's value) |
+| deployer | `PM_ORIGIN` (secret) | where CMS calls `/api/auth/cms-validate` | ✅ resolved — code falls back to `PM_CALLBACK_ORIGIN` (`deployer/src/index.ts:123`), so no separate set needed |
+| **CMS Worker** (per-Site) | `SITE_ID` / `PM_ORIGIN` / `CMS_AUTH_SECRET` (vars) | injected by deployer `--var` at deploy | auto on deploy (empty placeholders in `CMS/wrangler.jsonc`) |
+| CMS | `DB` (per-Site D1) | the Site's content | ❌ **NOT auto-created** — manual (see below) |
+| CMS | `MEDIA` (R2 bucket) | media library | ❌ **NOT auto-created** — manual |
+| CMS | `AI` (Workers AI) + AI Gateway `bizbeecms-cms` | chat / AI tools | ❌ gateway is a manual dashboard step; binding works once it exists |
 
-Legend: ✅ verified live · ❔ code expects it, not confirmed set · ❌ not provisioned / not automated · ⚠️ caveat.
+Legend: ✅ verified live · ❌ not provisioned / not automated · ⚠️ caveat. **All control-plane secrets
+are now set — the only open items are per-Site/account infra (D1, R2, AI Gateway) and verification.**
 
-## What is NOT automated (manual, once per account or per Site)
+---
 
-The deployer does **not** provision infra — it only builds + `wrangler deploy`s the CMS Worker.
-Before/around a CMS deploy a human must, with CF auth:
-- **AI Gateway** `bizbeecms-cms` (dashboard → AI → AI Gateway) + Workers AI enabled — once, shared.
-- **per-Site D1**: `wrangler d1 create …` then `wrangler d1 migrations apply` (CMS migrations, incl. `0002_*` asset table).
-- **per-Site R2 bucket** (`bizbeecms-cms-media` or per-Site) bound as `MEDIA`.
-- The CMS Worker's `wrangler.jsonc` `DB`/`MEDIA` ids are placeholders → the deploy step must override them per-Site (same mechanism as the `--var`s), OR pre-create and reference real ids.
+## Part A — Deploy PM itself (already done; re-run after PM changes)
+
+Runs inside **`ProjectManager/`** (its own npm package, not a workspace).
+
+```bash
+cd ProjectManager
+npm run bundle:cms     # regenerate the committed CMS bundle if CMS/ changed (see note ‡)
+npm run deploy         # = (predeploy: preflight) → opennextjs-cloudflare build && deploy
+```
+
+- `predeploy`→`preflight` (`scripts/preflight-deploy.mjs`) is an npm pre-script that **aborts** the
+  deploy if `wrangler.jsonc` still has placeholder zero-ids, missing `nodejs_compat` /
+  `global_fetch_strictly_public` flags, or a missing/short/structurally-broken CMS bundle.
+- **NEVER run the OpenNext build while `next dev` is on 3601/3602** — it corrupts `.next` and 500s
+  the server. `lsof -ti:3601 -ti:3602`; if a `next-server` is there, kill it + `rm -rf .next .open-next`.
+- Confirm: `npx wrangler deployments list` · `curl -sS https://bizbeecms-projectmanager.vali-draganescu88.workers.dev/api/health`.
+
+‡ **CMS bundle note:** PM's preflight requires `src/lib/deploy/cms-bundle.generated.js`, a committed
+pre-bundled CMS artifact. It is a leftover gate from the **old** Script-Upload path — the live CMS
+deploy now goes through the deployer Container (which builds CMS fresh from a git clone), so the
+committed bundle is **not what gets deployed**. Keep regenerating it (`npm run bundle:cms`) only to
+keep preflight green; it does not affect the container deploy.
+
+## Part B — First-run bootstrap (in the deployed PM)
+
+1. Open the PM URL. With an empty `users` table, `/register` is **open**.
+2. Register the **first** user → becomes **SuperAdmin** (invite rights). After this `/register`
+   self-closes; further users come via the invite flow (scope Admins/SiteManagers by country).
+
+## Part C — Provision per-Site / account infra (NOT automated — manual, with CF auth)
+
+The deployer only builds + `wrangler deploy`s the CMS Worker; it does **not** create infra. Before
+(or as part of) a CMS deploy:
+
+- **AI Gateway** `bizbeecms-cms` — dashboard → AI → AI Gateway; enable **Workers AI**. Once, shared
+  across Sites. (Override per-Site with the `AI_GATEWAY` var if you use a different slug.)
+- **per-Site D1**: `wrangler d1 create bizbeecms-cms-<slug>` → `wrangler d1 migrations apply …`
+  (CMS migrations under `CMS/migrations/`, incl. `0002_*` asset table).
+- **per-Site R2 bucket**: `wrangler r2 bucket create bizbeecms-cms-media` (or per-Site), bound `MEDIA`.
+- The CMS `wrangler.jsonc` `DB`/`MEDIA` ids are placeholders → the deploy step must override them
+  per-Site (same `--var`/binding-override mechanism), OR pre-create and reference real ids.
+
+## Part D — Trigger a CMS deploy & verify (the open HITL P1)
+
+1. In PM: create a **Site** (Sites → New) → its detail page → **Deploy**. Worker name `bizbeecms-cms-<slug>`.
+2. Watch status latch `deploying` → `deployed` (+ `worker_name`) on the deployer callback, or `failed`.
+3. Verify boot + auth (this round-trip has **never run live yet**):
+   ```bash
+   npx wrangler deployments list --name bizbeecms-cms-<slug>
+   curl -i  https://bizbeecms-cms-<slug>.<subdomain>.workers.dev/api/pages      # signed-out → expect 401 (auth guard)
+   curl -sS https://bizbeecms-cms-<slug>.<subdomain>.workers.dev/               # public page → 200 (needs a published `home` slug, else 404 by design)
+   ```
+   Then sign in to PM as a user **with** access to the Site, forward the `bizbee_session` cookie to a
+   CMS admin route → expect **200**; a PM user **without** access → **401** / forbidden page.
+
+---
 
 ## Verified vs unverified (be honest in reports)
 
-- ✅ **PM deploys and runs** — done 2026-06-18, version `a555b3d7-1f87-46e6-90ca-46188833d361`.
-- ✅ **Sec1 wiring exists in code**: deployer injects the 3 vars (`deployer/src/index.ts:191-194`);
-  PM `/api/auth/cms-validate` + CMS `guard-core.ts`/`guard.ts` are built and unit-tested.
-- ❔ **deployer Worker deployed + its secrets set** — UNKNOWN; required before any CMS deploy works.
-- ❔ **A real CMS Worker has ever booted** — no evidence one has; the cross-Worker auth round-trip
-  (CMS→PM) has never run live. This is the open `HITL.md` P1.
+- ✅ **PM deployed & running** — 2026-06-18, version `a555b3d7-1f87-46e6-90ca-46188833d361`.
+- ✅ **deployer deployed** — 2026-06-17, all 6 base secrets + `CMS_AUTH_SECRET` set.
+- ✅ **Sec1 control plane complete**: `CMS_AUTH_SECRET` matches on PM + deployer; `PM_ORIGIN` resolves
+  via `PM_CALLBACK_ORIGIN` fallback; deployer injects all 3 vars (`deployer/src/index.ts:191-194`);
+  PM `/api/auth/cms-validate` + CMS `guard-core.ts`/`guard.ts` built and unit-tested.
+- ❌ **No per-Site infra provisioned** (D1 / R2 / AI Gateway) and **no CMS Worker booted yet** — the
+  CMS→PM auth round-trip and all live CMS features are unverified. This is the open `HITL.md` P1.
 
 ## Pointers (don't re-derive these)
 
 - PM→deployer trigger: `ProjectManager/src/app/api/sites/[id]/deploy/route.ts`
-- deployer + container + `wrangler deploy` command: `deployer/src/index.ts` (`:191-194` for the deploy line)
+- deployer + container + `wrangler deploy` command: `deployer/src/index.ts` (`:191-194`; var fallbacks `:117-123`)
 - deployer required secrets: `deployer/wrangler.jsonc:26-32` (comment block)
 - CMS auth bridge: `ProjectManager/src/app/api/auth/cms-validate/route.ts` ←→ `CMS/src/lib/auth/guard-core.ts` + `guard.ts`
 - CMS per-Site vars declared empty: `CMS/wrangler.jsonc` (`SITE_ID`/`PM_ORIGIN`/`CMS_AUTH_SECRET`)
 - Auth decision rationale: memory `pm-cms-auth-decision`; deploy mechanism: memory `pm-cms-deploy-via-container`
-- PM's own deploy runbook (steps 0–10): `DEPLOY.md` (its step 11 is the superseded path — see top note)
 - Live HITL items to verify post-deploy: `HITL.md`
 ```
