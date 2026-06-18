@@ -155,6 +155,10 @@
     "importing": "Tuodaan…",
     "importEmpty": "Liitä paketti tai valitse tiedosto ensin.",
     "imported": "Tuotiin ”{name}”.",
-    "updated": "Päivitettiin ”{name}”."
+    "updated": "Päivitettiin ”{name}”.",
+    "kitsTitle": "Aloituspaketit",
+    "kitsHint": "Asenna valmiiksi koottu komponenttijoukko yhdellä napsautuksella. Blogipaketti lisää artikkelin otsikon, artikkelin rungon, kirjoittajakortin ja artikkelilistan.",
+    "installBlogKit": "Asenna blogipaketti",
+    "kitInstalled": "Blogipaketti asennettu: {created} luotu, {updated} päivitetty."
   }
 }

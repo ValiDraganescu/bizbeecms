@@ -155,6 +155,10 @@
     "importing": "Impordin…",
     "importEmpty": "Kleebi pakett või vali esmalt fail.",
     "imported": "Imporditud „{name}”.",
-    "updated": "Uuendatud „{name}”."
+    "updated": "Uuendatud „{name}”.",
+    "kitsTitle": "Stardipaketid",
+    "kitsHint": "Paigalda valmis komponentide komplekt ühe klõpsuga. Blogipakett lisab postituse päise, postituse sisu, autorikaardi ja postituste loendi.",
+    "installBlogKit": "Paigalda blogipakett",
+    "kitInstalled": "Blogipakett paigaldatud: {created} loodud, {updated} uuendatud."
   }
 }

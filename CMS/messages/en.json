@@ -155,6 +155,10 @@
     "importing": "Importing…",
     "importEmpty": "Paste a bundle or choose a file first.",
     "imported": "Imported “{name}”.",
-    "updated": "Updated “{name}”."
+    "updated": "Updated “{name}”.",
+    "kitsTitle": "Starter kits",
+    "kitsHint": "Install a curated set of premade components in one click. The blog kit adds a post header, post body, author card and post list.",
+    "installBlogKit": "Install blog kit",
+    "kitInstalled": "Blog kit installed: {created} created, {updated} updated."
   }
 }

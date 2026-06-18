@@ -100,6 +100,32 @@ export function ComponentsManager({
     await importBundle(text);
   }
 
+  // Install the blog starter kit (epic G1): one POST to the kit route, which
+  // runs every premade bundle through the SAME import gate + write path.
+  async function installBlogKit() {
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/components/kit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "blog" }),
+      });
+      if (!res.ok) {
+        setError(await errorOf(res));
+        return;
+      }
+      const j = (await res.json()) as { created: number; updated: number };
+      setNotice(t("kitInstalled", { created: j.created, updated: j.updated }));
+      await refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {error && (
@@ -118,6 +144,20 @@ export function ComponentsManager({
           {notice}
         </p>
       )}
+
+      {/* Starter kits: one-click install of a premade component set (G1) */}
+      <section className="flex flex-col gap-2 rounded-md border border-border bg-surface-raised p-4">
+        <h2 className="text-lg font-semibold text-foreground">{t("kitsTitle")}</h2>
+        <p className="text-sm text-foreground-muted">{t("kitsHint")}</p>
+        <button
+          type="button"
+          className="mt-1 self-start rounded-md border border-border px-4 py-2 text-foreground hover:bg-surface disabled:opacity-50"
+          disabled={busy}
+          onClick={() => void installBlogKit()}
+        >
+          {t("installBlogKit")}
+        </button>
+      </section>
 
       {/* Component list with per-component export */}
       <section className="flex flex-col gap-3">

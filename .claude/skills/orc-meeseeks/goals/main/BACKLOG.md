@@ -84,7 +84,7 @@ States: TODO | DOING | DONE | BLOCKED. Each is ONE provable capability. Order is
 
 **G. Premade component kits (starter library)**
 > Built on H — a kit is a curated, versioned export bundle the CMS ships with and can import into any Site.
-- TODO: **G1 — blog component kit.** A set of premade `{tree,script,css}` components for quickly building blog pages: PostList (lists child pages — title/excerpt/date/link), PostHeader (title + meta), PostBody (rich content), maybe TagFilter. Seeded into a Site's component library so the AI/user composes a blog from them instead of authoring from scratch. Builds ON A1/A2 + the H import format. Proves: "build me a blog" → a working blog from premade parts in minutes.
+- DONE (2026-06-18): **G1 — blog component kit.** 5 premade components authored AS `bizbeecms.component` v1 portable bundles in `CMS/src/lib/components/blog-kit.ts` (BlogPostHeader, BlogPostBody, AuthorCard, PostListItem, PostList). One-click install via `POST /api/components/kit` (`src/app/api/components/kit/route.ts`) which re-validates EVERY bundle through `parsePortableComponent` then upserts via `upsertImportedComponent` — SAME gate + write path as manual import, NO new path. "Install blog kit" button in ComponentsManager. EN/FI/ET keys + `scripts/blog-kit.test.mjs` (5 tests). Build gate green, bundle regenerated. PostList is a static demo container (real posts via page blocks); follow-ons in NEXT.
 - (later) Gxx — other kits (landing/marketing, docs, portfolio) follow the same pattern once G1 validates the approach.
 
 **Z. Future / parked (TBD — not scoped, just don't forget)**
