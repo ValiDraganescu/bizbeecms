@@ -13,7 +13,7 @@
 
 ---
 
-## The three actors
+## The actors
 
 ```
                          ┌──────────────────────────────────────────────────────────┐
@@ -72,6 +72,59 @@
    which resolves the PM session and runs PM's site-reach check. **Any PM user with access to the
    Site is a CMS admin.** (See `pm-cms-auth-decision` memory + `HITL.md` Done P0.)
 
+## Custom customer domains (Cloudflare for SaaS) — added 2026-06-18
+
+Lets a customer point their own domain (e.g. `restovista.com`) at a deployed Site
+**without** adding that domain to our CF account. Custom hostnames bind to the
+`bizbeecms.com` **zone**, not to a Worker, so a single router Worker fans out to the
+right per-Site CMS Worker by `Host`.
+
+```
+  customer.com  (CNAME → cf.bizbeecms.com, + TXT for DV cert)
+     │
+     ▼  CF for SaaS custom hostname (cert auto-issued/renewed) → zone bizbeecms.com
+  ┌──────────────────────────┐   HOST_MAP KV    ┌──────────────────────────┐
+  │  bizbeecms-router        │  host → slug     │  bizbeecms-cms-<slug>    │
+  │  DEPLOYED ✅             │ ───lookup──────▶ │  (per-Site CMS Worker)   │
+  │  route cf.bizbeecms.com/*│   then fetch →   │  .workers.dev URL        │
+  └──────────────────────────┘                  └──────────────────────────┘
+```
+
+- **Router** (`router/src/index.ts`): reads `Host`, looks up the slug in `HOST_MAP`
+  KV, proxies to `https://bizbeecms-cms-<slug>.<WORKERS_SUBDOMAIN>.workers.dev`
+  (preserving path/query, forwarding original host as `x-forwarded-host`). Proxies by
+  `.workers.dev` URL rather than service binding — Sites are created at runtime, so a
+  static binding can't exist for them.
+- **Attach** (`deployer/src/index.ts` `POST /attach-domain`, Bearer `DEPLOYER_SECRET`,
+  body `{slug, hostname}`): registers the custom hostname via the CF
+  `zones/<CF_ZONE_ID>/custom_hostnames` API (`ssl: txt/dv`), writes `hostname → slug`
+  to `HOST_MAP` KV, returns the DNS records the customer must add (`cname` →
+  `cf.bizbeecms.com`, `txt` for DV). Idempotent (reuses existing on CF error 1406).
+- **Fallback origin**: `cf.bizbeecms.com` — dummy proxied A record (`192.0.2.1`) in the
+  bizbeecms.com zone; set as the CF for SaaS Fallback Origin.
+- **Apex caveat**: customer apex domains can't always CNAME — registrar needs CNAME
+  flattening, else an A record to CF's anycast IPs. PM UI should show both.
+
+### Status (2026-06-18)
+- ✅ `bizbeecms-router` deployed (route `cf.bizbeecms.com/*`); `HOST_MAP` KV created
+  (`1c276b01cd5a41f0b8c98ace07b4c064`), bound to both router and deployer.
+- ✅ `cf.bizbeecms.com` dummy proxied A record added in the bizbeecms.com zone (the
+  old project's dead `bizbeecms.com`/`www` → `195.201.28.111` records are stale and
+  can be deleted/repointed — apex is reserved for a future PM/marketing site);
+  `CF_ZONE_ID` secret set on deployer; deployer redeployed with `/attach-domain`.
+- ❌ **`CF_API_TOKEN` needs ZONE-scoped perms for custom hostnames** — the token is
+  currently all `Account`-scoped. custom_hostnames is a **Zone** resource, so add
+  **`Zone · SSL and Certificates · Edit`** + **`Zone · Zone · Read`** with a Zone
+  Resources include for `bizbeecms.com`. (`Account · SSL and Certificates · Edit` does
+  NOT cover it.) `/attach-domain` fails the call until this is added.
+- ❌ **Fallback Origin not yet set** in the CF dashboard (SSL/TLS → Custom Hostnames →
+  Fallback Origin = `cf.bizbeecms.com`).
+- ❌ End-to-end untested — also needs a live `bizbeecms-cms-<slug>` Worker (none booted
+  yet) for the router proxy target to exist.
+- ⚠️ To catch customer **apex** domains the router route must widen from
+  `cf.bizbeecms.com/*` to `*/*` (zone bizbeecms.com). Note the `*.bizbeecms.com`
+  wildcard DNS record would then be shadowed by that route.
+
 ## Env-var / secret status (verified live 2026-06-18)
 
 | Where | Name | Purpose | Status |
@@ -84,7 +137,9 @@
 | PM | `DEPLOYER_SECRET` (secret) | bearer PM→deployer | ✅ set |
 | PM | `CMS_AUTH_SECRET` (secret) | bearer PM's `/api/auth/cms-validate` checks incoming CMS requests against | ✅ **set 2026-06-18** (= deployer's value) |
 | PM | `CF_API_TOKEN`, `CF_ACCOUNT_ID` (secrets) | legacy Script-Upload path | ⚠️ set but unused by the container path |
-| **deployer Worker** ✅ deployed (2026-06-17) | `CF_API_TOKEN` (secret) | Workers Scripts: Edit — deploys the CMS Worker | ✅ set |
+| **deployer Worker** ✅ deployed (2026-06-17) | `CF_API_TOKEN` (secret) | Workers Scripts/KV/R2: Edit — deploys the CMS Worker; **+ Zone · SSL and Certificates · Edit + Zone · Zone · Read** (zone bizbeecms.com) for `/attach-domain` custom_hostnames | ⚠️ set, but **zone-scoped perms not yet added** (token is all Account-scoped) |
+| deployer | `CF_ZONE_ID` (secret) | bizbeecms.com zone id (`dfaec5f7…`) — custom_hostnames target | ✅ **set 2026-06-18** |
+| deployer | `HOST_MAP` (KV `1c276b01…`) | host → slug map written by `/attach-domain` | ✅ provisioned + bound |
 | deployer | `CF_ACCOUNT_ID` (secret) | account owning CMS Workers (`f510a160…`) | ✅ set |
 | deployer | `DEPLOYER_SECRET` (secret) | bearer it requires from PM | ✅ set (= PM's value) |
 | deployer | `REPO_URL` (secret) | https clone URL of this repo | ✅ set |
@@ -96,6 +151,8 @@
 | CMS | `DB` (per-Site D1) | the Site's content | ❌ **NOT auto-created** — manual (see below) |
 | CMS | `MEDIA` (R2 bucket) | media library | ❌ **NOT auto-created** — manual |
 | CMS | `AI` (Workers AI) + AI Gateway `bizbeecms-cms` | chat / AI tools | ❌ gateway is a manual dashboard step; binding works once it exists |
+| **router Worker** ✅ deployed (2026-06-18) | `HOST_MAP` (KV `1c276b01…`) | host → slug lookup | ✅ bound |
+| router | `WORKERS_SUBDOMAIN` (var) | builds the per-Site `.workers.dev` proxy target (`vali-draganescu88`) | ✅ set |
 
 Legend: ✅ verified live · ❌ not provisioned / not automated · ⚠️ caveat. **All control-plane secrets
 are now set — the only open items are per-Site/account infra (D1, R2, AI Gateway) and verification.**
@@ -177,5 +234,6 @@ The deployer only builds + `wrangler deploy`s the CMS Worker; it does **not** cr
 - CMS auth bridge: `ProjectManager/src/app/api/auth/cms-validate/route.ts` ←→ `CMS/src/lib/auth/guard-core.ts` + `guard.ts`
 - CMS per-Site vars declared empty: `CMS/wrangler.jsonc` (`SITE_ID`/`PM_ORIGIN`/`CMS_AUTH_SECRET`)
 - Auth decision rationale: memory `pm-cms-auth-decision`; deploy mechanism: memory `pm-cms-deploy-via-container`
+- Custom domains: router `router/src/index.ts`; attach endpoint `deployer/src/index.ts` (`/attach-domain`, `attachDomain()`); fallback origin `cf.bizbeecms.com`; `HOST_MAP` KV `1c276b01cd5a41f0b8c98ace07b4c064`
 - Live HITL items to verify post-deploy: `HITL.md`
 ```
