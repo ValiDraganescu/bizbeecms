@@ -11,6 +11,7 @@ import {
   isAuthorized,
   parseDeployEvent,
   insertDeployEvent,
+  buildFailedCallbackEvent,
 } from "./deploy-events.ts";
 import * as schema from "../../db/schema.ts";
 
@@ -111,6 +112,45 @@ test("insertDeployEvent persists nullable fields as null, not undefined", async 
   // The three nullable columns bind to null (D1 stores NULL), never undefined.
   assert.ok(params.includes(null));
   assert.ok(!params.includes(undefined));
+});
+
+test("buildFailedCallbackEvent combines error + log tail into one terminal failed event", () => {
+  const ev = buildFailedCallbackEvent("site-9", "wrangler deploy failed", "line1\nline2", 1_700_000_000_000);
+  assert.equal(ev.siteId, "site-9");
+  assert.equal(ev.step, "callback");
+  assert.equal(ev.status, "failed");
+  assert.equal(ev.startedAt, 1_700_000_000_000);
+  assert.equal(ev.durationMs, null);
+  assert.equal(ev.ramAvailableMb, null);
+  // Both the reported error and the log tail are preserved in the error field.
+  assert.ok(ev.error && ev.error.includes("wrangler deploy failed"));
+  assert.ok(ev.error && ev.error.includes("line1\nline2"));
+});
+
+test("buildFailedCallbackEvent tolerates a missing error and missing log", () => {
+  const ev = buildFailedCallbackEvent("site-9", undefined, undefined, 42);
+  assert.equal(ev.error, "(no error)"); // no log tail appended when there's no log
+  const ev2 = buildFailedCallbackEvent("site-9", "boom", "", 42);
+  assert.equal(ev2.error, "boom"); // empty log → not appended
+});
+
+test("a failed callback event persists into deploy_events via insertDeployEvent", async () => {
+  const d1 = fakeD1();
+  const db = cfDb(d1 as unknown as D1Database);
+
+  await insertDeployEvent(
+    buildFailedCallbackEvent("site-9", "build OOM", "npm ERR! ...", 1_700_000_000_000),
+    db,
+  );
+
+  assert.equal(d1.calls.length, 1);
+  const { sql, params } = d1.calls[0];
+  assert.match(sql, /insert into "deploy_events"/i);
+  assert.ok(params.includes("site-9"));
+  assert.ok(params.includes("callback"));
+  assert.ok(params.includes("failed"));
+  // The combined error text (reported error + log tail) is bound, not dropped.
+  assert.ok(params.some((p) => typeof p === "string" && p.includes("build OOM") && p.includes("npm ERR!")));
 });
 
 test("parseDeployEvent accepts a valid body and coerces numerics", () => {

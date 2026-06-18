@@ -90,6 +90,34 @@ export function parseDeployEvent(
 }
 
 /**
+ * Build the terminal "callback" failed event the deploy-callback persists when
+ * the deployer reports an overall `failed`. The per-step trail already captures
+ * each step's short error (slice 2); this is the FINAL deployer-reported error +
+ * build-log tail, persisted so the UI can read it instead of it living only in
+ * `wrangler tail`. Pure (caller passes `now`) so it's node-testable.
+ * `step: "callback"` distinguishes it from the per-step rows in the trail.
+ */
+export function buildFailedCallbackEvent(
+  siteId: string,
+  error: unknown,
+  log: unknown,
+  now: number,
+): ParsedDeployEvent {
+  const errText = typeof error === "string" && error.length > 0 ? error : "(no error)";
+  const logText = typeof log === "string" && log.length > 0 ? log : null;
+  const combined = logText ? `${errText}\n--- log tail ---\n${logText}` : errText;
+  return {
+    siteId,
+    step: "callback",
+    status: "failed",
+    startedAt: now,
+    durationMs: null,
+    error: combined,
+    ramAvailableMb: null,
+  };
+}
+
+/**
  * Insert one validated deploy event. `injectedDb` is the test seam; production
  * callers omit it and get the live D1-bound drizzle client.
  */

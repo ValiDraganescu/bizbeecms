@@ -51,3 +51,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   builds); PM `npm test` → 37 pass. Dev confirmed NOT on 3601/3602 first. NOT deployed live; NOT
   applied migration 0003 (still HITL).
 - **Files:** deployer/src/index.ts
+
+## 2026-06-18 19:52 — Slice 3: Surface errors (persist final deploy error)
+- **Status:** DONE
+- **What I did:**
+  - Resolved the `ponytail:` TODO in PM `src/app/api/deploy-callback/route.ts`. On a `failed`
+    callback it now PERSISTS the deployer's final `body.error` + build-log tail (`body.log`) as a
+    terminal `failed` deploy_event (`step: "callback"`) via slice-1 `insertDeployEvent` — kept the
+    existing `console.error` too (handy in `wrangler tail`). Persistence is wrapped in try/catch so
+    it is best-effort and CANNOT break the status latch (`setSiteDeployStatus`) that follows.
+  - **Storage choice:** reused the existing `deploy_events` trail rather than adding an `error`
+    column to `sites`. Rationale: the trail table + read-API/UI already exist (slices 1, 4), so the
+    error renders for free with zero schema churn / no new migration.
+  - New pure helper `buildFailedCallbackEvent(siteId, error, log, now)` in
+    `src/lib/deploy/deploy-events.ts`: combines reported error + log tail; tolerates missing/empty
+    error (→ `(no error)`) and missing/empty log (not appended). Pure (caller passes `now`) → node-testable.
+- **Verified:** `npm test` → 40 pass (3 new: pure combine, missing-error/log tolerance, and a
+  fake-D1 insert proving the combined error binds into a real `insert into "deploy_events"`).
+  `npx opennextjs-cloudflare build` green (dev confirmed NOT on 3601/3602 first). Honest assertions.
+- **Files:** ProjectManager/src/app/api/deploy-callback/route.ts,
+  src/lib/deploy/deploy-events.ts, src/lib/deploy/deploy-events.test.ts

@@ -34,8 +34,14 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **Reuse the slice-1 ingest contract in slice 2**: the bash script must POST
   `{siteId, step, status: started|ok|failed, startedAt (ms epoch), durationMs?, error?, ramAvailableMb?}`.
   `parseDeployEvent` coerces shell strings → ints, so curl emitting numbers as quoted strings is fine.
-- **Apply migration 0003 to live D1 (HITL)** before slice 2 emits to a deployed PM, or the ingest
-  POST 500s on a missing `deploy_events` table.
+- **Migration 0003 IS APPLIED to remote D1** (confirmed 2026-06-18). The earlier "HITL: apply 0003"
+  note is now stale — live ingest no longer 500s on a missing `deploy_events` table.
+- **Final deploy error lives in deploy_events, NOT a `sites` column.** Slice 3 persists the
+  callback's final error+log tail as a terminal `failed` event with `step: "callback"`. The read
+  API/UI must surface that row's `error` on failure. Don't re-add a `sites.error` column — that was
+  the rejected alternative (extra migration for what the trail already covers).
+- **deploy-callback persistence is best-effort (try/catch).** The error-event insert must never throw
+  past the catch — `setSiteDeployStatus` (the status latch) MUST still run. Keep that ordering.
 - **`date +%s%3N` is GNU-only.** Slice 2's `now_ms()` uses it; works in the Linux container but
   prints a literal `N` on macOS/BSD — so the bash emit helpers can only be functionally tested on
   Linux (or with a stubbed `now_ms`). Don't "fix" it for macOS; the container is GNU/Linux.

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { findSiteById, setSiteDeployStatus } from "@/lib/site/site";
+import {
+  buildFailedCallbackEvent,
+  insertDeployEvent,
+} from "@/lib/deploy/deploy-events";
 
 type Body = {
   siteId?: unknown;
@@ -45,13 +49,24 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "notFound" }, { status: 404 });
   }
 
-  // On failure, log the deployer's reported error + build-log tail so it's
-  // visible in `wrangler tail` (the Site row only stores status, not the error).
-  // ponytail: log-only, no error column — add one if failures need to persist in the UI.
+  // On failure, persist the deployer's final error + build-log tail as a
+  // terminal `failed` deploy_event so the UI can surface it (not just
+  // `wrangler tail`). We reuse the existing deploy_events trail rather than
+  // adding an `error` column to `sites`: the trail already exists and the read
+  // API/UI will render it, so this keeps schema churn at zero. Best-effort — a
+  // failed insert must NEVER break the status latch below, so it's try/caught.
   if (status === "failed") {
+    const log = (body as { log?: unknown }).log;
     console.error(
-      `[deploy-callback] site=${siteId} FAILED: ${String(body.error ?? "(no error)")} | log: ${String((body as { log?: unknown }).log ?? "(none)")}`,
+      `[deploy-callback] site=${siteId} FAILED: ${String(body.error ?? "(no error)")} | log: ${String(log ?? "(none)")}`,
     );
+    try {
+      await insertDeployEvent(
+        buildFailedCallbackEvent(siteId, body.error, log, Date.now()),
+      );
+    } catch (e) {
+      console.error(`[deploy-callback] failed to persist error event: ${String(e)}`);
+    }
   }
 
   const workerName =

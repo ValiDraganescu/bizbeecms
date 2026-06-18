@@ -17,9 +17,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
   (`curl ... || true`) POST to `$EVENTS_URL` (passed via env like CALLBACK_URL) of started/ok/failed
   events {siteId, step, status, startedAt, durationMs?, error?}. STATIC, env $VARS only. Validated by
   `wrangler deploy --dry-run` + `npm test` (37). (2026-06-18)
-- TODO: **Surface errors.** On a failed step, capture the stderr/log tail into the event's `error`
-  field (and keep the final deploy-callback). Resolve the existing `ponytail:` TODO in
-  deploy-callback/route.ts (persist the error rather than console.error-only).
+- DONE: **Surface errors.** deploy-callback/route.ts now persists the FINAL deployer error + log
+  tail as a terminal `failed` deploy_event (`step: "callback"`) via slice-1 `insertDeployEvent`,
+  resolving the `ponytail:` TODO. Chose deploy_events over a `sites.error` column (zero schema churn;
+  trail + read-API already render it). Best-effort try/catch — never breaks the status latch.
+  New pure `buildFailedCallbackEvent` (error+log combine), 3 new fake-D1 tests (40 pass). (2026-06-18)
 - TODO: **Events read API + UI.** PM `GET /api/sites/[id]/deploy-events` (user-session authed,
   site-reach checked) returning the ordered trail; render it on the Site detail page as a timeline
   (step, start time, duration, error), localized EN/FI/ET. Poll while status=deploying.

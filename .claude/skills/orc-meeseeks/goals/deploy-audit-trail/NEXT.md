@@ -1,27 +1,28 @@
 # Note to the next Meeseeks (deploy-audit-trail)
 
-Slices 1 + 2 are DONE.
-- Slice 1: `deploy_events` table + migration 0003 + `POST /api/deploy-events` ingest (Bearer
-  DEPLOYER_SECRET, pure parse/auth, injected-Db insert, fake-D1 tests).
-- Slice 2: `deployer/src/index.ts` `buildScript()` now emits started/ok/failed events per step
-  (clone/npm/build/provision/migrate/deploy) to `$EVENTS_URL`, best-effort, STATIC, env $VARS only.
+Slices 1, 2, 3 are DONE.
+- Slice 1: `deploy_events` table + migration 0003 + `POST /api/deploy-events` ingest.
+- Slice 2: `deployer/src/index.ts` `buildScript()` emits started/ok/failed events per step.
+- Slice 3: PM `deploy-callback/route.ts` now persists the FINAL deployer error + log tail as a
+  terminal `failed` deploy_event (`step: "callback"`) via `insertDeployEvent` (best-effort try/catch;
+  never breaks the status latch). Resolved the old `ponytail:` TODO. New pure helper
+  `buildFailedCallbackEvent` in `lib/deploy/deploy-events.ts`. Errors now live in the trail — NOT in a
+  `sites` column (deliberate: zero schema churn, the read API/UI surface it for free).
 
-**Take the FIRST remaining TODO: slice — "Surface errors."**
-The slice-2 `step_fail` already sends a *short* (200-char) error per failed step. What's left is the
-existing `ponytail:` TODO in PM `src/app/api/deploy-callback/route.ts`: the FINAL callback currently
-`console.error`s the error/log instead of persisting it. Persist it on the Site row (or rely on the
-deploy_events `error` column now that the failed step records it — decide which; probably add an
-`error`/`lastError` column to sites OR just lean on deploy_events and have the read API surface it).
-Resolve that ponytail TODO; don't duplicate the per-step error capture slice 2 already does.
+**Migration 0003 is APPLIED to remote D1** (confirmed by driver 2026-06-18) — the old HITL note was
+stale. Live ingest no longer 500s on a missing table.
 
-Then: **Events read API + UI** — PM `GET /api/sites/[id]/deploy-events` (user-session authed,
-site-reach checked) returning the ordered trail; render a timeline on the Site detail page
-(step / start time / duration / error), localized EN/FI/ET, poll while status=deploying.
+**Take the FIRST remaining TODO: "Events read API + UI."**
+PM `GET /api/sites/[id]/deploy-events` — user-session authed, site-reach checked (mirror the other
+`/api/sites/[id]/*` routes), returns the ordered trail (order by `startedAt`/`createdAt`). Render a
+timeline on the Site detail page: step / start time / duration / error (the `callback` row from slice 3
+holds the final error + log tail — show it prominently on failure). Localize EN/FI/ET. Poll while
+status=deploying. Use a relative-`.ts`-importable lib query if you also want a node test (see the
+deploy-events.ts caveats about `@/` alias + `allowImportingTsExtensions`).
 
-RAM (`/proc/meminfo` MemAvailable around `next build` → `ramAvailableMb`) is nice-to-have, last.
+Then: RAM (`/proc/meminfo` MemAvailable around `next build` → `ramAvailableMb`) — nice-to-have, last.
+Then: Verify end-to-end (real deploy → full ordered trail; forced failure records error; emit failure
+doesn't break deploy).
 
-**HITL still pending:** apply migration 0003 to live D1 — `wrangler d1 migrations apply bizbeecms`
-— before any of this hits a deployed PM (the table doesn't exist remotely yet, so live ingest 500s).
-
-Gates: PM `npm test` green + `npx opennextjs-cloudflare build` (PM) / `npx wrangler deploy --dry-run`
-(deployer). NEVER run opennextjs build while `npm run dev` is on 3601/3602.
+Gates: PM `npm test` green + `npx opennextjs-cloudflare build` (PM). NEVER run opennextjs build while
+`npm run dev` is on 3601/3602.
