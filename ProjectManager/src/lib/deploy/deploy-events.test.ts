@@ -14,6 +14,7 @@ import {
   buildFailedCallbackEvent,
   listDeployEventsForSite,
   collapseDeployEvents,
+  selectLatestRun,
   type TimelineRow,
 } from "./deploy-events.ts";
 import * as schema from "../../db/schema.ts";
@@ -71,6 +72,7 @@ test("insertDeployEvent compiles a real insert into deploy_events with bound val
   await insertDeployEvent(
     {
       siteId: "site-1",
+      deployId: "run-abc",
       step: "build",
       status: "ok",
       startedAt: 1_700_000_000_000,
@@ -87,6 +89,7 @@ test("insertDeployEvent compiles a real insert into deploy_events with bound val
   assert.match(sql, /insert into "deploy_events"/i);
   // Real column values flow through as bound params.
   assert.ok(params.includes("site-1"));
+  assert.ok(params.includes("run-abc")); // deployId binds to the deploy_id column
   assert.ok(params.includes("build"));
   assert.ok(params.includes("ok"));
   assert.ok(params.includes(1_700_000_000_000)); // startedAt as ms epoch
@@ -101,6 +104,7 @@ test("insertDeployEvent persists nullable fields as null, not undefined", async 
   await insertDeployEvent(
     {
       siteId: "site-2",
+      deployId: null,
       step: "clone",
       status: "started",
       startedAt: 1_700_000_000_000,
@@ -171,6 +175,7 @@ test("listDeployEventsForSite maps D1 rows back through the real schema", async 
     {
       id: "e1",
       site_id: "site-7",
+      deploy_id: "run-7",
       step: "build",
       status: "ok",
       started_at: 1_700_000_000_000,
@@ -186,6 +191,7 @@ test("listDeployEventsForSite maps D1 rows back through the real schema", async 
 
   assert.equal(events.length, 1);
   assert.equal(events[0].id, "e1");
+  assert.equal(events[0].deployId, "run-7");
   assert.equal(events[0].step, "build");
   assert.equal(events[0].status, "ok");
   assert.equal(events[0].durationMs, 4200);
@@ -195,8 +201,9 @@ test("listDeployEventsForSite maps D1 rows back through the real schema", async 
 });
 
 test("buildFailedCallbackEvent combines error + log tail into one terminal failed event", () => {
-  const ev = buildFailedCallbackEvent("site-9", "wrangler deploy failed", "line1\nline2", 1_700_000_000_000);
+  const ev = buildFailedCallbackEvent("site-9", "wrangler deploy failed", "line1\nline2", 1_700_000_000_000, "run-9");
   assert.equal(ev.siteId, "site-9");
+  assert.equal(ev.deployId, "run-9"); // the run id rides on the terminal callback event
   assert.equal(ev.step, "callback");
   assert.equal(ev.status, "failed");
   assert.equal(ev.startedAt, 1_700_000_000_000);
@@ -208,10 +215,12 @@ test("buildFailedCallbackEvent combines error + log tail into one terminal faile
 });
 
 test("buildFailedCallbackEvent tolerates a missing error and missing log", () => {
-  const ev = buildFailedCallbackEvent("site-9", undefined, undefined, 42);
+  const ev = buildFailedCallbackEvent("site-9", undefined, undefined, 42, undefined);
   assert.equal(ev.error, "(no error)"); // no log tail appended when there's no log
-  const ev2 = buildFailedCallbackEvent("site-9", "boom", "", 42);
+  assert.equal(ev.deployId, null); // a missing deployId stays null
+  const ev2 = buildFailedCallbackEvent("site-9", "boom", "", 42, "");
   assert.equal(ev2.error, "boom"); // empty log → not appended
+  assert.equal(ev2.deployId, null); // a blank deployId stays null
 });
 
 test("a failed callback event persists into deploy_events via insertDeployEvent", async () => {
@@ -219,7 +228,7 @@ test("a failed callback event persists into deploy_events via insertDeployEvent"
   const db = cfDb(d1 as unknown as D1Database);
 
   await insertDeployEvent(
-    buildFailedCallbackEvent("site-9", "build OOM", "npm ERR! ...", 1_700_000_000_000),
+    buildFailedCallbackEvent("site-9", "build OOM", "npm ERR! ...", 1_700_000_000_000, "run-9"),
     db,
   );
 
@@ -236,6 +245,7 @@ test("a failed callback event persists into deploy_events via insertDeployEvent"
 test("parseDeployEvent accepts a valid body and coerces numerics", () => {
   const r = parseDeployEvent({
     siteId: "s",
+    deployId: "run-42",
     step: "deploy",
     status: "failed",
     startedAt: "1700000000000", // string from a shell curl is coerced
@@ -245,12 +255,18 @@ test("parseDeployEvent accepts a valid body and coerces numerics", () => {
   });
   assert.ok(r.ok);
   if (r.ok) {
+    assert.equal(r.event.deployId, "run-42");
     assert.equal(r.event.startedAt, 1_700_000_000_000);
     assert.equal(r.event.durationMs, 900);
     assert.equal(r.event.ramAvailableMb, 128);
     assert.equal(r.event.error, "boom");
     assert.equal(r.event.status, "failed");
   }
+
+  // A body without a deployId (legacy deployer) parses with deployId: null.
+  const noRun = parseDeployEvent({ siteId: "s", step: "x", status: "ok", startedAt: 1 });
+  assert.ok(noRun.ok);
+  if (noRun.ok) assert.equal(noRun.event.deployId, null);
 });
 
 test("parseDeployEvent rejects missing siteId, bad status, and missing startedAt", () => {
@@ -272,11 +288,46 @@ test("isAuthorized: matches only a non-empty secret equal to the bearer token", 
 
 const row = (o: Partial<TimelineRow> & { step: string; status: TimelineRow["status"] }): TimelineRow => ({
   id: `${o.step}-${o.status}`,
+  deployId: "run-1",
   startedAt: "2026-06-18T10:00:00.000Z",
   durationMs: null,
   error: null,
   ramAvailableMb: null,
   ...o,
+});
+
+test("selectLatestRun keeps only the most-recently-started run's events", () => {
+  // Two runs interleaved as the read API returns them (oldest-first). The newer
+  // run (run-2, later startedAt) must be the only one shown — the bug repro.
+  const kept = selectLatestRun([
+    row({ id: "a", deployId: "run-1", step: "build", status: "failed", startedAt: "2026-06-18T10:00:00.000Z" }),
+    row({ id: "b", deployId: "run-1", step: "callback", status: "failed", startedAt: "2026-06-18T10:01:00.000Z" }),
+    row({ id: "c", deployId: "run-2", step: "clone", status: "started", startedAt: "2026-06-18T10:05:00.000Z" }),
+    row({ id: "d", deployId: "run-2", step: "build", status: "started", startedAt: "2026-06-18T10:06:00.000Z" }),
+  ]);
+  assert.deepEqual(kept.map((r) => r.id), ["c", "d"]);
+  assert.ok(kept.every((r) => r.deployId === "run-2"));
+});
+
+test("selectLatestRun preserves original order within the selected run", () => {
+  const kept = selectLatestRun([
+    row({ id: "x1", deployId: "run-2", step: "clone", status: "started", startedAt: "2026-06-18T10:05:00.000Z" }),
+    row({ id: "old", deployId: "run-1", step: "build", status: "failed", startedAt: "2026-06-18T10:00:00.000Z" }),
+    row({ id: "x2", deployId: "run-2", step: "clone", status: "ok", startedAt: "2026-06-18T10:05:30.000Z" }),
+  ]);
+  assert.deepEqual(kept.map((r) => r.id), ["x1", "x2"]);
+});
+
+test("selectLatestRun groups legacy null-deployId rows as one run", () => {
+  const kept = selectLatestRun([
+    row({ id: "n1", deployId: null, step: "clone", status: "started", startedAt: "2026-06-18T09:00:00.000Z" }),
+    row({ id: "n2", deployId: null, step: "build", status: "ok", startedAt: "2026-06-18T09:01:00.000Z" }),
+  ]);
+  assert.deepEqual(kept.map((r) => r.id), ["n1", "n2"]);
+});
+
+test("selectLatestRun returns [] for no events", () => {
+  assert.deepEqual(selectLatestRun([]), []);
 });
 
 test("collapseDeployEvents folds each step's started+ok pair into one finished row", () => {

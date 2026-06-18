@@ -219,6 +219,9 @@ async function startDeploy(
 ): Promise<void> {
   const workerName = `${WORKER_PREFIX}${input.slug}`.slice(0, 63);
   const sandbox = getSandbox(env.Sandbox, `deploy-${input.slug}`);
+  // One id per deploy invocation, like SITE_ID — every per-step emit AND the
+  // final callback carry it so the timeline can isolate a single run's events.
+  const deployId = crypto.randomUUID();
 
   // The script is fully STATIC — no caller-controlled value is interpolated
   // into it. Everything (secrets AND the non-secret per-deploy values) is
@@ -236,6 +239,7 @@ async function startDeploy(
       WORKER_NAME: workerName,
       SLUG: input.slug,
       SITE_ID: input.siteId,
+      DEPLOY_ID: deployId,
       CALLBACK_URL: env.PM_CALLBACK_ORIGIN
         ? `${env.PM_CALLBACK_ORIGIN.replace(/\/+$/, "")}/api/deploy-callback`
         : "",
@@ -270,14 +274,14 @@ report() {
   # $1=status (deployed|failed) ; $2=optional error
   if [ -z "$CALLBACK_URL" ]; then return; fi
   if [ "$1" = "deployed" ]; then
-    body="{\\"siteId\\":\\"$SITE_ID\\",\\"status\\":\\"deployed\\",\\"workerName\\":\\"$WORKER_NAME\\"}"
+    body="{\\"siteId\\":\\"$SITE_ID\\",\\"deployId\\":\\"$DEPLOY_ID\\",\\"status\\":\\"deployed\\",\\"workerName\\":\\"$WORKER_NAME\\"}"
   else
     # keep error short + JSON-safe
     # Include the tail of the build log so the failure is self-explanatory in PM,
     # not just a step name. JSON-escape: strip quotes/newlines/backslashes/tabs.
     tail_log=$(tail -n 25 /workspace/build.log 2>/dev/null | tr '"\\\\\\n\\t' '    ' | cut -c1-1500)
     err=$(printf '%s' "\${2:-}" | tr '"\\n' '  ' | cut -c1-200)
-    body="{\\"siteId\\":\\"$SITE_ID\\",\\"status\\":\\"failed\\",\\"error\\":\\"$err\\",\\"log\\":\\"$tail_log\\"}"
+    body="{\\"siteId\\":\\"$SITE_ID\\",\\"deployId\\":\\"$DEPLOY_ID\\",\\"status\\":\\"failed\\",\\"error\\":\\"$err\\",\\"log\\":\\"$tail_log\\"}"
   fi
   curl -sS -X POST "$CALLBACK_URL" \
     -H "Authorization: Bearer $DEPLOYER_SECRET" \
@@ -288,7 +292,7 @@ report() {
 # --- Per-step audit trail (deploy-audit-trail) -----------------------------
 # Best-effort, NEVER fatal — mirrors report() exactly (curl ... || true). The
 # ingest contract (validated by PM parseDeployEvent, which coerces these quoted
-# shell strings to ints): {siteId, step, status, startedAt, durationMs?, error?}.
+# shell strings to ints): {siteId, deployId, step, status, startedAt, durationMs?, error?}.
 # STEP_NAME/STEP_START_MS are module-level shell state set by step_start so the
 # matching step_ok/step_fail can compute durationMs without repeating the name.
 STEP_NAME=""
@@ -312,7 +316,7 @@ emit_event() {
   # ramAvailableMb (nice-to-have): only when a step sampled it. parseDeployEvent
   # coerces the quoted integer string to a number.
   if [ -n "$STEP_RAM_MB" ]; then extra="$extra,\\"ramAvailableMb\\":\\"$STEP_RAM_MB\\""; fi
-  local body="{\\"siteId\\":\\"$SITE_ID\\",\\"step\\":\\"$1\\",\\"status\\":\\"$2\\"$extra}"
+  local body="{\\"siteId\\":\\"$SITE_ID\\",\\"deployId\\":\\"$DEPLOY_ID\\",\\"step\\":\\"$1\\",\\"status\\":\\"$2\\"$extra}"
   curl -sS -X POST "$EVENTS_URL" \
     -H "Authorization: Bearer $DEPLOYER_SECRET" \
     -H "Content-Type: application/json" \

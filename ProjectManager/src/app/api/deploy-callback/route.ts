@@ -62,7 +62,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
     try {
       await insertDeployEvent(
-        buildFailedCallbackEvent(siteId, body.error, log, Date.now()),
+        buildFailedCallbackEvent(
+          siteId,
+          body.error,
+          log,
+          Date.now(),
+          (body as { deployId?: unknown }).deployId,
+        ),
       );
     } catch (e) {
       console.error(`[deploy-callback] failed to persist error event: ${String(e)}`);

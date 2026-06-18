@@ -67,6 +67,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   → no field (best-effort, never fatal). Container is Linux so `/proc/meminfo` exists; don't use `free -m`
   (extra parsing, same data).
 
+- **Per-run isolation: `selectLatestRun` runs BEFORE `collapseDeployEvents` in the UI.** Each emit +
+  both deployer `report` bodies carry `deployId` (the deployer mints ONE `crypto.randomUUID()` per
+  invocation, passed via env as `DEPLOY_ID` like SITE_ID). `selectLatestRun(events)` (pure, in
+  `lib/deploy/deploy-events.ts`) keeps only the deployId of the max-`startedAt` event; legacy
+  null-deployId rows all share one group. Don't filter by run at ingest or in SQL — keep ALL runs
+  persisted; the UI picks the latest. Migration `0004_legal_fabian_cortez.sql` adds nullable
+  `deploy_id` (drizzle-generated via `npm run db:generate` — do NOT hand-write the migration or its
+  snapshot/journal; let drizzle-kit emit all three). `deploy_id` is NULLABLE on purpose (pre-0004
+  rows + a legacy deployer have null). DRIVER (not HITL) applies 0004 to remote D1 + redeploys both
+  workers after the fix lands.
 - **The timeline collapses raw events CLIENT-SIDE — keep BOTH rows persisted.** Each step emits a
   `started` then `ok`/`failed` (two `deploy_events` rows); the duration is computed from that pair.
   `collapseDeployEvents()` (pure, in `lib/deploy/deploy-events.ts`) folds them into one UI row.

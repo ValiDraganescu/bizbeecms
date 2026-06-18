@@ -34,6 +34,9 @@ export function isAuthorized(secret: unknown, bearer: string): boolean {
 /** A validated event ready to insert (sans id/createdAt, which we fill in). */
 export type ParsedDeployEvent = {
   siteId: string;
+  // One id per deploy run (the deployer mints a UUID per invocation). Null only
+  // for pre-0004 rows / a deployer that doesn't send one.
+  deployId: string | null;
   step: string;
   status: DeployEventStatus;
   startedAt: number;
@@ -80,10 +83,16 @@ export function parseDeployEvent(
   const error =
     typeof b.error === "string" && b.error.length > 0 ? b.error : null;
 
+  const deployId =
+    typeof b.deployId === "string" && b.deployId.trim().length > 0
+      ? b.deployId.trim()
+      : null;
+
   return {
     ok: true,
     event: {
       siteId,
+      deployId,
       step,
       status: status as DeployEventStatus,
       startedAt: Math.trunc(startedAt),
@@ -107,12 +116,17 @@ export function buildFailedCallbackEvent(
   error: unknown,
   log: unknown,
   now: number,
+  deployId: unknown,
 ): ParsedDeployEvent {
   const errText = typeof error === "string" && error.length > 0 ? error : "(no error)";
   const logText = typeof log === "string" && log.length > 0 ? log : null;
   const combined = logText ? `${errText}\n--- log tail ---\n${logText}` : errText;
   return {
     siteId,
+    deployId:
+      typeof deployId === "string" && deployId.trim().length > 0
+        ? deployId.trim()
+        : null,
     step: "callback",
     status: "failed",
     startedAt: now,
@@ -130,6 +144,7 @@ export function buildFailedCallbackEvent(
  */
 export type TimelineRow = {
   id: string;
+  deployId: string | null;
   step: string;
   status: DeployEventStatus;
   startedAt: string;
@@ -137,6 +152,33 @@ export type TimelineRow = {
   error: string | null;
   ramAvailableMb: number | null;
 };
+
+/**
+ * Keep only the LATEST deploy run's events, fixing the bug where a fresh deploy
+ * rendered interleaved with the previous (failed) run's rows. The latest run is
+ * the `deployId` of the event with the greatest `startedAt`; ties keep the
+ * later position (events arrive oldest-first). Events sharing that deployId are
+ * returned in their original order. Pure — no I/O — so it's node-testable.
+ *
+ * Pre-0004 rows have `deployId: null`; they all share the same null group, so a
+ * site whose only events predate the migration still shows them as one run.
+ */
+export function selectLatestRun(events: readonly TimelineRow[]): TimelineRow[] {
+  if (events.length === 0) return [];
+  // Find the run id of the most-recently-started event. Iterate forward so a
+  // tie on startedAt resolves to the later (last-wins) event's run.
+  let latestId = events[0].deployId;
+  let latestAt = Date.parse(events[0].startedAt);
+  for (const e of events) {
+    const at = Date.parse(e.startedAt);
+    // NaN-safe: an unparseable date never wins over a real one.
+    if (!Number.isNaN(at) && (Number.isNaN(latestAt) || at >= latestAt)) {
+      latestAt = at;
+      latestId = e.deployId;
+    }
+  }
+  return events.filter((e) => e.deployId === latestId);
+}
 
 /**
  * Collapse the raw chronological event trail (two rows per step: a `started`
@@ -160,6 +202,7 @@ export function collapseDeployEvents(events: readonly TimelineRow[]): TimelineRo
     }
     byStep.set(e.step, {
       id: prev.id,
+      deployId: prev.deployId,
       step: prev.step,
       startedAt: prev.startedAt,
       status: e.status,
@@ -185,6 +228,7 @@ export async function insertDeployEvent(
   const row: NewDeployEvent = {
     id: crypto.randomUUID(),
     siteId: event.siteId,
+    deployId: event.deployId,
     step: event.step,
     status: event.status,
     startedAt: new Date(event.startedAt),

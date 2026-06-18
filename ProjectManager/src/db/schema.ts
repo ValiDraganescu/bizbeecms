@@ -96,6 +96,9 @@ export const deployEvents = sqliteTable("deploy_events", {
   siteId: text("site_id")
     .notNull()
     .references(() => sites.id, { onDelete: "cascade" }),
+  // One id per deploy invocation (deployer mints a UUID per run), so the
+  // timeline can show only the latest run's events. Nullable for pre-0004 rows.
+  deployId: text("deploy_id"),
   step: text("step").notNull(),
   status: text("status").notNull().$type<DeployEventStatus>(),
   startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),

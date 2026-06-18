@@ -1,0 +1,1 @@
+ALTER TABLE `deploy_events` ADD `deploy_id` text;

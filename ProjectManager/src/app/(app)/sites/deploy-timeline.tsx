@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Badge, type BadgeTone } from "@/components/ui";
 import type { DeployEventStatus, SiteStatus } from "@/db/schema";
-import { collapseDeployEvents } from "@/lib/deploy/deploy-events";
+import { collapseDeployEvents, selectLatestRun } from "@/lib/deploy/deploy-events";
 
 /** A deploy event as it arrives over JSON (Date columns serialize to ISO strings). */
 type WireEvent = {
   id: string;
+  deployId: string | null;
   step: string;
   status: DeployEventStatus;
   startedAt: string;
@@ -86,8 +87,9 @@ export function DeployTimeline({
     return <p className="text-sm text-foreground-muted">{t("empty")}</p>;
   }
 
-  // Each step emits two raw events (started + ok/failed); collapse to one row.
-  const rows = collapseDeployEvents(events);
+  // Show only the latest deploy run (drop the previous run's rows), then
+  // collapse each step's started+ok/failed pair into one row.
+  const rows = collapseDeployEvents(selectLatestRun(events));
 
   return (
     <ol className="flex flex-col gap-3">

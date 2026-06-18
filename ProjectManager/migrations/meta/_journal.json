@@ -29,6 +29,13 @@
       "when": 1781800855387,
       "tag": "0003_curvy_dragon_man",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1781803530490,
+      "tag": "0004_legal_fabian_cortez",
+      "breakpoints": true
     }
   ]
 }
