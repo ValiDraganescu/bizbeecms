@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { BlockEditor } from "@/components/pages/block-editor";
-import { getPageBlocks, listComponentNamesForPalette } from "@/db/page-store";
+import { getPageBlocks, listComponentPalette } from "@/db/page-store";
 import type { Block } from "@/lib/render/tree";
 
 export const dynamic = "force-dynamic";
@@ -31,14 +31,14 @@ export default async function PageBlocksPage({
   // No D1 binding offline → the page is unresolvable, so 404 (live data needs a
   // real binding; the surrounding app builds because other routes degrade).
   let page: { id: string; slug: string; blocks: Block[] } | null = null;
-  let palette: string[] = [];
+  let palette: { name: string; propsSchema: string | null }[] = [];
   try {
     page = await getPageBlocks(id);
   } catch {
     /* unbound D1 in this env */
   }
   try {
-    palette = await listComponentNamesForPalette();
+    palette = await listComponentPalette();
   } catch {
     /* unbound D1 — empty palette */
   }

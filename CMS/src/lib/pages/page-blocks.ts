@@ -94,6 +94,50 @@ export function validateBlocks(
   }
 }
 
+/**
+ * Parse a component's `propsSchema` JSON into the editor's field descriptors —
+ * the SAME allowlist the renderer's `declaredProps` derives, so the props UI and
+ * the binder agree on which props exist. Each entry is `{ name, type, default }`;
+ * `type` is normalized to `"richtext"` (→ textarea) or `"string"` (→ input) so an
+ * unknown/missing type degrades to a plain text field. PURE — never throws.
+ */
+export function parsePropsSchema(
+  propsSchema: string | null | undefined,
+): { name: string; type: "string" | "richtext"; default: string }[] {
+  if (!propsSchema) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(propsSchema);
+  } catch {
+    return [];
+  }
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) return [];
+  return Object.entries(parsed as Record<string, unknown>).map(([name, spec]) => {
+    const s = spec && typeof spec === "object" ? (spec as Record<string, unknown>) : {};
+    const type = s.type === "richtext" ? "richtext" : "string";
+    const def = typeof s.default === "string" ? s.default : "";
+    return { name, type, default: def };
+  });
+}
+
+/**
+ * Drop undeclared keys from a block's props, mirroring the renderer's allowlist
+ * (`declaredProps`): only props named in `declared` survive. Empty-string values
+ * are dropped too (no point persisting blanks — an unbound slot renders ""). PURE.
+ */
+export function validateBlockProps(
+  props: Record<string, unknown>,
+  declared: Set<string>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(props)) {
+    if (!declared.has(k)) continue;
+    if (typeof v === "string" && v === "") continue;
+    out[k] = v;
+  }
+  return out;
+}
+
 /** A fresh top-level block referencing `component`, with a unique generated id. */
 export function makeBlock(component: string, existing: Block[]): Block {
   return { id: uniqueBlockId(component, existing), component };

@@ -13,12 +13,23 @@
  *
  * ponytail: top-level blocks only this slice; nested block.children authored by
  * the AI round-trip untouched but aren't edited here. Up/down reorder, no DnD lib.
+ * Per-block props: one field per DECLARED prop (the component's propsSchema), a
+ * textarea for `richtext` else a text input. Localized (locale-object) props get a
+ * single default-locale field this slice — per-locale editing logged in NEXT.md.
  */
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { addBlock, moveBlock, removeBlock } from "@/lib/pages/page-blocks";
+import {
+  addBlock,
+  moveBlock,
+  parsePropsSchema,
+  removeBlock,
+  validateBlockProps,
+} from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
+
+type PaletteEntry = { name: string; propsSchema: string | null };
 
 export function BlockEditor({
   pageId,
@@ -27,14 +38,35 @@ export function BlockEditor({
 }: {
   pageId: string;
   initialBlocks: Block[];
-  palette: string[];
+  palette: PaletteEntry[];
 }) {
   const t = useTranslations("pageBlocks");
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
-  const [picked, setPicked] = useState<string>(palette[0] ?? "");
+  const [picked, setPicked] = useState<string>(palette[0]?.name ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  const schemaOf = (component: string) =>
+    parsePropsSchema(palette.find((p) => p.name === component)?.propsSchema);
+
+  /** Set one prop on a block, mirroring the renderer's declared-prop allowlist. */
+  function setProp(blockId: string, propName: string, value: string) {
+    mutate(
+      blocks.map((b) => {
+        if (b.id !== blockId) return b;
+        const declared = new Set(schemaOf(b.component).map((f) => f.name));
+        const props = validateBlockProps(
+          { ...(b.props ?? {}), [propName]: value },
+          declared,
+        );
+        const next = { ...b };
+        if (Object.keys(props).length > 0) next.props = props;
+        else delete next.props;
+        return next;
+      }),
+    );
+  }
 
   function mutate(next: Block[]) {
     setBlocks(next);
@@ -80,9 +112,9 @@ export function BlockEditor({
               onChange={(e) => setPicked(e.target.value)}
               aria-label={t("component")}
             >
-              {palette.map((name) => (
-                <option key={name} value={name}>
-                  {name}
+              {palette.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -119,8 +151,9 @@ export function BlockEditor({
           {blocks.map((b, i) => (
             <li
               key={b.id}
-              className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-raised px-3 py-2"
+              className="flex flex-col gap-3 rounded-md border border-border bg-surface-raised px-3 py-2"
             >
+              <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 flex-col">
                 <span className="truncate font-mono text-foreground">{b.component}</span>
                 <span className="truncate text-sm text-foreground-muted">{b.id}</span>
@@ -154,6 +187,46 @@ export function BlockEditor({
                   {t("remove")}
                 </button>
               </div>
+              </div>
+              {(() => {
+                const fields = schemaOf(b.component);
+                if (fields.length === 0) return null;
+                const props = (b.props ?? {}) as Record<string, unknown>;
+                return (
+                  <div className="flex flex-col gap-2 border-t border-border pt-3">
+                    {fields.map((f) => {
+                      const raw = props[f.name];
+                      const value = typeof raw === "string" ? raw : "";
+                      const fieldId = `${b.id}-${f.name}`;
+                      return (
+                        <label key={f.name} className="flex flex-col gap-1">
+                          <span className="text-sm text-foreground-muted">{f.name}</span>
+                          {f.type === "richtext" ? (
+                            <textarea
+                              id={fieldId}
+                              className={`${input} min-h-20`}
+                              value={value}
+                              placeholder={f.default}
+                              disabled={busy}
+                              onChange={(e) => setProp(b.id, f.name, e.target.value)}
+                            />
+                          ) : (
+                            <input
+                              id={fieldId}
+                              type="text"
+                              className={input}
+                              value={value}
+                              placeholder={f.default}
+                              disabled={busy}
+                              onChange={(e) => setProp(b.id, f.name, e.target.value)}
+                            />
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </li>
           ))}
         </ol>

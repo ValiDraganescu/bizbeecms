@@ -305,10 +305,19 @@ export async function setPageBlocks(
 }
 
 /** List the Site's component names for the C3 block palette (sorted). */
-export async function listComponentNamesForPalette(): Promise<string[]> {
+/**
+ * The block editor's palette WITH each component's `propsSchema` (C3 props UI) —
+ * so the editor can render a field per declared prop for a selected block. Name +
+ * raw propsSchema JSON string (the editor parses it via `parsePropsSchema`).
+ */
+export async function listComponentPalette(): Promise<
+  { name: string; propsSchema: string | null }[]
+> {
   const db = await getDb();
-  const rows = await db.select({ name: schema.component.name }).from(schema.component);
-  return rows.map((r) => r.name).sort((a, b) => a.localeCompare(b));
+  const rows = await db
+    .select({ name: schema.component.name, propsSchema: schema.component.propsSchema })
+    .from(schema.component);
+  return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Delete a page. Refuses if it still has children (avoid orphaning the tree). */

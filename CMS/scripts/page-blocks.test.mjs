@@ -17,7 +17,9 @@ import { dirname, join } from "node:path";
 import {
   addBlock,
   moveBlock,
+  parsePropsSchema,
   removeBlock,
+  validateBlockProps,
   validateBlocks,
 } from "../src/lib/pages/page-blocks.ts";
 
@@ -34,6 +36,31 @@ function keys(obj, prefix = "") {
   }
   return out;
 }
+
+test("parsePropsSchema yields one field per declared prop, type-normalized", () => {
+  const fields = parsePropsSchema(
+    JSON.stringify({
+      title: { type: "string", default: "Hi" },
+      body: { type: "richtext", default: "" },
+      odd: { type: "weird" },
+    }),
+  );
+  assert.equal(fields.length, 3);
+  const byName = Object.fromEntries(fields.map((f) => [f.name, f]));
+  assert.deepEqual(byName.title, { name: "title", type: "string", default: "Hi" });
+  assert.equal(byName.body.type, "richtext");
+  assert.equal(byName.odd.type, "string", "unknown type degrades to string");
+  assert.deepEqual(parsePropsSchema(null), [], "no schema → no fields");
+  assert.deepEqual(parsePropsSchema("{bad json"), [], "bad JSON → no fields");
+});
+
+test("validateBlockProps drops undeclared keys and empty strings (renderer allowlist)", () => {
+  const out = validateBlockProps(
+    { title: "Hello", secret: "leak", blank: "" },
+    new Set(["title", "blank"]),
+  );
+  assert.deepEqual(out, { title: "Hello" }, "undeclared dropped, empty dropped");
+});
 
 test("addBlock appends an immutable, uniquely-id'd block", () => {
   const a = [];
