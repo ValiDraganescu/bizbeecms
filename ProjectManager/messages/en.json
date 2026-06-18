@@ -227,6 +227,17 @@
       "country": "Country",
       "global": "Global"
     },
+    "timeline": {
+      "title": "Deploy timeline",
+      "description": "Each deploy step with its start time, duration, and any error.",
+      "empty": "No deploy events yet. They appear here once a deploy runs.",
+      "ram": "{mb} MB free",
+      "status": {
+        "started": "Running",
+        "ok": "Done",
+        "failed": "Failed"
+      }
+    },
     "assign": {
       "title": "Assigned users",
       "description": "Users who can manage this Site. Country scope limits who's eligible.",

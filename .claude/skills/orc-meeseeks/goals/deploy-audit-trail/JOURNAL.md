@@ -71,3 +71,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `npx opennextjs-cloudflare build` green (dev confirmed NOT on 3601/3602 first). Honest assertions.
 - **Files:** ProjectManager/src/app/api/deploy-callback/route.ts,
   src/lib/deploy/deploy-events.ts, src/lib/deploy/deploy-events.test.ts
+
+## 2026-06-18 — Slice 4: Events read API + UI (visibility payoff)
+- **Status:** DONE
+- **What I did:**
+  - PM `GET /api/sites/[id]/deploy-events` (`src/app/api/sites/[id]/deploy-events/route.ts`):
+    USER-session authed (getCurrentUser) with the SAME site-reach check as the deploy trigger
+    (`canManageSiteByCountry || isUserAssignedToSite`). NOT DEPLOYER_SECRET — this is user-facing.
+    Returns `{ status, events }` (status from the Site row so the client knows when to stop polling).
+  - New `listDeployEventsForSite(siteId, injectedDb?)` in `lib/deploy/deploy-events.ts`: relative-`.ts`
+    + injected-Db seam (same node-testable pattern as `insertDeployEvent`). Orders
+    `asc(startedAt), asc(createdAt)` → oldest-first timeline.
+  - Client `src/app/(app)/sites/deploy-timeline.tsx`: fetches the trail, polls every 5s WHILE
+    status==='deploying', stops on deployed/failed (mirrors deploy-form's poll). Renders per step:
+    name, status Badge, start time (toLocaleTimeString), duration (ms/s), ram (if set), and the
+    error in a `<pre>` for failed steps — incl. the terminal `callback` row (slice 3) holding the
+    final deployer error + log tail. Design tokens only (border-border, bg-danger-subtle/text-danger).
+  - Mounted in a Card on the Site detail page (`[id]/page.tsx`).
+  - i18n `sites.timeline` (title/description/empty/ram/status.{started,ok,failed}) added to EN/FI/ET.
+- **Verified:** `npm test` → 42 pass (2 new honest fake-D1 tests: compiled SELECT filters by
+  site_id + orders started_at,created_at; seeded D1 rows map back through the real schema, startedAt
+  → Date). `npx opennextjs-cloudflare build` green (dev confirmed NOT on 3601/3602 first).
+- **Files:** ProjectManager/src/app/api/sites/[id]/deploy-events/route.ts,
+  src/app/(app)/sites/deploy-timeline.tsx, src/app/(app)/sites/[id]/page.tsx,
+  src/lib/deploy/deploy-events.ts, src/lib/deploy/deploy-events.test.ts, messages/{en,fi,et}.json

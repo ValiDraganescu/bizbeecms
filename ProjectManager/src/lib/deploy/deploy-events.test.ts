@@ -12,6 +12,7 @@ import {
   parseDeployEvent,
   insertDeployEvent,
   buildFailedCallbackEvent,
+  listDeployEventsForSite,
 } from "./deploy-events.ts";
 import * as schema from "../../db/schema.ts";
 
@@ -112,6 +113,83 @@ test("insertDeployEvent persists nullable fields as null, not undefined", async 
   // The three nullable columns bind to null (D1 stores NULL), never undefined.
   assert.ok(params.includes(null));
   assert.ok(!params.includes(undefined));
+});
+
+/** Fake D1 whose `all()` returns seeded rows, so the read query's mapping is testable. */
+function fakeD1Rows(rows: Record<string, unknown>[]) {
+  const calls: { sql: string; params: unknown[] }[] = [];
+  return {
+    calls,
+    prepare(sql: string) {
+      const stmt: {
+        sql: string;
+        params: unknown[];
+        bind: (...p: unknown[]) => unknown;
+        all: () => Promise<unknown>;
+        raw: () => Promise<unknown>;
+      } = {
+        sql,
+        params: [],
+        bind(...p: unknown[]) {
+          stmt.params = p;
+          return stmt;
+        },
+        async all() {
+          calls.push({ sql: stmt.sql, params: stmt.params });
+          return { results: rows };
+        },
+        async raw() {
+          calls.push({ sql: stmt.sql, params: stmt.params });
+          return rows.map((r) => Object.values(r));
+        },
+      };
+      return stmt;
+    },
+  };
+}
+
+test("listDeployEventsForSite filters by site and orders by started_at then created_at", async () => {
+  const d1 = fakeD1Rows([]);
+  const db = cfDb(d1 as unknown as D1Database);
+
+  await listDeployEventsForSite("site-7", db);
+
+  assert.equal(d1.calls.length, 1);
+  const { sql, params } = d1.calls[0];
+  // Reads the real table, scoped to the requested site, oldest-first for the timeline.
+  assert.match(sql, /from "deploy_events"/i);
+  assert.match(sql, /where "deploy_events"\."site_id" = \?/i);
+  assert.match(sql, /order by "deploy_events"\."started_at" asc, "deploy_events"\."created_at" asc/i);
+  assert.deepEqual(params, ["site-7"]);
+});
+
+test("listDeployEventsForSite maps D1 rows back through the real schema", async () => {
+  // started_at/created_at are stored as ms-epoch ints; drizzle maps them to Date.
+  const d1 = fakeD1Rows([
+    {
+      id: "e1",
+      site_id: "site-7",
+      step: "build",
+      status: "ok",
+      started_at: 1_700_000_000_000,
+      duration_ms: 4200,
+      error: null,
+      ram_available_mb: 512,
+      created_at: 1_700_000_000_100,
+    },
+  ]);
+  const db = cfDb(d1 as unknown as D1Database);
+
+  const events = await listDeployEventsForSite("site-7", db);
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].id, "e1");
+  assert.equal(events[0].step, "build");
+  assert.equal(events[0].status, "ok");
+  assert.equal(events[0].durationMs, 4200);
+  assert.equal(events[0].ramAvailableMb, 512);
+  assert.ok(events[0].startedAt instanceof Date);
+  assert.equal(events[0].startedAt.getTime(), 1_700_000_000_000);
 });
 
 test("buildFailedCallbackEvent combines error + log tail into one terminal failed event", () => {

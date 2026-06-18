@@ -227,6 +227,17 @@
       "country": "Maa",
       "global": "Globaali"
     },
+    "timeline": {
+      "title": "Julkaisun aikajana",
+      "description": "Jokainen julkaisun vaihe aloitusaikoineen, kestoineen ja mahdollisine virheineen.",
+      "empty": "Ei vielä julkaisutapahtumia. Ne näkyvät tässä, kun julkaisu suoritetaan.",
+      "ram": "{mb} MB vapaana",
+      "status": {
+        "started": "Käynnissä",
+        "ok": "Valmis",
+        "failed": "Epäonnistui"
+      }
+    },
     "assign": {
       "title": "Liitetyt käyttäjät",
       "description": "Käyttäjät, jotka voivat hallita tätä sivustoa. Maa-alue rajaa, ketkä ovat valittavissa.",

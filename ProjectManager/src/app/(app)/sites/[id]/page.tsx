@@ -23,6 +23,7 @@ import {
 } from "@/lib/site/site";
 import { AssignForm } from "../assign-form";
 import { DeployForm } from "../deploy-form";
+import { DeployTimeline } from "../deploy-timeline";
 import { CustomDomainForm } from "../custom-domain-form";
 import { isDeployStuck } from "@/lib/deploy";
 import { SiteForm } from "../site-form";
@@ -153,6 +154,16 @@ export default async function SiteDetailPage({
             status={site.status}
             stuck={isDeployStuck(site)}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("timeline.title")}</CardTitle>
+          <CardDescription>{t("timeline.description")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DeployTimeline siteId={site.id} initialStatus={site.status} />
         </CardContent>
       </Card>
 

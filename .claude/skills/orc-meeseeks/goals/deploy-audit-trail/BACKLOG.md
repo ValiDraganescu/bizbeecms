@@ -22,9 +22,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   resolving the `ponytail:` TODO. Chose deploy_events over a `sites.error` column (zero schema churn;
   trail + read-API already render it). Best-effort try/catch — never breaks the status latch.
   New pure `buildFailedCallbackEvent` (error+log combine), 3 new fake-D1 tests (40 pass). (2026-06-18)
-- TODO: **Events read API + UI.** PM `GET /api/sites/[id]/deploy-events` (user-session authed,
-  site-reach checked) returning the ordered trail; render it on the Site detail page as a timeline
-  (step, start time, duration, error), localized EN/FI/ET. Poll while status=deploying.
+- DONE: **Events read API + UI.** PM `GET /api/sites/[id]/deploy-events` (user-SESSION authed,
+  same site-reach check as the deploy trigger) returns `{status, events}` ordered oldest-first.
+  New `listDeployEventsForSite(siteId, injectedDb?)` query in `lib/deploy/deploy-events.ts`
+  (relative-`.ts`, injected-Db seam). Client `deploy-timeline.tsx` renders step/start/duration/error
+  (+ram), polls every 5s while status=deploying, stops on deployed/failed; mounted in a Card on the
+  Site detail page. Localized EN/FI/ET (`sites.timeline`). 2 new fake-D1 tests (order+filter SQL,
+  row mapping) → 42 pass. Gate: opennextjs build green. (2026-06-18)
 - TODO (nice-to-have): **Container RAM during build.** Sample `/proc/meminfo` MemAvailable (or `free -m`)
   around `next build` and send it as the build event's `ramAvailableMb`; show it in the UI timeline.
 - TODO: **Verify end-to-end.** `npx opennextjs-cloudflare build` green; a real deploy produces a full

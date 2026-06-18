@@ -1,28 +1,22 @@
 # Note to the next Meeseeks (deploy-audit-trail)
 
-Slices 1, 2, 3 are DONE.
-- Slice 1: `deploy_events` table + migration 0003 + `POST /api/deploy-events` ingest.
-- Slice 2: `deployer/src/index.ts` `buildScript()` emits started/ok/failed events per step.
-- Slice 3: PM `deploy-callback/route.ts` now persists the FINAL deployer error + log tail as a
-  terminal `failed` deploy_event (`step: "callback"`) via `insertDeployEvent` (best-effort try/catch;
-  never breaks the status latch). Resolved the old `ponytail:` TODO. New pure helper
-  `buildFailedCallbackEvent` in `lib/deploy/deploy-events.ts`. Errors now live in the trail — NOT in a
-  `sites` column (deliberate: zero schema churn, the read API/UI surface it for free).
+Slices 1, 2, 3, 4 are DONE. The core trail is now end-to-end visible:
+- Slice 1: `deploy_events` table + migration 0003 (APPLIED to remote D1) + `POST /api/deploy-events` ingest.
+- Slice 2: `deployer/src/index.ts` `buildScript()` emits started/ok/failed per step.
+- Slice 3: deploy-callback persists the FINAL error+log tail as a terminal `failed` `callback` event.
+- Slice 4: `GET /api/sites/[id]/deploy-events` (USER-session authed) + `deploy-timeline.tsx` Card on the
+  Site detail page (step / start / duration / error / ram, polls 5s while deploying). i18n EN/FI/ET.
+  New query `listDeployEventsForSite(siteId, injectedDb?)` in `lib/deploy/deploy-events.ts`.
 
-**Migration 0003 is APPLIED to remote D1** (confirmed by driver 2026-06-18) — the old HITL note was
-stale. Live ingest no longer 500s on a missing table.
+**Take the FIRST remaining TODO: "Container RAM during build" (nice-to-have).**
+In `deployer/src/index.ts` `buildScript()`, sample container RAM around the heavy `next build` step
+(`/proc/meminfo` MemAvailable kB → MB, or `free -m`; GNU/Linux container) and send it as the build
+`step_ok`/`step_fail` event's `ramAvailableMb` (the ingest + schema column + UI render already exist —
+the timeline shows `· {mb} MB free` when set). Best-effort, never fatal (like every emit). Validate
+the deployer with `npx wrangler deploy --dry-run` + render-then-`bash -n` the script offline (see caveats).
 
-**Take the FIRST remaining TODO: "Events read API + UI."**
-PM `GET /api/sites/[id]/deploy-events` — user-session authed, site-reach checked (mirror the other
-`/api/sites/[id]/*` routes), returns the ordered trail (order by `startedAt`/`createdAt`). Render a
-timeline on the Site detail page: step / start time / duration / error (the `callback` row from slice 3
-holds the final error + log tail — show it prominently on failure). Localize EN/FI/ET. Poll while
-status=deploying. Use a relative-`.ts`-importable lib query if you also want a node test (see the
-deploy-events.ts caveats about `@/` alias + `allowImportingTsExtensions`).
+**Then the LAST TODO: "Verify end-to-end."** Real deploy → full ordered trail with timings; a forced
+step failure records the error; an emit failure does NOT break the deploy.
 
-Then: RAM (`/proc/meminfo` MemAvailable around `next build` → `ramAvailableMb`) — nice-to-have, last.
-Then: Verify end-to-end (real deploy → full ordered trail; forced failure records error; emit failure
-doesn't break deploy).
-
-Gates: PM `npm test` green + `npx opennextjs-cloudflare build` (PM). NEVER run opennextjs build while
-`npm run dev` is on 3601/3602.
+Gates: PM `npm test` green + `npx opennextjs-cloudflare build` (PM). Deployer gate = `wrangler deploy
+--dry-run`. NEVER run opennextjs build while `npm run dev` is on 3601/3602.

@@ -227,6 +227,17 @@
       "country": "Riik",
       "global": "Globaalne"
     },
+    "timeline": {
+      "title": "Avaldamise ajajoon",
+      "description": "Iga avaldamise samm koos algusaja, kestuse ja võimaliku veaga.",
+      "empty": "Avaldamissündmusi veel pole. Need ilmuvad siia, kui avaldamine käivitub.",
+      "ram": "{mb} MB vaba",
+      "status": {
+        "started": "Töötab",
+        "ok": "Valmis",
+        "failed": "Ebaõnnestus"
+      }
+    },
     "assign": {
       "title": "Määratud kasutajad",
       "description": "Kasutajad, kes saavad seda saiti hallata. Riigi ulatus piirab, kes on sobivad.",

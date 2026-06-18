@@ -1,6 +1,14 @@
 # Caveats — deploy-audit-trail
 Read every line before working. Each entry was learned the hard way by a previous Meeseeks.
 
+- **The read API is USER-session authed, NOT DEPLOYER_SECRET.** `GET /api/sites/[id]/deploy-events`
+  is user-facing (timeline UI) → `getCurrentUser` + the same site-reach check as the deploy trigger
+  (`canManageSiteByCountry || isUserAssignedToSite`). Only the INGEST (`POST /api/deploy-events`) uses
+  the bearer secret. Don't conflate the two.
+- **`deploy_events.startedAt/createdAt` are `timestamp_ms` → JS `Date`.** Over the JSON read API they
+  serialize to ISO strings, so the client component types them as `string` and `new Date(iso)`s them.
+  Don't type the wire shape as `Date`.
+
 - **The build is a DETACHED bash script** written by `deployer/src/index.ts` `buildScript()` and run
   with `startProcess`. It is FULLY STATIC — no caller value is interpolated (shell-injection guard).
   Audit emits must follow the same rule: values come via the process env as `$VARS`, never inlined.

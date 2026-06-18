@@ -11,9 +11,14 @@
 // can type-strip and import this module without a bundler resolving aliases.
 // Import schema from schema.ts directly (db/index.ts pulls in
 // @opennextjs/cloudflare and has extensionless re-exports node can't resolve).
+import { asc, eq } from "drizzle-orm";
 import * as schema from "../../db/schema.ts";
 import type { Db } from "../../db/index.ts";
-import type { DeployEventStatus, NewDeployEvent } from "../../db/schema.ts";
+import type {
+  DeployEvent,
+  DeployEventStatus,
+  NewDeployEvent,
+} from "../../db/schema.ts";
 
 const STATUSES: readonly DeployEventStatus[] = ["started", "ok", "failed"];
 
@@ -139,4 +144,21 @@ export async function insertDeployEvent(
     ramAvailableMb: event.ramAvailableMb,
   };
   await db.insert(schema.deployEvents).values(row);
+}
+
+/**
+ * List a Site's deploy events in chronological order (oldest first) so the UI
+ * can render them as a top-to-bottom timeline. `injectedDb` is the test seam;
+ * production callers omit it and get the live D1-bound drizzle client.
+ */
+export async function listDeployEventsForSite(
+  siteId: string,
+  injectedDb?: Db,
+): Promise<DeployEvent[]> {
+  const db = injectedDb ?? (await (await import("../../db/index.ts")).getDb());
+  return db
+    .select()
+    .from(schema.deployEvents)
+    .where(eq(schema.deployEvents.siteId, siteId))
+    .orderBy(asc(schema.deployEvents.startedAt), asc(schema.deployEvents.createdAt));
 }
