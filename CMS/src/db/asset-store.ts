@@ -9,16 +9,9 @@
  * R2 binding is native: `env.MEDIA.put/get/delete`, no presigning.
  */
 import { desc, eq } from "drizzle-orm";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDb, schema } from "./index";
 import type { Asset } from "./schema";
-
-async function getBucket(): Promise<R2Bucket> {
-  const { env } = await getCloudflareContext({ async: true });
-  const bucket = (env as unknown as { MEDIA?: R2Bucket }).MEDIA;
-  if (!bucket) throw new Error("R2 bucket binding MEDIA is not configured");
-  return bucket;
-}
+import { getStorage } from "@/lib/ports/storage";
 
 /** List asset metadata, newest first. */
 export async function listAssets(): Promise<Asset[]> {
@@ -33,10 +26,8 @@ export async function putAsset(input: {
   contentType: string;
   bytes: ArrayBuffer;
 }): Promise<Asset> {
-  const bucket = await getBucket();
-  await bucket.put(input.key, input.bytes, {
-    httpMetadata: { contentType: input.contentType },
-  });
+  const storage = await getStorage();
+  await storage.put(input.key, input.bytes, { contentType: input.contentType });
 
   const db = await getDb();
   const row: Asset = {
@@ -53,14 +44,14 @@ export async function putAsset(input: {
 
 /** Delete an asset from R2 + D1 (best-effort R2; D1 row is the source of truth). */
 export async function deleteAsset(key: string): Promise<void> {
-  const bucket = await getBucket();
-  await bucket.delete(key);
+  const storage = await getStorage();
+  await storage.delete(key);
   const db = await getDb();
   await db.delete(schema.asset).where(eq(schema.asset.key, key));
 }
 
 /** Fetch raw bytes for the serve route. Returns null if absent. */
 export async function getAssetObject(key: string): Promise<R2ObjectBody | null> {
-  const bucket = await getBucket();
-  return bucket.get(key);
+  const storage = await getStorage();
+  return storage.get(key);
 }

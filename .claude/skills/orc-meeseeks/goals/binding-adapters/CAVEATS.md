@@ -15,3 +15,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   port must preserve streaming; don't collapse it to a non-streaming call.
 - **Testing discipline is enforced** (orc-test-review). No tautological mocks, no
   `toHaveBeenCalledWith` on internal collaborators. The mock-the-port test must assert real behavior.
+- **Ports live in `CMS/src/lib/ports/<name>.ts`** (Storage is there). Put `Db`/`Ai` alongside it.
+- **node --test CAN import the real adapter `.ts`** even though `getStorage()` imports
+  `@opennextjs/cloudflare` — the import resolves but isn't invoked unless you call the factory, so
+  the test imports `CfStorage` directly (no drift-prone re-declaration). DO import the real class.
+- **node strip-only mode rejects TS parameter properties** (`constructor(private readonly x)`).
+  Use an explicit field + assignment in the constructor, or the test import throws "not supported
+  in strip-only mode". (That's why `CfStorage` declares the field separately.)
+- **Pattern for the next ports:** interface = only the methods actually called; adapter wraps the
+  binding 1:1; a `getX()` factory is the SOLE `env.X` reader. asset-store dropped its `getBucket()`
+  + `getCloudflareContext` import entirely — do the same for the Db/Ai seams.
