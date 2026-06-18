@@ -91,5 +91,33 @@
     "saving": "Salvestan…",
     "cancel": "Tühista",
     "invalidSlug": "Sisesta kehtiv kärgtunnus: väiketähed, numbrid ja sidekriipsud."
+  },
+  "brand": {
+    "title": "Bränd & AI persoona",
+    "subtitle": "Kirjelda selle saidi identiteeti üks kord. AI assistent kasutab seda, et iga loodud komponent ja leht vastaks sinu brändile.",
+    "label": {
+      "brandName": "Brändi nimi",
+      "tagline": "Loosung",
+      "voice": "Brändi hääl & toon",
+      "design": "Disainisuund",
+      "aiPersona": "AI assistendi juhised"
+    },
+    "placeholder": {
+      "brandName": "nt Acme Coffee",
+      "tagline": "nt Väikepartii kohv, röstitud iga päev",
+      "voice": "nt Soe, mänguline, lihtne keel",
+      "design": "nt Minimalistlik, rohke tühi ruum, ümarad kaardid",
+      "aiPersona": "nt Soovita alati ligipääsetavat kontrasti; eelista lühikesi sektsioone"
+    },
+    "hint": {
+      "brandName": "Sinu brändi või saidi nimi.",
+      "tagline": "Üherealine kokkuvõte saidi teemast.",
+      "voice": "Kuidas tekst peaks kõlama — toon ja iseloom.",
+      "design": "Visuaalne stiil, mille poole AI peaks püüdlema.",
+      "aiPersona": "Lisajuhised AI ehitajale."
+    },
+    "save": "Salvesta",
+    "saving": "Salvestamine…",
+    "saved": "Brändiseaded salvestatud."
   }
 }

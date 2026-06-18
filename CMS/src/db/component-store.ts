@@ -14,6 +14,19 @@ import { getDb, schema } from "./index";
 import type { ComponentArtifactInput } from "@/lib/chat/component-tool";
 
 /**
+ * List the Site's component names (for the AI system prompt — so the model
+ * reuses existing components instead of re-authoring them). Names only; the full
+ * artifact isn't needed for the prompt.
+ */
+export async function listComponentNames(): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({ name: schema.component.name })
+    .from(schema.component);
+  return rows.map((r) => r.name);
+}
+
+/**
  * Insert or update a component by its unique `name`. Returns the action taken so
  * the chat route can tell the model "created" vs "updated".
  */

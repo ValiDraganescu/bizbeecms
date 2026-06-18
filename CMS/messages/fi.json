@@ -91,5 +91,33 @@
     "saving": "Tallennetaan…",
     "cancel": "Peruuta",
     "invalidSlug": "Anna kelvollinen polkutunnus: pieniä kirjaimia, numeroita ja väliviivoja."
+  },
+  "brand": {
+    "title": "Brändi & tekoälyn persoona",
+    "subtitle": "Kuvaa tämän sivuston identiteetti kerran. Tekoälyavustaja käyttää sitä, jotta jokainen luotu komponentti ja sivu vastaa brändiäsi.",
+    "label": {
+      "brandName": "Brändin nimi",
+      "tagline": "Iskulause",
+      "voice": "Brändin ääni & sävy",
+      "design": "Suunnittelusuunta",
+      "aiPersona": "Tekoälyavustajan ohjeet"
+    },
+    "placeholder": {
+      "brandName": "esim. Acme Coffee",
+      "tagline": "esim. Pienen erän kahvia, paahdettu päivittäin",
+      "voice": "esim. Lämmin, leikkisä, selkeä kieli",
+      "design": "esim. Minimalistinen, runsaasti tilaa, pyöristetyt kortit",
+      "aiPersona": "esim. Ehdota aina saavutettavaa kontrastia; suosi lyhyitä osioita"
+    },
+    "hint": {
+      "brandName": "Brändisi tai sivustosi nimi.",
+      "tagline": "Yhden rivin kuvaus sivuston aiheesta.",
+      "voice": "Miltä tekstin tulisi kuulostaa — sävy ja persoona.",
+      "design": "Visuaalinen tyyli, johon tekoälyn tulisi pyrkiä.",
+      "aiPersona": "Lisäohjeet tekoälyn rakentajalle."
+    },
+    "save": "Tallenna",
+    "saving": "Tallennetaan…",
+    "saved": "Brändiasetukset tallennettu."
   }
 }

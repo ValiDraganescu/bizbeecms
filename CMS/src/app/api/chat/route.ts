@@ -39,11 +39,13 @@ import {
   coerceLimit,
   formatAssetList,
 } from "@/lib/chat/list-assets-tool";
-import { upsertComponent } from "@/db/component-store";
+import { listComponentNames, upsertComponent } from "@/db/component-store";
 import { missingComponents, upsertPage } from "@/db/page-store";
 import { applyTranslation } from "@/db/translate-store";
-import { getContentLocales } from "@/db/settings-store";
+import { getContentLocales, getSiteIdentity } from "@/db/settings-store";
 import { listAssets } from "@/db/asset-store";
+import { buildSystemPrompt } from "@/lib/settings/site-settings";
+import { allowedClasses } from "@/lib/render/utility-css";
 
 export const dynamic = "force-dynamic";
 
@@ -89,12 +91,18 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  // Prepend a system prompt built from the Site's identity (E2 brand/design/AI
+  // persona) + its existing components + the bounded utility-class vocabulary, so
+  // generated artifacts match the Site and reference real components/classes.
+  // Only if the client didn't already supply a system message.
+  const messages = await withSystemPrompt(parsed.messages);
+
   let upstream: ReadableStream<Uint8Array>;
   try {
     // OpenAI-compatible streaming call through AI Gateway.
     upstream = (await ai.run(
       DEFAULT_MODEL as Parameters<Ai["run"]>[0],
-      { messages: parsed.messages, stream: true, tools: TOOLS } as Parameters<
+      { messages, stream: true, tools: TOOLS } as Parameters<
         Ai["run"]
       >[1],
       { gateway: { id: gatewayId(env) } } as Parameters<Ai["run"]>[2],
@@ -114,6 +122,39 @@ export async function POST(request: Request): Promise<Response> {
       Connection: "keep-alive",
     },
   });
+}
+
+type ChatMessage = { role: string; content: string };
+
+/**
+ * Build the E2 system prompt (Site identity + components + utility classes) and
+ * prepend it to the conversation — unless the client already sent a system
+ * message (it owns the prompt then). Reads are defensive: an unbound D1 (no Site
+ * provisioned, or this offline env) falls back to an empty identity / no
+ * components, so the base instruction still ships.
+ */
+async function withSystemPrompt(messages: ChatMessage[]): Promise<ChatMessage[]> {
+  if (messages.some((m) => m.role === "system")) return messages;
+
+  let identity;
+  let componentNames: string[] = [];
+  try {
+    identity = await getSiteIdentity();
+  } catch {
+    /* unbound D1 → no identity */
+  }
+  try {
+    componentNames = await listComponentNames();
+  } catch {
+    /* unbound D1 → no components */
+  }
+
+  const system = buildSystemPrompt({
+    identity,
+    componentNames,
+    utilityClasses: [...allowedClasses()].sort(),
+  });
+  return [{ role: "system", content: system }, ...messages];
 }
 
 /**

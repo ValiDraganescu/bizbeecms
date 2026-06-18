@@ -91,5 +91,33 @@
     "saving": "Saving…",
     "cancel": "Cancel",
     "invalidSlug": "Enter a valid slug: lowercase letters, digits and hyphens."
+  },
+  "brand": {
+    "title": "Brand & AI persona",
+    "subtitle": "Describe this Site's identity once. The AI assistant uses it to make every generated component and page match your brand.",
+    "label": {
+      "brandName": "Brand name",
+      "tagline": "Tagline",
+      "voice": "Brand voice & tone",
+      "design": "Design direction",
+      "aiPersona": "AI assistant instructions"
+    },
+    "placeholder": {
+      "brandName": "e.g. Acme Coffee",
+      "tagline": "e.g. Small-batch coffee, roasted daily",
+      "voice": "e.g. Warm, playful, plain language",
+      "design": "e.g. Minimal, generous whitespace, rounded cards",
+      "aiPersona": "e.g. Always suggest accessible contrast; prefer short sections"
+    },
+    "hint": {
+      "brandName": "The name of your brand or Site.",
+      "tagline": "A one-line summary of what this Site is about.",
+      "voice": "How copy should sound — tone and personality.",
+      "design": "The visual style the AI should aim for.",
+      "aiPersona": "Extra behavioral guidance for the AI builder."
+    },
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Brand settings saved."
   }
 }

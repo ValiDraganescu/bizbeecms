@@ -20,9 +20,15 @@ import {
   emptyThemeOverrides,
   normalizeThemeOverrides,
 } from "@/lib/render/theme";
+import {
+  type SiteIdentity,
+  emptySiteIdentity,
+  normalizeSiteIdentity,
+} from "@/lib/settings/site-settings";
 
 const CONTENT_LOCALES_KEY = "content_locales";
 const THEME_OVERRIDES_KEY = "theme_overrides";
+const SITE_IDENTITY_KEY = "site_identity";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
 async function upsertSetting(key: string, value: string): Promise<void> {
@@ -97,5 +103,30 @@ export async function setThemeOverrides(
 ): Promise<ThemeOverrides> {
   const normalized = normalizeThemeOverrides(overrides);
   await upsertSetting(THEME_OVERRIDES_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+/** Read the per-Site brand/design/AI-persona identity, or empty if unset. */
+export async function getSiteIdentity(): Promise<SiteIdentity> {
+  const db = await getDb();
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, SITE_IDENTITY_KEY))
+    .limit(1);
+
+  const raw = rows[0]?.value;
+  if (!raw) return emptySiteIdentity();
+  try {
+    return normalizeSiteIdentity(JSON.parse(raw));
+  } catch {
+    return emptySiteIdentity();
+  }
+}
+
+/** Upsert the Site identity (normalized — trimmed + length-bounded fields). */
+export async function setSiteIdentity(identity: unknown): Promise<SiteIdentity> {
+  const normalized = normalizeSiteIdentity(identity);
+  await upsertSetting(SITE_IDENTITY_KEY, JSON.stringify(normalized));
   return normalized;
 }
