@@ -230,6 +230,13 @@ async function startDeploy(
   await sandbox.writeFile("/workspace/deploy.sh", buildScript());
   await sandbox.startProcess("bash /workspace/deploy.sh", {
     env: {
+      // Force wrangler non-interactive. The build script runs DETACHED (no TTY);
+      // any wrangler prompt (deploy confirmation, first-run subdomain, D1
+      // availability) would block FOREVER waiting for input it can never get —
+      // observed: `wrangler deploy` hung ~10min with the step stuck at "started".
+      // CI=true makes wrangler skip prompts / use defaults instead of blocking.
+      CI: "true",
+      WRANGLER_SEND_METRICS: "false",
       GITHUB_TOKEN: env.GITHUB_TOKEN ?? "",
       CLOUDFLARE_API_TOKEN: env.CF_API_TOKEN,
       CLOUDFLARE_ACCOUNT_ID: env.CF_ACCOUNT_ID,
