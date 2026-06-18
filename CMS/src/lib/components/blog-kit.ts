@@ -29,6 +29,7 @@
 import {
   PORTABLE_FORMAT,
   PORTABLE_VERSION,
+  enumerateAssetDeps,
   type PortableComponent,
 } from "./portable.ts";
 
@@ -41,6 +42,9 @@ function bundle(component: PortableComponent["component"]): PortableComponent {
     format: PORTABLE_FORMAT,
     version: PORTABLE_VERSION,
     meta: { note: `bizbeecms blog starter kit — ${component.name}` },
+    // Kit components are self-contained (no media refs) → empty deps, but
+    // enumerate so a future kit that references an asset declares it correctly.
+    assets: enumerateAssetDeps(component),
     component,
   };
 }

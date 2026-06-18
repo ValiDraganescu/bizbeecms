@@ -159,6 +159,8 @@
     "kitsTitle": "Aloituspaketit",
     "kitsHint": "Asenna valmiiksi koottu komponenttijoukko yhdellä napsautuksella. Blogipaketti lisää artikkelin otsikon, artikkelin rungon, kirjoittajakortin ja artikkelilistan.",
     "installBlogKit": "Asenna blogipaketti",
-    "kitInstalled": "Blogipaketti asennettu: {created} luotu, {updated} päivitetty."
+    "kitInstalled": "Blogipaketti asennettu: {created} luotu, {updated} päivitetty.",
+    "assetDepsTitle": "Mediariippuvuudet",
+    "assetDepsHint": "Tämä komponentti viittaa alla oleviin mediatiedostoihin. Varmista, että ne ovat tällä sivustolla (lataa ne, muuten ne näkyvät rikkinäisinä)."
   }
 }

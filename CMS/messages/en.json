@@ -159,6 +159,8 @@
     "kitsTitle": "Starter kits",
     "kitsHint": "Install a curated set of premade components in one click. The blog kit adds a post header, post body, author card and post list.",
     "installBlogKit": "Install blog kit",
-    "kitInstalled": "Blog kit installed: {created} created, {updated} updated."
+    "kitInstalled": "Blog kit installed: {created} created, {updated} updated.",
+    "assetDepsTitle": "Asset dependencies",
+    "assetDepsHint": "This component references the media assets below. Make sure they exist on this site (upload them, or they will appear broken)."
   }
 }

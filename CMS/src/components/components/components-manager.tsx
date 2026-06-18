@@ -30,6 +30,9 @@ export function ComponentsManager({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // H3: /media/<key> asset deps the just-imported bundle references — the target
+  // Site must have these uploaded or the references dangle.
+  const [assetDeps, setAssetDeps] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -40,6 +43,7 @@ export function ComponentsManager({
   async function exportOne(name: string) {
     setError(null);
     setNotice(null);
+    setAssetDeps([]);
     try {
       const res = await fetch(`/api/components?name=${encodeURIComponent(name)}`);
       if (!res.ok) {
@@ -62,6 +66,7 @@ export function ComponentsManager({
   async function importBundle(text: string) {
     setError(null);
     setNotice(null);
+    setAssetDeps([]);
     if (text.trim() === "") {
       setError(t("importEmpty"));
       return;
@@ -77,12 +82,17 @@ export function ComponentsManager({
         setError(await errorOf(res));
         return;
       }
-      const j = (await res.json()) as { action: "created" | "updated"; name: string };
+      const j = (await res.json()) as {
+        action: "created" | "updated";
+        name: string;
+        assets?: string[];
+      };
       setNotice(
         j.action === "created"
           ? t("imported", { name: j.name })
           : t("updated", { name: j.name }),
       );
+      setAssetDeps(j.assets ?? []);
       setPaste("");
       if (fileRef.current) fileRef.current.value = "";
       await refresh();
@@ -105,6 +115,7 @@ export function ComponentsManager({
   async function installBlogKit() {
     setError(null);
     setNotice(null);
+    setAssetDeps([]);
     setBusy(true);
     try {
       const res = await fetch("/api/components/kit", {
@@ -116,8 +127,9 @@ export function ComponentsManager({
         setError(await errorOf(res));
         return;
       }
-      const j = (await res.json()) as { created: number; updated: number };
+      const j = (await res.json()) as { created: number; updated: number; assets?: string[] };
       setNotice(t("kitInstalled", { created: j.created, updated: j.updated }));
+      setAssetDeps(j.assets ?? []);
       await refresh();
     } catch (err) {
       setError((err as Error).message);
@@ -143,6 +155,22 @@ export function ComponentsManager({
         >
           {notice}
         </p>
+      )}
+      {assetDeps.length > 0 && (
+        <div
+          role="status"
+          className="flex flex-col gap-1 rounded-md border border-border bg-surface-raised px-3 py-2"
+        >
+          <span className="text-sm font-medium text-foreground">{t("assetDepsTitle")}</span>
+          <span className="text-sm text-foreground-muted">{t("assetDepsHint")}</span>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {assetDeps.map((k) => (
+              <li key={k} className="truncate font-mono text-sm text-foreground-muted">
+                /media/{k}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {/* Starter kits: one-click install of a premade component set (G1) */}

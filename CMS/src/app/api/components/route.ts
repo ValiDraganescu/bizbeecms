@@ -64,21 +64,28 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // Accept either the bundle directly, or { bundle: … } / { text: "<json>" }.
+  // An optional { rebind: { oldKey: newKey | null } } remaps asset URLs (H3).
+  const obj = body && typeof body === "object" ? (body as Record<string, unknown>) : null;
   const raw =
-    body && typeof body === "object" && "bundle" in (body as Record<string, unknown>)
-      ? (body as Record<string, unknown>).bundle
-      : body && typeof body === "object" && "text" in (body as Record<string, unknown>)
-        ? (body as Record<string, unknown>).text
-        : body;
+    obj && "bundle" in obj ? obj.bundle : obj && "text" in obj ? obj.text : body;
+  const rebind =
+    obj && obj.rebind && typeof obj.rebind === "object"
+      ? (obj.rebind as Record<string, string | null>)
+      : undefined;
 
-  const parsed = parsePortableComponent(raw);
+  const parsed = parsePortableComponent(raw, { rebind });
   if (!parsed.ok) {
     return Response.json({ error: parsed.errors.join("; ") }, { status: 400 });
   }
 
   try {
     const res = await upsertImportedComponent(parsed.component);
-    return Response.json(res, { status: res.action === "created" ? 201 : 200 });
+    // Surface the asset deps the imported component still references so the UI
+    // can warn about assets the target Site may be missing (H3).
+    return Response.json(
+      { ...res, assets: parsed.assets },
+      { status: res.action === "created" ? 201 : 200 },
+    );
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to import component" },

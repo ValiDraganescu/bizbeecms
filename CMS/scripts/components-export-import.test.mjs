@@ -16,6 +16,7 @@ import { dirname, join } from "node:path";
 import {
   PORTABLE_FORMAT,
   PORTABLE_VERSION,
+  enumerateAssetDeps,
   parsePortableComponent,
   serializeComponent,
 } from "../src/lib/components/portable.ts";
@@ -105,4 +106,76 @@ test("parse rejects an unsafe component name", () => {
 test("parse rejects propsSchema that is not valid JSON", () => {
   const bundle = serializeComponent({ ...goodRow, propsSchema: "{not json" });
   assert.equal(parsePortableComponent(bundle).ok, false);
+});
+
+// ── H3: asset-URL dependency handling ───────────────────────────────────────
+const KEY_A = "assets/logo_1700000000000_a1b2c3d4.png";
+const KEY_B = "assets/hero_1700000000001_e5f6a7b8.jpg";
+
+const assetRow = {
+  name: "Hero",
+  tree: JSON.stringify({
+    tag: "div",
+    props: { className: "p-4" },
+    children: [
+      { tag: "img", props: { src: `/media/${KEY_A}`, className: "w-full" }, children: [] },
+      "see /media/" + KEY_B,
+    ],
+  }),
+  script: "",
+  css: "",
+  propsSchema: null,
+};
+
+test("H3: export enumerates the /media/<key> deps into the envelope", () => {
+  const bundle = serializeComponent(assetRow);
+  assert.deepEqual(bundle.assets, [KEY_B, KEY_A].sort());
+  // A component with no media refs declares an empty deps list.
+  assert.deepEqual(serializeComponent(goodRow).assets, []);
+});
+
+test("H3: enumerateAssetDeps only collects the safe /media/<key> shape", () => {
+  const deps = enumerateAssetDeps({
+    tree: {
+      tag: "div",
+      props: { src: `/media/${KEY_A}`, href: "https://evil.example/media/x" },
+      children: ["/media/../../etc/passwd", "/media/not_a_valid_key"],
+    },
+  });
+  assert.deepEqual(deps, [KEY_A]); // external URL + traversal + bad shape ignored
+});
+
+test("H3: rebind oldKey→newKey rewrites through the SAME validation gate", () => {
+  const bundle = serializeComponent(assetRow);
+  const parsed = parsePortableComponent(bundle, { rebind: { [KEY_A]: KEY_B } });
+  assert.ok(parsed.ok, parsed.ok ? "" : parsed.errors.join("; "));
+  // KEY_A got rewritten to KEY_B; remaining dep set is just KEY_B.
+  assert.deepEqual(parsed.assets, [KEY_B]);
+  const json = JSON.stringify(parsed.component.tree);
+  assert.ok(!json.includes(KEY_A), "old key should be gone");
+  assert.ok(json.includes(`/media/${KEY_B}`), "new key present");
+});
+
+test("H3: rebind null strips the URL to a placeholder", () => {
+  const bundle = serializeComponent(assetRow);
+  const parsed = parsePortableComponent(bundle, { rebind: { [KEY_A]: null, [KEY_B]: null } });
+  assert.ok(parsed.ok, parsed.ok ? "" : parsed.errors.join("; "));
+  assert.deepEqual(parsed.assets, []); // all stripped
+});
+
+test("H3: an unsafe rebind target is ignored (URL left untouched)", () => {
+  const bundle = serializeComponent(assetRow);
+  const parsed = parsePortableComponent(bundle, {
+    rebind: { [KEY_A]: "../../etc/passwd" },
+  });
+  assert.ok(parsed.ok, parsed.ok ? "" : parsed.errors.join("; "));
+  // Unsafe target rejected → original KEY_A reference survives.
+  assert.ok(parsed.assets.includes(KEY_A));
+});
+
+test("H3: no-rebind parse still reports the deps it carries", () => {
+  const bundle = serializeComponent(assetRow);
+  const parsed = parsePortableComponent(bundle);
+  assert.ok(parsed.ok);
+  assert.deepEqual(parsed.assets, [KEY_B, KEY_A].sort());
 });

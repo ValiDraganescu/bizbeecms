@@ -21,10 +21,31 @@
 
 import { validateComponentArtifact } from "../chat/component-tool.ts";
 import type { TreeNode } from "../render/tree.ts";
+import { ASSET_URL_PREFIX, isValidAssetKey } from "../render/asset.ts";
 
 /** Current bundle format version. Bump when the envelope shape changes. */
 export const PORTABLE_FORMAT = "bizbeecms.component";
 export const PORTABLE_VERSION = 1 as const;
+
+/**
+ * H3 — asset-URL dependency handling.
+ *
+ * A component's tree/script/css can embed `/media/<key>` URLs that point at the
+ * SOURCE Site's R2 bucket. Moving the component to another Site leaves those
+ * references dangling (the target Site's R2 has no such object). So the portable
+ * format DECLARES its asset deps (the set of `/media/<key>` keys it references)
+ * at export time, and the importer can inspect/rebind them before the upsert.
+ *
+ * Only the KNOWN, SAFE `/media/<key>` shape is enumerated/rewritten — `key` must
+ * pass `isValidAssetKey` (the same traversal-guarded shape the serve route
+ * accepts). Anything else (external URLs, odd paths) is left untouched, so a
+ * rebind can never smuggle in a path-traversal or a foreign-origin reference.
+ */
+// Match `/media/<key>` where <key> is the asset-key shape. Captures the key.
+const MEDIA_URL_RE = new RegExp(
+  `${ASSET_URL_PREFIX.replace(/[/]/g, "\\/")}(assets\\/[a-z0-9][a-z0-9_]*_\\d+_[a-z0-9]+\\.[a-z0-9]+)`,
+  "g",
+);
 
 // propsSchema is opaque JSON metadata (the AI/import hint). Bound it so a bundle
 // can't smuggle a multi-MB blob; it's never eval'd, only stored + shown.
@@ -36,12 +57,90 @@ export interface PortableComponent {
   version: typeof PORTABLE_VERSION;
   /** Free-text provenance/notes (optional, bounded, never executed). */
   meta?: { exportedAt?: string; note?: string };
+  /**
+   * Asset deps (H3): the SOURCE-Site `/media/<key>` keys this component
+   * references. The importer uses this to tell the user what assets the bundle
+   * needs (and what to rebind) before installing into another Site. Declared at
+   * export time; advisory — the source of truth is always a fresh enumeration.
+   */
+  assets: string[];
   component: {
     name: string;
     tree: TreeNode;
     script: string;
     css: string;
     propsSchema: string | null;
+  };
+}
+
+/**
+ * Enumerate the distinct, sorted `/media/<key>` asset keys referenced anywhere
+ * in a component artifact (tree text + string prop values, script, css). PURE.
+ * Only the known safe shape is collected — see MEDIA_URL_RE.
+ */
+export function enumerateAssetDeps(parts: {
+  tree: TreeNode;
+  script?: string;
+  css?: string;
+}): string[] {
+  const keys = new Set<string>();
+  const scan = (s: string) => {
+    for (const m of s.matchAll(MEDIA_URL_RE)) {
+      if (isValidAssetKey(m[1])) keys.add(m[1]);
+    }
+  };
+  // Walk the tree, scanning text nodes and string prop values.
+  const walk = (node: TreeNode) => {
+    if (typeof node === "string") return scan(node);
+    if (node.props) {
+      for (const v of Object.values(node.props)) {
+        if (typeof v === "string") scan(v);
+      }
+    }
+    for (const child of node.children ?? []) walk(child);
+  };
+  walk(parts.tree);
+  if (parts.script) scan(parts.script);
+  if (parts.css) scan(parts.css);
+  return [...keys].sort();
+}
+
+/**
+ * Rebind map applied on import (H3): for each source asset key, either a target
+ * key (oldKey → newKey, rewriting `/media/<old>` → `/media/<new>`) or `null`
+ * (strip the URL to "" — a placeholder/missing default). Keys/values not in the
+ * known safe shape are ignored, so rebind can't introduce unsafe references.
+ */
+export type AssetRebind = Record<string, string | null>;
+
+/** Rewrite `/media/<key>` URLs in a string using the rebind map. PURE. */
+function rebindString(s: string, rebind: AssetRebind): string {
+  return s.replace(MEDIA_URL_RE, (whole, key: string) => {
+    if (!isValidAssetKey(key) || !(key in rebind)) return whole;
+    const target = rebind[key];
+    if (target === null) return ""; // strip → unbound/placeholder
+    if (typeof target === "string" && isValidAssetKey(target)) {
+      return ASSET_URL_PREFIX + target;
+    }
+    return whole; // unsafe target → leave original untouched
+  });
+}
+
+/** Apply a rebind map to a tree's text + string props. PURE, immutable. */
+function rebindTree(node: TreeNode, rebind: AssetRebind): TreeNode {
+  if (typeof node === "string") return rebindString(node, rebind);
+  const props = node.props
+    ? Object.fromEntries(
+        Object.entries(node.props).map(([k, v]) => [
+          k,
+          typeof v === "string" ? rebindString(v, rebind) : v,
+        ]),
+      )
+    : node.props;
+  return {
+    ...node,
+    ...(props ? { props } : {}),
+    ...(node.children ? { children: node.children.map((c) => rebindTree(c, rebind)) } : {}),
   };
 }
 
@@ -70,15 +169,18 @@ export function serializeComponent(
   } catch {
     tree = { tag: "div", props: {}, children: [] };
   }
+  const script = row.script ?? "";
+  const css = row.css ?? "";
   return {
     format: PORTABLE_FORMAT,
     version: PORTABLE_VERSION,
     ...(meta ? { meta } : {}),
+    assets: enumerateAssetDeps({ tree, script, css }),
     component: {
       name: row.name,
       tree,
-      script: row.script ?? "",
-      css: row.css ?? "",
+      script,
+      css,
       propsSchema: row.propsSchema ?? null,
     },
   };
@@ -93,14 +195,32 @@ export interface ImportedComponent {
   propsSchema: string | null;
 }
 
+/** Options for the import trust boundary (H3). */
+export interface ParseOptions {
+  /**
+   * Apply an asset rebind map BEFORE validation (oldKey → newKey, or null to
+   * strip). Only known safe `/media/<key>` shapes are rewritten; everything
+   * else is left untouched. The result still goes through the SAME
+   * `validateComponentArtifact` gate — no separate write/validation path.
+   */
+  rebind?: AssetRebind;
+}
+
 /**
- * H2 — parse + validate an UNTRUSTED bundle (object, or a JSON string of one)
+ * H2/H3 — parse + validate an UNTRUSTED bundle (object, or a JSON string of one)
  * into a persistable component, or return the problems. PURE — never throws,
  * never writes. This is the IMPORT trust boundary.
+ *
+ * On success it also returns `assets`: the `/media/<key>` deps the (rebound)
+ * component still references, so the caller can warn the importer about assets
+ * the target Site is missing.
  */
 export function parsePortableComponent(
   raw: unknown,
-): { ok: true; component: ImportedComponent } | { ok: false; errors: string[] } {
+  opts: ParseOptions = {},
+):
+  | { ok: true; component: ImportedComponent; assets: string[] }
+  | { ok: false; errors: string[] } {
   // Accept a JSON string (file/paste) or an already-parsed object.
   let obj: unknown = raw;
   if (typeof raw === "string") {
@@ -149,14 +269,22 @@ export function parsePortableComponent(
     }
   }
 
+  // ── H3: optionally rebind asset URLs BEFORE validation ──
+  // We only rebind a tree we can parse as an object; an unparseable/invalid
+  // tree falls through to validateComponentArtifact, which reports it.
+  let tree = c.tree;
+  let script = c.script;
+  let css = c.css;
+  if (opts.rebind) {
+    const treeObj = coerceTreeNode(c.tree);
+    if (treeObj !== null) tree = rebindTree(treeObj, opts.rebind);
+    if (typeof script === "string") script = rebindString(script, opts.rebind);
+    if (typeof css === "string") css = rebindString(css, opts.rebind);
+  }
+
   // ── the artifact itself: reuse the SAME gate the AI tool uses ──
   // (renderable tree, allowed utility classes, bounded script, safe name).
-  const v = validateComponentArtifact({
-    name: c.name,
-    tree: c.tree,
-    script: c.script,
-    css: c.css,
-  });
+  const v = validateComponentArtifact({ name: c.name, tree, script, css });
   if (!v.ok) errors.push(...v.errors);
 
   if (errors.length > 0 || !v.ok) return { ok: false, errors };
@@ -164,7 +292,26 @@ export function parsePortableComponent(
   return {
     ok: true,
     component: { ...v.artifact, propsSchema },
+    // Deps remaining AFTER any rebind — what the target Site must actually have.
+    assets: enumerateAssetDeps(v.artifact),
   };
+}
+
+/** Parse a tree that may be an object or a JSON string into a TreeNode, or null. */
+function coerceTreeNode(raw: unknown): TreeNode | null {
+  let val: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      val = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof val === "string") return val;
+  if (val && typeof val === "object" && typeof (val as { tag?: unknown }).tag === "string") {
+    return val as TreeNode;
+  }
+  return null;
 }
 
 function byteLength(s: string): number {

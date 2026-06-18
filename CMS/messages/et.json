@@ -159,6 +159,8 @@
     "kitsTitle": "Stardipaketid",
     "kitsHint": "Paigalda valmis komponentide komplekt ühe klõpsuga. Blogipakett lisab postituse päise, postituse sisu, autorikaardi ja postituste loendi.",
     "installBlogKit": "Paigalda blogipakett",
-    "kitInstalled": "Blogipakett paigaldatud: {created} loodud, {updated} uuendatud."
+    "kitInstalled": "Blogipakett paigaldatud: {created} loodud, {updated} uuendatud.",
+    "assetDepsTitle": "Meediasõltuvused",
+    "assetDepsHint": "See komponent viitab allolevatele meediafailidele. Veendu, et need on sellel saidil olemas (laadi need üles, muidu kuvatakse need katkistena)."
   }
 }

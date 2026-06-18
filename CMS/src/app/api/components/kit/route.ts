@@ -49,6 +49,7 @@ export async function POST(request: Request): Promise<Response> {
   // 1) Re-validate every bundle through the import trust boundary FIRST, so a
   //    single bad bundle fails the whole install before any partial write.
   const validated = [];
+  const assetDeps = new Set<string>();
   for (const b of blogKit()) {
     const parsed = parsePortableComponent(b);
     if (!parsed.ok) {
@@ -57,6 +58,7 @@ export async function POST(request: Request): Promise<Response> {
         { status: 500 },
       );
     }
+    for (const k of parsed.assets) assetDeps.add(k);
     validated.push(parsed.component);
   }
 
@@ -68,7 +70,9 @@ export async function POST(request: Request): Promise<Response> {
     }
     const created = results.filter((r) => r.action === "created").length;
     const updated = results.filter((r) => r.action === "updated").length;
-    return Response.json({ id, installed: results, created, updated });
+    // Asset deps the kit references (H3) — empty for the blog kit, but surfaced
+    // so a future media-bearing kit tells the user what to upload.
+    return Response.json({ id, installed: results, created, updated, assets: [...assetDeps] });
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to install kit" },
