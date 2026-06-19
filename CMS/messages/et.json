@@ -269,6 +269,18 @@
       "preview": "Eelvaade"
     },
     "emptyCanvas": "Muutmise alustamiseks vali ülaribalt leht.",
+    "layersEmpty": "Plokke veel pole — lisa sektsioon komponentide paneelist.",
+    "create": {
+      "slug": "Identifikaator",
+      "slugPlaceholder": "meist",
+      "parent": "Ülemleht",
+      "noParent": "Puudub (ülemtase)",
+      "draft": "Mustand",
+      "create": "Loo leht",
+      "creating": "Loomine…",
+      "cancel": "Tühista",
+      "invalidSlug": "Identifikaator võib sisaldada ainult väiketähti, numbreid või sidekriipse."
+    },
     "refresh": "Värskenda",
     "previewUrlPlaceholder": "Eelvaateks vali leht",
     "previewEmpty": "Lehe eelvaade ilmub siia, kui leht on valitud.",

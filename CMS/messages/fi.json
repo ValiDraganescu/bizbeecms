@@ -269,6 +269,18 @@
       "preview": "Esikatselu"
     },
     "emptyCanvas": "Aloita muokkaus valitsemalla sivu yläpalkista.",
+    "layersEmpty": "Ei vielä lohkoja — lisää osio Komponentit-paneelista.",
+    "create": {
+      "slug": "Polkutunnus",
+      "slugPlaceholder": "tietoa",
+      "parent": "Yläsivu",
+      "noParent": "Ei mitään (ylätaso)",
+      "draft": "Luonnos",
+      "create": "Luo sivu",
+      "creating": "Luodaan…",
+      "cancel": "Peruuta",
+      "invalidSlug": "Polkutunnus voi sisältää vain pieniä kirjaimia, numeroita tai väliviivoja."
+    },
     "refresh": "Päivitä",
     "previewUrlPlaceholder": "Valitse sivu esikatselua varten",
     "previewEmpty": "Sivun esikatselu näkyy täällä, kun sivu on valittu.",

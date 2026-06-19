@@ -17,6 +17,10 @@ Read every line before working. Each entry was learned the hard way by a previou
 - Gate workflow that works: CMS `npx tsc --noEmit` → CMS `npx opennextjs-cloudflare build` → PM
   `npm run bundle:cms` (regenerates `ProjectManager/src/lib/deploy/cms-bundle.generated.js`). Run the
   opennext build only with dev stopped (port 3601) — see main CAVEATS.
+- `node --test` does NOT resolve the `@/` tsconfig alias — pure-helper tests under
+  `src/lib/...` must import the thing-under-test with a RELATIVE `.ts` path (the helper
+  file itself can use `@/...` since it's only type-checked + bundled, never run by node).
+  See `lib/pages/page-picker.test.ts` (imports `PageSummary` as `../../db/page-store.ts`).
 - The page-builder shell is a `"use client"` component; the `/admin/page-builder/page.tsx` server route
   is a thin wrapper (force-dynamic) that just renders `<PageBuilderShell/>`. Keep feature wiring in the
   client shell (it already holds viewport/center-tab/right-tab chrome state).

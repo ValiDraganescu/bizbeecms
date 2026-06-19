@@ -4,6 +4,8 @@ import { getTranslations } from "next-intl/server";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { BlockEditor } from "@/components/pages/block-editor";
 import { getPageBlocks, listComponentPalette } from "@/db/page-store";
+import { getContentLocales } from "@/db/settings-store";
+import { defaultContentLocales } from "@/lib/render/localize";
 import type { Block } from "@/lib/render/tree";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +34,7 @@ export default async function PageBlocksPage({
   // real binding; the surrounding app builds because other routes degrade).
   let page: { id: string; slug: string; blocks: Block[] } | null = null;
   let palette: { name: string; propsSchema: string | null }[] = [];
+  let locales = defaultContentLocales().locales;
   try {
     page = await getPageBlocks(id);
   } catch {
@@ -41,6 +44,11 @@ export default async function PageBlocksPage({
     palette = await listComponentPalette();
   } catch {
     /* unbound D1 — empty palette */
+  }
+  try {
+    locales = (await getContentLocales()).locales;
+  } catch {
+    /* unbound D1 — default single-locale set */
   }
   if (!page) notFound();
 
@@ -58,7 +66,12 @@ export default async function PageBlocksPage({
         </div>
         <LocaleSwitcher />
       </header>
-      <BlockEditor pageId={page.id} initialBlocks={page.blocks} palette={palette} />
+      <BlockEditor
+        pageId={page.id}
+        initialBlocks={page.blocks}
+        palette={palette}
+        locales={locales}
+      />
     </main>
   );
 }

@@ -14,17 +14,21 @@
  * ponytail: top-level blocks only this slice; nested block.children authored by
  * the AI round-trip untouched but aren't edited here. Up/down reorder, no DnD lib.
  * Per-block props: one field per DECLARED prop (the component's propsSchema), a
- * textarea for `richtext` else a text input. Localized (locale-object) props get a
- * single default-locale field this slice — per-locale editing logged in NEXT.md.
+ * textarea for `richtext` else a text input. Localized props are stored as locale
+ * objects (`{en,fi,…}`); with >1 site content locale every prop renders ONE field
+ * PER locale and writes a `{loc:text}` object; single-locale sites keep one field
+ * + a bare string (per-locale value/write logic is the pure page-blocks module).
  */
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   addBlock,
+  localeFieldValue,
   moveBlock,
   parsePropsSchema,
   removeBlock,
+  setLocalizedProp,
   validateBlockProps,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
@@ -35,10 +39,13 @@ export function BlockEditor({
   pageId,
   initialBlocks,
   palette,
+  locales,
 }: {
   pageId: string;
   initialBlocks: Block[];
   palette: PaletteEntry[];
+  /** Site content locales (default first); >1 → per-locale prop fields. */
+  locales: string[];
 }) {
   const t = useTranslations("pageBlocks");
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
@@ -50,14 +57,19 @@ export function BlockEditor({
   const schemaOf = (component: string) =>
     parsePropsSchema(palette.find((p) => p.name === component)?.propsSchema);
 
-  /** Set one prop on a block, mirroring the renderer's declared-prop allowlist. */
-  function setProp(blockId: string, propName: string, value: string) {
+  /**
+   * Set one locale's text on a prop, mirroring the renderer's declared-prop
+   * allowlist. With >1 content locale the stored value is a `{loc:text}` object;
+   * single-locale sites store a bare string (the pure helper decides which).
+   */
+  function setProp(blockId: string, propName: string, locale: string, value: string) {
     mutate(
       blocks.map((b) => {
         if (b.id !== blockId) return b;
         const declared = new Set(schemaOf(b.component).map((f) => f.name));
+        const current = (b.props ?? {})[propName as keyof typeof b.props];
         const props = validateBlockProps(
-          { ...(b.props ?? {}), [propName]: value },
+          { ...(b.props ?? {}), [propName]: setLocalizedProp(current, locale, value, locales) },
           declared,
         );
         const next = { ...b };
@@ -192,36 +204,52 @@ export function BlockEditor({
                 const fields = schemaOf(b.component);
                 if (fields.length === 0) return null;
                 const props = (b.props ?? {}) as Record<string, unknown>;
+                const multi = locales.length > 1;
+                const defaultLocale = locales[0];
                 return (
-                  <div className="flex flex-col gap-2 border-t border-border pt-3">
+                  <div className="flex flex-col gap-3 border-t border-border pt-3">
                     {fields.map((f) => {
                       const raw = props[f.name];
-                      const value = typeof raw === "string" ? raw : "";
-                      const fieldId = `${b.id}-${f.name}`;
                       return (
-                        <label key={f.name} className="flex flex-col gap-1">
+                        <fieldset key={f.name} className="flex flex-col gap-1">
                           <span className="text-sm text-foreground-muted">{f.name}</span>
-                          {f.type === "richtext" ? (
-                            <textarea
-                              id={fieldId}
-                              className={`${input} min-h-20`}
-                              value={value}
-                              placeholder={f.default}
-                              disabled={busy}
-                              onChange={(e) => setProp(b.id, f.name, e.target.value)}
-                            />
-                          ) : (
-                            <input
-                              id={fieldId}
-                              type="text"
-                              className={input}
-                              value={value}
-                              placeholder={f.default}
-                              disabled={busy}
-                              onChange={(e) => setProp(b.id, f.name, e.target.value)}
-                            />
-                          )}
-                        </label>
+                          {locales.map((loc) => {
+                            const value = localeFieldValue(raw, loc, defaultLocale);
+                            const fieldId = `${b.id}-${f.name}-${loc}`;
+                            const ariaLabel = multi ? `${f.name} (${loc})` : f.name;
+                            return (
+                              <div key={loc} className="flex items-start gap-2">
+                                {multi && (
+                                  <span className="mt-2 w-10 shrink-0 font-mono text-xs uppercase text-foreground-muted">
+                                    {loc}
+                                  </span>
+                                )}
+                                {f.type === "richtext" ? (
+                                  <textarea
+                                    id={fieldId}
+                                    className={`${input} min-h-20 flex-1`}
+                                    value={value}
+                                    placeholder={f.default}
+                                    disabled={busy}
+                                    aria-label={ariaLabel}
+                                    onChange={(e) => setProp(b.id, f.name, loc, e.target.value)}
+                                  />
+                                ) : (
+                                  <input
+                                    id={fieldId}
+                                    type="text"
+                                    className={`${input} flex-1`}
+                                    value={value}
+                                    placeholder={f.default}
+                                    disabled={busy}
+                                    aria-label={ariaLabel}
+                                    onChange={(e) => setProp(b.id, f.name, loc, e.target.value)}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </fieldset>
                       );
                     })}
                   </div>

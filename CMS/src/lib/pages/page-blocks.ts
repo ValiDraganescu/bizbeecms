@@ -22,6 +22,7 @@
  */
 
 import { planPage, type Block } from "../render/tree.ts";
+import { isLocaleObject } from "../render/localize.ts";
 
 const ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
 
@@ -136,6 +137,62 @@ export function validateBlockProps(
     out[k] = v;
   }
   return out;
+}
+
+/**
+ * The string to show in the per-locale editor field for `locale`, given a prop's
+ * current stored value. A locale object (`{en,fi,…}`) yields its `locale` entry
+ * (falling back to "" — NOT to another locale, so each field edits exactly its
+ * own locale). A bare string is the value for the site's DEFAULT locale only
+ * (legacy / single-locale authoring); other locale fields start empty. PURE.
+ */
+export function localeFieldValue(
+  propValue: unknown,
+  locale: string,
+  defaultLocale: string,
+): string {
+  if (isLocaleObject(propValue)) {
+    const v = (propValue as Record<string, unknown>)[locale];
+    return typeof v === "string" ? v : "";
+  }
+  if (typeof propValue === "string") {
+    return locale === defaultLocale ? propValue : "";
+  }
+  return "";
+}
+
+/**
+ * Set one locale's text on a localized prop, returning the new prop value.
+ *
+ * - Single content locale → a bare string (no needless locale object), matching
+ *   how non-localized props are stored and how the legacy single-field editor
+ *   wrote them.
+ * - Multiple locales → a `{ loc: text }` locale object, carrying over the other
+ *   locales' current values (read from the existing prop value, whatever its
+ *   shape) and dropping any locale whose text is empty. An all-empty result
+ *   collapses to "" so `validateBlockProps` then drops the prop entirely.
+ *
+ * PURE — never mutates inputs.
+ */
+export function setLocalizedProp(
+  current: unknown,
+  locale: string,
+  value: string,
+  locales: string[],
+): string | Record<string, string> {
+  if (locales.length <= 1) return value;
+  const defaultLocale = locales[0];
+  const obj: Record<string, string> = {};
+  for (const loc of locales) {
+    const text = loc === locale ? value : localeFieldValue(current, loc, defaultLocale);
+    if (text !== "") obj[loc] = text;
+  }
+  const keys = Object.keys(obj);
+  if (keys.length === 0) return "";
+  // A single non-empty locale that is the default collapses to a bare string,
+  // so a freshly-typed default-only prop stays simple (and round-trips cleanly).
+  if (keys.length === 1 && keys[0] === defaultLocale) return obj[defaultLocale];
+  return obj;
 }
 
 /** A fresh top-level block referencing `component`, with a unique generated id. */

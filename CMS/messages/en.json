@@ -269,6 +269,18 @@
       "preview": "Preview"
     },
     "emptyCanvas": "Select a page from the top bar to start editing.",
+    "layersEmpty": "No blocks yet — add a Section from the Components rail.",
+    "create": {
+      "slug": "Slug",
+      "slugPlaceholder": "about",
+      "parent": "Parent page",
+      "noParent": "None (top level)",
+      "draft": "Draft",
+      "create": "Create page",
+      "creating": "Creating…",
+      "cancel": "Cancel",
+      "invalidSlug": "Slug must be lowercase letters, digits or hyphens."
+    },
     "refresh": "Refresh",
     "previewUrlPlaceholder": "Select a page to preview",
     "previewEmpty": "The page preview appears here once a page is selected.",

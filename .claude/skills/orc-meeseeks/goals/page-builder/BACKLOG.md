@@ -5,7 +5,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
-- TODO: **Wire page select + create into the builder's page picker (reuse existing CMS page CRUD).**
+- DONE: **Wire page select + create into the builder's page picker (reuse existing CMS page CRUD).**
   Make the top-bar page picker actually load the Site's pages and let the operator pick one OR create a
   new page — reusing the EXISTING C2 page CRUD, not a new one. What already exists in `CMS/`:
   `GET/POST/PUT/DELETE /api/pages` (+ `/api/pages/[id]`), `db/page-store.ts`

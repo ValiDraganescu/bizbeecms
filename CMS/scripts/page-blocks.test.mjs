@@ -16,9 +16,11 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   addBlock,
+  localeFieldValue,
   moveBlock,
   parsePropsSchema,
   removeBlock,
+  setLocalizedProp,
   validateBlockProps,
   validateBlocks,
 } from "../src/lib/pages/page-blocks.ts";
