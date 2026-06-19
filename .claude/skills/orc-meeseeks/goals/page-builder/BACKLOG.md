@@ -55,14 +55,80 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `addComponentToColumn`/`sectionColumns` already existed + tested (page-blocks-sections.test.ts 14/14) → no
   new tree logic, no new test. i18n `pageBuilder.column` + `dropComponentHint` EN/FI/ET. tsc + opennext build
   green. PM `bundle:cms` DEFERRED (cross-loop guardrail; UI-only, no render change this run).
-- TODO: **DnD slice 3 — reorder + cross-column move in the Layers tree (pure helper first).** Today
-  `moveBlock(blocks, index, delta)` only nudges within one flat list. Add a pure
-  `moveNode(blocks, dragId, targetId, position)` (position = before/after/into) to `page-blocks.ts` handling:
-  reorder Sections among themselves, reorder components within a column, AND move a component between columns
-  (incl. across Sections) — node test covering same-column reorder, cross-column move, cross-section move, and
-  no-op/invalid-target. THEN wire Layers-tree nodes as draggable + drop targets (before/after/into via
-  drop-zone thirds) calling `moveNode`; unifies slices 1–2 drops (insert-at-index). Gate: CMS tsc + opennext
-  build green; regen PM cms-bundle. EN/FI/ET.
+- DONE (2026-06-19): **DnD slice 3 — reorder + cross-column move in the Layers tree (pure helper first).**
+  Pure `moveNode(blocks, dragId, targetId, position)` (`before`/`after`/`into`) added to `page-blocks.ts`:
+  finds the dragged node anywhere in the tree (`findNode`), removes it (`removeNode`), then inserts it as a
+  sibling before/after the target (`insertSibling`, works at any depth) OR as the last child of a container
+  target (`insertInto`, only Sections/columns accept). No-ops (return a structural `clone`) on self-drop,
+  missing ids, `into` a leaf, or target-inside-dragged (descendant guard). Handles reorder-Sections,
+  reorder-within-column, cross-column move, cross-section move. 6 node tests added → page-blocks-sections.test.ts
+  19/19. THEN wired `LayersTree` (page-builder-shell.tsx): added `{kind:"move",id}` to the `DragPayload` union;
+  Section + component node buttons are now `draggable` + drop targets via a shared `reorderProps(id)` helper
+  (top-half=before / bottom-half=after via `edgeOf`, box-shadow edge indicator via `edgeClass`,
+  `stopPropagation` so a move-drop doesn't bubble to the column/root); a `move` payload dropped on a COLUMN
+  cell → `moveNode(id, col.id, "into")` (cross-column). Rail section/component drops unchanged (gated on
+  `kind`). No new visible strings (edge highlight is CSS-only) → no i18n add. tsc + opennext build green. PM
+  `bundle:cms` NOT owed (UI-only — `moveNode` yields the same Block shape, no render output change); bundle
+  still owed from the column-model run per CAVEATS.
+
+> COMPONENT PROPS SCHEMA (USER DECISION 2026-06-19): aicms-style per-component config — each prop has a
+> field type + default + required/optional, overridable in the right-rail Block tab (screenshots:
+> ImageCarousel/ArtworkGrid settings panels). bizbee ALREADY has the bones: `component.propsSchema` column
+> (db/schema.ts), and `parsePropsSchema`/`validateBlockProps`/`setLocalizedProp` in `lib/pages/page-blocks.ts`
+> — BUT the parser only understands `{type:"string"|"richtext", default}`. The 16 kit components
+> (blog/landing/docs-kit.ts) already ship propsSchema, all `{type:"string"}`. Reference for the richer
+> vocab: aicms `lib/widgets/props_schema.ts` (FieldType union) + `lib/widgets/builtin_schemas.ts` (real
+> schemas) + the settings-form renderer in `components/page_structure_diagram.tsx`.
+
+- TODO: **Component props-schema FOUNDATION — richer field vocab + Block-tab settings form (BLOCKS the 3
+  kit-upgrade tasks below).** Extend bizbee's existing schema path to the aicms field types and required/
+  optional + default semantics, then render an editable settings form for the SELECTED component in the
+  right-rail Block tab. Concretely:
+  - `lib/pages/page-blocks.ts` `parsePropsSchema`: widen the descriptor type beyond `string|richtext` to
+    `string | richtext | number | boolean | select` (carry `options` for select, `required?:boolean`,
+    `default`, AND `translatable?:boolean` — see translatable bullet). Keep it PURE + degrade unknown types
+    to string. Extend the existing unit test.
+  - `validateBlockProps`: enforce TYPES on save (number coerces/drops non-numeric, boolean → bool, select
+    must be one of `options`) and keep REQUIRED props (don't drop a required prop to ""); leave per-locale
+    string handling (`setLocalizedProp`) intact. Test the new coercion + required cases.
+  - **TRANSLATABLE props (USER REQUIREMENT 2026-06-19):** the schema declares which props are translatable
+    (`translatable: true`, only meaningful for string/richtext). bizbee ALREADY has the per-locale machinery
+    — `setLocalizedProp`/`localeFieldValue` store a prop as `{en,fi,et}`, the shell already receives
+    `contentLocales` (from `getContentLocales()`, same source the SEO form uses). So: a TRANSLATABLE
+    string/richtext field renders ONE input PER content locale (like the SEO form's per-locale rows),
+    each writing via `setLocalizedProp(props,key,locale,value,defaultLocale)`; a NON-translatable field
+    renders a single input. number/boolean/select are never translatable. Test that a translatable prop
+    round-trips per-locale and a non-translatable one stays a bare value.
+  - Block tab UI (right rail in `page-builder-shell.tsx`): when a non-Section component is selected, render
+    one input per schema field — text/textarea(richtext)/number/checkbox/select; translatable string/richtext
+    fields render the per-content-locale input set (above), pre-filled via `localeFieldValue`; others
+    pre-filled from `block.props` (falling back to `default`). Label by `label`/`description`, mark required
+    fields; persist via the EXISTING block PUT. Mirror the screenshot panels (the EN/FI/ET tabs are the
+    per-locale set). Localize the FORM CHROME EN/FI/ET (field labels come from the schema). NOTE: the "AI
+    Translate" button in the aicms screenshot is OUT OF SCOPE here — separate later task.
+  Gate: CMS tsc + opennext build green; regen PM cms-bundle. This is the shared backend+frontend support
+  the per-kit tasks below depend on.
+- TODO: **Upgrade BLOG kit component schemas to the richer vocab** (`lib/components/blog-kit.ts`:
+  BlogPostHeader, BlogPostBody, AuthorCard, PostListItem, PostList). For each, replace the flat
+  `{type:"string"}` propsSchema with real field types/defaults/required matching what the component actually
+  renders (number/boolean/select where it fits — e.g. PostList limit=number, layout=select), modeled on
+  aicms `builtin_schemas.ts`. **Mark `translatable:true` on each human-readable text prop** (titles, body,
+  author name, labels — anything an editor would localize); leave structural/config props non-translatable.
+  Don't change component MARKUP/behavior, only its propsSchema. Depends on the
+  FOUNDATION task (needs the widened vocab). Parallelizable with the other two kit tasks. Gate: CMS tsc +
+  opennext build green; regen PM cms-bundle. (Bundle regen is shared — if run concurrently, see CAVEATS re
+  cross-loop bundle edits; defer + note in NEXT.md if blocked.)
+- TODO: **Upgrade LANDING kit component schemas to the richer vocab** (`lib/components/landing-kit.ts`:
+  Hero, FeatureGrid, CTABand, Testimonial, SiteFooter). Same as the blog-kit task — enrich each propsSchema
+  with real field types/defaults/required (e.g. FeatureGrid columns=select, CTABand has bool toggles),
+  **`translatable:true` on text props** (headline, subhead, CTA label, testimonial body, footer text),
+  markup unchanged. Depends on the FOUNDATION task. Parallelizable. Gate: CMS tsc + opennext build green;
+  regen PM cms-bundle.
+- TODO: **Upgrade DOCS kit component schemas to the richer vocab** (`lib/components/docs-kit.ts`:
+  DocsHeader, Callout, CodeBlock, StepList, ApiParam, + the 6th). Same as the blog/landing tasks — enrich
+  each propsSchema (e.g. Callout variant=select, ApiParam required=boolean), **`translatable:true` on text
+  props** (header title, callout body, step text, param description), markup unchanged. Depends on
+  the FOUNDATION task. Parallelizable. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
 - DONE (2026-06-19): **Make Save PERSIST — register reserved Section as a renderer primitive.**
   `SECTION_COMPONENT` now lives in `lib/render/tree.ts` (single source); `validateBlocks` deletes it
   from `componentNames` so the block PUT route's `missingComponents` no longer 409s on a page with

@@ -139,3 +139,22 @@ Read every line before working. Each entry was learned the hard way by a previou
 - The Block tab only resolves the selected block at the TOP level (`blocks.find(b=>b.id===selectedBlockId)`)
   — fine today because only Sections are selectable from Layers. When component-blocks become selectable
   (deeper nesting), that lookup must walk children too.
+
+- DnD slice 3 DONE: the `DragPayload` union now has a third variant `{kind:"move",id}` (existing-node
+  reorder) alongside `{kind:"section"}` (rail) + `{kind:"component",name}` (rail). EVERY drop handler MUST
+  gate on `payload.kind` so a move isn't mistaken for a rail insert and vice-versa — the column cell now
+  branches: `component` → `onDropComponent` (new block), `move` → `onMoveNode(id,col.id,"into")`. The pure
+  mover is `moveNode(blocks,dragId,targetId,position)` in `page-blocks.ts`; position before/after = SIBLING of
+  the target (at any depth), `into` = last child of a CONTAINER target (Section/column only — leaf = no-op).
+  Reorder UI lives in `LayersTree`'s `reorderProps(id)` (shared by Section + component buttons): top half of a
+  node = before, bottom = after (`edgeOf`), `stopPropagation` on the move's onDragStart/onDrop keeps it off the
+  column/root zones. KNOWN COSMETIC: hovering a component button inside a column fires BOTH the button's edge
+  highlight AND the column's `hoverSlot` highlight (button onDragOver bubbles to the column) — harmless, left
+  as-is (ponytail). If it ever matters, stopPropagation the reorder onDragOver, but then the column won't show
+  its hover when dragging over a child — pick one.
+- There is NO drop zone to move a Section INTO a column or a component OUT to the top level as a sibling of a
+  Section yet — `moveNode` SUPPORTS it (drop a component before/after a Section button → it becomes a
+  top-level sibling), but that produces a top-level non-Section block. `validateBlocks`/`planPage` tolerate it
+  (renders the bare component at top level), so it's not broken, just unusual. The reorder UI only exposes
+  before/after on existing buttons + `into` on columns; richer constraints (e.g. "components only inside
+  columns") are not enforced in the UI — add a guard in `moveNode` or the drop handler if a future task wants it.

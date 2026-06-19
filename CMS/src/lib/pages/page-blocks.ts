@@ -441,6 +441,99 @@ export function mergeSectionProps(
 }
 
 /**
+ * Move the block `dragId` to a new position relative to `targetId`, immutable.
+ *
+ * `position`:
+ *  - `"before"` / `"after"` — drop as a SIBLING of the target, just before/after
+ *    it in the target's parent list (reorder Sections, reorder/cross-column move
+ *    of components, even across Sections — wherever the target lives).
+ *  - `"into"` — drop as the LAST child of the target (e.g. drop a component into
+ *    an empty column). The target must accept children (a Section or a column);
+ *    a leaf component target falls back to a no-op.
+ *
+ * No-op (returns a structurally-equal clone) when: dragId === targetId, either id
+ * is missing, or the target is a descendant of the dragged node (can't move a node
+ * inside itself). PURE — never mutates inputs; ids are preserved (no reassignment).
+ *
+ * This unifies the editor's reorder + cross-container drops onto one helper; the
+ * DnD UI computes before/after/into from drop-zone thirds and calls this.
+ */
+export function moveNode(
+  blocks: Block[],
+  dragId: string,
+  targetId: string,
+  position: "before" | "after" | "into",
+): Block[] {
+  if (dragId === targetId) return clone(blocks);
+  const dragged = findNode(blocks, dragId);
+  const target = findNode(blocks, targetId);
+  if (!dragged || !target) return clone(blocks);
+  // Can't drop a node into/next to its own descendant.
+  if (findNode(dragged.children ?? [], targetId)) return clone(blocks);
+
+  const without = removeNode(blocks, dragId);
+
+  if (position === "into") {
+    // Only containers (Sections / columns) accept dropped children.
+    if (!isSection(target) && !isSectionColumn(target)) return clone(blocks);
+    return insertInto(without, targetId, dragged);
+  }
+  return insertSibling(without, targetId, dragged, position);
+}
+
+/** Find a node by id anywhere in the tree (depth-first). */
+function findNode(blocks: Block[], id: string): Block | null {
+  for (const b of blocks) {
+    if (b.id === id) return b;
+    const inChild = b.children ? findNode(b.children, id) : null;
+    if (inChild) return inChild;
+  }
+  return null;
+}
+
+/** Remove the node `id` wherever it sits in the tree (immutable). */
+function removeNode(blocks: Block[], id: string): Block[] {
+  const out: Block[] = [];
+  for (const b of blocks) {
+    if (b.id === id) continue;
+    out.push(b.children ? { ...b, children: removeNode(b.children, id) } : b);
+  }
+  return out;
+}
+
+/** Insert `node` as the last child of the container `targetId` (immutable). */
+function insertInto(blocks: Block[], targetId: string, node: Block): Block[] {
+  return blocks.map((b) => {
+    if (b.id === targetId) return { ...b, children: [...(b.children ?? []), node] };
+    return b.children ? { ...b, children: insertInto(b.children, targetId, node) } : b;
+  });
+}
+
+/** Insert `node` just before/after the sibling `targetId` (immutable). */
+function insertSibling(
+  blocks: Block[],
+  targetId: string,
+  node: Block,
+  position: "before" | "after",
+): Block[] {
+  const idx = blocks.findIndex((b) => b.id === targetId);
+  if (idx >= 0) {
+    const at = position === "before" ? idx : idx + 1;
+    const next = [...blocks];
+    next.splice(at, 0, node);
+    return next;
+  }
+  return blocks.map((b) =>
+    b.children ? { ...b, children: insertSibling(b.children, targetId, node, position) } : b,
+  );
+}
+
+/** Structural clone of a block tree (so a no-op move returns a fresh array). */
+function clone(blocks: Block[]): Block[] {
+  return blocks.map((b) => (b.children ? { ...b, children: clone(b.children) } : { ...b }));
+}
+
+/**
  * The Section to insert into when the operator clicks a rail component: the
  * explicitly-selected one if it's a Section, else the LAST section on the page,
  * else null (caller should add a Section first). PURE.

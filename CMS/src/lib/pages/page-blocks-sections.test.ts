@@ -12,6 +12,7 @@ import {
   addComponentToSection,
   mergeSectionProps,
   targetSectionId,
+  moveNode,
   validateBlocks,
 } from "./page-blocks.ts";
 import { planPage, type Block, type ComponentArtifact } from "../render/tree.ts";
@@ -198,6 +199,82 @@ test("mergeSectionProps columns patch reflows columns via setSectionColumns", ()
   t = mergeSectionProps(t, s, { columns: 1 });
   assert.equal(sectionColumns(t[0]).length, 1);
   assert.equal(sectionColumns(t[0])[0].children?.length, 1, "Hero reflowed, not lost");
+});
+
+test("moveNode reorders Sections among themselves (before/after)", () => {
+  const t = addSection(addSection([])); // [A, B]
+  const [a, b] = t;
+  // move B before A → [B, A]
+  const r1 = moveNode(t, b.id, a.id, "before");
+  assert.deepEqual(r1.map((s) => s.id), [b.id, a.id]);
+  // move A after B → [B, A]
+  const r2 = moveNode(t, a.id, b.id, "after");
+  assert.deepEqual(r2.map((s) => s.id), [b.id, a.id]);
+  assert.deepEqual(t.map((s) => s.id), [a.id, b.id], "input not mutated");
+});
+
+test("moveNode reorders components within a column", () => {
+  let t = addSection([]);
+  const sid = t[0].id;
+  t = addComponentToColumn(t, sid, 0, "A");
+  t = addComponentToColumn(t, sid, 0, "B");
+  const [ca, cb] = sectionColumns(t[0])[0].children!;
+  // move B before A
+  const r = moveNode(t, cb.id, ca.id, "before");
+  assert.deepEqual(
+    sectionColumns(r[0])[0].children!.map((c) => c.component),
+    ["B", "A"],
+  );
+});
+
+test("moveNode moves a component between columns (cross-column, via 'into')", () => {
+  let t = addSection([]);
+  const sid = t[0].id;
+  t = setSectionColumns(t, sid, 2);
+  t = addComponentToColumn(t, sid, 0, "Hero");
+  const hero = sectionColumns(t[0])[0].children![0];
+  const col1 = sectionColumns(t[0])[1];
+  const r = moveNode(t, hero.id, col1.id, "into");
+  assert.equal(sectionColumns(r[0])[0].children!.length, 0, "left column emptied");
+  assert.deepEqual(
+    sectionColumns(r[0])[1].children!.map((c) => c.component),
+    ["Hero"],
+    "Hero moved into column 1",
+  );
+});
+
+test("moveNode moves a component across Sections (sibling of a component in another section)", () => {
+  let t = addSection(addSection([])); // [S1, S2]
+  const s1 = t[0].id;
+  const s2 = t[1].id;
+  t = addComponentToColumn(t, s1, 0, "Hero");
+  t = addComponentToColumn(t, s2, 0, "Card");
+  const hero = sectionColumns(t.find((s) => s.id === s1)!)[0].children![0];
+  const card = sectionColumns(t.find((s) => s.id === s2)!)[0].children![0];
+  // drop Hero after Card in S2's column
+  const r = moveNode(t, hero.id, card.id, "after");
+  assert.equal(sectionColumns(r.find((s) => s.id === s1)!)[0].children!.length, 0);
+  assert.deepEqual(
+    sectionColumns(r.find((s) => s.id === s2)!)[0].children!.map((c) => c.component),
+    ["Card", "Hero"],
+  );
+});
+
+test("moveNode is a no-op for self, missing ids, into-a-leaf, or target-inside-dragged", () => {
+  let t = addSection([]);
+  const sid = t[0].id;
+  t = addComponentToColumn(t, sid, 0, "Hero");
+  const hero = sectionColumns(t[0])[0].children![0];
+  // self
+  assert.deepEqual(moveNode(t, sid, sid, "before"), t);
+  // missing drag / target
+  assert.deepEqual(moveNode(t, "nope", sid, "before"), t);
+  assert.deepEqual(moveNode(t, sid, "nope", "after"), t);
+  // 'into' a leaf component (no children accepted) → no-op
+  assert.deepEqual(moveNode(t, sid, hero.id, "into"), t);
+  // moving a Section into its own descendant column → no-op
+  const col = sectionColumns(t[0])[0];
+  assert.deepEqual(moveNode(t, sid, col.id, "into"), t);
 });
 
 test("mergeSectionProps is a no-op for a non-Section id and never mutates", () => {

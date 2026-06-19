@@ -43,6 +43,7 @@ import {
   isSection,
   mergeSectionProps,
   targetSectionId,
+  moveNode,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
 
@@ -55,7 +56,10 @@ type RightTab = "block" | "page" | "seo";
 // drags the LAYOUT "Section" (`{kind:"section"}`); slice 2 adds `{kind:"component",
 // name}`. Drop targets read it back via `readDragPayload`.
 const DND_MIME = "application/x-page-builder";
-type DragPayload = { kind: "section" } | { kind: "component"; name: string };
+type DragPayload =
+  | { kind: "section" }
+  | { kind: "component"; name: string }
+  | { kind: "move"; id: string };
 
 function setDragPayload(e: React.DragEvent, payload: DragPayload) {
   e.dataTransfer.setData(DND_MIME, JSON.stringify(payload));
@@ -193,6 +197,13 @@ export function PageBuilderShell({
   // the target isn't a valid section/column (the pure helper guards range).
   function onDropComponentToColumn(sectionId: string, colIndex: number, component: string) {
     setBlocks((b) => addComponentToColumn(b, sectionId, colIndex, component));
+    setDirty(true);
+  }
+
+  // Move a Layers node (DnD slice 3): reorder Sections, reorder within a column,
+  // or move a component across columns/sections. The pure helper guards no-ops.
+  function onMoveNode(dragId: string, targetId: string, position: "before" | "after" | "into") {
+    setBlocks((b) => moveNode(b, dragId, targetId, position));
     setDirty(true);
   }
 
@@ -440,6 +451,7 @@ export function PageBuilderShell({
                   selectedId={selectedBlockId}
                   onSelect={setSelectedBlockId}
                   onDropComponent={onDropComponentToColumn}
+                  onMoveNode={onMoveNode}
                 />
               )}
               {/* Drop indicator: a blue line where the new Section appends. */}
@@ -878,15 +890,19 @@ function LayersTree({
   selectedId,
   onSelect,
   onDropComponent,
+  onMoveNode,
 }: {
   blocks: Block[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onDropComponent: (sectionId: string, colIndex: number, name: string) => void;
+  onMoveNode: (dragId: string, targetId: string, position: "before" | "after" | "into") => void;
 }) {
   const t = useTranslations("pageBuilder");
   // The column-drop slot under the cursor, keyed `${sectionId}:${colIndex}`.
   const [hoverSlot, setHoverSlot] = useState<string | null>(null);
+  // Reorder hover: which node + which half (before/after) the cursor is over.
+  const [hoverEdge, setHoverEdge] = useState<{ id: string; pos: "before" | "after" } | null>(null);
 
   function nodeClass(id: string): string {
     return (
@@ -897,11 +913,61 @@ function LayersTree({
     );
   }
 
+  // Top half of the node = drop BEFORE it, bottom half = drop AFTER it.
+  function edgeOf(e: React.DragEvent): "before" | "after" {
+    const r = e.currentTarget.getBoundingClientRect();
+    return e.clientY - r.top < r.height / 2 ? "before" : "after";
+  }
+
+  // Reorder drop handlers shared by Section + component node buttons. Only a
+  // `move` payload reorders (a rail section/component is handled elsewhere).
+  function reorderProps(id: string) {
+    return {
+      draggable: true,
+      onDragStart: (e: React.DragEvent) => {
+        setDragPayload(e, { kind: "move", id });
+        e.stopPropagation();
+      },
+      onDragOver: (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const pos = edgeOf(e);
+        setHoverEdge((h) => (h?.id === id && h.pos === pos ? h : { id, pos }));
+      },
+      onDragLeave: (e: React.DragEvent) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setHoverEdge((h) => (h?.id === id ? null : h));
+        }
+      },
+      onDrop: (e: React.DragEvent) => {
+        const pos = edgeOf(e);
+        setHoverEdge(null);
+        const payload = readDragPayload(e);
+        if (payload?.kind !== "move") return;
+        e.preventDefault();
+        e.stopPropagation();
+        onMoveNode(payload.id, id, pos);
+      },
+    };
+  }
+
+  function edgeClass(id: string): string {
+    if (hoverEdge?.id !== id) return "";
+    return hoverEdge.pos === "before"
+      ? " ring-2 ring-primary ring-offset-1 [box-shadow:0_-2px_0_var(--color-primary)]"
+      : " ring-2 ring-primary ring-offset-1 [box-shadow:0_2px_0_var(--color-primary)]";
+  }
+
   return (
     <ul className="mx-auto max-w-xl space-y-2">
       {blocks.map((b, i) => (
         <li key={b.id}>
-          <button type="button" onClick={() => onSelect(b.id)} className={nodeClass(b.id)}>
+          <button
+            type="button"
+            onClick={() => onSelect(b.id)}
+            className={nodeClass(b.id) + edgeClass(b.id)}
+            {...reorderProps(b.id)}
+          >
             {isSection(b) ? `${t("layoutSection")} ${i + 1}` : b.component}
           </button>
           {isSection(b) && (
@@ -926,11 +992,16 @@ function LayersTree({
                     onDrop={(e) => {
                       setHoverSlot(null);
                       const payload = readDragPayload(e);
-                      // Only components drop INTO a column; a Section is rejected.
-                      if (payload?.kind !== "component") return;
-                      e.preventDefault();
                       e.stopPropagation();
-                      onDropComponent(b.id, ci, payload.name);
+                      // A rail component → new block in this column. A `move` of an
+                      // existing component → drop INTO this column (cross-column).
+                      if (payload?.kind === "component") {
+                        e.preventDefault();
+                        onDropComponent(b.id, ci, payload.name);
+                      } else if (payload?.kind === "move") {
+                        e.preventDefault();
+                        onMoveNode(payload.id, col.id, "into");
+                      }
                     }}
                     className={
                       "rounded-md border border-dashed p-2 transition-colors " +
@@ -949,7 +1020,8 @@ function LayersTree({
                             <button
                               type="button"
                               onClick={() => onSelect(c.id)}
-                              className={nodeClass(c.id)}
+                              className={nodeClass(c.id) + edgeClass(c.id)}
+                              {...reorderProps(c.id)}
                             >
                               {c.component}
                             </button>
