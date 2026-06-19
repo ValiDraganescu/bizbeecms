@@ -1,19 +1,24 @@
 # Note to the next Meeseeks (custom-domains)
 
-Done so far:
-- `deployer.bizbeecms.com` → deployer Worker; PM `DEPLOYER_URL` → it.
-- `manager.bizbeecms.com` → PM Worker; PM `APP_ORIGIN` → it. `cmsWorkerUrl()` decoupled from APP_ORIGIN.
-- Per-site CMS served at `<slug>.site.bizbeecms.com` via the ROUTER (slug from subdomain, no HOST_MAP write).
-- `cmsWorkerUrl()` returns `https://<slug>.site.bizbeecms.com`; `hosts.ts` has `SITE_HOST_SUFFIX`/`siteUrlForSlug()`/`PM_ORIGIN`. Deployer injects committed `PM_ORIGIN=https://manager.bizbeecms.com`.
-- **SSO VERIFIED:** `cms-sso.test.ts` extended (12→16, all pass via `node --test src/lib/auth/cms-sso.test.ts`). Own-zone check accepts `<slug>.site.bizbeecms.com` + `manager.bizbeecms.com` with NO allowlist change; lookalikes (`*.bizbeecms.com.evil.com`, `evil.attacker.workers.dev`) still rejected. The hostname gate (the only host-dependent SSO step) is proven by test.
+**ALL BACKLOG TASKS ARE DONE. The goal is code-complete.** Every "what good looks like"
+bullet in GOAL.md is satisfied at the code/config level:
+- PM → `manager.bizbeecms.com` (route + APP_ORIGIN).
+- Deployer → `deployer.bizbeecms.com` (route + DEPLOYER_URL).
+- Per-site CMS → `<slug>.site.bizbeecms.com` (router-derived slug, `cmsWorkerUrl()` returns it).
+- SSO allowlist accepts the new hosts, rejects lookalikes — 16/16 tests pass.
+- workers.dev decommissioned from all user-facing paths; kept only as SSO allowlist +
+  internal transport/fallback (see CAVEATS "CUTOVER STATE").
 
-**LAST TODO (BACKLOG ## Tasks, only open one): Decommission / alias the old `.workers.dev` URLs.**
-- Confirm nothing user-facing still depends on `bizbeecms-projectmanager.workers.dev` / `bizbeecms-deployer.workers.dev` / `bizbeecms-cms-<slug>.workers.dev`.
-- `cmsWorkerUrl()` already returns the custom host (no workers.dev leak). Audit: `send-invite.ts` (uses APP_ORIGIN = manager.bizbeecms.com ✓), SSO (request-relative ✓), DEPLOYER_URL (custom ✓). Grep for any remaining `.workers.dev` / `WORKERS_DEV_SUFFIX` usage that reaches users.
-- Leave workers.dev reachable as a cheap fallback (per CAVEATS: don't disable the workers.dev subdomain). Note the cutover state in CAVEATS.md if you change anything.
-- This is the FINAL task — after it, the goal's "what good looks like" is met modulo the live-deploy + wildcard-cert step (infra, not code).
+**What is NOT done — and CANNOT be done from code (infra, needs the live Cloudflare account):**
+1. Run the real deploys: `cd ProjectManager && npx opennextjs-cloudflare build` then deploy;
+   `cd deployer && npx wrangler deploy` (needs Docker for the container image); deploy router.
+   Confirm the custom hostnames actually attach + resolve.
+2. Provision a `*.site.bizbeecms.com` WILDCARD cert (advanced cert) on the bizbeecms.com zone
+   BEFORE the router route can terminate TLS for per-site CMS.
+3. Live SSO walk: log into PM at manager.*, open a site CMS at <slug>.site.* — confirm the
+   nonce mint→redirect→exchange→validate round-trip end-to-end on real hosts.
 
-Reminders:
-- `*.site.bizbeecms.com` route needs a wildcard cert on the zone at deploy time (code can't fix that).
-- No live deploy run yet — all config/code only. Deployer dry-run needs Docker.
-- `WORKERS_DEV_SUFFIX`/`ACCOUNT_WORKERS_SUBDOMAIN` are still used by the SSO allowlist's own-account CMS-worker check (`isOwnCmsWorker`) — that's the workers.dev fallback path, KEEP it. Don't delete those constants when decommissioning.
+**If you were summoned for this goal with no infra access:** there is no code work left.
+Do NOT invent code churn or "tighten" the workers.dev refs — they are load-bearing
+(CAVEATS "CUTOVER STATE"). Either report the goal as code-complete/blocked-on-infra, or
+pick up a backlog item the human adds. Don't loosen the SSO host allowlist.
