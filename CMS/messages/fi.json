@@ -198,7 +198,16 @@
     "assetDepsTitle": "Mediariippuvuudet",
     "assetDepsHint": "Tämä komponentti viittaa alla oleviin mediatiedostoihin. Varmista, että ne ovat tällä sivustolla (lataa ne, muuten ne näkyvät rikkinäisinä).",
     "componentDepsTitle": "Puuttuvat komponenttiriippuvuudet",
-    "componentDepsHint": "Tämä komponentti käyttää alla olevia komponentteja, joita ei ole asennettu tälle sivustolle. Tuo ne ensin, muuten ne näkyvät piilotettuina paikkamerkkeinä."
+    "componentDepsHint": "Tämä komponentti käyttää alla olevia komponentteja, joita ei ole asennettu tälle sivustolle. Tuo ne ensin, muuten ne näkyvät piilotettuina paikkamerkkeinä.",
+    "rebindTitle": "Uudelleenmäärittele resurssiviittaukset",
+    "rebindHint": "Säilytä kukin tämän paketin viittaama resurssi, ohjaa se johonkin tämän sivuston mediatiedostoon tai poista se. Tuo sitten uudelleen ottaaksesi muutokset käyttöön.",
+    "rebindPresent": "tällä sivustolla",
+    "rebindMissing": "puuttuu täältä",
+    "rebindKeep": "Säilytä",
+    "rebindDrop": "Poista",
+    "rebindToLabel": "Ohjaa mediatiedostoon…",
+    "applyRebind": "Tuo uudelleen uudelleenmäärityksellä",
+    "applyingRebind": "Tuodaan uudelleen…"
   },
   "adminAuth": {
     "forbiddenTitle": "Pääsy estetty",

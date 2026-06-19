@@ -35,6 +35,14 @@ export function ComponentsManager({
   const [assetDeps, setAssetDeps] = useState<string[]>([]);
   // H3b: nested-component refs the import/kit needs that aren't installed here.
   const [missingComponents, setMissingComponents] = useState<string[]>([]);
+  // H3b part 1 — editable asset-rebind. After a paste/upload import, keep the
+  // source bundle + this Site's media keys so we can offer a per-dep rebind
+  // (keep / point at a /media key / drop) and re-import {text, rebind}. Kit
+  // installs have no single re-importable bundle → they keep the read-only list.
+  const [lastBundle, setLastBundle] = useState<string | null>(null);
+  const [siteAssetKeys, setSiteAssetKeys] = useState<string[]>([]);
+  // Per-dep choice: undefined/"" = keep, "__drop__" = remove, else a /media key.
+  const [rebind, setRebind] = useState<Record<string, string>>({});
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -42,11 +50,25 @@ export function ComponentsManager({
     if (res.ok) setComponents((await res.json()) as ComponentSummary[]);
   }
 
+  // Load this Site's media keys so a rebind can target a real asset (H3b p1).
+  async function loadSiteAssetKeys() {
+    try {
+      const res = await fetch("/api/assets");
+      if (res.ok) {
+        const rows = (await res.json()) as { key: string }[];
+        setSiteAssetKeys(rows.map((r) => r.key));
+      }
+    } catch {
+      /* gallery fetch is best-effort; rebind UI still works minus targets */
+    }
+  }
+
   async function exportOne(name: string) {
     setError(null);
     setNotice(null);
     setAssetDeps([]);
     setMissingComponents([]);
+    setLastBundle(null);
     try {
       const res = await fetch(`/api/components?name=${encodeURIComponent(name)}`);
       if (!res.ok) {
@@ -66,7 +88,9 @@ export function ComponentsManager({
     }
   }
 
-  async function importBundle(text: string) {
+  // `rebindMap` (H3b p1): re-import the SAME bundle with a {oldKey: newKey|null}
+  // map applied. The server route + pure validator already accept {rebind}.
+  async function importBundle(text: string, rebindMap?: Record<string, string | null>) {
     setError(null);
     setNotice(null);
     setAssetDeps([]);
@@ -80,7 +104,7 @@ export function ComponentsManager({
       const res = await fetch("/api/components", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(rebindMap ? { text, rebind: rebindMap } : { text }),
       });
       if (!res.ok) {
         setError(await errorOf(res));
@@ -99,6 +123,11 @@ export function ComponentsManager({
       );
       setAssetDeps(j.assets ?? []);
       setMissingComponents(j.missingComponents ?? []);
+      // Keep the bundle source + reset rebind choices so the (possibly still
+      // dangling) deps can be rebound and re-imported again.
+      setLastBundle(text);
+      setRebind({});
+      void loadSiteAssetKeys();
       setPaste("");
       if (fileRef.current) fileRef.current.value = "";
       await refresh();
@@ -107,6 +136,17 @@ export function ComponentsManager({
     } finally {
       setBusy(false);
     }
+  }
+
+  // Build the rebind map from the per-dep choices and re-import the bundle.
+  function applyRebind() {
+    if (!lastBundle) return;
+    const map: Record<string, string | null> = {};
+    for (const [key, choice] of Object.entries(rebind)) {
+      if (choice === "__drop__") map[key] = null;
+      else if (choice) map[key] = choice;
+    }
+    void importBundle(lastBundle, map);
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -123,6 +163,7 @@ export function ComponentsManager({
     setNotice(null);
     setAssetDeps([]);
     setMissingComponents([]);
+    setLastBundle(null); // kits have no single re-importable bundle → read-only deps
     setBusy(true);
     try {
       const res = await fetch("/api/components/kit", {
@@ -169,7 +210,60 @@ export function ComponentsManager({
           {notice}
         </p>
       )}
-      {assetDeps.length > 0 && (
+      {/* Editable rebind (H3b part 1): after a paste/upload import, let the
+          admin keep / repoint / drop each referenced asset, then re-import. */}
+      {assetDeps.length > 0 && lastBundle && (
+        <div className="flex flex-col gap-3 rounded-md border border-border bg-surface-raised px-3 py-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-foreground">{t("rebindTitle")}</span>
+            <span className="text-sm text-foreground-muted">{t("rebindHint")}</span>
+          </div>
+          <ul className="flex flex-col gap-2">
+            {assetDeps.map((k) => {
+              const present = siteAssetKeys.includes(k);
+              return (
+                <li key={k} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate font-mono text-sm text-foreground">/media/{k}</span>
+                    <span className={`text-xs ${present ? "text-success" : "text-danger"}`}>
+                      {present ? t("rebindPresent") : t("rebindMissing")}
+                    </span>
+                  </div>
+                  <select
+                    className="shrink-0 rounded-md border border-border bg-surface px-2 py-1 text-sm text-foreground"
+                    value={rebind[k] ?? ""}
+                    disabled={busy}
+                    aria-label={`/media/${k}`}
+                    onChange={(e) => setRebind((r) => ({ ...r, [k]: e.target.value }))}
+                  >
+                    <option value="">{t("rebindKeep")}</option>
+                    <option value="__drop__">{t("rebindDrop")}</option>
+                    {siteAssetKeys.length > 0 && (
+                      <optgroup label={t("rebindToLabel")}>
+                        {siteAssetKeys.map((sk) => (
+                          <option key={sk} value={sk}>
+                            /media/{sk}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </li>
+              );
+            })}
+          </ul>
+          <button
+            type="button"
+            className="self-start rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+            disabled={busy}
+            onClick={() => applyRebind()}
+          >
+            {busy ? t("applyingRebind") : t("applyRebind")}
+          </button>
+        </div>
+      )}
+      {/* Read-only deps list for kit installs / exports (no single bundle to re-import). */}
+      {assetDeps.length > 0 && !lastBundle && (
         <div
           role="status"
           className="flex flex-col gap-1 rounded-md border border-border bg-surface-raised px-3 py-2"

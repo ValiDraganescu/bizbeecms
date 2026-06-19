@@ -12,7 +12,7 @@ Plow continuously, NO stopping for human action. If your task needs the human (l
 - PM fully built + live (M1 done). Deploy via the deployer Container.
 - **A (Rendering foundation) COMPLETE; B (AI assistant) COMPLETE (offline cores):** chat SSE + 5 tools + `/admin/chat` UI + real system prompt (E2).
 - **C1/C1b/C2/C3 DONE** + per-block props editing UI (binding loop CLOSED).
-- **H1/H2/H3/H3b DONE:** component export/import with BOTH asset-URL deps AND nested-component deps declared/warned on import.
+- **H-track FULLY DONE (2026-06-19):** component export/import with BOTH asset-URL deps AND nested-component deps declared/warned on import, PLUS the editable asset-rebind UI (H3b part 1 — keep/repoint/drop each dep then re-import `{text,rebind}`). Nothing left in H.
 - **G1 DONE:** blog starter kit (template for future kits).
 - **D1 + list_assets DONE; E1 + E2 DONE** (theme overrides + brand/AI-persona settings → AI prompt).
 - **🔒 Sec1 DONE (2026-06-18): CMS admin auth** (PM cms-validate + CMS requireAdmin gate + /admin layout guard + deployer var wiring).
@@ -20,8 +20,8 @@ Plow continuously, NO stopping for human action. If your task needs the human (l
 - **🧹 Housekeeping DONE (2026-06-19): CMS/tsconfig.tsbuildinfo untracked + gitignored** (the `a07c70a` commit had only edited the backlog note, never the file — see CAVEAT "a backlog-note commit is NOT proof").
 
 ## Next valuable slice — pick ONE:
-1. **H3b part 1 — editable asset-rebind UI** (DEFERRED, the last H-track polish). The format/validator/REST `{rebind}` hook + the nested-component dep WARNING are done; only the editable per-dep rebind picker remains. In `components-manager.tsx`: after a paste/upload/kit response returning `assets`, cross-check vs `GET /api/assets`, render a per-dep control (keep / rebind to a `/media/<key>` from the gallery / drop=null), build the `{rebind}` map, POST `{text|bundle, rebind}` — route ALREADY accepts `{rebind}`, validator done. Purely editor-UI.
-2. **G2+ — more kits (landing/marketing, docs, portfolio).** Kit template proven (`lib/components/<x>-kit.ts` + kit route id + button). New kits should author `{{slots}}` + `propsSchema` from the start (see blog-kit.ts). Kit-install dep-check (H3b) excludes self-kit names before warning.
+1. **G2+ — more kits (landing/marketing, docs, portfolio).** ← LEAN HERE (H-track is now fully CLOSED). Kit template proven (`CMS/src/lib/components/<x>-kit.ts` array of `bizbeecms.component` v1 bundles + an `id` branch in `CMS/src/app/api/components/kit/route.ts` + an install button/handler in `components-manager.tsx` + a `kitInstalled`-style i18n key + a `scripts/<x>-kit.test.mjs`). New kits MUST author `{{slots}}` + `propsSchema` from the start (see `blog-kit.ts`). Kit-install dep-check (H3b) excludes self-kit names before warning. Pattern: copy the blog-kit slice end-to-end for a "landing/marketing" kit (hero, feature grid, CTA band, testimonial, footer).
+2. **H-track DONE** — H3b part 1 (editable asset-rebind UI) shipped 2026-06-19; H1/H2/H3/H3b parts 1&2 all complete. Nothing left in H.
 3. **Per-locale block-prop editing** (DEFERRED). A localized prop currently gets ONE text field writing a bare string (shows in all locales). To do per-locale: render N fields from `getContentLocales()`, write a `{en,fi,et}` object. `validateBlockProps` already keeps object values → editor-UI-only expansion.
 4. **F1 — PM deploy fleet view.** PM dashboard listing all Sites' deploy status + stuck flags. PM-side.
 5. **D2 — Cloudflare Images transforms** (optional, smaller).

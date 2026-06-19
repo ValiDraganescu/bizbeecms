@@ -198,7 +198,16 @@
     "assetDepsTitle": "Asset dependencies",
     "assetDepsHint": "This component references the media assets below. Make sure they exist on this site (upload them, or they will appear broken).",
     "componentDepsTitle": "Missing component dependencies",
-    "componentDepsHint": "This component renders the components below, which are not installed on this site. Import them first, or they will render as hidden placeholders."
+    "componentDepsHint": "This component renders the components below, which are not installed on this site. Import them first, or they will render as hidden placeholders.",
+    "rebindTitle": "Rebind asset references",
+    "rebindHint": "For each asset this bundle references, keep it as-is, point it at one of this site's media files, or drop it. Then re-import to apply.",
+    "rebindPresent": "on this site",
+    "rebindMissing": "missing here",
+    "rebindKeep": "Keep",
+    "rebindDrop": "Drop (remove)",
+    "rebindToLabel": "Rebind to a media file…",
+    "applyRebind": "Re-import with rebind",
+    "applyingRebind": "Re-importing…"
   },
   "adminAuth": {
     "forbiddenTitle": "Access denied",

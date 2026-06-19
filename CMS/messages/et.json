@@ -198,7 +198,16 @@
     "assetDepsTitle": "Meediasõltuvused",
     "assetDepsHint": "See komponent viitab allolevatele meediafailidele. Veendu, et need on sellel saidil olemas (laadi need üles, muidu kuvatakse need katkistena).",
     "componentDepsTitle": "Puuduvad komponendisõltuvused",
-    "componentDepsHint": "See komponent renderdab allolevaid komponente, mida pole sellele saidile paigaldatud. Impordi need esmalt, muidu kuvatakse need peidetud kohatäidetena."
+    "componentDepsHint": "See komponent renderdab allolevaid komponente, mida pole sellele saidile paigaldatud. Impordi need esmalt, muidu kuvatakse need peidetud kohatäidetena.",
+    "rebindTitle": "Seo varade viited ümber",
+    "rebindHint": "Iga selle paketi viidatud vara puhul säilita see, suuna mõnele selle saidi meediafailile või eemalda. Seejärel impordi uuesti, et muudatused rakenduksid.",
+    "rebindPresent": "sellel saidil",
+    "rebindMissing": "puudub siit",
+    "rebindKeep": "Säilita",
+    "rebindDrop": "Eemalda",
+    "rebindToLabel": "Seo meediafailiga…",
+    "applyRebind": "Impordi uuesti ümberseostamisega",
+    "applyingRebind": "Impordin uuesti…"
   },
   "adminAuth": {
     "forbiddenTitle": "Juurdepääs keelatud",
