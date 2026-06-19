@@ -685,8 +685,13 @@ function findNode(blocks: Block[], id: string): Block | null {
   return null;
 }
 
-/** Remove the node `id` wherever it sits in the tree (immutable). */
-function removeNode(blocks: Block[], id: string): Block[] {
+/**
+ * Remove the node `id` wherever it sits in the tree (immutable). Removing a
+ * Section drops its columns + their components too (the whole subtree goes with
+ * it); removing a component leaf drops just that block. No-op if `id` is absent.
+ * PURE — never mutates inputs. Backs the Layers-tree delete affordance.
+ */
+export function removeNode(blocks: Block[], id: string): Block[] {
   const out: Block[] = [];
   for (const b of blocks) {
     if (b.id === id) continue;

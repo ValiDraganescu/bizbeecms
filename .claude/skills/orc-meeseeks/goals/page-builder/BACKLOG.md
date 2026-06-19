@@ -176,7 +176,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
   padding/margin/gap/bg on the column cell). Pure `mergeColumnProps(blocks,colId,patch)` (mirror
   `mergeSectionProps`) + node test. Persists via the existing block PUT / draft auto-save. i18n EN/FI/ET.
   Gate: CMS tsc + opennext build green; regen PM cms-bundle.
-- TODO: **Delete nodes in the Layers tree — component or whole Section, with a confirm prompt.** In
+- DONE (2026-06-19 21:18): **Delete nodes in the Layers tree — component or whole Section, with a confirm prompt.** Exported pure `removeNode`; `onDeleteNode` + `DeleteNodeControl` (trash + in-app confirm popover, EN/FI/ET `pageBuilder.deleteNode`) on each Section AND component leaf; clears selection. 4 tests added. tsc 0 + opennext build green. In
   `LayersTree` (`page-builder-shell.tsx`) add a delete affordance (trash icon, on hover/selection) on each
   Section node AND each component node; clicking it removes that node. The data layer ALREADY has it:
   nested-safe `removeNode(blocks, id)` in `lib/pages/page-blocks.ts` (line ~645) — wire the button to it via

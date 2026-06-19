@@ -396,6 +396,14 @@
       "confirm": "Kas kustutada see veerg ja selle komponendid?",
       "cancel": "Tühista"
     },
+    "deleteNode": {
+      "action": "Kustuta",
+      "section": "Kustuta sektsioon",
+      "component": "Kustuta komponent",
+      "confirmSection": "Kas kustutada see sektsioon ja kogu selle sisu?",
+      "confirmComponent": "Kas kustutada see komponent?",
+      "cancel": "Tühista"
+    },
     "dropComponentHint": "Lohista komponent siia",
     "componentNoProps": "Sellel komponendil pole muudetavaid omadusi.",
     "localePickerLabel": "Muudetav keel",

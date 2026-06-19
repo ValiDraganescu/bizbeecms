@@ -520,3 +520,21 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/render/tree.ts (columnStyle + mgn, planColumn), CMS/src/components/page-builder/
   page-builder-shell.tsx (ColumnSettings extended), CMS/scripts/render-tree.test.mjs (+3),
   CMS/messages/{en,fi,et}.json (columnAlign/columnAlignHint/columnAlignInherit/columnMargin/columnGap).
+
+## 2026-06-19 21:18 — Delete nodes in Layers tree (component or whole Section, in-app confirm)
+- **Status:** DONE
+- **What I did:** Exported the existing pure `removeNode(blocks, id)` from page-blocks.ts (was
+  private; nested-safe, immutable — removing a Section drops its columns+components, removing a
+  component leaf drops just that block). Added `onDeleteNode` handler in page-builder-shell (calls
+  setBlocks(removeNode), clears selection if the deleted node was selected, marks dirty) and threaded
+  it into `LayersTree`. Added a `DeleteNodeControl` local component (trash icon + inline confirm
+  popover) — reuses the SAME in-app confirm pattern as deleteColumn/PageSettings, NOT native
+  window.confirm. Rendered on each Section node AND each component leaf. EN/FI/ET `pageBuilder.deleteNode`
+  catalog (action/section/component/confirmSection/confirmComponent/cancel). Used bg-danger/
+  text-danger-foreground tokens (confirmed in globals.css).
+- **Verified:** `node --test scripts/page-blocks.test.mjs` 21/21 (added 3 removeNode behavior tests +
+  1 EN/FI/ET deleteNode parity/non-empty test). `npx tsc --noEmit` exit 0 (FULLY clean). `npx
+  opennextjs-cloudflare build` complete (dev stopped, port 3601 free).
+- **Files:** CMS/src/lib/pages/page-blocks.ts (export removeNode), CMS/src/components/page-builder/
+  page-builder-shell.tsx (onDeleteNode + DeleteNodeControl + affordances), CMS/scripts/
+  page-blocks.test.mjs (+4 tests), CMS/messages/{en,fi,et}.json (pageBuilder.deleteNode).

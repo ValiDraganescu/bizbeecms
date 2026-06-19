@@ -396,6 +396,14 @@
       "confirm": "Poistetaanko tämä sarake ja sen komponentit?",
       "cancel": "Peruuta"
     },
+    "deleteNode": {
+      "action": "Poista",
+      "section": "Poista osio",
+      "component": "Poista komponentti",
+      "confirmSection": "Poistetaanko tämä osio ja kaikki sen sisältö?",
+      "confirmComponent": "Poistetaanko tämä komponentti?",
+      "cancel": "Peruuta"
+    },
     "dropComponentHint": "Pudota komponentti tähän",
     "componentNoProps": "Tällä komponentilla ei ole muokattavia ominaisuuksia.",
     "localePickerLabel": "Muokattava kieli",

@@ -46,6 +46,7 @@ import {
   isSectionColumn,
   mergeSectionProps,
   deleteColumn,
+  removeNode,
   targetSectionId,
   moveNode,
   findBlock,
@@ -287,6 +288,15 @@ export function PageBuilderShell({
   function onDeleteColumn(columnId: string) {
     setBlocks((b) => deleteColumn(b, columnId));
     setSelectedBlockId((cur) => (cur === columnId ? null : cur));
+    setDirty(true);
+  }
+
+  // Delete a whole Section (with its columns + components) or a single component
+  // leaf via the pure, nested-safe removeNode. Clears selection if the removed
+  // node was the selected one.
+  function onDeleteNode(nodeId: string) {
+    setBlocks((b) => removeNode(b, nodeId));
+    setSelectedBlockId((cur) => (cur === nodeId ? null : cur));
     setDirty(true);
   }
 
@@ -540,6 +550,7 @@ export function PageBuilderShell({
                   onDropComponent={onDropComponentToColumn}
                   onMoveNode={onMoveNode}
                   onDeleteColumn={onDeleteColumn}
+                  onDeleteNode={onDeleteNode}
                 />
               )}
               {/* Drop indicator: a blue line where the new Section appends. */}
@@ -1045,6 +1056,7 @@ function LayersTree({
   onDropComponent,
   onMoveNode,
   onDeleteColumn,
+  onDeleteNode,
 }: {
   blocks: Block[];
   selectedId: string | null;
@@ -1052,6 +1064,7 @@ function LayersTree({
   onDropComponent: (sectionId: string, colIndex: number, name: string) => void;
   onMoveNode: (dragId: string, targetId: string, position: "before" | "after" | "into") => void;
   onDeleteColumn: (columnId: string) => void;
+  onDeleteNode: (nodeId: string) => void;
 }) {
   const t = useTranslations("pageBuilder");
   // The column-drop slot under the cursor, keyed `${sectionId}:${colIndex}`.
@@ -1060,6 +1073,8 @@ function LayersTree({
   const [hoverEdge, setHoverEdge] = useState<{ id: string; pos: "before" | "after" } | null>(null);
   // Which column's delete is awaiting in-app confirm (NOT native window.confirm).
   const [confirmDeleteCol, setConfirmDeleteCol] = useState<string | null>(null);
+  // Which node (Section or component leaf) is awaiting in-app delete confirm.
+  const [confirmDeleteNode, setConfirmDeleteNode] = useState<string | null>(null);
 
   function nodeClass(id: string): string {
     return (
@@ -1115,18 +1130,83 @@ function LayersTree({
       : " ring-2 ring-primary ring-offset-1 [box-shadow:0_2px_0_var(--color-primary)]";
   }
 
+  // Trash button + in-app confirm popover for deleting a whole Section or a
+  // single component leaf (NOT native window.confirm). `kind` picks the copy.
+  function DeleteNodeControl({ id, kind }: { id: string; kind: "section" | "component" }) {
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setConfirmDeleteNode((cur) => (cur === id ? null : id));
+          }}
+          title={t("deleteNode.action")}
+          aria-label={t(kind === "section" ? "deleteNode.section" : "deleteNode.component")}
+          className="rounded p-1 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-danger"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-3.5 w-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 6h18M8 6V4h8v2m-9 0v14a2 2 0 002 2h6a2 2 0 002-2V6" />
+          </svg>
+        </button>
+        {confirmDeleteNode === id && (
+          <div className="absolute right-0 top-full z-10 mt-1 w-48 rounded-md border border-border bg-surface p-2 shadow-md">
+            <p className="mb-1.5 text-xs text-foreground">
+              {t(kind === "section" ? "deleteNode.confirmSection" : "deleteNode.confirmComponent")}
+            </p>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteNode(id);
+                  setConfirmDeleteNode(null);
+                }}
+                className="rounded bg-danger px-2 py-1 text-[11px] font-medium text-danger-foreground"
+              >
+                {t("deleteNode.action")}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmDeleteNode(null);
+                }}
+                className="rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-surface-muted"
+              >
+                {t("deleteNode.cancel")}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <ul className="mx-auto max-w-xl space-y-2">
       {blocks.map((b, i) => (
         <li key={b.id}>
-          <button
-            type="button"
-            onClick={() => onSelect(b.id)}
-            className={nodeClass(b.id) + edgeClass(b.id)}
-            {...reorderProps(b.id)}
-          >
-            {isSection(b) ? `${t("layoutSection")} ${i + 1}` : b.component}
-          </button>
+          <div className="flex items-start gap-1">
+            <button
+              type="button"
+              onClick={() => onSelect(b.id)}
+              className={nodeClass(b.id) + edgeClass(b.id)}
+              {...reorderProps(b.id)}
+            >
+              {isSection(b) ? `${t("layoutSection")} ${i + 1}` : b.component}
+            </button>
+            <DeleteNodeControl id={b.id} kind={isSection(b) ? "section" : "component"} />
+          </div>
           {isSection(b) && (
             // Lay columns as a ROW (grid), mirroring the real render in
             // tree.ts planSection: N equal tracks, or collapse → empty cols 0fr.
@@ -1239,14 +1319,17 @@ function LayersTree({
                       <ul className="space-y-1.5">
                         {col.children!.map((c) => (
                           <li key={c.id}>
-                            <button
-                              type="button"
-                              onClick={() => onSelect(c.id)}
-                              className={nodeClass(c.id) + edgeClass(c.id)}
-                              {...reorderProps(c.id)}
-                            >
-                              {c.component}
-                            </button>
+                            <div className="flex items-start gap-1">
+                              <button
+                                type="button"
+                                onClick={() => onSelect(c.id)}
+                                className={nodeClass(c.id) + edgeClass(c.id)}
+                                {...reorderProps(c.id)}
+                              >
+                                {c.component}
+                              </button>
+                              <DeleteNodeControl id={c.id} kind="component" />
+                            </div>
                           </li>
                         ))}
                       </ul>

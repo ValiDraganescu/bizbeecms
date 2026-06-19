@@ -25,6 +25,7 @@ import {
   moveBlock,
   parsePropsSchema,
   removeBlock,
+  removeNode,
   setLocalizedProp,
   validateBlockProps,
   validateBlocks,
@@ -250,6 +251,65 @@ test("deleteColumn refuses to delete the only column (no-op)", () => {
   const cols = after[0].children.filter((c) => c.component === "__section_column__");
   assert.equal(cols.length, 1, "last column is NOT deleted");
   assert.equal(cols[0].children[0].component, "Hero", "content untouched");
+});
+
+test("removeNode deletes a whole Section incl. its columns + components", () => {
+  // Two Sections; the first has a Hero + Cta across two columns. Removing the
+  // first Section drops everything inside it; the second Section is untouched.
+  let blocks = addSection([]);
+  const s1 = blocks[0].id;
+  blocks = setSectionColumns(blocks, s1, 2);
+  blocks = addComponentToColumn(blocks, s1, 0, "Hero");
+  blocks = addComponentToColumn(blocks, s1, 1, "Cta");
+  blocks = addSection(blocks);
+  const s2 = blocks[1].id;
+  blocks = addComponentToColumn(blocks, s2, 0, "Gallery");
+
+  const after = removeNode(blocks, s1);
+  assert.equal(after.length, 1, "only the second Section remains");
+  assert.equal(after[0].id, s2);
+  const json = JSON.stringify(after);
+  assert.ok(!json.includes('"Hero"') && !json.includes('"Cta"'), "section's components gone");
+  assert.ok(json.includes('"Gallery"'), "other Section's content kept");
+});
+
+test("removeNode deletes a single nested component leaf, leaving the rest", () => {
+  let blocks = addSection([]);
+  const s1 = blocks[0].id;
+  blocks = addComponentToColumn(blocks, s1, 0, "Hero");
+  blocks = addComponentToColumn(blocks, s1, 0, "Cta");
+  const col = blocks[0].children.find((c) => c.component === "__section_column__");
+  const heroId = col.children[0].id;
+
+  const after = removeNode(blocks, heroId);
+  const colAfter = after[0].children.find((c) => c.component === "__section_column__");
+  assert.equal(colAfter.children.length, 1, "one component removed, one left");
+  assert.equal(colAfter.children[0].component, "Cta", "the right leaf survived");
+});
+
+test("removeNode is a no-op for a missing id (immutable, structurally equal)", () => {
+  let blocks = addSection([]);
+  blocks = addComponentToColumn(blocks, blocks[0].id, 0, "Hero");
+  const after = removeNode(blocks, "does-not-exist");
+  assert.deepEqual(after, blocks, "tree unchanged when id absent");
+});
+
+test("pageBuilder.deleteNode keys parity + non-empty across EN/FI/ET", () => {
+  const cats = { en: load("en"), fi: load("fi"), et: load("et") };
+  for (const [l, cat] of Object.entries(cats)) {
+    assert.ok(cat.pageBuilder?.deleteNode, `${l}.json missing pageBuilder.deleteNode`);
+  }
+  const en = keys(cats.en.pageBuilder.deleteNode).sort();
+  assert.ok(en.length > 0);
+  for (const l of ["fi", "et"]) {
+    assert.deepEqual(keys(cats[l].pageBuilder.deleteNode).sort(), en, `${l} deleteNode keys differ`);
+  }
+  for (const [l, cat] of Object.entries(cats)) {
+    for (const k of keys(cat.pageBuilder.deleteNode)) {
+      const v = k.split(".").reduce((o, p) => o[p], cat.pageBuilder.deleteNode);
+      assert.ok(typeof v === "string" && v.trim() !== "", `${l}: deleteNode.${k} empty`);
+    }
+  }
 });
 
 test("sectionGridCols collapse behavior shrinks empty columns to 0fr", () => {

@@ -315,3 +315,6 @@ Read every line before working. Each entry was learned the hard way by a previou
   `sectionColumns(b).length > 1`, and `onDeleteColumn` clears `selectedBlockId` if it was the deleted column.
   In-app confirm = `confirmDeleteCol` state in `LayersTree` (inline Delete/Cancel row, the PageSettings
   pattern — NOT native window.confirm). i18n keys live under `pageBuilder.deleteColumn.{action,confirm,cancel}`.
+
+- `removeNode` in page-blocks.ts is now EXPORTED (pure, nested-safe, immutable) — reuse it for any
+  Layers-tree deletion. It deletes a whole subtree (Section → its columns+components) or a single leaf.

@@ -396,6 +396,14 @@
       "confirm": "Delete this column and its components?",
       "cancel": "Cancel"
     },
+    "deleteNode": {
+      "action": "Delete",
+      "section": "Delete section",
+      "component": "Delete component",
+      "confirmSection": "Delete this section and everything in it?",
+      "confirmComponent": "Delete this component?",
+      "cancel": "Cancel"
+    },
     "dropComponentHint": "Drop a component here",
     "componentNoProps": "This component has no configurable properties.",
     "localePickerLabel": "Editing language",
