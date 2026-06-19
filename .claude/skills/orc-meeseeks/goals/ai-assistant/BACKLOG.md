@@ -1,0 +1,40 @@
+# Backlog — ai-assistant
+Task states: TODO | DOING | DONE | BLOCKED.
+
+## Bugs
+(human-reported bugs land here, newest at top; they outrank everything)
+
+## Tasks
+> ASSISTANT = page-aware Intercom widget over the EXISTING chat backend. Reference: aicms
+> `src/modules/admin-chat/` (`chat_widget.tsx`, `debug_panel.tsx`, `lib/chat/{tool_scopes,assemble_prompt,
+> tool_executor,chat_tools}.ts`). Read CAVEATS for what bizbee already has + tool portability. The model
+> transport is the binding-adapters REST-`Ai` task — this goal consumes it, doesn't build it.
+
+- TODO: **Slice 1 — Intercom-style chat widget shell (replace/augment the full-page assistant).** Build a
+  floating bubble (bottom-right, fixed) in the CMS admin layout that opens a compact chat panel over any
+  page; open/close/minimize; reuse the EXISTING chat transport (`app/api/chat/route.ts` + the SSE client in
+  `lib/chat/client-sse.ts`) — do NOT fork a new chat pipeline. Messages list + input + send, streaming
+  replies. Match the PM/CMS design system (purpose tokens). EN/FI/ET for the widget chrome. LAYOUT/transport
+  only this slice — page-awareness, debug, history, model-picker are later slices. Gate: CMS tsc + opennext
+  build green; regen PM cms-bundle.
+- TODO: **Slice 2 — page-awareness: per-page system prompt + scoped tools.** Port aicms
+  `lib/chat/tool_scopes.ts`: a `detectAdminContext(url)` (strip `/<locale>/` prefix, read the segment after
+  `admin` → page-builder | components | pages | settings | general), a per-context prompt addition, and a
+  per-context tool subset. The widget sends its current page context (or URL) with each request; the chat
+  route assembles `buildSystemPrompt` + the context prompt and exposes only that context's tools. Pure
+  helpers (`detectAdminContext`, `toolsForContext`, `contextPrompt`) with node tests. ONLY wire contexts
+  whose tools already have backends (see CAVEATS — start with what exists: components, pages, settings).
+  Gate: CMS tsc + opennext build green; regen PM cms-bundle. EN/FI/ET.
+- TODO: **Slice 3 — port the missing CMS-structural tools (one PR's worth).** Add the tools bizbee lacks
+  but has backends for, so the scoped contexts are useful: `update_page_blocks`, `list_pages`, `get_page`,
+  `list_builtin_types` (page-builder); `update_component`, `get_component`, `list_components` (components);
+  `get_brand_identity`/`update_brand_identity`, `get_theme`/`update_theme`, `list_locales` (settings).
+  Each tool calls the EXISTING store/REST (reuse page-store/component-store/settings-store; do NOT fork
+  data paths). Skip any tool whose backend doesn't exist yet (note it). Add a node test per new tool's
+  arg-validation/execution shape (mock the store). Gate: CMS tsc + opennext build green; regen PM cms-bundle.
+- TODO: **Slice 4 — debug panel + model picker + conversation history.** Widget gets: a DEBUG view showing
+  the assembled system prompt + the active tool list for the current context (aicms `debug_panel.tsx`); a
+  MODEL PICKER (the model list source — confirm whether to expose Cloudflare AI / gateway models; coordinate
+  with the binding-adapters REST task for the model id list); and per-Site conversation HISTORY (list past
+  threads, open/delete — pick a store: D1 table or KV; the simplest that fits). Pure helpers tested; UI
+  localized EN/FI/ET. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
