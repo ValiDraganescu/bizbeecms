@@ -81,6 +81,8 @@ export const page = sqliteTable(
     // Per-locale SEO as JSON maps, e.g. { "en": "Welcome", "fi": "Tervetuloa" }.
     metaTitle: text("meta_title").notNull().default("{}"),
     metaDescription: text("meta_description").notNull().default("{}"),
+    // Per-locale OpenGraph image URL (R2 asset url), e.g. { "en": "https://…/x.png" }.
+    metaImage: text("meta_image").notNull().default("{}"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

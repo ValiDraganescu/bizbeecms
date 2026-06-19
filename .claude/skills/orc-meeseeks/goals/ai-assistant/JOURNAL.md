@@ -107,3 +107,37 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/chat/route.ts (imports+dispatch+handlers), CMS/src/lib/chat/tool-scopes.ts
   (KNOWN_TOOL_NAMES + scopes + prompts), CMS/scripts/tool-scopes.test.mjs (assertions),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-19 20:39 — Slice 3 (part 2): write tools (update_*) + list_builtin_types
+- **Status:** DONE
+- **What I did:** Gave the assistant the UPDATE half of discovery — each gated by the
+  SAME validator/normalizer create_* uses (no shortcuts):
+  - New PURE module `CMS/src/lib/chat/write-tools.ts` (node-testable, no @/): 5 tool schemas
+    (`update_component`, `update_page_blocks`, `update_brand_identity`, `update_theme`,
+    `list_builtin_types`) + pure helpers `builtinBlockTypes()` (exposes only `Section`, hides
+    `__section_column__`), `splitThemeArgs(args)` (keeps object light/dark, flags presence),
+    `coerceIdentityArg(args)`.
+  - Wired `api/chat/route.ts`: imported the 5 schemas + helpers + `setPageBlocks`,
+    `setSiteIdentity`/`setThemeOverrides`/`setThemeOverridesDark`, and `validateBlocks`
+    (lib/pages/page-blocks). Added all 5 to `TOOL_BY_NAME`, 5 dispatch branches, and handlers:
+    update_component → `validateComponentArtifact` + `upsertComponent` (same name updates in
+    place); update_page_blocks → `coerceIdArg(id)` + `validateBlocks` + `missingComponents`
+    check + `setPageBlocks` (edits BLOCKS only, never meta); update_brand_identity →
+    `coerceIdentityArg` + `setSiteIdentity` (normalizes = trust gate); update_theme →
+    `splitThemeArgs` + `setThemeOverrides[Dark]` (normalize to known tokens + safe colors =
+    trust gate; ≥1 of light/dark required); list_builtin_types → static `builtinBlockTypes()`.
+    All handlers ok:false on bad input, never throw into the stream.
+  - Registered in `tool-scopes.ts`: added all 5 to `KNOWN_TOOL_NAMES`; page-builder gained
+    update_component/update_page_blocks/list_builtin_types; components gained update_component;
+    pages gained update_page_blocks/list_builtin_types; settings gained update_brand_identity/
+    update_theme. Updated the per-context prompts ("get_* first, then update_* — replaces, not
+    merges").
+- **Verified:** `node --test scripts/write-tools.test.mjs scripts/tool-scopes.test.mjs
+  scripts/read-tools.test.mjs` 17/17 pass. `tsc --noEmit` clean. `opennextjs-cloudflare build`
+  green. Regenerated PM cms-bundle + selfcheck passed (only the standing static-assets
+  live-deploy warning). NOT verified (HITL): live model calling these tools + actual D1 writes
+  need a real AI binding + Site + browser.
+- **Files:** CMS/src/lib/chat/write-tools.ts (new), CMS/scripts/write-tools.test.mjs (new),
+  CMS/src/app/api/chat/route.ts (imports+dispatch+handlers), CMS/src/lib/chat/tool-scopes.ts
+  (KNOWN_TOOL_NAMES + scopes + prompts), CMS/scripts/tool-scopes.test.mjs (assertions),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).

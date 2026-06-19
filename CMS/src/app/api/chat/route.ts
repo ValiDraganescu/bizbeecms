@@ -48,6 +48,17 @@ import {
   formatPageList,
 } from "@/lib/chat/read-tools";
 import {
+  UPDATE_COMPONENT_TOOL,
+  UPDATE_PAGE_BLOCKS_TOOL,
+  UPDATE_BRAND_IDENTITY_TOOL,
+  UPDATE_THEME_TOOL,
+  LIST_BUILTIN_TYPES_TOOL,
+  builtinBlockTypes,
+  splitThemeArgs,
+  coerceIdentityArg,
+} from "@/lib/chat/write-tools";
+import { validateBlocks } from "@/lib/pages/page-blocks";
+import {
   detectAdminContext,
   isAdminContext,
   toolsForContext,
@@ -61,13 +72,22 @@ import {
   listComponents,
   getComponentByName,
 } from "@/db/component-store";
-import { missingComponents, upsertPage, listPages, getPageById } from "@/db/page-store";
+import {
+  missingComponents,
+  upsertPage,
+  listPages,
+  getPageById,
+  setPageBlocks,
+} from "@/db/page-store";
 import { applyTranslation } from "@/db/translate-store";
 import {
   getContentLocales,
   getSiteIdentity,
   getThemeOverrides,
   getThemeOverridesDark,
+  setSiteIdentity,
+  setThemeOverrides,
+  setThemeOverridesDark,
 } from "@/db/settings-store";
 import { listAssets } from "@/db/asset-store";
 import { buildSystemPrompt } from "@/lib/settings/site-settings";
@@ -95,6 +115,11 @@ const TOOL_BY_NAME: Record<ToolName, unknown> = {
   list_locales: LIST_LOCALES_TOOL,
   get_brand_identity: GET_BRAND_IDENTITY_TOOL,
   get_theme: GET_THEME_TOOL,
+  list_builtin_types: LIST_BUILTIN_TYPES_TOOL,
+  update_component: UPDATE_COMPONENT_TOOL,
+  update_page_blocks: UPDATE_PAGE_BLOCKS_TOOL,
+  update_brand_identity: UPDATE_BRAND_IDENTITY_TOOL,
+  update_theme: UPDATE_THEME_TOOL,
 };
 
 /** Resolve the context's tool-name list to the actual tool objects. */
@@ -255,6 +280,16 @@ async function runTools(
         await handleGetBrandIdentity(emit);
       } else if (call.name === GET_THEME_TOOL.function.name) {
         await handleGetTheme(emit);
+      } else if (call.name === LIST_BUILTIN_TYPES_TOOL.function.name) {
+        emit({ name: call.name, ok: true, builtins: builtinBlockTypes() });
+      } else if (call.name === UPDATE_COMPONENT_TOOL.function.name) {
+        await handleUpdateComponent(call.args, emit);
+      } else if (call.name === UPDATE_PAGE_BLOCKS_TOOL.function.name) {
+        await handleUpdatePageBlocks(call.args, emit);
+      } else if (call.name === UPDATE_BRAND_IDENTITY_TOOL.function.name) {
+        await handleUpdateBrandIdentity(call.args, emit);
+      } else if (call.name === UPDATE_THEME_TOOL.function.name) {
+        await handleUpdateTheme(call.args, emit);
       } else {
         emit({ name: call.name, ok: false, errors: [`unknown tool: ${call.name}`] });
       }
@@ -454,5 +489,123 @@ async function handleGetTheme(emit: (d: Record<string, unknown>) => void): Promi
     emit({ name, ok: true, theme: { light, dark } });
   } catch (err) {
     emit({ name, ok: false, errors: [`failed to get theme: ${(err as Error).message}`] });
+  }
+}
+
+// ── Slice 3 part 2: write tools (untrusted artifacts → validate like create_*) ─
+
+/**
+ * Update an existing component: same UNTRUSTED-artifact validation as
+ * create_component (upsertComponent updates in place by name), reported under the
+ * update_component name so the model/UI distinguishes intent.
+ */
+async function handleUpdateComponent(
+  args: unknown,
+  emit: (data: Record<string, unknown>) => void,
+): Promise<void> {
+  const name = UPDATE_COMPONENT_TOOL.function.name;
+  const valid = validateComponentArtifact(args);
+  if (!valid.ok) {
+    emit({ name, ok: false, errors: valid.errors });
+    return;
+  }
+  try {
+    const res = await upsertComponent(valid.artifact);
+    emit({ name, ok: true, action: res.action, component: res.name });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to save component: ${(err as Error).message}`] });
+  }
+}
+
+/**
+ * Replace an existing page's block tree (NOT its metadata). The block tree is
+ * untrusted → validate its shape with the C3 `validateBlocks` gate (same one the
+ * visual editor uses), verify referenced components exist, then setPageBlocks.
+ */
+async function handleUpdatePageBlocks(
+  args: unknown,
+  emit: (data: Record<string, unknown>) => void,
+): Promise<void> {
+  const name = UPDATE_PAGE_BLOCKS_TOOL.function.name;
+  const id = coerceIdArg(args, "id");
+  if (!id) {
+    emit({ name, ok: false, errors: ["id is required (use list_pages/get_page to find it)"] });
+    return;
+  }
+  const blocksArg =
+    typeof args === "object" && args !== null
+      ? (args as Record<string, unknown>).blocks
+      : undefined;
+  const valid = validateBlocks(blocksArg);
+  if (!valid.ok) {
+    emit({ name, ok: false, errors: valid.errors });
+    return;
+  }
+  try {
+    const missing = await missingComponents(valid.componentNames);
+    if (missing.length > 0) {
+      emit({
+        name,
+        ok: false,
+        errors: [`unknown components (create them first): ${missing.join(", ")}`],
+      });
+      return;
+    }
+    const res = await setPageBlocks(id, valid.blocks);
+    if (!res.ok) {
+      emit({ name, ok: false, errors: res.errors });
+      return;
+    }
+    emit({ name, ok: true, action: "updated", page: id });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to update page blocks: ${(err as Error).message}`] });
+  }
+}
+
+/**
+ * Update the Site's brand identity. setSiteIdentity normalizes (trims, drops
+ * unknown keys, length-bounds) — it IS the trust gate for this untrusted object;
+ * we only ensure an identity object was supplied. Returns the normalized result.
+ */
+async function handleUpdateBrandIdentity(
+  args: unknown,
+  emit: (data: Record<string, unknown>) => void,
+): Promise<void> {
+  const name = UPDATE_BRAND_IDENTITY_TOOL.function.name;
+  const identity = coerceIdentityArg(args);
+  if (identity === undefined) {
+    emit({ name, ok: false, errors: ["identity must be an object (use get_brand_identity first)"] });
+    return;
+  }
+  try {
+    const saved = await setSiteIdentity(identity);
+    emit({ name, ok: true, action: "updated", identity: saved });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to save brand identity: ${(err as Error).message}`] });
+  }
+}
+
+/**
+ * Update the Site's theme overrides (light and/or dark). setThemeOverrides[Dark]
+ * normalize to known tokens + safe colors — the trust gate for the untrusted
+ * token→color maps. At least one of light/dark must be supplied.
+ */
+async function handleUpdateTheme(
+  args: unknown,
+  emit: (data: Record<string, unknown>) => void,
+): Promise<void> {
+  const name = UPDATE_THEME_TOOL.function.name;
+  const { light, dark, any } = splitThemeArgs(args);
+  if (!any) {
+    emit({ name, ok: false, errors: ["supply 'light' and/or 'dark' as a token→color object"] });
+    return;
+  }
+  try {
+    const result: Record<string, unknown> = {};
+    if (light !== undefined) result.light = await setThemeOverrides(light);
+    if (dark !== undefined) result.dark = await setThemeOverridesDark(dark);
+    emit({ name, ok: true, action: "updated", theme: result });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to save theme: ${(err as Error).message}`] });
   }
 }

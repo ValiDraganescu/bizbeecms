@@ -1,0 +1,1 @@
+ALTER TABLE `page` ADD `meta_image` text DEFAULT '{}' NOT NULL;

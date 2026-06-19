@@ -1,30 +1,37 @@
 # Note to the next Meeseeks (ai-assistant)
 
-DONE so far: Slice 1 (Intercom widget) + Slice 2 (page-awareness) + Slice 3 PART 1 (read-only
-discovery tools). The model can now DISCOVER existing site structure before editing:
-`list_components`, `get_component`, `list_pages`, `get_page`, `list_locales`, `get_brand_identity`,
-`get_theme` — all in `CMS/src/lib/chat/read-tools.ts` (pure: schemas + `coerceIdArg`/`formatComponentList`/
-`formatPageList`), dispatched in `api/chat/route.ts`, registered in `tool-scopes.ts`. Each is backed by
-an EXISTING store (zero corruption risk). Settings context now reads brand/theme/locales.
+DONE so far: Slice 1 (Intercom widget) + Slice 2 (page-awareness) + Slice 3 part 1 (read/discovery
+tools) + Slice 3 part 2 (WRITE tools). The assistant now has the full CRUD tool catalog:
+- READ: list_components, get_component, list_pages, get_page, list_locales, get_brand_identity,
+  get_theme, list_builtin_types.
+- WRITE: create_component/update_component, create_page/update_page_blocks, update_brand_identity,
+  update_theme, translate, list_assets.
+All in `CMS/src/lib/chat/{read-tools,write-tools,*-tool}.ts`, dispatched in `api/chat/route.ts`,
+scoped per page in `lib/chat/tool-scopes.ts`. Every write is gated by the same validator/normalizer
+its create_* sibling uses. Gates all green; PM cms-bundle regenerated.
 
-PICK NEXT: **Slice 3 part 2 — the WRITE tools.** These carry UNTRUSTED artifacts → validate with the
-same rigor as create_component/create_page (do NOT skip validation):
-  - `update_component` — reuse `validateComponentArtifact` + `upsertComponent` (same-name already
-    updates; mostly an alias with an "exists" check, or just reuse create_component's path).
-  - `update_page_blocks` — `setPageBlocks(pageId, blocks)`; block tree untrusted → validate like
-    create_page does (reuse page-tool.ts's block validator).
-  - `update_brand_identity` — `setSiteIdentity(unknown)` (normalizes internally — still shape-check).
-  - `update_theme` — `setThemeOverrides`/`setThemeOverridesDark` (normalize to known tokens + safe
-    colors = the trust gate; pass the model's `{token:color}` map straight in).
-  - `list_builtin_types` — ONLY if a block-type/builtin registry exists (CHECK `listComponentPalette`
-    in page-store + any builtin registry; skip + note if absent).
-For EACH: validator + route handler (ok:false on bad, never throw) + register in `KNOWN_TOOL_NAMES`,
-`TOOLS_BY_CONTEXT`, and the route's `TOOL_BY_NAME` — ALL THREE or it's a dead tool. Node test per tool's
-arg-validation (mock the store).
+PICK NEXT: **Slice 4 — debug panel + model picker + per-Site conversation history.** (The last
+backlog item; the tool catalog is now complete.) Three independent sub-slices — do ONE per run, add
+the other two as fresh TODOs and take the first:
+  1. **Debug view** (smallest, do first): a toggle in the chat widget showing the ASSEMBLED system
+     prompt + the ACTIVE tool list for the current context. Both are already computed server-side
+     (`withSystemPrompt` + `toolsForRequest` in route.ts). Easiest path: a tiny read endpoint
+     (e.g. `GET /api/chat/debug?context=...` → `{systemPrompt, tools:[names]}`) OR compute the
+     tool-name list client-side via `toolsForContext(detectAdminContext(pathname))` (pure, already
+     imported in the widget) + the prompt via the endpoint. Model: aicms `debug_panel.tsx`.
+     Localize panel chrome EN/FI/ET.
+  2. **Model picker:** confirm the model-id list source FIRST (coordinate with binding-adapters'
+     REST `Ai` task — DEFAULT_MODEL is `@cf/meta/llama-3.1-8b-instruct` in route.ts; is there a
+     curated CF/gateway model list to expose?). Widget sends a chosen `model` in the POST body;
+     thread an optional VALIDATED `model` through (untrusted → allowlist → default DEFAULT_MODEL).
+     Don't expose arbitrary strings.
+  3. **Per-Site conversation history:** list past threads, open/delete. Pick the SIMPLEST store —
+     a D1 table (Site already scopes the binding) is likely cleanest; KV if you prefer. Pure
+     helpers tested; UI localized.
 
-WATCH OUT (read CAVEATS): stores live at `CMS/src/db/` (`@/db/*` alias); pure tool modules NEVER import
-stores/@/. tool-scopes speaks NAMES, route owns OBJECTS. `usePathname` has NO locale prefix.
-`getPageById` returns metadata only (no blocks) — for block editing read blocks via `getPageBlocks`.
-Always: tsc + opennext build (dev server OFF first) + regen PM cms-bundle on any CMS source change.
-
-Then **Slice 4** (debug panel + model picker + per-Site conversation history) remains.
+WATCH OUT (read CAVEATS): stores at `CMS/src/db/` (`@/db/*`); pure tool modules NEVER import stores/@/.
+tool-scopes speaks NAMES, route owns OBJECTS (TOOL_BY_NAME) — register a new tool in all THREE
+(KNOWN_TOOL_NAMES + TOOLS_BY_CONTEXT + TOOL_BY_NAME) or it's dead. `update_page_blocks` uses
+`validateBlocks` (page-blocks), edits blocks ONLY. `setSiteIdentity`/`setThemeOverrides` ARE the trust
+gate (take unknown, normalize). Always: tsc + opennext build (dev server OFF first) + regen PM
+cms-bundle on any CMS source change.

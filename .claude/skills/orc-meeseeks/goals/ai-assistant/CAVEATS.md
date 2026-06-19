@@ -80,3 +80,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   `getThemeOverridesDark`. For WRITE tools (part 2): page-store `setPageBlocks`/`upsertPageMeta`,
   component-store `upsertComponent`, settings-store `setSiteIdentity` (normalizes)/`setThemeOverrides[Dark]`
   (normalize to known tokens + safe colors = the trust gate, pass model map straight in).
+
+- Slice 3 part 2 (write tools) DONE: `lib/chat/write-tools.ts` (pure: 5 schemas + builtinBlockTypes/
+  splitThemeArgs/coerceIdentityArg). `update_page_blocks` edits ONLY the block tree via `setPageBlocks`
+  (NEVER metadata — that's create_page/page-meta). It validates the tree with `validateBlocks`
+  (lib/pages/page-blocks) NOT `validatePageInput` — `validateBlocks` already drops the reserved
+  `Section`/`__section_column__` names before the `missingComponents` check, so a page using Sections
+  won't 409. `update_component` is `create_component`'s validate+upsert under a new name (upsert updates
+  in place by name). `setSiteIdentity`/`setThemeOverrides[Dark]` take `unknown` and ARE the trust gate
+  (normalize internally) — the route only checks an object was supplied, doesn't re-validate the shape.
+  `list_builtin_types` exposes ONLY `Section`; `__section_column__` is Section-internal — never expose it.

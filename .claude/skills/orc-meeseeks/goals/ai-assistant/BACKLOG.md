@@ -42,15 +42,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   existing store (listComponents/getComponentByName/listPages/getPageById/getContentLocales/
   getSiteIdentity/getThemeOverrides[Dark]). Settings context now reads brand/theme/locales; page-builder +
   components + pages contexts gained discovery. Node tests (read-tools 4 + tool-scopes refreshed). Gates green.
-- TODO: **Slice 3 part 2 — the WRITE tools (untrusted artifacts, validate like create_*).**
-  `update_component` (reuse `upsertComponent` + `validateComponentArtifact` — same name updates already),
-  `update_page_blocks` (`setPageBlocks` — validate the block tree like create_page does; check the block
-  shape validator), `update_brand_identity` (`setSiteIdentity` — it normalizes; still validate shape),
-  `update_theme` (`setThemeOverrides`/`setThemeOverridesDark` — they normalize to known tokens + safe
-  colors; pass the model's map straight in, they're the trust gate). Also `list_builtin_types` IF a
-  builtin/block-type registry exists (CHECK `listComponentPalette` / page-store — verify before exposing).
-  Each: validator + route handler + register in KNOWN_TOOL_NAMES/TOOLS_BY_CONTEXT/TOOL_BY_NAME (all three).
-  Node test per tool's arg-validation. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
+- DONE: **Slice 3 part 2 — the WRITE tools (untrusted artifacts, validate like create_*).**
+  Added `update_component` (`validateComponentArtifact`+`upsertComponent`), `update_page_blocks`
+  (`validateBlocks`+`missingComponents`+`setPageBlocks` — blocks only, never meta),
+  `update_brand_identity` (`setSiteIdentity` normalizes = trust gate), `update_theme`
+  (`setThemeOverrides[Dark]` normalize tokens+colors = trust gate), `list_builtin_types` (static —
+  only `Section` exposed; `__section_column__` stays internal). New pure `lib/chat/write-tools.ts`
+  (schemas + builtinBlockTypes/splitThemeArgs/coerceIdentityArg) + route dispatch/handlers +
+  tool-scopes registration (KNOWN_TOOL_NAMES + scopes + TOOL_BY_NAME — all three). Node tests
+  (write-tools 5 + tool-scopes refreshed). Gates green.
 - TODO: **Slice 4 — debug panel + model picker + conversation history.** Widget gets: a DEBUG view showing
   the assembled system prompt + the active tool list for the current context (aicms `debug_panel.tsx`); a
   MODEL PICKER (the model list source — confirm whether to expose Cloudflare AI / gateway models; coordinate

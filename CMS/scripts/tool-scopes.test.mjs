@@ -80,6 +80,13 @@ test("toolsForContext scopes per page (write + Slice 3 read tools)", () => {
     assert.ok(settings.has(n), `settings should expose ${n}`);
   }
   assert.ok(!settings.has("create_component"), "settings must NOT author components");
+  // Slice 3 part 2: settings can update brand/theme; page-builder can update comp/blocks.
+  for (const n of ["update_brand_identity", "update_theme"]) {
+    assert.ok(settings.has(n), `settings should expose ${n}`);
+  }
+  for (const n of ["update_component", "update_page_blocks", "list_builtin_types"]) {
+    assert.ok(pb.has(n), `page-builder should expose ${n}`);
+  }
   // general gets the full catalog.
   assert.deepEqual([...toolsForContext("general")].sort(), [...KNOWN_TOOL_NAMES].sort());
 });

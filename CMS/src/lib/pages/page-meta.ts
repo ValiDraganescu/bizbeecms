@@ -20,6 +20,8 @@ export interface PageMetaInput {
   publishStatus: PublishStatus;
   metaTitle: Record<string, string>;
   metaDescription: Record<string, string>;
+  /** Per-locale OpenGraph image URL (R2 asset url). */
+  metaImage: Record<string, string>;
 }
 
 // Same slug grammar as the create_page tool: a lowercase URL segment.
@@ -75,6 +77,8 @@ export function validatePageMeta(
   if (metaDescription === undefined) {
     errors.push("metaDescription must be a map of locale → string");
   }
+  const metaImage = coerceStringMap(a.metaImage);
+  if (metaImage === undefined) errors.push("metaImage must be a map of locale → string");
 
   if (errors.length > 0) return { ok: false, errors };
   return {
@@ -85,6 +89,7 @@ export function validatePageMeta(
       publishStatus,
       metaTitle: metaTitle as Record<string, string>,
       metaDescription: metaDescription as Record<string, string>,
+      metaImage: metaImage as Record<string, string>,
     },
   };
 }
