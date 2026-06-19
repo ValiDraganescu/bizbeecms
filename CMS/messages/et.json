@@ -192,7 +192,7 @@
     "imported": "Imporditud „{name}”.",
     "updated": "Uuendatud „{name}”.",
     "kitsTitle": "Stardipaketid",
-    "kitsHint": "Paigalda valmis komplekt komponente ühe klõpsuga. Blogipakett lisab postituse päise, sisu, autorikaardi ja postituste loendi; maandumispakett lisab hero-ploki, omaduste ruudustiku, CTA-riba, soovituse ja jaluse; dokumentatsioonipakett lisab päise, märkuse, koodiploki, sammude loendi ja API-parameetri; portfooliopakett lisab hero-ploki, projektikaardi, oskuste loendi, töö ajajoone ja kontaktikutse.",
+    "kitsHint": "Paigalda valmis komplekt komponente ühe klõpsuga. Blogipakett lisab postituse päise, sisu, autorikaardi ja postituste loendi; maandumispakett lisab hero-ploki, omaduste ruudustiku, CTA-riba, soovituse ja jaluse; dokumentatsioonipakett lisab päise, märkuse, koodiploki, sammude loendi ja API-parameetri; portfooliopakett lisab hero-ploki, projektikaardi, oskuste loendi, töö ajajoone ja kontaktikutse; hinnapakett lisab sektsiooni päise, hinnaastme, omaduste rea, tootekaardi ja KKK-kirje.",
     "installBlogKit": "Paigalda blogipakett",
     "kitInstalled": "Blogipakett paigaldatud: {created} loodud, {updated} uuendatud.",
     "assetDepsTitle": "Meediasõltuvused",
@@ -210,7 +210,8 @@
     "applyingRebind": "Impordin uuesti…",
     "installLandingKit": "Paigalda maandumispakett",
     "installDocsKit": "Paigalda dokumentatsioonipakett",
-    "installPortfolioKit": "Paigalda portfooliopakett"
+    "installPortfolioKit": "Paigalda portfooliopakett",
+    "installPricingKit": "Paigalda hinnapakett"
   },
   "adminAuth": {
     "forbiddenTitle": "Juurdepääs keelatud",
