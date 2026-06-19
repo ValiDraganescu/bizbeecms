@@ -38,20 +38,12 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const host = request.headers.get("host")?.toLowerCase() ?? "";
 
-    // Per-Site CMS hostnames are <slug>.site.bizbeecms.com — the slug is encoded
-    // in the subdomain, so no HOST_MAP lookup is needed. A dedicated .site.*
-    // namespace (not a bare *.bizbeecms.com) so the route can't shadow our own
-    // one-level infra custom domains (manager/deployer/cf). Customer-owned custom
-    // hostnames (anything else) still resolve their Site via HOST_MAP KV.
-    const SITE_SUFFIX = ".site.bizbeecms.com";
-    let slug: string | null = null;
-    if (host.endsWith(SITE_SUFFIX)) {
-      const sub = host.slice(0, -SITE_SUFFIX.length);
-      // Only a single leftmost label is a Site slug; reject nested labels.
-      if (/^[a-z0-9][a-z0-9-]*$/.test(sub)) slug = sub;
-    } else {
-      slug = await env.HOST_MAP.get(host);
-    }
+    // Every host this router serves is a customer-owned custom hostname; the Site
+    // it maps to is looked up in HOST_MAP KV (written by the deployer on
+    // /attach-domain). Per-Site CMS deployments are reached directly on their
+    // own bizbeecms-cms-<slug>.workers.dev URL, NOT through this router (the
+    // `<slug>.site.bizbeecms.com` scheme was ruled out — needed a paid ACM cert).
+    const slug = await env.HOST_MAP.get(host);
     if (!slug) {
       return new Response("Unknown domain", { status: 404 });
     }

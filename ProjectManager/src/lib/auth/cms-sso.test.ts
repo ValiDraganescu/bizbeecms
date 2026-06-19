@@ -20,23 +20,18 @@ test("classifyCmsReturnUrl accepts our own zone", () => {
   assert.ok(r && "url" in r);
 });
 
-test("classifyCmsReturnUrl accepts <slug>.site.bizbeecms.com (per-Site custom-domains scheme, own-zone)", () => {
-  const r = classifyCmsReturnUrl("https://acme.site.bizbeecms.com/api/auth/sso-callback");
-  assert.ok(r && "url" in r);
-});
-
 test("classifyCmsReturnUrl accepts manager.bizbeecms.com (PM custom domain, own-zone)", () => {
   const r = classifyCmsReturnUrl("https://manager.bizbeecms.com/api/auth/sso-callback");
   assert.ok(r && "url" in r);
 });
 
 test("classifyCmsReturnUrl rejects a lookalike that only ends in our zone label (suffix-spoof)", () => {
-  // `acme.site.bizbeecms.com.evil.com` must NOT pass own-zone: the host ends in
+  // `manager.bizbeecms.com.evil.com` must NOT pass own-zone: the host ends in
   // `.evil.com`, not `.bizbeecms.com`, so it is treated as an unknown host.
   const r = classifyCmsReturnUrl(
-    "https://acme.site.bizbeecms.com.evil.com/api/auth/sso-callback",
+    "https://manager.bizbeecms.com.evil.com/api/auth/sso-callback",
   );
-  assert.deepEqual(r, { host: "acme.site.bizbeecms.com.evil.com" });
+  assert.deepEqual(r, { host: "manager.bizbeecms.com.evil.com" });
 });
 
 test("classifyCmsReturnUrl returns {host} for a plain workers.dev attacker host", () => {

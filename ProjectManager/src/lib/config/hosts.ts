@@ -21,22 +21,11 @@ export const CMS_WORKER_PREFIX = "bizbeecms-cms-";
 /** Our real registrable zone (NOT on the Public Suffix List). */
 export const ZONE_DOMAIN = "bizbeecms.com";
 
-/**
- * Per-Site CMS public hostname suffix: a Site deployed as worker
- * `bizbeecms-cms-<slug>` is served at `https://<slug>.site.bizbeecms.com`
- * (the router derives the slug from the leftmost subdomain label). A dedicated
- * `.site.*` namespace, NOT bare `<slug>.bizbeecms.com`: a one-level wildcard
- * route shadows our own infra custom domains (manager/deployer). Cost: the free
- * universal cert covers only `*.bizbeecms.com`, so `*.site.bizbeecms.com` needs
- * an Advanced Certificate Manager cert on the zone. Single source of truth so no
- * `.workers.dev` strings leak into user-facing links.
- */
-export const SITE_HOST_SUFFIX = `.site.${ZONE_DOMAIN}`;
-
-/** Public CMS URL for a Site slug: `https://<slug>.site.bizbeecms.com`. */
-export function siteUrlForSlug(slug: string): string {
-  return `https://${slug}${SITE_HOST_SUFFIX}`;
-}
+// NOTE: per-Site CMS deployments are served PERMANENTLY at their
+// `bizbeecms-cms-<slug>.workers.dev` URL (see worker-url.ts). The earlier
+// `<slug>.site.bizbeecms.com` scheme was removed (USER DECISION 2026-06-19): it
+// needed a paid Advanced Certificate Manager wildcard cert for `*.site.*`, which
+// is ruled out. Customer-owned custom domains still resolve via HOST_MAP + router.
 
 /** PM's stable custom domain. PM-internal links and injected PM_ORIGIN use it. */
 export const PM_ORIGIN = `https://manager.${ZONE_DOMAIN}`;

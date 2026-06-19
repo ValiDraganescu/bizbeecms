@@ -22,10 +22,7 @@
   "routes": [
     { "pattern": "*/*", "zone_name": "bizbeecms.com" },
     // Redundant under */* but kept explicit for clarity / if */* is ever removed.
-    { "pattern": "cf.bizbeecms.com/*", "zone_name": "bizbeecms.com" },
-    // Per-Site CMS at <slug>.site.bizbeecms.com — DORMANT (needs paid ACM cert for
-    // *.site.*; sites serve on workers.dev today). Slug from leftmost label.
-    { "pattern": "*.site.bizbeecms.com/*", "zone_name": "bizbeecms.com" }
+    { "pattern": "cf.bizbeecms.com/*", "zone_name": "bizbeecms.com" }
   ],
 
   "kv_namespaces": [

@@ -6,14 +6,16 @@ Move bizbeecms off `*.vali-draganescu88.workers.dev` and onto stable custom doma
 Target end-state:
 - **PM** runs at `manager.bizbeecms.com`
 - **Deployer** Worker runs at `deployer.bizbeecms.com`
-- **Per-site CMS** deployments are served at `<slug>.site.bizbeecms.com`
+- **Per-site CMS** deployments are served at their `bizbeecms-cms-<slug>.workers.dev` URL; **customer-owned custom domains** reach them via the router (HOST_MAP). (The `<slug>.site.bizbeecms.com` scheme was ruled out — USER DECISION 2026-06-19, below.)
 - **SSO keeps working** across all of the above (the nonce-handoff flow + host allowlist).
+
+> **USER DECISION 2026-06-19:** the `*.site.bizbeecms.com` wildcard cert (paid Advanced Certificate Manager) is NOT going to happen, so per-site CMS deployments stay PERMANENTLY on their `bizbeecms-cms-<slug>.workers.dev` URL. The dormant `.site.*` scaffolding (hosts.ts `siteUrlForSlug`/`SITE_HOST_SUFFIX`, the router `*.site.*` route + leftmost-label branch, the worker-url.ts "switch back" comment, the `.site.*`-acceptance SSO test) has been removed.
 
 ## What "good" looks like
 - PM reachable at `https://manager.bizbeecms.com`; `APP_ORIGIN` and all PM→PM/PM→CMS links use it.
 - Deployer reachable at `https://deployer.bizbeecms.com`; PM's `DEPLOYER_URL` points there.
-- A freshly deployed Site is reachable at `https://<slug>.site.bizbeecms.com` (not `bizbeecms-cms-<slug>.workers.dev`).
-- Logging into PM at `manager.bizbeecms.com` and opening a Site's CMS admin at `<slug>.site.bizbeecms.com` completes SSO end-to-end (nonce mint → redirect → exchange → validate), with the host allowlist accepting the new hosts and still rejecting attacker-controlled lookalikes.
+- A freshly deployed Site is reachable at `https://bizbeecms-cms-<slug>.workers.dev`; an operator-attached customer-owned custom domain resolves through the router (HOST_MAP).
+- Logging into PM at `manager.bizbeecms.com` and opening a Site's CMS admin completes SSO end-to-end (nonce mint → redirect → exchange → validate), with the host allowlist accepting the real hosts (own-account workers.dev CMS workers, `manager.*`, customer custom domains) and still rejecting attacker-controlled lookalikes.
 - Cloudflare-only: custom hostnames attached to the `bizbeecms.com` zone; no new non-CF infra.
 
 ## Grounding (verified 2026-06-19 — file:line)
