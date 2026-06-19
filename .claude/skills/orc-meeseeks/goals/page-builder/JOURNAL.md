@@ -694,3 +694,17 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/pages/page-blocks.ts, CMS/src/components/page-builder/page-builder-shell.tsx,
   CMS/src/lib/components/blog-kit.ts, CMS/scripts/page-blocks.test.mjs, CMS/scripts/blog-kit.test.mjs,
   CMS/scripts/{landing,docs,portfolio,pricing}-kit.test.mjs (vocab allowlist).
+
+## 2026-06-20 00:04 — Layers canvas full width
+- **Status:** DONE
+- **What I did:** Removed the narrow `mx-auto max-w-xl` constraint pinning the Layers section/column
+  tree to a centered column. The `LayersTree` root `<ul>` (page-builder-shell.tsx ~1328) is now just
+  `space-y-2` so it fills the full width of the Layers pane (the parent scroll `<div>` already supplies
+  the `p-6` gutter). Also dropped the matching `mx-auto max-w-xl` from the append-Section drop indicator
+  (~681) so the blue "drop to add Section" line spans the same full width. Section rows + COLUMN cards
+  widen to use the space (the column grid `gridTemplateColumns` was never constrained — only the wrapper).
+  Preview tab UNTOUCHED (its own iframe sizing reflects the real page).
+- **Verified:** `npx tsc --noEmit` no page-builder-shell errors; `npx opennextjs-cloudflare build` GREEN
+  (dev stopped, 3601 free). CSS-only change, no logic → no node test (ponytail). Broken-image hook finding
+  (L1492) is the pre-existing MetaImagePicker `<img src={value}>` false positive — untouched.
+- **Files:** CMS/src/components/page-builder/page-builder-shell.tsx

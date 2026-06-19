@@ -678,7 +678,7 @@ export function PageBuilderShell({
               )}
               {/* Drop indicator: a blue line where the new Section appends. */}
               {selected && layersDropActive && (
-                <div className="mx-auto mt-3 flex max-w-xl items-center gap-2">
+                <div className="mt-3 flex items-center gap-2">
                   <span className="h-0.5 flex-1 rounded bg-primary" />
                   <span className="text-xs font-medium text-primary">
                     {t("dropSectionHint")}
@@ -1325,7 +1325,7 @@ function LayersTree({
   }
 
   return (
-    <ul className="mx-auto max-w-xl space-y-2">
+    <ul className="space-y-2">
       {blocks.map((b, i) => (
         <li key={b.id}>
           <div className="flex items-start gap-1">

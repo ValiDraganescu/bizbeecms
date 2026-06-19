@@ -39,6 +39,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
   tsc + opennext build green.
 
 ## Tasks
+- DONE (2026-06-20 00:04): **Layers canvas FULL WIDTH.** Removed the `mx-auto max-w-xl` on the `LayersTree`
+  root `<ul>` (~1328) → now `space-y-2`, fills the pane (parent scroll div keeps the `p-6` gutter). Also
+  dropped `mx-auto max-w-xl` from the append-Section drop indicator (~681) to match. Section rows + COLUMN
+  cards widen; Preview tab untouched. No new strings. CSS-only (no test). tsc clean + opennext build green.
+  See JOURNAL 00:04.
 - DONE (2026-06-19 20:44): **SEO per-locale META IMAGE (OG image).** New `metaImage` JSON-map column on
   `page` (migration `0004_past_drax.sql`, mirrors meta_title) threaded through `validatePageMeta`/
   `buildSeoMetaBody` + `upsertPageMeta` (no fork). SEO form got `MetaImagePicker` (per-active-locale, browses
