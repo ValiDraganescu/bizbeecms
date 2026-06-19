@@ -95,6 +95,10 @@
       "warning": "Varoitus",
       "info": "Tieto",
       "danger": "Vaara"
+    },
+    "mode": {
+      "light": "Vaalea",
+      "dark": "Tumma"
     }
   },
   "media": {
@@ -346,6 +350,11 @@
     },
     "column": "Sarake",
     "dropComponentHint": "Pudota komponentti tähän",
-    "componentNoProps": "Tällä komponentilla ei ole muokattavia ominaisuuksia."
+    "componentNoProps": "Tällä komponentilla ei ole muokattavia ominaisuuksia.",
+    "previewTheme": {
+      "light": "Vaalea",
+      "system": "Järjestelmä",
+      "dark": "Tumma"
+    }
   }
 }

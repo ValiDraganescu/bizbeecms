@@ -95,6 +95,10 @@
       "warning": "Warning",
       "info": "Info",
       "danger": "Danger"
+    },
+    "mode": {
+      "light": "Light",
+      "dark": "Dark"
     }
   },
   "media": {
@@ -346,6 +350,11 @@
     },
     "column": "Column",
     "dropComponentHint": "Drop a component here",
-    "componentNoProps": "This component has no configurable properties."
+    "componentNoProps": "This component has no configurable properties.",
+    "previewTheme": {
+      "light": "Light",
+      "system": "System",
+      "dark": "Dark"
+    }
   }
 }

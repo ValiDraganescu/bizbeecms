@@ -218,3 +218,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   query — so a light override never stomps dark. Dark map persists under the `theme_overrides_dark` settings
   key (`get/setThemeOverridesDark`). If you add a dark-override EDITOR, write through `setThemeOverridesDark`,
   never reuse the light `setThemeOverrides` for it.
+
+- DARK-OVERRIDE EDITOR + PREVIEW TOGGLE DONE (2026-06-19). The theme editor (`theme-editor.tsx`) is now
+  two components: a thin `ThemeEditor` (the Light/Dark mode TAB) + a keyed `ModeEditor` (the actual body,
+  parametrized by `defaults: Record<ThemeToken,string>`, `mode:"light"|"dark"`, `showPresets:boolean`).
+  Switching tabs remounts ModeEditor (key=mode) so each mode's edit state is fresh from its own initial
+  overrides. Dark mode opens on `DARK_DEFAULT_THEME` (theme.ts — JS MIRROR of globals `[data-theme="dark"]`;
+  a `theme.test.ts` parity test parses the CSS and fails if they drift, so KEEP THEM IN SYNC when you touch
+  either). Storage stays sparse (diff-from-default). Presets are coordinated LIGHT palettes → `showPresets`
+  is false for dark (applying a light preset as dark overrides would be wrong). The API route branches on
+  `?mode=dark` → `get/setThemeOverridesDark`; light = no param. Don't add a second dark endpoint.
+- PREVIEW THEME TOGGLE: the builder preview iframe forces color mode via `/preview/<id>?theme=dark|light`;
+  the route wraps `<RenderedPage>` in `<div data-theme=...>` ONLY when the param is present (no param =
+  inherit root layout `data-theme="system"` = follows OS, the unchanged default). The shell's
+  `previewTheme` state is `"system"|"light"|"dark"`; "system" sends NO param. The iframe `key` includes
+  previewTheme so flipping it reloads. If you add per-Site dark overrides via the editor, they show in this
+  forced-dark preview because they scope to `[data-theme="dark"]` which the wrapper now sets.

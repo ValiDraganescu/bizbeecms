@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
+  DARK_DEFAULT_THEME,
   DEFAULT_THEME,
   THEME_PRESETS,
   THEME_TOKENS,
@@ -17,6 +20,39 @@ test("every DEFAULT_THEME value is a safe paintable color", () => {
     assert.ok(
       isSafeColorValue(DEFAULT_THEME[token]),
       `default ${token} = "${DEFAULT_THEME[token]}" is not a safe color`,
+    );
+  }
+});
+
+test("every DARK_DEFAULT_THEME value is a safe paintable color", () => {
+  for (const token of THEME_TOKENS) {
+    assert.ok(
+      isSafeColorValue(DARK_DEFAULT_THEME[token]),
+      `dark default ${token} = "${DARK_DEFAULT_THEME[token]}" is not a safe color`,
+    );
+  }
+});
+
+// The dark-override EDITOR opens on DARK_DEFAULT_THEME and stores diffs from it;
+// if it drifts from globals.css's [data-theme="dark"] block, "value === default"
+// (= no override) would be wrong and the editor would persist phantom overrides.
+test("DARK_DEFAULT_THEME mirrors globals.css [data-theme=\"dark\"]", () => {
+  const css = readFileSync(
+    fileURLToPath(new URL("../../app/globals.css", import.meta.url)),
+    "utf8",
+  );
+  // Grab the first `[data-theme="dark"] { … }` block's --color-* declarations.
+  const block = css.match(/\[data-theme="dark"\]\s*\{([^}]*)\}/);
+  assert.ok(block, "globals.css has no [data-theme=\"dark\"] block");
+  const fromCss: Record<string, string> = {};
+  for (const m of block![1].matchAll(/--color-([\w-]+):\s*([^;]+);/g)) {
+    fromCss[m[1]] = m[2].trim();
+  }
+  for (const token of THEME_TOKENS) {
+    assert.equal(
+      DARK_DEFAULT_THEME[token],
+      fromCss[token],
+      `dark default ${token} drifted from globals.css`,
     );
   }
 });

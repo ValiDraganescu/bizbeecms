@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { SettingsNav } from "@/components/settings/settings-nav";
 import { ThemeEditor } from "@/components/settings/theme-editor";
-import { getThemeOverrides } from "@/db/settings-store";
+import { getThemeOverrides, getThemeOverridesDark } from "@/db/settings-store";
 import { emptyThemeOverrides } from "@/lib/render/theme";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +22,12 @@ export default async function ThemePage() {
   // No D1 binding offline → fall back to empty overrides so the page still
   // renders (live data needs a real binding; see CAVEATS / HITL).
   let initial = emptyThemeOverrides();
+  let initialDark = emptyThemeOverrides();
   try {
-    initial = await getThemeOverrides();
+    [initial, initialDark] = await Promise.all([
+      getThemeOverrides(),
+      getThemeOverridesDark(),
+    ]);
   } catch {
     /* unbound D1 in this env — render defaults */
   }
@@ -35,7 +39,7 @@ export default async function ThemePage() {
         <h1 className="text-2xl font-semibold text-foreground">{t("title")}</h1>
         <p className="mt-1 text-foreground-muted">{t("subtitle")}</p>
       </header>
-      <ThemeEditor initial={initial} />
+      <ThemeEditor initial={initial} initialDark={initialDark} />
     </main>
   );
 }

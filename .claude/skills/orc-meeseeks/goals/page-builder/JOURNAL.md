@@ -354,3 +354,28 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   bundle (PM predeploy auto-regens; not this task's to own).
 - **Files:** CMS/src/components/page-builder/page-builder-shell.tsx, CMS/src/lib/pages/page-blocks.ts,
   CMS/scripts/page-blocks.test.mjs
+
+## 2026-06-19 17:24 — Dark-mode preview TOGGLE + per-Site DARK theme override editor (UI)
+- **Status:** DONE
+- **What I did:** Wired the UI for the dark-theme data layer (which was already done). (1) PREVIEW
+  TOGGLE: added a light/system/dark segmented toggle in the builder preview URL bar
+  (`page-builder-shell.tsx`, new `previewTheme` state + `PreviewThemeIcon` sun/monitor/moon). "system" =
+  no param (iframe follows OS, unchanged default); light/dark append `?theme=` to `/preview/<id>`. The
+  preview route now reads `?theme=dark|light` and wraps `<RenderedPage>` in a `<div data-theme=...>` so
+  globals.css's `[data-theme="dark"]` token block + the per-Site dark overrides cascade — operator SEES
+  dark without changing their OS. iframe key includes previewTheme so toggling reloads it. (2) DARK
+  OVERRIDE EDITOR: `theme-editor.tsx` got a Light/Dark MODE tab; split the editor into a thin
+  `ThemeEditor` wrapper (mode tab) + a keyed `ModeEditor` (the old body, parametrized by a `defaults` map
+  + `mode` + `showPresets`). Dark mode opens on new `DARK_DEFAULT_THEME` (JS mirror of globals
+  `[data-theme="dark"]`, added to `theme.ts`), stores SPARSE diffs, PUTs to `/api/settings/theme?mode=dark`.
+  Presets (coordinated LIGHT palettes) hidden in the dark tab. API route `route.ts` now branches on
+  `?mode=dark` → `get/setThemeOverridesDark`. Theme page loads + passes `initialDark`. i18n
+  `pageBuilder.previewTheme.{light,system,dark}` + `theme.mode.{light,dark}` in EN/FI/ET.
+- **Verified:** new `theme.test.ts` tests — DARK_DEFAULT_THEME all-safe + a PARITY test that parses
+  globals.css's `[data-theme="dark"]` block and asserts each token matches (guards drift); `node --test
+  src/lib/render/theme.test.ts` 8/8 green. `npx tsc --noEmit` clean. `npx opennextjs-cloudflare build`
+  complete (port 3601 free). Did NOT regen the CMS bundle (PM predeploy auto-regens).
+- **Files:** CMS/src/app/preview/[id]/page.tsx, CMS/src/components/page-builder/page-builder-shell.tsx,
+  CMS/src/components/settings/theme-editor.tsx, CMS/src/app/admin/settings/theme/page.tsx,
+  CMS/src/app/api/settings/theme/route.ts, CMS/src/lib/render/theme.ts, CMS/src/lib/render/theme.test.ts,
+  CMS/messages/{en,fi,et}.json

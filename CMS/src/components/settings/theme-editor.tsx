@@ -13,20 +13,22 @@
  * its default is "no override"). Predefined palettes (THEME_PRESETS) apply a
  * full palette in one click.
  *
- * Storage is single-palette: overrides serialize to `:root{}` and win over
- * globals.css on the published route (see lib/render/theme.ts). The published
- * site's dark mode comes from globals' [data-theme="dark"], which overrides
- * don't touch — so there's no Light/Dark split here (unlike aicms).
+ * Two palettes, one editor: a Light/Dark MODE tab. LIGHT overrides serialize to
+ * `:root{}`, DARK overrides to `[data-theme="dark"]` + the system media query
+ * (see lib/render/theme.ts) — so a Site can theme dark mode DISTINCTLY (the P2
+ * dark-background bug fix). Each mode opens populated with its globals.css
+ * defaults (DEFAULT_THEME / DARK_DEFAULT_THEME) and stores SPARSE diffs.
  *
- * GET/PUT `/api/settings/theme`; the server re-validates (known tokens + safe
- * colors), so the validation source of truth stays lib/render/theme.ts. REST
- * only, copy via next-intl. ponytail: native <input type="color"> + text field;
- * no form lib, no picker lib.
+ * GET/PUT `/api/settings/theme` (light) and `?mode=dark` (dark); the server
+ * re-validates (known tokens + safe colors), so the validation source of truth
+ * stays lib/render/theme.ts. REST only, copy via next-intl. ponytail: native
+ * <input type="color"> + text field; no form lib, no picker lib.
  */
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
+  DARK_DEFAULT_THEME,
   DEFAULT_THEME,
   THEME_PRESETS,
   THEME_TOKENS,
@@ -54,9 +56,14 @@ const GROUPS: { key: string; tokens: ThemeToken[] }[] = [
   },
 ];
 
+type Defaults = Record<ThemeToken, string>;
+
 /** Full effective palette: defaults with the stored overrides laid on top. */
-function effectiveFrom(overrides: ThemeOverrides): Record<ThemeToken, string> {
-  const out = { ...DEFAULT_THEME };
+function effectiveFrom(
+  overrides: ThemeOverrides,
+  defaults: Defaults,
+): Record<ThemeToken, string> {
+  const out = { ...defaults };
   for (const token of THEME_TOKENS) {
     if (overrides[token]) out[token] = overrides[token];
   }
@@ -64,10 +71,13 @@ function effectiveFrom(overrides: ThemeOverrides): Record<ThemeToken, string> {
 }
 
 /** Sparse overrides = the effective values that differ from the default. */
-function diffFromDefault(effective: Record<ThemeToken, string>): ThemeOverrides {
+function diffFromDefault(
+  effective: Record<ThemeToken, string>,
+  defaults: Defaults,
+): ThemeOverrides {
   const out: ThemeOverrides = {};
   for (const token of THEME_TOKENS) {
-    if (effective[token].trim() !== DEFAULT_THEME[token]) out[token] = effective[token];
+    if (effective[token].trim() !== defaults[token]) out[token] = effective[token];
   }
   return out;
 }
@@ -85,31 +95,104 @@ function previewVars(effective: Record<ThemeToken, string>): React.CSSProperties
   return style as React.CSSProperties;
 }
 
-export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
+type Mode = "light" | "dark";
+
+/**
+ * Outer shell: the Light/Dark MODE tab. Each mode gets a FRESH `ModeEditor`
+ * (keyed on mode) so switching tabs reloads that mode's own initial overrides
+ * and edit state — no cross-mode leakage.
+ */
+export function ThemeEditor({
+  initial,
+  initialDark,
+}: {
+  initial: ThemeOverrides;
+  initialDark: ThemeOverrides;
+}) {
+  const t = useTranslations("theme");
+  const [mode, setMode] = useState<Mode>("light");
+  return (
+    <div className="flex flex-col gap-4">
+      <div
+        className="flex w-fit items-center gap-0.5 rounded-md border border-border bg-surface-muted p-0.5"
+        role="tablist"
+      >
+        {(["light", "dark"] as Mode[]).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            onClick={() => setMode(m)}
+            className={
+              "rounded px-3 py-1 text-sm " +
+              (mode === m
+                ? "bg-surface text-foreground shadow-sm"
+                : "text-foreground-muted hover:text-foreground")
+            }
+          >
+            {t(`mode.${m}`)}
+          </button>
+        ))}
+      </div>
+      {mode === "light" ? (
+        <ModeEditor
+          key="light"
+          mode="light"
+          initial={initial}
+          defaults={DEFAULT_THEME}
+          showPresets
+        />
+      ) : (
+        <ModeEditor
+          key="dark"
+          mode="dark"
+          initial={initialDark}
+          defaults={DARK_DEFAULT_THEME}
+          showPresets={false}
+        />
+      )}
+    </div>
+  );
+}
+
+function ModeEditor({
+  initial,
+  defaults,
+  mode,
+  showPresets,
+}: {
+  initial: ThemeOverrides;
+  defaults: Defaults;
+  mode: Mode;
+  showPresets: boolean;
+}) {
   const t = useTranslations("theme");
   // Editing state is the FULL effective palette (always populated).
   const [palette, setPalette] = useState<Record<ThemeToken, string>>(() =>
-    effectiveFrom(initial),
+    effectiveFrom(initial, defaults),
   );
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const overrides = useMemo(() => diffFromDefault(palette), [palette]);
+  const overrides = useMemo(() => diffFromDefault(palette, defaults), [palette, defaults]);
   const overrideCount = Object.keys(overrides).length;
+  const putUrl =
+    mode === "dark" ? "/api/settings/theme?mode=dark" : "/api/settings/theme";
 
   function setToken(token: ThemeToken, value: string) {
     setSaved(false);
     setError(null);
     // Empty input → snap back to the default (the field is never truly blank).
-    setPalette((p) => ({ ...p, [token]: value === "" ? DEFAULT_THEME[token] : value }));
+    setPalette((p) => ({ ...p, [token]: value === "" ? defaults[token] : value }));
   }
 
   function resetAll() {
     setSaved(false);
     setError(null);
-    setPalette({ ...DEFAULT_THEME });
+    setPalette({ ...defaults });
   }
 
   function applyPreset(key: string) {
@@ -117,7 +200,7 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
     if (!preset) return;
     setSaved(false);
     setError(null);
-    setPalette(effectiveFrom(preset.overrides));
+    setPalette(effectiveFrom(preset.overrides, defaults));
   }
 
   async function save() {
@@ -130,7 +213,7 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
     setError(null);
     setSaved(false);
     try {
-      const res = await fetch("/api/settings/theme", {
+      const res = await fetch(putUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(overrides),
@@ -147,7 +230,7 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
         return;
       }
       // Adopt the server's normalized truth (it drops unknown/unsafe entries).
-      setPalette(effectiveFrom((await res.json()) as ThemeOverrides));
+      setPalette(effectiveFrom((await res.json()) as ThemeOverrides, defaults));
       setSaved(true);
     } catch (err) {
       setError((err as Error).message);
@@ -158,28 +241,33 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Toolbar: preset picker + count + reset/save */}
+      {/* Toolbar: preset picker (light only) + count + reset/save. Presets are
+          coordinated LIGHT palettes, so they're hidden in the dark tab. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm text-foreground-muted">
-          {t("presetLabel")}
-          <select
-            className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
-            defaultValue=""
-            onChange={(e) => {
-              applyPreset(e.target.value);
-              e.target.selectedIndex = 0; // back to the "choose…" placeholder
-            }}
-          >
-            <option value="" disabled>
-              {t("presetPlaceholder")}
-            </option>
-            {THEME_PRESETS.map((p) => (
-              <option key={p.key} value={p.key}>
-                {t(`preset.${p.key}`)}
+        {showPresets ? (
+          <label className="flex items-center gap-2 text-sm text-foreground-muted">
+            {t("presetLabel")}
+            <select
+              className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+              defaultValue=""
+              onChange={(e) => {
+                applyPreset(e.target.value);
+                e.target.selectedIndex = 0; // back to the "choose…" placeholder
+              }}
+            >
+              <option value="" disabled>
+                {t("presetPlaceholder")}
               </option>
-            ))}
-          </select>
-        </label>
+              {THEME_PRESETS.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {t(`preset.${p.key}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span />
+        )}
         <div className="flex items-center gap-2">
           <span className="text-sm text-foreground-muted">
             {t("overrideCount", { count: overrideCount })}

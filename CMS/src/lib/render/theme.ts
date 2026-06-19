@@ -90,6 +90,40 @@ export const DEFAULT_THEME: Record<ThemeToken, string> = {
 };
 
 /**
+ * The DARK-mode default value for every token — a JS mirror of the
+ * `[data-theme="dark"]` block in globals.css. Lets the dark-override editor open
+ * fully populated with the real dark defaults (so "value === default" stays "no
+ * override" and storage stays sparse, same as light). KEEP IN SYNC with the
+ * `[data-theme="dark"]` `--color-*` declarations; the parity test guards drift.
+ */
+export const DARK_DEFAULT_THEME: Record<ThemeToken, string> = {
+  surface: "oklch(0.2 0.012 268)",
+  "surface-muted": "oklch(0.25 0.014 268)",
+  "surface-raised": "oklch(0.275 0.015 268)",
+  foreground: "oklch(0.95 0.006 268)",
+  "foreground-muted": "oklch(0.7 0.018 268)",
+  border: "oklch(0.34 0.016 268)",
+  primary: "oklch(0.72 0.15 268)",
+  "primary-hover": "oklch(0.79 0.13 268)",
+  "primary-foreground": "oklch(0.18 0.03 268)",
+  "primary-subtle": "oklch(0.34 0.07 268)",
+  danger: "oklch(0.68 0.18 18)",
+  "danger-hover": "oklch(0.74 0.16 18)",
+  "danger-foreground": "oklch(0.18 0.04 18)",
+  "danger-subtle": "oklch(0.36 0.08 18)",
+  success: "oklch(0.72 0.14 150)",
+  "success-foreground": "oklch(0.18 0.04 150)",
+  "success-subtle": "oklch(0.34 0.07 150)",
+  warning: "oklch(0.78 0.14 75)",
+  "warning-foreground": "oklch(0.2 0.04 75)",
+  "warning-subtle": "oklch(0.37 0.07 75)",
+  info: "oklch(0.72 0.13 240)",
+  "info-foreground": "oklch(0.18 0.04 240)",
+  "info-subtle": "oklch(0.34 0.07 240)",
+  ring: "oklch(0.72 0.15 268)",
+};
+
+/**
  * Predefined palettes an author can apply in one click — each is a COMPLETE,
  * coordinated palette across ALL 24 tokens (not just the brand swatch), so
  * switching presets re-tints surfaces, text, borders, focus ring AND the

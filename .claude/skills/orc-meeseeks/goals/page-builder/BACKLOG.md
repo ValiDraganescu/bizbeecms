@@ -39,7 +39,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   tsc + opennext build green.
 
 ## Tasks
-- TODO: **Dark-mode preview toggle + per-Site DARK theme override editor (follow-on to the dark-bg bug).**
+- DONE (2026-06-19): **Dark-mode preview toggle + per-Site DARK theme override editor.** Preview URL bar
+  got a light/system/dark toggle (`previewTheme` state) → `?theme=` on `/preview/<id>` which wraps
+  `<RenderedPage>` in `<div data-theme=...>`. Theme editor got a Light/Dark MODE tab (`ModeEditor`
+  parametrized by `defaults`/`mode`/`showPresets`); dark opens on new `DARK_DEFAULT_THEME`, PUTs
+  `?mode=dark` → `get/setThemeOverridesDark`. New `theme.test.ts` parity test parses globals
+  `[data-theme="dark"]`. tsc + opennext + node-test green. See JOURNAL 17:24.
+- TODO (ORIGINAL TEXT, kept for ref): **Dark-mode preview toggle + per-Site DARK theme override editor (follow-on to the dark-bg bug).**
   The data layer is DONE: `themeOverridesToCss(light, dark?)` emits light→`:root`, dark→`[data-theme="dark"]`
   + `@media(prefers-color-scheme:dark){[data-theme="system"]}`; `get/setThemeOverridesDark` persist a
   `theme_overrides_dark` map; `render-page.tsx` threads it. WHAT'S LEFT (UI): (1) the builder's PREVIEW iframe

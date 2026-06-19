@@ -95,6 +95,10 @@
       "warning": "Hoiatus",
       "info": "Teave",
       "danger": "Oht"
+    },
+    "mode": {
+      "light": "Hele",
+      "dark": "Tume"
     }
   },
   "media": {
@@ -346,6 +350,11 @@
     },
     "column": "Veerg",
     "dropComponentHint": "Lohista komponent siia",
-    "componentNoProps": "Sellel komponendil pole muudetavaid omadusi."
+    "componentNoProps": "Sellel komponendil pole muudetavaid omadusi.",
+    "previewTheme": {
+      "light": "Hele",
+      "system": "Süsteem",
+      "dark": "Tume"
+    }
   }
 }

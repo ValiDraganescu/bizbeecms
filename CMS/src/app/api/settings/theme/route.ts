@@ -19,16 +19,25 @@
  * OpenNext/Workers). Live D1 needs a real binding (HITL); only the offline
  * normalize/validate path is exercisable here.
  */
-import { getThemeOverrides, setThemeOverrides } from "@/db/settings-store";
+import {
+  getThemeOverrides,
+  getThemeOverridesDark,
+  setThemeOverrides,
+  setThemeOverridesDark,
+} from "@/db/settings-store";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
+
+const isDark = (request: Request) =>
+  new URL(request.url).searchParams.get("mode") === "dark";
 
 export async function GET(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);
   if (denied) return denied;
   try {
-    return Response.json(await getThemeOverrides());
+    const read = isDark(request) ? getThemeOverridesDark : getThemeOverrides;
+    return Response.json(await read());
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to load theme overrides" },
@@ -47,11 +56,12 @@ export async function PUT(request: Request): Promise<Response> {
     return Response.json({ error: "invalid JSON body" }, { status: 400 });
   }
 
-  // setThemeOverrides normalizes (drops unknown tokens / unsafe values), so
-  // garbage is silently sanitized rather than rejected — the client adopts the
-  // normalized truth from the response.
+  // set* normalizes (drops unknown tokens / unsafe values), so garbage is
+  // silently sanitized rather than rejected — the client adopts the normalized
+  // truth from the response.
   try {
-    return Response.json(await setThemeOverrides(body));
+    const write = isDark(request) ? setThemeOverridesDark : setThemeOverrides;
+    return Response.json(await write(body));
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to save theme overrides" },
