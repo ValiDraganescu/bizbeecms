@@ -1,16 +1,16 @@
 # Note to the next Meeseeks (custom-domains)
 
-Done so far: BOTH single-Worker custom domains attached.
+Done so far:
 - `deployer.bizbeecms.com` → deployer Worker; PM `DEPLOYER_URL` points at it.
-- `manager.bizbeecms.com` → PM Worker; PM `APP_ORIGIN` flipped to it.
-- `cmsWorkerUrl()` no longer parses APP_ORIGIN — it now builds the workers.dev URL from `WORKERS_DEV_SUFFIX` (hosts.ts). So the "Open CMS" link survives the APP_ORIGIN flip. (That worry from the old NEXT.md is handled.)
+- `manager.bizbeecms.com` → PM Worker; PM `APP_ORIGIN` flipped to it. `cmsWorkerUrl()` decoupled from APP_ORIGIN (uses `WORKERS_DEV_SUFFIX`).
+- **Per-site CMS now served at `<slug>.site.bizbeecms.com` via the ROUTER** (Option A). Router route widened (`*.site.bizbeecms.com/*`) + router derives the slug from the subdomain (no HOST_MAP write). Deployer untouched; worker names still `bizbeecms-cms-<slug>`.
 
-**Next TODO (BACKLOG ## Tasks, first open): switch per-site CMS hostname scheme to `<slug>.site.bizbeecms.com`.**
-- This is the BIGGER one — touches deployer + router (+ possibly the per-site custom-hostname attach). Decide the mechanism first:
-  - Option A: widen the router route to `*.site.bizbeecms.com/*` and have the router map `<slug>.site.bizbeecms.com` → `bizbeecms-cms-<slug>` (it already does Host→slug via HOST_MAP KV; see `router/src/index.ts:32`).
-  - Option B: attach a per-site custom hostname at deploy time in `deployer/src/index.ts`.
-- Keep internal worker names (`bizbeecms-cms-<slug>`) intact — only the PUBLIC hostname changes.
-- THEN (next task after): once sites serve at `<slug>.site.bizbeecms.com`, update `cmsWorkerUrl()` again to return that custom host instead of workers.dev (I left a `ponytail:` comment there marking exactly this).
-- SSO already accepts `*.bizbeecms.com` (own-zone) — no allowlist change needed for site SSO. Don't touch the allowlist.
+**Next TODO (BACKLOG ## Tasks, first open): Point `PM_ORIGIN` + site links at the new hosts.**
+- Make `cmsWorkerUrl()` (ProjectManager/src/lib/deploy/worker-url.ts) return `https://<slug>.site.bizbeecms.com` instead of the `.workers.dev` URL — there's a `ponytail:` comment marking the spot. The slug is the worker-name suffix after `CMS_WORKER_PREFIX`; build the host from `ZONE_DOMAIN` (`<slug>.site.<ZONE_DOMAIN>`). Add a `SITE_HOST_SUFFIX`/helper in `hosts.ts` so it's the single source of truth and no `.workers.dev` strings leak into user-facing "Open CMS"/"open site" links.
+- Confirm the deployer injects `PM_ORIGIN=https://manager.bizbeecms.com` (deployer/src/index.ts:262 — its own env var, NOT PM's APP_ORIGIN).
 
-Pattern reminder: single-Worker custom domain = `routes:[{pattern,custom_domain:true}]` in that worker's wrangler.jsonc; CF attaches hostname+cert on `wrangler deploy`. Verify JSONC parses (strip `//` lines then JSON.parse). No live deploy was run this session — all changes are config/code only.
+THEN: "Verify SSO end-to-end on new domains" (own-zone path already accepts `<slug>.site.bizbeecms.com` — verify, don't edit the allowlist; add/extend a cms-sso unit test if one exists).
+
+Reminders:
+- The `*.site.bizbeecms.com` route needs a wildcard cert on the zone at deploy time (code can't fix that).
+- No live deploy was run this session — all changes config/code only. Verify with `wrangler deploy --dry-run` (router has no local tsc; that's the typecheck/bundle gate).

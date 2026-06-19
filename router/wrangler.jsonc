@@ -11,7 +11,11 @@
   // via the HOST_MAP KV and proxies. The route is a wildcard so EVERY custom
   // hostname registered against the zone lands here.
   "routes": [
-    { "pattern": "cf.bizbeecms.com/*", "zone_name": "bizbeecms.com" }
+    { "pattern": "cf.bizbeecms.com/*", "zone_name": "bizbeecms.com" },
+    // Per-Site CMS public hostnames. Every <slug>.site.bizbeecms.com lands here;
+    // the Worker derives the slug straight from the subdomain (no HOST_MAP entry
+    // needed) and proxies to the internal bizbeecms-cms-<slug> Worker.
+    { "pattern": "*.site.bizbeecms.com/*", "zone_name": "bizbeecms.com" }
     // After the fallback origin is set + the first custom hostname is live,
     // widen to "*/*" (zone_name bizbeecms.com) so customer apex domains match.
   ],
