@@ -29,6 +29,8 @@ import {
   type PageOption,
 } from "@/lib/pages/page-picker";
 import type { PageSummary } from "@/db/page-store";
+import { filterGroups } from "@/lib/components/rail-filter";
+import type { ComponentGroup } from "@/lib/components/grouped";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 type CenterTab = "layers" | "preview";
@@ -88,11 +90,22 @@ export function PageBuilderShell() {
   const [pages, setPages] = useState<PageSummary[]>([]);
   const [selected, setSelected] = useState<PageOption | null>(null);
 
+  // Components rail: the Site's kit/component groups + the search query.
+  const [groups, setGroups] = useState<ComponentGroup[]>([]);
+  const [search, setSearch] = useState("");
+
   useEffect(() => {
     let live = true;
     void (async () => {
       const res = await fetch("/api/pages");
       if (live && res.ok) setPages((await res.json()) as PageSummary[]);
+    })();
+    void (async () => {
+      const res = await fetch("/api/components/grouped");
+      if (live && res.ok) {
+        const body = (await res.json()) as { groups?: ComponentGroup[] };
+        setGroups(body.groups ?? []);
+      }
     })();
     return () => {
       live = false;
@@ -212,31 +225,14 @@ export function PageBuilderShell() {
             </p>
             <input
               type="search"
-              disabled
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder={t("searchComponents")}
-              className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-foreground-muted disabled:opacity-60"
+              aria-label={t("searchComponents")}
+              className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-foreground-muted"
             />
           </div>
-          <div className="flex-1 space-y-4 overflow-y-auto p-3">
-            <div>
-              <p className="px-1 font-mono text-[11px] uppercase tracking-wide text-foreground-muted">
-                {t("categoryLayout")}
-              </p>
-              <ul className="mt-1.5 space-y-1">
-                <li className="cursor-grab rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground">
-                  {t("layoutSection")}
-                </li>
-              </ul>
-            </div>
-            <div>
-              <p className="px-1 font-mono text-[11px] uppercase tracking-wide text-foreground-muted">
-                {t("categoryComponents")}
-              </p>
-              <p className="mt-1.5 px-1 text-sm text-foreground-muted">
-                {t("componentsEmpty")}
-              </p>
-            </div>
-          </div>
+          <ComponentsRail groups={groups} search={search} />
         </aside>
 
         {/* CENTER — Layers / Preview */}
@@ -352,6 +348,104 @@ export function PageBuilderShell() {
             )}
           </div>
         </aside>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Left-rail Components panel: the LAYOUT primitive (Section) above the real
+ * COMPONENTS source — kit groups from `GET /api/components/grouped`, each an
+ * expandable header (kit display name or the "individually-imported" bucket)
+ * listing its component names, filtered live by the search box.
+ *
+ * Insert-into-Section is a SEPARATE slice (needs the page block-tree store);
+ * clicking a component does nothing yet — items are presented draggable-styled.
+ *
+ * ponytail: groups expanded by default (small lists); collapse state is local
+ * useState keyed by group label. Insert wiring deferred — see backlog.
+ */
+function ComponentsRail({
+  groups,
+  search,
+}: {
+  groups: ComponentGroup[];
+  search: string;
+}) {
+  const t = useTranslations("pageBuilder");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  const visible = filterGroups(groups, search);
+
+  // Map a kit id to a display label; null = the individually-imported bucket.
+  function groupLabel(kit: string | null): string {
+    if (kit == null) return t("kitIndividual");
+    // i18n keys kit.blog/kit.landing/kit.docs; fall back to the raw id.
+    const key = `kit.${kit}`;
+    const label = t(key);
+    return label === key ? kit : label;
+  }
+
+  return (
+    <div className="flex-1 space-y-4 overflow-y-auto p-3">
+      {/* LAYOUT — the Section primitive (always present). */}
+      <div>
+        <p className="px-1 font-mono text-[11px] uppercase tracking-wide text-foreground-muted">
+          {t("categoryLayout")}
+        </p>
+        <ul className="mt-1.5 space-y-1">
+          <li className="cursor-grab rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground">
+            {t("layoutSection")}
+          </li>
+        </ul>
+      </div>
+
+      {/* COMPONENTS — grouped by source kit. */}
+      <div>
+        <p className="px-1 font-mono text-[11px] uppercase tracking-wide text-foreground-muted">
+          {t("categoryComponents")}
+        </p>
+        {visible.length === 0 ? (
+          <p className="mt-1.5 px-1 text-sm text-foreground-muted">
+            {search.trim() ? t("componentsNoMatch") : t("componentsEmpty")}
+          </p>
+        ) : (
+          <div className="mt-1.5 space-y-2">
+            {visible.map((g) => {
+              const label = groupLabel(g.kit);
+              const isCollapsed = collapsed[label] ?? false;
+              return (
+                <div key={g.kit ?? "__ungrouped"}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCollapsed((c) => ({ ...c, [label]: !isCollapsed }))
+                    }
+                    aria-expanded={!isCollapsed}
+                    className="flex w-full items-center justify-between rounded px-1 py-1 text-left text-xs font-medium text-foreground hover:bg-surface-muted"
+                  >
+                    <span>{label}</span>
+                    <span className="text-foreground-muted">
+                      {isCollapsed ? "+" : "−"}
+                    </span>
+                  </button>
+                  {!isCollapsed && (
+                    <ul className="mt-1 space-y-1">
+                      {g.components.map((name) => (
+                        <li
+                          key={name}
+                          className="cursor-grab rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground"
+                        >
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

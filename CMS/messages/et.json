@@ -264,6 +264,13 @@
     "categoryComponents": "Komponendid",
     "layoutSection": "Sektsioon",
     "componentsEmpty": "Komponente pole veel — impordi komplekt või komponent.",
+    "componentsNoMatch": "Ükski komponent ei vasta otsingule.",
+    "kitIndividual": "Eraldi imporditud",
+    "kit": {
+      "blog": "Ajaveebi komplekt",
+      "landing": "Maandumiskomplekt",
+      "docs": "Dokumentatsioonikomplekt"
+    },
     "center": {
       "layers": "Kihid",
       "preview": "Eelvaade"

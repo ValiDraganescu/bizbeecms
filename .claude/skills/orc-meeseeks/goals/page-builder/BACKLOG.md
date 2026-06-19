@@ -30,8 +30,9 @@ Task states: TODO | DOING | DONE | BLOCKED.
   backed by a PURE grouping helper (with a node test). The rail-UI rendering (groups, search, insert into
   section) stays in the task below. Reuse `upsertImportedComponent` + the kit registry — no second pipeline.
 
-- TODO: **Components rail: show imported starter kits + their components, searchable, add into Sections
-  (like aicms).** Make the builder's left Components rail the real component source, mirroring how aicms
+- DOING (render+search DONE 2026-06-19; insert split into the task right below): **Components rail: show
+  imported starter kits + their components, searchable, add into Sections (like aicms).**
+  Make the builder's left Components rail the real component source, mirroring how aicms
   composes (`src/modules/page-builder/components/page-builder-v2/left_rail_components.tsx`): the operator
   adds **Sections**, and into a Section drops **components**. What this slice covers:
   - Render the Site's **starter kits** as expandable groups, each expanding to its components; plus a
@@ -51,6 +52,19 @@ Task states: TODO | DOING | DONE | BLOCKED.
   CF-native (REST + fetch), EN/FI/ET. Depends on the LAYOUT task (rail shell) and benefits from the
   page-select task (a selected page to insert into). Add pure tests for any grouping/flatten helper +
   search filter. Gate: CMS tsc + opennextjs build green; regen PM cms-bundle.
+  STATUS: render + search DONE (rail-filter.ts/.test.ts, ComponentsRail in page-builder-shell.tsx). The
+  remaining INSERT half is the task right below.
+
+- TODO: **Insert components into Sections — page block-tree store + drag/click insert.** The rail now
+  renders kit groups + searchable component names, but the items are INERT (clicking a component does
+  nothing — `ComponentsRail` in `page-builder-shell.tsx` has the `<li>`s draggable-styled only). This
+  slice adds the editor's block tree: the selected page holds **Sections**, each Section holds
+  **components** (aicms `page-builder-v2` section model). Make a "Section" added from the LAYOUT category,
+  and a rail component click/drag insert into the SELECTED Section. Persist via the existing C2/C3 block
+  REST — do NOT fork a new block pipeline. Add a pure tree-mutation helper + test (add-section,
+  add-component-to-section, mirroring `page-picker`/`grouped` test style — relative `.ts` imports, node
+  can't resolve `@/`). This is ALSO the prerequisite for the Center Layers tree (it renders the same tree).
+  Gate: CMS tsc + opennext build green; regen PM cms-bundle. EN/FI/ET.
 
 - TODO: **Center: Layers ⟷ Preview toggle — layers tree of sections+components, and a true-to-site
   preview.** Wire the center column's Layers/Preview tab (shell from the LAYOUT task) to real content,
@@ -71,6 +85,21 @@ Task states: TODO | DOING | DONE | BLOCKED.
     fork a second renderer; true-to-site means reusing the real one).
   CF-native (REST + fetch), EN/FI/ET. Depends on the LAYOUT + page-select tasks. Add a pure test for any
   tree-build/flatten helper. Gate: CMS tsc + opennextjs build green; regen PM cms-bundle.
+
+- TODO: **Right rail: page SEO settings form (reuse existing per-locale page SEO).** Fill the right
+  rail's **SEO** tab (shell exists from the LAYOUT task) with a real form that edits the SELECTED page's
+  SEO and saves it. Reuse what C2 already stores — do NOT invent new SEO fields/storage:
+  - Fields: per-locale `metaTitle` + `metaDescription` (JSON maps on the `page` row, `db/schema.ts`
+    `meta_title`/`meta_description`), validated by `lib/pages/page-meta.ts` `validatePageMeta`. The same
+    pair is edited today in `components/pages/pages-manager.tsx` (the C2 SEO legend) and persisted via
+    `PUT /api/pages/[id]`.
+  - In the builder: when a page is selected, the SEO tab shows a per-content-locale title + description
+    editor (locales come from the content-locale settings, like C2), pre-filled from the loaded page, and
+    Save `PUT`s the full page meta back through the EXISTING route — no new page-store/validation path.
+  - CF-native (REST + fetch); localize the field LABELS EN/FI/ET (the VALUES are per-content-locale
+    content). Depends on the page-select task (needs a selected page) + the LAYOUT task (tab shell).
+  - Richer SEO (canonical, OG image, noindex) is a SEPARATE later task + schema add — this slice is
+    title + description, matching what exists. Gate: CMS tsc + opennextjs build green; regen PM cms-bundle.
 
 - DONE: **Build the page-builder LAYOUT (shell only — no features).** Implement the static layout from
   `docs/page-builder-layout.md` in the CMS admin (e.g. `/admin/page-builder`), modeled on aicms

@@ -264,6 +264,13 @@
     "categoryComponents": "Components",
     "layoutSection": "Section",
     "componentsEmpty": "No components yet — import a kit or component.",
+    "componentsNoMatch": "No components match your search.",
+    "kitIndividual": "Individually imported",
+    "kit": {
+      "blog": "Blog kit",
+      "landing": "Landing kit",
+      "docs": "Docs kit"
+    },
     "center": {
       "layers": "Layers",
       "preview": "Preview"

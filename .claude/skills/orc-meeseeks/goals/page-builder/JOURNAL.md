@@ -62,3 +62,25 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/components/kit/route.ts, CMS/src/app/api/components/grouped/route.ts (new),
   CMS/src/lib/components/grouped.ts (+ .test.ts, new), CMS/migrations/0003_worthless_fallen_one.sql
   (+ meta), ProjectManager/src/lib/deploy/cms-bundle.generated.js.
+
+## 2026-06-19 13:38 — Components rail UI: grouped kits + searchable (render half)
+- **Status:** DONE (render + search; insert-into-Section split into its own backlog task)
+- **What I did:** Wired the left Components rail to the real grouped data. Shell now
+  `useEffect`-fetches `GET /api/components/grouped` alongside `/api/pages`, into a new
+  `groups` state. Replaced the static rail with a `ComponentsRail` sub-component: keeps the
+  LAYOUT category (Section) on top, then renders each kit group (blog/landing/docs +
+  trailing "individually-imported") as an expandable header (collapse state local, keyed by
+  label) listing its component names. The search box is now LIVE (was `disabled`) and filters
+  component names across all groups via a new PURE helper `lib/components/rail-filter.ts`
+  (`filterGroups` — case-insensitive substring, drops empty groups, empty query passthrough)
+  with a 5-case node test. Added i18n `pageBuilder.kit.{blog,landing,docs}`, `kitIndividual`,
+  `componentsNoMatch` in EN/FI/ET. Component `<li>`s are draggable-STYLED but INERT — actual
+  insert-into-Section needs the page block-tree store, split into a new backlog task.
+- **Verified:** `node --test rail-filter.test.ts` 5/5 pass; CMS `npx tsc --noEmit` clean;
+  3 message JSONs parse; `npx opennextjs-cloudflare build` green (dev stopped, port 3601 free);
+  regenerated PM `bundle:cms` (cms-bundle.generated.js, 6477 KB). Did NOT click through live
+  (no D1 binding offline, HITL) — REST contract is the existing grouped endpoint, build-green +
+  pure-helper test cover this slice.
+- **Files:** CMS/src/lib/components/rail-filter.ts (+ .test.ts, new),
+  CMS/src/components/page-builder/page-builder-shell.tsx, CMS/messages/{en,fi,et}.json,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js.

@@ -264,6 +264,13 @@
     "categoryComponents": "Komponentit",
     "layoutSection": "Osio",
     "componentsEmpty": "Ei vielä komponentteja — tuo paketti tai komponentti.",
+    "componentsNoMatch": "Mikään komponentti ei vastaa hakuasi.",
+    "kitIndividual": "Erikseen tuodut",
+    "kit": {
+      "blog": "Blogipaketti",
+      "landing": "Laskeutumispaketti",
+      "docs": "Dokumentaatiopaketti"
+    },
     "center": {
       "layers": "Tasot",
       "preview": "Esikatselu"
