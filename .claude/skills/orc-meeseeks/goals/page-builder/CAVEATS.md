@@ -80,3 +80,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   the rest of /admin) → returns `notFound()` if not an authed admin, so drafts never leak publicly. The
   builder iframe keys on `${id}-${previewNonce}`; bump `previewNonce` to force a reload (refresh btn +
   after a successful Save).
+
+- `npm run bundle:cms` runs a FULL OpenNext `next build` over CMS/ then esbuild-bundles
+  `.open-next/worker.js` into the committed `cms-bundle.generated.js` (~6.9MB minified). It reads
+  CURRENT CMS source from disk — including UNCOMMITTED CMS edits — so the bundle can capture another
+  loop's in-flight work. Only regen when your task owns the bundle OR the user explicitly approves
+  overwriting a contended/abandoned bundle. Verify a regen with grep against the generated file
+  (`RenderedPage`/`buildPlanFromPage`/`data-section`/`metaTitle`/`preview/[id]`) and a `node -e import()`
+  smoke (exports `{builtAt,files,mainModule}`, mainModule=worker.js). The minified bundle writes
+  `builtAt = "..."` (spaces, no colon) — grep `builtAt` not `builtAt:`.

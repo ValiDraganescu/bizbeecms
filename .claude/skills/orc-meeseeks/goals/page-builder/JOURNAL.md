@@ -150,3 +150,19 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/page-builder/page-builder-shell.tsx, CMS/src/app/admin/page-builder/page.tsx,
   CMS/src/components/pages/pages-manager.tsx, CMS/messages/{en,fi,et}.json.
   DEFERRED: PM npm run bundle:cms (cross-loop guardrail — bundle file owned by another loop).
+
+## 2026-06-19 17:26 — Regen deployable CMS bundle (the deferred 3-change regen)
+- **Status:** DONE
+- **What I did:** Ran PM `npm run bundle:cms` (`build-cms-bundle.mjs --opennext`) to regenerate
+  `ProjectManager/src/lib/deploy/cms-bundle.generated.js` from current CMS source — the regen the last
+  3 page-builder workers explicitly deferred (cross-loop bundle-contention guardrail). USER EXPLICITLY
+  approved overwriting the dirty/abandoned bundle this run. The OpenNext build picked up the three
+  committed CMS render changes — Section renderer primitive (`tree.ts`/`render-page.tsx`), `/preview/[id]`
+  draft-preview route, and the SEO metaTitle/metaDescription form — plus the in-flight public-route
+  rewire (`[[...slug]]/page.tsx` → shared `RenderedPage`/`buildPlanFromPage`, `collectComponentNames`).
+- **Verified:** OpenNext `next build` green; route manifest lists `ƒ /preview/[id]`. Grepped the
+  generated bundle: `RenderedPage` ✓, `buildPlanFromPage` ✓, `data-section` (Section primitive) ✓,
+  `metaTitle` (SEO) ✓, `preview/[id]` ✓. `node` import of the generated module loads clean — exports
+  `{builtAt,files,mainModule}`, mainModule=worker.js, builtAt=2026-06-19T14:26 (this run). Did NOT
+  live-deploy (HITL — needs CF creds / deployer Worker).
+- **Files:** ProjectManager/src/lib/deploy/cms-bundle.generated.js (regenerated; committed by explicit path).

@@ -12,9 +12,15 @@ metaTitle/metaDescription via a new `SeoForm` in `page-builder-shell.tsx`, pre-f
 (`setLocaleValue`, `buildSeoMetaBody`) + `page-meta.test.ts` 3/3; C2 pages-manager deduped onto
 `setLocaleValue`. i18n `seo*` keys EN/FI/ET.
 
-⚠️ DEFERRED (still): PM `npm run bundle:cms` regen of `cms-bundle.generated.js` NOT run — cross-loop
-guardrail forbids touching ProjectManager files. THREE CMS render/builder changes (Save-persist
-Sections, Preview route, this SEO form) sit un-bundled. Whoever owns the bundle MUST regen.
+✅ BUNDLE REGEN DONE (2026-06-19 17:26): PM `npm run bundle:cms` ran — `cms-bundle.generated.js` now
+reflects current CMS source (Section primitive, /preview/[id], SEO form, public-route renderer rewire).
+Verified by grep (`RenderedPage`/`buildPlanFromPage`/`data-section`/`metaTitle`/`preview/[id]`) + a
+clean `node` import of the generated module. The 3 committed render changes are now deployable.
+NOTE for future: regen the bundle only when YOUR task owns it (or the user approves overwriting a
+contended/abandoned one, as this run had) — otherwise keep deferring per the cross-loop guardrail.
+HEADS-UP: at this run's time CMS `[[...slug]]/page.tsx` + `tree.ts` were still uncommitted (another
+loop's tail wiring the public route to the shared renderer); the bundle captured them. If those get
+reverted/changed, the bundle needs another regen.
 
 Strongest next tasks (BACKLOG order):
 - **Right rail: Block props editor** — wire `selectedBlockId` to a props form using
