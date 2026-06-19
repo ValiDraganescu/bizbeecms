@@ -236,7 +236,12 @@
         "started": "Käynnissä",
         "ok": "Valmis",
         "failed": "Epäonnistui"
-      }
+      },
+      "showPrevious": "Näytä aiemmat julkaisut",
+      "loadingMore": "Ladataan…",
+      "noMore": "Ei aiempia julkaisuja.",
+      "runAt": "Julkaistu {time}",
+      "currentRun": "Nykyinen julkaisu"
     },
     "assign": {
       "title": "Liitetyt käyttäjät",

@@ -180,6 +180,55 @@ export function selectLatestRun(events: readonly TimelineRow[]): TimelineRow[] {
   return events.filter((e) => e.deployId === latestId);
 }
 
+export type DeployRun = {
+  /** The run's deployId (or null for pre-0004 rows, grouped together). */
+  deployId: string | null;
+  /** This run's events, collapsed to one row per step, oldest step first. */
+  steps: TimelineRow[];
+  /** When the run started (min startedAt across its steps), ms epoch. */
+  startedAt: number;
+};
+
+/**
+ * Group a chronological event trail into deploy RUNS (one per `deployId`), newest
+ * run first, each run's steps collapsed. Powers the timeline's "previous
+ * deployments" history: page back through the events API, feed the accumulated
+ * events here, render each run as its own group. Pure — node-testable.
+ *
+ * Pre-0004 rows (deployId: null) collapse into a single null group, same as
+ * selectLatestRun, so legacy events still render as one run.
+ */
+export function groupRunsByDeployId(
+  events: readonly TimelineRow[],
+): DeployRun[] {
+  const order: (string | null)[] = [];
+  const byRun = new Map<string | null, TimelineRow[]>();
+  for (const e of events) {
+    if (!byRun.has(e.deployId)) {
+      byRun.set(e.deployId, []);
+      order.push(e.deployId);
+    }
+    byRun.get(e.deployId)!.push(e);
+  }
+
+  const runs: DeployRun[] = order.map((deployId) => {
+    const steps = collapseDeployEvents(byRun.get(deployId)!);
+    const startedAt = steps.reduce((min, s) => {
+      const at = Date.parse(s.startedAt);
+      return Number.isNaN(at) ? min : Math.min(min, at);
+    }, Number.POSITIVE_INFINITY);
+    return {
+      deployId,
+      steps,
+      startedAt: Number.isFinite(startedAt) ? startedAt : 0,
+    };
+  });
+
+  // Newest run first.
+  runs.sort((a, b) => b.startedAt - a.startedAt);
+  return runs;
+}
+
 /**
  * Collapse the raw chronological event trail (two rows per step: a `started`
  * then an `ok`/`failed`) into one row per `step`, fixing the bug where the

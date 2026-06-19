@@ -236,7 +236,12 @@
         "started": "Töötab",
         "ok": "Valmis",
         "failed": "Ebaõnnestus"
-      }
+      },
+      "showPrevious": "Näita varasemaid juurutusi",
+      "loadingMore": "Laadimine…",
+      "noMore": "Varasemaid juurutusi pole.",
+      "runAt": "Juurutatud {time}",
+      "currentRun": "Praegune juurutus"
     },
     "assign": {
       "title": "Määratud kasutajad",

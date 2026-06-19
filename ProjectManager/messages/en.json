@@ -236,7 +236,12 @@
         "started": "Running",
         "ok": "Done",
         "failed": "Failed"
-      }
+      },
+      "showPrevious": "Show previous deployments",
+      "loadingMore": "Loading…",
+      "noMore": "No earlier deployments.",
+      "runAt": "Deployed {time}",
+      "currentRun": "Current deployment"
     },
     "assign": {
       "title": "Assigned users",

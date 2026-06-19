@@ -15,6 +15,7 @@ import {
   listDeployEventsForSite,
   collapseDeployEvents,
   selectLatestRun,
+  groupRunsByDeployId,
   deployProgress,
   fmtElapsed,
   clampPageLimit,
@@ -485,4 +486,33 @@ test("listDeployEventsPaged: `before` cursor adds a created_at < ? bound", async
   assert.match(sql, /"site_id" = \?/i);
   assert.match(sql, /"created_at" < \?/i);
   assert.ok(params.includes("site-1"));
+});
+
+test("groupRunsByDeployId: newest run first, each run's steps collapsed", () => {
+  const runs = groupRunsByDeployId([
+    // older run (run-1)
+    row({ step: "clone", status: "started", startedAt: "2026-06-19T10:00:00.000Z", deployId: "run-1" }),
+    row({ step: "clone", status: "ok", durationMs: 2000, deployId: "run-1" }),
+    // newer run (run-2)
+    row({ step: "clone", status: "started", startedAt: "2026-06-19T11:00:00.000Z", deployId: "run-2" }),
+    row({ step: "clone", status: "ok", durationMs: 1500, deployId: "run-2" }),
+    row({ step: "npm", status: "started", startedAt: "2026-06-19T11:00:02.000Z", deployId: "run-2" }),
+  ]);
+  assert.equal(runs.length, 2);
+  assert.equal(runs[0].deployId, "run-2"); // newest first
+  assert.equal(runs[1].deployId, "run-1");
+  // run-2's clone collapsed to one row (started+ok), plus npm still running.
+  assert.deepEqual(runs[0].steps.map((s) => s.step), ["clone", "npm"]);
+  assert.equal(runs[0].steps[0].status, "ok");
+  assert.equal(runs[1].steps.length, 1);
+});
+
+test("groupRunsByDeployId: legacy null deployId rows form one run", () => {
+  const runs = groupRunsByDeployId([
+    row({ step: "clone", status: "started", startedAt: "2026-06-19T10:00:00.000Z", deployId: null }),
+    row({ step: "npm", status: "started", startedAt: "2026-06-19T10:00:02.000Z", deployId: null }),
+  ]);
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0].deployId, null);
+  assert.equal(runs[0].steps.length, 2);
 });
