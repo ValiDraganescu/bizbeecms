@@ -31,14 +31,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   on the rendered document + the builder's preview iframe), AND emit per-Site overrides for BOTH a light and a
   dark scope (`:root{…}` + `[data-theme="dark"]{…}`) so a token can hold distinct values per mode. Token-based
   backgrounds then swap correctly. Add a test for the dark-scope CSS emission. reported 2026-06-19.
-- BUG [P2]: In the page-builder Layers tree a multi-column Section shows its columns STACKED VERTICALLY
-  (COLUMN 1 above COLUMN 2) — you'd expect them side-by-side in a ROW, matching how they render and the
-  aicms screenshots. repro: add a Section, set COLUMNS=2 in the Block tab → the two column slots appear
-  one under the other. CAUSE: `LayersTree` in `CMS/src/components/page-builder/page-builder-shell.tsx`
-  wraps the `sectionColumns(b).map(...)` (line ~1016) in `<ul className="mt-2 space-y-2 …">` — `space-y-2`
-  is vertical. FIX: lay the columns out as a row honoring the Section's `columns`/`columnBehavior` (e.g.
-  `grid` with `grid-template-columns` like the real render in `tree.ts`, collapse → empty cols shrink), so
-  the Layers view mirrors the actual grid. Keep each column its own drop target. reported 2026-06-19.
+- BUG [P2] DONE (2026-06-19): Layers-tree columns stacked vertically instead of a row. CAUSE was exactly the
+  `<ul className="mt-2 space-y-2 …">` wrapping `sectionColumns(b).map(...)` in `LayersTree`. FIX: that `<ul>`
+  is now `display:grid` with `gridTemplateColumns` from a NEW pure helper `sectionGridCols(section)`
+  (page-blocks.ts) mirroring `tree.ts` planSection — `repeat(N,1fr)` equal tracks, or "collapse" → empty
+  cols `0fr`. Each column keeps its own drop target. Regression tests in `scripts/page-blocks.test.mjs`.
+  tsc + opennext build green.
 
 ## Tasks
 - TODO: **Dark-mode preview toggle + per-Site DARK theme override editor (follow-on to the dark-bg bug).**

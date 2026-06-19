@@ -1,21 +1,21 @@
 # Note to the next Meeseeks (page-builder)
 
-**THIS run (BUG P2 — dark-mode background):** FIXED the data layer. The curator's gap #1 was a
-misdiagnosis — the rendered/public/preview pages ALREADY follow OS dark (root layout `app/layout.tsx`
-sets `<html data-theme="system">` + imports globals.css with the dark blocks). The REAL bug was gap #2:
-`themeOverridesToCss` emitted `:root{…}` only, so a per-Site override stomped BOTH light and dark.
-Now `themeOverridesToCss(light, dark?)`: light→`:root` only; dark→`[data-theme="dark"]` +
-`@media(prefers-color-scheme:dark){[data-theme="system"]}`. New `theme_overrides_dark` store key
-(`get/setThemeOverridesDark`); `render-page.tsx` threads it. Tests in `theme.test.ts`. Bug flipped DONE.
+**THIS run (BUG P2 — Layers-tree columns stacked):** FIXED. The Layers tree showed a multi-column
+Section's columns stacked vertically. Cause: `<ul className="mt-2 space-y-2 …">` around
+`sectionColumns(b).map(...)` in `LayersTree` (page-builder-shell.tsx). Now that `<ul>` is `display:grid`
+with `gridTemplateColumns` from a NEW pure helper `sectionGridCols(section)` (page-blocks.ts) that mirrors
+`tree.ts` planSection (`repeat(N,1fr)`, collapse→empty cols `0fr`). Each column keeps its own drop target.
+Regression tests in `scripts/page-blocks.test.mjs`. Bug flipped DONE.
 
-**CHECK BUGS FIRST:** one open bug REMAINS in BACKLOG `## Bugs` — the LAYERS-TREE columns-stacked-vertically
-P2 (`LayersTree` in `page-builder-shell.tsx` ~1016 wraps columns in `space-y-2` = vertical; lay them as a
-ROW honoring the Section's `columns`/`columnBehavior`, each column still its own drop target). Take that
-NEXT (bugs outrank tasks). Reproduce it (2-col Section → cols stacked), fix, add/adjust a test, flip DONE.
+**CHECK BUGS FIRST:** ALL bugs in BACKLOG `## Bugs` are now DONE. If a fresh human bug appears there, take
+it before any task.
 
-After bugs are clear, the top queued task is the **dark-mode preview TOGGLE + per-Site DARK override
-editor** (follow-on I queued — the data layer is done; only the UI to SEE/edit dark is left).
+**Top queued task** (bugs clear): the **dark-mode preview TOGGLE + per-Site DARK override editor** — the
+data layer is DONE (`themeOverridesToCss(light,dark?)`, `get/setThemeOverridesDark`, render-page threads
+both). What's left is UI: (1) a LIGHT/DARK toggle in the preview chrome that forces `data-theme` on the
+preview iframe (e.g. `?theme=dark` → `/preview/[id]` sets `data-theme` on its wrapper), (2) a DARK tab in
+the theme settings editor writing through `setThemeOverridesDark`. EN/FI/ET chrome.
 
-Gate: CMS `npx tsc --noEmit` → `node --test src/lib/render/*.test.ts` / `scripts/*.test.mjs` →
+Gate: CMS `npx tsc --noEmit` → `node --test scripts/*.test.mjs` / `src/lib/render/*.test.ts` →
 `npx opennextjs-cloudflare build` (dev STOPPED, port 3601 free). Stage ONLY CMS files + goals/page-builder/*
 by explicit path — NO `git add -A`. Do NOT touch cms-bundle.generated.js (PM predeploy auto-regens it).

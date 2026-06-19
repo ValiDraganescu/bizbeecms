@@ -16,6 +16,10 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   addBlock,
+  addSection,
+  setSectionColumns,
+  addComponentToColumn,
+  sectionGridCols,
   localeFieldValue,
   moveBlock,
   parsePropsSchema,
@@ -200,4 +204,28 @@ test("pageBlocks namespace + pages.editBlocks parity across EN/FI/ET", () => {
       assert.ok(typeof v === "string" && v.trim() !== "", `${l}: ${path} empty`);
     }
   }
+});
+
+test("sectionGridCols mirrors the render: N equal tracks (Layers row, not stacked)", () => {
+  // A 2-column Section must produce a 2-track grid so the Layers tree lays its
+  // columns side-by-side as a ROW (regression: was stacked vertically).
+  let blocks = addSection([]);
+  const sectionId = blocks[0].id;
+  blocks = setSectionColumns(blocks, sectionId, 2);
+  assert.equal(sectionGridCols(blocks[0]), "repeat(2, 1fr)");
+
+  blocks = setSectionColumns(blocks, sectionId, 3);
+  assert.equal(sectionGridCols(blocks[0]), "repeat(3, 1fr)");
+});
+
+test("sectionGridCols collapse behavior shrinks empty columns to 0fr", () => {
+  let blocks = addSection([]);
+  const sectionId = blocks[0].id;
+  blocks = setSectionColumns(blocks, sectionId, 2);
+  blocks = blocks.map((b) =>
+    b.id === sectionId ? { ...b, props: { ...b.props, columnBehavior: "collapse" } } : b,
+  );
+  // col 0 gets a component, col 1 stays empty → "1fr 0fr".
+  blocks = addComponentToColumn(blocks, sectionId, 0, "Hero");
+  assert.equal(sectionGridCols(blocks[0]), "1fr 0fr");
 });

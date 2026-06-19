@@ -203,6 +203,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   edits — see the bundle:cms caveat above). The committed bundle can lag CMS source between deploys; that's
   fine now, deploy refreshes it. Don't re-add a manual "regen owed" hand-off note for render changes.
 
+- LAYERS-TREE COLUMN LAYOUT (2026-06-19): the Layers tree lays a Section's columns as a ROW via
+  `display:grid` + `gridTemplateColumns` from the pure `sectionGridCols(section)` (page-blocks.ts), which
+  MIRRORS `tree.ts` planSection (`repeat(N,1fr)`, or "collapse"→empty cols `0fr`). If you change planSection's
+  grid math, update `sectionGridCols` too (two mirrors — there's no shared constant; a node-testable pure
+  helper can't import the server-only render path). Do NOT revert the `<ul>` to `space-y-*` (that's the
+  vertical-stack bug). Each column `<li>` is still its own drop target.
 - DARK MODE ON THE RENDERED PAGE WORKS via the ROOT LAYOUT: `CMS/src/app/layout.tsx` sets
   `<html data-theme="system">` and imports `globals.css` (which holds the `[data-theme="dark"]` +
   `@media(prefers-color-scheme:dark){[data-theme="system"]}` dark token blocks). So public `[[...slug]]` and

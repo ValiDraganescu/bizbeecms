@@ -448,6 +448,22 @@ export function sectionColumns(section: Block): Block[] {
 }
 
 /**
+ * The CSS `grid-template-columns` value for a Section's columns, mirroring the
+ * public render (tree.ts planSection): "collapse" behavior shrinks empty columns
+ * to 0fr, otherwise N equal 1fr tracks. Used by the Layers tree so it lays
+ * columns out as a ROW exactly like the rendered page (not stacked).
+ */
+export function sectionGridCols(section: Block): string {
+  const p = (section.props ?? {}) as Record<string, unknown>;
+  const cols = sectionColumns(section);
+  const columns = typeof p.columns === "number" ? p.columns : Number(p.columns) || cols.length || 1;
+  if (p.columnBehavior === "collapse") {
+    return cols.map((c) => ((c.children?.length ?? 0) > 0 ? "1fr" : "0fr")).join(" ") || "1fr";
+  }
+  return `repeat(${Math.max(1, columns)}, 1fr)`;
+}
+
+/**
  * Set a Section's column count to `n` (clamped 1–4), immutable.
  *
  * - Growing adds empty columns at the end.

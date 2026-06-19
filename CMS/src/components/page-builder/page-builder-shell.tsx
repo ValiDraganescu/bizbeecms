@@ -40,6 +40,7 @@ import {
   addComponentToSection,
   addComponentToColumn,
   sectionColumns,
+  sectionGridCols,
   isSection,
   isSectionColumn,
   mergeSectionProps,
@@ -1012,7 +1013,12 @@ function LayersTree({
             {isSection(b) ? `${t("layoutSection")} ${i + 1}` : b.component}
           </button>
           {isSection(b) && (
-            <ul className="mt-2 space-y-2 border-l border-border pl-4">
+            // Lay columns as a ROW (grid), mirroring the real render in
+            // tree.ts planSection: N equal tracks, or collapse → empty cols 0fr.
+            <ul
+              className="mt-2 grid gap-2 border-l border-border pl-4"
+              style={{ gridTemplateColumns: sectionGridCols(b) }}
+            >
               {sectionColumns(b).map((col, ci) => {
                 const slotKey = `${b.id}:${ci}`;
                 const active = hoverSlot === slotKey;

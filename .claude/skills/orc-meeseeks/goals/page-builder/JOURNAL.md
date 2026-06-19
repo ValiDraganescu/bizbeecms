@@ -337,3 +337,20 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   manually regen the CMS bundle (PM `predeploy` auto-regens it; not my task's to own).
 - **Files:** CMS/src/lib/render/theme.ts, CMS/src/lib/render/theme.test.ts, CMS/src/db/settings-store.ts,
   CMS/src/lib/render/render-page.tsx
+
+## 2026-06-19 20:23 — BUG P2: Layers-tree columns stacked vertically instead of as a row
+- **Status:** DONE
+- **What I did:** Fixed the Layers tree (`LayersTree` in `page-builder-shell.tsx` ~1014) showing a
+  multi-column Section's columns STACKED VERTICALLY instead of side-by-side as a ROW. Cause was the
+  `<ul className="mt-2 space-y-2 …">` wrapping the `sectionColumns(b).map(...)` — `space-y-2` is a vertical
+  stack. Replaced with `display:grid` + `gridTemplateColumns` driven by a NEW pure helper `sectionGridCols`
+  (page-blocks.ts) that MIRRORS the render math in `tree.ts` planSection: "collapse" behavior → empty
+  columns shrink to `0fr`, otherwise `repeat(N, 1fr)` equal tracks from the Section's `columns` prop. Each
+  column stays its own drop target (handlers unchanged). Single source = the Layers view now matches the
+  actual grid render.
+- **Verified:** added 2 regression tests to `scripts/page-blocks.test.mjs` (2-/3-col → `repeat(N, 1fr)`;
+  collapse with one filled col → `1fr 0fr`); `node --test scripts/page-blocks.test.mjs` 15/15 green;
+  `npx tsc --noEmit` clean; `npx opennextjs-cloudflare build` green (port 3601 free). Did NOT regen the CMS
+  bundle (PM predeploy auto-regens; not this task's to own).
+- **Files:** CMS/src/components/page-builder/page-builder-shell.tsx, CMS/src/lib/pages/page-blocks.ts,
+  CMS/scripts/page-blocks.test.mjs
