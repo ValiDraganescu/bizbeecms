@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { ADMIN_SECTIONS } from "@/components/admin-nav";
+import { ADMIN_SECTIONS } from "@/components/admin-sections";
 
 export const dynamic = "force-dynamic";
 

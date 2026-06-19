@@ -4,23 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { LocaleSwitcher } from "@/components/locale-switcher";
-
-/**
- * Section links shown in the admin nav AND on the /admin index page (slice #6).
- * Single source of truth so the two stay in sync. Settings' sub-pages
- * (content-locales / theme / brand) are grouped under one "Settings" link
- * pointing at content-locales (the simpler option per NEXT.md) — no sub-nav.
- *
- * `key` is both the i18n label key (adminNav.<key>) and description key
- * (adminNav.desc.<key>); "home" has no desc (it's the landing itself).
- */
-export const ADMIN_SECTIONS = [
-  { key: "chat", href: "/admin/chat" },
-  { key: "pages", href: "/admin/pages" },
-  { key: "components", href: "/admin/components" },
-  { key: "media", href: "/admin/media" },
-  { key: "settings", href: "/admin/settings/content-locales" },
-] as const;
+import { ADMIN_SECTIONS } from "@/components/admin-sections";
 
 /**
  * Persistent admin nav rendered by the (already auth-guarded) /admin/layout.tsx,
