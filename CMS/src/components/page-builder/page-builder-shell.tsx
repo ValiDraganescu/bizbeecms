@@ -45,6 +45,7 @@ import {
   isSection,
   isSectionColumn,
   mergeSectionProps,
+  deleteColumn,
   targetSectionId,
   moveNode,
   findBlock,
@@ -277,6 +278,15 @@ export function PageBuilderShell({
       }
       return mergeBlockProps(b, columnId, next);
     });
+    setDirty(true);
+  }
+
+  // Delete a SPECIFIC column, discarding its components (distinct from the
+  // COLUMNS control's shrink-reflow). Decrements the Section's columns via the
+  // pure deleteColumn; clears selection if the deleted column was selected.
+  function onDeleteColumn(columnId: string) {
+    setBlocks((b) => deleteColumn(b, columnId));
+    setSelectedBlockId((cur) => (cur === columnId ? null : cur));
     setDirty(true);
   }
 
@@ -529,6 +539,7 @@ export function PageBuilderShell({
                   onSelect={setSelectedBlockId}
                   onDropComponent={onDropComponentToColumn}
                   onMoveNode={onMoveNode}
+                  onDeleteColumn={onDeleteColumn}
                 />
               )}
               {/* Drop indicator: a blue line where the new Section appends. */}
@@ -1033,18 +1044,22 @@ function LayersTree({
   onSelect,
   onDropComponent,
   onMoveNode,
+  onDeleteColumn,
 }: {
   blocks: Block[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onDropComponent: (sectionId: string, colIndex: number, name: string) => void;
   onMoveNode: (dragId: string, targetId: string, position: "before" | "after" | "into") => void;
+  onDeleteColumn: (columnId: string) => void;
 }) {
   const t = useTranslations("pageBuilder");
   // The column-drop slot under the cursor, keyed `${sectionId}:${colIndex}`.
   const [hoverSlot, setHoverSlot] = useState<string | null>(null);
   // Reorder hover: which node + which half (before/after) the cursor is over.
   const [hoverEdge, setHoverEdge] = useState<{ id: string; pos: "before" | "after" } | null>(null);
+  // Which column's delete is awaiting in-app confirm (NOT native window.confirm).
+  const [confirmDeleteCol, setConfirmDeleteCol] = useState<string | null>(null);
 
   function nodeClass(id: string): string {
     return (
@@ -1157,19 +1172,69 @@ function LayersTree({
                         : "border-border bg-surface-muted")
                     }
                   >
-                    <button
-                      type="button"
-                      onClick={() => onSelect(col.id)}
-                      aria-pressed={selectedId === col.id}
-                      className={
-                        "w-full rounded px-1 pb-1 text-left font-mono text-[11px] uppercase tracking-wide transition-colors " +
-                        (selectedId === col.id
-                          ? "text-primary"
-                          : "text-foreground-muted hover:text-foreground")
-                      }
-                    >
-                      {t("column")} {ci + 1}
-                    </button>
+                    <div className="flex items-center gap-1 pb-1">
+                      <button
+                        type="button"
+                        onClick={() => onSelect(col.id)}
+                        aria-pressed={selectedId === col.id}
+                        className={
+                          "flex-1 rounded px-1 text-left font-mono text-[11px] uppercase tracking-wide transition-colors " +
+                          (selectedId === col.id
+                            ? "text-primary"
+                            : "text-foreground-muted hover:text-foreground")
+                        }
+                      >
+                        {t("column")} {ci + 1}
+                      </button>
+                      {sectionColumns(b).length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteCol(col.id)}
+                          title={t("deleteColumn.action")}
+                          aria-label={t("deleteColumn.action")}
+                          className="rounded p-0.5 text-foreground-muted transition-colors hover:text-foreground"
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-3.5 w-3.5"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M3 6h18M8 6V4h8v2m-9 0v14a2 2 0 002 2h6a2 2 0 002-2V6" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    {confirmDeleteCol === col.id && (
+                      <div className="mb-1.5 rounded-md border border-border bg-surface p-2">
+                        <p className="mb-1.5 text-xs text-foreground">
+                          {t("deleteColumn.confirm")}
+                        </p>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onDeleteColumn(col.id);
+                              setConfirmDeleteCol(null);
+                            }}
+                            className="rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground"
+                          >
+                            {t("deleteColumn.action")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteCol(null)}
+                            className="rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-surface-muted"
+                          >
+                            {t("deleteColumn.cancel")}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     {(col.children?.length ?? 0) > 0 ? (
                       <ul className="space-y-1.5">
                         {col.children!.map((c) => (

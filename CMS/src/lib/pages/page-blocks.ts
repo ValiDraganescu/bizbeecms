@@ -506,6 +506,34 @@ export function setSectionColumns(blocks: Block[], sectionId: string, n: number)
 }
 
 /**
+ * Delete a SPECIFIC column from its parent Section, DISCARDING its components
+ * (immutable). Distinct from `setSectionColumns` shrink, which reflows a removed
+ * column's content into the last kept column — this drops the column's children
+ * entirely (e.g. keep column 2, throw away column 1).
+ *
+ * Removes that `__section_column__` node AND decrements the parent Section's
+ * `props.columns` so the grid recomputes (out-of-sync columns would mis-render).
+ * GUARD: a Section must keep ≥1 column — deleting the only column is a no-op.
+ * No-op if `columnId` isn't a Section column. PURE — never mutates inputs.
+ */
+export function deleteColumn(blocks: Block[], columnId: string): Block[] {
+  return blocks.map((section) => {
+    if (!isSection(section)) {
+      return section.children
+        ? { ...section, children: deleteColumn(section.children, columnId) }
+        : section;
+    }
+    const cols = sectionColumns(section);
+    const target = cols.find((c) => c.id === columnId);
+    if (!target) return section;
+    if (cols.length <= 1) return section; // keep ≥1 column
+    const nextChildren = (section.children ?? []).filter((c) => c.id !== columnId);
+    const remaining = nextChildren.filter(isSectionColumn).length;
+    return { ...section, props: { ...section.props, columns: remaining }, children: nextChildren };
+  });
+}
+
+/**
  * Append a component block into a Section's column at `colIndex` (0-based),
  * immutable. No-op if `sectionId` isn't a Section or `colIndex` is out of range.
  * The new child gets an id unique across the whole tree.

@@ -391,6 +391,11 @@
       "tablet": "Tabletti",
       "desktop": "Työpöytä"
     },
+    "deleteColumn": {
+      "action": "Poista sarake",
+      "confirm": "Poistetaanko tämä sarake ja sen komponentit?",
+      "cancel": "Peruuta"
+    },
     "dropComponentHint": "Pudota komponentti tähän",
     "componentNoProps": "Tällä komponentilla ei ole muokattavia ominaisuuksia.",
     "localePickerLabel": "Muokattava kieli",

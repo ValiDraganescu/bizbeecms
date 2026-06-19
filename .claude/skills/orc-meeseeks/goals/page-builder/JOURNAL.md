@@ -482,3 +482,21 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** `CMS/src/lib/render/tree.ts`, `CMS/src/lib/render/utility-css.ts`,
   `CMS/src/components/page-builder/page-builder-shell.tsx`, `CMS/scripts/render-tree.test.mjs`,
   `CMS/scripts/utility-css.test.mjs`, `CMS/messages/{en,fi,et}.json`.
+
+## 2026-06-19 21:08 — Delete a SPECIFIC column (discard its components)
+- **Status:** DONE
+- **What I did:** Added pure `deleteColumn(blocks, columnId)` to `page-blocks.ts` — removes the
+  `__section_column__` node AND its components, then sets the parent Section's `props.columns` to the
+  remaining column count (so the grid recomputes; distinct from `setSectionColumns` shrink which
+  REFLOWS content into the last kept column). Guard: a Section keeps ≥1 column — deleting the only
+  column is a no-op. Recurses into nested children. Wired a trash affordance onto each "Column N" label
+  in `LayersTree` (page-builder-shell.tsx), shown only when the Section has >1 column, behind the SAME
+  in-app confirm pattern as PageSettings (a `confirmDeleteCol` state swaps in an inline Delete/Cancel
+  row — NOT native window.confirm). New `onDeleteColumn` shell handler clears selection if the deleted
+  column was selected. i18n `pageBuilder.deleteColumn.{action,confirm,cancel}` EN/FI/ET.
+- **Verified:** `node --test scripts/page-blocks.test.mjs` 17/17 (2 new deleteColumn tests: delete col 1
+  of 2 → col 2's component survives as sole column + columns==1; deleting the only column is a no-op).
+  `npx tsc --noEmit` exit 0 (fully clean). `npx opennextjs-cloudflare build` complete (dev stopped, 3601
+  free), worker.js written. Did NOT regen cms-bundle (PM predeploy auto-regens).
+- **Files:** `CMS/src/lib/pages/page-blocks.ts`, `CMS/src/components/page-builder/page-builder-shell.tsx`,
+  `CMS/scripts/page-blocks.test.mjs`, `CMS/messages/{en,fi,et}.json`.

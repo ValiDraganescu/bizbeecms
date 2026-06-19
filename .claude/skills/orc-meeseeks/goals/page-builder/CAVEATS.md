@@ -295,3 +295,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   add a second panel. Column props patch-merge through `onUpdateColumnProps` (page-builder-shell.tsx) →
   `mergeBlockProps` (a column is a normal tree node; `false`/`undefined` in the patch DELETES the key so
   storage stays sparse / reverts to render default).
+
+- DELETE-A-COLUMN ≠ SHRINK (2026-06-19 21:08): two distinct column ops, don't conflate. `setSectionColumns`
+  (COLUMNS segmented control) shrink REFLOWS a removed column's content into the last kept column (keeps
+  content). `deleteColumn(blocks, columnId)` (page-blocks.ts, trash icon on the "Column N" Layers label)
+  DISCARDS that column's components and sets `props.columns` to the remaining count. GUARD: a Section keeps
+  ≥1 column — `deleteColumn` on the only column is a NO-OP. The trash button only renders when
+  `sectionColumns(b).length > 1`, and `onDeleteColumn` clears `selectedBlockId` if it was the deleted column.
+  In-app confirm = `confirmDeleteCol` state in `LayersTree` (inline Delete/Cancel row, the PageSettings
+  pattern — NOT native window.confirm). i18n keys live under `pageBuilder.deleteColumn.{action,confirm,cancel}`.

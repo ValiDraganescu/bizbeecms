@@ -391,6 +391,11 @@
       "tablet": "Tablet",
       "desktop": "Desktop"
     },
+    "deleteColumn": {
+      "action": "Delete column",
+      "confirm": "Delete this column and its components?",
+      "cancel": "Cancel"
+    },
     "dropComponentHint": "Drop a component here",
     "componentNoProps": "This component has no configurable properties.",
     "localePickerLabel": "Editing language",

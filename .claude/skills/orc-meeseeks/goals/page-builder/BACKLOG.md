@@ -131,7 +131,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   queries. The page-builder's own viewport toggle (Desktop/Tablet/Mobile) should reflect the hidden state in
   Preview. Depends on the Column settings panel + benefits from the responsive-grid task. Pure mapping
   (props→classes) tested. i18n EN/FI/ET. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
-- TODO: **Delete a SPECIFIC column (discard its components) — distinct from shrink-reflow.** The COLUMNS
+- DONE (2026-06-19 21:08): **Delete a SPECIFIC column (discard its components) — distinct from shrink-reflow.**
+  Pure `deleteColumn(blocks, columnId)` in page-blocks.ts removes the `__section_column__` node + its
+  components and sets the parent Section's `props.columns` to the remaining column count (≥1 guard: deleting
+  the only column is a no-op). Trash affordance on each "Column N" Layers label (shown only when >1 column),
+  behind the same in-app confirm pattern as PageSettings (`confirmDeleteCol` state, NOT native window.confirm);
+  `onDeleteColumn` shell handler clears selection if the deleted column was selected. i18n
+  `pageBuilder.deleteColumn.{action,confirm,cancel}` EN/FI/ET. Tests page-blocks 17/17 (+2). tsc + opennext
+  green. See JOURNAL 21:08. (Original text retained below.)
+- TODO (ORIGINAL TEXT, kept for ref): **Delete a SPECIFIC column (discard its components) — distinct from shrink-reflow.** The COLUMNS
   segmented control's shrink (`setSectionColumns`, page-blocks.ts ~461) keeps content — it reflows a removed
   column's components into the LAST kept column. KEEP that (the user likes it). This task adds the OTHER
   operation: delete COLUMN N specifically, DISCARDING its components, e.g. so a 2-col Section keeps column 2

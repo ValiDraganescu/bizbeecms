@@ -391,6 +391,11 @@
       "tablet": "Tahvelarvuti",
       "desktop": "Töölaud"
     },
+    "deleteColumn": {
+      "action": "Kustuta veerg",
+      "confirm": "Kas kustutada see veerg ja selle komponendid?",
+      "cancel": "Tühista"
+    },
     "dropComponentHint": "Lohista komponent siia",
     "componentNoProps": "Sellel komponendil pole muudetavaid omadusi.",
     "localePickerLabel": "Muudetav keel",

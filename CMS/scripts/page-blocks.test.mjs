@@ -19,6 +19,7 @@ import {
   addSection,
   setSectionColumns,
   addComponentToColumn,
+  deleteColumn,
   sectionGridCols,
   localeFieldValue,
   moveBlock,
@@ -216,6 +217,39 @@ test("sectionGridCols mirrors the render: N equal tracks (Layers row, not stacke
 
   blocks = setSectionColumns(blocks, sectionId, 3);
   assert.equal(sectionGridCols(blocks[0]), "repeat(3, 1fr)");
+});
+
+test("deleteColumn drops a specific column + its components, decrements columns", () => {
+  // 2-col Section: col 0 has a Hero, col 1 has a Cta. Delete col 0 (discard its
+  // Hero); col 1's Cta survives as the SOLE column, columns==1.
+  let blocks = addSection([]);
+  const sectionId = blocks[0].id;
+  blocks = setSectionColumns(blocks, sectionId, 2);
+  blocks = addComponentToColumn(blocks, sectionId, 0, "Hero");
+  blocks = addComponentToColumn(blocks, sectionId, 1, "Cta");
+  const cols = blocks[0].children.filter((c) => c.component === "__section_column__");
+  const col0Id = cols[0].id;
+
+  blocks = deleteColumn(blocks, col0Id);
+  const after = blocks[0].children.filter((c) => c.component === "__section_column__");
+  assert.equal(after.length, 1, "one column remains");
+  assert.equal(blocks[0].props.columns, 1, "columns prop decremented");
+  // The surviving column is the old col 1 (its Cta is intact); the Hero is gone.
+  assert.equal(after[0].children[0].component, "Cta");
+  const allComponents = JSON.stringify(blocks);
+  assert.ok(!allComponents.includes('"Hero"'), "deleted column's component discarded");
+});
+
+test("deleteColumn refuses to delete the only column (no-op)", () => {
+  let blocks = addSection([]); // 1 column by default
+  const sectionId = blocks[0].id;
+  blocks = addComponentToColumn(blocks, sectionId, 0, "Hero");
+  const onlyCol = blocks[0].children.find((c) => c.component === "__section_column__");
+
+  const after = deleteColumn(blocks, onlyCol.id);
+  const cols = after[0].children.filter((c) => c.component === "__section_column__");
+  assert.equal(cols.length, 1, "last column is NOT deleted");
+  assert.equal(cols[0].children[0].component, "Hero", "content untouched");
 });
 
 test("sectionGridCols collapse behavior shrinks empty columns to 0fr", () => {
