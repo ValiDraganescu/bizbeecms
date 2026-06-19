@@ -5,7 +5,13 @@
  * color tokens into collapsible families (Brand, Surfaces, Text, …) — inspired
  * by the aicms theme editor — each row showing a swatch-cluster summary that
  * expands to per-token swatch + free-text controls. A live preview panel re-
- * themes instantly as you edit (overrides applied as inline --color-* vars).
+ * themes instantly as you edit.
+ *
+ * The editor opens FULLY POPULATED with the globals.css defaults (DEFAULT_THEME)
+ * so every default is visible and tweakable. Storage stays SPARSE: on save we
+ * persist only the tokens whose value differs from the default (a field back at
+ * its default is "no override"). Predefined palettes (THEME_PRESETS) apply a
+ * full palette in one click.
  *
  * Storage is single-palette: overrides serialize to `:root{}` and win over
  * globals.css on the published route (see lib/render/theme.ts). The published
@@ -14,13 +20,15 @@
  *
  * GET/PUT `/api/settings/theme`; the server re-validates (known tokens + safe
  * colors), so the validation source of truth stays lib/render/theme.ts. REST
- * only, copy via next-intl. ponytail: optimistic local edit then one PUT;
- * native <input type="color"> + text field; no form lib, no picker lib.
+ * only, copy via next-intl. ponytail: native <input type="color"> + text field;
+ * no form lib, no picker lib.
  */
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
+  DEFAULT_THEME,
+  THEME_PRESETS,
   THEME_TOKENS,
   isSafeColorValue,
   type ThemeOverrides,
@@ -46,44 +54,70 @@ const GROUPS: { key: string; tokens: ThemeToken[] }[] = [
   },
 ];
 
-/** Default swatch shown when a token has no override or a non-hex value. */
+/** Full effective palette: defaults with the stored overrides laid on top. */
+function effectiveFrom(overrides: ThemeOverrides): Record<ThemeToken, string> {
+  const out = { ...DEFAULT_THEME };
+  for (const token of THEME_TOKENS) {
+    if (overrides[token]) out[token] = overrides[token];
+  }
+  return out;
+}
+
+/** Sparse overrides = the effective values that differ from the default. */
+function diffFromDefault(effective: Record<ThemeToken, string>): ThemeOverrides {
+  const out: ThemeOverrides = {};
+  for (const token of THEME_TOKENS) {
+    if (effective[token].trim() !== DEFAULT_THEME[token]) out[token] = effective[token];
+  }
+  return out;
+}
+
+/** <input type="color"> only takes #rrggbb; pass hex through, else neutral. */
 const NEUTRAL = "#888888";
 const hexOf = (v: string) => (/^#[0-9a-f]{6}$/i.test(v) ? v : NEUTRAL);
 
-/** Inline --color-* vars for the live-preview container, from current edits. */
-function previewVars(overrides: ThemeOverrides): React.CSSProperties {
+/** Inline --color-* vars for the live-preview container. */
+function previewVars(effective: Record<ThemeToken, string>): React.CSSProperties {
   const style: Record<string, string> = {};
-  for (const [token, value] of Object.entries(overrides)) {
-    if (isSafeColorValue(value)) style[`--color-${token}`] = value;
+  for (const token of THEME_TOKENS) {
+    if (isSafeColorValue(effective[token])) style[`--color-${token}`] = effective[token];
   }
   return style as React.CSSProperties;
 }
 
 export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
   const t = useTranslations("theme");
-  const [overrides, setOverrides] = useState<ThemeOverrides>(initial);
+  // Editing state is the FULL effective palette (always populated).
+  const [palette, setPalette] = useState<Record<ThemeToken, string>>(() =>
+    effectiveFrom(initial),
+  );
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const dirtyCount = useMemo(() => Object.keys(overrides).length, [overrides]);
+  const overrides = useMemo(() => diffFromDefault(palette), [palette]);
+  const overrideCount = Object.keys(overrides).length;
 
-  function setToken(token: string, value: string) {
+  function setToken(token: ThemeToken, value: string) {
     setSaved(false);
     setError(null);
-    setOverrides((prev) => {
-      const next = { ...prev };
-      if (value.trim() === "") delete next[token];
-      else next[token] = value;
-      return next;
-    });
+    // Empty input → snap back to the default (the field is never truly blank).
+    setPalette((p) => ({ ...p, [token]: value === "" ? DEFAULT_THEME[token] : value }));
   }
 
   function resetAll() {
     setSaved(false);
     setError(null);
-    setOverrides({});
+    setPalette({ ...DEFAULT_THEME });
+  }
+
+  function applyPreset(key: string) {
+    const preset = THEME_PRESETS.find((p) => p.key === key);
+    if (!preset) return;
+    setSaved(false);
+    setError(null);
+    setPalette(effectiveFrom(preset.overrides));
   }
 
   async function save() {
@@ -112,7 +146,8 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
         setError(msg);
         return;
       }
-      setOverrides((await res.json()) as ThemeOverrides);
+      // Adopt the server's normalized truth (it drops unknown/unsafe entries).
+      setPalette(effectiveFrom((await res.json()) as ThemeOverrides));
       setSaved(true);
     } catch (err) {
       setError((err as Error).message);
@@ -123,16 +158,36 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-foreground-muted">
-          {t("overrideCount", { count: dirtyCount })}
-        </p>
+      {/* Toolbar: preset picker + count + reset/save */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <label className="flex items-center gap-2 text-sm text-foreground-muted">
+          {t("presetLabel")}
+          <select
+            className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            defaultValue=""
+            onChange={(e) => {
+              applyPreset(e.target.value);
+              e.target.selectedIndex = 0; // back to the "choose…" placeholder
+            }}
+          >
+            <option value="" disabled>
+              {t("presetPlaceholder")}
+            </option>
+            {THEME_PRESETS.map((p) => (
+              <option key={p.key} value={p.key}>
+                {t(`preset.${p.key}`)}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="flex items-center gap-2">
+          <span className="text-sm text-foreground-muted">
+            {t("overrideCount", { count: overrideCount })}
+          </span>
           <button
             type="button"
             className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground-muted hover:text-foreground disabled:opacity-40"
-            disabled={dirtyCount === 0}
+            disabled={overrideCount === 0}
             onClick={resetAll}
           >
             {t("resetAll")}
@@ -159,22 +214,19 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
             >
               <button
                 type="button"
-                onClick={() =>
-                  setOpen((p) => ({ ...p, [group.key]: !isOpen }))
-                }
+                onClick={() => setOpen((p) => ({ ...p, [group.key]: !isOpen }))}
                 aria-expanded={isOpen}
                 className="flex w-full items-center gap-3 px-4 py-3 text-left"
               >
                 <span className="flex-1 font-medium text-foreground">
                   {t(`group.${group.key}`)}
                 </span>
-                {/* Swatch-cluster summary */}
                 <span className="flex -space-x-1.5" aria-hidden>
                   {group.tokens.map((token) => (
                     <span
                       key={token}
                       className="h-4 w-4 rounded-full border border-border"
-                      style={{ background: hexOf(overrides[token] ?? "") }}
+                      style={{ background: palette[token] }}
                     />
                   ))}
                 </span>
@@ -197,12 +249,10 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
               {isOpen && (
                 <ul className="flex flex-col divide-y divide-border border-t border-border">
                   {group.tokens.map((token) => {
-                    const value = overrides[token] ?? "";
+                    const value = palette[token];
+                    const isOverridden = value.trim() !== DEFAULT_THEME[token];
                     return (
-                      <li
-                        key={token}
-                        className="flex items-center gap-3 px-4 py-2"
-                      >
+                      <li key={token} className="flex items-center gap-3 px-4 py-2">
                         <span className="w-40 shrink-0 font-mono text-sm text-foreground">
                           {token}
                         </span>
@@ -224,7 +274,7 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
                         <button
                           type="button"
                           className="rounded border border-border px-2 py-1 text-sm text-foreground-muted hover:text-foreground disabled:opacity-40"
-                          disabled={value === ""}
+                          disabled={!isOverridden}
                           onClick={() => setToken(token, "")}
                         >
                           {t("reset")}
@@ -239,10 +289,9 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
         })}
       </ul>
 
-      {/* Live preview — overrides applied as inline vars so the sample re-themes
-          instantly without affecting the admin chrome. */}
+      {/* Live preview — effective palette applied as inline vars. */}
       <section
-        style={previewVars(overrides)}
+        style={previewVars(palette)}
         className="rounded-md border border-border bg-surface p-4"
       >
         <h3 className="mb-3 text-sm font-medium text-foreground-muted">
@@ -294,13 +343,11 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
   );
 }
 
-/** Compile-time guard: GROUPS must cover every THEME_TOKEN exactly once. */
+/** Dev-time guard: GROUPS must cover every THEME_TOKEN exactly once. */
 const _grouped = GROUPS.flatMap((g) => g.tokens);
 if (
   _grouped.length !== THEME_TOKENS.length ||
   new Set(_grouped).size !== THEME_TOKENS.length
 ) {
-  // ponytail: cheap dev-time assert so a future token added to THEME_TOKENS
-  // can't silently drop out of the configurator.
   console.error("theme-editor: GROUPS do not partition THEME_TOKENS");
 }

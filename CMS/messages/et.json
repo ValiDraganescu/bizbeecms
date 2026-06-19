@@ -61,6 +61,16 @@
     "saved": "Teema salvestatud.",
     "invalidValue": "Vigane värv tunnusele {token}: {value}",
     "resetAll": "Lähtesta kõik",
+    "presetLabel": "Eelseade",
+    "presetPlaceholder": "Vali eelseade…",
+    "preset": {
+      "default": "Vaikimisi (indigo)",
+      "emerald": "Smaragd",
+      "crimson": "Karmiinpunane",
+      "amber": "Merevaik",
+      "violet": "Violett",
+      "slate": "Kiltkivi"
+    },
     "overrideCount": "{count, plural, =0 {Korvamisi pole — kasutatakse vaikeväärtusi} one {# korvamine} other {# korvamist}}",
     "preview": "Eelvaade",
     "previewHeading": "Kiire pruun rebane",

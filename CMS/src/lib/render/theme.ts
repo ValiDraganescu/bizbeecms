@@ -55,6 +55,96 @@ export type ThemeToken = (typeof THEME_TOKENS)[number];
 
 const TOKEN_SET = new Set<string>(THEME_TOKENS);
 
+/**
+ * The light-mode default value for every token — a JS mirror of the `:root`
+ * block in globals.css. Lets the editor open fully populated (so an author can
+ * see and tweak each default) and lets "value === default" be treated as "no
+ * override" on save, keeping stored overrides sparse. KEEP IN SYNC with the
+ * `:root` `--color-*` declarations; the parity test guards drift.
+ */
+export const DEFAULT_THEME: Record<ThemeToken, string> = {
+  surface: "oklch(0.995 0.001 268)",
+  "surface-muted": "oklch(0.968 0.004 268)",
+  "surface-raised": "oklch(1 0 0)",
+  foreground: "oklch(0.24 0.012 268)",
+  "foreground-muted": "oklch(0.5 0.014 268)",
+  border: "oklch(0.915 0.006 268)",
+  primary: "oklch(0.5 0.19 268)",
+  "primary-hover": "oklch(0.43 0.19 268)",
+  "primary-foreground": "oklch(0.99 0.002 268)",
+  "primary-subtle": "oklch(0.95 0.03 268)",
+  danger: "oklch(0.55 0.2 18)",
+  "danger-hover": "oklch(0.48 0.2 18)",
+  "danger-foreground": "oklch(0.99 0.01 18)",
+  "danger-subtle": "oklch(0.955 0.03 18)",
+  success: "oklch(0.55 0.13 150)",
+  "success-foreground": "oklch(0.99 0.01 150)",
+  "success-subtle": "oklch(0.955 0.04 150)",
+  warning: "oklch(0.62 0.14 75)",
+  "warning-foreground": "oklch(0.99 0.01 75)",
+  "warning-subtle": "oklch(0.955 0.05 75)",
+  info: "oklch(0.55 0.13 240)",
+  "info-foreground": "oklch(0.99 0.01 240)",
+  "info-subtle": "oklch(0.955 0.035 240)",
+  ring: "oklch(0.5 0.19 268)",
+};
+
+/**
+ * Predefined palettes an author can apply in one click. Each preset only sets
+ * the few "character" tokens (the accent hue + its derivatives); the rest fall
+ * back to the defaults. `key` is an i18n label (theme.preset.<key>). Values are
+ * oklch so they re-tint consistently. The "default" preset clears all overrides.
+ */
+export const THEME_PRESETS: { key: string; overrides: ThemeOverrides }[] = [
+  { key: "default", overrides: {} },
+  {
+    key: "emerald",
+    overrides: {
+      primary: "oklch(0.55 0.14 160)",
+      "primary-hover": "oklch(0.48 0.14 160)",
+      "primary-subtle": "oklch(0.95 0.03 160)",
+      ring: "oklch(0.55 0.14 160)",
+    },
+  },
+  {
+    key: "crimson",
+    overrides: {
+      primary: "oklch(0.55 0.2 18)",
+      "primary-hover": "oklch(0.48 0.2 18)",
+      "primary-subtle": "oklch(0.955 0.03 18)",
+      ring: "oklch(0.55 0.2 18)",
+    },
+  },
+  {
+    key: "amber",
+    overrides: {
+      primary: "oklch(0.68 0.15 75)",
+      "primary-hover": "oklch(0.6 0.15 75)",
+      "primary-foreground": "oklch(0.24 0.04 75)",
+      "primary-subtle": "oklch(0.955 0.05 75)",
+      ring: "oklch(0.68 0.15 75)",
+    },
+  },
+  {
+    key: "violet",
+    overrides: {
+      primary: "oklch(0.5 0.22 300)",
+      "primary-hover": "oklch(0.43 0.22 300)",
+      "primary-subtle": "oklch(0.95 0.04 300)",
+      ring: "oklch(0.5 0.22 300)",
+    },
+  },
+  {
+    key: "slate",
+    overrides: {
+      primary: "oklch(0.45 0.03 250)",
+      "primary-hover": "oklch(0.38 0.03 250)",
+      "primary-subtle": "oklch(0.94 0.01 250)",
+      ring: "oklch(0.45 0.03 250)",
+    },
+  },
+];
+
 export function isThemeToken(name: string): name is ThemeToken {
   return TOKEN_SET.has(name);
 }

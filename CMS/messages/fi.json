@@ -61,6 +61,16 @@
     "saved": "Teema tallennettu.",
     "invalidValue": "Virheellinen väri tunnukselle {token}: {value}",
     "resetAll": "Palauta kaikki",
+    "presetLabel": "Esiasetus",
+    "presetPlaceholder": "Valitse esiasetus…",
+    "preset": {
+      "default": "Oletus (indigo)",
+      "emerald": "Smaragdi",
+      "crimson": "Karmiininpunainen",
+      "amber": "Meripihka",
+      "violet": "Violetti",
+      "slate": "Liuske"
+    },
     "overrideCount": "{count, plural, =0 {Ei korvauksia — käytetään oletuksia} one {# korvaus} other {# korvausta}}",
     "preview": "Esikatselu",
     "previewHeading": "Nopea ruskea kettu",

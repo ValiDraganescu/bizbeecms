@@ -61,6 +61,16 @@
     "saved": "Theme saved.",
     "invalidValue": "Invalid color for {token}: {value}",
     "resetAll": "Reset all",
+    "presetLabel": "Preset",
+    "presetPlaceholder": "Choose a preset…",
+    "preset": {
+      "default": "Default (indigo)",
+      "emerald": "Emerald",
+      "crimson": "Crimson",
+      "amber": "Amber",
+      "violet": "Violet",
+      "slate": "Slate"
+    },
     "overrideCount": "{count, plural, =0 {No overrides — using defaults} one {# override} other {# overrides}}",
     "preview": "Live preview",
     "previewHeading": "The quick brown fox",

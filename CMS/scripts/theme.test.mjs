@@ -17,6 +17,8 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   THEME_TOKENS,
+  DEFAULT_THEME,
+  THEME_PRESETS,
   isThemeToken,
   isSafeColorValue,
   normalizeThemeOverrides,
@@ -120,6 +122,51 @@ test("normalizeThemeOverrides: garbage → empty object, never throws", () => {
   for (const junk of [null, undefined, 5, "str", [], [1, 2]]) {
     assert.deepEqual(normalizeThemeOverrides(junk), {});
   }
+});
+
+test("DEFAULT_THEME: one safe value per token, matching globals.css :root", () => {
+  // Every token has a default, and each default is itself a safe color value.
+  for (const token of THEME_TOKENS) {
+    const v = DEFAULT_THEME[token];
+    assert.ok(typeof v === "string" && v.trim() !== "", `${token} default missing`);
+    assert.ok(isSafeColorValue(v), `${token} default not a safe color: ${v}`);
+  }
+  assert.equal(
+    Object.keys(DEFAULT_THEME).length,
+    THEME_TOKENS.length,
+    "DEFAULT_THEME has an entry per token and no extras",
+  );
+
+  // Drift guard: the values must equal the light-mode :root in globals.css.
+  const css = readFileSync(join(here, "..", "src", "app", "globals.css"), "utf8");
+  const root = css.slice(css.indexOf(":root"), css.indexOf("/* Dark token"));
+  for (const token of THEME_TOKENS) {
+    const m = root.match(new RegExp(`--color-${token}\\s*:\\s*([^;]+);`));
+    assert.ok(m, `globals.css :root missing --color-${token}`);
+    assert.equal(
+      m[1].trim(),
+      DEFAULT_THEME[token],
+      `--color-${token} drifted from DEFAULT_THEME`,
+    );
+  }
+});
+
+test("THEME_PRESETS: every preset is known tokens + safe values", () => {
+  assert.ok(THEME_PRESETS.length > 0);
+  const keys = new Set();
+  for (const preset of THEME_PRESETS) {
+    assert.ok(!keys.has(preset.key), `duplicate preset key ${preset.key}`);
+    keys.add(preset.key);
+    // A preset is just sparse overrides — must survive normalization unchanged.
+    assert.deepEqual(
+      normalizeThemeOverrides(preset.overrides),
+      preset.overrides,
+      `preset ${preset.key} has an unknown token or unsafe value`,
+    );
+  }
+  // The "default" preset clears everything.
+  const def = THEME_PRESETS.find((p) => p.key === "default");
+  assert.deepEqual(def?.overrides, {}, "default preset must be empty");
 });
 
 test("themeOverridesToCss: emits a safe :root rule, empty for no overrides", () => {
