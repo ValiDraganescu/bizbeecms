@@ -8,10 +8,12 @@
 
   // Stable custom domain on the bizbeecms.com zone (Cloudflare attaches the
   // hostname + cert automatically on deploy). PM's DEPLOYER_URL points here.
-  // The old bizbeecms-deployer.<account>.workers.dev URL stays reachable as a
-  // fallback (workers.dev subdomain is not disabled).
+  // The SECOND, plain route `deployer.bizbeecms.com/*` is REQUIRED to out-specific
+  // the router's `*/*` route (for CF-for-SaaS) — on this zone a route beats a Worker
+  // custom domain, so without it the */* router would swallow deployer and 404 it.
   "routes": [
-    { "pattern": "deployer.bizbeecms.com", "custom_domain": true }
+    { "pattern": "deployer.bizbeecms.com", "custom_domain": true },
+    { "pattern": "deployer.bizbeecms.com/*", "zone_name": "bizbeecms.com" }
   ],
 
   // The on-demand container that runs the real CMS build + wrangler deploy.

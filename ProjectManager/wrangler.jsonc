@@ -11,10 +11,16 @@
   "observability": {
     "enabled": true
   },
-  // Custom domain on the bizbeecms.com zone. Cloudflare attaches the hostname +
-  // cert on `wrangler deploy`; the workers.dev subdomain stays reachable as a
-  // fallback. (Same shape as deployer/wrangler.jsonc.)
-  "routes": [{ "pattern": "manager.bizbeecms.com", "custom_domain": true }],
+  // Custom domain on the bizbeecms.com zone (Cloudflare attaches hostname + cert
+  // on deploy). The SECOND, plain route `manager.bizbeecms.com/*` is REQUIRED: the
+  // router owns a `*/*` route for Cloudflare-for-SaaS custom hostnames, and on this
+  // zone a route beats a Worker custom domain — so without this more-specific route
+  // the `*/*` router would swallow manager.bizbeecms.com and 404 it. This route
+  // out-specifics `*/*` and keeps PM on its own Worker. (See router/wrangler.jsonc.)
+  "routes": [
+    { "pattern": "manager.bizbeecms.com", "custom_domain": true },
+    { "pattern": "manager.bizbeecms.com/*", "zone_name": "bizbeecms.com" }
+  ],
   "vars": {
     "APP_ORIGIN": "https://manager.bizbeecms.com",
     "DEPLOYER_URL": "https://deployer.bizbeecms.com"

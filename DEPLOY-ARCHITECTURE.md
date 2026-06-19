@@ -56,7 +56,43 @@ The `.site.*` namespace avoids the collision in #2, BUT the **free universal cer
 record. The router route `*.site.bizbeecms.com/*` is deployed but DORMANT (no DNS resolves to it). Code
 is all in place to flip it on later.
 
-### 4. ✅ WHAT WORKS NOW: sites stay on workers.dev (option B)
+### 6. ✅ Cloudflare-for-SaaS custom customer domains — the EXACT working recipe (verified live: www.restovista.com → test-1)
+Pointing a customer's own domain (e.g. `www.restovista.com`, registered anywhere) at a Site is
+CF-for-SaaS. It took several wrong turns; this is the verified-working setup. ALL of these are required:
+
+1. **Attach the custom hostname** — PM custom-domain form → deployer `/attach-domain` → CF
+   `custom_hostnames` API (`ssl: {method:"txt", type:"dv"}`) + writes `HOST_MAP[hostname]=slug`.
+2. **Customer adds DNS at their registrar** (the PM UI now shows all of these — see fix in trap #7):
+   - **Routing:** `CNAME www.<domain> → cf.bizbeecms.com` (subdomain). An apex can't CNAME → use
+     `A @ → 104.21.34.242` + `A @ → 172.67.210.25` (CF anycast).
+   - **Cert validation:** add the `_acme-challenge.<host>` **TXT** record(s) CF returns (the hostname
+     is created with TXT method, so the TXT — NOT the DCV CNAME — is what validates it). Two TXT values
+     are returned; add both. Cert goes `pending_validation` → `active` within minutes.
+3. **Fallback Origin = `cf.bizbeecms.com`** (SSL/TLS → Custom Hostnames → Fallback Origin), and its DNS
+   record MUST be **originless: `AAAA 100::`, Proxied** — ⚠️ NOT `A 192.0.2.1`. A real IP makes CF
+   attempt an origin pull → **522 Connection timed out**. `100::` is the documented black-hole that tells
+   CF to route to the edge/Worker instead. (This was the 522 we hit.)
+4. **Router `*/*` route** — CF-for-SaaS only delivers custom-hostname traffic to a Worker via a `*/*`
+   route on the fallback-origin zone (CF "Worker as origin" docs). A host-specific route does NOT catch
+   SaaS traffic. `cf.bizbeecms.com/*` alone is NOT enough — the router never fired until `*/*` existed.
+5. **Protect infra hosts from `*/*`** — `*/*` is greedy and (on this zone) BEATS the Worker custom
+   domains for manager/deployer (verified: they 404'd the instant `*/*` went live). Fix: PM and deployer
+   each declare a MORE-SPECIFIC route for their own host (`manager.bizbeecms.com/*`,
+   `deployer.bizbeecms.com/*`) in their wrangler.jsonc, which out-specifics `*/*`. Verified: all three
+   (manager 200, deployer its-own-404, www.restovista 200) work simultaneously.
+
+**Net zone route table (live, working):** `*/*`→router, `manager.bizbeecms.com/*`→PM,
+`deployer.bizbeecms.com/*`→deployer, `cf.bizbeecms.com/*`+`*.site.bizbeecms.com/*`→router (last two
+redundant under `*/*`, kept for clarity). Adding a NEW infra host on the zone? It WILL be swallowed by
+`*/*` unless you add its own more-specific route.
+
+### 7. PM UI hid the DV records the customer must add
+The deployer read `ssl.txt_name` (top-level), but CF returns DV records under `ssl.validation_records[]`
+(+ a DCV-delegation CNAME under `ssl.dcv_delegation_records[]`). So the form showed only the routing
+CNAME and told the operator to "add the TXT record" it never displayed. Fixed: deployer parses both
+shapes; form shows routing (CNAME + apex A) and all validation records.
+
+### 4. ✅ WHAT WORKS NOW: per-Site default URL stays workers.dev (option B)
 `cmsWorkerUrl()` (`ProjectManager/src/lib/deploy/worker-url.ts`) returns
 `https://<workerName>.vali-draganescu88.workers.dev` directly. No ACM cost. Customer-owned custom
 domains still work for free via the existing `/attach-domain` + `HOST_MAP` + router flow (each is a single
@@ -199,15 +235,14 @@ right per-Site CMS Worker by `Host`.
 - ✅ **Stale `*.bizbeecms.com/*` → `bizbee-platform-dispatcher` route DELETED** (trap #1) —
   it was shadowing the infra custom domains. Do NOT re-add a bare `*.bizbeecms.com/*` route
   (trap #2). If you ever need a zone-wide route, point it at `bizbeecms-router`, not a dispatcher.
-- ❌ **`CF_API_TOKEN` needs ZONE-scoped perms for custom hostnames** — the token is
-  currently all `Account`-scoped. custom_hostnames is a **Zone** resource, so add
-  **`Zone · SSL and Certificates · Edit`** + **`Zone · Zone · Read`** with a Zone
-  Resources include for `bizbeecms.com`. `/attach-domain` fails the call until this is added.
-- ❌ **Fallback Origin not yet set** in the CF dashboard (SSL/TLS → Custom Hostnames →
-  Fallback Origin = `cf.bizbeecms.com`).
-- ⚠️ Per-site `<slug>.site.bizbeecms.com` is NOT live (needs paid ACM + `*.site` DNS, trap #3).
-  Sites are served on workers.dev today (option B, trap #4). Customer-owned custom domains work
-  via `/attach-domain` once the zone-scoped token (above) is set.
+- ✅ **CF-for-SaaS custom customer domains WORK END-TO-END** (verified 2026-06-19:
+  `https://www.restovista.com` → test-1 CMS, valid cert). The deployer's `CF_API_TOKEN` has the
+  needed zone SSL perms (the `/attach-domain` call succeeded). Full working recipe = **trap #6**.
+- ✅ **Fallback Origin = `cf.bizbeecms.com`** set and Active; its DNS is **`AAAA 100::` Proxied**
+  (originless — NOT `192.0.2.1`, which 522'd; trap #6 step 3).
+- ✅ **Router `*/*` route live** + specific `manager.*`/`deployer.*` routes protect the infra hosts.
+- ⚠️ Per-site `<slug>.site.bizbeecms.com` is still NOT live (needs paid ACM + `*.site` DNS, trap #3).
+  Sites serve on workers.dev (option B, trap #4); customer-owned domains are the supported custom-URL path.
 
 ## Env-var / secret status (verified live 2026-06-18)
 

@@ -6,23 +6,25 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
-  // All customer custom hostnames (Cloudflare for SaaS) terminate at the
-  // bizbeecms.com zone and hit this Worker. It maps Host -> per-Site CMS Worker
-  // via the HOST_MAP KV and proxies. The route is a wildcard so EVERY custom
-  // hostname registered against the zone lands here.
+  // Customer custom hostnames (Cloudflare for SaaS) bind to the bizbeecms.com ZONE
+  // and reach this Worker via the *fallback origin* (cf.bizbeecms.com, an
+  // ORIGINLESS `AAAA 100::` proxied record — a real IP like 192.0.2.1 makes CF try
+  // an origin pull and 522s). For CF-for-SaaS to deliver custom-hostname traffic to
+  // a Worker, the recipe REQUIRES a `*/*` route (CF docs: "Worker as origin"). A
+  // host-specific route does NOT catch SaaS traffic; only `*/*` does.
+  //
+  // `*/*` is greedy — it would also swallow our own infra custom domains
+  // (manager/deployer). FIX: PM and deployer each declare a MORE-SPECIFIC route for
+  // their own host (manager.bizbeecms.com/*, deployer.bizbeecms.com/*) in THEIR
+  // wrangler.jsonc, which out-specifics `*/*` and keeps them on their own Worker.
+  // (On this zone a route beats a Worker custom domain — verified twice — so the
+  // specific routes, not the custom-domain bindings, are what protect them.)
   "routes": [
+    { "pattern": "*/*", "zone_name": "bizbeecms.com" },
+    // Redundant under */* but kept explicit for clarity / if */* is ever removed.
     { "pattern": "cf.bizbeecms.com/*", "zone_name": "bizbeecms.com" },
-    // Per-Site CMS public hostnames. Every <slug>.site.bizbeecms.com lands here;
-    // the Worker derives the slug from the leftmost subdomain label (no HOST_MAP
-    // entry needed) and proxies to the internal bizbeecms-cms-<slug> Worker.
-    //
-    // WHY .site.* and not *.bizbeecms.com: a bare `*.bizbeecms.com/*` route is too
-    // greedy — it SHADOWS our own one-level infra custom domains (manager/deployer
-    // dropped to 404 when we tried it; on this zone the wildcard route beats the
-    // Worker custom domain). A dedicated second-level namespace avoids the
-    // collision. Cost: the free universal cert only covers `*.bizbeecms.com` (one
-    // level), so `<slug>.site.bizbeecms.com` needs an Advanced Certificate Manager
-    // cert for `*.site.bizbeecms.com` on the zone.
+    // Per-Site CMS at <slug>.site.bizbeecms.com — DORMANT (needs paid ACM cert for
+    // *.site.*; sites serve on workers.dev today). Slug from leftmost label.
     { "pattern": "*.site.bizbeecms.com/*", "zone_name": "bizbeecms.com" }
   ],
 
