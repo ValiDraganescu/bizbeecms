@@ -5,6 +5,19 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-19): **Make `bundle:cms` an automatic step in the PM deploy (USER DECISION 2026-06-19).** Today the
+  CMS deploy bundle `ProjectManager/src/lib/deploy/cms-bundle.generated.js` is regenerated MANUALLY via
+  `npm run bundle:cms`, so it goes stale whenever CMS render code changes (and page-builder workers keep
+  deferring the regen per the cross-loop guardrail). Fix: chain the regen into PM `predeploy` so every
+  deploy ships a fresh bundle. In `ProjectManager/package.json` change
+  `"predeploy": "npm run preflight"` → `"predeploy": "npm run bundle:cms && npm run preflight"` (regen
+  FIRST, then the existing preflight validates the fresh bundle). `npm run deploy` already triggers
+  `predeploy` via npm lifecycle — no new script/dep. ALSO regen the bundle ONCE this run (it's currently
+  owed-stale from the Section→Columns render change) and commit it, so deploy + tree are both clean.
+  Gate: `npm run bundle:cms` succeeds + `npm run preflight` passes on the fresh bundle + a dry
+  `npm run deploy`-up-to-predeploy is not required (preflight green is enough). Stage ProjectManager/
+  package.json + cms-bundle.generated.js + goals/page-builder/* by explicit path.
+
 > SECTION COLUMN MODEL (USER DECISION 2026-06-19): adopt the aicms Section→Columns→components model.
 > A Section has `columns` (1–4) realized as `__section_column__` children; COMPONENTS drop into a COLUMN,
 > not the Section. Reference: aicms `components/BlockRenderer.tsx` lines ~200–268 (exact prop + render shape)

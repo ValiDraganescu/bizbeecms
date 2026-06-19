@@ -183,3 +183,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   ({name,propsSchema}) reusing `listComponentPalette` (same source the server-rendered C3 editor uses).
   `/api/components/grouped` returns NAMES ONLY — don't try to read propsSchema from it. The shell loads the
   palette into a `name→propsSchema` map in the same mount effect as groups.
+
+- BUNDLE NOW AUTO-REGENS ON PM DEPLOY (2026-06-19): `ProjectManager/package.json` `predeploy` is
+  `npm run bundle:cms && npm run preflight` — every `npm run deploy` rebuilds the CMS bundle from current
+  CMS source FIRST, then preflight validates it. CONSEQUENCE: the "bundle owed-stale" debt is gone — a
+  deploy always ships fresh. Meeseeks runs STILL must not casually run `bundle:cms` / stage
+  cms-bundle.generated.js unless the run OWNS it (concurrency: it captures other loops' uncommitted CMS
+  edits — see the bundle:cms caveat above). The committed bundle can lag CMS source between deploys; that's
+  fine now, deploy refreshes it. Don't re-add a manual "regen owed" hand-off note for render changes.

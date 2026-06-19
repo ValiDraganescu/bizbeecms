@@ -303,3 +303,17 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Verified:** `npx tsc --noEmit` clean; `node --test scripts/docs-kit.test.mjs` 6/6;
   `npx opennextjs-cloudflare build` green (dev port 3601 free).
 - **Files:** CMS/src/lib/components/docs-kit.ts, CMS/scripts/docs-kit.test.mjs
+
+## 2026-06-19 18:43 — Auto-bundle:cms on PM deploy + regen owed-stale bundle
+- **Status:** DONE
+- **What I did:** Chained the CMS bundle regen into the PM deploy lifecycle so every deploy ships a
+  fresh bundle. `ProjectManager/package.json`: `"predeploy": "npm run preflight"` →
+  `"predeploy": "npm run bundle:cms && npm run preflight"` (regen FIRST, preflight validates the fresh
+  bundle). `npm run deploy` already fires `predeploy` via npm lifecycle — no new script/dep. Also regen'd
+  the bundle ONCE this run (owed-stale since the Section→Columns render change): `npm run bundle:cms`
+  (full OpenNext build → esbuild → cms-bundle.generated.js, builtAt=2026-06-19T15:43:46.671Z, 6647KB).
+- **Verified:** port 3601 free before build; `npm run bundle:cms` succeeded; `npm run preflight` passed
+  (1 pre-existing static-assets-gap warning, not a validation failure); grep on the regenerated bundle
+  confirms current Section render — `data-section-column` ×1, `data-section` ×1, `preview/[id]` ×1,
+  `RenderedPage` ×1, `builtAt` ×1. The owed bundle obligation from the column-model run is now CLEARED.
+- **Files:** ProjectManager/package.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js
