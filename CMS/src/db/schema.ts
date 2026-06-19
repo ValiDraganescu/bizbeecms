@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
  * bizbeecms CMS — per-Site D1 (SQLite) schema (Milestone 2, epic A1).
@@ -83,6 +83,13 @@ export const page = sqliteTable(
     metaDescription: text("meta_description").notNull().default("{}"),
     // Per-locale OpenGraph image URL (R2 asset url), e.g. { "en": "https://…/x.png" }.
     metaImage: text("meta_image").notNull().default("{}"),
+    // PAGE VERSIONING (slice 1): pointers into `page_version`. `draftVersionId`
+    // is the currently-editable version; `publishedVersionId` is the live one.
+    // Nullable so existing rows backfill safely (no FK — the app resolves them).
+    // `page.blocks`/`publishStatus` stay authoritative until later slices migrate
+    // readers; these pointers are additive this slice.
+    draftVersionId: text("draft_version_id"),
+    publishedVersionId: text("published_version_id"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -93,6 +100,36 @@ export const page = sqliteTable(
   // Slug is unique per parent: two siblings can't share a slug, but the same
   // slug may repeat at different tree levels.
   (t) => [uniqueIndex("page_parent_slug_unique").on(t.parentPageId, t.slug)],
+);
+
+/**
+ * Page version — a snapshot of a page's blocks + meta (PAGE VERSIONING slice 1).
+ * A page keeps history here: `status:"draft"` is the editable working copy,
+ * `status:"published"` is a frozen published snapshot. `versionNo` is the
+ * monotonic published sequence (drafts use 0). `meta` is a JSON blob of the
+ * per-locale SEO maps {metaTitle,metaDescription,metaImage,…} captured at save
+ * time. `page.draftVersionId`/`publishedVersionId` point at rows here. No FK so
+ * deleting a page doesn't cascade silently — the app owns the lifecycle.
+ */
+export const pageVersion = sqliteTable(
+  "page_version",
+  {
+    id: text("id").primaryKey(),
+    pageId: text("page_id").notNull(),
+    blocks: text("blocks").notNull().default("[]"),
+    // JSON snapshot of the page's per-locale meta maps at this version.
+    meta: text("meta").notNull().default("{}"),
+    status: text("status").notNull().$type<PublishStatus>().default("draft"),
+    // Monotonic published sequence (1,2,3…); drafts carry 0.
+    versionNo: integer("version_no").notNull().default(0),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  // Index by page for "list this page's versions" reads. NOT unique: a page can
+  // accumulate multiple draft rows (publish leaves the old draft as history) so
+  // (pageId,status,versionNo) is NOT a key (drafts all share versionNo 0).
+  (t) => [index("page_version_page_idx").on(t.pageId)],
 );
 
 /**
@@ -168,3 +205,5 @@ export type Asset = typeof asset.$inferSelect;
 export type NewAsset = typeof asset.$inferInsert;
 export type ChatThread = typeof chatThread.$inferSelect;
 export type NewChatThread = typeof chatThread.$inferInsert;
+export type PageVersion = typeof pageVersion.$inferSelect;
+export type NewPageVersion = typeof pageVersion.$inferInsert;

@@ -218,7 +218,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
 > `published_version_id` (live). publish = copy draft → new published version; restore = copy old version →
 > new draft. Slices below — do in order; slice 1 (schema+store) gates all.
 
-- TODO: **Versioning slice 1 — schema + version store (pure/data first, no UI).** Add the `page_version`
+- DONE (2026-06-19 21:29): **Versioning slice 1 — schema + version store (pure/data first, no UI).** Added
+  `page_version(id, page_id, blocks, meta, status, version_no, created_at)` + `page.draft_version_id`/
+  `published_version_id` (migration `0006_robust_wendell_rand.sql`, additive). Pure algebra in
+  `lib/pages/page-version.ts` (`nextVersionNo` monotonic over published, `planDraftFrom`, `planPublish`
+  = snapshot+auto-draft, `planRestore`, `applyDraftEdit`) + store wrappers `db/page-version-store.ts`
+  (`getDraft` create-if-absent, `saveDraftBlocks`, `publishDraft`, `listVersions`, `newDraftFromVersion`).
+  Existing `page.blocks`/`publishStatus` UNTOUCHED (slice 2 migrates readers). BACKFILL DEFERRED (ponytail):
+  no SQL backfill — `getDraft` create-if-absent + slice-2 `page.blocks` fallback cover existing pages; raw
+  SQL can't mint UUIDs cleanly. page-version 6/6 + page-store 5/5 + schema-migration 4/4, tsc 0, opennext
+  green. See JOURNAL 21:29. (Original text retained below.)
+- TODO (ORIGINAL TEXT, kept for ref): **Versioning slice 1 — schema + version store (pure/data first, no UI).** Add the `page_version`
   table + `page.draft_version_id`/`page.published_version_id` (drizzle migration). Version-store functions in
   `db/page-store.ts` (or a new `db/page-version-store.ts`): `getDraft(pageId)` (create-if-absent from the
   current published version or empty), `saveDraftBlocks(pageId, blocks)` (writes the DRAFT version, no

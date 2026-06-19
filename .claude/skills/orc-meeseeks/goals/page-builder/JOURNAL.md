@@ -560,3 +560,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/render/tree.ts (pad() optional unit + planSection paddingUnit),
   CMS/src/components/page-builder/page-builder-shell.tsx (SectionSettings single switch),
   CMS/scripts/render-tree.test.mjs (+3 planSection padding tests).
+
+## 2026-06-19 21:29 — Versioning slice 1: schema + pure version store (NO UI)
+- **Status:** DONE
+- **What I did:** Added the PAGE VERSIONING data layer (gates slices 2-4). Schema: new
+  `page_version(id, page_id, blocks, meta, status:draft|published, version_no, created_at)`
+  table + `page.draft_version_id`/`page.published_version_id` nullable pointers (drizzle
+  migration `0006_robust_wendell_rand.sql`, additive — safe on existing rows). Pure transition
+  algebra in `lib/pages/page-version.ts` (node-testable, NO D1): `nextVersionNo` (monotonic
+  over PUBLISHED rows only; drafts carry versionNo 0), `planDraftFrom` (empty or copy a source),
+  `planPublish` (snapshot draft → published + auto-draft copied from it), `planRestore` (copy a
+  past version → new draft, non-destructive), `applyDraftEdit`. Thin store wrappers in
+  `db/page-version-store.ts`: `getDraft` (create-if-absent from published else empty),
+  `saveDraftBlocks` (overwrite draft in place, NO publish), `publishDraft` (publish + auto-draft,
+  sets both pointers), `listVersions`, `newDraftFromVersion` (restore). Existing
+  `page.blocks`/`publishStatus` UNTOUCHED — additive, readers migrate in slice 2.
+- **Verified:** `node --test scripts/page-version.test.mjs` 6/6 (create→edit→publish→auto-draft→
+  restore lifecycle + version_no monotonic + restore non-destructive). page-store.test.mjs 5/5
+  (hand-DDL updated w/ the 2 new page cols). schema-migration.test.mjs 4/4 (+1 versioning
+  assertion). `npx tsc --noEmit` 0 errors (fully clean). `npx opennextjs-cloudflare build`
+  complete (dev stopped, port 3601 free). Did NOT run live D1 (needs binding/HITL) — store
+  wrappers are build/type-verified only, like the rest of page-store.ts.
+- **Files:** CMS/src/db/schema.ts (page_version table + page pointers + types),
+  CMS/migrations/0006_robust_wendell_rand.sql (+ meta/0006_snapshot.json, _journal.json),
+  CMS/src/lib/pages/page-version.ts (NEW pure algebra), CMS/src/db/page-version-store.ts (NEW
+  store wrappers), CMS/scripts/page-version.test.mjs (NEW), CMS/scripts/page-store.test.mjs
+  (hand-DDL +2 cols), CMS/scripts/schema-migration.test.mjs (+versioning test).

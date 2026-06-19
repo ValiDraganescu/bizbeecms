@@ -329,3 +329,25 @@ Read every line before working. Each entry was learned the hard way by a previou
   `{paddingUnit, padding<Side>Unit: undefined×4}` to clear the legacy keys (mergeSectionProps drops
   undefined). GAP stays px. If you touch Section padding render, the test is render-tree.test.mjs
   `sectionStyleOf` (3 padding cases).
+
+- PAGE VERSIONING slice 1 LANDED (2026-06-19 21:29, DATA ONLY — no routes/UI). Two layers, keep them
+  separate: PURE algebra `lib/pages/page-version.ts` (node-testable, NO D1 — planDraftFrom/planPublish/
+  planRestore/nextVersionNo/applyDraftEdit return record SHAPES the store stamps with id/createdAt) and
+  STORE wrappers `db/page-version-store.ts` (getDraft/saveDraftBlocks/publishDraft/listVersions/
+  newDraftFromVersion — load rows, call planners, write; accept an injectedDb for tests). DON'T inline
+  version logic in routes; slices 2-4 call these. MODEL FACTS: a DRAFT carries `versionNo:0` (NOT in the
+  published sequence); `nextVersionNo` counts only `status:"published"` rows so it's monotonic+gap-free as
+  long as it's only called on publish (first publish→1). PUBLISH = insert published(versionNo bumped) +
+  insert a fresh auto-draft COPIED from the snapshot, then set BOTH page pointers (the old draft row is
+  left as harmless history). The `page_version` index is NON-unique on page_id (a page accumulates multiple
+  draft rows over publishes — do NOT make (pageId,status,versionNo) unique, drafts all share versionNo 0).
+- VERSIONING did NOT touch `page.blocks`/`publishStatus` — ON PURPOSE (additive slice). Existing readers
+  (`app/[[...slug]]`, `/preview/[id]`, setPageBlocks) still use `page.blocks`. Slice 2 migrates them to read
+  the version pointers. NO SQL BACKFILL was written: `getDraft` create-if-absent (from published version
+  else empty) + a slice-2 `page.blocks` fallback cover legacy pages; a raw-SQL backfill can't mint per-row
+  UUIDs cleanly and was deemed speculative (ponytail). If slice 2/3 needs existing published pages to have a
+  real published_version row, do a one-time TS backfill loop (mint UUIDs in JS) at migration-apply time, not SQL.
+- VERSIONING migration is `0006_robust_wendell_rand.sql` (drizzle-kit auto-named). Apply with
+  `wrangler d1 migrations apply <db>` (NOT auto-run by build). Hand-DDL fixture `scripts/page-store.test.mjs`
+  was updated with the 2 new page cols (draft_version_id/published_version_id) per the HAND-FIXTURE DRIFT
+  caveat — grep `CREATE TABLE page` fixtures after any future page-schema change.

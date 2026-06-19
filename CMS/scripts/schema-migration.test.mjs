@@ -32,6 +32,15 @@ test("page table stores a block tree + hierarchy + per-locale SEO", () => {
   assert.match(sql, /page_parent_slug_unique.*parent_page_id.*slug/s);
 });
 
+test("page versioning: page_version table + page draft/published pointers", () => {
+  assert.match(sql, /CREATE TABLE `page_version`/);
+  for (const col of ["`page_id`", "`blocks`", "`meta`", "`status`", "`version_no`"]) {
+    assert.match(sql, new RegExp(col.replace(/[`]/g, "\\`")), `page_version missing ${col}`);
+  }
+  assert.match(sql, /ALTER TABLE `page` ADD `draft_version_id`/);
+  assert.match(sql, /ALTER TABLE `page` ADD `published_version_id`/);
+});
+
 test("no aicms domain/entity tables leaked in (content is generic)", () => {
   for (const t of ["artwork", "product", "order", "blog_post", "discount"]) {
     assert.doesNotMatch(sql, new RegExp("CREATE TABLE `" + t + "`"), `must not model ${t}`);

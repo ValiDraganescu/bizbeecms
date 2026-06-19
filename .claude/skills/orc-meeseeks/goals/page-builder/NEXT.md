@@ -1,25 +1,28 @@
 # Note to the next Meeseeks (page-builder)
 
-**THIS run (Section padding — ONE shared rem/px unit switch):** DONE. SectionSettings
-(page-builder-shell.tsx) now has ONE rem/px switch in the PADDING legend row instead of
-four per-side toggles; the four side inputs are plain number boxes. Stores a single
-`paddingUnit` (rem default) and clears legacy `padding<Side>Unit` on switch.
-`tree.ts` `pad(p,side,unit?)` gained an optional unit; `planSection` passes the shared
-`paddingUnit`. MIGRATION: legacy per-side pages use Top's unit (fallback in both shell +
-render). Column padding panel UNCHANGED (per-side, out of scope). GAP stays px. render-tree
-36/36 (+3), tsc 0 (fully clean), opennext build green. See CAVEATS "SECTION PADDING IS NOW A
-SINGLE SHARED UNIT".
+**THIS run (Versioning slice 1 — schema + pure version store, NO UI):** DONE. New `page_version`
+table + `page.draft_version_id`/`published_version_id` (migration `0006_robust_wendell_rand.sql`,
+additive). Pure algebra `lib/pages/page-version.ts` + store wrappers `db/page-version-store.ts`
+(getDraft/saveDraftBlocks/publishDraft/listVersions/newDraftFromVersion). `page.blocks`/
+`publishStatus` UNTOUCHED on purpose. Tests: page-version 6/6, page-store 5/5, schema-migration
+4/4. tsc 0 + opennext build green. See CAVEATS "PAGE VERSIONING slice 1 LANDED".
+
+**USER MUST APPLY THE MIGRATION** before slices 2-4 work against a live DB:
+`cd CMS && wrangler d1 migrations apply <db-name>` (remote) or `--local` for dev. NOT auto-run by build.
 
 **CHECK BUGS FIRST:** ALL bugs in BACKLOG `## Bugs` are DONE. If a fresh human bug appears, take it first.
 
-**BUILD IS GREEN** as of 21:23: `npx tsc --noEmit` exit 0 + `npx opennextjs-cloudflare build` complete.
-If a future build fails on a non-page-builder file, re-check (other loops share the tree — see CAVEATS).
+**BUILD IS GREEN** as of 21:29 (tsc 0 + opennext build complete). If a future build fails on a
+non-page-builder file, re-check (other loops share the tree — see CAVEATS).
 
-**Top queued tasks** (bugs clear) — pick the highest:
-- **Builder PREVIEW dark-mode TOGGLE follow-on** — data layer done; the preview toggle + dark-tab editor
-  were marked DONE (backlog ~48). Re-verify it's actually shipped before re-doing; if done, skip.
+**Top queued tasks** — pick the highest:
+- **Versioning slice 2** — public route (`app/[[...slug]]`) renders `published_version_id` (fallback
+  `page.blocks` for un-migrated pages); `/preview/[id]` renders the DRAFT version (fallback published).
+  Reuse `render-page.tsx` — only the block SOURCE changes. Auto-refresh the preview iframe on draft change.
+  Use the store wrappers from this run; do NOT inline version logic.
+- **Versioning slice 3** — debounced auto-save to draft + manual Save (both → `saveDraftBlocks`) +
+  separate Publish (`publishDraft`). Top bar = [Save] [Publish]. Opening a page w/ no draft = `getDraft`.
 - **Adopt `<LocalePicker>` in C2** (`pages-manager.tsx` + `pages/block-editor.tsx` still stack locales).
-- **Page VERSIONING slice 1** (schema + version store) gates the whole versioning track.
 - **Schema field types DATE/TIME** (native date/time pickers in ComponentSettings).
 
 Gate: CMS `npx tsc --noEmit` → relevant node tests (`node --test scripts/*.test.mjs`) →
