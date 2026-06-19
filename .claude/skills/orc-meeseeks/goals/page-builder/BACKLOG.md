@@ -5,6 +5,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-19): **Make Save PERSIST — register reserved Section as a renderer primitive.**
+  `SECTION_COMPONENT` now lives in `lib/render/tree.ts` (single source); `validateBlocks` deletes it
+  from `componentNames` so the block PUT route's `missingComponents` no longer 409s on a page with
+  Sections; `planPage` renders a Section block as a `<div data-section=...>` nesting its `children`.
+  6/6 tests pass (`page-blocks-sections.test.ts`). NOTE: PM `npm run bundle:cms` regen deferred — the
+  generated bundle file was being edited concurrently by another goal loop.
+
 - DONE: **Wire page select + create into the builder's page picker (reuse existing CMS page CRUD).**
   Make the top-bar page picker actually load the Site's pages and let the operator pick one OR create a
   new page — reusing the EXISTING C2 page CRUD, not a new one. What already exists in `CMS/`:

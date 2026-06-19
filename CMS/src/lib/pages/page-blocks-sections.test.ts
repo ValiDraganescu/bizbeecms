@@ -6,8 +6,9 @@ import {
   addSection,
   addComponentToSection,
   targetSectionId,
+  validateBlocks,
 } from "./page-blocks.ts";
-import type { Block } from "../render/tree.ts";
+import { planPage, type Block, type ComponentArtifact } from "../render/tree.ts";
 
 test("addSection appends an empty Section with a unique id", () => {
   const t0: Block[] = [];
@@ -56,4 +57,31 @@ test("targetSectionId: selected section wins, else last section, else null", () 
   // a selected non-section block falls back to the last section
   const mixed: Block[] = [{ id: "h1", component: "Hero" }, ...two];
   assert.equal(targetSectionId(mixed, "h1"), b.id);
+});
+
+test("validateBlocks excludes the reserved Section from componentNames", () => {
+  // A page of one Section holding a Hero component: only Hero needs to exist in
+  // D1; "Section" must NOT appear (else the route would 409 on a renderer primitive).
+  const t = addSection([]);
+  const withChild = addComponentToSection(t, t[0].id, "Hero");
+  const v = validateBlocks(withChild);
+  assert.ok(v.ok, "blocks validate");
+  if (v.ok) {
+    assert.deepEqual(v.componentNames, ["Hero"], "Section excluded, Hero kept");
+  }
+});
+
+test("planPage renders a Section as a container nesting its children", () => {
+  const t = addSection([]);
+  const blocks = addComponentToSection(t, t[0].id, "Hero");
+  const hero: ComponentArtifact = { name: "Hero", tree: { tag: "h1", children: ["Hi"] } };
+  const plan = planPage(blocks, new Map([["Hero", hero]]));
+  const section = plan.root[0];
+  assert.equal(section.kind, "element");
+  if (section.kind === "element") {
+    assert.equal(section.tag, "div");
+    assert.equal(section.props["data-section"], t[0].id);
+    assert.equal(section.children.length, 1, "Hero nested inside the Section");
+    assert.equal(section.children[0].kind === "element" && section.children[0].tag, "h1");
+  }
 });

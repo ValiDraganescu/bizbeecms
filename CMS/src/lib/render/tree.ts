@@ -18,6 +18,16 @@
 
 import { resolveLocalized } from "./localize.ts";
 
+/**
+ * Reserved component name for a layout Section — a builder primitive, NOT an
+ * AI-authored D1 component. A Section block renders as a plain container that
+ * nests its `children` blocks; the renderer handles it directly so no D1
+ * `component` row is needed (and the block PUT route excludes it from the
+ * component-existence check). Lives here (the lowest layer) so both the renderer
+ * and the editor (`page-blocks.ts`, which re-exports it) agree on the one name.
+ */
+export const SECTION_COMPONENT = "Section";
+
 // ── Component element tree (what `component.tree` holds, parsed) ─────────────
 export type TreeNode =
   | string
@@ -201,6 +211,16 @@ export function planPage(
   const seenScripts = new Set<string>();
 
   function planBlock(block: Block): ElementPlan {
+    // A Section is a built-in layout container: render a <div> wrapping its
+    // child blocks. No D1 component lookup — it's a renderer primitive.
+    if (block.component === SECTION_COMPONENT) {
+      return {
+        kind: "element",
+        tag: "div",
+        props: { "data-section": block.id },
+        children: (block.children ?? []).map(planBlock),
+      };
+    }
     const artifact = components.get(block.component);
     if (!artifact) {
       return placeholder(`unknown component "${block.component}"`);

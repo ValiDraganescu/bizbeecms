@@ -21,8 +21,12 @@
  * PURE (no React / D1 / CF imports). Relative `.ts` import keeps it node-loadable.
  */
 
-import { planPage, type Block } from "../render/tree.ts";
+import { planPage, SECTION_COMPONENT, type Block } from "../render/tree.ts";
 import { isLocaleObject } from "../render/localize.ts";
+
+// Re-export so the editor/UI keeps importing the reserved Section name from here
+// (the renderer in tree.ts owns the single definition, so both layers agree).
+export { SECTION_COMPONENT };
 
 const ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
 
@@ -62,6 +66,10 @@ export function validateBlocks(
   }
 
   if (errors.length > 0) return { ok: false, errors };
+  // The reserved Section name is a renderer primitive, not a D1 component — drop
+  // it so the route's component-existence check (`missingComponents`) never 409s
+  // on a page that contains Sections.
+  names.delete(SECTION_COMPONENT);
   return { ok: true, blocks: value as Block[], componentNames: [...names] };
 
   function walk(block: unknown, path: string): void {
@@ -248,9 +256,6 @@ function uniqueBlockId(component: string, existing: Block[]): string {
 // section; that's fine for rendering but page-wide uniqueness is enforced at
 // persist time by `validateBlocks` (it rejects duplicate ids across the whole
 // tree) — see `uniqueIdAcrossTree` below which keeps the editor in step.
-
-/** The reserved component name for a layout Section block. */
-export const SECTION_COMPONENT = "Section";
 
 /** True if a block is a layout Section (holds dropped components in children). */
 export function isSection(block: Block): boolean {

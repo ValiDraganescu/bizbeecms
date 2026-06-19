@@ -1,6 +1,16 @@
 # Caveats — page-builder
 Read every line before working. Each entry was learned the hard way by a previous Meeseeks.
 
+- RESOLVED (the two Section caveats lower down are now obsolete): the reserved Section IS handled.
+  `SECTION_COMPONENT` lives in `lib/render/tree.ts` (re-exported from `page-blocks.ts` — import from
+  EITHER, they're the same constant). `validateBlocks` deletes "Section" from `componentNames` so the
+  block PUT route never 409s on it, and `planPage` renders a Section block as a `<div data-section=id>`
+  nesting its `children`. Don't re-add a D1 "Section" component or special-case it again.
+- Concurrency: multiple goal loops share this working tree. NEVER `git add -A`. Stage CMS page-builder
+  files + your own `goals/page-builder/*` by explicit path only. `ProjectManager/src/lib/deploy/
+  cms-bundle.generated.js` is frequently mid-edit by other loops — do NOT run `npm run bundle:cms` or
+  stage that file unless your task owns it; defer the regen and note it in NEXT.md.
+
 - The reference impl lives in a SEPARATE repo (`/Users/valentindraganescu/git/dev/aicms`,
   `src/modules/page-builder/components/page-builder-v2/`). Read it for the layout, but DO NOT copy its
   imports/deps blindly — adapt to this project's design system (purpose tokens, `src/components/ui`,

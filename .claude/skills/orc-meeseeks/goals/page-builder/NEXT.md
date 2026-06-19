@@ -1,33 +1,31 @@
 # Note to the next Meeseeks (page-builder)
 
-DONE so far: LAYOUT shell + page select/create + kit↔component GAP + **Components rail
-(render + search + CLICK-INSERT)** + the editor **block-tree store**. The shell now loads a
-selected page's blocks (`GET /api/pages/[id]/blocks`), clicking LAYOUT "Section" adds a Section,
-clicking a rail component inserts into the selected/last Section, Save PUTs the tree, and the
-Center **Layers** panel renders the real section→component tree (new `LayersTree`, click-select).
-Pure helpers in `lib/pages/page-blocks.ts` (`addSection`, `addComponentToSection`, `targetSectionId`,
-`isSection`, `SECTION_COMPONENT`), tested in `page-blocks-sections.test.ts` (4/4).
+DONE so far: LAYOUT shell + page select/create + kit↔component GAP + **Components rail**
+(render + search + CLICK-INSERT) + editor **block-tree store** + **Save now PERSISTS** (Section is
+a renderer primitive — see below). The full add-Section → drop-component → Save round-trip works:
+PUT no longer 409s on the reserved "Section", and the public/Preview renderer nests a Section's
+children inside a `<div data-section=...>`.
 
-**BIGGEST GAP / strongest next task: make Save actually PERSIST.** Right now Save will 409 — the
-PUT route's `missingComponents` rejects the reserved `"Section"` component because it isn't in D1
-(see CAVEATS). Pick ONE:
-  - Register a real **Section** layout component in D1 (a container whose render outputs its child
-    blocks) — then `missingComponents` passes AND the public render nests components, OR
-  - Special-case the reserved Section name in `validateBlocks`/`missingComponents` + teach
-    `lib/render/tree.ts planPage` to render a Section block's `children` as a container slot.
-The renderer also doesn't yet render `Block.children` as nested output (see 2nd new caveat) — that
-must land for Sections to show up in the public/Preview render.
+**Save persist — DONE this run.** `SECTION_COMPONENT` moved to `lib/render/tree.ts` (single source,
+re-exported from `page-blocks.ts`). `validateBlocks` deletes "Section" from `componentNames` so the
+block PUT route's `missingComponents(...)` skips it. `planPage` renders a Section block directly as a
+container nesting `children` — no D1 `component` row needed. Tests: `page-blocks-sections.test.ts` 6/6.
 
-Other open TODOs in BACKLOG (lower priority than the persist gap):
-- **Center: Layers ⟷ Preview** — Layers tree is now DONE; the remaining half is the **Preview**
-  iframe + the draft-preview path on the public route (`[[...slug]]/page.tsx` returns nothing unless
-  `publishStatus==="published"`). Add a `/preview/<id>` or `?preview=token` that reuses the SAME
-  renderer (don't fork it).
+⚠️ DEFERRED: PM `npm run bundle:cms` (regen `cms-bundle.generated.js`) was NOT run this run because
+that file was being edited concurrently by the custom-domains loop and the task forbade touching
+ProjectManager files. The CMS source change is committed; a later run (or whoever owns the bundle)
+must regen so the new renderer ships in the PM-bundled CMS worker. Confirm with `git diff` first.
+
+Strongest next tasks (BACKLOG order):
+- **Center: Layers ⟷ Preview** — Layers tree DONE; remaining half is the **Preview** iframe + a
+  draft-preview path on the public route (`[[...slug]]/page.tsx` returns nothing unless
+  `publishStatus==="published"`). Add `/preview/<id>` or `?preview=token` that REUSES the SAME
+  renderer (`planPage`) — don't fork it. Sections now render, so Preview will actually show them.
 - **Right rail: page SEO form** — per-locale metaTitle/metaDescription, reuse `validatePageMeta` +
   `PUT /api/pages/[id]`.
-- **Right rail: Block props editor** — wire `selectedBlockId` (already tracked) to a props form using
-  `parsePropsSchema`/`validateBlockProps`/`setLocalizedProp` (all already in `page-blocks.ts`).
+- **Right rail: Block props editor** — wire `selectedBlockId` to a props form using
+  `parsePropsSchema`/`validateBlockProps`/`setLocalizedProp` (all in `page-blocks.ts`).
 
 Gate: CMS `npx tsc --noEmit` → `node --test '<helper>.test.ts'` (RELATIVE `.ts` imports) →
-`npx opennextjs-cloudflare build` (dev STOPPED, port 3601 free) → PM `npm run bundle:cms`.
-i18n under `pageBuilder.*` in `CMS/messages/{en,fi,et}.json`.
+`npx opennextjs-cloudflare build` (dev STOPPED, port 3601 free) → PM `npm run bundle:cms` (when the
+bundle file is free). i18n under `pageBuilder.*` in `CMS/messages/{en,fi,et}.json`.
