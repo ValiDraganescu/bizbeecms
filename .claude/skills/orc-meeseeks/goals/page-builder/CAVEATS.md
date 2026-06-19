@@ -254,6 +254,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   `npx tsc --noEmit` and `opennextjs-cloudflare build` are BOTH fully green again across the whole CMS.
   (chat/route.ts still shows `M` in git status but type-checks.) If a future build fails on a file outside
   page-builder, re-apply the old "don't chase another loop's WIP" rule, but it's clean as of this run.
+- PAGE DELETE IS A QUERY-PARAM ROUTE (2026-06-19): there is NO `app/api/pages/[id]/route.ts` — only
+  `[id]/blocks`. To delete a page call `DELETE /api/pages?id=<id>` (the DELETE handler in
+  `app/api/pages/route.ts` reads `id` from `searchParams`, runs `deletePage(id)`, 409 on child/ref conflict).
+  Backlog text said `DELETE /api/pages/[id]` — that's WRONG, use the query param. Publish/unpublish reuses the
+  full-meta `PUT /api/pages` (body has `id`); the pure `buildPublishToggleBody(page)` in `page-meta.ts` flips
+  publishStatus and keeps every SEO map, so a publish toggle never blanks metaTitle/description/image.
+- IN-APP CONFIRM PATTERN (no native window.confirm — it blocks browser automation per CLAUDE.md): `PageSettings`
+  in page-builder-shell.tsx uses a `confirming` boolean state that swaps the Delete button for an inline
+  confirm row (Delete/Cancel) styled with design-system tokens. REUSE this exact pattern for the future
+  Layers-tree node-delete + column-delete tasks (one shared idea, not native dialogs).
 - SHARED-TREE COMMIT SWEEP (seen 2026-06-19): a SIBLING loop's `git add -A` swept up THIS run's
   uncommitted `schema.ts` + migration `0004_past_drax.sql` into THEIR commit (6619f3d, ai-assistant). So
   by my commit time `git diff` showed those files clean (already in HEAD) even though I'd edited them — NOT
