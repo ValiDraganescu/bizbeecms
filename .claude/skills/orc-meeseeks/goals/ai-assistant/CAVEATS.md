@@ -81,6 +81,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   component-store `upsertComponent`, settings-store `setSiteIdentity` (normalizes)/`setThemeOverrides[Dark]`
   (normalize to known tokens + safe colors = the trust gate, pass model map straight in).
 
+- SYSTEM PROMPT now has ONE builder: PURE-context logic stays in `tool-scopes.ts`, but the actual
+  prompt ASSEMBLY (Site identity + components + utility classes + contextPrompt, with defensive D1
+  reads) lives in `lib/chat/assemble-prompt.ts` `assembleSystemPrompt(context)` (NOT pure — owns @/db
+  + @/lib imports). BOTH `api/chat/route.ts` (POST `withSystemPrompt`) and `api/chat/debug/route.ts`
+  call it — do NOT inline a second copy or the debug view drifts from what the model actually gets.
+  Untrusted→context resolution is the PURE `resolveRequestContext(context, pathname)` in tool-scopes.ts
+  (explicit valid context wins → detect pathname → "general"); both routes use it. The debug panel
+  (`components/chat/chat-debug-panel.tsx`) computes the tool list CLIENT-side (pure toolsForContext) and
+  fetches only the prompt from `GET /api/chat/debug` (admin-only — it reveals the system prompt).
+
 - Slice 3 part 2 (write tools) DONE: `lib/chat/write-tools.ts` (pure: 5 schemas + builtinBlockTypes/
   splitThemeArgs/coerceIdentityArg). `update_page_blocks` edits ONLY the block tree via `setPageBlocks`
   (NEVER metadata — that's create_page/page-meta). It validates the tree with `validateBlocks`

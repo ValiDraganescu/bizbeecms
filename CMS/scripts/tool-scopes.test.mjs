@@ -14,6 +14,7 @@ import {
   isAdminContext,
   toolsForContext,
   contextPrompt,
+  resolveRequestContext,
   KNOWN_TOOL_NAMES,
 } from "../src/lib/chat/tool-scopes.ts";
 
@@ -97,4 +98,18 @@ test("contextPrompt is non-empty and context-specific", () => {
   assert.ok(pb.length > 0 && settings.length > 0);
   assert.notEqual(pb, settings);
   assert.match(pb, /Page Builder/i);
+});
+
+test("resolveRequestContext: explicit valid context wins, else pathname, else general", () => {
+  // valid explicit context wins (even if a pathname is also present)
+  assert.equal(resolveRequestContext("settings", "/admin/pages"), "settings");
+  // invalid context falls through to pathname detection
+  assert.equal(resolveRequestContext("bogus", "/admin/components"), "components");
+  // no context → detect from pathname
+  assert.equal(resolveRequestContext(undefined, "/admin/page-builder"), "page-builder");
+  // nothing usable → general (full toolset). Never throws on untrusted input.
+  assert.equal(resolveRequestContext(undefined, undefined), "general");
+  assert.equal(resolveRequestContext(null, 42), "general");
+  // shared contract with the debug + POST routes: same inputs, same answer.
+  assert.equal(resolveRequestContext("media", null), "media");
 });

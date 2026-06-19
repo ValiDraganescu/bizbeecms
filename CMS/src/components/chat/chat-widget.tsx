@@ -17,11 +17,13 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ChatConversation, useChat } from "@/components/chat/chat-conversation";
+import { ChatDebugPanel } from "@/components/chat/chat-debug-panel";
 import { detectAdminContext } from "@/lib/chat/tool-scopes";
 
 export function ChatWidget() {
   const t = useTranslations("chat.widget");
   const [open, setOpen] = useState(false);
+  const [debug, setDebug] = useState(false);
   const pathname = usePathname();
   // The conversation lives at the widget level so it SURVIVES minimize (closing
   // the panel just hides it; the transcript is intact when reopened).
@@ -42,20 +44,42 @@ export function ChatWidget() {
               <p className="truncate font-semibold text-foreground">{t("title")}</p>
               <p className="truncate text-xs text-foreground-muted">{t("subtitle")}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label={t("minimize")}
-              className="shrink-0 rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setDebug((d) => !d)}
+                aria-label={t("debug")}
+                aria-pressed={debug}
+                title={t("debug")}
+                className={
+                  "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground " +
+                  (debug ? "bg-surface-muted text-foreground" : "text-foreground-muted")
+                }
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 5V3M12 21v-2M5 12H3M21 12h-2M7 7 5.5 5.5M18.5 18.5 17 17M17 7l1.5-1.5M5.5 18.5 7 17" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label={t("minimize")}
+                className="rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            </div>
           </header>
 
           <div className="flex min-h-0 flex-1 flex-col p-3">
-            <ChatConversation chat={chat} transcriptClassName="flex-1" />
+            {debug ? (
+              <ChatDebugPanel />
+            ) : (
+              <ChatConversation chat={chat} transcriptClassName="flex-1" />
+            )}
           </div>
         </div>
       )}

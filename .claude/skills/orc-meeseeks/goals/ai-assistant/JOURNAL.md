@@ -141,3 +141,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/chat/route.ts (imports+dispatch+handlers), CMS/src/lib/chat/tool-scopes.ts
   (KNOWN_TOOL_NAMES + scopes + prompts), CMS/scripts/tool-scopes.test.mjs (assertions),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-19 20:46 — Slice 4 (sub-slice 1): debug view (system prompt + active tools)
+- **Status:** DONE
+- **What I did:** Gave the widget a DEBUG toggle (aicms `debug_panel.tsx`) showing EXACTLY what the
+  assistant gets for the current admin page — no fork, both surfaces share one builder:
+  - Extracted the system-prompt assembly out of `api/chat/route.ts`'s `withSystemPrompt` into a new
+    `CMS/src/lib/chat/assemble-prompt.ts` `assembleSystemPrompt(context)` (NOT pure — owns the @/db +
+    @/lib reads: getSiteIdentity + listComponentNames + buildSystemPrompt + allowedClasses +
+    contextPrompt, defensive on unbound D1). The POST route now calls it; debug route reuses it →
+    the panel can't drift from the live prompt.
+  - New `GET /api/chat/debug?context=&pathname=` (`CMS/src/app/api/chat/debug/route.ts`): admin-only
+    (reveals the prompt), resolves context, returns `{context, systemPrompt, tools:[names]}`.
+  - Added a PURE `resolveRequestContext(context, pathname)` to `tool-scopes.ts` — the ONE untrusted→
+    context resolution BOTH routes now use (explicit valid context wins, else detect pathname, else
+    "general"; never throws). Killed the duplicated `resolveContext` in both routes.
+  - New client `CMS/src/components/chat/chat-debug-panel.tsx`: tool list computed client-side via the
+    pure toolsForContext(detectAdminContext(pathname)) (instant); system prompt fetched lazily from
+    the endpoint while the panel is open. Wired a debug toggle into chat-widget.tsx header (panel
+    replaces the conversation when on; conversation state survives the toggle).
+  - i18n `chat.debug.*` (context/tools/noTools/prompt/loading/error) + `chat.widget.debug` in en/fi/et.
+- **Verified:** `node --test scripts/tool-scopes.test.mjs` 9/9 pass (added a resolveRequestContext test
+  guarding the shared contract). `tsc --noEmit` clean. `opennextjs-cloudflare build` green
+  (`/api/chat/debug` in the route manifest). Regenerated PM cms-bundle + selfcheck passed (only the
+  standing static-assets live-deploy warning). NOT verified (HITL): live prompt fetch in a real
+  browser with a bound D1.
+- **Files:** CMS/src/lib/chat/assemble-prompt.ts (new), CMS/src/app/api/chat/debug/route.ts (new),
+  CMS/src/components/chat/chat-debug-panel.tsx (new), CMS/src/lib/chat/tool-scopes.ts
+  (resolveRequestContext), CMS/src/app/api/chat/route.ts (shared helpers), CMS/src/components/chat/
+  chat-widget.tsx (debug toggle), CMS/messages/{en,fi,et}.json, CMS/scripts/tool-scopes.test.mjs (test),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).

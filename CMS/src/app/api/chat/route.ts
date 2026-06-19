@@ -59,15 +59,13 @@ import {
 } from "@/lib/chat/write-tools";
 import { validateBlocks } from "@/lib/pages/page-blocks";
 import {
-  detectAdminContext,
-  isAdminContext,
   toolsForContext,
-  contextPrompt,
+  resolveRequestContext,
   type AdminPageContext,
   type ToolName,
 } from "@/lib/chat/tool-scopes";
+import { assembleSystemPrompt } from "@/lib/chat/assemble-prompt";
 import {
-  listComponentNames,
   upsertComponent,
   listComponents,
   getComponentByName,
@@ -90,8 +88,6 @@ import {
   setThemeOverridesDark,
 } from "@/db/settings-store";
 import { listAssets } from "@/db/asset-store";
-import { buildSystemPrompt } from "@/lib/settings/site-settings";
-import { allowedClasses } from "@/lib/render/utility-css";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -199,9 +195,7 @@ type ChatMessage = { role: string; content: string };
 function resolveContext(body: unknown): AdminPageContext {
   if (typeof body !== "object" || body === null) return "general";
   const b = body as { context?: unknown; pathname?: unknown };
-  if (isAdminContext(b.context)) return b.context;
-  if (typeof b.pathname === "string") return detectAdminContext(b.pathname);
-  return "general";
+  return resolveRequestContext(b.context, b.pathname);
 }
 
 /**
@@ -217,28 +211,7 @@ async function withSystemPrompt(
   context: AdminPageContext,
 ): Promise<ChatMessage[]> {
   if (messages.some((m) => m.role === "system")) return messages;
-
-  let identity;
-  let componentNames: string[] = [];
-  try {
-    identity = await getSiteIdentity();
-  } catch {
-    /* unbound D1 → no identity */
-  }
-  try {
-    componentNames = await listComponentNames();
-  } catch {
-    /* unbound D1 → no components */
-  }
-
-  const system =
-    buildSystemPrompt({
-      identity,
-      componentNames,
-      utilityClasses: [...allowedClasses()].sort(),
-    }) +
-    "\n\n" +
-    contextPrompt(context);
+  const system = await assembleSystemPrompt(context);
   return [{ role: "system", content: system }, ...messages];
 }
 

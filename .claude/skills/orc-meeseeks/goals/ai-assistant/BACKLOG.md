@@ -51,9 +51,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
   (schemas + builtinBlockTypes/splitThemeArgs/coerceIdentityArg) + route dispatch/handlers +
   tool-scopes registration (KNOWN_TOOL_NAMES + scopes + TOOL_BY_NAME — all three). Node tests
   (write-tools 5 + tool-scopes refreshed). Gates green.
-- TODO: **Slice 4 — debug panel + model picker + conversation history.** Widget gets: a DEBUG view showing
-  the assembled system prompt + the active tool list for the current context (aicms `debug_panel.tsx`); a
-  MODEL PICKER (the model list source — confirm whether to expose Cloudflare AI / gateway models; coordinate
-  with the binding-adapters REST task for the model id list); and per-Site conversation HISTORY (list past
-  threads, open/delete — pick a store: D1 table or KV; the simplest that fits). Pure helpers tested; UI
-  localized EN/FI/ET. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
+- DONE: **Slice 4 sub-slice 1 — debug view.** Widget DEBUG toggle showing the assembled system prompt
+  (`GET /api/chat/debug`, reusing the new shared `assembleSystemPrompt`) + the active tool list (pure
+  `toolsForContext`) for the current context (aicms `debug_panel.tsx`). New `lib/chat/assemble-prompt.ts`
+  (shared prompt builder, no fork) + pure `resolveRequestContext` (both routes' untrusted→context
+  contract) + `components/chat/chat-debug-panel.tsx`. i18n `chat.debug.*` EN/FI/ET. Gates green.
+- TODO: **Slice 4 sub-slice 2 — model picker.** Confirm the model-id list source FIRST (coordinate with
+  binding-adapters' REST `Ai` task — DEFAULT_MODEL is `@cf/meta/llama-3.1-8b-instruct` in route.ts; is
+  there a curated CF/gateway list to expose?). Widget sends a chosen `model` in the POST body; thread an
+  optional VALIDATED `model` through (untrusted → allowlist → default DEFAULT_MODEL). No arbitrary strings.
+  Pure allowlist helper tested; UI localized EN/FI/ET. Gate: CMS tsc + opennext build; regen PM cms-bundle.
+- TODO: **Slice 4 sub-slice 3 — per-Site conversation history.** List past threads, open/delete. Pick the
+  SIMPLEST store — a D1 table (Site already scopes the binding) is likely cleanest; KV if preferred. Save
+  threads on send; load/list/delete in the widget. Pure helpers tested; UI localized EN/FI/ET. Gate: CMS
+  tsc + opennext build; regen PM cms-bundle.

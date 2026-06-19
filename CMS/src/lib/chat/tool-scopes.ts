@@ -91,6 +91,21 @@ export function isAdminContext(v: unknown): v is AdminPageContext {
   );
 }
 
+/**
+ * The ONE untrusted→context resolution both the chat POST route (body
+ * `{context,pathname}`) and the debug GET route (`?context=&pathname=`) use:
+ * a valid explicit `context` wins; else detect from `pathname`; else "general"
+ * (full toolset). Never throws — every input is untrusted.
+ */
+export function resolveRequestContext(
+  context: unknown,
+  pathname: unknown,
+): AdminPageContext {
+  if (isAdminContext(context)) return context;
+  if (typeof pathname === "string") return detectAdminContext(pathname);
+  return "general";
+}
+
 // ── Tool scoping (by tool name) ───────────────────────────────────────────────
 
 /**
