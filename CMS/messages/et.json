@@ -26,6 +26,13 @@
     "tool": {
       "ok": "{name}: {action} {subject}",
       "fail": "{name} ebaõnnestus"
+    },
+    "widget": {
+      "title": "Tehisintellekti assistent",
+      "subtitle": "Ehita vesteldes — igal lehel.",
+      "open": "Ava tehisintellekti assistent",
+      "close": "Sulge tehisintellekti assistent",
+      "minimize": "Minimeeri"
     }
   },
   "contentLocales": {

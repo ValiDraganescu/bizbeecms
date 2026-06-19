@@ -23,13 +23,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
 > tool_executor,chat_tools}.ts`). Read CAVEATS for what bizbee already has + tool portability. The model
 > transport is the binding-adapters REST-`Ai` task — this goal consumes it, doesn't build it.
 
-- TODO: **Slice 1 — Intercom-style chat widget shell (replace/augment the full-page assistant).** Build a
-  floating bubble (bottom-right, fixed) in the CMS admin layout that opens a compact chat panel over any
-  page; open/close/minimize; reuse the EXISTING chat transport (`app/api/chat/route.ts` + the SSE client in
-  `lib/chat/client-sse.ts`) — do NOT fork a new chat pipeline. Messages list + input + send, streaming
-  replies. Match the PM/CMS design system (purpose tokens). EN/FI/ET for the widget chrome. LAYOUT/transport
-  only this slice — page-awareness, debug, history, model-picker are later slices. Gate: CMS tsc + opennext
-  build green; regen PM cms-bundle.
+- DONE: **Slice 1 — Intercom-style chat widget shell.** Floating bottom-right bubble in `SidebarShell`,
+  opens a compact panel over any /admin/* page (open/close/minimize; transcript survives minimize). Shared
+  chat core extracted to `components/chat/chat-conversation.tsx` (`useChat` + `ChatConversation`); both the
+  widget and the full-page `/admin/chat` render it — ONE pipeline, no fork. Widget hidden on `/admin/chat`.
+  `chat.widget.*` i18n EN/FI/ET. Gates green (tsc, opennext, cms-bundle regen + selfcheck).
 - TODO: **Slice 2 — page-awareness: per-page system prompt + scoped tools.** Port aicms
   `lib/chat/tool_scopes.ts`: a `detectAdminContext(url)` (strip `/<locale>/` prefix, read the segment after
   `admin` → page-builder | components | pages | settings | general), a per-context prompt addition, and a

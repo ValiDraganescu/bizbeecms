@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { ADMIN_SECTIONS } from "@/components/admin-sections";
+import { ChatWidget } from "@/components/chat/chat-widget";
 
 /**
  * Collapsible admin shell — sidebar nav + scrollable content area, adapted from
@@ -331,6 +332,10 @@ export function SidebarShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="flex-1 overflow-y-auto">{children}</main>
+
+      {/* Intercom-style floating assistant on every admin page EXCEPT the
+          full-page /admin/chat (which already renders the same conversation). */}
+      {!pathname.startsWith("/admin/chat") && <ChatWidget />}
     </div>
   );
 }

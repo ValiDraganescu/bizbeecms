@@ -45,3 +45,10 @@ Read every line before working. Each entry was learned the hard way by a previou
 - `/api/translate` strings are NOT user-facing chrome (it's a backend endpoint returning JSON), so no
   i18n strings were added this slice. The page-builder AI-translate BUTTON that calls it must localize
   its own UI (EN/FI/ET) in the page-builder goal.
+
+- CHAT UI is now ONE shared core: `components/chat/chat-conversation.tsx` (`useChat` hook owns the
+  fetch/SSE; `ChatConversation` is the transcript+form with `transcriptClassName`/`footer` seams).
+  BOTH `chat-widget.tsx` (floating bubble in `SidebarShell`) and the full-page `admin-chat.tsx` render
+  it. DO NOT add chat-transport logic to either surface — extend `useChat`/`ChatConversation`. The
+  widget is mounted once in `SidebarShell` and HIDDEN on `/admin/chat` (else two copies of the same
+  conversation). `chat.widget.*` i18n keys exist in en/fi/et.

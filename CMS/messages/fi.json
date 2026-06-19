@@ -26,6 +26,13 @@
     "tool": {
       "ok": "{name}: {action} {subject}",
       "fail": "{name} epäonnistui"
+    },
+    "widget": {
+      "title": "Tekoälyavustaja",
+      "subtitle": "Rakenna keskustellen — millä tahansa sivulla.",
+      "open": "Avaa tekoälyavustaja",
+      "close": "Sulje tekoälyavustaja",
+      "minimize": "Pienennä"
     }
   },
   "contentLocales": {

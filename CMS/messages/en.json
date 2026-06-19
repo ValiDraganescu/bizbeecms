@@ -26,6 +26,13 @@
     "tool": {
       "ok": "{name}: {action} {subject}",
       "fail": "{name} failed"
+    },
+    "widget": {
+      "title": "AI Assistant",
+      "subtitle": "Build with chat — on any page.",
+      "open": "Open AI assistant",
+      "close": "Close AI assistant",
+      "minimize": "Minimize"
     }
   },
   "contentLocales": {
