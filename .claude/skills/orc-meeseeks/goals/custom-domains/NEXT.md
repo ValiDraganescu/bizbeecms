@@ -1,27 +1,30 @@
 # Note to the next Meeseeks (custom-domains)
 
-**The goal is code-complete.** All original "what good looks like" bullets are
-satisfied at code/config level, AND the one human-added UI backlog item (the
-custom-domain setup explainer) is now DONE too. There is **no open code work**
-and **no open bug** in BACKLOG.md.
+**The goal is code-complete AND the SetupGuide visual review is now DONE.**
+No open bug, no open code TODO in BACKLOG.md. Every "what good looks like"
+bullet is satisfied at code/config level; the operator-facing custom-domain
+setup explainer is built, i18n-parity-checked (EN/FI/ET), and VERIFIED
+rendering — last run fetched a live dev render of `/sites/<id>` and asserted
+all 12 `guide.*` strings + example DNS rows + apex IPs + `<details>` appear
+(EN and FI), with no raw-key leak, on a non-deployed site (the empty state).
 
-Most recent run: added an always-visible `SetupGuide` to `CustomDomainForm`
-(`ProjectManager/src/app/(app)/sites/custom-domain-form.tsx`) — CNAME/A-record/
-"other options" guidance shown before any domain is attached. New i18n
-`sites.customDomain.guide.*` in EN/FI/ET. tsc clean.
-
-**What remains is INFRA / live-verification only — not codeable here:**
+**What remains is INFRA / live-cloud-verification only — NOT codeable here:**
 1. Live deploys: `cd ProjectManager && npx opennextjs-cloudflare build` then deploy;
-   `cd deployer && npx wrangler deploy` (Docker for the container image); deploy router.
-   (PM is already live at manager.bizbeecms.com per CAVEATS "LIVE DEPLOY".)
+   `cd deployer && npx wrangler deploy` (needs Docker for the container image);
+   deploy the router. (PM is already live at manager.bizbeecms.com — see CAVEATS
+   "LIVE DEPLOY".)
 2. `*.site.bizbeecms.com` WILDCARD cert (Advanced Certificate Manager) on the zone
    before the router can terminate TLS for per-site CMS — sites are DELIBERATELY
-   on workers.dev today (CAVEATS "DECISION option B") to avoid the ACM cost.
-3. Visual/screenshot review of the new SetupGuide block (run `npm run dev`, open a
-   site's Custom domain card) — make sure the spacing/`<details>` looks right.
+   on workers.dev today (CAVEATS "DECISION option B") to dodge the ACM cost.
+3. End-to-end SSO walk on the LIVE custom hosts (host-classification gate is already
+   unit-proven 16/16; only the live nonce-mint→exchange→validate round-trip is unrun).
 
-**If summoned with no infra access and no new human backlog item:** there's no
-forced code churn left. Either pick up (3) the visual review if you can run a
-browser, or report code-complete / blocked-on-infra. Do NOT loosen the SSO host
-allowlist or "finish decommissioning" the load-bearing workers.dev refs
+**To run a local dev render again** (e.g. to re-check the guide UI or screenshot it):
+see the new CAVEATS entry — migrate local D1 (`wrangler d1 migrations apply bizbeecms
+--local`), register the first user, create a site, fetch `/sites/<id>`. The guide
+renders without a real deploy.
+
+**If summoned with no infra access and no new human backlog item:** there is no
+forced code churn. Report code-complete / blocked-on-infra. Do NOT loosen the SSO
+host allowlist or "finish decommissioning" the load-bearing workers.dev refs
 (CAVEATS "CUTOVER STATE").
