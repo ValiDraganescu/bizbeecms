@@ -1,0 +1,188 @@
+/**
+ * In-house searchable model picker (ai-assistant goal — model picker over the
+ * full Workers-AI catalog). Replaces the plain `<select>` in the chat widget.
+ *
+ * Loads the catalog from `GET /api/chat/models` (cached + lazily refreshed in
+ * D1), groups by PROVIDER (the `@cf/<vendor>/...` segment), orders each group
+ * LOW→HIGH price, and supports a SEARCH/filter box + keyboard nav. No dropdown/
+ * combobox dependency — a button + an absolutely-positioned panel, design-system
+ * tokens. Falls back to the static `CHAT_MODELS` if the fetch fails so it's
+ * never empty.
+ */
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
+import {
+  CHAT_MODELS,
+  filterCatalog,
+  groupByProvider,
+  type CatalogModel,
+} from "@/lib/chat/models";
+
+export function ModelPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const t = useTranslations("chat.widget");
+  const [catalog, setCatalog] = useState<ReadonlyArray<CatalogModel>>(CHAT_MODELS);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load the catalog once on mount; keep the static fallback on failure.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/chat/models");
+        if (!res.ok) return;
+        const j = (await res.json()) as { models?: CatalogModel[] };
+        if (!cancelled && Array.isArray(j.models) && j.models.length > 0) {
+          setCatalog(j.models);
+        }
+      } catch {
+        /* offline / no binding — keep the static fallback */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Close on outside click.
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  // Focus the search box when opened.
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  const filtered = useMemo(() => filterCatalog(catalog, query), [catalog, query]);
+  const groups = useMemo(() => groupByProvider(filtered), [filtered]);
+  // Flat list of ids in display order, for keyboard nav across groups.
+  const flat = useMemo(() => groups.flatMap((g) => g.models), [groups]);
+
+  const selected = catalog.find((m) => m.id === value);
+  const buttonLabel = selected ? selected.label : value;
+
+  function choose(id: string) {
+    onChange(id);
+    setOpen(false);
+    setQuery("");
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((i) => Math.min(i + 1, flat.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const m = flat[active];
+      if (m) choose(m.id);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="relative min-w-0 flex-1">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-surface px-2 py-1 text-left text-foreground"
+      >
+        <span className="truncate">{buttonLabel}</span>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          className="shrink-0"
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute bottom-full left-0 z-50 mb-1 max-h-72 w-72 max-w-[90vw] overflow-hidden rounded-md border border-border bg-surface shadow-lg">
+          <div className="border-b border-border p-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setActive(0);
+              }}
+              onKeyDown={onKeyDown}
+              placeholder={t("modelSearch")}
+              aria-label={t("modelSearch")}
+              className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
+            />
+          </div>
+          <ul className="max-h-56 overflow-y-auto py-1" role="listbox">
+            {flat.length === 0 ? (
+              <li className="px-3 py-2 text-foreground-muted">{t("modelNoResults")}</li>
+            ) : (
+              groups.map((g) => (
+                <li key={g.provider}>
+                  <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
+                    {g.provider}
+                  </div>
+                  <ul>
+                    {g.models.map((m) => {
+                      const idx = flat.indexOf(m);
+                      return (
+                        <li key={m.id}>
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={m.id === value}
+                            onClick={() => choose(m.id)}
+                            onMouseEnter={() => setActive(idx)}
+                            className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left ${
+                              idx === active ? "bg-primary/10" : ""
+                            } ${m.id === value ? "font-semibold text-primary" : "text-foreground"}`}
+                          >
+                            <span className="truncate">{m.label}</span>
+                            {m.price != null && (
+                              <span className="shrink-0 text-foreground-muted">
+                                ${m.price}
+                              </span>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}

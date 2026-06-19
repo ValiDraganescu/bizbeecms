@@ -30,6 +30,7 @@ const CONTENT_LOCALES_KEY = "content_locales";
 const THEME_OVERRIDES_KEY = "theme_overrides";
 const THEME_OVERRIDES_DARK_KEY = "theme_overrides_dark";
 const SITE_IDENTITY_KEY = "site_identity";
+const MODEL_CATALOG_KEY = "model_catalog";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
 async function upsertSetting(
@@ -164,4 +165,48 @@ export async function setSiteIdentity(identity: unknown): Promise<SiteIdentity> 
   const normalized = normalizeSiteIdentity(identity);
   await upsertSetting(SITE_IDENTITY_KEY, JSON.stringify(normalized));
   return normalized;
+}
+
+/**
+ * Cached AI model catalog (ai-assistant goal — searchable model picker). Stored
+ * as ONE `site_settings` row (`model_catalog`) holding `{ fetchedAt, models }`,
+ * refreshed lazily by `GET /api/chat/models` at most ~twice a day. Reuses the
+ * generic settings table — no dedicated table needed (ponytail: one JSON row).
+ */
+export interface CatalogCache {
+  /** epoch ms of the last successful CF API fetch. */
+  fetchedAt: number;
+  /** the parsed `CatalogModel[]` (see lib/chat/models.ts). */
+  models: import("../lib/chat/models.ts").CatalogModel[];
+}
+
+/** Read the cached catalog, or null if unset / unparseable. */
+export async function getModelCatalogCache(
+  injectedDb?: Db,
+): Promise<CatalogCache | null> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, MODEL_CATALOG_KEY))
+    .limit(1);
+  const raw = rows[0]?.value;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as CatalogCache;
+    if (typeof parsed?.fetchedAt !== "number" || !Array.isArray(parsed?.models)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** Upsert the cached catalog. */
+export async function setModelCatalogCache(
+  cache: CatalogCache,
+  injectedDb?: Db,
+): Promise<void> {
+  await upsertSetting(MODEL_CATALOG_KEY, JSON.stringify(cache), injectedDb);
 }

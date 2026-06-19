@@ -19,7 +19,8 @@ import { useTranslations } from "next-intl";
 import { ChatConversation, useChat } from "@/components/chat/chat-conversation";
 import { ChatDebugPanel } from "@/components/chat/chat-debug-panel";
 import { detectAdminContext } from "@/lib/chat/tool-scopes";
-import { CHAT_MODELS, DEFAULT_MODEL } from "@/lib/chat/models";
+import { DEFAULT_MODEL } from "@/lib/chat/models";
+import { ModelPicker } from "@/components/chat/model-picker";
 
 type ThreadSummary = { id: string; title: string; updatedAt: number };
 
@@ -301,21 +302,10 @@ export function ChatWidget() {
                 chat={chat}
                 transcriptClassName="flex-1"
                 footer={
-                  <label className="flex items-center gap-2 text-xs text-foreground-muted">
+                  <div className="flex items-center gap-2 text-xs text-foreground-muted">
                     <span className="shrink-0">{t("model")}</span>
-                    <select
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                      aria-label={t("model")}
-                      className="min-w-0 flex-1 rounded-md border border-border bg-surface px-2 py-1 text-foreground"
-                    >
-                      {CHAT_MODELS.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    <ModelPicker value={model} onChange={setModel} />
+                  </div>
                 }
               />
             )}

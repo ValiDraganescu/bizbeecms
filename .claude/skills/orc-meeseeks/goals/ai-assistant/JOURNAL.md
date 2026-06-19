@@ -283,3 +283,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   build/types + read-through.
 - **Files:** CMS/src/components/chat/chat-widget.tsx;
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-20 00:25 — Searchable model picker over the full Workers-AI catalog
+- **Status:** DONE
+- **What I did:** Replaced the 3-model `<select>` allowlist with a real catalog. (1)
+  `lib/chat/models.ts`: added `CatalogModel` shape + pure helpers `parseModelCatalog`
+  (reads CF list-models JSON or bare array → drops deprecated + non-"Text Generation",
+  extracts id/provider/price from `properties[]`), `providerOf` (vendor-from-id
+  `@cf/<vendor>/...`), `groupByProvider` (alpha, price-sorted within), `sortByPrice`
+  (asc, null last), `filterCatalog`. `resolveModel`/`isKnownModel` now take an optional
+  dynamic allowlist (cached catalog ids) while keeping the static `CHAT_MODELS` fallback
+  + `DEFAULT_MODEL` guard (untrusted → known → default, never 400). (2) Cache: reused the
+  generic `site_settings` table (NO new table/migration) — `getModelCatalogCache`/
+  `setModelCatalogCache` in `db/settings-store.ts` store one `model_catalog` JSON row
+  `{fetchedAt, models}`. (3) `GET /api/chat/models` (admin-only): serves cache, lazily
+  refreshes when >12h old via CF API (`env.CF_ACCOUNT_ID`+`CF_API_TOKEN`, absent →
+  static fallback); never empty. (4) Chat route validates `body.model` against the cached
+  catalog ids. (5) In-house combobox `components/chat/model-picker.tsx` (search + grouped
+  provider headers + price + keyboard nav, no dep) replaces the `<select>`. (6) i18n
+  `chat.widget.modelSearch`/`modelNoResults` EN/FI/ET.
+- **Verified:** `node --test scripts/models.test.mjs` 11/11 (added 7: dynamic-allowlist,
+  providerOf, parse incl. deprecated/non-text-gen drop + bare-array tolerance, sort, group,
+  filter). `tsc --noEmit` clean. `opennextjs-cloudflare build` green. PM `bundle:cms` regen
+  + `bundle:selfcheck` pass (only the pre-existing static-assets-gap warning). Could NOT
+  verify the live CF API fetch — needs CF_ACCOUNT_ID/CF_API_TOKEN provisioned per-Site
+  (deployer injects them; absent locally → static fallback path, which IS exercised).
+- **Files:** CMS/src/lib/chat/models.ts, CMS/src/db/settings-store.ts,
+  CMS/src/app/api/chat/models/route.ts (new), CMS/src/app/api/chat/route.ts,
+  CMS/src/components/chat/model-picker.tsx (new), CMS/src/components/chat/chat-widget.tsx,
+  CMS/messages/{en,fi,et}.json, CMS/scripts/models.test.mjs,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen)

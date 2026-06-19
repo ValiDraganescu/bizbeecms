@@ -39,7 +39,9 @@
       "history": "Historia",
       "historyEmpty": "Ei tallennettuja keskusteluja vielä.",
       "historyUntitled": "Nimetön",
-      "historyDelete": "Poista keskustelu"
+      "historyDelete": "Poista keskustelu",
+      "modelSearch": "Hae malleja…",
+      "modelNoResults": "Malleja ei löytynyt"
     },
     "debug": {
       "context": "Sivun konteksti",

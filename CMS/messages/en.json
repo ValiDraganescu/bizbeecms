@@ -39,7 +39,9 @@
       "history": "History",
       "historyEmpty": "No saved conversations yet.",
       "historyUntitled": "Untitled",
-      "historyDelete": "Delete conversation"
+      "historyDelete": "Delete conversation",
+      "modelSearch": "Search models…",
+      "modelNoResults": "No models found"
     },
     "debug": {
       "context": "Page context",

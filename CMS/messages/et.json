@@ -39,7 +39,9 @@
       "history": "Ajalugu",
       "historyEmpty": "Salvestatud vestlusi veel pole.",
       "historyUntitled": "Pealkirjata",
-      "historyDelete": "Kustuta vestlus"
+      "historyDelete": "Kustuta vestlus",
+      "modelSearch": "Otsi mudeleid…",
+      "modelNoResults": "Mudeleid ei leitud"
     },
     "debug": {
       "context": "Lehe kontekst",

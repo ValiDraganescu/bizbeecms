@@ -13,6 +13,11 @@ import {
   DEFAULT_MODEL,
   isKnownModel,
   resolveModel,
+  parseModelCatalog,
+  groupByProvider,
+  sortByPrice,
+  filterCatalog,
+  providerOf,
 } from "../src/lib/chat/models.ts";
 
 test("DEFAULT_MODEL is itself an allowlisted id", () => {
@@ -48,4 +53,106 @@ test("resolveModel returns allowlisted value, else the default", () => {
   assert.equal(resolveModel(null), DEFAULT_MODEL);
   assert.equal(resolveModel(123), DEFAULT_MODEL);
   assert.equal(resolveModel({}), DEFAULT_MODEL);
+});
+
+test("resolveModel accepts ids from the dynamic catalog allowlist", () => {
+  const allowed = new Set(["@cf/some/new-model", "@cf/another/model"]);
+  assert.equal(resolveModel("@cf/some/new-model", allowed), "@cf/some/new-model");
+  // unknown even with a catalog → default
+  assert.equal(resolveModel("@cf/not/in-catalog", allowed), DEFAULT_MODEL);
+  // static ids still pass even with a catalog set supplied
+  assert.equal(resolveModel(DEFAULT_MODEL, allowed), DEFAULT_MODEL);
+  assert.equal(isKnownModel("@cf/some/new-model", allowed), true);
+  assert.equal(isKnownModel("@cf/some/new-model"), false); // no catalog arg
+});
+
+test("providerOf extracts the vendor segment of a CF id", () => {
+  assert.equal(providerOf("@cf/meta/llama-3.1-8b-instruct"), "meta");
+  assert.equal(providerOf("@hf/nousresearch/hermes-2-pro"), "nousresearch");
+  assert.equal(providerOf("weird"), "other");
+});
+
+// Sample CF list-models payload (the shape the helpers must survive).
+const SAMPLE = {
+  result: [
+    {
+      name: "@cf/meta/llama-3.3-70b-instruct",
+      description: "strong",
+      task: { name: "Text Generation" },
+      properties: [
+        { property_id: "price", value: [{ unit: "per M input tokens", price: "0.29" }] },
+      ],
+    },
+    {
+      name: "@cf/meta/llama-3.1-8b-instruct",
+      task: { name: "Text Generation" },
+      properties: [
+        { property_id: "price", value: [{ unit: "per M input tokens", price: "0.05" }] },
+      ],
+    },
+    {
+      name: "@cf/openai/whisper",
+      task: { name: "Automatic Speech Recognition" }, // dropped: not text gen
+    },
+    {
+      name: "@cf/old/deprecated-model",
+      deprecated: true, // dropped
+      task: { name: "Text Generation" },
+    },
+    {
+      name: "@hf/google/gemma-7b",
+      task: { name: "Text Generation" },
+      properties: [], // no price → sorts last
+    },
+  ],
+};
+
+test("parseModelCatalog extracts id/provider/price; drops deprecated + non-text-gen", () => {
+  const cat = parseModelCatalog(SAMPLE);
+  const ids = cat.map((m) => m.id);
+  assert.ok(ids.includes("@cf/meta/llama-3.3-70b-instruct"));
+  assert.ok(ids.includes("@cf/meta/llama-3.1-8b-instruct"));
+  assert.ok(ids.includes("@hf/google/gemma-7b"));
+  assert.ok(!ids.includes("@cf/openai/whisper")); // not text generation
+  assert.ok(!ids.includes("@cf/old/deprecated-model")); // deprecated
+  const small = cat.find((m) => m.id === "@cf/meta/llama-3.1-8b-instruct");
+  assert.equal(small.provider, "meta");
+  assert.equal(small.price, 0.05);
+  const noPrice = cat.find((m) => m.id === "@hf/google/gemma-7b");
+  assert.equal(noPrice.price, null);
+});
+
+test("parseModelCatalog tolerates a bare array (no result wrapper) + junk", () => {
+  assert.deepEqual(parseModelCatalog(null), []);
+  assert.deepEqual(parseModelCatalog({}), []);
+  assert.deepEqual(parseModelCatalog([{ task: { name: "Text Generation" } }]), []); // no name
+  const bare = parseModelCatalog([
+    { name: "@cf/x/y", task: { name: "Text Generation" } },
+  ]);
+  assert.equal(bare.length, 1);
+});
+
+test("sortByPrice orders LOW→HIGH; null price last", () => {
+  const cat = parseModelCatalog(SAMPLE).filter((m) => m.provider === "meta");
+  cat.push({ id: "@cf/meta/z", label: "z", provider: "meta", price: null });
+  const sorted = sortByPrice(cat);
+  assert.equal(sorted[0].price, 0.05);
+  assert.equal(sorted[1].price, 0.29);
+  assert.equal(sorted[sorted.length - 1].price, null);
+});
+
+test("groupByProvider groups + sorts within group + sorts providers", () => {
+  const groups = groupByProvider(parseModelCatalog(SAMPLE));
+  const providers = groups.map((g) => g.provider);
+  assert.deepEqual(providers, ["google", "meta"]); // alpha
+  const meta = groups.find((g) => g.provider === "meta");
+  assert.equal(meta.models[0].price, 0.05); // cheapest first
+});
+
+test("filterCatalog matches id/label/provider; empty query → all", () => {
+  const cat = parseModelCatalog(SAMPLE);
+  assert.equal(filterCatalog(cat, "").length, cat.length);
+  assert.ok(filterCatalog(cat, "llama").every((m) => m.id.includes("llama")));
+  assert.ok(filterCatalog(cat, "google").length >= 1); // provider match
+  assert.equal(filterCatalog(cat, "zzz-nothing").length, 0);
 });

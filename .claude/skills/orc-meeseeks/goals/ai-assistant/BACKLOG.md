@@ -86,7 +86,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   SIMPLEST store — a D1 table (Site already scopes the binding) is likely cleanest; KV if preferred. Save
   threads on send; load/list/delete in the widget. Pure helpers tested; UI localized EN/FI/ET. Gate: CMS
   tsc + opennext build; regen PM cms-bundle.
-- TODO: **Searchable model picker over the FULL AI Gateway catalog (grouped by provider, price-sorted).**
+- DONE (2026-06-20): **Searchable model picker over the FULL AI Gateway catalog (grouped by provider, price-sorted).**
+  Pure helpers in `lib/chat/models.ts` (parseModelCatalog/groupByProvider/sortByPrice/filterCatalog/
+  providerOf; resolveModel now takes a dynamic catalog allowlist). Cache = ONE `site_settings`
+  `model_catalog` row (no new table). `GET /api/chat/models` serves cache + lazy-refresh >12h via CF
+  list-models API (env.CF_ACCOUNT_ID/CF_API_TOKEN; static fallback when absent). In-house combobox
+  `components/chat/model-picker.tsx` (search + provider groups + price + kbd nav) replaces the `<select>`.
+  i18n modelSearch/modelNoResults EN/FI/ET. models.test 11/11; tsc + opennext green; cms-bundle regen.
+  Grouping axis = vendor-from-id (`@cf/<vendor>/...`), there is no provider field (noted in CAVEATS).
+- ~~TODO~~: **Searchable model picker over the FULL AI Gateway catalog (grouped by provider, price-sorted).**
   USER 2026-06-19: the picker today is a plain `<select>` over a 3-model allowlist (`lib/chat/models.ts`
   `CHAT_MODELS` = 3 `@cf/...` ids; rendered in `components/chat/chat-widget.tsx` ~245). User wants EVERY model
   available in the AI Gateway, in a CUSTOM select that (1) supports SEARCH/filter, (2) groups by PROVIDER

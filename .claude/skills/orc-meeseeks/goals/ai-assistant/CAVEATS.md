@@ -151,3 +151,28 @@ Read every line before working. Each entry was learned the hard way by a previou
   `repeat(auto-fit, minmax(min(100%, 16rem), 1fr))`. Introduced by the page-builder "responsive
   Section columns" change (commit fc0b2e7) — the test wasn't updated. Fails on a clean tree, so
   the full CMS suite is 416/417. It's a PAGE-BUILDER goal bug; flag it there, don't fix it here.
+
+- MODEL CATALOG (searchable picker) DONE. The picker is now backed by the FULL Workers-AI
+  catalog, not the 3-id allowlist. Key facts:
+  - GROUPING AXIS = vendor-from-id (`@cf/<vendor>/...` → `providerOf`), NOT a "provider"
+    field — the CF list-models API has NO provider field (it has `task.name`). Chose vendor-
+    from-id for a provider-like grouping (spec said "pick one + note it"). If you ever want
+    task-based grouping, the data's there in `task.name`.
+  - CACHE reuses the GENERIC `site_settings` table (one `model_catalog` JSON row
+    `{fetchedAt, models}`) — NO new D1 table / migration. `getModelCatalogCache`/
+    `setModelCatalogCache` in `db/settings-store.ts`. Lazy refresh on read when >12h old
+    (`GET /api/chat/models`); ponytail: no Cron — add a scheduled handler only if laggy.
+  - LIVE FETCH needs `env.CF_ACCOUNT_ID` + `env.CF_API_TOKEN` (the deployer must inject them
+    per-Site — the SAME creds binding-adapters' REST `Ai` uses). They are NOT in wrangler.jsonc
+    vars yet; when absent the route serves the STATIC `CHAT_MODELS` fallback (never empty,
+    never throws). If the live catalog never appears in a deployed CMS, that's the missing
+    var — coordinate with the deployer / binding-adapters task to add CF_ACCOUNT_ID/CF_API_TOKEN.
+  - SCOPE LIMIT: CF list-models returns WORKERS-AI models only (`@cf/...`). The unified
+    AI-Gateway multi-provider catalog (direct OpenAI/Anthropic) is NOT exposed by any API —
+    a curated supplement merged on top is the only way to add those (not built; note the gap).
+  - `resolveModel(value, allowedSet?)` / `isKnownModel(value, allowedSet?)` now take an
+    OPTIONAL dynamic allowlist. The chat route reads the cached catalog ids and passes them so
+    a freshly-catalogued id validates; static ids always pass. Keep the untrusted→known→default
+    guard — never forward an arbitrary id to env.AI.run.
+  - The combobox `components/chat/model-picker.tsx` is IN-HOUSE (no dropdown dep). It fetches
+    `/api/chat/models` on mount, keeps the static fallback on failure. Don't add a combobox lib.

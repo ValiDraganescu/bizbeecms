@@ -70,6 +70,7 @@ import {
 } from "@/lib/chat/tool-scopes";
 import { assembleSystemPrompt } from "@/lib/chat/assemble-prompt";
 import { resolveModel } from "@/lib/chat/models";
+import { getModelCatalogCache } from "@/db/settings-store";
 import {
   upsertComponent,
   listComponents,
@@ -148,13 +149,23 @@ export async function POST(request: Request): Promise<Response> {
   // from. Untrusted → validate / detect; unknown falls back to "general".
   const context = resolveContext(body);
 
-  // Optional, UNTRUSTED `model` (the picker — Slice 4): validate against the
-  // allowlist, fall back to DEFAULT_MODEL. Never a 400 (same contract as
-  // `context`); arbitrary strings never reach `env.AI.run`.
+  // Optional, UNTRUSTED `model` (the picker): validate against the cached
+  // catalog ids (plus the static allowlist), fall back to DEFAULT_MODEL. Never
+  // a 400 (same contract as `context`); arbitrary strings never reach
+  // `env.AI.run`. The catalog cache is best-effort — a read failure just leaves
+  // the static allowlist as the trust set.
+  let catalogIds: ReadonlySet<string> | undefined;
+  try {
+    const cache = await getModelCatalogCache();
+    if (cache) catalogIds = new Set(cache.models.map((m) => m.id));
+  } catch {
+    /* cache read failed — static allowlist still validates */
+  }
   const model = resolveModel(
     typeof body === "object" && body !== null
       ? (body as { model?: unknown }).model
       : undefined,
+    catalogIds,
   );
 
   const ai = await getAi();
