@@ -80,7 +80,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
 > vocab: aicms `lib/widgets/props_schema.ts` (FieldType union) + `lib/widgets/builtin_schemas.ts` (real
 > schemas) + the settings-form renderer in `components/page_structure_diagram.tsx`.
 
-- TODO: **Component props-schema FOUNDATION — richer field vocab + Block-tab settings form (BLOCKS the 3
+- DONE (2026-06-19): **Component props-schema FOUNDATION — richer field vocab + Block-tab settings form.**
+  `parsePropsSchema` now returns `PropField[]` (string|richtext|number|boolean|select + required/translatable/
+  label/description/options/defaultValue; unknown→string). `validateBlockProps` got a schema-aware overload
+  (type coercion + required-prop retention) while keeping the legacy `Set` path for C3 block-editor. New PURE
+  tree-walk `findBlock`/`mergeBlockProps` (nested components are selectable now). UI `ComponentSettings` in
+  page-builder-shell.tsx renders one control per field; translatable text → per-content-locale inputs via
+  `setLocalizedProp`; persists via the existing block PUT. New `GET /api/components/palette` ({name,propsSchema}).
+  i18n `pageBuilder.componentNoProps` EN/FI/ET. tsc + opennext build green; page-blocks-schema.test.ts 9/9,
+  sections 19/19. PM bundle:cms DEFERRED (cross-loop guardrail; still owed from the column-model run — render
+  output unchanged this task). The 3 kit-upgrade TODOs below are now UNBLOCKED.
+- ~~TODO~~: **Component props-schema FOUNDATION — richer field vocab + Block-tab settings form (BLOCKS the 3
   kit-upgrade tasks below).** Extend bizbee's existing schema path to the aicms field types and required/
   optional + default semantics, then render an editable settings form for the SELECTED component in the
   right-rail Block tab. Concretely:

@@ -234,3 +234,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Verified:** tsc --noEmit clean; `node --test page-blocks-sections.test.ts` 19/19 (6 new moveNode tests: section reorder before/after, within-column reorder, cross-column `into`, cross-section sibling, and the no-op bundle); opennext build green (dev stopped, port 3601 free). No new visible strings → no i18n change.
 - **Files:** CMS/src/lib/pages/page-blocks.ts, CMS/src/lib/pages/page-blocks-sections.test.ts, CMS/src/components/page-builder/page-builder-shell.tsx
 - **Bundle:** PM `bundle:cms` NOT owed (UI-only; `moveNode` yields the same Block shape, no render output change). Bundle still owed from the column-model run (see CAVEATS) — a render-touching run should regen.
+
+## 2026-06-19 18:25 — Component props-schema FOUNDATION (richer vocab + Block-tab settings form)
+- **Status:** DONE
+- **What I did:** Widened the existing schema path + added the right-rail Block-tab settings form for a
+  selected COMPONENT (not just Section). `page-blocks.ts`: `parsePropsSchema` now returns a `PropField[]`
+  with the aicms-style vocab — `type: string|richtext|number|boolean|select` (unknown→string), plus
+  `required`, `translatable` (honored only on string/richtext), `label`, `description`, `options`
+  (`["a",{value,label}]` both accepted), and a typed `defaultValue` for number/boolean. `validateBlockProps`
+  got a schema-aware overload: pass `PropField[]` → type coercion (number→finite/drop non-numeric,
+  boolean→bool, select must be in `options`) + required props NEVER dropped to "" (declared default
+  substituted); legacy `Set<string>` allowlist path kept intact so the C3 `block-editor.tsx` is unaffected.
+  New PURE tree-walk helpers `findBlock`/`mergeBlockProps` (the Block tab MUST tree-walk now that nested
+  components are selectable from Layers column cells). UI: new `ComponentSettings` form in
+  `page-builder-shell.tsx` — one control per schema field (text/textarea/number/checkbox/select); a
+  TRANSLATABLE string/richtext field renders one input PER content locale (mirrors SEO tab) writing via
+  `setLocalizedProp`; every edit re-validates the full props via `validateBlockProps(schema)` and persists
+  via the existing block PUT (Save). Block tab now resolves the selected block via `findBlock` (tree-walk).
+  New endpoint `GET /api/components/palette` → `[{name,propsSchema}]` (reuses `listComponentPalette`) so the
+  client shell can parse the selected component's schema. i18n `pageBuilder.componentNoProps` EN/FI/ET.
+- **Verified:** CMS `npx tsc --noEmit` clean; `node --test page-blocks-schema.test.ts` 9/9; existing
+  `page-blocks-sections.test.ts` 19/19 (no regression); `npx opennextjs-cloudflare build` green (dev stopped,
+  port free); `/api/components/palette` present in routes-manifest. Could NOT verify live D1 wiring (no
+  binding offline) — endpoint degrades like the others.
+- **Files:** CMS `src/lib/pages/page-blocks.ts`, `src/components/page-builder/page-builder-shell.tsx`,
+  `src/app/api/components/palette/route.ts`, `src/lib/pages/page-blocks-schema.test.ts`,
+  `messages/{en,fi,et}.json`.

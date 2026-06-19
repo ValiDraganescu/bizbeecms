@@ -336,6 +336,7 @@
       "bgForeground": "Etuala"
     },
     "column": "Sarake",
-    "dropComponentHint": "Pudota komponentti tähän"
+    "dropComponentHint": "Pudota komponentti tähän",
+    "componentNoProps": "Tällä komponentilla ei ole muokattavia ominaisuuksia."
   }
 }

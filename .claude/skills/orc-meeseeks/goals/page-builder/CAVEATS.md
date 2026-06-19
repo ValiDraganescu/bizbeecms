@@ -158,3 +158,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   (renders the bare component at top level), so it's not broken, just unusual. The reorder UI only exposes
   before/after on existing buttons + `into` on columns; richer constraints (e.g. "components only inside
   columns") are not enforced in the UI — add a guard in `moveNode` or the drop handler if a future task wants it.
+
+- PROPS-SCHEMA FOUNDATION DONE (2026-06-19): `parsePropsSchema` now returns `PropField[]` (NOT the old
+  `{name,type:"string"|"richtext",default}[]`) — `type` widened to string|richtext|number|boolean|select
+  (+ `required`,`translatable`,`label?`,`description?`,`options?`,`defaultValue?`). `validateBlockProps`
+  is OVERLOADED: pass `Set<string>` for the legacy name-allowlist (C3 `block-editor.tsx` still does), or
+  `PropField[]` for schema-aware TYPE COERCION (number/boolean/select) + required-prop retention. Don't
+  collapse the two — block-editor relies on the Set path. `translatable` is ONLY honored on string/richtext
+  (scalars are never per-locale). The kit-upgrade tasks just author `translatable:true` + real types in each
+  kit's `propsSchema` JSON — the FOUNDATION already reads them; no parser change needed for those.
+- The Block tab in `page-builder-shell.tsx` now resolves the selected node via PURE `findBlock` (tree-walk),
+  NOT `blocks.find` — nested components in Section columns ARE selectable. Persist a component's edits with
+  PURE `mergeBlockProps(blocks,id,props)` (tree-walk; `{}` drops the props key). Both live in page-blocks.ts.
+- The client shell needs each component's raw propsSchema → new endpoint `GET /api/components/palette`
+  ({name,propsSchema}) reusing `listComponentPalette` (same source the server-rendered C3 editor uses).
+  `/api/components/grouped` returns NAMES ONLY — don't try to read propsSchema from it. The shell loads the
+  palette into a `name→propsSchema` map in the same mount effect as groups.

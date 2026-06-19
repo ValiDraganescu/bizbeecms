@@ -336,6 +336,7 @@
       "bgForeground": "Esiplaan"
     },
     "column": "Veerg",
-    "dropComponentHint": "Lohista komponent siia"
+    "dropComponentHint": "Lohista komponent siia",
+    "componentNoProps": "Sellel komponendil pole muudetavaid omadusi."
   }
 }

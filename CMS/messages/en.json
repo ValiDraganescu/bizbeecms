@@ -336,6 +336,7 @@
       "bgForeground": "Foreground"
     },
     "column": "Column",
-    "dropComponentHint": "Drop a component here"
+    "dropComponentHint": "Drop a component here",
+    "componentNoProps": "This component has no configurable properties."
   }
 }

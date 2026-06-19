@@ -41,9 +41,17 @@ import {
   addComponentToColumn,
   sectionColumns,
   isSection,
+  isSectionColumn,
   mergeSectionProps,
   targetSectionId,
   moveNode,
+  findBlock,
+  mergeBlockProps,
+  parsePropsSchema,
+  validateBlockProps,
+  setLocalizedProp,
+  localeFieldValue,
+  type PropField,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
 
@@ -141,6 +149,8 @@ export function PageBuilderShell({
   // Components rail: the Site's kit/component groups + the search query.
   const [groups, setGroups] = useState<ComponentGroup[]>([]);
   const [search, setSearch] = useState("");
+  // name → raw propsSchema JSON (Block tab renders a settings form per declared prop).
+  const [propsSchemas, setPropsSchemas] = useState<Record<string, string | null>>({});
 
   // The selected page's block tree (sections + their dropped components) and the
   // currently-selected node id (drives which section a rail click drops into and,
@@ -214,6 +224,13 @@ export function PageBuilderShell({
     setDirty(true);
   }
 
+  // Replace a (nested) component block's full props (tree-walk merge). The Block
+  // tab computes the validated props from its schema-driven form and calls this.
+  function onUpdateComponentProps(blockId: string, props: Record<string, unknown>) {
+    setBlocks((b) => mergeBlockProps(b, blockId, props));
+    setDirty(true);
+  }
+
   async function onSave() {
     if (!selected) return;
     setSaving(true);
@@ -243,6 +260,17 @@ export function PageBuilderShell({
       if (live && res.ok) {
         const body = (await res.json()) as { groups?: ComponentGroup[] };
         setGroups(body.groups ?? []);
+      }
+    })();
+    void (async () => {
+      const res = await fetch("/api/components/palette");
+      if (live && res.ok) {
+        const body = (await res.json()) as {
+          palette?: { name: string; propsSchema: string | null }[];
+        };
+        setPropsSchemas(
+          Object.fromEntries((body.palette ?? []).map((p) => [p.name, p.propsSchema])),
+        );
       }
     })();
     return () => {
@@ -541,15 +569,28 @@ export function PageBuilderShell({
           <div className="flex-1 overflow-y-auto p-4">
             {rightTab === "block" &&
               (() => {
-                const sel = selectedBlockId
-                  ? blocks.find((b) => b.id === selectedBlockId) ?? null
-                  : null;
+                // Selected node can be nested (a component inside a column), so
+                // tree-walk — a top-level find would miss it.
+                const sel = selectedBlockId ? findBlock(blocks, selectedBlockId) : null;
                 if (sel && isSection(sel)) {
                   return (
                     <SectionSettings
                       key={sel.id}
                       section={sel}
                       onChange={(patch) => onUpdateSection(sel.id, patch)}
+                    />
+                  );
+                }
+                // A component block (not a Section or a column shell): show its
+                // schema-driven settings form.
+                if (sel && !isSectionColumn(sel)) {
+                  return (
+                    <ComponentSettings
+                      key={sel.id}
+                      block={sel}
+                      schema={parsePropsSchema(propsSchemas[sel.component])}
+                      locales={contentLocales}
+                      onChange={(props) => onUpdateComponentProps(sel.id, props)}
                     />
                   );
                 }
@@ -1373,6 +1414,165 @@ function SectionSettings({
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Right-rail Block tab when a COMPONENT block is selected — a settings form
+ * auto-generated from the component's `propsSchema` (parsed via `parsePropsSchema`).
+ *
+ * One control per declared prop: text/textarea(richtext)/number/checkbox/select.
+ * TRANSLATABLE string/richtext props (`translatable:true` in the schema) render
+ * one input PER content locale (mirrors the SEO tab) and write a `{loc:text}`
+ * object via `setLocalizedProp`; non-translatable / scalar props render a single
+ * control. Every edit re-validates the full props through `validateBlockProps`
+ * (the schema overload — type coercion + required-prop retention) and hands the
+ * parent the persistable props; the existing top-bar Save writes them. All PURE
+ * prop-merge logic lives in `page-blocks.ts` — never duplicated here.
+ */
+function ComponentSettings({
+  block,
+  schema,
+  locales,
+  onChange,
+}: {
+  block: Block;
+  schema: PropField[];
+  locales: string[];
+  onChange: (props: Record<string, unknown>) => void;
+}) {
+  const t = useTranslations("pageBuilder");
+  const props = (block.props ?? {}) as Record<string, unknown>;
+  const multi = locales.length > 1;
+  const defaultLocale = locales[0];
+
+  const label = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
+  const input =
+    "w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-foreground-muted";
+
+  // Apply one field's new raw value, then re-validate the WHOLE props by schema so
+  // types coerce and required props stay present.
+  function setField(name: string, value: unknown) {
+    onChange(validateBlockProps({ ...props, [name]: value }, schema));
+  }
+  function setLocalized(name: string, locale: string, value: string) {
+    const current = props[name];
+    setField(name, setLocalizedProp(current, locale, value, locales));
+  }
+
+  if (schema.length === 0) {
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="font-mono text-sm text-foreground">{block.component}</p>
+        <p className="text-sm text-foreground-muted">{t("componentNoProps")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="font-mono text-sm text-foreground">{block.component}</p>
+      {schema.map((f) => {
+        const raw = props[f.name];
+        const labelText = f.label || f.name;
+        return (
+          <fieldset key={f.name} className="flex flex-col gap-1.5">
+            <span className={label}>
+              {labelText}
+              {f.required && <span className="text-danger"> *</span>}
+            </span>
+            {f.description && (
+              <span className="text-xs text-foreground-muted">{f.description}</span>
+            )}
+
+            {/* Translatable text → one field per content locale. */}
+            {f.translatable ? (
+              locales.map((loc) => {
+                const value = localeFieldValue(raw, loc, defaultLocale);
+                return (
+                  <div key={loc} className="flex items-start gap-2">
+                    {multi && (
+                      <span className="mt-2 w-8 shrink-0 font-mono text-xs uppercase text-foreground-muted">
+                        {loc}
+                      </span>
+                    )}
+                    {f.type === "richtext" ? (
+                      <textarea
+                        className={`${input} min-h-16`}
+                        value={value}
+                        placeholder={f.default}
+                        aria-label={multi ? `${labelText} (${loc})` : labelText}
+                        onChange={(e) => setLocalized(f.name, loc, e.target.value)}
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        className={input}
+                        value={value}
+                        placeholder={f.default}
+                        aria-label={multi ? `${labelText} (${loc})` : labelText}
+                        onChange={(e) => setLocalized(f.name, loc, e.target.value)}
+                      />
+                    )}
+                  </div>
+                );
+              })
+            ) : f.type === "select" ? (
+              <select
+                className={input}
+                value={typeof raw === "string" ? raw : f.default}
+                aria-label={labelText}
+                onChange={(e) => setField(f.name, e.target.value)}
+              >
+                {(f.options ?? []).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            ) : f.type === "boolean" ? (
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={raw === true || raw === "true"}
+                  aria-label={labelText}
+                  onChange={(e) => setField(f.name, e.target.checked)}
+                />
+                {labelText}
+              </label>
+            ) : f.type === "number" ? (
+              <input
+                type="number"
+                className={input}
+                value={typeof raw === "number" ? raw : f.default}
+                placeholder={f.default}
+                aria-label={labelText}
+                onChange={(e) =>
+                  setField(f.name, e.target.value === "" ? "" : Number(e.target.value))
+                }
+              />
+            ) : f.type === "richtext" ? (
+              <textarea
+                className={`${input} min-h-16`}
+                value={typeof raw === "string" ? raw : ""}
+                placeholder={f.default}
+                aria-label={labelText}
+                onChange={(e) => setField(f.name, e.target.value)}
+              />
+            ) : (
+              <input
+                type="text"
+                className={input}
+                value={typeof raw === "string" ? raw : ""}
+                placeholder={f.default}
+                aria-label={labelText}
+                onChange={(e) => setField(f.name, e.target.value)}
+              />
+            )}
+          </fieldset>
+        );
+      })}
     </div>
   );
 }

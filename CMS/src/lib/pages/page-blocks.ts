@@ -109,16 +109,63 @@ export function validateBlocks(
   }
 }
 
+/** A field type the editor's settings form knows how to render. */
+export type PropFieldType = "string" | "richtext" | "number" | "boolean" | "select";
+
+/** A `{value,label}` choice for a `select` field. */
+export interface PropOption {
+  value: string;
+  label: string;
+}
+
+/** One configurable prop, parsed from a component's `propsSchema` JSON. */
+export interface PropField {
+  name: string;
+  type: PropFieldType;
+  /** Raw default as authored (string for text/select, string|number|boolean else). */
+  default: string;
+  /** Typed default for non-string fields (number/boolean), else undefined. */
+  defaultValue?: unknown;
+  required: boolean;
+  /** Only meaningful for string/richtext — others are never per-locale. */
+  translatable: boolean;
+  /** Human label (falls back to `name` in the UI). */
+  label?: string;
+  description?: string;
+  /** select-only: the allowed options. */
+  options?: PropOption[];
+}
+
+const FIELD_TYPES = new Set<PropFieldType>(["string", "richtext", "number", "boolean", "select"]);
+
+/** Normalize a raw `options` value into `{value,label}[]` (strings → value=label). */
+function parseOptions(raw: unknown): PropOption[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PropOption[] = [];
+  for (const o of raw) {
+    if (typeof o === "string") out.push({ value: o, label: o });
+    else if (o && typeof o === "object") {
+      const v = (o as Record<string, unknown>).value;
+      const l = (o as Record<string, unknown>).label;
+      if (typeof v === "string") out.push({ value: v, label: typeof l === "string" ? l : v });
+    }
+  }
+  return out;
+}
+
 /**
  * Parse a component's `propsSchema` JSON into the editor's field descriptors —
  * the SAME allowlist the renderer's `declaredProps` derives, so the props UI and
- * the binder agree on which props exist. Each entry is `{ name, type, default }`;
- * `type` is normalized to `"richtext"` (→ textarea) or `"string"` (→ input) so an
- * unknown/missing type degrades to a plain text field. PURE — never throws.
+ * the binder agree on which props exist.
+ *
+ * The schema is an object keyed by prop name; each value is a descriptor:
+ *   `{ type, default, required, translatable, label, description, options }`.
+ * `type` is one of string | richtext | number | boolean | select — an
+ * unknown/missing type degrades to "string" (a plain text field, never throws).
+ * `translatable` is only honored for string/richtext (other types are scalar).
+ * PURE — never throws.
  */
-export function parsePropsSchema(
-  propsSchema: string | null | undefined,
-): { name: string; type: "string" | "richtext"; default: string }[] {
+export function parsePropsSchema(propsSchema: string | null | undefined): PropField[] {
   if (!propsSchema) return [];
   let parsed: unknown;
   try {
@@ -129,26 +176,98 @@ export function parsePropsSchema(
   if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) return [];
   return Object.entries(parsed as Record<string, unknown>).map(([name, spec]) => {
     const s = spec && typeof spec === "object" ? (spec as Record<string, unknown>) : {};
-    const type = s.type === "richtext" ? "richtext" : "string";
-    const def = typeof s.default === "string" ? s.default : "";
-    return { name, type, default: def };
+    const type = FIELD_TYPES.has(s.type as PropFieldType) ? (s.type as PropFieldType) : "string";
+    const isText = type === "string" || type === "richtext";
+
+    // Default: a string for text/select; a typed value (number/bool) carried in
+    // both `default` (display) and `defaultValue` (typed) for the others.
+    let def = "";
+    let defaultValue: unknown;
+    if (type === "number") {
+      const n = typeof s.default === "number" ? s.default : Number(s.default);
+      if (Number.isFinite(n)) {
+        defaultValue = n;
+        def = String(n);
+      }
+    } else if (type === "boolean") {
+      defaultValue = s.default === true || s.default === "true";
+      def = defaultValue ? "true" : "false";
+    } else {
+      def = typeof s.default === "string" ? s.default : "";
+    }
+
+    return {
+      name,
+      type,
+      default: def,
+      defaultValue,
+      required: s.required === true,
+      // Only text fields can be per-locale; ignore translatable on scalars.
+      translatable: isText && s.translatable === true,
+      label: typeof s.label === "string" ? s.label : undefined,
+      description: typeof s.description === "string" ? s.description : undefined,
+      options: type === "select" ? parseOptions(s.options) : undefined,
+    };
   });
 }
 
 /**
- * Drop undeclared keys from a block's props, mirroring the renderer's allowlist
- * (`declaredProps`): only props named in `declared` survive. Empty-string values
- * are dropped too (no point persisting blanks — an unbound slot renders ""). PURE.
+ * Drop undeclared keys from a block's props and (when given the typed schema)
+ * coerce each value to its declared type, mirroring the renderer's allowlist
+ * (`declaredProps`). Two call shapes:
+ *
+ *  - `validateBlockProps(props, Set<name>)` — legacy: keep only declared keys,
+ *    drop empty strings. No type coercion (the value is already a string or a
+ *    locale object from the per-locale editor). Used by the C3 block-editor.
+ *  - `validateBlockProps(props, PropField[])` — schema-aware: keep only declared
+ *    keys and coerce by type — number → finite number (non-numeric dropped),
+ *    boolean → bool, select → value must be one of `options` (else dropped),
+ *    string/richtext kept as-is (string or locale object). A REQUIRED prop is
+ *    NEVER dropped to "" — its declared default is substituted so the prop stays
+ *    present; a non-required empty string is dropped (unbound slot renders "").
+ *
+ * PURE — never mutates inputs, never throws.
  */
 export function validateBlockProps(
   props: Record<string, unknown>,
-  declared: Set<string>,
+  declared: Set<string> | PropField[],
 ): Record<string, unknown> {
+  // Legacy Set path — name allowlist only, no coercion.
+  if (declared instanceof Set) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(props)) {
+      if (!declared.has(k)) continue;
+      if (typeof v === "string" && v === "") continue;
+      out[k] = v;
+    }
+    return out;
+  }
+
+  // Schema-aware path — coerce each declared prop by its type.
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(props)) {
-    if (!declared.has(k)) continue;
-    if (typeof v === "string" && v === "") continue;
-    out[k] = v;
+  for (const f of declared) {
+    const raw = props[f.name];
+    if (f.type === "number") {
+      const n = typeof raw === "number" ? raw : Number(raw);
+      if (Number.isFinite(n)) out[f.name] = n;
+      else if (f.required && f.defaultValue !== undefined) out[f.name] = f.defaultValue;
+    } else if (f.type === "boolean") {
+      out[f.name] = raw === true || raw === "true";
+    } else if (f.type === "select") {
+      const ok = f.options?.some((o) => o.value === raw);
+      if (ok) out[f.name] = raw;
+      else if (f.required && f.default !== "") out[f.name] = f.default;
+    } else {
+      // string / richtext — string or a {loc:text} locale object; "" is dropped
+      // unless required (then keep the declared default so it stays present).
+      if (typeof raw === "string" && raw === "") {
+        if (f.required && f.default !== "") out[f.name] = f.default;
+      } else if (raw != null) {
+        out[f.name] = raw;
+      } else if (f.required && f.default !== "") {
+        out[f.name] = f.default;
+      }
+    }
   }
   return out;
 }
@@ -479,6 +598,37 @@ export function moveNode(
     return insertInto(without, targetId, dragged);
   }
   return insertSibling(without, targetId, dragged, position);
+}
+
+/**
+ * Find a block by id anywhere in the tree (depth-first) — the editor's selected
+ * node may be a nested component inside a Section column, not just a top-level
+ * block, so the Block tab MUST tree-walk (a top-level `blocks.find` misses it).
+ * Returns null if absent. PURE.
+ */
+export function findBlock(blocks: Block[], id: string): Block | null {
+  return findNode(blocks, id);
+}
+
+/**
+ * Replace the `props` of the block `id` wherever it sits in the tree (immutable).
+ * An empty `props` ({}) drops the key entirely (matches how the C3 editor stores
+ * an unbound block). No-op if `id` is absent. PURE — never mutates inputs.
+ */
+export function mergeBlockProps(
+  blocks: Block[],
+  id: string,
+  props: Record<string, unknown>,
+): Block[] {
+  return blocks.map((b) => {
+    if (b.id === id) {
+      const next: Block = { ...b };
+      if (Object.keys(props).length > 0) next.props = props;
+      else delete next.props;
+      return next;
+    }
+    return b.children ? { ...b, children: mergeBlockProps(b.children, id, props) } : b;
+  });
 }
 
 /** Find a node by id anywhere in the tree (depth-first). */
