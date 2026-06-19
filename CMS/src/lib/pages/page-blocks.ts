@@ -328,6 +328,54 @@ export function setLocalizedProp(
   return obj;
 }
 
+/**
+ * Collect the SOURCE-locale text of every translatable string/richtext prop that
+ * actually has text, for the AI-translate button. Returns `{ fieldName: text }`
+ * (the body the `/api/translate` endpoint wants under `fields`). Skips props with
+ * empty source text (nothing to translate). PURE.
+ */
+export function collectTranslatableSource(
+  props: Record<string, unknown> | undefined,
+  schema: PropField[],
+  fromLocale: string,
+  defaultLocale: string,
+): Record<string, string> {
+  const p = props ?? {};
+  const out: Record<string, string> = {};
+  for (const f of schema) {
+    if (!f.translatable) continue;
+    if (f.type !== "string" && f.type !== "richtext") continue;
+    const text = localeFieldValue(p[f.name], fromLocale, defaultLocale);
+    if (text.trim() !== "") out[f.name] = text;
+  }
+  return out;
+}
+
+/**
+ * Merge AI-translation results back into a block's props. `translations` is the
+ * endpoint's `{ fieldName: { loc: text } }` map; for each field we write every
+ * returned locale's text through `setLocalizedProp` (keeping the storage shape
+ * consistent with manual edits), then re-validate the whole props by schema.
+ * Locales not in the Site's `locales` list are ignored. PURE.
+ */
+export function mergeTranslations(
+  props: Record<string, unknown> | undefined,
+  translations: Record<string, Record<string, string>>,
+  schema: PropField[],
+  locales: string[],
+): Record<string, unknown> {
+  let next: Record<string, unknown> = { ...(props ?? {}) };
+  for (const [field, localeMap] of Object.entries(translations)) {
+    if (!localeMap || typeof localeMap !== "object") continue;
+    for (const loc of locales) {
+      const text = localeMap[loc];
+      if (typeof text !== "string" || text === "") continue;
+      next = { ...next, [field]: setLocalizedProp(next[field], loc, text, locales) };
+    }
+  }
+  return validateBlockProps(next, schema);
+}
+
 /** A fresh top-level block referencing `component`, with a unique generated id. */
 export function makeBlock(component: string, existing: Block[]): Block {
   return { id: uniqueBlockId(component, existing), component };

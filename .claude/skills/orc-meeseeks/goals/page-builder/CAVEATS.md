@@ -398,3 +398,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   `previewVersionId` + bumps `draftReloadNonce` (a new state added to the draft-load effect deps) to re-run
   the load effect so the editor shows the restored blocks. `previewVersionId` also auto-clears on page change
   (its own effect). In-app confirm for restore (NOT native window.confirm). i18n `pageBuilder.versions.*`.
+
+- "TRANSLATE WITH AI" BUTTON DONE (2026-06-19 21:53): `ComponentSettings` (page-builder-shell.tsx) calls the
+  ai-assistant loop's EXISTING `POST /api/translate` — DO NOT add a second model client; only CALL it.
+  CONTRACT (verified on disk): body `{kind:"component", target:<component name>, fields:{name:sourceText},
+  fromLocale}` → `{ok:true, translations:{name:{loc:text}}, missing}` (the `translations` map INCLUDES the
+  source locale; merge ignores it harmlessly). On 4xx/5xx it returns `{error}` OR `{errors:[]}` — handle
+  BOTH (`j.error ?? j.errors?.join("; ")`). The endpoint needs a real AI binding (`getAi()` → 503 if
+  unconfigured) so LIVE translation is HITL/build-verified only. Pure logic lives in page-blocks.ts:
+  `collectTranslatableSource(props,schema,fromLocale,defaultLocale)` (only translatable string/richtext props
+  with non-empty source text) + `mergeTranslations(props,translations,schema,locales)` (writes each returned
+  locale via setLocalizedProp, ignores locales NOT in the Site list, then validateBlockProps). The button
+  uses `picker.active` as the SOURCE locale (translate FROM the locale you're viewing). It renders ONLY when
+  `multi && hasTranslatable`. If you add a page-level translate (kind:"page"), reuse these same helpers + the
+  same endpoint — don't fork.

@@ -441,6 +441,11 @@
     "columnAlignHint": "Alista selle veeru joondus (vaikimisi sektsioonist).",
     "columnAlignInherit": "Päri",
     "columnMargin": "Veeris",
-    "columnGap": "Vahe (px)"
+    "columnGap": "Vahe (px)",
+    "translate": {
+      "action": "Tõlgi tehisintellektiga",
+      "busy": "Tõlgin…",
+      "empty": "Lähtekeeles pole midagi tõlkida."
+    }
   }
 }

@@ -441,6 +441,11 @@
     "columnAlignHint": "Override this column's alignment (defaults to the Section).",
     "columnAlignInherit": "Inherit",
     "columnMargin": "Margin",
-    "columnGap": "Gap (px)"
+    "columnGap": "Gap (px)",
+    "translate": {
+      "action": "Translate with AI",
+      "busy": "Translating…",
+      "empty": "Nothing to translate in the source language."
+    }
   }
 }

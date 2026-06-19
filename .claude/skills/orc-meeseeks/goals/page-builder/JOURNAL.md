@@ -652,3 +652,24 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/preview/[id]/page.tsx (?version= read-only render), CMS/src/components/page-builder/
   page-builder-shell.tsx (VersionHistory component, previewSrc, previewVersionId + draftReloadNonce state,
   onRestoreVersion, Page-tab wiring), CMS/messages/{en,fi,et}.json (pageBuilder.versions.*).
+
+## 2026-06-19 21:53 — Component "Translate with AI" button
+- **Status:** DONE
+- **What I did:** Wired the AUTO-translate path into `ComponentSettings` (page-builder-shell.tsx).
+  A per-component "Translate with AI" button sits under the LocalePicker (only when multi-locale +
+  the schema has translatable fields). It collects every translatable string/richtext prop's text in
+  the ACTIVE (source) locale and POSTs `{kind:"component", target:block.component, fields, fromLocale}`
+  to the EXISTING `POST /api/translate` (ai-assistant loop's endpoint — I only CALL it, no 2nd model
+  client). On `{ok,translations}` it merges the returned `{loc:text}` maps back into props for review
+  before Save. Loading ("Translating…") + error states. Request-shaping/merge logic is PURE in
+  page-blocks.ts: `collectTranslatableSource(props,schema,fromLocale,defaultLocale)` (translatable
+  text props w/ non-empty source only) + `mergeTranslations(props,translations,schema,locales)`
+  (per-locale setLocalizedProp then validateBlockProps; ignores unconfigured locales/empties).
+  EN/FI/ET `pageBuilder.translate.{action,busy,empty}`.
+- **Verified:** node --test page-blocks 25/25 (+4 new: collect/merge happy + edge). `npx tsc --noEmit`
+  fully clean. `npx opennextjs-cloudflare build` GREEN (`/api/translate` in the route map). The model
+  call needs a real AI binding (HITL) so live translation is build-verified only — merge/shape logic
+  is unit-tested.
+- **Files:** CMS/src/lib/pages/page-blocks.ts (collectTranslatableSource + mergeTranslations),
+  CMS/src/components/page-builder/page-builder-shell.tsx (translateAll handler + button UI),
+  CMS/scripts/page-blocks.test.mjs (+4 tests), CMS/messages/{en,fi,et}.json (pageBuilder.translate.*).

@@ -441,6 +441,11 @@
     "columnAlignHint": "Ohita tämän sarakkeen tasaus (oletuksena osion mukaan).",
     "columnAlignInherit": "Peri",
     "columnMargin": "Marginaali",
-    "columnGap": "Väli (px)"
+    "columnGap": "Väli (px)",
+    "translate": {
+      "action": "Käännä tekoälyllä",
+      "busy": "Käännetään…",
+      "empty": "Lähdekielessä ei ole käännettävää."
+    }
   }
 }

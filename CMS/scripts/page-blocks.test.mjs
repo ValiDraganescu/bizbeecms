@@ -27,6 +27,8 @@ import {
   removeBlock,
   removeNode,
   setLocalizedProp,
+  collectTranslatableSource,
+  mergeTranslations,
   validateBlockProps,
   validateBlocks,
 } from "../src/lib/pages/page-blocks.ts";
@@ -322,4 +324,58 @@ test("sectionGridCols collapse behavior shrinks empty columns to 0fr", () => {
   // col 0 gets a component, col 1 stays empty → "1fr 0fr".
   blocks = addComponentToColumn(blocks, sectionId, 0, "Hero");
   assert.equal(sectionGridCols(blocks[0]), "1fr 0fr");
+});
+
+// ── AI-translate helpers (collect source + merge results) ───────────────────
+
+const TRANSLATE_SCHEMA = [
+  { name: "title", type: "string", translatable: true, default: "" },
+  { name: "body", type: "richtext", translatable: true, default: "" },
+  { name: "href", type: "string", translatable: false, default: "" },
+  { name: "count", type: "number", translatable: true, default: 0 },
+];
+
+test("collectTranslatableSource: only translatable text props with non-empty source", () => {
+  const props = {
+    title: { en: "Pricing", fi: "" },
+    body: "Body text", // bare string = default-locale value
+    href: { en: "/x" }, // not translatable → skipped
+    count: 3, // number, not text → skipped
+  };
+  const out = collectTranslatableSource(props, TRANSLATE_SCHEMA, "en", "en");
+  assert.deepEqual(out, { title: "Pricing", body: "Body text" });
+});
+
+test("collectTranslatableSource: empty/whitespace source fields are skipped", () => {
+  const out = collectTranslatableSource(
+    { title: { en: "   " }, body: { en: "Hi" } },
+    TRANSLATE_SCHEMA,
+    "en",
+    "en",
+  );
+  assert.deepEqual(out, { body: "Hi" });
+});
+
+test("mergeTranslations: merges per-locale maps via setLocalizedProp + re-validates", () => {
+  const locales = ["en", "fi", "et"];
+  const props = { title: { en: "Pricing" }, href: { en: "/p" } };
+  const translations = {
+    title: { en: "Pricing", fi: "Hinnoittelu", et: "Hinnakiri" },
+  };
+  const next = mergeTranslations(props, translations, TRANSLATE_SCHEMA, locales);
+  assert.deepEqual(next.title, { en: "Pricing", fi: "Hinnoittelu", et: "Hinnakiri" });
+  // untouched non-translatable prop survives validation (it's declared)
+  assert.deepEqual(next.href, { en: "/p" });
+});
+
+test("mergeTranslations: ignores locales not in the Site list and empty strings", () => {
+  const locales = ["en", "fi"];
+  const props = { title: { en: "Hi" } };
+  const next = mergeTranslations(
+    props,
+    { title: { en: "Hi", fi: "Moi", de: "Hallo" } }, // de not configured
+    TRANSLATE_SCHEMA,
+    locales,
+  );
+  assert.deepEqual(next.title, { en: "Hi", fi: "Moi" });
 });

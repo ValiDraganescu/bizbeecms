@@ -56,6 +56,8 @@ import {
   validateBlockProps,
   setLocalizedProp,
   localeFieldValue,
+  collectTranslatableSource,
+  mergeTranslations,
   type PropField,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
@@ -2170,6 +2172,8 @@ function ComponentSettings({
   const defaultLocale = locales[0];
   const picker = useLocalePicker(locales);
   const hasTranslatable = schema.some((f) => f.translatable);
+  const [translating, setTranslating] = useState(false);
+  const [translateError, setTranslateError] = useState<string | null>(null);
 
   const label = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
   const input =
@@ -2185,6 +2189,46 @@ function ComponentSettings({
     setField(name, setLocalizedProp(current, locale, value, locales));
   }
 
+  // "Translate with AI": collect every translatable prop's text in the ACTIVE
+  // (source) locale, POST it to the shared /api/translate engine, then merge the
+  // returned per-locale maps back into props for the user to review before Save.
+  async function translateAll() {
+    setTranslateError(null);
+    const fields = collectTranslatableSource(props, schema, picker.active, defaultLocale);
+    if (Object.keys(fields).length === 0) {
+      setTranslateError(t("translate.empty"));
+      return;
+    }
+    setTranslating(true);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "component",
+          target: block.component,
+          fields,
+          fromLocale: picker.active,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        translations?: Record<string, Record<string, string>>;
+        error?: string;
+        errors?: string[];
+      };
+      if (!res.ok || !j.ok || !j.translations) {
+        setTranslateError(j.error ?? j.errors?.join("; ") ?? `HTTP ${res.status}`);
+        return;
+      }
+      onChange(mergeTranslations(props, j.translations, schema, locales));
+    } catch (err) {
+      setTranslateError((err as Error).message);
+    } finally {
+      setTranslating(false);
+    }
+  }
+
   if (schema.length === 0) {
     return (
       <div className="flex flex-col gap-2">
@@ -2198,7 +2242,20 @@ function ComponentSettings({
     <div className="flex flex-col gap-4">
       <p className="font-mono text-sm text-foreground">{block.component}</p>
       {multi && hasTranslatable && (
-        <LocalePicker state={picker} label={t("localePickerLabel")} />
+        <div className="flex flex-col gap-2">
+          <LocalePicker state={picker} label={t("localePickerLabel")} />
+          <button
+            type="button"
+            disabled={translating}
+            onClick={translateAll}
+            className="self-start rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-muted disabled:opacity-50"
+          >
+            {translating ? t("translate.busy") : t("translate.action")}
+          </button>
+          {translateError && (
+            <p className="text-xs text-danger">{translateError}</p>
+          )}
+        </div>
       )}
       {schema.map((f) => {
         const raw = props[f.name];

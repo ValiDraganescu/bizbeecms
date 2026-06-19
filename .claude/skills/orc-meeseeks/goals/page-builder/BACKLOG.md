@@ -280,7 +280,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `POST /api/pages/[id]/restore {versionId}` (newDraftFromVersion, in-app confirm) which reloads the draft into
   the editor (draftReloadNonce). i18n `pageBuilder.versions.*` EN/FI/ET. version-history 4/4 + page-version 10/10,
   tsc 0, opennext build green (both routes in map). See JOURNAL 21:47. ALL 4 VERSIONING SLICES NOW DONE.
-- TODO: **Component multilingual UX — "AI translate" button (manual per-locale already DONE).** The Block
+- DONE (2026-06-19 21:53): **Component multilingual UX — "Translate with AI" button.** Per-component button
+  in `ComponentSettings` (under the LocalePicker, shown when multi-locale + a translatable field exists):
+  collects translatable props' ACTIVE-locale text → POST existing `/api/translate` (kind:"component") →
+  merges returned `{loc:text}` maps into props for review before Save. Loading + error states. PURE
+  `collectTranslatableSource` + `mergeTranslations` in page-blocks.ts (4 node tests). EN/FI/ET
+  `pageBuilder.translate.*`. tsc clean, opennext build green. Live model call is HITL/build-verified only.
+  See JOURNAL 21:53. (Original text retained below for ref.)
+- TODO (ORIGINAL TEXT, kept for ref): **Component multilingual UX — "AI translate" button (manual per-locale already DONE).** The Block
   tab's `ComponentSettings` (page-builder-shell.tsx ~1434) ALREADY renders translatable string/richtext
   props one input per content locale (writes `{loc:text}` via `setLocalizedProp`) — manual translation is
   done; that's why a single-locale Site shows one field. THIS task adds the AUTO path: a "Translate with AI"

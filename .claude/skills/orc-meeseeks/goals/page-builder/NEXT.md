@@ -1,36 +1,35 @@
 # Note to the next Meeseeks (page-builder)
 
-**THIS run (Versioning slice 4 — version history UI + view/restore):** DONE. **ALL 4 VERSIONING SLICES ARE
-NOW COMPLETE.** Right-rail PAGE tab now shows `VersionHistory` (below PageSettings): a list of PUBLISHED
-versions (version_no + timestamp, "Live" badge on the current one) from NEW `GET /api/pages/[id]/versions`
-(PURE `buildHistory` in lib/pages/version-history.ts). Per version: **View** (renders it read-only in the
-preview iframe via `/preview/<id>?version=<vid>` — route guards page ownership; shell switches center tab to
-preview + shows a "back to draft" banner) and **Create draft** (in-app confirm → NEW
-`POST /api/pages/[id]/restore {versionId}` → `newDraftFromVersion` copies the version into a fresh draft,
-source untouched, then the editor reloads the draft via a new `draftReloadNonce`). REST+fetch only, NO server
-actions. i18n EN/FI/ET `pageBuilder.versions.*`. tsc 0, version-history 4/4 + page-version 10/10, opennext
-build green (both routes in the map). See CAVEATS "VERSIONING slice 4 DONE".
+**THIS run (Component "Translate with AI" button):** DONE. `ComponentSettings` (page-builder-shell.tsx)
+now has a per-component "Translate with AI" button under the LocalePicker (only when multi-locale + the
+component schema has a translatable field). It collects every translatable string/richtext prop's text in
+the ACTIVE (source) locale and POSTs the ai-assistant loop's EXISTING `POST /api/translate`
+(`{kind:"component", target:block.component, fields, fromLocale}`) — NO second model client. On
+`{ok,translations}` it merges the returned `{loc:text}` maps into props for review before Save. Loading
+("Translating…") + error states. PURE logic in page-blocks.ts: `collectTranslatableSource` +
+`mergeTranslations` (4 node tests). EN/FI/ET `pageBuilder.translate.*`. tsc clean, opennext build green.
+LIVE model call is HITL/build-verified only (needs a real AI binding; endpoint 503s without one). See
+CAVEATS "TRANSLATE WITH AI BUTTON DONE".
 
 **CHECK BUGS FIRST:** ALL bugs in BACKLOG `## Bugs` are DONE. If a fresh human bug appears, take it first.
 
-**USER MUST APPLY MIGRATION 0006** (`0006_robust_wendell_rand.sql`) before versioning is live end-to-end
-(`wrangler d1 migrations apply <db>` remote / `--local` dev). NOT auto-run by build. Until applied, getDraft/
-publishDraft/listVersions hit empty version rows; public falls back to page.blocks (slice 2 pickRenderBlocks).
-All versioning is BUILD-VERIFIED ONLY — needs a real D1 binding + the migration to exercise live (HITL).
-
-**Top queued tasks now (no more versioning slices):**
+**Top queued tasks now:**
+- **Schema field types DATE/TIME** — native `<input type=date/time>` in ComponentSettings (parse+validate
+  in page-blocks.ts; migrate BlogPostHeader.date etc. to `type:"date"`; node tests). Full spec in BACKLOG.
 - Adopt `<LocalePicker>`/`useLocalePicker` in C2 `pages-manager.tsx` + `pages/block-editor.tsx` (they still
-  STACK all content locales; the builder forms already use the shared picker — full app-wide consistency).
-- Schema field types DATE/TIME — native `<input type=date/time>` in ComponentSettings (parse+validate in
-  page-blocks.ts; migrate BlogPostHeader.date etc. to `type:"date"`; node tests). Full spec in BACKLOG.
-- Component "AI translate" button — BLOCKED until the ai-assistant goal ships `POST /api/translate`. Skip
-  until then.
-- Polish: the History list shows version_no + raw `toLocaleString()` timestamp; could group/relative-time if
-  the user wants. Low priority.
+  STACK all content locales; the builder forms already use the shared picker — app-wide consistency).
+- POSSIBLE follow-on: a PAGE-level "Translate with AI" (kind:"page") for the SEO meta form (metaTitle/
+  metaDescription per locale) reusing the SAME endpoint + `collectTranslatableSource`/`mergeTranslations`
+  pattern. Endpoint already supports kind:"page".
+- Polish: History list shows raw `toLocaleString()` timestamp; could group/relative-time. Low priority.
 
 Gate: CMS `npx tsc --noEmit` → `node --test scripts/*.test.mjs` → `npx opennextjs-cloudflare build` (dev
 STOPPED, 3601 free). Stage ONLY CMS files + `goals/page-builder/*` by EXPLICIT PATH — NO `git add -A`. Do
-NOT touch cms-bundle.generated.js (PM predeploy auto-regens) or other loops' files.
+NOT touch cms-bundle.generated.js (PM predeploy auto-regens) or other loops' files (esp. the ai-assistant
+loop's api/translate + api/chat — you only CALL the endpoint, never edit it).
 
 NOTE: the impeccable hook still flags `MetaImagePicker`'s `<img src={value}>` (broken-image) — a real
 user-supplied OG-image URL, a FALSE POSITIVE, pre-existing. Ignore it / don't "fix" it.
+
+**USER MUST APPLY MIGRATIONS** 0004 (metaImage) + 0006 (versioning) with `wrangler d1 migrations apply`
+before those features are live end-to-end. NOT auto-run by build.
