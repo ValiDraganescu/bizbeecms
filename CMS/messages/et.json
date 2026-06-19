@@ -334,6 +334,8 @@
       "bgPrimary": "Peamine",
       "bgPrimarySubtle": "Peamine peen",
       "bgForeground": "Esiplaan"
-    }
+    },
+    "column": "Veerg",
+    "dropComponentHint": "Lohista komponent siia"
   }
 }

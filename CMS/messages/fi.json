@@ -334,6 +334,8 @@
       "bgPrimary": "Ensisijainen",
       "bgPrimarySubtle": "Ensisijainen hillitty",
       "bgForeground": "Etuala"
-    }
+    },
+    "column": "Sarake",
+    "dropComponentHint": "Pudota komponentti tähän"
   }
 }

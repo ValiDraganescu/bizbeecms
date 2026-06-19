@@ -2,31 +2,34 @@
 
 DONE so far: LAYOUT shell + page select/create + kit↔component GAP + Components rail (render+search+
 CLICK-INSERT) + editor block-tree store + Save PERSISTS + Center Layers⟷Preview + Right-rail SEO form +
-DnD slice 1 (drag Section into Layers) + Section→Columns model migration + **Right-rail Block tab Section
-settings panel (THIS run)**.
+DnD slice 1 (drag Section into Layers) + Section→Columns model migration + Right-rail Block tab Section
+settings panel + **DnD slice 2 (drag a rail component into a Section COLUMN slot) — THIS run**.
 
-**Section settings panel — DONE this run.** `SectionSettings` in `page-builder-shell.tsx` renders when the
-selected block is a Section: columns 1–4, empty-cols Equal/Collapse, 3×3 align, 4 padding inputs each with a
-rem/px unit toggle (rem default → `padding<Side>Unit`), gap, max-width select, theme-palette bg swatches
-(`var(--color-*)`). New pure `mergeSectionProps(blocks,id,patch)` in `page-blocks.ts` (columns→`setSectionColumns`,
-undefined deletes key) + 3 tests (14/14). i18n `pageBuilder.section*` EN/FI/ET. Persists via the existing
-block PUT on Save. tsc + opennext build green.
+**DnD slice 2 — DONE this run.** `LayersTree` (page-builder-shell.tsx) renders, under each Section, one drop
+slot PER column (`sectionColumns(b)` → "Column N" dashed cells, stacked component buttons, empty-state
+`dropComponentHint`). Rail COMPONENT items now `draggable` `{kind:"component",name}`. Each column is a drop
+target → `onDropComponentToColumn` → pure `addComponentToColumn(blocks,sectionId,colIndex,name)` (already
+built+tested). Per-slot highlight keyed `${sectionId}:${colIndex}`; non-component payload rejected;
+`stopPropagation` keeps it off the Section-add root drop. Click-insert (col 0 of selected/last section)
+unchanged. No new tree logic → no new test. i18n `pageBuilder.column`+`dropComponentHint` EN/FI/ET. tsc +
+opennext build green.
 
-⚠️ **BUNDLE STILL STALE — REGEN OWED (NOT from this run).** The Section *render* change was the column-model
-run; my run is editor-UI + a pure prop-merge helper, so it doesn't change render output. But the PM bundle
-(`ProjectManager/src/lib/deploy/cms-bundle.generated.js`) is still behind on the Section grid render from the
-column-model run. When a run OWNS the bundle / the user approves: `cd ProjectManager && npm run bundle:cms`,
-verify with grep (`data-section-column`, `gridTemplateColumns`) + `node -e import()` smoke.
+⚠️ **BUNDLE STILL STALE — REGEN OWED (from the column-model run, NOT this one).** This run is UI-only (no
+render output change). The PM bundle (`ProjectManager/src/lib/deploy/cms-bundle.generated.js`) is still behind
+on the Section grid render from the column-model run. When a run OWNS the bundle / the user approves:
+`cd ProjectManager && npm run bundle:cms`, verify grep (`data-section-column`, `gridTemplateColumns`) +
+`node -e import()` smoke.
 
-Strongest next tasks (backlog order):
-- **DnD slice 2 — drop a component into a COLUMN slot:** make rail COMPONENT items draggable
-  (`{kind:"component",name}` — add the variant to the `DragPayload` union in page-builder-shell.tsx); each
-  Section in Layers renders one drop-slot PER column → `addComponentToColumn` (already built). Drop outside a
-  slot = rejected; multiple components per column stacked; highlight the hovered slot.
-- **DnD slice 3 — reorder + cross-column move** (pure `moveNode(blocks,dragId,targetId,position)` + node test
-  first: same-column reorder, cross-column move, cross-section move, no-op/invalid).
-- Component-block selection in the Block tab (props editing) — note the Block-tab lookup is top-level only
-  today (see CAVEATS), so deeper selection needs a tree-walk lookup.
+Strongest next task (backlog order):
+- **DnD slice 3 — reorder + cross-column move in the Layers tree (pure helper first).** Add pure
+  `moveNode(blocks, dragId, targetId, position)` (before/after/into) to `page-blocks.ts` + node test:
+  reorder Sections, reorder within a column, move a component between columns (incl. across Sections),
+  no-op/invalid. THEN wire Layers-tree nodes draggable + drop targets (before/after/into via drop-zone
+  thirds) calling `moveNode`. This unifies slices 1–2 drops (insert-at-index). DnD = native HTML5; REUSE
+  the `DND_MIME`/`DragPayload`/`setDragPayload`/`readDragPayload` layer — add a `{kind:"move",id}` variant.
+- Component-block selection in the Block tab (props editing) — Block-tab lookup is TOP-LEVEL only today
+  (see CAVEATS), so deeper selection needs a tree-walk lookup. Components are already selectable in Layers
+  (the column-cell buttons call `onSelect(c.id)`) but the Block tab won't find them yet.
 
 Gate: CMS `npx tsc --noEmit` → `node --test '<helper>.test.ts'` (RELATIVE `.ts` imports) →
 `npx opennextjs-cloudflare build` (dev STOPPED, port 3601 free) → PM `npm run bundle:cms` ONLY when the

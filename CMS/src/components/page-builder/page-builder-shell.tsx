@@ -38,6 +38,8 @@ import type { ComponentGroup } from "@/lib/components/grouped";
 import {
   addSection,
   addComponentToSection,
+  addComponentToColumn,
+  sectionColumns,
   isSection,
   mergeSectionProps,
   targetSectionId,
@@ -185,6 +187,13 @@ export function PageBuilderShell({
     setBlocks((b) => addComponentToSection(b, target, component));
     setDirty(true);
     return true;
+  }
+
+  // Drop a rail component into a specific Section COLUMN (DnD slice 2). No-op if
+  // the target isn't a valid section/column (the pure helper guards range).
+  function onDropComponentToColumn(sectionId: string, colIndex: number, component: string) {
+    setBlocks((b) => addComponentToColumn(b, sectionId, colIndex, component));
+    setDirty(true);
   }
 
   // Merge a Section settings patch into the selected Section's props (columns
@@ -430,6 +439,7 @@ export function PageBuilderShell({
                   blocks={blocks}
                   selectedId={selectedBlockId}
                   onSelect={setSelectedBlockId}
+                  onDropComponent={onDropComponentToColumn}
                 />
               )}
               {/* Drop indicator: a blue line where the new Section appends. */}
@@ -669,8 +679,12 @@ function ComponentsRail({
                           <button
                             type="button"
                             disabled={!canEdit}
+                            draggable={canEdit}
+                            onDragStart={(e) =>
+                              setDragPayload(e, { kind: "component", name })
+                            }
                             onClick={() => insert(name)}
-                            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+                            className="w-full cursor-grab rounded-md border border-border bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-surface-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {name}
                           </button>
@@ -863,12 +877,16 @@ function LayersTree({
   blocks,
   selectedId,
   onSelect,
+  onDropComponent,
 }: {
   blocks: Block[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onDropComponent: (sectionId: string, colIndex: number, name: string) => void;
 }) {
   const t = useTranslations("pageBuilder");
+  // The column-drop slot under the cursor, keyed `${sectionId}:${colIndex}`.
+  const [hoverSlot, setHoverSlot] = useState<string | null>(null);
 
   function nodeClass(id: string): string {
     return (
@@ -886,19 +904,66 @@ function LayersTree({
           <button type="button" onClick={() => onSelect(b.id)} className={nodeClass(b.id)}>
             {isSection(b) ? `${t("layoutSection")} ${i + 1}` : b.component}
           </button>
-          {isSection(b) && (b.children?.length ?? 0) > 0 && (
+          {isSection(b) && (
             <ul className="mt-2 space-y-2 border-l border-border pl-4">
-              {b.children!.map((c) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(c.id)}
-                    className={nodeClass(c.id)}
+              {sectionColumns(b).map((col, ci) => {
+                const slotKey = `${b.id}:${ci}`;
+                const active = hoverSlot === slotKey;
+                return (
+                  <li
+                    key={col.id}
+                    // Each COLUMN is its own drop target → addComponentToColumn.
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "copy";
+                      if (hoverSlot !== slotKey) setHoverSlot(slotKey);
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                        setHoverSlot((s) => (s === slotKey ? null : s));
+                      }
+                    }}
+                    onDrop={(e) => {
+                      setHoverSlot(null);
+                      const payload = readDragPayload(e);
+                      // Only components drop INTO a column; a Section is rejected.
+                      if (payload?.kind !== "component") return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onDropComponent(b.id, ci, payload.name);
+                    }}
+                    className={
+                      "rounded-md border border-dashed p-2 transition-colors " +
+                      (active
+                        ? "border-primary bg-primary-subtle"
+                        : "border-border bg-surface-muted")
+                    }
                   >
-                    {c.component}
-                  </button>
-                </li>
-              ))}
+                    <p className="px-1 pb-1 font-mono text-[11px] uppercase tracking-wide text-foreground-muted">
+                      {t("column")} {ci + 1}
+                    </p>
+                    {(col.children?.length ?? 0) > 0 ? (
+                      <ul className="space-y-1.5">
+                        {col.children!.map((c) => (
+                          <li key={c.id}>
+                            <button
+                              type="button"
+                              onClick={() => onSelect(c.id)}
+                              className={nodeClass(c.id)}
+                            >
+                              {c.component}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="px-1 py-1 text-xs text-foreground-muted">
+                        {t("dropComponentHint")}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </li>

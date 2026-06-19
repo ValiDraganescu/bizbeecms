@@ -126,6 +126,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   default). BG swatches use design-system purpose tokens (`var(--color-*)`), NOT hex — they resolve at
   render because the renderer writes `style.backgroundColor` inline. Padding stores a per-side unit
   (`padding<Side>Unit`, rem default) which `tree.ts` `pad()` already reads.
+- DnD slice 2 DONE: rail COMPONENT items drag `{kind:"component",name}`; per-column drop slots live in
+  `LayersTree` (page-builder-shell.tsx), keyed `${sectionId}:${colIndex}` for the hover highlight. A column's
+  onDrop calls `stopPropagation()` so the drop does NOT also bubble to the CENTER Layers root drop zone (which
+  appends a Section on a `section` payload). Keep that stopPropagation if you touch column drops, else a
+  component-on-column would ALSO be ignored-then-bubble (harmless today since root rejects non-section, but
+  don't rely on it). Component dropped on the Layers ROOT = rejected (root onDrop only acts on `section`).
+  The root onDragOver still shows the blue "drop to add Section" line while dragging a COMPONENT over empty
+  Layers space — cosmetically misleading but harmless (the drop is rejected). If it bugs you, gate the root
+  indicator on `e.dataTransfer.types.includes(DND_MIME)` is NOT enough (value unreadable in dragover); you'd
+  need a shell-level "what kind is being dragged" state set in onDragStart. Left as-is (ponytail).
 - The Block tab only resolves the selected block at the TOP level (`blocks.find(b=>b.id===selectedBlockId)`)
   — fine today because only Sections are selectable from Layers. When component-blocks become selectable
   (deeper nesting), that lookup must walk children too.

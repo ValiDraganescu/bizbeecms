@@ -334,6 +334,8 @@
       "bgPrimary": "Primary",
       "bgPrimarySubtle": "Primary subtle",
       "bgForeground": "Foreground"
-    }
+    },
+    "column": "Column",
+    "dropComponentHint": "Drop a component here"
   }
 }

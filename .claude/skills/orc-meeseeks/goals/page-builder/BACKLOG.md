@@ -44,13 +44,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
   preventDefault + blue indicator, onDrop → `onAddSection()` = APPEND; empty Layers = append). i18n
   `pageBuilder.dropSectionHint` EN/FI/ET. No tree logic touched (reused `addSection`) → no new test.
   tsc + opennext build green. PM `bundle:cms` DEFERRED (cross-loop guardrail; UI-only, no render change).
-- TODO: **DnD slice 2 — drag a component from the rail into a COLUMN drop-slot.** Build on the column model +
-  slice 1's payload. Each Section in the Layers tree renders one "Drop here" slot PER column (COL 1..N, like
-  the 3rd/4th screenshots). Make rail COMPONENT items draggable (`{kind:"component", name}`) and each column
-  slot a drop target calling a pure `addComponentToColumn(blocks, sectionId, colIndex, name)` (replaces the
-  old section-direct `addComponentToSection`; add it to `page-blocks.ts` + node test). A component dropped
-  outside any column slot is rejected. Multiple components per column, stacked. Drop highlight on the hovered
-  slot. Gate: CMS tsc + opennext build green; regen PM cms-bundle. EN/FI/ET.
+- DONE (2026-06-19): **DnD slice 2 — drag a component from the rail into a COLUMN drop-slot.** `LayersTree`
+  in `page-builder-shell.tsx` now renders, under each Section, one drop slot PER column (`sectionColumns(b)`
+  → "Column N" dashed cells); rail COMPONENT items are `draggable` with `{kind:"component",name}`. Each column
+  is a drop target (onDragOver preventDefault + per-slot highlight keyed `${sectionId}:${colIndex}`, onDrop →
+  `onDropComponentToColumn` = pure `addComponentToColumn(blocks,sectionId,colIndex,name)`, `stopPropagation`
+  so it doesn't bubble to the Section-add root drop zone). Non-component payloads (a Section) are rejected in
+  the column handler; a component dropped on the Layers ROOT hits the existing root onDrop which only acts on
+  `section` payloads → rejected. Components stack within a column; empty column shows `dropComponentHint`.
+  `addComponentToColumn`/`sectionColumns` already existed + tested (page-blocks-sections.test.ts 14/14) → no
+  new tree logic, no new test. i18n `pageBuilder.column` + `dropComponentHint` EN/FI/ET. tsc + opennext build
+  green. PM `bundle:cms` DEFERRED (cross-loop guardrail; UI-only, no render change this run).
 - TODO: **DnD slice 3 — reorder + cross-column move in the Layers tree (pure helper first).** Today
   `moveBlock(blocks, index, delta)` only nudges within one flat list. Add a pure
   `moveNode(blocks, dragId, targetId, position)` (position = before/after/into) to `page-blocks.ts` handling:
