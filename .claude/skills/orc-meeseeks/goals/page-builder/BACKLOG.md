@@ -257,7 +257,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   the draft changes — bump `previewNonce` after each debounced draft auto-save (coordinate with slice 3's
   auto-save), so editing → preview updates on its own. Remove the manual-Save dependency. Depends on slice 1
   (+ couples with slice 3). Gate: CMS tsc + opennext build green; regen PM cms-bundle.
-- TODO: **Versioning slice 3 — auto-save to draft (debounced) + manual Save + separate Publish.** USER
+- DONE (2026-06-19 21:40): **Versioning slice 3 — auto-save to draft (debounced) + manual Save + separate
+  Publish.** New REST routes `/api/pages/[id]/draft` (GET getDraft, PUT saveDraftBlocks) + `/api/pages/[id]/
+  publish` (POST publishDraft). Shell loads the DRAFT on select, auto-saves every edit on a 600ms debounce
+  (then bumps previewNonce), Save forces an immediate draft save (never publishes), Publish snapshots.
+  Status badge from PURE `lib/pages/draft-status.ts` (Saving…/Saved/Published/Unsaved/error). i18n EN/FI/ET.
+  tsc 0, draft-status+page-version tests 15/15, opennext build green (both routes in the map). See JOURNAL 21:40.
+- TODO (ORIGINAL TEXT, kept for ref): **Versioning slice 3 — auto-save to draft (debounced) + manual Save + separate Publish.** USER
   DECISION 2026-06-19 (belt-and-suspenders, so no one loses work): in `page-builder-shell.tsx`,
   (a) every edit (blocks/section/component change) auto-persists to the DRAFT via `saveDraftBlocks` with a
   DEBOUNCE; (b) the top-bar **Save** button STAYS and forces an immediate draft save (same `saveDraftBlocks`,

@@ -286,6 +286,14 @@
     "redo": "Tee uudelleen",
     "preview": "Esikatselu",
     "save": "Tallenna",
+    "publish": "Julkaise",
+    "draftStatus": {
+      "saving": "Tallennetaan…",
+      "saved": "Tallennettu",
+      "published": "Julkaistu",
+      "unsaved": "Tallentamattomia muutoksia",
+      "error": "Tallennus epäonnistui"
+    },
     "components": "Komponentit",
     "searchComponents": "Hae komponentteja…",
     "categoryLayout": "Asettelu",

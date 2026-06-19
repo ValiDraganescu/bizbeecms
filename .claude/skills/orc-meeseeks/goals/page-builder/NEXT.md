@@ -1,41 +1,35 @@
 # Note to the next Meeseeks (page-builder)
 
-**THIS run (Versioning slice 2 — render routes read the right version + preview auto-refresh seam):** DONE.
-Public route renders the PUBLISHED version's blocks (`getVersion(page.publishedVersionId)`, fallback
-`page.blocks` for legacy pages); preview renders DRAFT → else PUBLISHED → else legacy. Block-SOURCE choice
-is the pure node-tested `pickRenderBlocks(version, fallbackVersion, legacyBlocks)` (page-version.ts); routes
-resolve the pointer via the NEW public `getVersion(id|null,db?)` (page-version-store.ts, NO create).
-`buildPlanFromPage(pageRow, blocksOverride?)` — optional 2nd arg, absent = legacy `page.blocks`. Shell:
-debounced (600ms) `previewNonce` bump on `blocks` change = the slice-3 auto-save seam. page-version 10/10,
-tsc 0, opennext build green. See CAVEATS "VERSIONING slice 2 LANDED" + "PREVIEW AUTO-REFRESH SEAM".
+**THIS run (Versioning slice 3 — debounced draft auto-save + Save + Publish):** DONE.
+Shell now writes DRAFTS via NEW REST routes (NO server actions): `/api/pages/[id]/draft` (GET=getDraft
+create-if-absent, PUT=saveDraftBlocks) + `/api/pages/[id]/publish` (POST=publishDraft). On page-select the
+shell loads the DRAFT (not page.blocks). Every block edit auto-saves on a 600ms debounce (reuses the slice-2
+effect → now `void saveDraft()`, then bumps previewNonce). Top bar = [Save][Publish]: Save forces an immediate
+draft save (ALWAYS draft, never publishes); Publish saves the draft if dirty then snapshots. Status badge from
+PURE `lib/pages/draft-status.ts` (Saving…/Saved/Published/Unsaved/Save failed), i18n EN/FI/ET. tsc 0,
+draft-status+page-version tests 15/15, opennext build green (both routes in the route map). See CAVEATS
+"VERSIONING slice 3 LANDED".
 
 **CHECK BUGS FIRST:** ALL bugs in BACKLOG `## Bugs` are DONE. If a fresh human bug appears, take it first.
 
-**USER MUST APPLY MIGRATION 0006** (`wrangler d1 migrations apply <db>` remote / `--local` dev) before any
-versioning behavior is live. NOT auto-run by build. Until then (and until slice 3 wires saveDraftBlocks) the
-render routes fall back to `page.blocks` — they're READY but the draft/published version rows are unpopulated.
+**USER MUST APPLY MIGRATION 0006** (`0006_robust_wendell_rand.sql`) before versioning is live
+(`wrangler d1 migrations apply <db>` remote / `--local` dev). NOT auto-run by build. Until then getDraft/
+publishDraft hit empty version rows; the public route falls back to page.blocks (slice 2 `pickRenderBlocks`).
+NOTE: builder edits now go to the DRAFT — so they're INVISIBLE on the public page until Publish. Intended.
 
-**BUILD GREEN** as of 21:33 (tsc 0 over whole CMS + opennext build complete, dev stopped/3601 free).
-
-**Top queued task — Versioning slice 3** (the natural next): in `page-builder-shell.tsx`,
-- REPLACE the slice-2 nonce-bump effect's body (the debounced effect above the pages/groups load) with the
-  real debounced auto-save: call `saveDraftBlocks(pageId, {blocks,meta})` THEN bump `previewNonce`. Don't add
-  a second debounce — reuse that one effect. Keep `onSave()` (forces an immediate draft save, no debounce).
-- Add a separate top-bar **Publish** button → `publishDraft(pageId)` (snapshot + auto-draft, slice 1). Top
-  bar = [Save] [Publish]. Opening a page with no draft = `getDraft` (create-if-absent). NOTE: the store
-  wrappers run server-side (D1) — the shell is `"use client"`, so you'll need API ROUTES wrapping
-  `saveDraftBlocks`/`publishDraft`/`getDraft` (the shell currently PUTs blocks via `/api/pages/[id]/blocks`
-  → `setPageBlocks`, which writes `page.blocks` NOT a version; slice 3 must route draft writes to
-  `saveDraftBlocks` instead — decide: new `/api/pages/[id]/draft` + `/publish`, or extend the blocks route).
-  Show draft status (saving…/saved/published). EN/FI/ET (Save, Publish, saving, saved, published).
-- Then **slice 4** (version history UI + restore via `newDraftFromVersion`/`listVersions`).
+**Top queued task — Versioning slice 4** (version history UI + restore/republish): a history list (top bar
+or a right-rail tab) from `listVersions(pageId)`; restore = `newDraftFromVersion(pageId, versionId)` → makes a
+new draft copied from that version (source untouched). Needs a new route, e.g. `GET /api/pages/[id]/versions`
+(listVersions) + `POST /api/pages/[id]/restore {versionId}` (newDraftFromVersion). After restore, refetch the
+draft into the shell (re-run the load effect / bump selected) so the editor shows the restored blocks. i18n
+EN/FI/ET. Show version_no + createdAt + which is currently published.
 
 Other queued: Adopt `<LocalePicker>` in C2 (pages-manager.tsx + pages/block-editor.tsx still stack locales);
-Schema field types DATE/TIME (native pickers in ComponentSettings).
+Schema field types DATE/TIME (native pickers in ComponentSettings); dark-mode preview toggle follow-on UI.
 
 Gate: CMS `npx tsc --noEmit` → `node --test scripts/*.test.mjs` → `npx opennextjs-cloudflare build` (dev
 STOPPED, 3601 free). Stage ONLY CMS files + `goals/page-builder/*` by EXPLICIT PATH — NO `git add -A`. Do
 NOT touch cms-bundle.generated.js (PM predeploy auto-regens) or other loops' files.
 
-NOTE: the impeccable hook still flags `MetaImagePicker`'s `<img src={value}>` (broken-image, L~1373) — a real
+NOTE: the impeccable hook still flags `MetaImagePicker`'s `<img src={value}>` (broken-image) — a real
 user-supplied OG-image URL, a FALSE POSITIVE, pre-existing. Ignore it / don't "fix" it.

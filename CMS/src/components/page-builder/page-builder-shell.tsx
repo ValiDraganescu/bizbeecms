@@ -28,6 +28,7 @@ import {
   buildSeoMetaBody,
   buildPublishToggleBody,
 } from "@/lib/pages/page-meta";
+import { nextDraftStatus, draftStatusKey, type DraftStatus } from "@/lib/pages/draft-status";
 import {
   flattenPagesForPicker,
   topLevelParents,
@@ -194,6 +195,9 @@ export function PageBuilderShell({
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Versioning slice 3: the draft auto-save status badge (saving…/saved/published).
+  const [draftStatus, setDraftStatus] = useState<DraftStatus>("saved");
+  const [publishing, setPublishing] = useState(false);
   // True while a draggable rail item hovers the Layers drop zone (blue indicator).
   const [layersDropActive, setLayersDropActive] = useState(false);
 
@@ -207,7 +211,8 @@ export function PageBuilderShell({
     }
     let live = true;
     void (async () => {
-      const res = await fetch(`/api/pages/${selected.id}/blocks`);
+      // Versioning slice 3: load the DRAFT (create-if-absent), not page.blocks.
+      const res = await fetch(`/api/pages/${selected.id}/draft`);
       if (!live) return;
       if (res.ok) {
         const body = (await res.json()) as { blocks?: Block[] };
@@ -217,6 +222,7 @@ export function PageBuilderShell({
       }
       setSelectedBlockId(null);
       setDirty(false);
+      setDraftStatus((s) => nextDraftStatus(s, "loaded"));
     })();
     return () => {
       live = false;
@@ -300,35 +306,78 @@ export function PageBuilderShell({
     setDirty(true);
   }
 
-  async function onSave() {
-    if (!selected) return;
+  // Persist the current blocks to the page's DRAFT version (saveDraftBlocks).
+  // Shared by the debounced auto-save and the manual Save button. Save ALWAYS
+  // saves the draft, NEVER publishes. Bumps previewNonce so the preview iframe
+  // (which renders the draft) reflects the just-saved state.
+  async function saveDraft(): Promise<boolean> {
+    if (!selected) return false;
     setSaving(true);
+    setDraftStatus((s) => nextDraftStatus(s, "saveStart"));
     try {
-      const res = await fetch(`/api/pages/${selected.id}/blocks`, {
+      const res = await fetch(`/api/pages/${selected.id}/draft`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ blocks }),
       });
       if (res.ok) {
         setDirty(false);
-        setPreviewNonce((n) => n + 1); // reflect persisted blocks in the iframe
+        setDraftStatus((s) => nextDraftStatus(s, "saveDone"));
+        setPreviewNonce((n) => n + 1);
+        return true;
       }
+      setDraftStatus((s) => nextDraftStatus(s, "error"));
+      return false;
+    } catch {
+      setDraftStatus((s) => nextDraftStatus(s, "error"));
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
-  // Versioning slice 2 seam: auto-refresh the preview iframe as the draft changes
-  // WITHOUT a button press. Debounce a `previewNonce` bump on every block edit so
-  // editing updates the preview on its own. The actual debounced draft AUTO-SAVE
-  // lands in slice 3 (saveDraftBlocks → preview reads the draft version); here the
-  // nonce wiring is ready and harmless — until slice 3 persists, a bump just reloads
-  // the already-persisted content. Skip while `saving` (onSave bumps explicitly).
-  // ponytail: plain setTimeout debounce, no lib; slice 3 swaps the body for a save.
+  // Manual Save — force an immediate draft save (no debounce).
+  async function onSave() {
+    await saveDraft();
+  }
+
+  // Publish — snapshot the draft into a new published version + auto-create a
+  // fresh draft (publishDraft). Saves the draft first so the latest edits ship.
+  async function onPublish() {
+    if (!selected) return;
+    setPublishing(true);
+    try {
+      if (dirty && !(await saveDraft())) return; // save failed → don't publish stale
+      const res = await fetch(`/api/pages/${selected.id}/publish`, { method: "POST" });
+      if (res.ok) {
+        setDraftStatus((s) => nextDraftStatus(s, "publishDone"));
+        setPreviewNonce((n) => n + 1);
+      } else {
+        setDraftStatus((s) => nextDraftStatus(s, "error"));
+      }
+    } catch {
+      setDraftStatus((s) => nextDraftStatus(s, "error"));
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  // Reflect a pending edit in the status badge ("Unsaved changes") the moment a
+  // block edit marks the page dirty (the debounce below then auto-saves it).
+  useEffect(() => {
+    if (dirty) setDraftStatus((s) => nextDraftStatus(s, "edit"));
+  }, [dirty]);
+
+  // Versioning slice 3: debounced AUTO-SAVE to the draft. Every block edit (after
+  // 600ms idle) persists via saveDraft (→ saveDraftBlocks) and bumps previewNonce,
+  // so the preview iframe (rendering the draft version) updates on its own with no
+  // button press. Skip while a save is already running (saveDraft bumps itself).
+  // ponytail: plain setTimeout debounce, no lib.
   useEffect(() => {
     if (!selected || !dirty || saving) return;
-    const t = setTimeout(() => setPreviewNonce((n) => n + 1), 600);
+    const t = setTimeout(() => void saveDraft(), 600);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocks, dirty, saving, selected]);
 
   useEffect(() => {
@@ -444,8 +493,16 @@ export function PageBuilderShell({
           </div>
         </div>
 
-        {/* Right: preview + save */}
+        {/* Right: draft status + save + publish */}
         <div className="flex items-center gap-2">
+          {selected && draftStatusKey(draftStatus) && (
+            <span
+              className="text-xs text-foreground-muted"
+              aria-live="polite"
+            >
+              {t(`draftStatus.${draftStatusKey(draftStatus)}`)}
+            </span>
+          )}
           <button
             type="button"
             disabled
@@ -457,9 +514,17 @@ export function PageBuilderShell({
             type="button"
             onClick={() => void onSave()}
             disabled={!selected || !dirty || saving}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
+            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-60"
           >
             {saving ? t("saving") : t("save")}
+          </button>
+          <button
+            type="button"
+            onClick={() => void onPublish()}
+            disabled={!selected || saving || publishing}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          >
+            {publishing ? t("saving") : t("publish")}
           </button>
         </div>
       </header>

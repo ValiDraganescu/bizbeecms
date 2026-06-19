@@ -286,6 +286,14 @@
     "redo": "Redo",
     "preview": "Preview",
     "save": "Save",
+    "publish": "Publish",
+    "draftStatus": {
+      "saving": "Saving…",
+      "saved": "Saved",
+      "published": "Published",
+      "unsaved": "Unsaved changes",
+      "error": "Save failed"
+    },
     "components": "Components",
     "searchComponents": "Search components…",
     "categoryLayout": "Layout",

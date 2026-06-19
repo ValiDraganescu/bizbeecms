@@ -368,3 +368,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   `wrangler d1 migrations apply <db>` (NOT auto-run by build). Hand-DDL fixture `scripts/page-store.test.mjs`
   was updated with the 2 new page cols (draft_version_id/published_version_id) per the HAND-FIXTURE DRIFT
   caveat — grep `CREATE TABLE page` fixtures after any future page-schema change.
+- VERSIONING slice 3 LANDED (2026-06-19 21:40): the shell now writes DRAFTS, not page.blocks. The OLD
+  `/api/pages/[id]/blocks` PUT (setPageBlocks → page.blocks) is NO LONGER called by the builder — the shell
+  loads + saves via `/api/pages/[id]/draft` (GET getDraft create-if-absent, PUT saveDraftBlocks) and publishes
+  via `/api/pages/[id]/publish` (POST publishDraft). The blocks route still exists (other callers / C3); don't
+  delete it, but builder edits go to the draft now. Public route renders the PUBLISHED version (slice 2), so
+  edits are INVISIBLE on the public page until you hit Publish — that's the intended draft/publish split.
+- DRAFT meta is preserved on blocks PUT: the draft route re-reads getDraft to keep the draft's current `meta`
+  string (the block editor doesn't touch SEO meta). If a future caller wants to write meta to the draft too,
+  extend the route body — don't blank it.
+- draftStatus is a PURE state machine in `lib/pages/draft-status.ts` (nextDraftStatus/draftStatusKey,
+  node-tested). The shell reflects it via `t("draftStatus.<key>")` (keys: saving/saved/published/unsaved/error
+  in EN/FI/ET). One effect flips status→"dirty" when `dirty` turns true; saveDraft drives saveStart/saveDone/
+  error; onPublish drives publishDone. Add new statuses to BOTH the machine AND the 3 message files.
+- The debounced auto-save REUSES the single slice-2 effect (now `void saveDraft()` instead of a bare nonce
+  bump). Do NOT add a second debounce effect. It has an eslint-disable for exhaustive-deps (saveDraft is a
+  fresh closure each render; deps stay [blocks,dirty,saving,selected] on purpose so it fires on edits only).

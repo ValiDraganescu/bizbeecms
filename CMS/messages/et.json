@@ -286,6 +286,14 @@
     "redo": "Tee uuesti",
     "preview": "Eelvaade",
     "save": "Salvesta",
+    "publish": "Avalda",
+    "draftStatus": {
+      "saving": "Salvestan…",
+      "saved": "Salvestatud",
+      "published": "Avaldatud",
+      "unsaved": "Salvestamata muudatused",
+      "error": "Salvestamine ebaõnnestus"
+    },
     "components": "Komponendid",
     "searchComponents": "Otsi komponente…",
     "categoryLayout": "Paigutus",

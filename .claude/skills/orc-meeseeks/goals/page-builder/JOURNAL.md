@@ -609,3 +609,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (getVersion), CMS/src/lib/render/render-page.tsx (blocksOverride arg), CMS/src/app/[[...slug]]/page.tsx,
   CMS/src/app/preview/[id]/page.tsx, CMS/src/components/page-builder/page-builder-shell.tsx (nonce seam),
   CMS/scripts/page-version.test.mjs (+5 tests).
+
+## 2026-06-19 21:40 — Versioning slice 3 — debounced draft auto-save + Save + Publish
+- **Status:** DONE
+- **What I did:** Wired the page-builder shell to the versioning store via NEW REST routes
+  (`/api/pages/[id]/draft` GET=getDraft create-if-absent, PUT=saveDraftBlocks; `/api/pages/[id]/publish`
+  POST=publishDraft) — REST+fetch, no server actions. Shell now: (a) loads the DRAFT (not page.blocks) on
+  page select; (b) every block edit auto-persists to the draft on a 600ms debounce then bumps previewNonce
+  (replaced the slice-2 nonce-only effect body); (c) top-bar Save forces an immediate draft save (saveDraft,
+  no debounce) — ALWAYS saves draft, never publishes; (d) separate Publish button → publishDraft (saves draft
+  first if dirty, then snapshots). Status badge (Saving…/Saved/Published/Unsaved/Save failed) driven by a PURE
+  node-tested state machine `lib/pages/draft-status.ts` (nextDraftStatus/draftStatusKey). i18n EN/FI/ET
+  (publish + draftStatus.*).
+- **Verified:** tsc 0; `node --test scripts/draft-status.test.mjs scripts/page-version.test.mjs` 15/15; all 3
+  message JSONs parse; `opennextjs-cloudflare build` green and both new routes appear in the route map
+  (`ƒ /api/pages/[id]/draft`, `ƒ /api/pages/[id]/publish`); dev stopped, 3601 free. Live D1 read/write needs a
+  real binding + migration 0006 applied (HITL) — build-verified only, same as slices 1-2.
+- **Files:** CMS/src/lib/pages/draft-status.ts (NEW), CMS/scripts/draft-status.test.mjs (NEW),
+  CMS/src/app/api/pages/[id]/draft/route.ts (NEW), CMS/src/app/api/pages/[id]/publish/route.ts (NEW),
+  CMS/src/components/page-builder/page-builder-shell.tsx (load draft, saveDraft/onSave/onPublish, debounced
+  auto-save, status badge, Publish button), CMS/messages/{en,fi,et}.json (publish + draftStatus.*).
