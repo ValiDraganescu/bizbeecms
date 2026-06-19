@@ -47,8 +47,15 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const pmOrigin = (env as unknown as { PM_ORIGIN?: string }).PM_ORIGIN;
   if (!pmOrigin) redirect("/");
 
+  // The public host the BROWSER is on. The router proxies custom domains to this
+  // Worker's internal workers.dev URL, so request host / x-forwarded-host get
+  // normalized to workers.dev by OpenNext — the router preserves the real host in
+  // x-bizbee-host (read it FIRST). Falls back to the standard headers when the
+  // request didn't come through the router (direct workers.dev hit). This is the
+  // ONLY place the CMS builds a host-dependent URL; keep it the single source.
   const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const host =
+    h.get("x-bizbee-host") ?? h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "https";
   const returnUrl = `${proto}://${host}/api/auth/sso-callback`;
   const ssoUrl =

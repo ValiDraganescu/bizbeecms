@@ -44,11 +44,15 @@ export default {
     target.protocol = "https:";
     target.host = `bizbeecms-cms-${slug}.${env.WORKERS_SUBDOMAIN}.workers.dev`;
 
-    // Forward the ORIGINAL host so the CMS can still resolve its own context
-    // (canonical links, etc.) from the customer domain rather than the internal
-    // workers.dev name.
+    // Forward the ORIGINAL host so the CMS can resolve its own context (SSO
+    // return URL, canonical links) from the customer domain, not the internal
+    // workers.dev name. We send BOTH x-forwarded-host (the standard) AND a
+    // private x-bizbee-host: OpenNext/Next normalizes x-forwarded-host to match
+    // the workers.dev URL it's actually serving, clobbering it — but it leaves
+    // our custom header untouched. The CMS reads x-bizbee-host first.
     const headers = new Headers(request.headers);
     headers.set("x-forwarded-host", host);
+    headers.set("x-bizbee-host", host);
 
     return fetch(
       new Request(target, {
