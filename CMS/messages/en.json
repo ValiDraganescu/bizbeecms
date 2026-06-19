@@ -172,6 +172,15 @@
   "adminNav": {
     "brand": "CMS admin",
     "home": "Home",
+    "expand": "Expand sidebar",
+    "collapse": "Collapse sidebar",
+    "viewSite": "View site",
+    "theme": {
+      "label": "Theme",
+      "light": "Light",
+      "system": "System",
+      "dark": "Dark"
+    },
     "chat": "AI Assistant",
     "pages": "Pages",
     "components": "Components",

@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getTranslations } from "next-intl/server";
 import { checkAdminFromHeaders } from "@/lib/auth/guard";
-import { AdminNav } from "@/components/admin-nav";
+import { SidebarShell } from "@/components/admin-sidebar";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +25,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const decision = await checkAdminFromHeaders();
   if (decision.allow) {
-    return (
-      <>
-        <AdminNav />
-        {children}
-      </>
-    );
+    return <SidebarShell>{children}</SidebarShell>;
   }
 
   if (decision.reason === "denied") {

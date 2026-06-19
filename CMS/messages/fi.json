@@ -172,6 +172,15 @@
   "adminNav": {
     "brand": "CMS-hallinta",
     "home": "Etusivu",
+    "expand": "Laajenna sivupalkki",
+    "collapse": "Tiivistä sivupalkki",
+    "viewSite": "Näytä sivusto",
+    "theme": {
+      "label": "Teema",
+      "light": "Vaalea",
+      "system": "Järjestelmä",
+      "dark": "Tumma"
+    },
     "chat": "Tekoälyavustaja",
     "pages": "Sivut",
     "components": "Komponentit",

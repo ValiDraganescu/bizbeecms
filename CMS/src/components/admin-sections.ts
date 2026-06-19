@@ -1,6 +1,6 @@
 /**
- * Admin section links — shared by the client AdminNav AND the server /admin index
- * page. Kept in a PLAIN module (NOT the `"use client"` admin-nav.tsx): importing a
+ * Admin section links — shared by the client SidebarShell AND the server /admin
+ * index page. Kept in a PLAIN module (NOT a `"use client"` component): importing a
  * non-component VALUE export from a client module into a server component gets
  * mangled by the bundler into a client-reference proxy, so `.map` blows up at
  * runtime (`ADMIN_SECTIONS.map is not a function`). A normal module crosses the

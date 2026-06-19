@@ -172,6 +172,15 @@
   "adminNav": {
     "brand": "CMS-i haldus",
     "home": "Avaleht",
+    "expand": "Laienda külgriba",
+    "collapse": "Ahenda külgriba",
+    "viewSite": "Vaata saiti",
+    "theme": {
+      "label": "Teema",
+      "light": "Hele",
+      "system": "Süsteem",
+      "dark": "Tume"
+    },
     "chat": "Tehisintellekti abiline",
     "pages": "Lehed",
     "components": "Komponendid",
