@@ -37,5 +37,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   clears it so no other step reports ram. Best-effort: MemAvailable absent → no field. STATIC, env
   $VARS only, never fatal. Verified by render-eval + `bash -n` + a 5-case functional harness, plus
   deployer `wrangler deploy --dry-run` + PM `npm test` (42). UI/schema/parse already accept ram. (2026-06-18)
+- DONE (2026-06-19): **Show total deploy duration per run.** Pure `runTotalDurationMs(steps)` in
+  `lib/deploy/deploy-events.ts` (span = max `startedAt+durationMs` − min `startedAt` over collapsed
+  steps; running step contributes only its start; null when no parseable start). `deploy-timeline.tsx`
+  renders it as a header line above the current run (`Total {dur}`) and appended to each previous-run
+  summary (`· {dur}`), via existing `fmtElapsed`. i18n `sites.timeline.total` EN/FI/ET. 3 pure tests.
+  Gate: npm test (80) + opennextjs build green.
+
 - TODO: **Verify end-to-end.** `npx opennextjs-cloudflare build` green; a real deploy produces a full
   ordered trail with timings; a forced step failure records the error; emit failure does not break deploy.

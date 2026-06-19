@@ -136,3 +136,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   confirmed OFF (3601/3602 free) before build; did NOT touch deployer/container (real deploy in flight).
 - **Files:** ProjectManager/src/lib/deploy/deploy-events.ts (+collapseDeployEvents, TimelineRow),
   deploy-events.test.ts (+4), src/app/(app)/sites/deploy-timeline.tsx (import + use collapsed rows).
+
+## 2026-06-19 15:57 — Show total deploy duration per run
+- **Status:** DONE
+- **What I did:**
+  - New pure `runTotalDurationMs(steps)` in `lib/deploy/deploy-events.ts`: total wall-clock span of
+    a run = (max step `startedAt + durationMs`) − (min step `startedAt`) over its COLLAPSED step rows.
+    A still-running step (no `durationMs`) contributes only its start, so the total grows as steps land.
+    NaN-safe (skips unparseable starts); returns null when no step has a parseable start; clamps ≥0.
+  - `deploy-timeline.tsx`: surfaces the total in TWO places — (1) a header line above the current
+    run's steps (`Total {duration}`), and (2) appended to each previous-run `<summary>` line
+    (`· {duration}`). Both use the existing `fmtElapsed` (s / XmZZs) for consistency with per-step durs.
+  - i18n `sites.timeline.total` ("Total {duration}") added EN/FI/ET.
+  - Pure unit tests (3): span across two finished steps (302000ms), still-running step contributes
+    only its start (2000ms), null when no parseable start.
+- **Verified:** `npm test` → 80 pass (+3 new). `npx opennextjs-cloudflare build` green (dev confirmed
+  NOT on 3601/3602 first). Codebase had already grown past the backlog note — `groupRunsByDeployId`,
+  `DeployRun`, paged history, `fmtElapsed`, `deployProgress` already existed; this slot the total in.
+- **Files:** ProjectManager/src/lib/deploy/deploy-events.ts (+runTotalDurationMs),
+  src/lib/deploy/deploy-events.test.ts (+3), src/app/(app)/sites/deploy-timeline.tsx,
+  messages/{en,fi,et}.json

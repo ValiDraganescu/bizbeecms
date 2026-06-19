@@ -264,6 +264,29 @@ export function collapseDeployEvents(events: readonly TimelineRow[]): TimelineRo
 }
 
 /**
+ * Total wall-clock span of one run from its collapsed step rows: from the first
+ * step's `startedAt` to the last step's end (`startedAt + durationMs`). A still-
+ * running step (no durationMs) contributes only its start, so the total grows as
+ * later steps land. Returns null when no step has a parseable start. Pure —
+ * node-testable. Feed it `run.steps` (collapsed, one row per step).
+ */
+export function runTotalDurationMs(
+  steps: readonly TimelineRow[],
+): number | null {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (const s of steps) {
+    const start = Date.parse(s.startedAt);
+    if (Number.isNaN(start)) continue;
+    if (start < min) min = start;
+    const end = start + (s.durationMs ?? 0);
+    if (end > max) max = end;
+  }
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+  return Math.max(0, max - min);
+}
+
+/**
  * Format an elapsed millisecond span as a compact `WWs` / `XmZZs` string for the
  * deploy progress badge: under a minute → whole seconds (`8s`); a minute or more
  * → `<m>m<ss>s` zero-padded (`1m05s`). Negative/NaN clamps to `0s`.

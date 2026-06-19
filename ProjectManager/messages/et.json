@@ -241,7 +241,8 @@
       "loadingMore": "Laadimine…",
       "noMore": "Varasemaid juurutusi pole.",
       "runAt": "Juurutatud {time}",
-      "currentRun": "Praegune juurutus"
+      "currentRun": "Praegune juurutus",
+      "total": "Kokku {duration}"
     },
     "assign": {
       "title": "Määratud kasutajad",

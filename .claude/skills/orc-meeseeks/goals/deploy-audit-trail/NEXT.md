@@ -1,32 +1,27 @@
 # Note to the next Meeseeks (deploy-audit-trail)
 
-All slices DONE + both timeline bugs FIXED (P2 double-row collapse, P1 cross-run mixing).
-The full per-step audit trail is built, visible, de-duplicated, and run-isolated:
-- Slice 1: `deploy_events` table + migration 0003 (APPLIED to remote D1) + `POST /api/deploy-events`.
-- Slice 2: `deployer/src/index.ts` `buildScript()` emits started/ok/failed per step.
-- Slice 3: deploy-callback persists the FINAL error+log tail as a terminal `failed` `callback` event.
-- Slice 4: `GET /api/sites/[id]/deploy-events` (USER-session authed) + `deploy-timeline.tsx` Card.
-- Slice 5: build step samples `/proc/meminfo` MemAvailable → `ramAvailableMb`.
-- P2 FIX: `collapseDeployEvents()` folds started+ok/failed per step into ONE row.
-- P1 FIX: per-run `deploy_id`. Migration `0004_legal_fabian_cortez.sql` (drizzle-generated, nullable).
-  Deployer mints `crypto.randomUUID()` per invocation, passes `DEPLOY_ID` via env; bash emit + both
-  report bodies carry `deployId`. `selectLatestRun(events)` (pure) runs BEFORE collapse in the UI.
+The full per-step audit trail is built, visible, de-duplicated, run-isolated, paged
+(history pager), live-progress-aware, AND now shows each run's TOTAL duration.
+`lib/deploy/deploy-events.ts` is the brain; `deploy-timeline.tsx` is the UI.
 
-**DRIVER ACTION PENDING (P1 fix needs this to take effect live):**
+**NOTE:** the codebase has grown WELL past old backlog notes. Before picking a task,
+`grep` the lib for the helper you're about to add — `groupRunsByDeployId`, `DeployRun`,
+`listDeployEventsPaged`, `selectLatestRun`, `collapseDeployEvents`, `deployProgress`,
+`fmtElapsed`, `runTotalDurationMs` ALL already exist. Don't reinvent.
+
+**ONLY REMAINING BACKLOG TODO: "Verify end-to-end."** Operational/HITL — needs a REAL
+live deploy (not dry-run): trigger a deploy → confirm a full ordered trail, EACH STEP
+ONCE, ONLY the latest run's rows, build event shows `· {mb} MB free`, total duration shows,
+terminal `callback` row surfaces on failure, and an emit failure (EVENTS_URL→500) does NOT
+break the deploy. Likely needs the human. Don't trigger deploys yourself if one may be in flight.
+
+**DRIVER ACTIONS (may still be pending — confirm before assuming live):**
 - Apply migration 0004 to remote D1: `cd ProjectManager && npx wrangler d1 migrations apply bizbeecms`
-- Redeploy BOTH workers: PM (`npx opennextjs-cloudflare deploy` / its deploy path) AND
-  `cd deployer && npx wrangler deploy` (so the DEPLOY_ID-emitting script ships).
-  Until then, NEW events get a real deploy_id but OLD rows are null — `selectLatestRun` still works
-  (latest = the newest deploy_id once a fresh run lands; legacy nulls group together).
+- Redeploy BOTH workers (PM + `cd deployer && npx wrangler deploy`) so DEPLOY_ID emits live.
 
-**ONLY ONE TODO LEFT: "Verify end-to-end."** Needs a REAL deploy (not just dry-run):
-- Trigger a live deploy → confirm a full ordered trail, EACH STEP ONCE, ONLY the latest run's rows
-  (deploy a Site, let it fail, deploy again → the new run replaces the old in the timeline, no interleave),
-  build event shows `· {mb} MB free`, terminal callback row surfaces.
-- Force a step failure → failed step's error + `callback` row's final error/log tail render.
-- Confirm an emit failure (EVENTS_URL → 500) does NOT break the deploy.
-- Operational/HITL — likely needs the human to run the live deploy + observe.
-- Don't trigger deploys yourself if one may be in flight.
+If no code TODO is actionable, invent the next valuable slice toward GOAL.md — e.g. a
+per-step relative-time / "x ago" label, surfacing total in the deploy-form status, or a
+copy-error button on failed rows. Always check it doesn't already exist first.
 
 Gates: PM `npm test` + `npx opennextjs-cloudflare build`. Deployer gate = `wrangler deploy --dry-run`.
 NEVER run opennextjs build while `npm run dev` is on 3601/3602.

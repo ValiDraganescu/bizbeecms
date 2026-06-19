@@ -17,6 +17,7 @@ import {
   selectLatestRun,
   groupRunsByDeployId,
   deployProgress,
+  runTotalDurationMs,
   fmtElapsed,
   clampPageLimit,
   listDeployEventsPaged,
@@ -383,6 +384,33 @@ test("collapseDeployEvents preserves first-seen startedAt, id, and ram from the 
   assert.equal(rows[0].id, "first");
   assert.equal(rows[0].startedAt, "2026-06-18T10:00:00.000Z");
   assert.equal(rows[0].ramAvailableMb, 900);
+});
+
+test("runTotalDurationMs: spans first step start to last step end (start + duration)", () => {
+  // clone @10:00:00 +2s, build @10:00:02 +300s → total 302s = 302000ms.
+  const total = runTotalDurationMs([
+    row({ step: "clone", status: "ok", startedAt: "2026-06-19T10:00:00.000Z", durationMs: 2000 }),
+    row({ step: "build", status: "ok", startedAt: "2026-06-19T10:00:02.000Z", durationMs: 300_000 }),
+  ]);
+  assert.equal(total, 302_000);
+});
+
+test("runTotalDurationMs: a still-running step contributes only its start", () => {
+  // clone done @10:00:00 +2s, build still running started @10:00:02 (no duration)
+  // → total = build start − clone start = 2s.
+  const total = runTotalDurationMs([
+    row({ step: "clone", status: "ok", startedAt: "2026-06-19T10:00:00.000Z", durationMs: 2000 }),
+    row({ step: "build", status: "started", startedAt: "2026-06-19T10:00:02.000Z" }),
+  ]);
+  assert.equal(total, 2000);
+});
+
+test("runTotalDurationMs: null when no step has a parseable start", () => {
+  assert.equal(runTotalDurationMs([]), null);
+  assert.equal(
+    runTotalDurationMs([row({ step: "x", status: "ok", startedAt: "not-a-date" })]),
+    null,
+  );
 });
 
 test("fmtElapsed: under a minute → whole seconds; a minute+ → XmZZs zero-padded", () => {

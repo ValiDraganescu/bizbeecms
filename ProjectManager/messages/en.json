@@ -241,7 +241,8 @@
       "loadingMore": "Loading…",
       "noMore": "No earlier deployments.",
       "runAt": "Deployed {time}",
-      "currentRun": "Current deployment"
+      "currentRun": "Current deployment",
+      "total": "Total {duration}"
     },
     "assign": {
       "title": "Assigned users",

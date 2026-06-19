@@ -256,13 +256,21 @@ export function ThemeEditor({ initial }: { initial: ThemeOverrides }) {
                         <span className="w-40 shrink-0 font-mono text-sm text-foreground">
                           {token}
                         </span>
-                        <input
-                          type="color"
-                          className="h-8 w-10 shrink-0 cursor-pointer rounded border border-border bg-surface"
-                          value={hexOf(value)}
-                          onChange={(e) => setToken(token, e.target.value)}
-                          aria-label={t("swatchLabel", { token })}
-                        />
+                        {/* Swatch shows the REAL value (browser paints oklch/rgb/…);
+                            the native <input type=color> only takes hex so it sits
+                            invisibly on top to open the OS picker on click. */}
+                        <label
+                          className="relative h-8 w-10 shrink-0 cursor-pointer overflow-hidden rounded border border-border"
+                          style={{ background: isSafeColorValue(value) ? value : NEUTRAL }}
+                        >
+                          <input
+                            type="color"
+                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                            value={hexOf(value)}
+                            onChange={(e) => setToken(token, e.target.value)}
+                            aria-label={t("swatchLabel", { token })}
+                          />
+                        </label>
                         <input
                           type="text"
                           className="flex-1 rounded-md border border-border bg-surface px-3 py-1.5 font-mono text-sm text-foreground"

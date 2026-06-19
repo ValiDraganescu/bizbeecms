@@ -6,6 +6,8 @@ import { Badge, type BadgeTone, Button } from "@/components/ui";
 import type { DeployEventStatus, SiteStatus } from "@/db/schema";
 import {
   groupRunsByDeployId,
+  runTotalDurationMs,
+  fmtElapsed,
   type DeployRun,
 } from "@/lib/deploy/deploy-events";
 
@@ -172,10 +174,20 @@ export function DeployTimeline({
 
   const runs = groupRunsByDeployId(events);
   const [current, ...previous] = runs;
+  const currentTotal = current ? runTotalDurationMs(current.steps) : null;
 
   return (
     <div className="flex flex-col gap-6">
-      {current ? <RunSteps steps={current.steps} t={t} /> : null}
+      {current ? (
+        <div className="flex flex-col gap-3">
+          {currentTotal !== null ? (
+            <p className="text-xs tabular-nums text-foreground-muted">
+              {t("total", { duration: fmtElapsed(currentTotal) })}
+            </p>
+          ) : null}
+          <RunSteps steps={current.steps} t={t} />
+        </div>
+      ) : null}
 
       {previous.length > 0 ? (
         <div className="flex flex-col gap-4 border-t border-border pt-4">
@@ -190,6 +202,11 @@ export function DeployTimeline({
                 <Badge tone={statusTone[runStatus(run)]}>
                   {t(`status.${runStatus(run)}`)}
                 </Badge>
+                {runTotalDurationMs(run.steps) !== null ? (
+                  <span className="tabular-nums">
+                    · {fmtElapsed(runTotalDurationMs(run.steps)!)}
+                  </span>
+                ) : null}
               </summary>
               <div className="mt-3 pl-4">
                 <RunSteps steps={run.steps} t={t} />

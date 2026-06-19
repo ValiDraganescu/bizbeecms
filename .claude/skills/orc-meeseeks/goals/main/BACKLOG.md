@@ -3,6 +3,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
+- BUG [P2]: CMS Theme editor (`/admin/settings/theme`, E1) — the per-token color SWATCHES all render gray,
+  even though the OKLCH text values next to them are correct (e.g. `oklch(0.5 0.19 268)`). Cause is almost
+  certainly the native `<input type="color">` in `theme-editor.tsx`: it only accepts `#rrggbb` hex, so feeding
+  it an `oklch()`/`lch()`/`rgb()` string makes it silently fall back to a default (gray/black) — the swatch
+  can't represent the actual color. Fix: render the swatch from the real CSS color value (e.g. a `<div>` /
+  background-color set to the oklch string, which the browser CAN paint), or convert oklch→hex for the
+  `<input type=color>` value (and convert back on pick). Keep the text field as the source of truth for the
+  full grammar (oklch/lab/lch/rgb/hsl) — only the swatch needs the fix. repro: open a Site → Theme tab →
+  expand any section (Brand/Surfaces/…) — swatches are gray while the oklch text is right — reported 2026-06-19
 
 ## Tasks
 - DONE: **C3 follow-on: block-prop → component-prop binding (G1's missing half).** `lib/render/tree.ts` now binds a block's DECLARED props into `{{prop}}` slots (text nodes + string prop values) of the referenced component's tree before planning. Allowlist = component's `propsSchema` keys; undeclared block props AND undeclared `{{slots}}` are dropped to ""; locale-object values resolved first; bound values land as plain text/data (React escapes downstream — no HTML injection, no eval). Route maps `propsSchema` into the component map. Blog-kit components rewritten to use `{{slots}}`. 6 new node tests (binds / undeclared dropped / undeclared slot empty / unsafe escaped / no-schema passthrough / locale resolve). CMS 193/193, PM 32/32, tsc clean, opennext build gate (via bundle:cms) clean, bundle regenerated.
@@ -95,6 +104,18 @@ States: TODO | DOING | DONE | BLOCKED. Each is ONE provable capability. Order is
 
 **Housekeeping**
 - TODO: **Stop tracking `CMS/tsconfig.tsbuildinfo`.** It's a TypeScript incremental-build artifact that got committed (shows up in diffs on every build). Add it to `.gitignore` (e.g. `**/tsconfig.tsbuildinfo` or `*.tsbuildinfo`) and `git rm --cached CMS/tsconfig.tsbuildinfo` so it stops appearing in commits. Check PM/ too in case its buildinfo is also tracked.
+
+- TODO: **Make theme presets complete, coordinated palettes (E1).** Today every entry in `THEME_PRESETS`
+  (`CMS/src/lib/render/theme.ts`) only sets the `primary*`/`ring` brand tokens — Surfaces, Text, Borders,
+  Success/Warning/Info/Danger stay at defaults, so picking "emerald" vs "crimson" only changes the Brand
+  swatch and looks half-done. Flesh out each preset (emerald/crimson/amber/violet/slate, + any others) into a
+  FULL palette across all 24 `THEME_TOKENS`: a matched surface/text/border set and harmonized success/
+  warning/info/danger that read well against that brand hue (keep the semantic meaning — success stays
+  green-ish, danger red-ish — but tune lightness/chroma to sit in the palette). "default" stays `{}`. Each
+  preset must still pass the `isSafeColorValue` grammar + `normalizeThemeOverrides` (these are the security
+  boundary — don't loosen them). Verify the live-preview card + accordion swatches change across ALL sections
+  per preset. Update/extend `theme.test.mjs` (each non-default preset now covers the full token set; values
+  all safe). Gate: CMS npm test + tsc + opennextjs build green; regen PM cms-bundle.
 
 **Z. Future / parked (TBD — not scoped, just don't forget)**
 - TBD: **Z1 — shop / product management.** E-commerce: products, cart, checkout, orders. Explicitly deferred — revisit after the core AI-CMS (A–H) proves out. When picked up, decide whether it's first-class entities (the one place real domain tables might be justified) or still composed from generic content + components. No design yet.

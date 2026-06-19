@@ -241,7 +241,8 @@
       "loadingMore": "Ladataan…",
       "noMore": "Ei aiempia julkaisuja.",
       "runAt": "Julkaistu {time}",
-      "currentRun": "Nykyinen julkaisu"
+      "currentRun": "Nykyinen julkaisu",
+      "total": "Yhteensä {duration}"
     },
     "assign": {
       "title": "Liitetyt käyttäjät",
