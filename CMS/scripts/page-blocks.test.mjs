@@ -125,6 +125,58 @@ test("validateBlocks rejects bad shape, dup ids, and non-array", () => {
   assert.equal(dup.ok, false, "duplicate ids rejected");
 });
 
+test("localeFieldValue reads the right per-locale string", () => {
+  // locale object → exactly that locale's entry (no cross-locale fallback in the editor)
+  const obj = { en: "Hello", fi: "Moi" };
+  assert.equal(localeFieldValue(obj, "en", "en"), "Hello");
+  assert.equal(localeFieldValue(obj, "fi", "en"), "Moi");
+  assert.equal(localeFieldValue(obj, "et", "en"), "", "missing locale → empty field");
+  // bare string belongs to the DEFAULT locale only (legacy / single-locale authoring)
+  assert.equal(localeFieldValue("Plain", "en", "en"), "Plain");
+  assert.equal(localeFieldValue("Plain", "fi", "en"), "", "non-default locale starts empty");
+  assert.equal(localeFieldValue(undefined, "en", "en"), "");
+  assert.equal(localeFieldValue(42, "en", "en"), "", "non-string value → empty");
+});
+
+test("setLocalizedProp: single locale stores a bare string", () => {
+  assert.equal(setLocalizedProp(undefined, "en", "Hi", ["en"]), "Hi");
+  assert.equal(setLocalizedProp("old", "en", "", ["en"]), "", "cleared → empty (validateBlockProps drops it)");
+});
+
+test("setLocalizedProp: multi-locale builds/updates a locale object, drops empties", () => {
+  // first edit on the default locale collapses to a bare string (stays simple)
+  assert.equal(setLocalizedProp(undefined, "en", "Hi", ["en", "fi", "et"]), "Hi");
+  // editing a non-default locale on a bare-string value promotes to an object,
+  // carrying the bare string into the default locale
+  assert.deepEqual(
+    setLocalizedProp("Hi", "fi", "Moi", ["en", "fi", "et"]),
+    { en: "Hi", fi: "Moi" },
+    "default carried over + new locale added; empty et omitted",
+  );
+  // editing an existing object updates one locale, leaves the rest
+  assert.deepEqual(
+    setLocalizedProp({ en: "Hi", fi: "Moi" }, "et", "Tere", ["en", "fi", "et"]),
+    { en: "Hi", fi: "Moi", et: "Tere" },
+  );
+  // clearing a non-default locale removes just that key
+  assert.deepEqual(
+    setLocalizedProp({ en: "Hi", fi: "Moi" }, "fi", "", ["en", "fi", "et"]),
+    "Hi",
+    "only the default remains → collapses back to a bare string",
+  );
+  // clearing everything → "" so the prop is dropped downstream
+  assert.equal(setLocalizedProp({ fi: "Moi" }, "fi", "", ["en", "fi", "et"]), "");
+});
+
+test("setLocalizedProp output round-trips through validateBlockProps + resolves", () => {
+  const declared = new Set(["title"]);
+  const localized = setLocalizedProp("Hi", "fi", "Moi", ["en", "fi"]);
+  const props = validateBlockProps({ title: localized }, declared);
+  assert.deepEqual(props, { title: { en: "Hi", fi: "Moi" } }, "object value survives validation");
+  const emptied = validateBlockProps({ title: setLocalizedProp("Hi", "en", "", ["en"]) }, declared);
+  assert.deepEqual(emptied, {}, "emptied prop dropped");
+});
+
 test("pageBlocks namespace + pages.editBlocks parity across EN/FI/ET", () => {
   const cats = { en: load("en"), fi: load("fi"), et: load("et") };
   for (const [l, cat] of Object.entries(cats)) {

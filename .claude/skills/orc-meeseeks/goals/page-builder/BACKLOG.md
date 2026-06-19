@@ -22,6 +22,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
   layout task below (the picker shell must exist first). Gate: CMS tsc + opennextjs build green; regen PM
   cms-bundle. Add/extend a pure test for any new picker helper (e.g. tree→dropdown flattening).
 
+- DOING: **GAP-closer for the Components rail: tag components with their source kit + grouped listing
+  endpoint.** First slice of the Components-rail task below — close the data GAP so the rail can group.
+  Add a `sourceKit` column to the `component` table (drizzle migration), thread the kit id through the
+  kit-install write path so installed kit components are tagged with their kit id, and expose
+  `GET /api/components/grouped` (kits-with-their-components + an "ungrouped/individually-imported" group)
+  backed by a PURE grouping helper (with a node test). The rail-UI rendering (groups, search, insert into
+  section) stays in the task below. Reuse `upsertImportedComponent` + the kit registry — no second pipeline.
+
 - TODO: **Components rail: show imported starter kits + their components, searchable, add into Sections
   (like aicms).** Make the builder's left Components rail the real component source, mirroring how aicms
   composes (`src/modules/page-builder/components/page-builder-v2/left_rail_components.tsx`): the operator

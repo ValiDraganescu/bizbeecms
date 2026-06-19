@@ -90,6 +90,7 @@ export async function getComponentByName(name: string): Promise<ComponentRow | n
 export async function upsertImportedComponent(
   c: ImportedComponent,
   injectedDb?: Db,
+  sourceKit: string | null = null,
 ): Promise<{ action: "created" | "updated"; name: string }> {
   const db = injectedDb ?? (await getDb());
   const now = new Date();
@@ -105,6 +106,7 @@ export async function upsertImportedComponent(
     script: c.script,
     css: c.css,
     propsSchema: c.propsSchema,
+    sourceKit,
     updatedAt: now,
   };
 

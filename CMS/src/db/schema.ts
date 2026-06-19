@@ -42,6 +42,10 @@ export const component = sqliteTable(
     css: text("css").notNull().default(""),
     // Optional JSON describing expected props (used by the AI + import validation).
     propsSchema: text("props_schema"),
+    // Source kit id ("blog"/"landing"/"docs") when this component was installed
+    // as part of a premade kit; NULL for individually-imported / AI-authored
+    // components. Lets the page-builder rail group components by their kit.
+    sourceKit: text("source_kit"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
