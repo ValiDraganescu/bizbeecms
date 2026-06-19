@@ -46,6 +46,27 @@ export async function listComponents(): Promise<ComponentRow[]> {
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** A component name + the kit it was installed from (null = individually imported). */
+export interface NamedKitComponent {
+  name: string;
+  sourceKit: string | null;
+}
+
+/**
+ * List every component's name + its `sourceKit` tag (for the page-builder rail's
+ * grouped view). Names only — the rail doesn't need the full artifact to list.
+ */
+export async function listComponentsWithKit(): Promise<NamedKitComponent[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      name: schema.component.name,
+      sourceKit: schema.component.sourceKit,
+    })
+    .from(schema.component);
+  return rows;
+}
+
 /**
  * Of the given component names, return the subset that DON'T exist in this Site
  * (H3b — nested-component dep warning on import). Empty input → empty result.

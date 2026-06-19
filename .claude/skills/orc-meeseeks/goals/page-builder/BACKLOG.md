@@ -22,7 +22,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
   layout task below (the picker shell must exist first). Gate: CMS tsc + opennextjs build green; regen PM
   cms-bundle. Add/extend a pure test for any new picker helper (e.g. tree→dropdown flattening).
 
-- DOING: **GAP-closer for the Components rail: tag components with their source kit + grouped listing
+- DONE: **GAP-closer for the Components rail: tag components with their source kit + grouped listing
   endpoint.** First slice of the Components-rail task below — close the data GAP so the rail can group.
   Add a `sourceKit` column to the `component` table (drizzle migration), thread the kit id through the
   kit-install write path so installed kit components are tagged with their kit id, and expose

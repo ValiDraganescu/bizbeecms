@@ -84,7 +84,9 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const results = [];
     for (const c of validated) {
-      results.push(await upsertImportedComponent(c));
+      // Tag each installed component with its source kit id so the page-builder
+      // rail can group them by kit (vs individually-imported components).
+      results.push(await upsertImportedComponent(c, undefined, id));
     }
     const created = results.filter((r) => r.action === "created").length;
     const updated = results.filter((r) => r.action === "updated").length;

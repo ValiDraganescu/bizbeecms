@@ -1,0 +1,1 @@
+ALTER TABLE `component` ADD `source_kit` text;

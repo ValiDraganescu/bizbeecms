@@ -39,3 +39,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/pages/page-picker.ts (+ .test.ts),
   CMS/src/components/page-builder/page-builder-shell.tsx, CMS/messages/{en,fi,et}.json,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js.
+
+## 2026-06-19 16:34 — GAP-closer: tag components with source kit + grouped listing endpoint
+- **Status:** DONE
+- **What I did:** Closed the kit↔component data GAP so the Components rail can group. Added a
+  `sourceKit text` column to the `component` table (drizzle migration `0003_worthless_fallen_one.sql`,
+  `ALTER TABLE component ADD source_kit text`). Threaded the kit id through the write path:
+  `upsertImportedComponent(c, injectedDb?, sourceKit=null)` now persists `sourceKit`, and the
+  kit-install loop (`/api/components/kit` POST) tags each installed component with its kit id
+  (`upsertImportedComponent(c, undefined, id)`). Manual imports / AI-authored stay NULL. Added
+  `listComponentsWithKit()` (name + sourceKit) to component-store. New PURE helper
+  `lib/components/grouped.ts` (`groupComponentsByKit(components, kitOrder)` → ordered kit groups +
+  trailing null "individually-imported" group; known kits always present even at 0 components; stale
+  tags surface, never dropped) with a 4-case node test. New `GET /api/components/grouped` endpoint
+  (requireAdmin) feeds the store rows + the SAME kit-id registry (blog/landing/docs) into the helper.
+- **Verified:** `node --test grouped.test.ts` 4/4 pass; CMS `npx tsc --noEmit` clean;
+  `npx opennextjs-cloudflare build` green (dev stopped, port 3601 free); regenerated PM
+  `bundle:cms` (cms-bundle.generated.js, 6475 KB worker source). Migration SQL inspected (single
+  additive ALTER, nullable → safe on existing rows). Did NOT run the live D1 write/read (no binding
+  offline, HITL) — build-green + the pure helper test cover this slice.
+- **Files:** CMS/src/db/schema.ts, CMS/src/db/component-store.ts,
+  CMS/src/app/api/components/kit/route.ts, CMS/src/app/api/components/grouped/route.ts (new),
+  CMS/src/lib/components/grouped.ts (+ .test.ts, new), CMS/migrations/0003_worthless_fallen_one.sql
+  (+ meta), ProjectManager/src/lib/deploy/cms-bundle.generated.js.

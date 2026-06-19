@@ -24,3 +24,12 @@ Read every line before working. Each entry was learned the hard way by a previou
 - The page-builder shell is a `"use client"` component; the `/admin/page-builder/page.tsx` server route
   is a thin wrapper (force-dynamic) that just renders `<PageBuilderShell/>`. Keep feature wiring in the
   client shell (it already holds viewport/center-tab/right-tab chrome state).
+- Components are stored FLAT in D1; the kit GAP is now CLOSED via a `sourceKit` column on `component`
+  (migration 0003). Tagging happens ONLY at kit install (`/api/components/kit` POST →
+  `upsertImportedComponent(c, undefined, id)`); manual import + AI write paths leave it NULL. Read the
+  grouped view via `GET /api/components/grouped` (uses pure `lib/components/grouped.ts` +
+  `db.listComponentsWithKit`). Do NOT add a second component pipeline — reuse these.
+- `drizzle-kit generate` (`npm run db:generate` in CMS) auto-names migrations (e.g.
+  `0003_worthless_fallen_one.sql`) and writes `migrations/meta/*`. A new nullable column = a single
+  additive `ALTER TABLE ... ADD` — safe on existing rows. Migrations are applied with
+  `wrangler d1 migrations apply` (per drizzle.config comment), NOT auto-run by the build.
