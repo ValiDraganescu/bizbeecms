@@ -15,7 +15,12 @@ import {
   moveNode,
   validateBlocks,
 } from "./page-blocks.ts";
-import { planPage, type Block, type ComponentArtifact } from "../render/tree.ts";
+import {
+  planPage,
+  MIN_COLUMN_WIDTH,
+  type Block,
+  type ComponentArtifact,
+} from "../render/tree.ts";
 
 test("addSection appends a Section seeded with one column", () => {
   const t0: Block[] = [];
@@ -147,8 +152,27 @@ test("planPage renders a Section as a grid of columns nesting components", () =>
   assert.equal(grid.kind === "element" && grid.tag, "section");
   if (grid.kind !== "element") return;
   const style = grid.props.style as Record<string, unknown>;
-  assert.equal(style.gridTemplateColumns, "repeat(2, 1fr)");
+  // EQUAL columns render responsive (auto-stack on narrow viewports) — built from
+  // MIN_COLUMN_WIDTH, not a hardcoded px, so this assertion tracks the const.
+  assert.equal(
+    style.gridTemplateColumns,
+    `repeat(auto-fit, minmax(min(100%, ${MIN_COLUMN_WIDTH}), 1fr))`,
+  );
   assert.equal(grid.children.length, 2, "two column cells");
+
+  // Sibling assertion pinning the OTHER branch: columnBehavior:"collapse" yields
+  // FIXED 1fr/0fr tracks (no responsive auto-fit) so both branches stay covered here.
+  const collapsed = t.map((s) =>
+    s.id === sid ? { ...s, props: { ...s.props, columnBehavior: "collapse" } } : s,
+  );
+  const collapsedPlan = planPage(collapsed, new Map([["Hero", hero]]));
+  const collapsedSection = collapsedPlan.root[0];
+  assert.equal(collapsedSection.kind, "element");
+  if (collapsedSection.kind !== "element") return;
+  const collapsedGrid = collapsedSection.children[0];
+  if (collapsedGrid.kind !== "element") return;
+  const collapsedStyle = collapsedGrid.props.style as Record<string, unknown>;
+  assert.equal(collapsedStyle.gridTemplateColumns, "1fr 0fr", "collapse → fixed 1fr/0fr");
 
   const col0 = grid.children[0];
   assert.equal(col0.kind === "element" && col0.tag, "div");

@@ -3,6 +3,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
+- BUG [P2] DONE (2026-06-20 00:35): stale test — `planPage renders a Section as a grid of columns nesting
+  components` expected `repeat(2, 1fr)` but the equal-columns branch (`tree.ts:552`) emits
+  `repeat(auto-fit, minmax(min(100%, ${MIN_COLUMN_WIDTH}), 1fr))` — code CORRECT, assertion stale (470/471).
+  FIX: `export`ed `MIN_COLUMN_WIDTH` from tree.ts; test imports it and builds the expectation from it (no
+  hardcoded px). Added a sibling assertion IN the same test that `columnBehavior:"collapse"` still yields
+  fixed `1fr 0fr` so BOTH branches are pinned. Gate met: CMS `npm test` 471/471, tsc clean, opennext build
+  green. — reported 2026-06-20
 - BUG [P2] DONE (2026-06-19): Section/column BACKGROUND color doesn't change with the dark theme. ROOT
   CAUSE was the curator's gap #2: per-Site overrides emitted `:root{…}` ONLY, so a Site that customized a
   token stomped BOTH light and dark — dark mode could never differ. (Gap #1 — "no data-theme on the rendered

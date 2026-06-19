@@ -452,7 +452,7 @@ const JUSTIFY: Record<string, string> = {
  * row to fewer columns — ultimately one — when MIN no longer fits. ~16rem (256px)
  * stacks 2-up around tablet and 1-up on phones. (Could later be a Section prop.)
  */
-const MIN_COLUMN_WIDTH = "16rem";
+export const MIN_COLUMN_WIDTH = "16rem";
 
 function num(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;

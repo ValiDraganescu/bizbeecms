@@ -708,3 +708,16 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (dev stopped, 3601 free). CSS-only change, no logic → no node test (ponytail). Broken-image hook finding
   (L1492) is the pre-existing MetaImagePicker `<img src={value}>` false positive — untouched.
 - **Files:** CMS/src/components/page-builder/page-builder-shell.tsx
+
+## 2026-06-20 00:35 — BUG [P2] fix: stale equal-columns grid assertion
+- **Status:** DONE
+- **What I did:** Verified the failure first (`repeat(auto-fit, minmax(min(100%, 16rem), 1fr))` actual vs
+  `repeat(2, 1fr)` expected at page-blocks-sections.test.ts:150) — exactly the diagnosed stale assertion;
+  code in tree.ts:552 is the intended responsive behavior. Fixed the TEST: `export`ed `MIN_COLUMN_WIDTH`
+  from tree.ts (was a private const), imported it in the test, and built the expectation string FROM it
+  (no hardcoded "16rem"). Added a sibling assertion inside the same test pinning the OTHER branch:
+  `columnBehavior:"collapse"` → fixed `1fr 0fr` tracks. Collapse already had its own test at :160; this
+  keeps both branches asserted together in the equal-columns test too.
+- **Verified:** section test 19/19, full CMS `npm test` 471/471 (was 470/471), `tsc --noEmit` clean,
+  `opennextjs-cloudflare build` green (dev stopped, 3601 free).
+- **Files:** CMS/src/lib/render/tree.ts (export const), CMS/src/lib/pages/page-blocks-sections.test.ts
