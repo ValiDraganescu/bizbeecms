@@ -34,7 +34,11 @@ import {
 } from "@/lib/render/tree";
 import { renderPlans } from "@/lib/render/react";
 import { generateUtilityCss } from "@/lib/render/utility-css";
-import { getContentLocales, getThemeOverrides } from "@/db/settings-store";
+import {
+  getContentLocales,
+  getThemeOverrides,
+  getThemeOverridesDark,
+} from "@/db/settings-store";
 import { themeOverridesToCss } from "@/lib/render/theme";
 
 // Precompiled once per worker instance — pure, deterministic, bounded vocabulary.
@@ -106,7 +110,10 @@ export async function buildPlanFromPage(
 export async function RenderedPage({ plan }: { plan: RenderPlan }) {
   let themeCss = "";
   try {
-    themeCss = themeOverridesToCss(await getThemeOverrides());
+    themeCss = themeOverridesToCss(
+      await getThemeOverrides(),
+      await getThemeOverridesDark(),
+    );
   } catch {
     /* unbound D1 in this env — no per-Site theme */
   }

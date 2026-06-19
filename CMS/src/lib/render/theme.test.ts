@@ -5,6 +5,7 @@ import {
   THEME_PRESETS,
   THEME_TOKENS,
   isSafeColorValue,
+  themeOverridesToCss,
 } from "./theme.ts";
 
 // Regression for the P2 theme-editor swatch bug: swatches are painted directly
@@ -38,4 +39,34 @@ test("isSafeColorValue accepts oklch/hex and rejects breakers", () => {
   assert.ok(isSafeColorValue("#3366ff"));
   assert.ok(!isSafeColorValue("red; background:url(x)"));
   assert.ok(!isSafeColorValue("</style>"));
+});
+
+// Regression for the P2 dark-background bug: a Site's LIGHT override must land
+// under :root ONLY (not stomp dark), and DARK overrides must scope to both the
+// explicit [data-theme="dark"] and the OS-driven [data-theme="system"], so a
+// token can hold DISTINCT values per mode and dark mode actually applies.
+test("themeOverridesToCss scopes light to :root and dark to dark scopes", () => {
+  const css = themeOverridesToCss(
+    { surface: "#ffffff" },
+    { surface: "#111111" },
+  );
+  assert.ok(css.includes(":root{--color-surface:#ffffff;}"));
+  assert.ok(css.includes('[data-theme="dark"]{--color-surface:#111111;}'));
+  assert.ok(
+    css.includes(
+      '@media (prefers-color-scheme:dark){[data-theme="system"]{--color-surface:#111111;}}',
+    ),
+  );
+  // The light override must NOT appear inside a dark scope (would stomp dark).
+  assert.ok(!css.includes('[data-theme="dark"]{--color-surface:#ffffff'));
+});
+
+test("themeOverridesToCss with only light overrides emits no dark scope", () => {
+  const css = themeOverridesToCss({ surface: "#ffffff" });
+  assert.equal(css, ":root{--color-surface:#ffffff;}");
+});
+
+test("themeOverridesToCss with no overrides is empty", () => {
+  assert.equal(themeOverridesToCss({}, {}), "");
+  assert.equal(themeOverridesToCss(undefined), "");
 });

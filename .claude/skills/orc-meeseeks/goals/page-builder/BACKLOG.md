@@ -3,7 +3,20 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
-- BUG [P2]: Section/column BACKGROUND color doesn't change with the dark theme — pick a theme-token
+- BUG [P2] DONE (2026-06-19): Section/column BACKGROUND color doesn't change with the dark theme. ROOT
+  CAUSE was the curator's gap #2: per-Site overrides emitted `:root{…}` ONLY, so a Site that customized a
+  token stomped BOTH light and dark — dark mode could never differ. (Gap #1 — "no data-theme on the rendered
+  page" — was WRONG on inspection: the root layout `app/layout.tsx` already sets `<html data-theme="system">`
+  and imports globals.css, so the public/preview page DOES follow OS dark via `prefers-color-scheme` and
+  globals.css's `[data-theme="system"]` dark block.) FIX: `themeOverridesToCss(light, dark?)` now scopes light
+  overrides to `:root` ONLY and dark overrides to BOTH `[data-theme="dark"]` and
+  `@media(prefers-color-scheme:dark){[data-theme="system"]}` so a token holds distinct values per mode and the
+  light override no longer stomps dark. New `theme_overrides_dark` store key (`get/setThemeOverridesDark`);
+  `render-page.tsx` threads it. Regression tests in `theme.test.ts`. tsc + opennext build green. REMAINING
+  (follow-on, NOT this bug): a builder PREVIEW dark-mode TOGGLE so the operator can flip the iframe to dark
+  to SEE it without changing their OS; + a settings UI to edit the dark override map (today only the store
+  exists). Queued as a new task below.
+- BUG [P2] (curator's original text, kept for ref): Section/column BACKGROUND color doesn't change with the dark theme — pick a theme-token
   background, switch to dark, still see the light color. DIAGNOSIS (curator checked the code, 2026-06-19):
   the mechanism is HALF right — the swatch already STORES theme tokens (`var(--color-surface)` etc., not
   hardcoded; `SectionSettings` ~1247, rendered as inline `style.backgroundColor` in `tree.ts` ~466/482), and
@@ -28,6 +41,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
   the Layers view mirrors the actual grid. Keep each column its own drop target. reported 2026-06-19.
 
 ## Tasks
+- TODO: **Dark-mode preview toggle + per-Site DARK theme override editor (follow-on to the dark-bg bug).**
+  The data layer is DONE: `themeOverridesToCss(light, dark?)` emits light→`:root`, dark→`[data-theme="dark"]`
+  + `@media(prefers-color-scheme:dark){[data-theme="system"]}`; `get/setThemeOverridesDark` persist a
+  `theme_overrides_dark` map; `render-page.tsx` threads it. WHAT'S LEFT (UI): (1) the builder's PREVIEW iframe
+  follows OS dark today (root layout `data-theme="system"`); add a LIGHT/DARK toggle in the preview chrome
+  that forces `data-theme` on the iframe document so the operator can SEE dark without changing their OS
+  (e.g. pass `?theme=dark` to `/preview/[id]` and have that route set `data-theme` on its wrapper, or
+  postMessage the iframe). (2) The theme settings editor (wherever light overrides are edited — find it via
+  `setThemeOverrides`/the theme settings page) gets a DARK tab/column to edit the dark map via
+  `setThemeOverridesDark`. EN/FI/ET for the toggle + dark-tab chrome. Gate: CMS tsc + opennext build green;
+  regen PM cms-bundle.
 - TODO: **Shared LOCALE SELECTOR for all per-locale editing (scales past 2-3 languages).** USER DECISION
   2026-06-19: stacking every content locale vertically doesn't scale (20 languages = unusable — see the SEO
   tab stacking EN/FI/RO-RO). Replace with a single locale SELECTOR (tabs or dropdown) that shows ONLY the

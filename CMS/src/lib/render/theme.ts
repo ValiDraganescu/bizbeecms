@@ -336,15 +336,38 @@ export function normalizeThemeOverrides(raw: unknown): ThemeOverrides {
   return out;
 }
 
-/**
- * Serialize validated overrides to a `:root{…}` CSS rule for an inline <style>.
- * Returns "" when there are no overrides (so the route can skip the element).
- * Re-normalizes defensively so this is safe even if handed unvalidated input.
- */
-export function themeOverridesToCss(raw: unknown): string {
-  const overrides = normalizeThemeOverrides(raw);
-  const decls = Object.entries(overrides)
+/** `{tokenA:colorA,…}` → `--color-tokenA:colorA;…` (no wrapping selector). */
+function overridesToDecls(overrides: ThemeOverrides): string {
+  return Object.entries(overrides)
     .map(([token, value]) => `--color-${token}:${value};`)
     .join("");
-  return decls === "" ? "" : `:root{${decls}}`;
+}
+
+/**
+ * Serialize validated per-Site overrides to inline-<style> CSS rules.
+ *
+ * LIGHT overrides land under `:root` (the light scope) — they must NOT win in
+ * dark mode, or a Site that tweaks one token (e.g. `surface`) would stomp the
+ * dark default and the page would never go dark (the P2 dark-background bug).
+ * DARK overrides land under BOTH `[data-theme="dark"]` (explicit dark) AND
+ * `@media (prefers-color-scheme: dark){[data-theme="system"]}` (OS-driven),
+ * mirroring globals.css so a Site can hold DISTINCT values per mode.
+ *
+ * Returns "" when there's nothing to emit (so the route can skip the element).
+ * Re-normalizes defensively so this is safe even if handed unvalidated input.
+ */
+export function themeOverridesToCss(raw: unknown, rawDark?: unknown): string {
+  const light = normalizeThemeOverrides(raw);
+  const dark = normalizeThemeOverrides(rawDark);
+
+  let css = "";
+  const lightDecls = overridesToDecls(light);
+  if (lightDecls) css += `:root{${lightDecls}}`;
+
+  const darkDecls = overridesToDecls(dark);
+  if (darkDecls) {
+    css += `[data-theme="dark"]{${darkDecls}}`;
+    css += `@media (prefers-color-scheme:dark){[data-theme="system"]{${darkDecls}}}`;
+  }
+  return css;
 }

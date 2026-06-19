@@ -317,3 +317,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   confirms current Section render — `data-section-column` ×1, `data-section` ×1, `preview/[id]` ×1,
   `RenderedPage` ×1, `builtAt` ×1. The owed bundle obligation from the column-model run is now CLEARED.
 - **Files:** ProjectManager/package.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-19 20:19 — BUG P2: dark-mode theme background (per-Site override stomped dark)
+- **Status:** DONE
+- **What I did:** Fixed the per-Site theme override emission so token backgrounds swap correctly in dark
+  mode. Curator's gap #1 was a misdiagnosis — the rendered/public/preview page ALREADY follows OS dark:
+  `app/layout.tsx` sets `<html data-theme="system">` and imports globals.css (which has the
+  `[data-theme="dark"]`/`[data-theme="system"]`+`prefers-color-scheme` dark blocks). The REAL bug was gap #2:
+  `themeOverridesToCss` emitted `:root{…}` ONLY, so any per-Site override stomped BOTH light and dark.
+  Reworked `themeOverridesToCss(raw, rawDark?)` (theme.ts): light overrides → `:root` ONLY; optional dark
+  overrides → `[data-theme="dark"]{…}` + `@media(prefers-color-scheme:dark){[data-theme="system"]{…}}` so a
+  token can hold DISTINCT values per mode and a light override no longer kills dark. Added
+  `theme_overrides_dark` settings key + `get/setThemeOverridesDark` (settings-store.ts) mirroring the light
+  pair; `render-page.tsx` now passes both maps. Queued the follow-on UI (preview dark toggle + dark override
+  editor) as a new backlog task — those are the remaining "let the operator SEE/edit dark" pieces.
+- **Verified:** added 3 regression tests to `theme.test.ts` (light→:root only, dark→both dark scopes, light
+  doesn't leak into dark, empty→""); `node --test src/lib/render/theme.test.ts` 6/6 + `scripts/theme.test.mjs`
+  10/10 green; `npx tsc --noEmit` clean; `npx opennextjs-cloudflare build` green (port 3601 free). Did NOT
+  manually regen the CMS bundle (PM `predeploy` auto-regens it; not my task's to own).
+- **Files:** CMS/src/lib/render/theme.ts, CMS/src/lib/render/theme.test.ts, CMS/src/db/settings-store.ts,
+  CMS/src/lib/render/render-page.tsx

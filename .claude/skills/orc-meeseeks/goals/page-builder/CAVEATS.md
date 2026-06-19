@@ -202,3 +202,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   cms-bundle.generated.js unless the run OWNS it (concurrency: it captures other loops' uncommitted CMS
   edits — see the bundle:cms caveat above). The committed bundle can lag CMS source between deploys; that's
   fine now, deploy refreshes it. Don't re-add a manual "regen owed" hand-off note for render changes.
+
+- DARK MODE ON THE RENDERED PAGE WORKS via the ROOT LAYOUT: `CMS/src/app/layout.tsx` sets
+  `<html data-theme="system">` and imports `globals.css` (which holds the `[data-theme="dark"]` +
+  `@media(prefers-color-scheme:dark){[data-theme="system"]}` dark token blocks). So public `[[...slug]]` and
+  `preview/[id]` pages — both just `<RenderedPage>` fragments under that layout — DO follow OS dark already.
+  Don't "add data-theme to the rendered page"; it's there. `themeOverridesToCss(light, dark?)` now scopes
+  per-Site LIGHT overrides to `:root` ONLY and DARK overrides to `[data-theme="dark"]` + the system media
+  query — so a light override never stomps dark. Dark map persists under the `theme_overrides_dark` settings
+  key (`get/setThemeOverridesDark`). If you add a dark-override EDITOR, write through `setThemeOverridesDark`,
+  never reuse the light `setThemeOverrides` for it.

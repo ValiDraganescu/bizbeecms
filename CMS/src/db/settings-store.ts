@@ -28,6 +28,7 @@ import {
 
 const CONTENT_LOCALES_KEY = "content_locales";
 const THEME_OVERRIDES_KEY = "theme_overrides";
+const THEME_OVERRIDES_DARK_KEY = "theme_overrides_dark";
 const SITE_IDENTITY_KEY = "site_identity";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
@@ -110,6 +111,33 @@ export async function setThemeOverrides(
 ): Promise<ThemeOverrides> {
   const normalized = normalizeThemeOverrides(overrides);
   await upsertSetting(THEME_OVERRIDES_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+/** Read the per-Site DARK-mode theme overrides, or `{}` if unset/garbage. */
+export async function getThemeOverridesDark(): Promise<ThemeOverrides> {
+  const db = await getDb();
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, THEME_OVERRIDES_DARK_KEY))
+    .limit(1);
+
+  const raw = rows[0]?.value;
+  if (!raw) return emptyThemeOverrides();
+  try {
+    return normalizeThemeOverrides(JSON.parse(raw));
+  } catch {
+    return emptyThemeOverrides();
+  }
+}
+
+/** Upsert the DARK-mode theme overrides (same normalization as light). */
+export async function setThemeOverridesDark(
+  overrides: unknown,
+): Promise<ThemeOverrides> {
+  const normalized = normalizeThemeOverrides(overrides);
+  await upsertSetting(THEME_OVERRIDES_DARK_KEY, JSON.stringify(normalized));
   return normalized;
 }
 
