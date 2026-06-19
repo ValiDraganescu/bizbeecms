@@ -302,6 +302,7 @@
     "seoEmpty": "SEO settings appear here once a page is selected.",
     "saving": "Saving…",
     "addSectionFirst": "Add a Section first, then drop components into it.",
+    "dropSectionHint": "Drop to add a Section",
     "seoMetaTitle": "Meta title",
     "seoMetaDescription": "Meta description",
     "seoSave": "Save SEO",

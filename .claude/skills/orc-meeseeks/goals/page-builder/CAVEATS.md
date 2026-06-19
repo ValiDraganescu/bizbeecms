@@ -89,3 +89,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   (`RenderedPage`/`buildPlanFromPage`/`data-section`/`metaTitle`/`preview/[id]`) and a `node -e import()`
   smoke (exports `{builtAt,files,mainModule}`, mainModule=worker.js). The minified bundle writes
   `builtAt = "..."` (spaces, no colon) — grep `builtAt` not `builtAt:`.
+
+- DnD is native HTML5 (NO dnd dependency — neither CMS nor aicms ships one; do not add one). The
+  shared payload layer lives in `page-builder-shell.tsx`: MIME `application/x-page-builder`, a
+  `DragPayload` union, and `setDragPayload`/`readDragPayload`. REUSE these for slices 2/3 — don't
+  invent a second payload format. GOTCHAS: a drop target MUST `e.preventDefault()` in `onDragOver`
+  or the browser won't fire `onDrop`; clear hover state in `onDragLeave` only when
+  `!e.currentTarget.contains(e.relatedTarget)` (else child elements flicker the indicator off).
+  `dataTransfer.getData(MIME)` returns "" during dragover in some browsers — read the payload in
+  `onDrop`, gate the indicator on a boolean state set in dragover instead.
+- HEADS-UP (backlog reordered mid-2026-06-19): the USER adopted the aicms Section→Columns model.
+  Future Section work seeds `__section_column__` children and components drop into a COLUMN, not the
+  Section directly. DnD slice 1 (this one) only drags the Section primitive into Layers (append), so
+  it's model-agnostic and unaffected. Slice 2 will need `addComponentToColumn` (replacing the
+  section-direct `addComponentToSection`) per the new backlog. The column model migration is the
+  prerequisite task above slices 2/3.

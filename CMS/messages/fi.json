@@ -302,6 +302,7 @@
     "seoEmpty": "SEO-asetukset näkyvät täällä, kun sivu on valittu.",
     "saving": "Tallennetaan…",
     "addSectionFirst": "Lisää ensin osio ja pudota sitten komponentit siihen.",
+    "dropSectionHint": "Pudota lisätäksesi osion",
     "seoMetaTitle": "Metaotsikko",
     "seoMetaDescription": "Metakuvaus",
     "seoSave": "Tallenna SEO",

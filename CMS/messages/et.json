@@ -302,6 +302,7 @@
     "seoEmpty": "SEO sätted ilmuvad siia, kui leht on valitud.",
     "saving": "Salvestamine…",
     "addSectionFirst": "Lisa esmalt sektsioon ja seejärel lohista komponendid sinna.",
+    "dropSectionHint": "Lohista sektsiooni lisamiseks",
     "seoMetaTitle": "Metapealkiri",
     "seoMetaDescription": "Metakirjeldus",
     "seoSave": "Salvesta SEO",

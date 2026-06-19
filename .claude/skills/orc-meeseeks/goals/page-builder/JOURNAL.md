@@ -166,3 +166,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `{builtAt,files,mainModule}`, mainModule=worker.js, builtAt=2026-06-19T14:26 (this run). Did NOT
   live-deploy (HITL — needs CF creds / deployer Worker).
 - **Files:** ProjectManager/src/lib/deploy/cms-bundle.generated.js (regenerated; committed by explicit path).
+
+## 2026-06-19 — DnD slice 1: drag a "Section" from the LAYOUT rail into the Layers tree
+- **Status:** DONE
+- **What I did:** Wired native HTML5 drag-and-drop for the LAYOUT "Section" primitive — no dnd
+  dependency. Added a tiny shared payload layer to `page-builder-shell.tsx`: `DND_MIME`
+  (`application/x-page-builder`), a `DragPayload` union (`{kind:"section"}` now; slice 2 will add
+  `{kind:"component",name}`), and `setDragPayload`/`readDragPayload` helpers (slices 2/3 reuse these).
+  The rail's Section button is now `draggable` (when a page is selected) with
+  `onDragStart={setDragPayload(e,{kind:"section"})}` + cursor-grab styling — click-to-add still works.
+  The center **Layers** panel is the drop target: `onDragOver` (preventDefault + dropEffect=copy +
+  show indicator), `onDragLeave` (clears only when truly leaving via `contains(relatedTarget)`),
+  `onDrop` (reads payload; section → `onAddSection()` which APPENDS). Drop onto empty Layers = append
+  (the empty-state branch is inside the same drop div). Blue drop-line indicator (`bg-primary` rules +
+  `t("dropSectionHint")`) renders while dragging over.
+- **Reuse:** No tree logic touched — reused the existing `addSection` helper via `onAddSection`. Per
+  the backlog ("pure helper test if you touch tree logic"), no new test needed; DnD is UI glue.
+- **Verified:** CMS `npx tsc --noEmit` clean; `npx opennextjs-cloudflare build` green (dev stopped,
+  3601 free). Did NOT live-drag (no D1/PM session offline — HITL); the drop calls the same already-
+  tested `addSection` path the click button uses.
+- **Files:** CMS/src/components/page-builder/page-builder-shell.tsx, CMS/messages/{en,fi,et}.json
+  (`pageBuilder.dropSectionHint`, 2-space indent). DEFERRED: PM `npm run bundle:cms` — cross-loop
+  guardrail (this run's task message explicitly forbids touching the bundle); a pure UI-only change,
+  no render/route behavior changed, so the bundle does not strictly need this slice yet.

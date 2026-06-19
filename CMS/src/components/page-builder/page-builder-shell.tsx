@@ -47,6 +47,28 @@ type Viewport = "desktop" | "tablet" | "mobile";
 type CenterTab = "layers" | "preview";
 type RightTab = "block" | "page" | "seo";
 
+// ── Native HTML5 drag-and-drop payload (no dnd dependency) ──────────────────
+// A rail item carries a small JSON payload on a custom MIME type. Slice 1 only
+// drags the LAYOUT "Section" (`{kind:"section"}`); slice 2 adds `{kind:"component",
+// name}`. Drop targets read it back via `readDragPayload`.
+const DND_MIME = "application/x-page-builder";
+type DragPayload = { kind: "section" } | { kind: "component"; name: string };
+
+function setDragPayload(e: React.DragEvent, payload: DragPayload) {
+  e.dataTransfer.setData(DND_MIME, JSON.stringify(payload));
+  e.dataTransfer.effectAllowed = "copy";
+}
+
+function readDragPayload(e: React.DragEvent): DragPayload | null {
+  const raw = e.dataTransfer.getData(DND_MIME);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as DragPayload;
+  } catch {
+    return null;
+  }
+}
+
 // Preview frame widths per viewport (desktop = full width). See layout doc.
 const VIEWPORT_WIDTH: Record<Viewport, string> = {
   desktop: "100%",
@@ -120,6 +142,8 @@ export function PageBuilderShell({
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  // True while a draggable rail item hovers the Layers drop zone (blue indicator).
+  const [layersDropActive, setLayersDropActive] = useState(false);
 
   // Load the selected page's blocks (or reset when nothing is selected).
   useEffect(() => {
@@ -351,8 +375,29 @@ export function PageBuilderShell({
 
           {/* Both panels mounted; toggled by `hidden` so a future iframe stays alive. */}
           <div className="relative flex-1 overflow-hidden bg-surface-muted">
-            {/* Layers */}
+            {/* Layers — drop target for dragging a Section from the LAYOUT rail. */}
             <div
+              onDragOver={(e) => {
+                if (!selected) return;
+                // Must preventDefault to allow a drop; show the indicator.
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "copy";
+                if (!layersDropActive) setLayersDropActive(true);
+              }}
+              onDragLeave={(e) => {
+                // Only clear when truly leaving the panel (not entering a child).
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                  setLayersDropActive(false);
+                }
+              }}
+              onDrop={(e) => {
+                setLayersDropActive(false);
+                if (!selected) return;
+                const payload = readDragPayload(e);
+                if (payload?.kind !== "section") return;
+                e.preventDefault();
+                onAddSection();
+              }}
               className={
                 "absolute inset-0 overflow-y-auto p-6 " +
                 (centerTab === "layers" ? "" : "hidden")
@@ -378,6 +423,16 @@ export function PageBuilderShell({
                   selectedId={selectedBlockId}
                   onSelect={setSelectedBlockId}
                 />
+              )}
+              {/* Drop indicator: a blue line where the new Section appends. */}
+              {selected && layersDropActive && (
+                <div className="mx-auto mt-3 flex max-w-xl items-center gap-2">
+                  <span className="h-0.5 flex-1 rounded bg-primary" />
+                  <span className="text-xs font-medium text-primary">
+                    {t("dropSectionHint")}
+                  </span>
+                  <span className="h-0.5 flex-1 rounded bg-primary" />
+                </div>
               )}
             </div>
 
@@ -546,8 +601,10 @@ function ComponentsRail({
             <button
               type="button"
               disabled={!canEdit}
+              draggable={canEdit}
+              onDragStart={(e) => setDragPayload(e, { kind: "section" })}
               onClick={onAddSection}
-              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full cursor-grab rounded-md border border-border bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-surface-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t("layoutSection")}
             </button>
