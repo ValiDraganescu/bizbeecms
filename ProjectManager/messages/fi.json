@@ -290,14 +290,11 @@
     "customDomain": {
       "title": "Mukautettu verkkotunnus",
       "cardDescription": "Osoita asiakkaan oma verkkotunnus tähän sivustoon.",
-      "description": "Rekisteröi asiakkaan verkkotunnus. Asiakas lisää alla olevat DNS-tietueet rekisteröijällään; Cloudflare myöntää HTTPS-varmenteen automaattisesti.",
+      "description": "Rekisteröi asiakkaan hallitsema verkkotunnus. Asiakas lisää alla näkyvät DNS-tietueet rekisteröijälleen; Cloudflare myöntää HTTPS-varmenteen automaattisesti.",
       "label": "Asiakkaan verkkotunnus",
-      "hint": "Verkkotunnus, jota asiakas hallitsee, esim. restovista.com",
+      "hint": "Asiakkaan hallitsema verkkotunnus, esim. example.com tai www.example.com",
       "attach": "Lisää verkkotunnus",
       "notDeployed": "Julkaise sivusto ensin — mukautettu verkkotunnus tarvitsee toimivan Workerin kohteekseen.",
-      "added": "{hostname} rekisteröity.",
-      "dnsIntro": "Pyydä asiakasta lisäämään nämä tietueet DNS-palveluntarjoajallaan:",
-      "certPending": "Varmenne pysyy odottavana, kunnes yksi yllä olevista vahvistustietueista on lisätty. Se myönnetään automaattisesti muutaman minuutin kuluttua.",
       "errors": {
         "notAllowed": "Sinulla ei ole oikeutta hallita tätä sivustoa.",
         "notFound": "Sivustoa ei löytynyt.",
@@ -308,10 +305,12 @@
         "unknown": "Jokin meni pieleen. Yritä uudelleen."
       },
       "step1Routing": "1. Osoita verkkotunnus meille:",
-      "apexAlt": "Juuriverkkotunnus (ilman www:tä) ei voi käyttää CNAME-tietuetta — käytä näitä A-tietueita:",
-      "step2Cert": "2. Vahvista HTTPS-varmenne (lisää yksi näistä):",
-      "dcvRecommended": "Suositeltu — yksi CNAME, jolla Cloudflare vahvistaa ja uusii varmenteen automaattisesti:",
-      "txtAlt": "Tai lisää tämä TXT-tietue:"
+      "step2Cert": "2. Vahvista HTTPS-varmenne:",
+      "attachedHeading": "Liitetyt verkkotunnukset",
+      "apexUseA": "Juuriverkkotunnus (ei alidomeenia) — ei voi käyttää CNAME-tietuetta, käytä näitä A-tietueita:",
+      "showValidation": "Näytä vahvistustietueet",
+      "txtAdd": "Lisää tämä TXT-tietue (yksi riittää; lisää kaikki jos palveluntarjoaja sallii):",
+      "certIssued": "Vahvistustietuetta ei tarvita — varmenne on myönnetty."
     }
   },
   "designSystem": {

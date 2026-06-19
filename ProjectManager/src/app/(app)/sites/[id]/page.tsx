@@ -20,6 +20,7 @@ import {
   getSiteUserIds,
   isUserAssignedToSite,
   listAssignableUsers,
+  listSiteDomains,
 } from "@/lib/site/site";
 import { AssignForm } from "../assign-form";
 import { DeployForm } from "../deploy-form";
@@ -61,6 +62,7 @@ export default async function SiteDetailPage({
   if (!canManage && !assigned) notFound();
 
   const creator = await findUserById(site.createdBy);
+  const domains = await listSiteDomains(site.id);
 
   // Public URL of the deployed CMS Worker (derived from APP_ORIGIN), if deployed.
   const workerUrl =
@@ -178,6 +180,7 @@ export default async function SiteDetailPage({
               <CustomDomainForm
                 siteId={site.id}
                 deployed={site.status === "deployed"}
+                domains={domains.map((d) => d.hostname)}
               />
             </CardContent>
           </Card>

@@ -82,6 +82,31 @@ export const sites = sqliteTable(
 );
 
 /**
+ * Customer-owned custom domains attached to a Site (Cloudflare-for-SaaS). The
+ * deployer registers the hostname with CF + writes HOST_MAP KV; we ALSO persist
+ * it here so PM can list a Site's domains (and re-show their DNS setup records)
+ * across page loads — KV alone isn't queryable by Site. One Site → many domains
+ * (e.g. apex + www). Routing DNS records are derived from the hostname; the
+ * cert-validation TXT is volatile (CF-issued) and fetched on demand, not stored.
+ */
+export const siteDomains = sqliteTable(
+  "site_domains",
+  {
+    id: text("id").primaryKey(),
+    siteId: text("site_id")
+      .notNull()
+      .references(() => sites.id, { onDelete: "cascade" }),
+    hostname: text("hostname").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [uniqueIndex("site_domains_hostname_unique").on(t.hostname)],
+);
+
+export type SiteDomain = typeof siteDomains.$inferSelect;
+
+/**
  * Per-step audit trail of a Site's CMS deploy (deploy-audit-trail subgoal).
  * The detached deployer bash script emits one row at the start and end of each
  * ordered step (clone/npm/build/provision/migrate/deploy) to PM's

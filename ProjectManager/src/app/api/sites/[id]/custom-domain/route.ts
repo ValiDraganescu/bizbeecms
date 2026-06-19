@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canManageSiteByCountry } from "@/lib/site/authz";
-import { findSiteById, isUserAssignedToSite } from "@/lib/site/site";
+import {
+  addSiteDomain,
+  findSiteById,
+  isUserAssignedToSite,
+} from "@/lib/site/site";
 
 export type CustomDomainError =
   | "notAllowed"
@@ -107,6 +111,9 @@ export async function POST(
       const upstream = data.error === "notConfigured" ? "notConfigured" : "deployerUnreachable";
       return NextResponse.json({ error: upstream }, { status: 502 });
     }
+    // Persist so the Site page can list this domain (and its DNS records) across
+    // reloads — the deployer only wrote CF + HOST_MAP, which PM can't query by Site.
+    await addSiteDomain(site.id, hostname);
     return NextResponse.json(data as CustomDomainResult);
   } catch {
     return NextResponse.json({ error: "deployerUnreachable" }, { status: 502 });

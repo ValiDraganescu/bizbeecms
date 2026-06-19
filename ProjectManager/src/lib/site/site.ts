@@ -273,3 +273,45 @@ export const SITE_STATUSES: SiteStatus[] = [
   "deployed",
   "failed",
 ];
+
+/** Custom domains attached to a Site, newest first. */
+export async function listSiteDomains(siteId: string) {
+  const db = await getDb();
+  return db
+    .select()
+    .from(schema.siteDomains)
+    .where(eq(schema.siteDomains.siteId, siteId))
+    .orderBy(desc(schema.siteDomains.createdAt));
+}
+
+/**
+ * Record a custom domain on a Site (idempotent on hostname — re-attaching an
+ * existing one is a no-op, so the deployer's idempotent /attach-domain stays
+ * idempotent end to end). The hostname is globally unique across Sites.
+ */
+export async function addSiteDomain(
+  siteId: string,
+  hostname: string,
+): Promise<void> {
+  const db = await getDb();
+  await db
+    .insert(schema.siteDomains)
+    .values({ id: crypto.randomUUID(), siteId, hostname })
+    .onConflictDoNothing({ target: schema.siteDomains.hostname });
+}
+
+/** Remove a custom domain from a Site (HOST_MAP cleanup is the deployer's job). */
+export async function removeSiteDomain(
+  siteId: string,
+  hostname: string,
+): Promise<void> {
+  const db = await getDb();
+  await db
+    .delete(schema.siteDomains)
+    .where(
+      and(
+        eq(schema.siteDomains.siteId, siteId),
+        eq(schema.siteDomains.hostname, hostname),
+      ),
+    );
+}

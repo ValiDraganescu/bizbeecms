@@ -47,3 +47,26 @@ export const PM_ORIGIN = `https://manager.${ZONE_DOMAIN}`;
  * /attach-domain CNAME value and the router's route.)
  */
 export const CUSTOM_DOMAIN_FALLBACK_ORIGIN = "cf.bizbeecms.com";
+
+/** CF anycast IPs for apex domains that can't CNAME — used as A records. */
+export const CUSTOM_DOMAIN_APEX_IPS = ["104.21.34.242", "172.67.210.25"];
+
+/**
+ * The DNS records a customer adds to point `hostname` at us. Deterministic from
+ * the hostname (NOT the volatile cert-validation TXT, which CF issues per attach):
+ * a subdomain CNAMEs to the fallback origin; an apex (exactly two labels, e.g.
+ * `example.com`) can't CNAME, so it uses A records to CF's anycast IPs. Always
+ * shown so the operator can re-check setup any time, not just right after attach.
+ */
+export function routingRecordsForHost(hostname: string): {
+  isApex: boolean;
+  cname: { name: string; value: string };
+  apexA: { name: string; values: string[] };
+} {
+  const isApex = hostname.split(".").length === 2;
+  return {
+    isApex,
+    cname: { name: hostname, value: CUSTOM_DOMAIN_FALLBACK_ORIGIN },
+    apexA: { name: hostname, values: CUSTOM_DOMAIN_APEX_IPS },
+  };
+}

@@ -290,14 +290,11 @@
     "customDomain": {
       "title": "Custom domain",
       "cardDescription": "Point a customer's own domain at this Site.",
-      "description": "Register a customer domain. They add the DNS records below at their registrar; Cloudflare issues the HTTPS certificate automatically.",
+      "description": "Register a domain the customer controls. They add the DNS records shown below at their registrar; Cloudflare issues the HTTPS certificate automatically.",
       "label": "Customer domain",
-      "hint": "A domain the customer controls, e.g. restovista.com",
+      "hint": "A domain the customer controls, e.g. example.com or www.example.com",
       "attach": "Add domain",
       "notDeployed": "Deploy this Site first — a custom domain needs a live Worker to point at.",
-      "added": "{hostname} registered.",
-      "dnsIntro": "Ask the customer to add these records at their DNS provider:",
-      "certPending": "The certificate stays pending until one validation record above is added. It issues automatically within a few minutes after that.",
       "errors": {
         "notAllowed": "You're not allowed to manage this Site.",
         "notFound": "Site not found.",
@@ -308,10 +305,12 @@
         "unknown": "Something went wrong. Please try again."
       },
       "step1Routing": "1. Point the domain at us:",
-      "apexAlt": "An apex domain (no www) can't use a CNAME — use these A records instead:",
-      "step2Cert": "2. Validate the HTTPS certificate (add one of these):",
-      "dcvRecommended": "Recommended — one CNAME that lets Cloudflare validate and auto-renew the certificate:",
-      "txtAlt": "Or, add this TXT record instead:"
+      "step2Cert": "2. Validate the HTTPS certificate:",
+      "attachedHeading": "Attached domains",
+      "apexUseA": "Apex domain (no subdomain) — can't use a CNAME, so use these A records:",
+      "showValidation": "Show validation records",
+      "txtAdd": "Add this TXT record (one is enough; add all if your provider allows):",
+      "certIssued": "No validation record needed — the certificate is issued."
     }
   },
   "designSystem": {

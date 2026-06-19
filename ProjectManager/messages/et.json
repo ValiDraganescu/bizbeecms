@@ -290,14 +290,11 @@
     "customDomain": {
       "title": "Kohandatud domeen",
       "cardDescription": "Suuna kliendi enda domeen sellele saidile.",
-      "description": "Registreeri kliendi domeen. Klient lisab allolevad DNS-kirjed oma registripidaja juures; Cloudflare väljastab HTTPS-sertifikaadi automaatselt.",
+      "description": "Registreeri domeen, mida klient haldab. Klient lisab allpool näidatud DNS-kirjed oma registripidaja juures; Cloudflare väljastab HTTPS-sertifikaadi automaatselt.",
       "label": "Kliendi domeen",
-      "hint": "Domeen, mida klient haldab, nt restovista.com",
+      "hint": "Domeen, mida klient haldab, nt example.com või www.example.com",
       "attach": "Lisa domeen",
       "notDeployed": "Juuruta sait esmalt — kohandatud domeen vajab sihtmärgiks töötavat Workerit.",
-      "added": "{hostname} registreeritud.",
-      "dnsIntro": "Palu kliendil lisada need kirjed oma DNS-teenusepakkuja juures:",
-      "certPending": "Sertifikaat jääb ootele, kuni üks ülaltoodud valideerimiskirjetest on lisatud. Pärast seda väljastatakse see automaatselt mõne minuti jooksul.",
       "errors": {
         "notAllowed": "Teil pole õigust seda saiti hallata.",
         "notFound": "Saiti ei leitud.",
@@ -308,10 +305,12 @@
         "unknown": "Midagi läks valesti. Proovige uuesti."
       },
       "step1Routing": "1. Suuna domeen meile:",
-      "apexAlt": "Tipptaseme domeen (ilma www-ta) ei saa kasutada CNAME-kirjet — kasuta neid A-kirjeid:",
-      "step2Cert": "2. Valideeri HTTPS-sertifikaat (lisa üks neist):",
-      "dcvRecommended": "Soovitatav — üks CNAME, mis laseb Cloudflare'il sertifikaati valideerida ja automaatselt uuendada:",
-      "txtAlt": "Või lisa see TXT-kirje:"
+      "step2Cert": "2. Valideeri HTTPS-sertifikaat:",
+      "attachedHeading": "Lisatud domeenid",
+      "apexUseA": "Tipptaseme domeen (ilma alamdomeenita) — ei saa kasutada CNAME-kirjet, kasuta neid A-kirjeid:",
+      "showValidation": "Näita valideerimiskirjeid",
+      "txtAdd": "Lisa see TXT-kirje (ühest piisab; lisa kõik, kui teenusepakkuja lubab):",
+      "certIssued": "Valideerimiskirjet pole vaja — sertifikaat on väljastatud."
     }
   },
   "designSystem": {
