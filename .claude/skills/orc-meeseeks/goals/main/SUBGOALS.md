@@ -4,3 +4,4 @@ Status: ACTIVE (being worked / available to drive) | PAUSED (set aside by the us
 
 - binding-adapters — ports-and-adapters seam over CMS env.DB/MEDIA/AI + CF adapter (no Vercel adapter; CF-native) — ACTIVE
 - deploy-audit-trail — per-step deploy audit trail (start/duration/error + RAM nice-to-have); events table + ingest API + UI timeline — ACTIVE
+- custom-domains — move PM→manager.bizbeecms.com, deployer→deployer.bizbeecms.com, sites→<slug>.site.bizbeecms.com; keep SSO working — ACTIVE
