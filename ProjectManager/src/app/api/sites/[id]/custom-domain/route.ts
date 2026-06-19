@@ -13,14 +13,19 @@ export type CustomDomainError =
   | "deployerUnreachable"
   | "unknown";
 
+export type DnsRecord = { name: string; value: string };
 export type CustomDomainResult = {
   ok: true;
   hostname: string;
   status: string;
   ssl: string;
   dns: {
-    cname: { name: string; value: string };
-    txt: { name: string; value: string } | null;
+    routing: {
+      cname: DnsRecord;
+      apexA: { name: string; values: string[] };
+    };
+    dcv: DnsRecord | null;
+    txt: DnsRecord[];
   };
 };
 

@@ -108,20 +108,48 @@ export function CustomDomainForm({
           <AlertBody>
             <p className="font-medium">{t("added", { hostname: result.hostname })}</p>
             <p className="mt-1 text-sm">{t("dnsIntro")}</p>
-            <dl className="mt-2 flex flex-col gap-2">
+
+            {/* 1. Routing — point the hostname at us. Subdomain → CNAME; an apex
+                domain can't CNAME, so it uses A records to CF's anycast IPs. */}
+            <p className="mt-3 text-sm font-medium">{t("step1Routing")}</p>
+            <dl className="mt-1 flex flex-col gap-2">
               <DnsRow
                 type="CNAME"
-                name={result.dns.cname.name}
-                value={result.dns.cname.value}
+                name={result.dns.routing.cname.name}
+                value={result.dns.routing.cname.value}
               />
-              {result.dns.txt ? (
+              <p className="text-xs text-foreground-muted">{t("apexAlt")}</p>
+              {result.dns.routing.apexA.values.map((ip) => (
                 <DnsRow
-                  type="TXT"
-                  name={result.dns.txt.name}
-                  value={result.dns.txt.value}
+                  key={ip}
+                  type="A"
+                  name={result.dns.routing.apexA.name}
+                  value={ip}
                 />
-              ) : null}
+              ))}
             </dl>
+
+            {/* 2. Cert validation — pick ONE. DCV CNAME is best (auto-renews). */}
+            <p className="mt-3 text-sm font-medium">{t("step2Cert")}</p>
+            {result.dns.dcv ? (
+              <dl className="mt-1 flex flex-col gap-2">
+                <p className="text-xs text-foreground-muted">{t("dcvRecommended")}</p>
+                <DnsRow
+                  type="CNAME"
+                  name={result.dns.dcv.name}
+                  value={result.dns.dcv.value}
+                />
+              </dl>
+            ) : null}
+            {result.dns.txt.length > 0 ? (
+              <dl className="mt-2 flex flex-col gap-2">
+                <p className="text-xs text-foreground-muted">{t("txtAlt")}</p>
+                {result.dns.txt.map((r) => (
+                  <DnsRow key={r.value} type="TXT" name={r.name} value={r.value} />
+                ))}
+              </dl>
+            ) : null}
+
             <p className="mt-2 text-sm text-foreground-muted">
               {t("certPending")}
             </p>

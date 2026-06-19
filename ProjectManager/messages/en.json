@@ -297,7 +297,7 @@
       "notDeployed": "Deploy this Site first — a custom domain needs a live Worker to point at.",
       "added": "{hostname} registered.",
       "dnsIntro": "Ask the customer to add these records at their DNS provider:",
-      "certPending": "The certificate stays pending until the customer adds the TXT record. Apex domains that can't use a CNAME should use an A record to Cloudflare's IPs instead.",
+      "certPending": "The certificate stays pending until one validation record above is added. It issues automatically within a few minutes after that.",
       "errors": {
         "notAllowed": "You're not allowed to manage this Site.",
         "notFound": "Site not found.",
@@ -306,7 +306,12 @@
         "notConfigured": "Custom-domain support isn't configured on the deployer.",
         "deployerUnreachable": "The deploy service is unreachable. Please try again.",
         "unknown": "Something went wrong. Please try again."
-      }
+      },
+      "step1Routing": "1. Point the domain at us:",
+      "apexAlt": "An apex domain (no www) can't use a CNAME — use these A records instead:",
+      "step2Cert": "2. Validate the HTTPS certificate (add one of these):",
+      "dcvRecommended": "Recommended — one CNAME that lets Cloudflare validate and auto-renew the certificate:",
+      "txtAlt": "Or, add this TXT record instead:"
     }
   },
   "designSystem": {

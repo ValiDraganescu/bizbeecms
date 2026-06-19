@@ -180,19 +180,40 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
   // Record the route mapping so the router can resolve this Host to the Site.
   await env.HOST_MAP.put(hostname, slug);
 
+  // CF returns DV records under ssl.validation_records[] (and a one-CNAME DCV
+  // delegation under ssl.dcv_delegation_records[]); some responses also carry the
+  // legacy top-level ssl.txt_name. Gather the TXT records from both shapes.
+  const ssl = record?.ssl;
+  const txt = [
+    ...(ssl?.txt_name && ssl.txt_value
+      ? [{ name: ssl.txt_name, value: ssl.txt_value }]
+      : []),
+    ...(ssl?.validation_records ?? [])
+      .filter((v) => v.txt_name && v.txt_value)
+      .map((v) => ({ name: v.txt_name as string, value: v.txt_value as string })),
+  ];
+  const dcv = (ssl?.dcv_delegation_records ?? [])
+    .filter((d) => d.cname && d.cname_target)
+    .map((d) => ({ name: d.cname as string, value: d.cname_target as string }));
+
   return Response.json({
     ok: true,
     hostname,
     slug,
     status: record?.status ?? "pending",
-    ssl: record?.ssl?.status ?? "pending",
-    // What the customer adds at their registrar. Apex domains that can't CNAME
-    // use an A record to CF's anycast IPs instead — the PM UI shows both.
+    ssl: ssl?.status ?? "pending",
+    // Every record the customer might add at their registrar:
+    //  - routing: CNAME the hostname to the fallback origin (or A for an apex).
+    //  - dcv: ONE CNAME that delegates cert validation + renewal to CF (best).
+    //  - txt: _acme-challenge TXT(s) — the alternative DV method.
     dns: {
-      cname: { name: hostname, value: "cf.bizbeecms.com" },
-      txt: record?.ssl?.txt_name
-        ? { name: record.ssl.txt_name, value: record.ssl.txt_value }
-        : null,
+      // Subdomain → CNAME; apex → A record to CF anycast (can't CNAME an apex).
+      routing: {
+        cname: { name: hostname, value: "cf.bizbeecms.com" },
+        apexA: { name: hostname, values: ["104.21.34.242", "172.67.210.25"] },
+      },
+      dcv: dcv[0] ?? null,
+      txt,
     },
   });
 }
@@ -203,8 +224,19 @@ type CfCustomHostname = {
   status: string;
   ssl?: {
     status?: string;
+    // Legacy top-level DV fields — present on some CF responses.
     txt_name?: string;
     txt_value?: string;
+    // The real location of DV records on current CF responses.
+    validation_records?: {
+      txt_name?: string;
+      txt_value?: string;
+      http_url?: string;
+      http_body?: string;
+    }[];
+    // DCV delegation: ONE CNAME the customer adds so CF manages validation +
+    // renewal automatically (the recommended method).
+    dcv_delegation_records?: { cname?: string; cname_target?: string }[];
   };
 };
 

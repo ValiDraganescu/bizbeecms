@@ -297,7 +297,7 @@
       "notDeployed": "Julkaise sivusto ensin — mukautettu verkkotunnus tarvitsee toimivan Workerin kohteekseen.",
       "added": "{hostname} rekisteröity.",
       "dnsIntro": "Pyydä asiakasta lisäämään nämä tietueet DNS-palveluntarjoajallaan:",
-      "certPending": "Varmenne pysyy odottavana, kunnes asiakas lisää TXT-tietueen. Juuriverkkotunnukset, jotka eivät voi käyttää CNAMEa, käyttävät A-tietuetta Cloudflaren IP-osoitteisiin.",
+      "certPending": "Varmenne pysyy odottavana, kunnes yksi yllä olevista vahvistustietueista on lisätty. Se myönnetään automaattisesti muutaman minuutin kuluttua.",
       "errors": {
         "notAllowed": "Sinulla ei ole oikeutta hallita tätä sivustoa.",
         "notFound": "Sivustoa ei löytynyt.",
@@ -306,7 +306,12 @@
         "notConfigured": "Mukautetun verkkotunnuksen tukea ei ole määritetty julkaisijassa.",
         "deployerUnreachable": "Julkaisupalveluun ei saada yhteyttä. Yritä uudelleen.",
         "unknown": "Jokin meni pieleen. Yritä uudelleen."
-      }
+      },
+      "step1Routing": "1. Osoita verkkotunnus meille:",
+      "apexAlt": "Juuriverkkotunnus (ilman www:tä) ei voi käyttää CNAME-tietuetta — käytä näitä A-tietueita:",
+      "step2Cert": "2. Vahvista HTTPS-varmenne (lisää yksi näistä):",
+      "dcvRecommended": "Suositeltu — yksi CNAME, jolla Cloudflare vahvistaa ja uusii varmenteen automaattisesti:",
+      "txtAlt": "Tai lisää tämä TXT-tietue:"
     }
   },
   "designSystem": {

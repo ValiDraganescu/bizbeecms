@@ -297,7 +297,7 @@
       "notDeployed": "Juuruta sait esmalt — kohandatud domeen vajab sihtmärgiks töötavat Workerit.",
       "added": "{hostname} registreeritud.",
       "dnsIntro": "Palu kliendil lisada need kirjed oma DNS-teenusepakkuja juures:",
-      "certPending": "Sertifikaat jääb ootele, kuni klient lisab TXT-kirje. Juurdomeenid, mis ei saa CNAMEt kasutada, peaksid kasutama A-kirjet Cloudflare'i IP-aadressidele.",
+      "certPending": "Sertifikaat jääb ootele, kuni üks ülaltoodud valideerimiskirjetest on lisatud. Pärast seda väljastatakse see automaatselt mõne minuti jooksul.",
       "errors": {
         "notAllowed": "Teil pole õigust seda saiti hallata.",
         "notFound": "Saiti ei leitud.",
@@ -306,7 +306,12 @@
         "notConfigured": "Kohandatud domeeni tugi pole juurutajas seadistatud.",
         "deployerUnreachable": "Juurutusteenus pole kättesaadav. Proovige uuesti.",
         "unknown": "Midagi läks valesti. Proovige uuesti."
-      }
+      },
+      "step1Routing": "1. Suuna domeen meile:",
+      "apexAlt": "Tipptaseme domeen (ilma www-ta) ei saa kasutada CNAME-kirjet — kasuta neid A-kirjeid:",
+      "step2Cert": "2. Valideeri HTTPS-sertifikaat (lisa üks neist):",
+      "dcvRecommended": "Soovitatav — üks CNAME, mis laseb Cloudflare'il sertifikaati valideerida ja automaatselt uuendada:",
+      "txtAlt": "Või lisa see TXT-kirje:"
     }
   },
   "designSystem": {
