@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getTranslations } from "next-intl/server";
 import { checkAdminFromHeaders } from "@/lib/auth/guard";
+import { verifyForwardedHost } from "@/lib/auth/forwarded-host";
 import { SidebarShell } from "@/components/admin-sidebar";
 
 export const dynamic = "force-dynamic";
@@ -44,18 +45,26 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   // confirms they're signed into PM) bounces back to our sso-callback with a
   // one-time nonce we exchange for a session cookie on THIS host.
   const { env } = await getCloudflareContext({ async: true });
-  const pmOrigin = (env as unknown as { PM_ORIGIN?: string }).PM_ORIGIN;
+  const e = env as unknown as { PM_ORIGIN?: string; CMS_AUTH_SECRET?: string };
+  const pmOrigin = e.PM_ORIGIN;
   if (!pmOrigin) redirect("/");
 
-  // The public host the BROWSER is on. The router proxies custom domains to this
-  // Worker's internal workers.dev URL, so request host / x-forwarded-host get
-  // normalized to workers.dev by OpenNext — the router preserves the real host in
-  // x-bizbee-host (read it FIRST). Falls back to the standard headers when the
-  // request didn't come through the router (direct workers.dev hit). This is the
-  // ONLY place the CMS builds a host-dependent URL; keep it the single source.
+  // The public host the BROWSER is on, for the SSO return URL. The router proxies
+  // customer domains to this Worker's internal workers.dev origin, so the request
+  // host / x-forwarded-host are normalized to workers.dev by OpenNext — the router
+  // preserves the real host in a SIGNED x-bizbee-host header. We only trust it
+  // when the HMAC verifies (else a direct workers.dev hit could forge it to spoof
+  // the SSO return → open redirect). Fall back to the request host when there's no
+  // valid signature (a legit direct workers.dev hit). PM ALSO re-validates the
+  // return host against HOST_MAP, so this is defense-in-depth, not the only gate.
+  // This is the ONLY place the CMS builds a host-dependent URL — keep it so.
   const h = await headers();
-  const host =
-    h.get("x-bizbee-host") ?? h.get("x-forwarded-host") ?? h.get("host");
+  const verifiedHost = await verifyForwardedHost(
+    h.get("x-bizbee-host"),
+    h.get("x-bizbee-host-sig"),
+    e.CMS_AUTH_SECRET,
+  );
+  const host = verifiedHost ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "https";
   const returnUrl = `${proto}://${host}/api/auth/sso-callback`;
   const ssoUrl =

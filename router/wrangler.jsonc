@@ -37,4 +37,7 @@
     // Per-Site CMS Workers live at https://bizbeecms-cms-<slug>.<SUBDOMAIN>.workers.dev
     "WORKERS_SUBDOMAIN": "vali-draganescu88"
   }
+  // SECRET (set with `wrangler secret put CMS_AUTH_SECRET`, = the same shared value
+  // the deployer injects into every CMS Worker): used to HMAC-sign x-bizbee-host so
+  // the CMS can verify the forwarded host came from this router, not a forged hit.
 }

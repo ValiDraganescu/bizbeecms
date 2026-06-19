@@ -1,7 +1,24 @@
 type Env = {
   HOST_MAP: KVNamespace;
   WORKERS_SUBDOMAIN: string;
+  // Shared secret (same value the deployer injects into every CMS Worker as
+  // CMS_AUTH_SECRET). Used to HMAC-sign x-bizbee-host so the CMS can prove the
+  // forwarded host came from THIS router, not a forged direct workers.dev hit.
+  CMS_AUTH_SECRET: string;
 };
+
+/** HMAC-SHA256 of `msg` with `secret`, hex-encoded. */
+async function hmacHex(secret: string, msg: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(msg));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 /**
  * bizbeecms-router — the single Worker every customer custom hostname resolves
@@ -46,13 +63,18 @@ export default {
 
     // Forward the ORIGINAL host so the CMS can resolve its own context (SSO
     // return URL, canonical links) from the customer domain, not the internal
-    // workers.dev name. We send BOTH x-forwarded-host (the standard) AND a
-    // private x-bizbee-host: OpenNext/Next normalizes x-forwarded-host to match
-    // the workers.dev URL it's actually serving, clobbering it — but it leaves
-    // our custom header untouched. The CMS reads x-bizbee-host first.
+    // workers.dev name. OpenNext normalizes x-forwarded-host to the workers.dev
+    // URL it actually serves, so we ALSO pass a private x-bizbee-host (left
+    // untouched). It is HMAC-SIGNED with the shared CMS_AUTH_SECRET so the CMS can
+    // verify it really came from this router — a direct workers.dev hit with a
+    // forged x-bizbee-host has no valid signature and is rejected (no open
+    // redirect / SSO-return spoof). Strip any inbound copies first.
     const headers = new Headers(request.headers);
+    headers.delete("x-bizbee-host");
+    headers.delete("x-bizbee-host-sig");
     headers.set("x-forwarded-host", host);
     headers.set("x-bizbee-host", host);
+    headers.set("x-bizbee-host-sig", await hmacHex(env.CMS_AUTH_SECRET, host));
 
     return fetch(
       new Request(target, {
