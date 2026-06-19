@@ -92,6 +92,32 @@ The deployer read `ssl.txt_name` (top-level), but CF returns DV records under `s
 CNAME and told the operator to "add the TXT record" it never displayed. Fixed: deployer parses both
 shapes; form shows routing (CNAME + apex A) and all validation records.
 
+### 8. SSO on a custom domain bounced the user to workers.dev (host-chain) — VERIFIED FIXED
+Logging into a CMS admin at a custom domain (e.g. `restovista.com/admin`) completed SSO but dumped the
+user on `bizbeecms-cms-<slug>.workers.dev/admin`. The whole SSO chain ran on the wrong host. Two layers:
+
+- **The SSO return URL was built from the wrong host.** `CMS/admin/layout.tsx` built
+  `return=https://<host>/api/auth/sso-callback` from `x-forwarded-host`. But the router proxies custom
+  domains to the Worker's INTERNAL `workers.dev` origin, and **OpenNext/Next normalizes
+  `x-forwarded-host` (and the request host) to that workers.dev URL** — so the real `restovista.com` was
+  lost and the entire chain (PM cms-sso → callback) ran on workers.dev. Fix: the router forwards the real
+  host in a private **`x-bizbee-host`** header (OpenNext leaves it untouched); the layout reads it.
+- **The callback redirected to an absolute internal origin.** `sso-callback/route.ts` did
+  `new URL('/admin', request.url).origin` — and `request.url` inside the Worker is the workers.dev URL.
+  Fix: redirect with a **relative `Location: /admin`** (no host) — the browser stays on whatever host it
+  requested. This also closed an open-redirect (no host built from a spoofable header).
+- **Security: `x-bizbee-host` is HMAC-signed.** A direct workers.dev hit could forge `x-bizbee-host` to
+  spoof the SSO return → open redirect. The router signs the host with the shared `CMS_AUTH_SECRET`
+  (`x-bizbee-host-sig`); the CMS (`lib/auth/forwarded-host.ts`, unit-tested) trusts the header ONLY when
+  the signature verifies (constant-time), else falls back to the request host. PM's `cms-sso` ALSO
+  re-validates the return host against `HOST_MAP`/own-zone — defense in depth. The router needs the
+  `CMS_AUTH_SECRET` secret set (= the shared value the deployer injects into every CMS).
+
+**RULE: the CMS has exactly ONE host-dependent URL build (the SSO returnUrl in admin/layout.tsx). Keep
+it there, keep it signature-gated. Everything else (sso-callback, asset/page/component routes) is
+host-independent (relative redirect / searchparams only). Don't reintroduce `url.origin`/`x-forwarded-host`
+based absolute URLs in the CMS.**
+
 ### 4. ✅ WHAT WORKS NOW: per-Site default URL stays workers.dev (option B)
 `cmsWorkerUrl()` (`ProjectManager/src/lib/deploy/worker-url.ts`) returns
 `https://<workerName>.vali-draganescu88.workers.dev` directly. No ACM cost. Customer-owned custom
@@ -343,9 +369,10 @@ The deployer only builds + `wrangler deploy`s the CMS Worker; it does **not** cr
 - ✅ **deployer live on `deployer.bizbeecms.com`** — 2026-06-19.
 - ✅ **router live** — `cf.bizbeecms.com/*` + dormant `*.site.bizbeecms.com/*`.
 - ✅ **A CMS site is deployed & live**: `bizbeecms-cms-test-1.vali-draganescu88.workers.dev` serves 200.
-- ✅ **CMS→PM SSO verified END-TO-END LIVE** — 2026-06-19: login at `manager.bizbeecms.com` → open
-  `bizbeecms-cms-test-1.workers.dev/admin` → nonce-exchange + `cms-validate` succeed → admin UI renders.
-  (Required fixing the stale `PM_ORIGIN`/`PM_CALLBACK_ORIGIN` — trap #5 — then redeploying the site.)
+- ✅ **CMS→PM SSO verified END-TO-END LIVE** — 2026-06-19, on BOTH the workers.dev host AND a custom
+  customer domain. Login at `manager.bizbeecms.com` → open `www.restovista.com/admin` → SSO completes and
+  the user **stays on `www.restovista.com/admin`** (no workers.dev bounce). Required: trap #5 (origins),
+  trap #8 (host chain: signed `x-bizbee-host` + relative callback redirect).
 - ✅ **Deploy callback + step-events verified** — fixed by the `PM_CALLBACK_ORIGIN` update (trap #5);
   deploys now complete (no more stuck `deploying` rows from a 404'd callback).
 - ❌ **Per-Site D1 / R2 / AI Gateway** still not auto-provisioned (manual, Part C). test-1 runs because
