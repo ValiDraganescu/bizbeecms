@@ -11,7 +11,7 @@
 // can type-strip and import this module without a bundler resolving aliases.
 // Import schema from schema.ts directly (db/index.ts pulls in
 // @opennextjs/cloudflare and has extensionless re-exports node can't resolve).
-import { asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, lt } from "drizzle-orm";
 import * as schema from "../../db/schema.ts";
 import type { Db } from "../../db/index.ts";
 import type {
@@ -215,6 +215,59 @@ export function collapseDeployEvents(events: readonly TimelineRow[]): TimelineRo
 }
 
 /**
+ * Format an elapsed millisecond span as a compact `WWs` / `XmZZs` string for the
+ * deploy progress badge: under a minute → whole seconds (`8s`); a minute or more
+ * → `<m>m<ss>s` zero-padded (`1m05s`). Negative/NaN clamps to `0s`.
+ */
+export function fmtElapsed(ms: number): string {
+  const total = Number.isFinite(ms) && ms > 0 ? Math.floor(ms / 1000) : 0;
+  if (total < 60) return `${total}s`;
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}m${String(s).padStart(2, "0")}s`;
+}
+
+export type DeployProgress = {
+  /** Current (still-running) step's name, or null if none is in flight. */
+  currentStep: string | null;
+  /** Elapsed ms of the current step (now − its startedAt). */
+  currentMs: number;
+  /** Elapsed ms of the whole run (now − the first step's startedAt). */
+  totalMs: number;
+};
+
+/**
+ * Compute live deploy progress from the LATEST run's collapsed step rows and a
+ * `now` timestamp. `currentMs` ticks the in-flight (`started`) step; `totalMs`
+ * spans from the run's first step. Returns null when there's nothing in flight
+ * (no rows, or every step already resolved). Pure — `now` is injected so it's
+ * node-testable and resume-safe.
+ */
+export function deployProgress(
+  collapsedRows: readonly TimelineRow[],
+  now: number,
+): DeployProgress | null {
+  if (collapsedRows.length === 0) return null;
+
+  const firstStart = collapsedRows.reduce((min, r) => {
+    const at = Date.parse(r.startedAt);
+    return Number.isNaN(at) ? min : Math.min(min, at);
+  }, Number.POSITIVE_INFINITY);
+  if (!Number.isFinite(firstStart)) return null;
+
+  // The in-flight step is the last one still in `started` (steps arrive ordered).
+  const running = [...collapsedRows].reverse().find((r) => r.status === "started");
+  if (!running) return null;
+
+  const stepStart = Date.parse(running.startedAt);
+  return {
+    currentStep: running.step,
+    currentMs: Number.isNaN(stepStart) ? 0 : Math.max(0, now - stepStart),
+    totalMs: Math.max(0, now - firstStart),
+  };
+}
+
+/**
  * Insert one validated deploy event. `injectedDb` is the test seam; production
  * callers omit it and get the live D1-bound drizzle client.
  */
@@ -254,4 +307,74 @@ export async function listDeployEventsForSite(
     .from(schema.deployEvents)
     .where(eq(schema.deployEvents.siteId, siteId))
     .orderBy(asc(schema.deployEvents.startedAt), asc(schema.deployEvents.createdAt));
+}
+
+/** Default + max page size for the deploy-events trail. A run is ~12 rows, so 50
+ * comfortably holds the latest run on the first page; 200 caps a hostile limit. */
+export const DEPLOY_EVENTS_PAGE_DEFAULT = 50;
+export const DEPLOY_EVENTS_PAGE_MAX = 200;
+
+/** Clamp a caller-supplied `limit` into [1, MAX], defaulting when absent/invalid. */
+export function clampPageLimit(raw: number | null): number {
+  if (raw === null || !Number.isFinite(raw) || raw < 1) {
+    return DEPLOY_EVENTS_PAGE_DEFAULT;
+  }
+  return Math.min(Math.floor(raw), DEPLOY_EVENTS_PAGE_MAX);
+}
+
+export type DeployEventsPage = {
+  /** The page's events in chronological (oldest-first) order for the timeline. */
+  events: DeployEvent[];
+  /**
+   * Cursor for the NEXT (older) page — the `createdAt` epoch (ms) of the oldest
+   * row returned; pass it back as `before`. Null when no older rows remain.
+   */
+  nextCursor: number | null;
+};
+
+/**
+ * One page of a Site's deploy events, newest deploys first. We fetch newest-first
+ * (so the freshest run is always on page 1), `limit + 1` to detect whether older
+ * rows exist, then return the page re-sorted oldest-first for top-to-bottom
+ * rendering. `before` (a `createdAt` ms epoch) walks backward in time.
+ *
+ * `createdAt` is the cursor key — monotonic insert order, stable under ties on
+ * `startedAt`. `injectedDb` is the test seam.
+ */
+export async function listDeployEventsPaged(
+  siteId: string,
+  opts: { limit?: number | null; before?: number | null } = {},
+  injectedDb?: Db,
+): Promise<DeployEventsPage> {
+  const db = injectedDb ?? (await (await import("../../db/index.ts")).getDb());
+  const limit = clampPageLimit(opts.limit ?? null);
+  const before = opts.before ?? null;
+
+  const where =
+    before !== null
+      ? and(
+          eq(schema.deployEvents.siteId, siteId),
+          lt(schema.deployEvents.createdAt, new Date(before)),
+        )
+      : eq(schema.deployEvents.siteId, siteId);
+
+  const rows = await db
+    .select()
+    .from(schema.deployEvents)
+    .where(where)
+    // Newest first for paging; +1 row tells us if another page follows.
+    .orderBy(desc(schema.deployEvents.createdAt))
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  // Oldest row of THIS page is the cursor for the next (older) page.
+  const nextCursor =
+    hasMore && page.length > 0
+      ? page[page.length - 1].createdAt.getTime()
+      : null;
+
+  // Return oldest-first so the timeline renders top-to-bottom.
+  page.reverse();
+  return { events: page, nextCursor };
 }

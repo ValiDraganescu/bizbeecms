@@ -4,8 +4,6 @@ import {
   Alert,
   AlertBody,
   AlertTitle,
-  Badge,
-  type BadgeTone,
   Card,
   CardContent,
   CardDescription,
@@ -18,19 +16,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui";
-import type { SiteStatus } from "@/db/schema";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canUserCreateSite } from "@/lib/site/authz";
 import { listSitesForUser } from "@/lib/site/site";
 import { cmsWorkerUrl } from "@/lib/deploy/worker-url";
 import { SiteForm } from "./site-form";
-
-const statusTone: Record<SiteStatus, BadgeTone> = {
-  draft: "neutral",
-  deploying: "primary",
-  deployed: "success",
-  failed: "danger",
-};
+import { DeployStatusBadge } from "./deploy-status-badge";
 
 /**
  * Sites list + create. The list is scoped server-side to what the user may see
@@ -140,9 +131,10 @@ export default async function SitesPage() {
                       {site.country ?? t("list.global")}
                     </TableCell>
                     <TableCell>
-                      <Badge tone={statusTone[site.status]}>
-                        {t(`status.${site.status}`)}
-                      </Badge>
+                      <DeployStatusBadge
+                        siteId={site.id}
+                        initialStatus={site.status}
+                      />
                     </TableCell>
                     <TableCell className="text-right">
                       {urls.get(site.id) ? (

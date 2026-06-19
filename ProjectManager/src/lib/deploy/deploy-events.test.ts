@@ -15,6 +15,12 @@ import {
   listDeployEventsForSite,
   collapseDeployEvents,
   selectLatestRun,
+  deployProgress,
+  fmtElapsed,
+  clampPageLimit,
+  listDeployEventsPaged,
+  DEPLOY_EVENTS_PAGE_DEFAULT,
+  DEPLOY_EVENTS_PAGE_MAX,
   type TimelineRow,
 } from "./deploy-events.ts";
 import * as schema from "../../db/schema.ts";
@@ -376,4 +382,107 @@ test("collapseDeployEvents preserves first-seen startedAt, id, and ram from the 
   assert.equal(rows[0].id, "first");
   assert.equal(rows[0].startedAt, "2026-06-18T10:00:00.000Z");
   assert.equal(rows[0].ramAvailableMb, 900);
+});
+
+test("fmtElapsed: under a minute → whole seconds; a minute+ → XmZZs zero-padded", () => {
+  assert.equal(fmtElapsed(0), "0s");
+  assert.equal(fmtElapsed(8_400), "8s");
+  assert.equal(fmtElapsed(59_999), "59s");
+  assert.equal(fmtElapsed(60_000), "1m00s");
+  assert.equal(fmtElapsed(65_000), "1m05s");
+  assert.equal(fmtElapsed(125_000), "2m05s");
+  assert.equal(fmtElapsed(-50), "0s"); // clamp
+  assert.equal(fmtElapsed(NaN), "0s");
+});
+
+test("deployProgress: current step ticks from its start, total from the run's first step", () => {
+  const t0 = Date.parse("2026-06-19T10:00:00.000Z");
+  const rows = collapseDeployEvents([
+    row({ step: "clone", status: "started", startedAt: "2026-06-19T10:00:00.000Z" }),
+    row({ step: "clone", status: "ok", durationMs: 2000 }),
+    row({ step: "npm", status: "started", startedAt: "2026-06-19T10:00:02.000Z" }),
+  ]);
+  const p = deployProgress(rows, t0 + 9_000); // 9s into the run, 7s into npm
+  assert.ok(p);
+  assert.equal(p.currentStep, "npm");
+  assert.equal(p.currentMs, 7_000);
+  assert.equal(p.totalMs, 9_000);
+});
+
+test("deployProgress: null when no step is in flight (all resolved) or no rows", () => {
+  assert.equal(deployProgress([], Date.now()), null);
+  const done = collapseDeployEvents([
+    row({ step: "clone", status: "started", startedAt: "2026-06-19T10:00:00.000Z" }),
+    row({ step: "clone", status: "ok", durationMs: 2000 }),
+  ]);
+  assert.equal(deployProgress(done, Date.parse("2026-06-19T10:00:05.000Z")), null);
+});
+
+test("clampPageLimit: defaults on absent/invalid, caps at MAX, floors fractional", () => {
+  assert.equal(clampPageLimit(null), DEPLOY_EVENTS_PAGE_DEFAULT);
+  assert.equal(clampPageLimit(0), DEPLOY_EVENTS_PAGE_DEFAULT);
+  assert.equal(clampPageLimit(-5), DEPLOY_EVENTS_PAGE_DEFAULT);
+  assert.equal(clampPageLimit(NaN), DEPLOY_EVENTS_PAGE_DEFAULT);
+  assert.equal(clampPageLimit(10), 10);
+  assert.equal(clampPageLimit(10_000), DEPLOY_EVENTS_PAGE_MAX);
+  assert.equal(clampPageLimit(7.9), 7);
+});
+
+/** A deploy_events D1 row as drizzle reads it back (snake_case, epoch ints). */
+const dbRow = (o: { id: string; created_at: number }) => ({
+  id: o.id,
+  site_id: "site-1",
+  deploy_id: "run-1",
+  step: "build",
+  status: "ok",
+  started_at: o.created_at,
+  duration_ms: null,
+  error: null,
+  ram_available_mb: null,
+  created_at: o.created_at,
+});
+
+test("listDeployEventsPaged: newest-first query, +1 probe, returns page oldest-first with a cursor", async () => {
+  // 3 rows returned for limit 2 → hasMore; page is the 2 newest, re-sorted oldest-first.
+  const d1 = fakeD1Rows([
+    dbRow({ id: "c", created_at: 3000 }),
+    dbRow({ id: "b", created_at: 2000 }),
+    dbRow({ id: "a", created_at: 1000 }), // the +1 probe row
+  ]);
+  const db = cfDb(d1 as unknown as D1Database);
+
+  const page = await listDeployEventsPaged("site-1", { limit: 2 }, db);
+
+  const { sql, params } = d1.calls[0];
+  assert.match(sql, /order by "deploy_events"\."created_at" desc/i);
+  assert.match(sql, /limit \?/i);
+  assert.ok(params.includes(3)); // limit + 1
+  // Page = the 2 newest, re-sorted oldest-first for the timeline.
+  assert.deepEqual(page.events.map((e) => e.id), ["b", "c"]);
+  // Cursor = createdAt of the oldest row IN THE PAGE (id "b" @ 2000).
+  assert.equal(page.nextCursor, 2000);
+});
+
+test("listDeployEventsPaged: no extra row → nextCursor null (last page)", async () => {
+  const d1 = fakeD1Rows([
+    dbRow({ id: "b", created_at: 2000 }),
+    dbRow({ id: "a", created_at: 1000 }),
+  ]);
+  const db = cfDb(d1 as unknown as D1Database);
+
+  const page = await listDeployEventsPaged("site-1", { limit: 5 }, db);
+  assert.equal(page.nextCursor, null);
+  assert.deepEqual(page.events.map((e) => e.id), ["a", "b"]);
+});
+
+test("listDeployEventsPaged: `before` cursor adds a created_at < ? bound", async () => {
+  const d1 = fakeD1Rows([]);
+  const db = cfDb(d1 as unknown as D1Database);
+
+  await listDeployEventsPaged("site-1", { limit: 10, before: 2000 }, db);
+
+  const { sql, params } = d1.calls[0];
+  assert.match(sql, /"site_id" = \?/i);
+  assert.match(sql, /"created_at" < \?/i);
+  assert.ok(params.includes("site-1"));
 });
