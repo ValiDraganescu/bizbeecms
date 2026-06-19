@@ -19,7 +19,14 @@ const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // mirror PM's 7-day session TTL
 export async function GET(request: Request): Promise<NextResponse> {
   const url = new URL(request.url);
   const nonce = url.searchParams.get("sso") ?? "";
-  const adminUrl = new URL("/admin", url.origin);
+  // The router proxies custom domains (e.g. restovista.com) to this Worker, so
+  // `request.url` is the INTERNAL workers.dev origin — redirecting to it would
+  // bounce the user off their own domain. Use the forwarded host the router sets
+  // (x-forwarded-host) so we land back on the host the browser is actually on.
+  const fwdHost = request.headers.get("x-forwarded-host");
+  const fwdProto = request.headers.get("x-forwarded-proto") ?? "https";
+  const adminOrigin = fwdHost ? `${fwdProto}://${fwdHost}` : url.origin;
+  const adminUrl = new URL("/admin", adminOrigin);
 
   const { env } = await getCloudflareContext({ async: true });
   const e = env as unknown as Record<string, unknown>;
