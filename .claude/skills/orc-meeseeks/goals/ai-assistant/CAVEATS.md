@@ -30,3 +30,18 @@ Read every line before working. Each entry was learned the hard way by a previou
 - Standing project rules (see main/CAVEATS): CF-native, REST + fetch, NO server actions for AI; EN/FI/ET
   i18n parity; gate every change on CMS tsc + `opennextjs-cloudflare build`; regen the PM cms-bundle when
   CMS render/runtime changes (watch the cross-loop bundle guardrail).
+
+- The `Ai` port (`lib/ports/ai.ts`) ONLY does STREAMING chat (`chat()` → SSE `ReadableStream`). For a
+  NON-streaming/programmatic model call, don't add a second client — drain the stream with
+  `collectStreamText` (lib/chat/translate-request.ts), which reuses `SseDeltaParser`. Small CF models wrap
+  JSON answers in prose/```json fences, so parse with a balanced-brace JSON extractor (see
+  `extractFirstJsonObject`), not `JSON.parse(wholeText)`.
+
+- `applyTranslation` (db/translate-store) only supports `kind:"page"` — it REJECTS `kind:"component"`
+  with a clear message (component text lives in block props at the page use-site). So `/api/translate`
+  with a component target will 422 by design until component-target translation is built. Page fields:
+  `metaTitle`, `metaDescription`, or `<blockId>.<propName>`.
+
+- `/api/translate` strings are NOT user-facing chrome (it's a backend endpoint returning JSON), so no
+  i18n strings were added this slice. The page-builder AI-translate BUTTON that calls it must localize
+  its own UI (EN/FI/ET) in the page-builder goal.

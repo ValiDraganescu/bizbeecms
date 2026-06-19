@@ -1,0 +1,131 @@
+/**
+ * Programmatic AI-translate endpoint (Milestone 2, ai-assistant goal).
+ *
+ * `POST /api/translate` with
+ *   `{ kind:"page"|"component", target, fields:{name:sourceText}, fromLocale, toLocales? }`
+ * → translates each field's SOURCE text into the target locales using the SAME
+ * AI Gateway / `Ai` port the chat assistant uses, validates the result via the
+ * EXISTING `validateTranslationInput`, writes via the EXISTING `applyTranslation`
+ * (one translation write path), and returns the produced `{loc:text}` maps so the
+ * caller can show them for optional review.
+ *
+ * This is the reusable engine the page-builder AI-translate button sits on — it
+ * is NOT a chat conversation and does NOT add a second model client.
+ *
+ * REST-only, no server actions (PM directive). The model call + D1 write need a
+ * real binding (HITL); the request shaping + response parsing are pure and
+ * unit-tested (`scripts/translate-request.test.mjs`).
+ */
+import { getAi, getGatewayId } from "@/lib/ports/ai";
+import {
+  buildTranslateMessages,
+  collectStreamText,
+  parseTranslateRequest,
+  parseTranslateResponse,
+  resolveTargetLocales,
+} from "@/lib/chat/translate-request";
+import { validateTranslationInput } from "@/lib/chat/translate-tool";
+import { applyTranslation } from "@/db/translate-store";
+import { getContentLocales } from "@/db/settings-store";
+import { requireAdmin } from "@/lib/auth/guard";
+
+export const dynamic = "force-dynamic";
+
+// Same default Workers AI model as the chat route (swappable via AI Gateway).
+const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+
+export async function POST(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+
+  const parsed = parseTranslateRequest(body);
+  if (!parsed.ok) {
+    return Response.json({ errors: parsed.errors }, { status: 400 });
+  }
+  const req = parsed.request;
+
+  const ai = await getAi();
+  if (!ai) {
+    return Response.json(
+      { error: "AI binding not configured for this Site" },
+      { status: 503 },
+    );
+  }
+
+  // Constrain to the Site's configured content locales (C1).
+  let locales;
+  try {
+    locales = await getContentLocales();
+  } catch {
+    locales = undefined;
+  }
+  const siteLocales = locales?.locales ?? [req.fromLocale];
+
+  const targetLocales = resolveTargetLocales(req.fromLocale, req.toLocales, siteLocales);
+  if (targetLocales.length === 0) {
+    return Response.json(
+      { error: "no target locales to translate into (only the source locale is configured)" },
+      { status: 400 },
+    );
+  }
+
+  // Ask the model for the translations.
+  let modelText: string;
+  try {
+    const upstream = await ai.chat(
+      buildTranslateMessages(req.fromLocale, targetLocales, req.fields),
+      { model: DEFAULT_MODEL, gatewayId: await getGatewayId() },
+    );
+    modelText = await collectStreamText(upstream);
+  } catch (err) {
+    return Response.json(
+      { error: `AI request failed: ${(err as Error).message}` },
+      { status: 502 },
+    );
+  }
+
+  const { fields, missing } = parseTranslateResponse(
+    modelText,
+    req.fromLocale,
+    targetLocales,
+    req.fields,
+  );
+
+  // Shape-gate the model's UNTRUSTED output before any write (reuse the chat
+  // tool's validator — same locale-object contract the renderer relies on).
+  const valid = validateTranslationInput(
+    { kind: req.kind, target: req.target, fields },
+    { allowedLocales: locales?.locales },
+  );
+  if (!valid.ok) {
+    return Response.json({ errors: valid.errors, missing }, { status: 422 });
+  }
+
+  // Persist via the EXISTING merge/write path.
+  try {
+    const res = await applyTranslation(valid.input);
+    if (!res.ok) {
+      return Response.json({ errors: res.errors, missing }, { status: 422 });
+    }
+    return Response.json({
+      ok: true,
+      action: res.action,
+      target: res.target,
+      fieldsWritten: res.fields,
+      translations: valid.input.fields,
+      missing,
+    });
+  } catch (err) {
+    return Response.json(
+      { error: `failed to apply translation: ${(err as Error).message}` },
+      { status: 500 },
+    );
+  }
+}

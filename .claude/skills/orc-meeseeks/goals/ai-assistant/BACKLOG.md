@@ -5,6 +5,19 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE: **Programmatic AI-translate endpoint (reuse the EXISTING translate tool + the AI Gateway).** A
+  button-driven "translate these fields to all content locales" path that is NOT a chat conversation. What
+  already exists: `lib/chat/translate-tool.ts` (`CREATE_TRANSLATION_TOOL`, `validateTranslationInput`,
+  `mergePageFields`) + `db/translate-store.ts` `applyTranslation(input)` (merges `{loc:text}` maps into the
+  page/component) — but it's ONLY reachable when the LLM decides to call it mid-chat. ADD a direct path:
+  `POST /api/translate` that takes `{kind:"page"|"component", target, fields, fromLocale, toLocales?}`
+  (default toLocales = the Site's content locales minus the source), calls the AI MODEL through the SAME AI
+  Gateway the assistant uses (binding-adapters `Ai`/REST path — do NOT add a second model client) to produce
+  each locale's text, validates via `validateTranslationInput`, and writes via the EXISTING
+  `applyTranslation`. Return the produced `{loc:text}` maps so callers can show them for optional review.
+  This is the reusable engine BOTH the page-builder AI-translate button (page-builder goal) and the chat
+  tool sit on. Mock the model in a node test (request shape + merge); no live API in tests. Gate: CMS tsc +
+  opennext build green; regen PM cms-bundle. EN/FI/ET for any user-facing string.
 > ASSISTANT = page-aware Intercom widget over the EXISTING chat backend. Reference: aicms
 > `src/modules/admin-chat/` (`chat_widget.tsx`, `debug_panel.tsx`, `lib/chat/{tool_scopes,assemble_prompt,
 > tool_executor,chat_tools}.ts`). Read CAVEATS for what bizbee already has + tool portability. The model
