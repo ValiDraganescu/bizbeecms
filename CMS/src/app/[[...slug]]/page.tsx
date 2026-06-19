@@ -10,28 +10,14 @@
  */
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { and, eq, inArray, isNull, type SQL } from "drizzle-orm";
-import { getLocale } from "next-intl/server";
+import { and, eq, isNull, type SQL } from "drizzle-orm";
 import { getDb } from "@/db";
-import { component as componentTable, page as pageTable } from "@/db/schema";
+import { page as pageTable } from "@/db/schema";
 import type { Page } from "@/db/schema";
-import {
-  type Block,
-  type ComponentArtifact,
-  type LocaleContext,
-  type TreeNode,
-  parseJsonColumn,
-  planPage,
-} from "@/lib/render/tree";
-import { renderPlans } from "@/lib/render/react";
+import { type LocaleContext, parseJsonColumn } from "@/lib/render/tree";
 import { resolveSlugPath } from "@/lib/render/slug";
-import { generateUtilityCss } from "@/lib/render/utility-css";
-import { getContentLocales, getThemeOverrides } from "@/db/settings-store";
 import { resolveLocalized } from "@/lib/render/localize";
-import { themeOverridesToCss } from "@/lib/render/theme";
-
-// Precompiled once per worker instance — pure, deterministic, bounded vocabulary.
-const UTILITY_CSS = generateUtilityCss();
+import { buildPlanFromPage, RenderedPage } from "@/lib/render/render-page";
 
 type RouteParams = { slug?: string[] };
 
@@ -62,56 +48,13 @@ async function resolvePage(
   return current;
 }
 
-/** Collect every component name referenced anywhere in a block tree. */
-function collectComponentNames(blocks: Block[], into: Set<string>): void {
-  for (const b of blocks) {
-    if (b?.component) into.add(b.component);
-    if (b?.children?.length) collectComponentNames(b.children, into);
-  }
-}
-
 /** Load the page + its render plan, or null if no published page matches. */
 async function loadPlan(params: RouteParams) {
   const db = await getDb();
   const path = resolveSlugPath(params.slug);
   const pageRow = await resolvePage(db, path);
   if (!pageRow) return null;
-
-  const blocks = parseJsonColumn<Block[]>(pageRow.blocks, []);
-
-  const names = new Set<string>();
-  collectComponentNames(blocks, names);
-
-  const components = new Map<string, ComponentArtifact>();
-  if (names.size > 0) {
-    const rows = await db
-      .select()
-      .from(componentTable)
-      .where(inArray(componentTable.name, [...names]));
-    for (const row of rows) {
-      components.set(row.name, {
-        name: row.name,
-        tree: parseJsonColumn<TreeNode>(row.tree, ""),
-        script: row.script || undefined,
-        propsSchema: row.propsSchema,
-      });
-    }
-  }
-
-  // Per-Site content locales (epic C1): resolve localized prop values in
-  // artifact trees to the active content locale, falling back to the site
-  // default. The requested locale follows the admin/UI locale (cookie/Accept-
-  // Language) but resolves against this Site's own data-driven content set.
-  const contentLocales = await getContentLocales();
-  const requested = await getLocale();
-  const locale: LocaleContext = {
-    locale: contentLocales.locales.includes(requested)
-      ? requested
-      : contentLocales.default,
-    fallback: contentLocales.default,
-  };
-
-  const plan = planPage(blocks, components, locale);
+  const { plan, locale } = await buildPlanFromPage(pageRow);
   return { page: pageRow, plan, locale };
 }
 
@@ -142,47 +85,6 @@ export default async function PublicPage({
 }) {
   const loaded = await loadPlan(await params);
   if (!loaded) notFound();
-
-  // Per-Site theme overrides (epic E1): re-theme the purpose color tokens
-  // without a rebuild. Validated server-side (only known tokens + safe colors);
-  // injected AFTER globals so the cascade lets them win. Defensive: a missing
-  // D1 binding (offline) just means no overrides.
-  let themeCss = "";
-  try {
-    themeCss = themeOverridesToCss(await getThemeOverrides());
-  } catch {
-    /* unbound D1 in this env — no per-Site theme */
-  }
-
-  const { plan } = loaded;
-  return (
-    <>
-      {/*
-        Precompiled utility sheet (epic A3). The build-time Tailwind scanner
-        never sees runtime artifact `className`s (they live in D1), so we ship a
-        bounded, AI-allowed utility vocabulary inline here. Inline <style> = part
-        of the SSR'd HTML, so it needs no static-asset upload (sidesteps the open
-        ASSETS deploy gap). See lib/render/utility-css.ts.
-      */}
-      <style dangerouslySetInnerHTML={{ __html: UTILITY_CSS }} />
-      {/*
-        Per-Site theme token overrides (epic E1). After UTILITY_CSS (and after
-        the build-bundled globals.css) so its :root declarations win. The values
-        are allowlisted by lib/render/theme.ts to a narrow color grammar, so they
-        can't break out of this <style> — end-user/free text never reaches here.
-      */}
-      {themeCss && <style dangerouslySetInnerHTML={{ __html: themeCss }} />}
-      {renderPlans(plan.root)}
-      {/*
-        Ship each used component's AI-authored client script to the browser.
-        The server forwards it as text; the browser executes it. The
-        dangerouslySetInnerHTML here is "this is a <script>", NOT user data —
-        end-user data is never interpolated into `script` (see GOAL.md security
-        boundary).
-      */}
-      {plan.scripts.map((s, i) => (
-        <script key={i} dangerouslySetInnerHTML={{ __html: s }} />
-      ))}
-    </>
-  );
+  // Identical render to the admin draft-preview route — see lib/render/render-page.
+  return <RenderedPage plan={loaded.plan} />;
 }

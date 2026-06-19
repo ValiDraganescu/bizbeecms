@@ -202,6 +202,24 @@ function bindTree(
  * - Each distinct used component contributes its `script` once, in first-use
  *   order (a component reused across blocks ships its script a single time).
  */
+/**
+ * Collect every distinct component name referenced anywhere in a block tree
+ * (recursing into `children`). Pure — used by both the public route and the
+ * draft-preview route to know which D1 component rows to fetch. The reserved
+ * Section primitive is included if present; callers ignore it (it needs no row).
+ */
+export function collectComponentNames(blocks: Block[]): Set<string> {
+  const into = new Set<string>();
+  const walk = (bs: Block[]) => {
+    for (const b of bs) {
+      if (b?.component) into.add(b.component);
+      if (b?.children?.length) walk(b.children);
+    }
+  };
+  walk(blocks);
+  return into;
+}
+
 export function planPage(
   blocks: Block[],
   components: Map<string, ComponentArtifact>,
