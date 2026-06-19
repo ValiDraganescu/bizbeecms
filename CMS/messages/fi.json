@@ -403,6 +403,11 @@
       "light": "Vaalea",
       "system": "Järjestelmä",
       "dark": "Tumma"
-    }
+    },
+    "columnAlign": "Sisällön tasaus",
+    "columnAlignHint": "Ohita tämän sarakkeen tasaus (oletuksena osion mukaan).",
+    "columnAlignInherit": "Peri",
+    "columnMargin": "Marginaali",
+    "columnGap": "Väli (px)"
   }
 }

@@ -12,7 +12,49 @@ import {
   planPage,
   parseJsonColumn,
   columnVisibilityClass,
+  columnStyle,
 } from "../src/lib/render/tree.ts";
+
+test("columnStyle: no props → inherits section align, zero spacing, transparent", () => {
+  const s = columnStyle(undefined, "center", "flex-end");
+  assert.equal(s.alignItems, "center");
+  assert.equal(s.justifyContent, "flex-end");
+  assert.equal(s.gap, "0px");
+  assert.equal(s.paddingTop, "0rem");
+  assert.equal(s.marginLeft, "0rem");
+  assert.equal(s.backgroundColor, "transparent");
+});
+
+test("columnStyle: own align overrides the section default", () => {
+  const s = columnStyle(
+    { verticalAlign: "bottom", horizontalAlign: "center" },
+    "flex-start",
+    "flex-start",
+  );
+  assert.equal(s.alignItems, "flex-end");
+  assert.equal(s.justifyContent, "center");
+});
+
+test("columnStyle: padding/margin honor per-side unit (rem default), gap is px, bg token passes through", () => {
+  const s = columnStyle(
+    {
+      paddingTop: 2,
+      paddingTopUnit: "px",
+      paddingLeft: 1,
+      marginBottom: 3,
+      marginBottomUnit: "px",
+      gap: 12,
+      backgroundColor: "var(--color-surface)",
+    },
+    "flex-start",
+    "flex-start",
+  );
+  assert.equal(s.paddingTop, "2px");
+  assert.equal(s.paddingLeft, "1rem");
+  assert.equal(s.marginBottom, "3px");
+  assert.equal(s.gap, "12px");
+  assert.equal(s.backgroundColor, "var(--color-surface)");
+});
 
 test("columnVisibilityClass: no flags → empty string", () => {
   assert.equal(columnVisibilityClass(undefined), "");

@@ -153,7 +153,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   CLAUDE.md, off-brand) → `deleteColumn`. Coordinate with the "Delete nodes in the Layers tree" task (same
   confirm component + trash pattern). i18n EN/FI/ET ("Delete column?"). Gate: CMS tsc + opennext build green;
   regen PM cms-bundle.
-- TODO: **Column settings panel — per-column alignment / padding / margin / gap / background.** Today
+- DONE (2026-06-19 21:13): **Column settings panel — per-column align/padding/margin/gap/background.**
+  EXTENDED the existing `ColumnSettings` (no second panel): 3×3 alignment grid + "Inherit" cell (clears
+  override → Section default), padding 4-side (rem/px per side), margin 4-side (new), gap (px), bg
+  theme-token swatches (dark-mode safe). Render via new pure `columnStyle(props, sAlignItems, sJustify)`
+  in tree.ts (+ `mgn()`); `planColumn` uses it. OMITTED max-width. render-tree 33/33 (+3), tsc 0,
+  opennext build green. EN/FI/ET `columnAlign*`/`columnMargin`/`columnGap`. See JOURNAL 21:13.
+- TODO (ORIGINAL TEXT, kept for ref): **Column settings panel — per-column alignment / padding / margin / gap / background.** Today
   selecting a `__section_column__` node in the Layers tree shows nothing (the Block tab falls through to
   `blockEmpty` — see the `isSectionColumn(sel)` branch in `page-builder-shell.tsx` ~586), and columns render
   with alignment INHERITED from the Section (`tree.ts` ~508–527 passes the Section's `alignItems`/

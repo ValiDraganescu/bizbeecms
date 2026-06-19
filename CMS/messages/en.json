@@ -403,6 +403,11 @@
       "light": "Light",
       "system": "System",
       "dark": "Dark"
-    }
+    },
+    "columnAlign": "Content alignment",
+    "columnAlignHint": "Override this column's alignment (defaults to the Section).",
+    "columnAlignInherit": "Inherit",
+    "columnMargin": "Margin",
+    "columnGap": "Gap (px)"
   }
 }

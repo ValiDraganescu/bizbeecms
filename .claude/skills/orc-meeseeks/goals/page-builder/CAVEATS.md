@@ -296,6 +296,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   `mergeBlockProps` (a column is a normal tree node; `false`/`undefined` in the patch DELETES the key so
   storage stays sparse / reverts to render default).
 
+- COLUMN SETTINGS PANEL FULLY LANDED (2026-06-19 21:13): a column's OWN props now drive its cell style
+  via pure `columnStyle(props, sectionAlignItems, sectionJustify)` (tree.ts) — `planColumn` uses it, do
+  NOT re-inline a column style. Per-column ALIGN is an OVERRIDE: `verticalAlign`/`horizontalAlign` absent
+  → inherit the Section default (the panel's "Inherit" button clears both via `{verticalAlign:undefined,
+  horizontalAlign:undefined}` → mergeBlockProps drops the keys). Margin uses NEW `mgn()` (per-side
+  `margin<Side>Unit`, rem default) mirroring `pad()`. Column `gap` is PX (spaces stacked components),
+  Section `gap` is also px — same default 0 for columns, 16 for sections. Column bg reuses the SAME
+  theme-token swatch set as SectionSettings (transparent default → dark-mode safe). MAX-WIDTH was
+  deliberately OMITTED (meaningless for a grid track). ColumnSettings is ONE panel (align/padding/margin/
+  gap/bg + the older visibility toggles) — don't split it. If you change `columnStyle`'s output shape,
+  update render-tree.test.mjs (3 columnStyle cases).
 - DELETE-A-COLUMN ≠ SHRINK (2026-06-19 21:08): two distinct column ops, don't conflate. `setSectionColumns`
   (COLUMNS segmented control) shrink REFLOWS a removed column's content into the last kept column (keeps
   content). `deleteColumn(blocks, columnId)` (page-blocks.ts, trash icon on the "Column N" Layers label)

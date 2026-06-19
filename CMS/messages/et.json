@@ -403,6 +403,11 @@
       "light": "Hele",
       "system": "Süsteem",
       "dark": "Tume"
-    }
+    },
+    "columnAlign": "Sisu joondus",
+    "columnAlignHint": "Alista selle veeru joondus (vaikimisi sektsioonist).",
+    "columnAlignInherit": "Päri",
+    "columnMargin": "Veeris",
+    "columnGap": "Vahe (px)"
   }
 }

@@ -464,6 +464,53 @@ function str(value: unknown, fallback: string): string {
 function pad(p: Record<string, unknown>, side: "Top" | "Right" | "Bottom" | "Left"): string {
   return `${num(p[`padding${side}`], 0)}${str(p[`padding${side}Unit`], "rem")}`;
 }
+/** A margin value + its per-side unit (rem default). 0 → "0" (no unit churn). */
+function mgn(p: Record<string, unknown>, side: "Top" | "Right" | "Bottom" | "Left"): string {
+  return `${num(p[`margin${side}`], 0)}${str(p[`margin${side}Unit`], "rem")}`;
+}
+
+/**
+ * Per-column cell style (epic: Column settings panel). A column carries its OWN
+ * optional props that override the Section defaults for THIS column only:
+ *   - verticalAlign(top|center|bottom) / horizontalAlign(left|center|right) —
+ *     override the Section's column alignment; absent → inherit `sectionAlignItems`
+ *     / `sectionJustify` passed by planSection.
+ *   - padding{Top,Right,Bottom,Left} + per-side *Unit (rem default).
+ *   - margin{Top,Right,Bottom,Left} + per-side *Unit (rem default).
+ *   - gap (px) between the column's stacked components (the column is a flex
+ *     column, so `gap` spaces its children vertically).
+ *   - backgroundColor (theme token `var(--color-*)`; default transparent so dark
+ *     mode works — resolved inline at render, like the Section background).
+ * Absent props fall back to render defaults (no padding/margin/gap, transparent).
+ * PURE — node-testable, no React.
+ */
+export function columnStyle(
+  props: Record<string, unknown> | undefined,
+  sectionAlignItems: string,
+  sectionJustify: string,
+): Record<string, string | number> {
+  const p = props ?? {};
+  const alignItems = p.verticalAlign != null ? (ALIGN_ITEMS[str(p.verticalAlign, "top")] ?? sectionAlignItems) : sectionAlignItems;
+  const justifyContent = p.horizontalAlign != null ? (JUSTIFY[str(p.horizontalAlign, "left")] ?? sectionJustify) : sectionJustify;
+  return {
+    minWidth: 0,
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems,
+    justifyContent,
+    gap: `${num(p.gap, 0)}px`,
+    paddingTop: pad(p, "Top"),
+    paddingRight: pad(p, "Right"),
+    paddingBottom: pad(p, "Bottom"),
+    paddingLeft: pad(p, "Left"),
+    marginTop: mgn(p, "Top"),
+    marginRight: mgn(p, "Right"),
+    marginBottom: mgn(p, "Bottom"),
+    marginLeft: mgn(p, "Left"),
+    backgroundColor: str(p.backgroundColor, "transparent"),
+  };
+}
 
 function planSection(
   block: Block,
@@ -551,14 +598,7 @@ function planColumn(
     props: {
       "data-section-column": col.id,
       ...(hideClass ? { className: hideClass } : {}),
-      style: {
-        minWidth: 0,
-        width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        alignItems,
-        justifyContent,
-      },
+      style: columnStyle(col.props, alignItems, justifyContent),
     },
     children: (col.children ?? []).map(planBlock),
   };

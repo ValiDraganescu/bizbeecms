@@ -500,3 +500,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   free), worker.js written. Did NOT regen cms-bundle (PM predeploy auto-regens).
 - **Files:** `CMS/src/lib/pages/page-blocks.ts`, `CMS/src/components/page-builder/page-builder-shell.tsx`,
   `CMS/scripts/page-blocks.test.mjs`, `CMS/messages/{en,fi,et}.json`.
+
+## 2026-06-19 21:13 — Column settings panel (align/padding/margin/gap/background)
+- **Status:** DONE
+- **What I did:** Extended the EXISTING `ColumnSettings` panel (no second panel) with per-column
+  controls writing to the `__section_column__` node's own props: CONTENT ALIGNMENT (3×3 grid + an
+  "Inherit" cell that clears the override so the column falls back to the Section default),
+  PADDING (4 sides, per-side rem/px unit), MARGIN (4 sides, per-side rem/px unit — new for columns),
+  GAP (px, spaces the column's stacked components), BACKGROUND (theme-token swatches, same set + the
+  transparent checkerboard the Section bg uses → dark mode works). Visibility controls kept below.
+  Render: new pure `columnStyle(props, sectionAlignItems, sectionJustify)` in `tree.ts` derives the
+  column cell style (own align overrides Section; padding via existing `pad()`, margin via new `mgn()`,
+  gap px, bg inline via `var(--color-*)`); `planColumn` now uses it. OMITTED max-width (meaningless for
+  a grid track — per backlog + user note). Patch-merges through the existing `onUpdateColumnProps` →
+  `mergeBlockProps` (undefined in patch DELETES the key → sparse storage / revert to default).
+- **Verified:** `node --test scripts/render-tree.test.mjs` 33/33 (+3 columnStyle cases: inherit/zero/
+  transparent, own-align override, padding-margin-unit + gap-px + bg passthrough). `npx tsc --noEmit`
+  exit 0 (fully clean). `npx opennextjs-cloudflare build` complete (dev stopped, port 3601 free).
+- **Files:** CMS/src/lib/render/tree.ts (columnStyle + mgn, planColumn), CMS/src/components/page-builder/
+  page-builder-shell.tsx (ColumnSettings extended), CMS/scripts/render-tree.test.mjs (+3),
+  CMS/messages/{en,fi,et}.json (columnAlign/columnAlignHint/columnAlignInherit/columnMargin/columnGap).
