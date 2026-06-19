@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { PageBuilderShell } from "@/components/page-builder/page-builder-shell";
+import { getContentLocales } from "@/db/settings-store";
+import { defaultContentLocales } from "@/lib/render/localize";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,14 @@ export async function generateMetadata(): Promise<Metadata> {
  * drag-to-insert, no live preview wiring, no settings logic — those come in later
  * slices. Explicit `/admin/page-builder` route. See docs/page-builder-layout.md.
  */
-export default function PageBuilderPage() {
-  return <PageBuilderShell />;
+export default async function PageBuilderPage() {
+  // Content locales drive the SEO tab's per-locale title/description fields.
+  // No D1 binding offline → fall back to defaults so the page still builds.
+  let locales = defaultContentLocales().locales;
+  try {
+    locales = (await getContentLocales()).locales;
+  } catch {
+    /* unbound D1 in this env — render default locale set */
+  }
+  return <PageBuilderShell contentLocales={locales} />;
 }

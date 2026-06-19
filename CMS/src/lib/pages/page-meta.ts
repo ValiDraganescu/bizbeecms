@@ -89,6 +89,55 @@ export function validatePageMeta(
   };
 }
 
+/**
+ * Set one content-locale's value in a locale→string map, immutably. Clearing a
+ * value (empty/whitespace) drops the key so empty strings aren't persisted —
+ * same convention the C2 pages-manager uses. PURE.
+ */
+export function setLocaleValue(
+  map: Record<string, string>,
+  loc: string,
+  value: string,
+): Record<string, string> {
+  const next = { ...map };
+  if (value.trim() === "") delete next[loc];
+  else next[loc] = value;
+  return next;
+}
+
+/**
+ * Minimal page identity the SEO form needs to PUT a meta update without
+ * touching slug/parent/publish (those keep their current values). Matches the
+ * fields the page picker already holds for the selected page.
+ */
+export interface PageSeoSource {
+  id: string;
+  slug: string;
+  parentSlug: string | null;
+  publishStatus: string;
+}
+
+/**
+ * Assemble the `PUT /api/pages` body for an SEO-only edit: keep the page's
+ * existing slug/parent/publish, swap in the edited per-locale title/description
+ * maps. The result is shaped for `validatePageMeta` (which the route re-runs).
+ * PURE — no fetch, no DB.
+ */
+export function buildSeoMetaBody(
+  page: PageSeoSource,
+  metaTitle: Record<string, string>,
+  metaDescription: Record<string, string>,
+): { id: string } & PageMetaInput {
+  return {
+    id: page.id,
+    slug: page.slug,
+    parentSlug: page.parentSlug,
+    publishStatus: page.publishStatus === "published" ? "published" : "draft",
+    metaTitle,
+    metaDescription,
+  };
+}
+
 /** Object of string values (null/empty → {}); undefined if any value isn't a string. */
 function coerceStringMap(raw: unknown): Record<string, string> | undefined {
   if (raw == null) return {};

@@ -22,7 +22,11 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { isValidSlug } from "@/lib/pages/page-meta";
+import {
+  isValidSlug,
+  setLocaleValue,
+  buildSeoMetaBody,
+} from "@/lib/pages/page-meta";
 import {
   flattenPagesForPicker,
   topLevelParents,
@@ -86,11 +90,19 @@ function ViewportIcon({ kind }: { kind: Viewport }) {
   }
 }
 
-export function PageBuilderShell() {
+export function PageBuilderShell({
+  contentLocales,
+}: {
+  // Site content locales (default first) — the SEO tab edits one title +
+  // description per locale, mirroring the C2 pages-manager SEO legend.
+  contentLocales: string[];
+}) {
   const t = useTranslations("pageBuilder");
   const [viewport, setViewport] = useState<Viewport>("desktop");
   const [centerTab, setCenterTab] = useState<CenterTab>("layers");
   const [rightTab, setRightTab] = useState<RightTab>("block");
+  // Bumped to force the preview iframe to reload (refresh button + after Save).
+  const [previewNonce, setPreviewNonce] = useState(0);
 
   // Real page list + the operator's current selection. The center/right panels
   // key off `selected`; later slices load that page's blocks / settings.
@@ -159,7 +171,10 @@ export function PageBuilderShell() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ blocks }),
       });
-      if (res.ok) setDirty(false);
+      if (res.ok) {
+        setDirty(false);
+        setPreviewNonce((n) => n + 1); // reflect persisted blocks in the iframe
+      }
     } finally {
       setSaving(false);
     }
@@ -376,7 +391,8 @@ export function PageBuilderShell() {
               <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
                 <button
                   type="button"
-                  disabled
+                  disabled={!selected}
+                  onClick={() => setPreviewNonce((n) => n + 1)}
                   title={t("refresh")}
                   aria-label={t("refresh")}
                   className="rounded p-1 text-foreground-muted disabled:opacity-50"
@@ -390,17 +406,27 @@ export function PageBuilderShell() {
                   {selected ? selected.path : t("previewUrlPlaceholder")}
                 </div>
               </div>
-              {/* Responsive frame area */}
+              {/* Responsive frame area — draft preview reuses the REAL renderer
+                  via /preview/<id> (any publish status), so it's true-to-site. */}
               <div className="flex flex-1 justify-center overflow-auto p-4">
                 <div
                   className="h-full overflow-hidden rounded-md border border-border bg-surface shadow-sm"
                   style={{ width: VIEWPORT_WIDTH[viewport], maxWidth: "100%" }}
                 >
-                  <div className="flex h-full items-center justify-center p-6">
-                    <p className="text-center text-sm text-foreground-muted">
-                      {t("previewEmpty")}
-                    </p>
-                  </div>
+                  {selected ? (
+                    <iframe
+                      key={`${selected.id}-${previewNonce}`}
+                      src={`/preview/${selected.id}`}
+                      title={t("previewIframeTitle")}
+                      className="h-full w-full border-0 bg-surface"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center p-6">
+                      <p className="text-center text-sm text-foreground-muted">
+                        {t("previewEmpty")}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -434,9 +460,22 @@ export function PageBuilderShell() {
             {rightTab === "page" && (
               <p className="text-sm text-foreground-muted">{t("pageEmpty")}</p>
             )}
-            {rightTab === "seo" && (
-              <p className="text-sm text-foreground-muted">{t("seoEmpty")}</p>
-            )}
+            {rightTab === "seo" &&
+              (() => {
+                const page = selected
+                  ? pages.find((p) => p.id === selected.id) ?? null
+                  : null;
+                return page ? (
+                  <SeoForm
+                    key={page.id}
+                    page={page}
+                    locales={contentLocales}
+                    onSaved={() => void refreshPages(page.id)}
+                  />
+                ) : (
+                  <p className="text-sm text-foreground-muted">{t("seoEmpty")}</p>
+                );
+              })()}
           </div>
         </aside>
       </div>
@@ -787,5 +826,126 @@ function LayersTree({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Right-rail SEO tab: edits the selected page's per-content-locale meta title +
+ * description and PUTs them back through the EXISTING C2 `/api/pages` route
+ * (same body `validatePageMeta` validates — no new page-store/validation path).
+ * Slug / parent / publish are kept as-is; this tab only owns SEO. After a
+ * successful save it refetches pages so the picker labels stay current.
+ *
+ * ponytail: local draft maps seeded from the loaded page (re-keyed per page id
+ * by the caller); no form lib. Reuses the pure setLocaleValue/buildSeoMetaBody
+ * helpers (tested in page-meta.test.ts).
+ */
+function SeoForm({
+  page,
+  locales,
+  onSaved,
+}: {
+  page: PageSummary;
+  locales: string[];
+  onSaved: () => void;
+}) {
+  const t = useTranslations("pageBuilder");
+  const [metaTitle, setMetaTitle] = useState<Record<string, string>>({
+    ...page.metaTitle,
+  });
+  const [metaDescription, setMetaDescription] = useState<Record<string, string>>({
+    ...page.metaDescription,
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    setError(null);
+    setSaved(false);
+    setBusy(true);
+    try {
+      const body = buildSeoMetaBody(page, metaTitle, metaDescription);
+      const res = await fetch("/api/pages", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(j.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      setSaved(true);
+      onSaved();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const input =
+    "w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-foreground-muted";
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      <p className="truncate font-mono text-xs text-foreground-muted">{page.slug}</p>
+      {locales.map((loc) => (
+        <fieldset key={loc} className="flex flex-col gap-2 border-t border-border pt-3">
+          <legend className="font-mono text-xs uppercase tracking-wide text-foreground-muted">
+            {loc}
+          </legend>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-foreground-muted">{t("seoMetaTitle")}</span>
+            <input
+              className={input}
+              value={metaTitle[loc] ?? ""}
+              onChange={(e) =>
+                setMetaTitle((m) => setLocaleValue(m, loc, e.target.value))
+              }
+              aria-label={`${t("seoMetaTitle")} (${loc})`}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-foreground-muted">{t("seoMetaDescription")}</span>
+            <textarea
+              className={input}
+              rows={3}
+              value={metaDescription[loc] ?? ""}
+              onChange={(e) =>
+                setMetaDescription((m) => setLocaleValue(m, loc, e.target.value))
+              }
+              aria-label={`${t("seoMetaDescription")} (${loc})`}
+            />
+          </label>
+        </fieldset>
+      ))}
+
+      {error && (
+        <p role="alert" className="text-xs text-danger">
+          {error}
+        </p>
+      )}
+      {saved && !error && (
+        <p role="status" className="text-xs text-foreground-muted">
+          {t("seoSaved")}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={busy}
+        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+      >
+        {busy ? t("saving") : t("seoSave")}
+      </button>
+    </form>
   );
 }

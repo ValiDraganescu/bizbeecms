@@ -291,6 +291,7 @@
     "refresh": "Refresh",
     "previewUrlPlaceholder": "Select a page to preview",
     "previewEmpty": "The page preview appears here once a page is selected.",
+    "previewIframeTitle": "Page preview",
     "right": {
       "block": "Block",
       "page": "Page",
@@ -300,6 +301,10 @@
     "pageEmpty": "Page settings appear here once a page is selected.",
     "seoEmpty": "SEO settings appear here once a page is selected.",
     "saving": "Saving…",
-    "addSectionFirst": "Add a Section first, then drop components into it."
+    "addSectionFirst": "Add a Section first, then drop components into it.",
+    "seoMetaTitle": "Meta title",
+    "seoMetaDescription": "Meta description",
+    "seoSave": "Save SEO",
+    "seoSaved": "SEO saved."
   }
 }

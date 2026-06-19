@@ -291,6 +291,7 @@
     "refresh": "Värskenda",
     "previewUrlPlaceholder": "Eelvaateks vali leht",
     "previewEmpty": "Lehe eelvaade ilmub siia, kui leht on valitud.",
+    "previewIframeTitle": "Lehe eelvaade",
     "right": {
       "block": "Plokk",
       "page": "Leht",
@@ -300,6 +301,10 @@
     "pageEmpty": "Lehe sätted ilmuvad siia, kui leht on valitud.",
     "seoEmpty": "SEO sätted ilmuvad siia, kui leht on valitud.",
     "saving": "Salvestamine…",
-    "addSectionFirst": "Lisa esmalt sektsioon ja seejärel lohista komponendid sinna."
+    "addSectionFirst": "Lisa esmalt sektsioon ja seejärel lohista komponendid sinna.",
+    "seoMetaTitle": "Metapealkiri",
+    "seoMetaDescription": "Metakirjeldus",
+    "seoSave": "Salvesta SEO",
+    "seoSaved": "SEO salvestatud."
   }
 }

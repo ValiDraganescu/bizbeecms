@@ -15,7 +15,12 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { isValidSlug, type PageMetaInput, type PublishStatus } from "@/lib/pages/page-meta";
+import {
+  isValidSlug,
+  setLocaleValue,
+  type PageMetaInput,
+  type PublishStatus,
+} from "@/lib/pages/page-meta";
 import type { PageSummary } from "@/db/page-store";
 
 type Draft = {
@@ -290,7 +295,7 @@ function PageEditor({
               className={input}
               value={draft.metaTitle[loc] ?? ""}
               onChange={(e) =>
-                onChange({ ...draft, metaTitle: setLocale(draft.metaTitle, loc, e.target.value) })
+                onChange({ ...draft, metaTitle: setLocaleValue(draft.metaTitle, loc, e.target.value) })
               }
               placeholder={t("metaTitle")}
               aria-label={`${t("metaTitle")} (${loc})`}
@@ -301,7 +306,7 @@ function PageEditor({
               onChange={(e) =>
                 onChange({
                   ...draft,
-                  metaDescription: setLocale(draft.metaDescription, loc, e.target.value),
+                  metaDescription: setLocaleValue(draft.metaDescription, loc, e.target.value),
                 })
               }
               placeholder={t("metaDescription")}
@@ -330,18 +335,6 @@ function PageEditor({
       </div>
     </form>
   );
-}
-
-/** Set one locale's value; drop the key when cleared so empty strings aren't stored. */
-function setLocale(
-  map: Record<string, string>,
-  loc: string,
-  value: string,
-): Record<string, string> {
-  const next = { ...map };
-  if (value.trim() === "") delete next[loc];
-  else next[loc] = value;
-  return next;
 }
 
 async function errorOf(res: Response): Promise<string> {

@@ -291,6 +291,7 @@
     "refresh": "Päivitä",
     "previewUrlPlaceholder": "Valitse sivu esikatselua varten",
     "previewEmpty": "Sivun esikatselu näkyy täällä, kun sivu on valittu.",
+    "previewIframeTitle": "Sivun esikatselu",
     "right": {
       "block": "Lohko",
       "page": "Sivu",
@@ -300,6 +301,10 @@
     "pageEmpty": "Sivun asetukset näkyvät täällä, kun sivu on valittu.",
     "seoEmpty": "SEO-asetukset näkyvät täällä, kun sivu on valittu.",
     "saving": "Tallennetaan…",
-    "addSectionFirst": "Lisää ensin osio ja pudota sitten komponentit siihen."
+    "addSectionFirst": "Lisää ensin osio ja pudota sitten komponentit siihen.",
+    "seoMetaTitle": "Metaotsikko",
+    "seoMetaDescription": "Metakuvaus",
+    "seoSave": "Tallenna SEO",
+    "seoSaved": "SEO tallennettu."
   }
 }

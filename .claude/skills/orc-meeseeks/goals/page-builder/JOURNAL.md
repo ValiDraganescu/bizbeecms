@@ -106,3 +106,47 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/pages/page-blocks.ts, CMS/src/lib/pages/page-blocks-sections.test.ts,
   CMS/src/components/page-builder/page-builder-shell.tsx,
   CMS/messages/{en,fi,et}.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-19 17:16 — Center Preview: draft-preview route reusing the real renderer
+- **Status:** DONE
+- **What I did:** Wired the builder's Preview iframe to a true-to-site draft preview.
+  Extracted the shared render core into `lib/render/render-page.tsx` — `buildPlanFromPage(pageRow)`
+  (page row → {plan, locale}, the identical block→plan walk) + `RenderedPage({plan})` (the shared
+  utility-CSS + theme + tree + client-scripts JSX). The public route `[[...slug]]/page.tsx` now calls
+  both (no behavior change — just deduped). New route `app/preview/[id]/page.tsx` loads ANY page by id
+  (no publish gate), gated by `checkAdminFromHeaders` (404s if not an authed admin so drafts never
+  leak), and renders via the SAME pipeline → pixel-identical to production. Shell: iframe `src=/preview/<id>`
+  keyed by `${id}-${previewNonce}`, honoring VIEWPORT_WIDTH (desktop 100% / tablet 768px / mobile 375px);
+  refresh button + post-Save now bump `previewNonce` to reload. Moved `collectComponentNames` into the
+  dep-free `tree.ts` (re-used by both routes) + added i18n `previewIframeTitle` (en/fi/et).
+- **Verified:** CMS `npx tsc --noEmit` clean; `node --test collect-component-names.test.ts` 4/4;
+  `page-blocks-sections.test.ts` 6/6 (no regression); `npx opennextjs-cloudflare build` green —
+  `/preview/[id]` appears as a dynamic route in the manifest. Could NOT live-click in a deployed CMS
+  (needs Worker + D1 + PM session — HITL).
+- **Files:** CMS/src/lib/render/render-page.tsx (new), CMS/src/app/preview/[id]/page.tsx (new),
+  CMS/src/app/[[...slug]]/page.tsx, CMS/src/lib/render/tree.ts,
+  CMS/src/lib/render/collect-component-names.test.ts (new),
+  CMS/src/components/page-builder/page-builder-shell.tsx, CMS/messages/{en,fi,et}.json
+
+## 2026-06-19 17:22 — Right rail SEO form (reuse C2 page-meta + PUT /api/pages)
+- **Status:** DONE
+- **What I did:** Wired the right rail's SEO tab to a real form. New `SeoForm` in
+  `page-builder-shell.tsx`: one meta title + meta description per CONTENT locale, pre-filled
+  from the selected page's `PageSummary` (`metaTitle`/`metaDescription` maps already loaded in
+  `pages` state — no new fetch). Save PUTs `{id,slug,parentSlug,publishStatus,metaTitle,
+  metaDescription}` to the EXISTING `/api/pages` (same body `validatePageMeta` validates;
+  slug/parent/publish kept as-is — SEO-only edit, no new page-store/validation path), then
+  refetches pages so picker labels stay current. Content locales: server `page.tsx` now resolves
+  `getContentLocales()` (default-locale fallback offline) and passes `contentLocales` to the shell.
+  Two new PURE helpers in `lib/pages/page-meta.ts`: `setLocaleValue` (immutable map set, drops
+  cleared keys) + `buildSeoMetaBody` (page identity + edited maps → PUT body shaped for
+  validatePageMeta). C2 `pages-manager.tsx` refactored to import `setLocaleValue` (deleted its
+  private `setLocale` copy — one source). i18n `seoMetaTitle/seoMetaDescription/seoSave/seoSaved`
+  EN/FI/ET (2-space indent — messages files use 2 spaces, NOT tabs).
+- **Verified:** `node --test page-meta.test.ts` 3/3; CMS `npx tsc --noEmit` clean; `npx
+  opennextjs-cloudflare build` green (dev stopped, 3601 free). Could NOT live-click (no D1 binding /
+  PM session offline — HITL); REST contract is the existing C2 PUT, build-green + pure test cover it.
+- **Files:** CMS/src/lib/pages/page-meta.ts (+ page-meta.test.ts new),
+  CMS/src/components/page-builder/page-builder-shell.tsx, CMS/src/app/admin/page-builder/page.tsx,
+  CMS/src/components/pages/pages-manager.tsx, CMS/messages/{en,fi,et}.json.
+  DEFERRED: PM npm run bundle:cms (cross-loop guardrail — bundle file owned by another loop).

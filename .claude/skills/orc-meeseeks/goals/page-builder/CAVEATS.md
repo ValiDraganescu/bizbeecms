@@ -56,3 +56,27 @@ Read every line before working. Each entry was learned the hard way by a previou
   container — `Block.children` round-trips through validate/persist but a "Section" won't visually
   nest its components in the public render until a Section container component renders `props`/slot
   children. Keep that in mind for the Preview slice.
+
+- CMS `messages/{en,fi,et}.json` use **2-space** indent (NOT tabs) and a trailing newline. If you
+  add keys with a script, write `json.dump(..., indent=2)` + `f.write("\n")` — `indent="\t"` reformats
+  the WHOLE file (600+ line phantom diff) and stomps other loops' in-flight message edits.
+- The page-builder shell takes a `contentLocales: string[]` prop (resolved server-side in
+  `app/admin/page-builder/page.tsx` via `getContentLocales()` w/ `defaultContentLocales()` fallback —
+  D1 unbound offline). The SEO tab edits one metaTitle+metaDescription per content locale and PUTs the
+  FULL page meta to the existing `/api/pages` (body `{id,slug,parentSlug,publishStatus,metaTitle,
+  metaDescription}` — slug/parent/publish kept as-is). NOTE: NEXT.md said "PUT /api/pages/[id]" but the
+  real route is `PUT /api/pages` with `id` IN the body — there is no `[id]/route.ts` (only `[id]/blocks`).
+- SEO-form pure helpers live in `lib/pages/page-meta.ts`: `setLocaleValue` (immutable locale-map set,
+  drops cleared keys — the C2 pages-manager now imports it too, don't re-add a private copy) +
+  `buildSeoMetaBody`. Tested in `page-meta.test.ts` (relative `.ts` import, `node --test`).
+
+- Public + preview render share ONE core: `lib/render/render-page.tsx` exports `buildPlanFromPage(pageRow)`
+  (page row → {plan, locale}) + `RenderedPage({plan})` (the SSR'd <style>+tree+scripts JSX). Both
+  `app/[[...slug]]/page.tsx` (published-leaf lookup) and `app/preview/[id]/page.tsx` (by-id, no publish
+  gate, admin-guarded) call them. NEVER inline a second render path — change render behavior in ONE place.
+- `render-page.tsx` is server-only (imports `getDb`, `next-intl/server`) so `node --test` CANNOT import it.
+  Pure, node-testable render helpers must live in the dep-free `tree.ts` (e.g. `collectComponentNames`).
+- The draft-preview route is `/preview/<pageId>` and is gated by `checkAdminFromHeaders` (same guard as
+  the rest of /admin) → returns `notFound()` if not an authed admin, so drafts never leak publicly. The
+  builder iframe keys on `${id}-${previewNonce}`; bump `previewNonce` to force a reload (refresh btn +
+  after a successful Save).

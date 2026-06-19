@@ -73,7 +73,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   can't resolve `@/`). This is ALSO the prerequisite for the Center Layers tree (it renders the same tree).
   Gate: CMS tsc + opennext build green; regen PM cms-bundle. EN/FI/ET.
 
-- TODO: **Center: Layers ⟷ Preview toggle — layers tree of sections+components, and a true-to-site
+- DONE (2026-06-19): **Center: Layers ⟷ Preview toggle.** BOTH halves done — Layers tree done earlier;
+  the **Preview** half is DONE this run. New `app/preview/[id]/page.tsx` renders ANY page by id (no
+  publish gate, admin-guarded via `checkAdminFromHeaders` → 404 if not authed) through the SAME pipeline
+  as the public route (shared `lib/render/render-page.tsx` `buildPlanFromPage` + `RenderedPage`, NOT a
+  forked renderer). Shell iframe `src=/preview/<id>` honors viewport widths; refresh + post-Save reload
+  via `previewNonce`. Test `collect-component-names.test.ts` 4/4. (Original text below.)
+- WAS-TODO: **Center: Layers ⟷ Preview toggle — layers tree of sections+components, and a true-to-site
   preview.** Wire the center column's Layers/Preview tab (shell from the LAYOUT task) to real content,
   mirroring aicms `center_canvas.tsx` (both panels mounted, toggled by CSS so the iframe stays alive).
   - **Layers:** render the selected page's structure as a tree — all **Sections** and, nested under each,
@@ -93,7 +99,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
   CF-native (REST + fetch), EN/FI/ET. Depends on the LAYOUT + page-select tasks. Add a pure test for any
   tree-build/flatten helper. Gate: CMS tsc + opennextjs build green; regen PM cms-bundle.
 
-- TODO: **Right rail: page SEO settings form (reuse existing per-locale page SEO).** Fill the right
+- DONE (2026-06-19): **Right rail: page SEO settings form (reuse existing per-locale page SEO).**
+  SEO tab now renders a real `SeoForm` per selected page: one meta title + meta description per
+  CONTENT locale (server page resolves `getContentLocales()`, passed as `contentLocales` prop;
+  default-locale fallback offline), pre-filled from the loaded `PageSummary`, Save PUTs the full meta
+  back through the EXISTING `/api/pages` (id+slug+parent+publish+meta — `validatePageMeta` re-runs;
+  slug/parent/publish kept as-is, SEO-only edit). Two new PURE helpers in `page-meta.ts`
+  (`setLocaleValue`, `buildSeoMetaBody`) + `page-meta.test.ts` 3/3; C2 pages-manager now reuses
+  `setLocaleValue` (deduped its private copy). i18n `seoMetaTitle/seoMetaDescription/seoSave/seoSaved`
+  EN/FI/ET. NOTE: PM `bundle:cms` regen DEFERRED (cross-loop guardrail forbids touching the bundle).
+  Original spec below.
+- WAS-TODO: **Right rail: page SEO settings form (reuse existing per-locale page SEO).** Fill the right
   rail's **SEO** tab (shell exists from the LAYOUT task) with a real form that edits the SELECTED page's
   SEO and saves it. Reuse what C2 already stores — do NOT invent new SEO fields/storage:
   - Fields: per-locale `metaTitle` + `metaDescription` (JSON maps on the `page` row, `db/schema.ts`
