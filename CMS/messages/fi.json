@@ -192,7 +192,7 @@
     "imported": "Tuotiin ”{name}”.",
     "updated": "Päivitettiin ”{name}”.",
     "kitsTitle": "Aloituspaketit",
-    "kitsHint": "Asenna valmis joukko komponentteja yhdellä napsautuksella. Blogipaketti lisää artikkelin otsikon, rungon, kirjoittajakortin ja artikkelilistan; laskeutumispaketti lisää hero-osion, ominaisuusruudukon, CTA-palkin, suosittelun ja alatunnisteen; dokumentaatiopaketti lisää otsikon, huomiolaatikon, koodilohkon, vaiheluettelon ja API-parametrin.",
+    "kitsHint": "Asenna valmis joukko komponentteja yhdellä napsautuksella. Blogipaketti lisää artikkelin otsikon, rungon, kirjoittajakortin ja artikkelilistan; laskeutumispaketti lisää hero-osion, ominaisuusruudukon, CTA-palkin, suosittelun ja alatunnisteen; dokumentaatiopaketti lisää otsikon, huomiolaatikon, koodilohkon, vaiheluettelon ja API-parametrin; portfoliopaketti lisää hero-osion, projektikortin, taitoluettelon, työaikajanan ja yhteydenottokehotteen.",
     "installBlogKit": "Asenna blogipaketti",
     "kitInstalled": "Blogipaketti asennettu: {created} luotu, {updated} päivitetty.",
     "assetDepsTitle": "Mediariippuvuudet",
@@ -209,7 +209,8 @@
     "applyRebind": "Tuo uudelleen uudelleenmäärityksellä",
     "applyingRebind": "Tuodaan uudelleen…",
     "installLandingKit": "Asenna laskeutumispaketti",
-    "installDocsKit": "Asenna dokumentaatiopaketti"
+    "installDocsKit": "Asenna dokumentaatiopaketti",
+    "installPortfolioKit": "Asenna portfoliopaketti"
   },
   "adminAuth": {
     "forbiddenTitle": "Pääsy estetty",

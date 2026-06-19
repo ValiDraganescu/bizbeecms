@@ -357,3 +357,19 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   FOUNDATION commits — files I never touched; confirmed not mine. Live D1 render → existing HITL P1.
 - **Files:** CMS/src/lib/render/tree.ts, CMS/src/lib/render/render-page.tsx, CMS/scripts/render-tree.test.mjs,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-19 18:57 — G4 portfolio component kit
+- **Status:** DONE
+- **What I did:** Fourth premade kit. New `CMS/src/lib/components/portfolio-kit.ts` (5 bundles:
+  PortfolioHero, ProjectCard, SkillList, WorkTimeline, ContactCallout — all `{{slots}}` + richer-vocab
+  `propsSchema`, prose props translatable / date-ranges + URL not). Same machinery as G1–G3: added
+  `{id:"portfolio",build,names}` to the `KITS` registry (`api/components/kit/route.ts`) + `{id:"portfolio",
+  labelKey:"installPortfolioKit"}` to the `KITS` const (`components-manager.tsx`) + `installPortfolioKit`
+  i18n (EN/FI/ET) + reworded `kitsHint` (3 catalogs) + `scripts/portfolio-kit.test.mjs` (6 cases).
+  NO new write/validation path — installs through the same `parsePortableComponent` gate + `upsertImportedComponent`.
+- **Verified:** CMS 353/353 (was 347, +6); every bundle passes the import gate (object + JSON-string).
+  All classNames in `allowedClasses()`. tsc clean; CMS `opennextjs-cloudflare build` gate PASS; PM bundle
+  regen 6656KB; PM 79/79. Scoped `git add` to my own files (page-builder race). Live D1 install → HITL P1.
+- **Files:** CMS/src/lib/components/portfolio-kit.ts, CMS/scripts/portfolio-kit.test.mjs,
+  CMS/src/app/api/components/kit/route.ts, CMS/src/components/components/components-manager.tsx,
+  CMS/messages/{en,fi,et}.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js
