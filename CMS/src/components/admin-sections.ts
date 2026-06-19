@@ -13,6 +13,7 @@
 export const ADMIN_SECTIONS = [
   { key: "chat", href: "/admin/chat" },
   { key: "pages", href: "/admin/pages" },
+  { key: "pageBuilder", href: "/admin/page-builder" },
   { key: "components", href: "/admin/components" },
   { key: "media", href: "/admin/media" },
   { key: "settings", href: "/admin/settings/content-locales" },

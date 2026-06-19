@@ -64,7 +64,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
   CF-native (REST + fetch), EN/FI/ET. Depends on the LAYOUT + page-select tasks. Add a pure test for any
   tree-build/flatten helper. Gate: CMS tsc + opennextjs build green; regen PM cms-bundle.
 
-- TODO: **Build the page-builder LAYOUT (shell only — no features).** Implement the static layout from
+- DONE: **Build the page-builder LAYOUT (shell only — no features).** Implement the static layout from
   `docs/page-builder-layout.md` in the CMS admin (e.g. `/admin/page-builder`), modeled on aicms
   `src/modules/page-builder/components/page-builder-v2/`. Deliver the **top bar + 3-column** shell:
   - **Top bar:** page-picker dropdown (lists pages, includes a "create new page" affordance) +

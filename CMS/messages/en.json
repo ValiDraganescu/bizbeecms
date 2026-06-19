@@ -239,7 +239,46 @@
       "pages": "Create and manage pages — slug, hierarchy, publish status and per-language SEO.",
       "components": "Export components as portable bundles, import them, or install starter kits.",
       "media": "Upload images to this site and reference them in components by URL.",
-      "settings": "Content languages, theme color overrides, and brand & AI persona."
-    }
+      "settings": "Content languages, theme color overrides, and brand & AI persona.",
+      "pageBuilder": "Compose pages visually from blocks and components."
+    },
+    "pageBuilder": "Page Builder"
+  },
+  "pageBuilder": {
+    "title": "Page Builder",
+    "pageSelector": "Select page",
+    "noPageSelected": "Select a page…",
+    "newPage": "New page",
+    "viewport": {
+      "desktop": "Desktop",
+      "tablet": "Tablet",
+      "mobile": "Mobile"
+    },
+    "undo": "Undo",
+    "redo": "Redo",
+    "preview": "Preview",
+    "save": "Save",
+    "components": "Components",
+    "searchComponents": "Search components…",
+    "categoryLayout": "Layout",
+    "categoryComponents": "Components",
+    "layoutSection": "Section",
+    "componentsEmpty": "No components yet — import a kit or component.",
+    "center": {
+      "layers": "Layers",
+      "preview": "Preview"
+    },
+    "emptyCanvas": "Select a page from the top bar to start editing.",
+    "refresh": "Refresh",
+    "previewUrlPlaceholder": "Select a page to preview",
+    "previewEmpty": "The page preview appears here once a page is selected.",
+    "right": {
+      "block": "Block",
+      "page": "Page",
+      "seo": "SEO"
+    },
+    "blockEmpty": "Select a block in the Layers panel to edit its properties.",
+    "pageEmpty": "Page settings appear here once a page is selected.",
+    "seoEmpty": "SEO settings appear here once a page is selected."
   }
 }

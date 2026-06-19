@@ -19,7 +19,14 @@ import { ADMIN_SECTIONS } from "@/components/admin-sections";
  * auth and renders <SidebarShell>{children}</SidebarShell>).
  */
 
-type IconKey = "home" | "chat" | "pages" | "components" | "media" | "settings";
+type IconKey =
+  | "home"
+  | "chat"
+  | "pages"
+  | "pageBuilder"
+  | "components"
+  | "media"
+  | "settings";
 
 function NavIcon({ name }: { name: IconKey }) {
   const common = {
@@ -53,6 +60,14 @@ function NavIcon({ name }: { name: IconKey }) {
           <polyline points="14 2 14 8 20 8" />
           <line x1="16" x2="8" y1="13" y2="13" />
           <line x1="16" x2="8" y1="17" y2="17" />
+        </svg>
+      );
+    case "pageBuilder":
+      return (
+        <svg {...common}>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <line x1="3" y1="9" x2="21" y2="9" />
+          <line x1="9" y1="21" x2="9" y2="9" />
         </svg>
       );
     case "components":

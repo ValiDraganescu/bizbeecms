@@ -169,6 +169,32 @@ test("THEME_PRESETS: every preset is known tokens + safe values", () => {
   assert.deepEqual(def?.overrides, {}, "default preset must be empty");
 });
 
+test("THEME_PRESETS: every non-default preset is a FULL coordinated palette", () => {
+  const allTokens = new Set(THEME_TOKENS);
+  for (const preset of THEME_PRESETS) {
+    if (preset.key === "default") continue;
+    const got = Object.keys(preset.overrides).sort();
+    assert.deepEqual(
+      got,
+      [...THEME_TOKENS].sort(),
+      `preset ${preset.key} must override every one of the ${THEME_TOKENS.length} tokens`,
+    );
+    for (const [tok, val] of Object.entries(preset.overrides)) {
+      assert.ok(allTokens.has(tok), `preset ${preset.key}: unknown token ${tok}`);
+      assert.ok(isSafeColorValue(val), `preset ${preset.key}: unsafe ${tok}=${val}`);
+    }
+    // Sanity: it actually re-tints surfaces/text/border, not just the brand —
+    // those neutrals must differ from the global defaults.
+    for (const tok of ["surface", "foreground", "border"]) {
+      assert.notEqual(
+        preset.overrides[tok],
+        DEFAULT_THEME[tok],
+        `preset ${preset.key}: ${tok} should differ from default (palette must look coordinated)`,
+      );
+    }
+  }
+});
+
 test("themeOverridesToCss: emits a safe :root rule, empty for no overrides", () => {
   assert.equal(themeOverridesToCss({}), "");
   assert.equal(themeOverridesToCss({ unknownToken: "#000" }), "");

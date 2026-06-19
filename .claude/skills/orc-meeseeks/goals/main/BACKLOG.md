@@ -109,17 +109,14 @@ States: TODO | DOING | DONE | BLOCKED. Each is ONE provable capability. Order is
   admin). Collapsed-sidebar state should still show it (icon-only) like the other items. Gate: CMS tsc +
   opennextjs build green; regen PM cms-bundle.
 
-- TODO: **Make theme presets complete, coordinated palettes (E1).** Today every entry in `THEME_PRESETS`
-  (`CMS/src/lib/render/theme.ts`) only sets the `primary*`/`ring` brand tokens — Surfaces, Text, Borders,
-  Success/Warning/Info/Danger stay at defaults, so picking "emerald" vs "crimson" only changes the Brand
-  swatch and looks half-done. Flesh out each preset (emerald/crimson/amber/violet/slate, + any others) into a
-  FULL palette across all 24 `THEME_TOKENS`: a matched surface/text/border set and harmonized success/
-  warning/info/danger that read well against that brand hue (keep the semantic meaning — success stays
-  green-ish, danger red-ish — but tune lightness/chroma to sit in the palette). "default" stays `{}`. Each
-  preset must still pass the `isSafeColorValue` grammar + `normalizeThemeOverrides` (these are the security
-  boundary — don't loosen them). Verify the live-preview card + accordion swatches change across ALL sections
-  per preset. Update/extend `theme.test.mjs` (each non-default preset now covers the full token set; values
-  all safe). Gate: CMS npm test + tsc + opennextjs build green; regen PM cms-bundle.
+- DONE (2026-06-19): **Make theme presets complete, coordinated palettes (E1).** All 5 non-default presets
+  (emerald/crimson/amber/violet/slate) are now full 24-token coordinated palettes in `CMS/src/lib/render/theme.ts`:
+  brand hue drives `primary*`/`ring`; surfaces/foreground/border carry a whisper of the brand hue; semantics
+  keep their meaning but are tuned to the palette, with brand↔semantic hue collisions nudged (crimson danger→32,
+  amber warning→55). "default" stays `{}`. All values still pass `isSafeColorValue`/`normalizeThemeOverrides`
+  unchanged. `theme.test.mjs` extended (new full-palette-coverage test). CMS 285/285, theme tsc clean, build gate
+  via `bundle:cms` PASS, PM bundle regen + 80/80. Live-preview re-tints all sections (applyPreset merges over
+  defaults). See JOURNAL 2026-06-19 16:23.
 
 ### Open questions to discuss before committing the backlog
 - Sequencing: do A (rendering) fully before B (AI), or interleave A1→A2→B1→B2 as one vertical thread?

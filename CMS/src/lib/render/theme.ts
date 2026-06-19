@@ -90,56 +90,177 @@ export const DEFAULT_THEME: Record<ThemeToken, string> = {
 };
 
 /**
- * Predefined palettes an author can apply in one click. Each preset only sets
- * the few "character" tokens (the accent hue + its derivatives); the rest fall
- * back to the defaults. `key` is an i18n label (theme.preset.<key>). Values are
- * oklch so they re-tint consistently. The "default" preset clears all overrides.
+ * Predefined palettes an author can apply in one click — each is a COMPLETE,
+ * coordinated palette across ALL 24 tokens (not just the brand swatch), so
+ * switching presets re-tints surfaces, text, borders, focus ring AND the
+ * brand/semantic colors together for a finished look.
+ *
+ * How each palette is built (so they stay coherent and easy to tune):
+ *   - Brand hue H drives `primary*` and `ring`.
+ *   - Surfaces / foreground / border carry a *whisper* of H (very low chroma,
+ *     ~0.004–0.02) so neutrals feel like they belong to the palette without
+ *     turning muddy.
+ *   - Semantics keep their MEANING — success≈green(150), warning≈amber(75),
+ *     info≈blue(240), danger≈red(18..25) — but their lightness/chroma are tuned
+ *     to sit in the palette. Where a semantic hue collides with the brand hue
+ *     (crimson↔danger, amber↔warning) the semantic is nudged a few degrees so
+ *     the two stay distinguishable.
+ *
+ * `key` is an i18n label (theme.preset.<key>). All values are oklch and must
+ * pass `isSafeColorValue` + survive `normalizeThemeOverrides` unchanged (the
+ * THEME_PRESETS test enforces this). The "default" preset clears all overrides.
  */
 export const THEME_PRESETS: { key: string; overrides: ThemeOverrides }[] = [
   { key: "default", overrides: {} },
   {
+    // Brand hue 160 (green). Slightly cool neutrals, fresh feel.
     key: "emerald",
     overrides: {
+      surface: "oklch(0.995 0.003 160)",
+      "surface-muted": "oklch(0.965 0.008 160)",
+      "surface-raised": "oklch(1 0 0)",
+      foreground: "oklch(0.24 0.02 165)",
+      "foreground-muted": "oklch(0.5 0.018 165)",
+      border: "oklch(0.91 0.012 160)",
       primary: "oklch(0.55 0.14 160)",
       "primary-hover": "oklch(0.48 0.14 160)",
+      "primary-foreground": "oklch(0.99 0.01 160)",
       "primary-subtle": "oklch(0.95 0.03 160)",
+      danger: "oklch(0.55 0.2 22)",
+      "danger-hover": "oklch(0.48 0.2 22)",
+      "danger-foreground": "oklch(0.99 0.01 22)",
+      "danger-subtle": "oklch(0.955 0.03 22)",
+      success: "oklch(0.56 0.14 155)",
+      "success-foreground": "oklch(0.99 0.01 155)",
+      "success-subtle": "oklch(0.955 0.045 155)",
+      warning: "oklch(0.65 0.14 80)",
+      "warning-foreground": "oklch(0.24 0.04 80)",
+      "warning-subtle": "oklch(0.955 0.05 80)",
+      info: "oklch(0.55 0.12 220)",
+      "info-foreground": "oklch(0.99 0.01 220)",
+      "info-subtle": "oklch(0.955 0.035 220)",
       ring: "oklch(0.55 0.14 160)",
     },
   },
   {
+    // Brand hue 18 (red). Warm neutrals; danger nudged to 32 so it differs.
     key: "crimson",
     overrides: {
+      surface: "oklch(0.995 0.004 25)",
+      "surface-muted": "oklch(0.965 0.01 25)",
+      "surface-raised": "oklch(1 0 0)",
+      foreground: "oklch(0.24 0.02 25)",
+      "foreground-muted": "oklch(0.5 0.02 25)",
+      border: "oklch(0.91 0.014 25)",
       primary: "oklch(0.55 0.2 18)",
       "primary-hover": "oklch(0.48 0.2 18)",
+      "primary-foreground": "oklch(0.99 0.01 18)",
       "primary-subtle": "oklch(0.955 0.03 18)",
+      danger: "oklch(0.52 0.18 32)",
+      "danger-hover": "oklch(0.45 0.18 32)",
+      "danger-foreground": "oklch(0.99 0.01 32)",
+      "danger-subtle": "oklch(0.955 0.035 32)",
+      success: "oklch(0.55 0.13 150)",
+      "success-foreground": "oklch(0.99 0.01 150)",
+      "success-subtle": "oklch(0.955 0.04 150)",
+      warning: "oklch(0.64 0.14 70)",
+      "warning-foreground": "oklch(0.24 0.04 70)",
+      "warning-subtle": "oklch(0.955 0.05 70)",
+      info: "oklch(0.55 0.13 240)",
+      "info-foreground": "oklch(0.99 0.01 240)",
+      "info-subtle": "oklch(0.955 0.035 240)",
       ring: "oklch(0.55 0.2 18)",
     },
   },
   {
+    // Brand hue 75 (amber). Brand is light → dark primary-foreground; warning
+    // nudged to 55 (toward orange) so it differs from the amber brand.
     key: "amber",
     overrides: {
+      surface: "oklch(0.995 0.004 80)",
+      "surface-muted": "oklch(0.965 0.01 80)",
+      "surface-raised": "oklch(1 0 0)",
+      foreground: "oklch(0.25 0.02 80)",
+      "foreground-muted": "oklch(0.5 0.02 80)",
+      border: "oklch(0.91 0.014 80)",
       primary: "oklch(0.68 0.15 75)",
       "primary-hover": "oklch(0.6 0.15 75)",
       "primary-foreground": "oklch(0.24 0.04 75)",
       "primary-subtle": "oklch(0.955 0.05 75)",
+      danger: "oklch(0.55 0.2 22)",
+      "danger-hover": "oklch(0.48 0.2 22)",
+      "danger-foreground": "oklch(0.99 0.01 22)",
+      "danger-subtle": "oklch(0.955 0.03 22)",
+      success: "oklch(0.56 0.14 150)",
+      "success-foreground": "oklch(0.99 0.01 150)",
+      "success-subtle": "oklch(0.955 0.04 150)",
+      warning: "oklch(0.62 0.16 55)",
+      "warning-foreground": "oklch(0.24 0.04 55)",
+      "warning-subtle": "oklch(0.955 0.06 55)",
+      info: "oklch(0.55 0.13 235)",
+      "info-foreground": "oklch(0.99 0.01 235)",
+      "info-subtle": "oklch(0.955 0.035 235)",
       ring: "oklch(0.68 0.15 75)",
     },
   },
   {
+    // Brand hue 300 (violet). Cool, slightly purple neutrals.
     key: "violet",
     overrides: {
+      surface: "oklch(0.995 0.004 300)",
+      "surface-muted": "oklch(0.965 0.01 300)",
+      "surface-raised": "oklch(1 0 0)",
+      foreground: "oklch(0.24 0.02 300)",
+      "foreground-muted": "oklch(0.5 0.02 300)",
+      border: "oklch(0.91 0.014 300)",
       primary: "oklch(0.5 0.22 300)",
       "primary-hover": "oklch(0.43 0.22 300)",
+      "primary-foreground": "oklch(0.99 0.01 300)",
       "primary-subtle": "oklch(0.95 0.04 300)",
+      danger: "oklch(0.55 0.2 18)",
+      "danger-hover": "oklch(0.48 0.2 18)",
+      "danger-foreground": "oklch(0.99 0.01 18)",
+      "danger-subtle": "oklch(0.955 0.03 18)",
+      success: "oklch(0.55 0.13 150)",
+      "success-foreground": "oklch(0.99 0.01 150)",
+      "success-subtle": "oklch(0.955 0.04 150)",
+      warning: "oklch(0.64 0.14 75)",
+      "warning-foreground": "oklch(0.24 0.04 75)",
+      "warning-subtle": "oklch(0.955 0.05 75)",
+      info: "oklch(0.55 0.14 270)",
+      "info-foreground": "oklch(0.99 0.01 270)",
+      "info-subtle": "oklch(0.955 0.04 270)",
       ring: "oklch(0.5 0.22 300)",
     },
   },
   {
+    // Brand hue 250 (blue-grey). Near-neutral, professional. Semantics stay
+    // saturated so they pop against the muted brand.
     key: "slate",
     overrides: {
+      surface: "oklch(0.995 0.002 250)",
+      "surface-muted": "oklch(0.965 0.006 250)",
+      "surface-raised": "oklch(1 0 0)",
+      foreground: "oklch(0.23 0.014 250)",
+      "foreground-muted": "oklch(0.5 0.016 250)",
+      border: "oklch(0.91 0.008 250)",
       primary: "oklch(0.45 0.03 250)",
       "primary-hover": "oklch(0.38 0.03 250)",
+      "primary-foreground": "oklch(0.99 0.005 250)",
       "primary-subtle": "oklch(0.94 0.01 250)",
+      danger: "oklch(0.55 0.2 18)",
+      "danger-hover": "oklch(0.48 0.2 18)",
+      "danger-foreground": "oklch(0.99 0.01 18)",
+      "danger-subtle": "oklch(0.955 0.03 18)",
+      success: "oklch(0.55 0.13 150)",
+      "success-foreground": "oklch(0.99 0.01 150)",
+      "success-subtle": "oklch(0.955 0.04 150)",
+      warning: "oklch(0.62 0.14 75)",
+      "warning-foreground": "oklch(0.24 0.04 75)",
+      "warning-subtle": "oklch(0.955 0.05 75)",
+      info: "oklch(0.55 0.13 240)",
+      "info-foreground": "oklch(0.99 0.01 240)",
+      "info-subtle": "oklch(0.955 0.035 240)",
       ring: "oklch(0.45 0.03 250)",
     },
   },

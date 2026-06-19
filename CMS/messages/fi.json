@@ -239,7 +239,46 @@
       "pages": "Luo ja hallitse sivuja — polkutunnus, hierarkia, julkaisutila ja kielikohtainen SEO.",
       "components": "Vie komponentteja siirrettävinä paketteina, tuo niitä tai asenna aloituspaketteja.",
       "media": "Lataa kuvia tälle sivustolle ja viittaa niihin komponenteissa URL-osoitteella.",
-      "settings": "Sisältökielet, teeman väriasetukset sekä brändi ja tekoälypersoona."
-    }
+      "settings": "Sisältökielet, teeman väriasetukset sekä brändi ja tekoälypersoona.",
+      "pageBuilder": "Koosta sivuja visuaalisesti lohkoista ja komponenteista."
+    },
+    "pageBuilder": "Sivurakentaja"
+  },
+  "pageBuilder": {
+    "title": "Sivurakentaja",
+    "pageSelector": "Valitse sivu",
+    "noPageSelected": "Valitse sivu…",
+    "newPage": "Uusi sivu",
+    "viewport": {
+      "desktop": "Työpöytä",
+      "tablet": "Tabletti",
+      "mobile": "Mobiili"
+    },
+    "undo": "Kumoa",
+    "redo": "Tee uudelleen",
+    "preview": "Esikatselu",
+    "save": "Tallenna",
+    "components": "Komponentit",
+    "searchComponents": "Hae komponentteja…",
+    "categoryLayout": "Asettelu",
+    "categoryComponents": "Komponentit",
+    "layoutSection": "Osio",
+    "componentsEmpty": "Ei vielä komponentteja — tuo paketti tai komponentti.",
+    "center": {
+      "layers": "Tasot",
+      "preview": "Esikatselu"
+    },
+    "emptyCanvas": "Aloita muokkaus valitsemalla sivu yläpalkista.",
+    "refresh": "Päivitä",
+    "previewUrlPlaceholder": "Valitse sivu esikatselua varten",
+    "previewEmpty": "Sivun esikatselu näkyy täällä, kun sivu on valittu.",
+    "right": {
+      "block": "Lohko",
+      "page": "Sivu",
+      "seo": "SEO"
+    },
+    "blockEmpty": "Valitse lohko Tasot-paneelista muokataksesi sen ominaisuuksia.",
+    "pageEmpty": "Sivun asetukset näkyvät täällä, kun sivu on valittu.",
+    "seoEmpty": "SEO-asetukset näkyvät täällä, kun sivu on valittu."
   }
 }

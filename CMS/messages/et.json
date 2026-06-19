@@ -239,7 +239,46 @@
       "pages": "Loo ja halda lehti — kärbis, hierarhia, avaldamise olek ja keelepõhine SEO.",
       "components": "Ekspordi komponente teisaldatavate pakettidena, impordi neid või paigalda stardikomplekte.",
       "media": "Laadi sellele saidile pilte üles ja viita neile komponentides URL-i kaudu.",
-      "settings": "Sisukeeled, teema värvialistamised ning bränd ja tehisintellekti persoon."
-    }
+      "settings": "Sisukeeled, teema värvialistamised ning bränd ja tehisintellekti persoon.",
+      "pageBuilder": "Koosta lehti visuaalselt plokkidest ja komponentidest."
+    },
+    "pageBuilder": "Lehe koostaja"
+  },
+  "pageBuilder": {
+    "title": "Lehe koostaja",
+    "pageSelector": "Vali leht",
+    "noPageSelected": "Vali leht…",
+    "newPage": "Uus leht",
+    "viewport": {
+      "desktop": "Töölaud",
+      "tablet": "Tahvelarvuti",
+      "mobile": "Mobiil"
+    },
+    "undo": "Võta tagasi",
+    "redo": "Tee uuesti",
+    "preview": "Eelvaade",
+    "save": "Salvesta",
+    "components": "Komponendid",
+    "searchComponents": "Otsi komponente…",
+    "categoryLayout": "Paigutus",
+    "categoryComponents": "Komponendid",
+    "layoutSection": "Sektsioon",
+    "componentsEmpty": "Komponente pole veel — impordi komplekt või komponent.",
+    "center": {
+      "layers": "Kihid",
+      "preview": "Eelvaade"
+    },
+    "emptyCanvas": "Muutmise alustamiseks vali ülaribalt leht.",
+    "refresh": "Värskenda",
+    "previewUrlPlaceholder": "Eelvaateks vali leht",
+    "previewEmpty": "Lehe eelvaade ilmub siia, kui leht on valitud.",
+    "right": {
+      "block": "Plokk",
+      "page": "Leht",
+      "seo": "SEO"
+    },
+    "blockEmpty": "Atribuutide muutmiseks vali plokk Kihtide paneelist.",
+    "pageEmpty": "Lehe sätted ilmuvad siia, kui leht on valitud.",
+    "seoEmpty": "SEO sätted ilmuvad siia, kui leht on valitud."
   }
 }
