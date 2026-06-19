@@ -29,7 +29,7 @@ export default async function ThemePage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
+    <main className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">{t("title")}</h1>
