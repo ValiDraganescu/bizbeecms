@@ -333,3 +333,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Verified:** Reproduced the mismatch in code (the old slug `bizbeecms-cms` ≠ the account gateway). Regression guard added to `CMS/scripts/ai-port.test.mjs` (2 new tests: `DEFAULT_AI_GATEWAY === "bizbeecms-ai-gateway"` + parse `wrangler.jsonc` AI_GATEWAY var == same) — 4/4 pass; would have FAILED before the fix (old source had the wrong literal). The live `env.AI.run` call can't be exercised offline (no CF auth) — the slug-pinning test is the strongest offline guard. PM bundle regenerated via `npm run bundle:cms` (full opennext CMS build) → PASS, 6652KB. NOTE: 8 pre-existing CMS test failures in component-store/parsePropsSchema are the PARALLEL page-builder loop's mid-flight props-schema widening (blog-kit.ts/.test.mjs + parsePropsSchema), NOT mine and NOT touched — my ai-port suite is green.
 - **⚠️ LIVE follow-up (HITL):** the live deployed CMS Site bakes `AI_GATEWAY` at deploy time → it must be REDEPLOYED to pick up the new slug. Logged to HITL.md.
 - **Files:** CMS/src/lib/ports/ai.ts, CMS/wrangler.jsonc, CMS/scripts/ai-port.test.mjs, DEPLOY-ARCHITECTURE.md, ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-19 18:39 — Nested-component render gap CLOSED (composition-by-tag)
+- **Status:** DONE
+- **What I did:** The renderer now ACTUALLY resolves a PascalCase `tag` inside a component's
+  tree to another component (e.g. `{tag:"AuthorCard"}` renders the AuthorCard component) — before,
+  it emitted `<authorcard>` literally and the H3b dep-warning was portability-only. `lib/render/tree.ts`:
+  `planTree` gained an optional `ComposeContext {components, depth, collectScript}`; a PascalCase tag
+  (`COMPONENT_TAG_RE`, same shape as `enumerateComponentDeps`) matching a known component is resolved
+  via new `planComponentTag` — binds the node's declared string props into the nested component's
+  `{{slots}}` (same allowlist + `bindTree` the page-block path uses, locale objects resolved first),
+  appends the node's children inside the resolved root, ships the nested component's `script` once via
+  a shared `collectScript`, and degrades to a hidden placeholder on unknown/text-root/over-deep refs
+  (`MAX_COMPONENT_DEPTH=16` guards cycles). `planPage`'s `planBlock` now passes `{components,depth:0,
+  collectScript}` into `planTree`. New pure `collectTreeComponentTags(tree)` enumerates nested tags so
+  `render-page.tsx` fetches them: the component-row fetch is now WAVE-based (block names → nested tags →
+  …, bounded by `MAX_FETCH_WAVES=16`) so transitively-referenced components load. NO compose context
+  passed = old literal behaviour (fully back-compat; existing callers/tests untouched).
+- **Verified:** `node --test scripts/render-tree.test.mjs` 23/23 (+8 new: resolve / unknown-placeholder /
+  nested script ship-once / cyclic depth-guard no-hang / no-compose back-compat / collectTreeComponentTags).
+  CMS tsc clean; `opennextjs-cloudflare build` gate PASS; PM bundle regen 6647KB. CMS suite has 8 PRE-EXISTING
+  failures (component-store + parsePropsSchema) from the parallel page-builder track's in-flight props-schema
+  FOUNDATION commits — files I never touched; confirmed not mine. Live D1 render → existing HITL P1.
+- **Files:** CMS/src/lib/render/tree.ts, CMS/src/lib/render/render-page.tsx, CMS/scripts/render-tree.test.mjs,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js

@@ -94,12 +94,65 @@ export type RenderPlan = {
  */
 export type LocaleContext = { locale: string; fallback: string };
 
-/** Walk one component element tree into element plans. */
-export function planTree(node: TreeNode, locale?: LocaleContext): ElementPlan {
+/**
+ * A `tag` that names ANOTHER component (composition-by-tag): a PascalCase
+ * identifier. Same shape `enumerateComponentDeps`/`validateComponentArtifact`
+ * treat as a component reference, so the renderer, the dep-warning, and the
+ * artifact gate all agree on what's a component vs a plain HTML element.
+ */
+const COMPONENT_TAG_RE = /^[A-Z][A-Za-z0-9_-]{0,63}$/;
+
+/**
+ * Guard runaway / cyclic component composition (A references B references A …).
+ * A component tree resolving deeper than this stops resolving nested-component
+ * tags (renders them as a hidden placeholder) instead of recursing forever.
+ */
+const MAX_COMPONENT_DEPTH = 16;
+
+/**
+ * Nested-component resolution context: the component map to resolve PascalCase
+ * tags against, and the current recursion depth. Absent (the common path: a
+ * single component tree with no component-tags) = tags render literally as
+ * before — fully back-compatible.
+ */
+type ComposeContext = {
+  components: Map<string, ComponentArtifact>;
+  depth: number;
+  /**
+   * Optional sink for a resolved nested component's client `script` (collected
+   * once per name, first-use order) — supplied by `planPage` so nested-by-tag
+   * components ship their script just like top-level block components do.
+   */
+  collectScript?: (artifact: ComponentArtifact) => void;
+};
+
+/**
+ * Walk one component element tree into element plans.
+ *
+ * When `compose` is supplied (the page renderer passes it), a node whose `tag`
+ * is a PascalCase component NAME present in the component map is RESOLVED to
+ * that component's own tree (composition-by-tag): the referencing node's string
+ * props bind into the nested component's `{{slots}}`, and the node's children
+ * are appended inside the nested component's root. This is what makes a kit
+ * component like `{ tag: "AuthorCard", props: {…} }` actually render the
+ * AuthorCard component instead of an `<authorcard>` literal. Unknown component
+ * tags / over-deep recursion fall back to a hidden placeholder.
+ */
+export function planTree(
+  node: TreeNode,
+  locale?: LocaleContext,
+  compose?: ComposeContext,
+): ElementPlan {
   if (typeof node === "string") return { kind: "text", text: node };
   if (node == null || typeof node !== "object" || typeof node.tag !== "string") {
     throw new Error(`Invalid tree node: ${JSON.stringify(node)}`);
   }
+
+  // Composition-by-tag: a PascalCase tag that resolves to a known component.
+  if (compose && COMPONENT_TAG_RE.test(node.tag)) {
+    return planComponentTag(node, locale, compose);
+  }
+
   const props = node.props ?? {};
   return {
     kind: "element",
@@ -110,8 +163,64 @@ export function planTree(node: TreeNode, locale?: LocaleContext): ElementPlan {
           unknown
         >)
       : props,
-    children: (node.children ?? []).map((c) => planTree(c, locale)),
+    children: (node.children ?? []).map((c) => planTree(c, locale, compose)),
   };
+}
+
+/**
+ * Resolve a `{ tag: "SomeComponent", props, children }` node by rendering the
+ * referenced component's tree in its place. The node's STRING props bind into
+ * the component's declared `{{slots}}` (same allowlist + binding the page-block
+ * path uses); the node's children append inside the resolved root. Cyclic /
+ * too-deep / unknown / text-root references degrade to a hidden placeholder so a
+ * bad reference can never throw or blank the page.
+ */
+function planComponentTag(
+  node: Exclude<TreeNode, string>,
+  locale: LocaleContext | undefined,
+  compose: ComposeContext,
+): ElementPlan {
+  if (compose.depth >= MAX_COMPONENT_DEPTH) {
+    return placeholder(`component "${node.tag}" nested too deeply`);
+  }
+  const artifact = compose.components.get(node.tag);
+  if (!artifact) {
+    // Not a known component — render the tag literally (e.g. an HTML-ish custom
+    // element the author intended, or a missing dep). Hidden placeholder keeps
+    // the page intact while signalling the gap (matches planPage's unknown path).
+    return placeholder(`unknown component "${node.tag}"`);
+  }
+  compose.collectScript?.(artifact);
+
+  // Bind the referencing node's declared string props into the nested tree's
+  // {{slots}} (resolve locale objects first), exactly like a page block does.
+  let tree = artifact.tree;
+  const rawProps = node.props ?? {};
+  if (Object.keys(rawProps).length > 0) {
+    const declared = declaredProps(artifact.propsSchema);
+    if (declared.size > 0) {
+      const values = locale
+        ? (resolveLocalized(rawProps, locale.locale, locale.fallback) as Record<
+            string,
+            unknown
+          >)
+        : rawProps;
+      tree = bindTree(tree, values, declared);
+    }
+  }
+
+  const childCompose: ComposeContext = {
+    components: compose.components,
+    depth: compose.depth + 1,
+    collectScript: compose.collectScript,
+  };
+  const el = planTree(tree, locale, childCompose);
+  const childPlans = (node.children ?? []).map((c) => planTree(c, locale, compose));
+  if (childPlans.length === 0) return el;
+  if (el.kind !== "element") {
+    return placeholder(`component "${node.tag}" cannot host children`);
+  }
+  return { ...el, children: [...el.children, ...childPlans] };
 }
 
 // ── Block-prop → component-prop binding (epic G1 follow-on) ──────────────────
@@ -229,6 +338,22 @@ export function collectComponentNames(blocks: Block[]): Set<string> {
   return into;
 }
 
+/**
+ * Collect the distinct PascalCase component-tag references INSIDE a component's
+ * element tree (composition-by-tag) — the names that the renderer will resolve
+ * against the component map. Used by the route to transitively fetch nested
+ * component rows that `collectComponentNames` (block-level only) can't see.
+ * Pure — never throws (malformed nodes are skipped).
+ */
+export function collectTreeComponentTags(node: TreeNode, into: Set<string> = new Set()): Set<string> {
+  if (typeof node !== "object" || node === null || typeof node.tag !== "string") {
+    return into;
+  }
+  if (COMPONENT_TAG_RE.test(node.tag)) into.add(node.tag);
+  for (const child of node.children ?? []) collectTreeComponentTags(child, into);
+  return into;
+}
+
 export function planPage(
   blocks: Block[],
   components: Map<string, ComponentArtifact>,
@@ -236,6 +361,15 @@ export function planPage(
 ): RenderPlan {
   const scripts: string[] = [];
   const seenScripts = new Set<string>();
+
+  // Ship a component's client script once (first-use order). Shared by top-level
+  // block components AND nested-by-tag components resolved inside a tree.
+  function collectScript(artifact: ComponentArtifact): void {
+    if (artifact.script && !seenScripts.has(artifact.name)) {
+      seenScripts.add(artifact.name);
+      scripts.push(artifact.script);
+    }
+  }
 
   function planBlock(block: Block): ElementPlan {
     // A Section is a built-in layout container rendered as a CSS grid of
@@ -254,10 +388,7 @@ export function planPage(
       return placeholder(`unknown component "${block.component}"`);
     }
     // Ship this component's script once.
-    if (artifact.script && !seenScripts.has(artifact.name)) {
-      seenScripts.add(artifact.name);
-      scripts.push(artifact.script);
-    }
+    collectScript(artifact);
 
     // Bind the block's DECLARED props into the component tree's `{{prop}}` slots
     // before planning. Only props in the component's propsSchema bind; locale
@@ -276,7 +407,10 @@ export function planPage(
       }
     }
 
-    const el = planTree(tree, locale);
+    // Pass the component map so a PascalCase tag inside this component's tree
+    // resolves to another component (composition-by-tag), depth-guarded; nested
+    // components ship their script via the shared collector.
+    const el = planTree(tree, locale, { components, depth: 0, collectScript });
     const childPlans = (block.children ?? []).map(planBlock);
     if (childPlans.length === 0) return el;
     if (el.kind !== "element") {

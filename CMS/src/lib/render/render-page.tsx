@@ -25,7 +25,10 @@ import {
   type LocaleContext,
   type RenderPlan,
   type TreeNode,
+  SECTION_COMPONENT,
+  SECTION_COLUMN_COMPONENT,
   collectComponentNames,
+  collectTreeComponentTags,
   parseJsonColumn,
   planPage,
 } from "@/lib/render/tree";
@@ -48,22 +51,38 @@ export async function buildPlanFromPage(
   const db = await getDb();
   const blocks = parseJsonColumn<Block[]>(pageRow.blocks, []);
 
-  const names = collectComponentNames(blocks);
-
   const components = new Map<string, ComponentArtifact>();
-  if (names.size > 0) {
+
+  // Fetch component rows in waves: block-referenced names first, then any
+  // PascalCase component-tags those trees reference (composition-by-tag), and so
+  // on transitively. Bounded by MAX_FETCH_WAVES so a cyclic/huge graph can't loop
+  // forever (the renderer's own depth guard handles cycles at render time too).
+  const MAX_FETCH_WAVES = 16;
+  let pending = collectComponentNames(blocks);
+  pending.delete(SECTION_COMPONENT);
+  pending.delete(SECTION_COLUMN_COMPONENT);
+  for (let wave = 0; wave < MAX_FETCH_WAVES && pending.size > 0; wave++) {
+    const want = [...pending].filter((n) => !components.has(n));
+    if (want.length === 0) break;
     const rows = await db
       .select()
       .from(componentTable)
-      .where(inArray(componentTable.name, [...names]));
+      .where(inArray(componentTable.name, want));
+    const next = new Set<string>();
     for (const row of rows) {
+      const tree = parseJsonColumn<TreeNode>(row.tree, "");
       components.set(row.name, {
         name: row.name,
-        tree: parseJsonColumn<TreeNode>(row.tree, ""),
+        tree,
         script: row.script || undefined,
         propsSchema: row.propsSchema,
       });
+      // Enqueue nested-component tags referenced inside this tree.
+      for (const tag of collectTreeComponentTags(tree)) {
+        if (!components.has(tag)) next.add(tag);
+      }
     }
+    pending = next;
   }
 
   const contentLocales = await getContentLocales();

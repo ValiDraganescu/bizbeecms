@@ -227,6 +227,90 @@ test("planPage binding: locale-object prop value resolves before binding", () =>
   assert.equal(texts(root[0])[0], "Moi");
 });
 
+// ── nested-component composition-by-tag (render gap closed) ──────────────────
+
+import { collectTreeComponentTags } from "../src/lib/render/tree.ts";
+
+// A leaf component, and a wrapper whose tree references it by PascalCase tag.
+const author = {
+  name: "AuthorCard",
+  tree: { tag: "div", props: { className: "author" }, children: ["{{name}}"] },
+  script: "/*author*/",
+  propsSchema: JSON.stringify({ name: { type: "string", default: "" } }),
+};
+const wrapper = {
+  name: "PostMeta",
+  tree: {
+    tag: "header",
+    children: [{ tag: "AuthorCard", props: { name: "Ada" } }],
+  },
+  script: "/*meta*/",
+};
+
+test("planPage: a PascalCase tag resolves to the referenced component's tree", () => {
+  const { root } = planPage(
+    [{ id: "1", component: "PostMeta" }],
+    mapOf(wrapper, author),
+  );
+  // header → AuthorCard's div, with the bound name text inside.
+  assert.equal(root[0].tag, "header");
+  assert.equal(root[0].children[0].tag, "div");
+  assert.equal(root[0].children[0].props.className, "author");
+  assert.deepEqual(texts(root[0].children[0]), ["Ada"]);
+});
+
+test("planPage: an unknown PascalCase tag becomes a hidden placeholder, no throw", () => {
+  const { root } = planPage(
+    [{ id: "1", component: "PostMeta" }],
+    mapOf(wrapper), // AuthorCard missing
+  );
+  assert.match(
+    root[0].children[0].props["data-render-error"],
+    /unknown component "AuthorCard"/,
+  );
+});
+
+test("planPage: a nested-by-tag component ships its script (once, with the wrapper's)", () => {
+  const { scripts } = planPage(
+    [{ id: "1", component: "PostMeta" }, { id: "2", component: "PostMeta" }],
+    mapOf(wrapper, author),
+  );
+  // wrapper script first (it's the block root), then the nested author, each once.
+  assert.deepEqual(scripts, ["/*meta*/", "/*author*/"]);
+});
+
+test("planPage: cyclic component references stop at the depth guard (no infinite loop)", () => {
+  const a = { name: "Aaa", tree: { tag: "div", children: [{ tag: "Bbb" }] } };
+  const b = { name: "Bbb", tree: { tag: "span", children: [{ tag: "Aaa" }] } };
+  // Should return (not hang) and end in a "nested too deeply" placeholder.
+  const { root } = planPage([{ id: "1", component: "Aaa" }], mapOf(a, b));
+  const errs = [];
+  (function walk(p) {
+    if (p.props?.["data-render-error"]) errs.push(p.props["data-render-error"]);
+    for (const c of p.children ?? []) walk(c);
+  })(root[0]);
+  assert.ok(errs.some((e) => /nested too deeply/.test(e)));
+});
+
+test("planTree without a compose context renders a PascalCase tag literally (back-compat)", () => {
+  // No components map passed → old behaviour: the tag is emitted as-is.
+  const plan = planTree({ tag: "AuthorCard", props: { name: "x" } });
+  assert.equal(plan.tag, "AuthorCard");
+  assert.equal(plan.kind, "element");
+});
+
+test("collectTreeComponentTags: enumerates only PascalCase tags, recursing", () => {
+  const tree = {
+    tag: "div",
+    children: [
+      { tag: "AuthorCard" },
+      { tag: "span", children: [{ tag: "PostList" }] },
+      "text",
+    ],
+  };
+  assert.deepEqual([...collectTreeComponentTags(tree)].sort(), ["AuthorCard", "PostList"]);
+});
+
 // ── parseJsonColumn ───────────────────────────────────────────────────────────
 
 test("parseJsonColumn: parses valid JSON", () => {
