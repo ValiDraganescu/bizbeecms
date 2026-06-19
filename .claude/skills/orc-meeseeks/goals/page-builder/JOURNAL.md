@@ -275,3 +275,19 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `npx opennextjs-cloudflare build` green (port 3601 free, dev stopped). PM bundle NOT regenerated — propsSchema
   is editor metadata, no render-output change (still owed from the column-model render run per CAVEATS).
 - **Files:** CMS `src/lib/components/blog-kit.ts`, `scripts/blog-kit.test.mjs`.
+
+## 2026-06-19 18:33 — Upgrade LANDING kit schemas to the richer vocab
+- **Status:** DONE
+- **What I did:** Enriched every component's `propsSchema` in `lib/components/landing-kit.ts`
+  (Hero, FeatureGrid, CTABand, Testimonial, SiteFooter) — kept bizbee's object-keyed shape, widened each
+  text-prop descriptor with `translatable:true` + `label` and `required:true` on each component's primary
+  text (Hero.headline, FeatureGrid.heading + feature{1,2,3}Title, CTABand.title, Testimonial.quote/author,
+  SiteFooter.tagline). `ctaHref` (Hero + CTABand) is a URL → label only, NON-translatable. Followed the
+  BLOG-run lesson: NO number/boolean/select fields — the kit markup binds only `{{slot}}` text, so a config
+  field would be dead metadata; markup left UNCHANGED.
+- **Verified:** CMS `npx tsc --noEmit` OK; `node --test scripts/landing-kit.test.mjs` 6/6 (new test asserts
+  every prop parses to a known field type, Hero.headline req+translatable, Hero.ctaHref NOT translatable,
+  FeatureGrid.feature1Title + SiteFooter.tagline req+translatable); `npx opennextjs-cloudflare build` green
+  (port 3601 free). PM bundle NOT regenerated — propsSchema is editor metadata, no render-output change
+  (still owed from the column-model render run per CAVEATS).
+- **Files:** CMS `src/lib/components/landing-kit.ts`, `scripts/landing-kit.test.mjs`.

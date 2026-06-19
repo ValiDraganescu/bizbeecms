@@ -8,6 +8,9 @@
 ## Loop mode (from driver hint)
 Plow continuously, NO stopping for human action. If your task needs the human (live CF auth, manual browser test, a secret, an external account action, a subjective call) → append a line to repo-root `HITL.md` under `## Open`, commit it, then pick the most valuable OFFLINE slice and do that.
 
+## ⚠️ JUST FIXED (2026-06-19 18:32) — BUG P1 CMS AI Assistant "2001"
+The CMS AI Assistant errored `2001: Please configure AI Gateway` on every message — gateway slug mismatch (`bizbeecms-cms` vs the real account gateway `bizbeecms-ai-gateway`). Fixed in `CMS/wrangler.jsonc` + `CMS/src/lib/ports/ai.ts` (`DEFAULT_AI_GATEWAY`), regression-pinned in `CMS/scripts/ai-port.test.mjs`, PM bundle regenerated. **HITL: the live CMS Site must be REDEPLOYED** to pick up the new var (baked at deploy time) — see HITL.md. See new CAVEAT "AI Gateway slug is bizbeecms-ai-gateway". NO open bugs remain in BACKLOG.md `## Bugs`.
+
 ## State of the world (git is the truth — `git log --oneline`)
 - PM fully built + live (M1 done). Deploy via the deployer Container.
 - **A (Rendering foundation) COMPLETE; B (AI assistant) COMPLETE (offline cores):** chat SSE + 5 tools + `/admin/chat` UI + real system prompt (E2).

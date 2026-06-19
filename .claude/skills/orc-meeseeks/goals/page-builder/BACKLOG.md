@@ -130,12 +130,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
   to a known field type, title=required+translatable, href NOT translatable, body=richtext+translatable →
   6/6 green. tsc + opennext build green. PM bundle:cms NOT owed (propsSchema is editor metadata, no render
   output change) — bundle still stale from the column-model render run per CAVEATS.
-- TODO: **Upgrade LANDING kit component schemas to the richer vocab** (`lib/components/landing-kit.ts`:
-  Hero, FeatureGrid, CTABand, Testimonial, SiteFooter). Same as the blog-kit task — enrich each propsSchema
-  with real field types/defaults/required (e.g. FeatureGrid columns=select, CTABand has bool toggles),
-  **`translatable:true` on text props** (headline, subhead, CTA label, testimonial body, footer text),
-  markup unchanged. Depends on the FOUNDATION task. Parallelizable. Gate: CMS tsc + opennext build green;
-  regen PM cms-bundle.
+- DONE (2026-06-19): **Upgrade LANDING kit component schemas to the richer vocab** (`lib/components/landing-kit.ts`:
+  Hero, FeatureGrid, CTABand, Testimonial, SiteFooter). Enriched every text-prop descriptor with
+  `translatable:true` + `label` + `required:true` on each component's primary text; `ctaHref` (Hero/CTABand)
+  is a URL → label only, NON-translatable. NO number/boolean/select added (kit markup binds only `{{slot}}`
+  text — a config field would be dead metadata; markup UNCHANGED per spec). Extended
+  `scripts/landing-kit.test.mjs` (+1 test, 6/6) asserting field-type vocab + Hero.headline req+translatable,
+  Hero.ctaHref NOT translatable, FeatureGrid.feature1Title + SiteFooter.tagline req+translatable. tsc +
+  opennext build green. PM bundle NOT owed (editor metadata, no render change).
 - TODO: **Upgrade DOCS kit component schemas to the richer vocab** (`lib/components/docs-kit.ts`:
   DocsHeader, Callout, CodeBlock, StepList, ApiParam, + the 6th). Same as the blog/landing tasks — enrich
   each propsSchema (e.g. Callout variant=select, ApiParam required=boolean), **`translatable:true` on text

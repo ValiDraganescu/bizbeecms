@@ -19,6 +19,7 @@ import {
   parsePortableComponent,
 } from "../src/lib/components/portable.ts";
 import { landingKit, landingKitNames } from "../src/lib/components/landing-kit.ts";
+import { parsePropsSchema } from "../src/lib/pages/page-blocks.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const msgDir = join(here, "..", "messages");
@@ -56,6 +57,37 @@ test("component names are unique within the kit", () => {
   assert.equal(new Set(names).size, names.length, "duplicate component name in kit");
   assert.ok(names.includes("Hero"));
   assert.ok(names.includes("SiteFooter"));
+});
+
+test("every component's propsSchema parses into the richer field vocab", () => {
+  const byName = Object.fromEntries(landingKit().map((b) => [b.component.name, b.component]));
+
+  // Every prop parses to a known field type.
+  for (const b of landingKit()) {
+    const fields = parsePropsSchema(b.component.propsSchema);
+    assert.ok(fields.length > 0, `${b.component.name}: schema parsed to no fields`);
+    for (const f of fields) {
+      assert.ok(
+        ["string", "richtext", "number", "boolean", "select"].includes(f.type),
+        `${b.component.name}.${f.name}: unknown field type ${f.type}`,
+      );
+    }
+  }
+
+  // Spot-check the semantics the upgrade adds.
+  const hero = parsePropsSchema(byName.Hero.propsSchema);
+  const headline = hero.find((f) => f.name === "headline");
+  assert.ok(headline.required && headline.translatable, "Hero.headline must be required + translatable");
+  const ctaHref = hero.find((f) => f.name === "ctaHref");
+  assert.ok(!ctaHref.translatable, "Hero.ctaHref (a URL) must NOT be translatable");
+
+  const grid = parsePropsSchema(byName.FeatureGrid.propsSchema);
+  const f1 = grid.find((f) => f.name === "feature1Title");
+  assert.ok(f1.required && f1.translatable, "FeatureGrid.feature1Title must be required + translatable");
+
+  const footer = parsePropsSchema(byName.SiteFooter.propsSchema);
+  const tagline = footer.find((f) => f.name === "tagline");
+  assert.ok(tagline.required && tagline.translatable, "SiteFooter.tagline must be required + translatable");
 });
 
 test("kit i18n keys exist with identical keys in EN/FI/ET", () => {

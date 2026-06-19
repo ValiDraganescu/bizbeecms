@@ -40,7 +40,7 @@
     }
   ],
   "vars": {
-    "AI_GATEWAY": "bizbeecms-cms",
+    "AI_GATEWAY": "bizbeecms-ai-gateway",
     // CMS admin-auth bridge (Sec1). The deployer OVERRIDES these per-Site at
     // `wrangler deploy` time (via --var); the placeholders here just declare the
     // shape and let the build/typegen see them.

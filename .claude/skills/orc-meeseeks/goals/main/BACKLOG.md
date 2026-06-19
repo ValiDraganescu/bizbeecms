@@ -3,6 +3,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
+- DONE [P1]: CMS AI Assistant errored `2001: Please configure AI Gateway` on every message. ROOT CAUSE:
+  gateway slug mismatch — code (`ai.ts` `getGatewayId` fallback) + `CMS/wrangler.jsonc` `vars.AI_GATEWAY`
+  both said `bizbeecms-cms`, but the gateway that actually exists on the account is `bizbeecms-ai-gateway`
+  (per the working curl `cf-aig-gateway-id: bizbeecms-ai-gateway`). The deployer doesn't set `AI_GATEWAY`
+  per-Site, so the wrangler var/code default is what ships → `env.AI.run({gateway:{id:"bizbeecms-cms"}})`
+  hit a nonexistent gateway → 2001. FIX: extracted `DEFAULT_AI_GATEWAY = "bizbeecms-ai-gateway"` (exported
+  const) in `ai.ts`, repointed `wrangler.jsonc` `AI_GATEWAY`, updated DEPLOY-ARCHITECTURE.md (3 spots).
+  REGRESSION GUARD: `CMS/scripts/ai-port.test.mjs` now pins `DEFAULT_AI_GATEWAY === "bizbeecms-ai-gateway"`
+  AND parses `wrangler.jsonc` to assert the var matches — both fail if the slug regresses (the live
+  `env.AI.run` can't be exercised offline). PM bundle regenerated. Fixed 2026-06-19. NOTE: redeploy needed
+  for the live Site to pick up the new var (baked at deploy time).
 - DONE [P2]: CMS Theme editor swatches rendered gray — the native `<input type="color">` only takes
   `#rrggbb`, so feeding it an `oklch()` string made it fall back to neutral. FIX (`theme-editor.tsx`): the
   swatch is now a `<label>` whose `background` is the REAL token value (the browser paints oklch/rgb/… fine),

@@ -93,11 +93,23 @@ export async function getAi(): Promise<Ai | null> {
 }
 
 /**
+ * Default AI Gateway slug — the gateway that actually exists on the account
+ * (dashboard → AI → AI Gateway). MUST match a real gateway or `env.AI.run` fails
+ * at runtime with `2001: Please configure AI Gateway`. Exported so a regression
+ * test can pin it (the runtime call can't be exercised offline).
+ *
+ * ponytail: hardcoded default; per-Site override stays the `AI_GATEWAY` var.
+ */
+export const DEFAULT_AI_GATEWAY = "bizbeecms-ai-gateway";
+
+/**
  * Resolve the AI Gateway slug for the current Site. Override at deploy time via
  * `AI_GATEWAY`; falls back to the default gateway so a freshly-provisioned Site
  * still works. Kept here so `env` reads stay in the port module.
  */
 export async function getGatewayId(): Promise<string> {
   const { env } = await getCloudflareContext({ async: true });
-  return (env as unknown as { AI_GATEWAY?: string }).AI_GATEWAY ?? "bizbeecms-cms";
+  return (
+    (env as unknown as { AI_GATEWAY?: string }).AI_GATEWAY ?? DEFAULT_AI_GATEWAY
+  );
 }

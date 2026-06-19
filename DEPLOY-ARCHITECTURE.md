@@ -295,12 +295,59 @@ right per-Site CMS Worker by `Host`.
 | **CMS Worker** (per-Site) | `SITE_ID` / `PM_ORIGIN` / `CMS_AUTH_SECRET` (vars) | injected by deployer `--var` at deploy. `PM_ORIGIN`=`manager.bizbeecms.com`. **Baked in at deploy time — a stale origin requires a REDEPLOY (trap #5).** | auto on deploy (empty placeholders in `CMS/wrangler.jsonc`); served at `bizbeecms-cms-<slug>.vali-draganescu88.workers.dev` |
 | CMS | `DB` (per-Site D1) | the Site's content | ❌ **NOT auto-created** — manual (see below) |
 | CMS | `MEDIA` (R2 bucket) | media library | ❌ **NOT auto-created** — manual |
-| CMS | `AI` (Workers AI) + AI Gateway `bizbeecms-cms` | chat / AI tools | ❌ gateway is a manual dashboard step; binding works once it exists |
+| CMS | `AI` (Workers AI) + AI Gateway `bizbeecms-ai-gateway` | chat / AI tools | ❌ gateway is a manual dashboard step; binding works once it exists. Slug MUST match the gateway on the account or `env.AI.run` fails `2001: Please configure AI Gateway` (fixed 2026-06-19). |
 | **router Worker** ✅ deployed (2026-06-18) | `HOST_MAP` (KV `1c276b01…`) | host → slug lookup | ✅ bound |
 | router | `WORKERS_SUBDOMAIN` (var) | builds the per-Site `.workers.dev` proxy target (`vali-draganescu88`) | ✅ set |
 
 Legend: ✅ verified live · ❌ not provisioned / not automated · ⚠️ caveat. **All control-plane secrets
 are now set — the only open items are per-Site/account infra (D1, R2, AI Gateway) and verification.**
+
+---
+
+## Config & magic-value inventory (where every CF constant lives)
+
+Every Cloudflare config/resource string in the codebase, and the ONE place each is
+defined. "Magic strings" are centralized per-component (the four packages can't share
+imports — each is its own npm package). When a value changes, edit only the source-of-truth
+cell; the bash-container strings and wrangler files are the exceptions (noted inline).
+
+### Source-of-truth files
+| Constant | Value | Defined in | Consumed by |
+|---|---|---|---|
+| Account workers.dev subdomain | `vali-draganescu88` | `ProjectManager/src/lib/config/hosts.ts` (`ACCOUNT_WORKERS_SUBDOMAIN`) · `router/wrangler.jsonc` (`vars.WORKERS_SUBDOMAIN`) | PM: `worker-url.ts`; router: `src/index.ts` (env var) |
+| workers.dev suffix | `.vali-draganescu88.workers.dev` | `hosts.ts` (`WORKERS_DEV_SUFFIX`, derived) | PM `cmsWorkerUrl()` |
+| CMS worker name prefix | `bizbeecms-cms-` | `hosts.ts` (`CMS_WORKER_PREFIX`) · `deployer/src/index.ts` (`WORKER_PREFIX`) | PM URL build; deployer naming |
+| Registrable zone | `bizbeecms.com` | `hosts.ts` (`ZONE_DOMAIN`) · all 4 `wrangler.jsonc` routes | PM host-trust checks; CF routes |
+| PM origin | `https://manager.bizbeecms.com` | `hosts.ts` (`PM_ORIGIN`, derived) · `ProjectManager/wrangler.jsonc` (`vars.APP_ORIGIN`) · `deployer/wrangler.jsonc` (`vars.PM_ORIGIN`) | PM links; injected into each CMS as `PM_ORIGIN` |
+| Deployer URL | `https://deployer.bizbeecms.com` | `ProjectManager/wrangler.jsonc` (`vars.DEPLOYER_URL`) | PM → deployer `POST /deploy` |
+| Custom-domain fallback origin | `cf.bizbeecms.com` | `hosts.ts` (`CUSTOM_DOMAIN_FALLBACK_ORIGIN`) · `deployer/src/index.ts` (`CUSTOM_DOMAIN_FALLBACK_ORIGIN`) · `router/wrangler.jsonc` route | shown to customer; CF-for-SaaS CNAME target |
+| CF apex anycast IPs | `104.21.34.242`, `172.67.210.25` | `hosts.ts` (`CUSTOM_DOMAIN_APEX_IPS`) · `deployer/src/index.ts` (`CUSTOM_DOMAIN_APEX_IPS`) | A records shown to customer for apex domains |
+| Originless fallback DNS | `AAAA 100::` (NOT `192.0.2.1` — 522s) | **dashboard only** (DNS record, not in code) | CF for SaaS fallback origin — see trap #6 |
+| AI Gateway slug | `bizbeecms-ai-gateway` | `CMS/wrangler.jsonc` (`vars.AI_GATEWAY`) + `CMS/src/lib/ports/ai.ts` (`DEFAULT_AI_GATEWAY`) | CMS `env.AI.run()` via gateway. Must name a real account gateway or every chat message errors `2001`. |
+
+> **PM ↔ deployer duplication is deliberate.** `hosts.ts` and `deployer/src/index.ts` each
+> hold their own copy of the worker prefix / fallback origin / apex IPs because they're
+> separate packages with no shared module. Both are listed above; change them together.
+
+### Resource IDs (`wrangler.jsonc` bindings — the canonical place for IDs)
+| Resource | ID | Binding | Files |
+|---|---|---|---|
+| PM D1 `bizbeecms` | `69cda498-69e6-44ce-9814-826afffa4a1a` | `DB` | `ProjectManager/wrangler.jsonc` |
+| PM sessions KV | `f400b577848f4e4aa6845d2fb46a601e` | `SESSIONS` | `ProjectManager/wrangler.jsonc` |
+| HOST_MAP KV | `1c276b01cd5a41f0b8c98ace07b4c064` | `HOST_MAP` | PM + deployer + router `wrangler.jsonc` (shared) |
+| CMS D1 (per-Site) | placeholder `0000…` → real id at deploy | `DB` | `CMS/wrangler.jsonc`; deployer patches per-Site (`DB_NAME=bizbeecms-cms-<slug>`) |
+| CMS R2 (per-Site) | `bizbeecms-cms-media` → `…-<slug>` at deploy | `MEDIA` | `CMS/wrangler.jsonc`; deployer patches (`BUCKET_NAME=bizbeecms-cms-media-<slug>`) |
+| Account id `f510a160…` / zone id `dfaec5f7…` | — | — | **secrets only** (`CF_ACCOUNT_ID`, `CF_ZONE_ID` on deployer); not hardcoded in source |
+
+### Deliberately NOT centralized
+- **Per-Site resource names in the deployer's container bash script** (`DB_NAME`,
+  `BUCKET_NAME`, `--name`, `--compatibility-date 2025-09-01`, `--var SITE_ID/PM_ORIGIN/CMS_AUTH_SECRET`):
+  the script runs as bash inside the Sandbox Container and can't import the TS constants.
+  Marked with a `ponytail:` comment at `deployer/src/index.ts` (DB_NAME line). Keep in sync
+  with `WORKER_PREFIX` by hand.
+- **`compatibility_date` / `compatibility_flags`**: per-Worker in each `wrangler.jsonc`
+  (PM+CMS `2025-03-25`, deployer+router `2025-09-01`). Intentionally independent per worker.
+- **Account id / zone id**: live as deployer **secrets**, never in source. Don't inline them.
 
 ---
 
@@ -340,8 +387,10 @@ keep preflight green; it does not affect the container deploy.
 The deployer only builds + `wrangler deploy`s the CMS Worker; it does **not** create infra. Before
 (or as part of) a CMS deploy:
 
-- **AI Gateway** `bizbeecms-cms` — dashboard → AI → AI Gateway; enable **Workers AI**. Once, shared
-  across Sites. (Override per-Site with the `AI_GATEWAY` var if you use a different slug.)
+- **AI Gateway** `bizbeecms-ai-gateway` — dashboard → AI → AI Gateway; enable **Workers AI**. Once, shared
+  across Sites. The slug MUST match `vars.AI_GATEWAY` / `DEFAULT_AI_GATEWAY` exactly, else `env.AI.run`
+  fails `2001: Please configure AI Gateway` on every chat message. (Override per-Site with the `AI_GATEWAY`
+  var if you use a different slug.)
 - **per-Site D1**: `wrangler d1 create bizbeecms-cms-<slug>` → `wrangler d1 migrations apply …`
   (CMS migrations under `CMS/migrations/`, incl. `0002_*` asset table).
 - **per-Site R2 bucket**: `wrangler r2 bucket create bizbeecms-cms-media` (or per-Site), bound `MEDIA`.

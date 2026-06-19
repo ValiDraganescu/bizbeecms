@@ -85,10 +85,10 @@ export function landingKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        headline: { type: "string", default: "Your product, beautifully launched" },
-        subhead: { type: "string", default: "A clear, compelling sentence about what you do." },
-        ctaLabel: { type: "string", default: "Get started" },
-        ctaHref: { type: "string", default: "#" },
+        headline: { type: "string", default: "Your product, beautifully launched", required: true, translatable: true, label: "Headline" },
+        subhead: { type: "string", default: "A clear, compelling sentence about what you do.", translatable: true, label: "Subhead" },
+        ctaLabel: { type: "string", default: "Get started", translatable: true, label: "CTA label" },
+        ctaHref: { type: "string", default: "#", label: "CTA link" },
       }),
     }),
 
@@ -172,13 +172,13 @@ export function landingKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        heading: { type: "string", default: "Why teams choose us" },
-        feature1Title: { type: "string", default: "Fast" },
-        feature1Body: { type: "string", default: "Describe the first benefit." },
-        feature2Title: { type: "string", default: "Reliable" },
-        feature2Body: { type: "string", default: "Describe the second benefit." },
-        feature3Title: { type: "string", default: "Simple" },
-        feature3Body: { type: "string", default: "Describe the third benefit." },
+        heading: { type: "string", default: "Why teams choose us", required: true, translatable: true, label: "Heading" },
+        feature1Title: { type: "string", default: "Fast", required: true, translatable: true, label: "Feature 1 title" },
+        feature1Body: { type: "string", default: "Describe the first benefit.", translatable: true, label: "Feature 1 body" },
+        feature2Title: { type: "string", default: "Reliable", required: true, translatable: true, label: "Feature 2 title" },
+        feature2Body: { type: "string", default: "Describe the second benefit.", translatable: true, label: "Feature 2 body" },
+        feature3Title: { type: "string", default: "Simple", required: true, translatable: true, label: "Feature 3 title" },
+        feature3Body: { type: "string", default: "Describe the third benefit.", translatable: true, label: "Feature 3 body" },
       }),
     }),
 
@@ -216,10 +216,10 @@ export function landingKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        title: { type: "string", default: "Ready to get started?" },
-        subtitle: { type: "string", default: "Join today and ship faster." },
-        ctaLabel: { type: "string", default: "Sign up" },
-        ctaHref: { type: "string", default: "#" },
+        title: { type: "string", default: "Ready to get started?", required: true, translatable: true, label: "Title" },
+        subtitle: { type: "string", default: "Join today and ship faster.", translatable: true, label: "Subtitle" },
+        ctaLabel: { type: "string", default: "Sign up", translatable: true, label: "CTA label" },
+        ctaHref: { type: "string", default: "#", label: "CTA link" },
       }),
     }),
 
@@ -259,9 +259,9 @@ export function landingKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        quote: { type: "string", default: "This product changed how we work." },
-        author: { type: "string", default: "Jane Doe" },
-        role: { type: "string", default: "CEO, Example Inc." },
+        quote: { type: "string", default: "This product changed how we work.", required: true, translatable: true, label: "Quote" },
+        author: { type: "string", default: "Jane Doe", required: true, translatable: true, label: "Author" },
+        role: { type: "string", default: "CEO, Example Inc.", translatable: true, label: "Role" },
       }),
     }),
 
@@ -290,8 +290,8 @@ export function landingKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        tagline: { type: "string", default: "Built with bizbeecms" },
-        copyright: { type: "string", default: "© 2026 Your Company. All rights reserved." },
+        tagline: { type: "string", default: "Built with bizbeecms", required: true, translatable: true, label: "Tagline" },
+        copyright: { type: "string", default: "© 2026 Your Company. All rights reserved.", translatable: true, label: "Copyright" },
       }),
     }),
   ];
