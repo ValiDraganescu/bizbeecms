@@ -92,10 +92,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   available in the AI Gateway, in a CUSTOM select that (1) supports SEARCH/filter, (2) groups by PROVIDER
   (section per provider), (3) within each provider section orders LOW→HIGH price. This REPLACES the 3-model
   allowlist with a real catalog.
-  - DEPENDS ON the binding-adapters REST-`Ai` task: that switches addressing to the gateway's `provider/model`
-    ids (e.g. `openai/gpt-4.1`) instead of the Workers-AI-binding `@cf/...` ids. Build the catalog on the
-    `provider/model` scheme; don't keep the `@cf/...` allowlist. If that task isn't landed yet, this is
-    BLOCKED on it — note so and pick another task.
+  - NOT BLOCKED (user 2026-06-20): build it now on the `@cf/...` catalog from the API below; if/when
+    binding-adapters lands the REST `provider/model` scheme, the catalog mapping adapts. Don't wait on it.
+  - ALT CATALOG SOURCE (user 2026-06-20): Cloudflare also publishes a unified markdown catalog at
+    `https://developers.cloudflare.com/ai/models/index.md` — parseable as a fallback/supplement if the
+    JSON API below is awkward. Prefer the JSON API for structured price/task fields; this md for the
+    multi-provider gateway models the API doesn't expose.
   - CATALOG SOURCE (RESOLVED by curator 2026-06-20 — there IS a real API, cache it; user asked to "cache the
     data in the DB once or twice a day"): Cloudflare's list-models endpoint is
     `GET https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/models/search`
