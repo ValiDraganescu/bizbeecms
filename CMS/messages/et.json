@@ -192,7 +192,7 @@
     "imported": "Imporditud „{name}”.",
     "updated": "Uuendatud „{name}”.",
     "kitsTitle": "Stardipaketid",
-    "kitsHint": "Paigalda valmis komponentide komplekt ühe klõpsuga. Blogipakett lisab postituse päise, postituse sisu, autorikaardi ja postituste loendi.",
+    "kitsHint": "Paigalda valmis komplekt komponente ühe klõpsuga. Blogipakett lisab postituse päise, sisu, autorikaardi ja postituste loendi; maandumispakett lisab hero-ploki, omaduste ruudustiku, CTA-riba, soovituse ja jaluse.",
     "installBlogKit": "Paigalda blogipakett",
     "kitInstalled": "Blogipakett paigaldatud: {created} loodud, {updated} uuendatud.",
     "assetDepsTitle": "Meediasõltuvused",
@@ -207,7 +207,8 @@
     "rebindDrop": "Eemalda",
     "rebindToLabel": "Seo meediafailiga…",
     "applyRebind": "Impordi uuesti ümberseostamisega",
-    "applyingRebind": "Impordin uuesti…"
+    "applyingRebind": "Impordin uuesti…",
+    "installLandingKit": "Paigalda maandumispakett"
   },
   "adminAuth": {
     "forbiddenTitle": "Juurdepääs keelatud",

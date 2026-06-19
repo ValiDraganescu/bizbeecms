@@ -20,13 +20,13 @@ Plow continuously, NO stopping for human action. If your task needs the human (l
 - **🧹 Housekeeping DONE (2026-06-19): CMS/tsconfig.tsbuildinfo untracked + gitignored** (the `a07c70a` commit had only edited the backlog note, never the file — see CAVEAT "a backlog-note commit is NOT proof").
 
 ## Next valuable slice — pick ONE:
-1. **G2+ — more kits (landing/marketing, docs, portfolio).** ← LEAN HERE (H-track is now fully CLOSED). Kit template proven (`CMS/src/lib/components/<x>-kit.ts` array of `bizbeecms.component` v1 bundles + an `id` branch in `CMS/src/app/api/components/kit/route.ts` + an install button/handler in `components-manager.tsx` + a `kitInstalled`-style i18n key + a `scripts/<x>-kit.test.mjs`). New kits MUST author `{{slots}}` + `propsSchema` from the start (see `blog-kit.ts`). Kit-install dep-check (H3b) excludes self-kit names before warning. Pattern: copy the blog-kit slice end-to-end for a "landing/marketing" kit (hero, feature grid, CTA band, testimonial, footer).
-2. **H-track DONE** — H3b part 1 (editable asset-rebind UI) shipped 2026-06-19; H1/H2/H3/H3b parts 1&2 all complete. Nothing left in H.
-3. **Per-locale block-prop editing** (DEFERRED). A localized prop currently gets ONE text field writing a bare string (shows in all locales). To do per-locale: render N fields from `getContentLocales()`, write a `{en,fi,et}` object. `validateBlockProps` already keeps object values → editor-UI-only expansion.
-4. **F1 — PM deploy fleet view.** PM dashboard listing all Sites' deploy status + stuck flags. PM-side.
-5. **D2 — Cloudflare Images transforms** (optional, smaller).
+1. **G3+ — yet more kits (docs, portfolio, e-commerce-landing).** Kit infra is now a `KITS` REGISTRY (G2): adding a kit = new `CMS/src/lib/components/<x>-kit.ts` + ONE `{id,build,names}` entry in the `KITS` array in `api/components/kit/route.ts` + ONE `{id,labelKey}` entry in the `KITS` const in `components-manager.tsx` + an `install<X>Kit` i18n key (all 3 catalogs) + a `scripts/<x>-kit.test.mjs`. Author `{{slots}}`+`propsSchema` from the start; every className must be in `allowedClasses()` (NO `rounded-md`/`text-6xl`). Copy `landing-kit.ts` end-to-end.
+2. **Per-locale block-prop editing** (DEFERRED). A localized prop currently gets ONE text field writing a bare string (shows in all locales). To do per-locale: render N fields from `getContentLocales()`, write a `{en,fi,et}` object. `validateBlockProps` already keeps object values → editor-UI-only expansion.
+3. **F1 — PM deploy fleet view.** PM dashboard listing all Sites' deploy status + stuck flags. PM-side.
+4. **D2 — Cloudflare Images transforms** (optional, smaller).
+5. **Nested-component render gap** (noted in H3b CAVEAT): the renderer does NOT actually resolve a PascalCase `tag` to another component (renders `<authorcard>` literally) — the deps warning is portability-only. If real composition-by-tag is wanted, that's a `lib/render` feature: resolve PascalCase tags against the component Map in `planTree`/`react.tsx`. Bigger slice — could be its own subgoal.
 
-Lean toward #1 (finish H-track) or #2 (more kits).
+Lean toward #1 (more kits — infra is trivial now) or #2.
 
 ## Settings/admin pattern is WELL-TRODDEN — reuse:
 PURE normalize/validate logic in `lib/...` (never `db/*` — drizzle import breaks node --test; import sibling source with `.ts` extension) → `db/*-store.ts` typed accessor → REST `api/.../route.ts` GET/PUT (server re-validates, NO server actions, **requireAdmin-gated**) → `/admin/.../page.tsx` (force-dynamic, try/catch → safe default offline; auto-covered by the admin layout guard + the new AdminNav chrome) + `"use client"` editor `fetch`ing the route → EN/FI/ET namespace (key parity test-locked). **New admin section?** also add it to `ADMIN_SECTIONS` in `CMS/src/components/admin-nav.tsx` + `adminNav.<key>`/`adminNav.desc.<key>` in all 3 catalogs (test-locked in admin-nav.test.mjs).
@@ -37,7 +37,7 @@ PURE normalize/validate logic in `lib/...` (never `db/*` — drizzle import brea
 - Run CMS commands inside `CMS/`; PM inside `ProjectManager/`. orc-meeseeks skill + goals at REPO ROOT `.claude/skills/...`.
 - After ANY `CMS/` change: `npm run bundle:cms` (ProjectManager/) to regen `cms-bundle.generated.js` (~6.5MB now). `npm run cf-typegen` (CMS) only after a wrangler BINDING change. `npm run db:generate` (CMS) only after a schema change.
 - Deploy gate = `npx opennextjs-cloudflare build`; NEVER run while a dev server is on 3601/3602. Check `lsof -ti:3601 -ti:3602`; clean `.next .open-next` (CMS + PM) after gating.
-- CMS tests: `npm test` now globs `scripts/*.test.mjs` AND `'src/**/*.test.ts'`, **274/274**. Dep-free, no `@/` alias, no React/DOM/drizzle/opennext imports; sibling imports via relative `./x.ts`.
+- CMS tests: `npm test` now globs `scripts/*.test.mjs` AND `'src/**/*.test.ts'`, **279/279**. Dep-free, no `@/` alias, no React/DOM/drizzle/opennext imports; sibling imports via relative `./x.ts`.
 - **Three page write contracts — don't merge:** AI `upsertPage` (blocks+parent), C2 `upsertPageMeta` (metadata, preserves blocks), C3 `setPageBlocks` (blocks-only, preserves metadata).
 - NO server eval on Workers; NO server actions (REST route handlers only). Use ONLY purpose theme tokens; all admin-UI strings via i18n (EN/FI/ET parity).
 - CMS public route is the optional catch-all — don't re-add a static `app/page.tsx`. Root `/` needs a published `home` slug or 404s (by design). Serve assets at `/media/<key>`.

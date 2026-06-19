@@ -19,6 +19,13 @@ import { useTranslations } from "next-intl";
 
 type ComponentSummary = { name: string; hasScript: boolean; hasCss: boolean };
 
+// Starter kits the UI offers. Keep in sync with the KITS registry in
+// `api/components/kit/route.ts`; `labelKey` is the i18n key for the button.
+const KITS = [
+  { id: "blog", labelKey: "installBlogKit" },
+  { id: "landing", labelKey: "installLandingKit" },
+] as const;
+
 export function ComponentsManager({
   initialComponents,
 }: {
@@ -156,9 +163,9 @@ export function ComponentsManager({
     await importBundle(text);
   }
 
-  // Install the blog starter kit (epic G1): one POST to the kit route, which
+  // Install a starter kit by id (epics G1/G2): one POST to the kit route, which
   // runs every premade bundle through the SAME import gate + write path.
-  async function installBlogKit() {
+  async function installKit(id: string) {
     setError(null);
     setNotice(null);
     setAssetDeps([]);
@@ -169,7 +176,7 @@ export function ComponentsManager({
       const res = await fetch("/api/components/kit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: "blog" }),
+        body: JSON.stringify({ id }),
       });
       if (!res.ok) {
         setError(await errorOf(res));
@@ -296,18 +303,24 @@ export function ComponentsManager({
         </div>
       )}
 
-      {/* Starter kits: one-click install of a premade component set (G1) */}
-      <section className="flex flex-col gap-2 rounded-md border border-border bg-surface-raised p-4">
+      {/* Starter kits: one-click install of a premade component set (G1/G2).
+          Each kit = one entry here; install goes through the gated kit route. */}
+      <section className="flex flex-col gap-3 rounded-md border border-border bg-surface-raised p-4">
         <h2 className="text-lg font-semibold text-foreground">{t("kitsTitle")}</h2>
         <p className="text-sm text-foreground-muted">{t("kitsHint")}</p>
-        <button
-          type="button"
-          className="mt-1 self-start rounded-md border border-border px-4 py-2 text-foreground hover:bg-surface disabled:opacity-50"
-          disabled={busy}
-          onClick={() => void installBlogKit()}
-        >
-          {t("installBlogKit")}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {KITS.map((k) => (
+            <button
+              key={k.id}
+              type="button"
+              className="self-start rounded-md border border-border px-4 py-2 text-foreground hover:bg-surface disabled:opacity-50"
+              disabled={busy}
+              onClick={() => void installKit(k.id)}
+            >
+              {t(k.labelKey)}
+            </button>
+          ))}
+        </div>
       </section>
 
       {/* Component list with per-component export */}

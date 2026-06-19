@@ -1,14 +1,16 @@
 /**
- * Premade-kit install endpoint (Milestone 2, epic G1).
+ * Premade-kit install endpoint (Milestone 2, epics G1/G2).
  *
  *   GET            → the kit manifest (id + component names) so the UI can show
- *                    what "Install blog kit" will add. No D1 read.
+ *                    what each "Install … kit" button will add. No D1 read.
  *   POST {id?}     → INSTALL the kit: run EVERY bundle through the SAME import
  *                    gate (`parsePortableComponent`) and the SAME write path
  *                    (`upsertImportedComponent`) the manual `/api/components`
  *                    import uses. No new validation or write path is introduced.
  *
- * The kit bundles are static, authored data (`lib/components/blog-kit.ts`), but
+ * Adding a kit = ONE entry in the KITS registry below (id + builder + names).
+ *
+ * The kit bundles are static, authored data (`lib/components/*-kit.ts`), but
  * they are STILL re-validated here — they go through the trust boundary exactly
  * like a pasted/uploaded bundle. If we ever ship a malformed kit bundle, the
  * gate rejects it with the same errors a bad import would get (and a regression
@@ -17,26 +19,32 @@
  * REST-only (no server actions). Live D1 write needs a real binding (HITL).
  */
 import { missingComponentNames, upsertImportedComponent } from "@/db/component-store";
-import { parsePortableComponent } from "@/lib/components/portable";
+import { parsePortableComponent, type PortableComponent } from "@/lib/components/portable";
 import { BLOG_KIT_ID, blogKit, blogKitNames } from "@/lib/components/blog-kit";
+import { LANDING_KIT_ID, landingKit, landingKitNames } from "@/lib/components/landing-kit";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
+// The kit registry — single source of truth for which kits exist.
+type Kit = { id: string; build: () => PortableComponent[]; names: () => string[] };
+const KITS: Kit[] = [
+  { id: BLOG_KIT_ID, build: blogKit, names: blogKitNames },
+  { id: LANDING_KIT_ID, build: landingKit, names: landingKitNames },
+];
+
 // The kit manifest is a STATIC list of what kits exist (no Site data, no D1) —
 // the install POST below is the privileged, gated write path.
 export function GET(): Response {
-  // Only the blog kit exists today; the shape is a list so more kits can be
-  // added without changing the contract.
   return Response.json({
-    kits: [{ id: BLOG_KIT_ID, components: blogKitNames() }],
+    kits: KITS.map((k) => ({ id: k.id, components: k.names() })),
   });
 }
 
 export async function POST(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);
   if (denied) return denied;
-  // Optional { id } selects a kit; default = the blog kit (the only one).
+  // Optional { id } selects a kit; default = the blog kit.
   let id = BLOG_KIT_ID;
   try {
     const body = (await request.json()) as unknown;
@@ -47,7 +55,8 @@ export async function POST(request: Request): Promise<Response> {
     /* empty/invalid body → default kit */
   }
 
-  if (id !== BLOG_KIT_ID) {
+  const kit = KITS.find((k) => k.id === id);
+  if (!kit) {
     return Response.json({ error: `unknown kit "${id}"` }, { status: 404 });
   }
 
@@ -56,7 +65,7 @@ export async function POST(request: Request): Promise<Response> {
   const validated = [];
   const assetDeps = new Set<string>();
   const componentDeps = new Set<string>();
-  for (const b of blogKit()) {
+  for (const b of kit.build()) {
     const parsed = parsePortableComponent(b);
     if (!parsed.ok) {
       return Response.json(
