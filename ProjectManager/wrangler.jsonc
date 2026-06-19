@@ -11,8 +11,12 @@
   "observability": {
     "enabled": true
   },
+  // Custom domain on the bizbeecms.com zone. Cloudflare attaches the hostname +
+  // cert on `wrangler deploy`; the workers.dev subdomain stays reachable as a
+  // fallback. (Same shape as deployer/wrangler.jsonc.)
+  "routes": [{ "pattern": "manager.bizbeecms.com", "custom_domain": true }],
   "vars": {
-    "APP_ORIGIN": "https://bizbeecms-projectmanager.vali-draganescu88.workers.dev",
+    "APP_ORIGIN": "https://manager.bizbeecms.com",
     "DEPLOYER_URL": "https://deployer.bizbeecms.com"
   },
   // Trusted public origin used to build invite/email links. MUST be set before
