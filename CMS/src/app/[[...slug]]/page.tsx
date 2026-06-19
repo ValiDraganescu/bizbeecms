@@ -18,6 +18,8 @@ import { type LocaleContext, parseJsonColumn } from "@/lib/render/tree";
 import { resolveSlugPath } from "@/lib/render/slug";
 import { resolveLocalized } from "@/lib/render/localize";
 import { buildPlanFromPage, RenderedPage } from "@/lib/render/render-page";
+import { getVersion } from "@/db/page-version-store";
+import { pickRenderBlocks } from "@/lib/pages/page-version";
 
 type RouteParams = { slug?: string[] };
 
@@ -54,7 +56,12 @@ async function loadPlan(params: RouteParams) {
   const path = resolveSlugPath(params.slug);
   const pageRow = await resolvePage(db, path);
   if (!pageRow) return null;
-  const { plan, locale } = await buildPlanFromPage(pageRow);
+  // Versioning slice 2: render the PUBLISHED version's blocks; legacy pages
+  // (no version rows) fall back to `page.blocks`. The publish gate already
+  // ran in resolvePage, so an un-versioned published page still renders.
+  const published = await getVersion(pageRow.publishedVersionId);
+  const blocks = pickRenderBlocks(published, null, pageRow.blocks);
+  const { plan, locale } = await buildPlanFromPage(pageRow, blocks);
   return { page: pageRow, plan, locale };
 }
 

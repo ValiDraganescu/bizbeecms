@@ -51,9 +51,14 @@ const UTILITY_CSS = generateUtilityCss();
  */
 export async function buildPlanFromPage(
   pageRow: Page,
+  blocksOverride?: string,
 ): Promise<{ plan: RenderPlan; locale: LocaleContext }> {
   const db = await getDb();
-  const blocks = parseJsonColumn<Block[]>(pageRow.blocks, []);
+  // Versioning slice 2: the route resolves WHICH version's blocks to render
+  // (published for public, draft-else-published for preview) and passes the
+  // JSON string here; absent → the legacy `page.blocks` column (unchanged
+  // behavior for callers that don't version yet).
+  const blocks = parseJsonColumn<Block[]>(blocksOverride ?? pageRow.blocks, []);
 
   const components = new Map<string, ComponentArtifact>();
 

@@ -347,6 +347,23 @@ Read every line before working. Each entry was learned the hard way by a previou
   else empty) + a slice-2 `page.blocks` fallback cover legacy pages; a raw-SQL backfill can't mint per-row
   UUIDs cleanly and was deemed speculative (ponytail). If slice 2/3 needs existing published pages to have a
   real published_version row, do a one-time TS backfill loop (mint UUIDs in JS) at migration-apply time, not SQL.
+- VERSIONING slice 2 LANDED (2026-06-19 21:33): render routes pick the block SOURCE per route, render
+  pipeline UNCHANGED. The decision is the PURE `pickRenderBlocks(version, fallbackVersion, legacyBlocks)`
+  (page-version.ts, node-tested) — PUBLIC passes (published, null, page.blocks); PREVIEW passes (draft,
+  published, page.blocks). Routes resolve a page pointer (`publishedVersionId`/`draftVersionId`) to a row via
+  the NEW public `getVersion(id|null, db?)` in page-version-store.ts — it does NOT create (unlike `getDraft`),
+  so a dangling/absent pointer → null → `pickRenderBlocks` falls back to `page.blocks`. `buildPlanFromPage`
+  now takes an OPTIONAL 2nd arg `blocksOverride` (JSON string); absent = legacy `page.blocks` (so any
+  non-versioning caller is unchanged). NEVER inline version selection in a route — extend `pickRenderBlocks`.
+  Because slice 3's `saveDraftBlocks` isn't wired yet, the DRAFT version is only populated by getDraft/
+  saveDraftBlocks calls (none in the editor yet) — so TODAY public+preview still effectively show `page.blocks`
+  via the legacy fallback until slice 3 persists drafts. That's intended; the routes are READY.
+- PREVIEW AUTO-REFRESH SEAM (slice 2): the shell now bumps `previewNonce` on a 600ms debounce whenever
+  `blocks` changes while `dirty && !saving` (page-builder-shell.tsx, the effect right above the pages/groups
+  load effect). That makes the iframe reload as you edit — but until slice 3 persists the draft, the reload
+  shows the SAME persisted content (harmless). SLICE 3 replaces that effect's body with the real debounced
+  `saveDraftBlocks` (save THEN bump). Don't add a SECOND debounce effect — reuse this one. `onSave()` still
+  bumps explicitly (and the effect skips while `saving`).
 - VERSIONING migration is `0006_robust_wendell_rand.sql` (drizzle-kit auto-named). Apply with
   `wrangler d1 migrations apply <db>` (NOT auto-run by build). Hand-DDL fixture `scripts/page-store.test.mjs`
   was updated with the 2 new page cols (draft_version_id/published_version_id) per the HAND-FIXTURE DRIFT

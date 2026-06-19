@@ -238,7 +238,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   version into a fresh draft). Keep block validation (`validateBlocks`). Migration must backfill: existing
   `page.blocks` → one published version (if published) + a draft. Pure helpers (version_no bump, snapshot
   copy) unit-tested. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
-- TODO: **Versioning slice 2 — public + preview routes read the right version.** Public route
+- DONE (2026-06-19 21:33): **Versioning slice 2 — public + preview routes read the right version + preview
+  auto-refresh seam.** Public route renders `getVersion(publishedVersionId)`'s blocks (fallback `page.blocks`
+  for legacy); preview renders DRAFT → else PUBLISHED → else legacy. Block-SOURCE selection = pure
+  `pickRenderBlocks(version, fallbackVersion, legacyBlocks)` (page-version.ts); routes resolve the pointer via
+  new public `getVersion(id|null)` (page-version-store.ts, no create). `buildPlanFromPage` got an optional
+  `blocksOverride` arg (shared pipeline unchanged). Shell: debounced (600ms) `previewNonce` bump on `blocks`
+  change = the slice-3 auto-save seam (no button). page-version 10/10 (+5), tsc 0, opennext green. See JOURNAL
+  21:33. (Original text retained below.)
+- TODO (ORIGINAL TEXT, kept for ref): **Versioning slice 2 — public + preview routes read the right version.** Public route
   (`app/[[...slug]]/page.tsx`) renders the PUBLISHED version (`published_version_id`), not `page.blocks`;
   if none published → still 404/unpublished as today. The builder's draft-preview route (`/preview/[id]`)
   renders (USER DECISION 2026-06-19): the DRAFT version if one exists; ELSE (e.g. just published, no draft

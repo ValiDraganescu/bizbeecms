@@ -10,10 +10,16 @@ import assert from "node:assert/strict";
 import {
   applyDraftEdit,
   nextVersionNo,
+  pickRenderBlocks,
   planDraftFrom,
   planPublish,
   planRestore,
 } from "../src/lib/pages/page-version.ts";
+
+/** A minimal version record for the block-source selection tests (slice 2). */
+function ver(status, blocks) {
+  return { id: "x", pageId: "p", blocks, meta: "{}", status, versionNo: 0, createdAt: 0 };
+}
 
 /** Stamp a planner output into a full VersionRecord (what the store does). */
 let seq = 0;
@@ -88,4 +94,30 @@ test("restore is non-destructive (does not mutate the source record)", () => {
   const frozen = JSON.stringify(src);
   planRestore(src);
   assert.equal(JSON.stringify(src), frozen);
+});
+
+// --- Versioning slice 2: block-source selection (published vs draft vs legacy) ---
+
+test("pickRenderBlocks (public): published version wins over legacy page.blocks", () => {
+  const published = ver("published", '["PUB"]');
+  assert.equal(pickRenderBlocks(published, null, '["LEGACY"]'), '["PUB"]');
+});
+
+test("pickRenderBlocks (public): no version → falls back to legacy page.blocks", () => {
+  assert.equal(pickRenderBlocks(null, null, '["LEGACY"]'), '["LEGACY"]');
+});
+
+test("pickRenderBlocks (preview): draft wins over published and legacy", () => {
+  const draft = ver("draft", '["DRAFT"]');
+  const published = ver("published", '["PUB"]');
+  assert.equal(pickRenderBlocks(draft, published, '["LEGACY"]'), '["DRAFT"]');
+});
+
+test("pickRenderBlocks (preview): no draft → published (just published, no draft yet)", () => {
+  const published = ver("published", '["PUB"]');
+  assert.equal(pickRenderBlocks(null, published, '["LEGACY"]'), '["PUB"]');
+});
+
+test("pickRenderBlocks (preview): no draft, no published → legacy page.blocks", () => {
+  assert.equal(pickRenderBlocks(null, null, '["LEGACY"]'), '["LEGACY"]');
 });

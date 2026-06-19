@@ -16,6 +16,8 @@ import { getDb } from "@/db";
 import { page as pageTable } from "@/db/schema";
 import { checkAdminFromHeaders } from "@/lib/auth/guard";
 import { buildPlanFromPage, RenderedPage } from "@/lib/render/render-page";
+import { getVersion } from "@/db/page-version-store";
+import { pickRenderBlocks } from "@/lib/pages/page-version";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +58,13 @@ export default async function PreviewPage({
   const pageRow = rows[0];
   if (!pageRow) notFound();
 
-  const { plan } = await buildPlanFromPage(pageRow);
+  // Versioning slice 2: preview shows the DRAFT version (latest editable state),
+  // else the PUBLISHED version (just published, no draft yet), else `page.blocks`
+  // (legacy pages with no version rows). Always the most-editable source available.
+  const draft = await getVersion(pageRow.draftVersionId, db);
+  const published = await getVersion(pageRow.publishedVersionId, db);
+  const blocks = pickRenderBlocks(draft, published, pageRow.blocks);
+  const { plan } = await buildPlanFromPage(pageRow, blocks);
   const rendered = <RenderedPage plan={plan} />;
   // `data-theme` on a wrapper re-scopes the token cascade for the forced mode.
   return theme ? <div data-theme={theme}>{rendered}</div> : rendered;

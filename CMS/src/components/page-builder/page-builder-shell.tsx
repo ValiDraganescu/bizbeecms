@@ -318,6 +318,19 @@ export function PageBuilderShell({
     }
   }
 
+  // Versioning slice 2 seam: auto-refresh the preview iframe as the draft changes
+  // WITHOUT a button press. Debounce a `previewNonce` bump on every block edit so
+  // editing updates the preview on its own. The actual debounced draft AUTO-SAVE
+  // lands in slice 3 (saveDraftBlocks → preview reads the draft version); here the
+  // nonce wiring is ready and harmless — until slice 3 persists, a bump just reloads
+  // the already-persisted content. Skip while `saving` (onSave bumps explicitly).
+  // ponytail: plain setTimeout debounce, no lib; slice 3 swaps the body for a save.
+  useEffect(() => {
+    if (!selected || !dirty || saving) return;
+    const t = setTimeout(() => setPreviewNonce((n) => n + 1), 600);
+    return () => clearTimeout(t);
+  }, [blocks, dirty, saving, selected]);
+
   useEffect(() => {
     let live = true;
     void (async () => {

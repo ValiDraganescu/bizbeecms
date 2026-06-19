@@ -138,3 +138,32 @@ export function planRestore(version: VersionRecord): {
 export function applyDraftEdit(draft: VersionRecord, seed: VersionSeed): VersionRecord {
   return { ...draft, blocks: seed.blocks, meta: seed.meta };
 }
+
+/**
+ * Pick which JSON `blocks` string a route should render (Versioning slice 2).
+ *
+ * Pure + node-testable — no D1. The store wrappers load the version row (or
+ * null), and the route passes the result here along with the legacy
+ * `page.blocks`. The block SOURCE is the ONLY thing that changes between
+ * routes; the render pipeline (`buildPlanFromPage`/`RenderedPage`) is shared.
+ *
+ *   - PUBLIC route  : prefer the PUBLISHED version; else fall back to
+ *     `page.blocks` (legacy pages predating versioning have no version rows).
+ *   - PREVIEW route : prefer the DRAFT version; else the PUBLISHED version
+ *     (just published, no draft yet); else `page.blocks` (legacy). Preview
+ *     always shows the latest editable state, falling back to live.
+ *
+ * `version` is the resolved version record for the route's preferred status
+ * (published for public, draft for preview), `fallbackVersion` is the
+ * secondary (published, for preview only — pass null for the public route),
+ * and `legacyBlocks` is `page.blocks`.
+ */
+export function pickRenderBlocks(
+  version: VersionRecord | null,
+  fallbackVersion: VersionRecord | null,
+  legacyBlocks: string,
+): string {
+  if (version) return version.blocks;
+  if (fallbackVersion) return fallbackVersion.blocks;
+  return legacyBlocks;
+}

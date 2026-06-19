@@ -586,3 +586,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/pages/page-version.ts (NEW pure algebra), CMS/src/db/page-version-store.ts (NEW
   store wrappers), CMS/scripts/page-version.test.mjs (NEW), CMS/scripts/page-store.test.mjs
   (hand-DDL +2 cols), CMS/scripts/schema-migration.test.mjs (+versioning test).
+
+## 2026-06-19 21:33 — Versioning slice 2: render routes read the right version + preview auto-refresh seam
+- **Status:** DONE
+- **What I did:** Public route (`app/[[...slug]]/page.tsx`) now renders the PUBLISHED
+  version's blocks (`getVersion(page.publishedVersionId)`), falling back to legacy
+  `page.blocks` for pages with no version rows. Preview route (`app/preview/[id]/page.tsx`)
+  renders DRAFT → else PUBLISHED → else legacy. Both go through the SAME pipeline:
+  `buildPlanFromPage` gained an optional `blocksOverride` JSON-string arg (absent = legacy
+  `page.blocks`, unchanged for non-versioning callers). Block-SOURCE selection is the pure
+  node-testable `pickRenderBlocks(version, fallbackVersion, legacyBlocks)` in
+  `lib/pages/page-version.ts`; new public store read `getVersion(id|null)` in
+  `db/page-version-store.ts` (no create, unlike getDraft — dangling pointer → null → fallback).
+  Shell auto-refresh SEAM: a debounced (600ms) `previewNonce` bump on `blocks` change so
+  editing refreshes the iframe on its own (no button). Slice 3 swaps that effect's body for
+  the real debounced `saveDraftBlocks`; the nonce wiring is ready + harmless until then.
+- **Verified:** node `page-version.test.mjs` 10/10 (+5 pickRenderBlocks cases). `npx tsc
+  --noEmit` 0 errors (whole CMS). `npx opennextjs-cloudflare build` complete (dev stopped,
+  port 3601 free). Live D1 read of version rows is HITL (needs migration 0006 applied + a
+  real binding) — build-verified only, same as slice 1.
+- **Files:** CMS/src/lib/pages/page-version.ts (pickRenderBlocks), CMS/src/db/page-version-store.ts
+  (getVersion), CMS/src/lib/render/render-page.tsx (blocksOverride arg), CMS/src/app/[[...slug]]/page.tsx,
+  CMS/src/app/preview/[id]/page.tsx, CMS/src/components/page-builder/page-builder-shell.tsx (nonce seam),
+  CMS/scripts/page-version.test.mjs (+5 tests).

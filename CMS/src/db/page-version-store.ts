@@ -63,6 +63,19 @@ async function loadVersion(db: Db, id: string): Promise<VersionRecord | null> {
 }
 
 /**
+ * Load a single version record by id (or null). Public read for the render
+ * routes (Versioning slice 2): a route holds the page's `draftVersionId` /
+ * `publishedVersionId` pointer and resolves it to the row to render. Does NOT
+ * create anything (unlike `getDraft`) — a dangling pointer just yields null and
+ * the route falls back per `pickRenderBlocks`.
+ */
+export async function getVersion(id: string | null, injectedDb?: Db): Promise<VersionRecord | null> {
+  if (!id) return null;
+  const db = injectedDb ?? (await getDb());
+  return loadVersion(db, id);
+}
+
+/**
  * The page's current draft version, creating one if absent. A page with no
  * draft yet seeds one from its published version (if any) else empty, and
  * points `page.draft_version_id` at it. Returns the draft record.
