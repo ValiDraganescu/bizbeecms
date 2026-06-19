@@ -318,3 +318,14 @@ Read every line before working. Each entry was learned the hard way by a previou
 
 - `removeNode` in page-blocks.ts is now EXPORTED (pure, nested-safe, immutable) — reuse it for any
   Layers-tree deletion. It deletes a whole subtree (Section → its columns+components) or a single leaf.
+
+- SECTION PADDING IS NOW A SINGLE SHARED UNIT (2026-06-19 21:23): a Section stores ONE `paddingUnit`
+  (rem default) governing all four sides — NOT per-side `padding<Side>Unit` anymore. `tree.ts` `pad(p,
+  side, unit?)` now takes an OPTIONAL unit: `planSection` passes the shared `paddingUnit`; called WITHOUT
+  unit (the COLUMN padding panel via `columnStyle`) it still reads per-side `padding<Side>Unit` — columns
+  keep per-side units ON PURPOSE (separate feature, not unified). MIGRATION for legacy Section pages: both
+  the shell read AND planSection do `str(p.paddingUnit, str(p.paddingTopUnit, "rem"))` so an old page that
+  only had per-side units uses Top's; don't drop that fallback. The SectionSettings rem/px switch writes
+  `{paddingUnit, padding<Side>Unit: undefined×4}` to clear the legacy keys (mergeSectionProps drops
+  undefined). GAP stays px. If you touch Section padding render, the test is render-tree.test.mjs
+  `sectionStyleOf` (3 padding cases).

@@ -1812,6 +1812,9 @@ function SectionSettings({
   const hAlign = s(p.horizontalAlign, "left");
   const maxWidth = s(p.maxWidth, "1280px");
   const bg = s(p.backgroundColor, "transparent");
+  // ONE shared padding unit for all four sides (migrate any legacy per-side unit:
+  // use Top's, default rem) — mirrors tree.ts planSection.
+  const paddingUnit = s(p.paddingUnit, s(p.paddingTopUnit, "rem"));
 
   const label = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
   const seg =
@@ -1899,40 +1902,53 @@ function SectionSettings({
         </div>
       </div>
 
-      {/* Padding — one input + rem/px unit toggle per side (rem default) */}
+      {/* Padding — one number input per side, sharing ONE rem/px unit switch */}
       <div className="flex flex-col gap-1.5">
-        <span className={label}>{t("sectionPadding")}</span>
+        <div className="flex items-center justify-between">
+          <span className={label}>{t("sectionPadding")}</span>
+          {/* single unit switch governing all four sides; clears legacy per-side units */}
+          <div className="flex overflow-hidden rounded-md border border-border">
+            {(["rem", "px"] as const).map((u) => (
+              <button
+                key={u}
+                type="button"
+                onClick={() =>
+                  onChange({
+                    paddingUnit: u,
+                    paddingTopUnit: undefined,
+                    paddingRightUnit: undefined,
+                    paddingBottomUnit: undefined,
+                    paddingLeftUnit: undefined,
+                  })
+                }
+                aria-pressed={paddingUnit === u}
+                className={`px-2 py-0.5 text-xs transition-colors ${
+                  paddingUnit === u
+                    ? "bg-primary-subtle font-medium text-foreground"
+                    : "bg-surface-muted text-foreground-muted hover:text-foreground"
+                }`}
+              >
+                {u}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-2">
-          {sides.map((side) => {
-            const unit = s(p[`padding${side}Unit`], "rem");
-            return (
-              <label key={side} className="flex flex-col gap-1">
-                <span className="text-[11px] text-foreground-muted">
-                  {t(`sectionSide.${side.toLowerCase()}`)}
-                </span>
-                <div className="flex items-stretch overflow-hidden rounded-md border border-border">
-                  <input
-                    type="number"
-                    min={0}
-                    value={num(p[`padding${side}`], 0)}
-                    onChange={(e) => onChange({ [`padding${side}`]: +e.target.value })}
-                    className="w-full bg-surface px-2 py-1 text-sm text-foreground outline-none"
-                    aria-label={`${t("sectionPadding")} ${side}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onChange({ [`padding${side}Unit`]: unit === "rem" ? "px" : "rem" })
-                    }
-                    className="border-l border-border bg-surface-muted px-2 text-xs text-foreground-muted hover:text-foreground"
-                    aria-label={`${side} unit: ${unit}`}
-                  >
-                    {unit}
-                  </button>
-                </div>
-              </label>
-            );
-          })}
+          {sides.map((side) => (
+            <label key={side} className="flex flex-col gap-1">
+              <span className="text-[11px] text-foreground-muted">
+                {t(`sectionSide.${side.toLowerCase()}`)}
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={num(p[`padding${side}`], 0)}
+                onChange={(e) => onChange({ [`padding${side}`]: +e.target.value })}
+                className="w-full rounded-md border border-border bg-surface px-2 py-1 text-sm text-foreground outline-none"
+                aria-label={`${t("sectionPadding")} ${side}`}
+              />
+            </label>
+          ))}
         </div>
       </div>
 

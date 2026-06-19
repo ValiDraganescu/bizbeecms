@@ -419,6 +419,32 @@ test("planSection: single column stays one full-width track (no auto-fit)", () =
   assert.equal(gridOf(section({ columns: 1 }, 1)), "1fr");
 });
 
+// The inner <section> style object for a planned Section block.
+function sectionStyleOf(block) {
+  const { root } = planPage([block], mapOf(card));
+  return root[0].children[0].props.style;
+}
+
+test("planSection: ONE shared paddingUnit governs all four sides", () => {
+  const s = sectionStyleOf(section({ columns: 1, paddingTop: 1, paddingRight: 2, paddingBottom: 3, paddingLeft: 4, paddingUnit: "px" }, 1));
+  assert.equal(s.paddingTop, "1px");
+  assert.equal(s.paddingRight, "2px");
+  assert.equal(s.paddingBottom, "3px");
+  assert.equal(s.paddingLeft, "4px");
+});
+
+test("planSection: padding defaults to rem when no unit set", () => {
+  const s = sectionStyleOf(section({ columns: 1, paddingTop: 2 }, 1));
+  assert.equal(s.paddingTop, "2rem");
+});
+
+test("planSection: migrates legacy per-side unit (uses Top's as the shared unit)", () => {
+  // an old saved page only had padding<Side>Unit (no paddingUnit)
+  const s = sectionStyleOf(section({ columns: 1, paddingTop: 1, paddingRight: 2, paddingTopUnit: "px" }, 1));
+  assert.equal(s.paddingTop, "1px");
+  assert.equal(s.paddingRight, "2px"); // Right's own unit ignored — Top's wins
+});
+
 test("planSection: 'collapse' keeps explicit fixed tracks (1fr/0fr), no auto-fit", () => {
   const block = {
     id: "s",

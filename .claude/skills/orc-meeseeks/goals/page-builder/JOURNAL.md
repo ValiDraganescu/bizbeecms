@@ -538,3 +538,25 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/pages/page-blocks.ts (export removeNode), CMS/src/components/page-builder/
   page-builder-shell.tsx (onDeleteNode + DeleteNodeControl + affordances), CMS/scripts/
   page-blocks.test.mjs (+4 tests), CMS/messages/{en,fi,et}.json (pageBuilder.deleteNode).
+
+## 2026-06-19 21:23 — Section padding: ONE shared rem/px unit switch (not per-side)
+- **Status:** DONE
+- **What I did:** Replaced the Section's four per-side padding unit toggles
+  (`padding<Side>Unit`) with a SINGLE shared `paddingUnit` (rem default) governing
+  all four sides. SectionSettings (page-builder-shell.tsx) now renders ONE rem/px
+  switch in the PADDING legend row; the four side inputs are plain number boxes.
+  Switching the unit writes `paddingUnit` AND clears the legacy per-side keys
+  (`{paddingUnit:u, padding<Side>Unit:undefined×4}` → mergeSectionProps drops them).
+  Render side: `tree.ts` `pad()` gained an optional `unit` arg; `planSection` reads
+  the single `paddingUnit` and passes it for every side. MIGRATION: legacy pages
+  with only `padding<Side>Unit` fall back to Top's unit (`str(p.paddingUnit,
+  str(p.paddingTopUnit,"rem"))`) in BOTH the shell read and planSection, so saved
+  pages don't silently flip to rem. Column padding panel (ColumnSettings) keeps its
+  own per-side units — UNCHANGED, out of scope (pad() w/o `unit` = old behavior).
+  GAP stays px (untouched). No new i18n keys (unit labels are literal rem/px).
+- **Verified:** render-tree.test.mjs 36/36 (+3: shared-unit all sides, rem default,
+  legacy per-side migration uses Top's). `npx tsc --noEmit` 0 errors (fully clean).
+  `npx opennextjs-cloudflare build` complete (dev stopped, port 3601 free).
+- **Files:** CMS/src/lib/render/tree.ts (pad() optional unit + planSection paddingUnit),
+  CMS/src/components/page-builder/page-builder-shell.tsx (SectionSettings single switch),
+  CMS/scripts/render-tree.test.mjs (+3 planSection padding tests).

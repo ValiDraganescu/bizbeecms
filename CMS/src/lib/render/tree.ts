@@ -460,9 +460,17 @@ function num(value: unknown, fallback: number): number {
 function str(value: unknown, fallback: string): string {
   return typeof value === "string" && value !== "" ? value : fallback;
 }
-/** A padding value + its per-side unit (rem default). */
-function pad(p: Record<string, unknown>, side: "Top" | "Right" | "Bottom" | "Left"): string {
-  return `${num(p[`padding${side}`], 0)}${str(p[`padding${side}Unit`], "rem")}`;
+/**
+ * A padding value + unit (rem default). When `unit` is given (Section uses a SINGLE
+ * shared `paddingUnit` for all four sides), it governs every side; otherwise each
+ * side reads its own `padding<Side>Unit` (the per-column padding panel still does).
+ */
+function pad(
+  p: Record<string, unknown>,
+  side: "Top" | "Right" | "Bottom" | "Left",
+  unit?: string,
+): string {
+  return `${num(p[`padding${side}`], 0)}${unit ?? str(p[`padding${side}Unit`], "rem")}`;
 }
 /** A margin value + its per-side unit (rem default). 0 → "0" (no unit churn). */
 function mgn(p: Record<string, unknown>, side: "Top" | "Right" | "Bottom" | "Left"): string {
@@ -521,6 +529,10 @@ function planSection(
   const columnBehavior = str(p.columnBehavior, "equal");
   const gap = num(p.gap, 16);
   const maxWidth = str(p.maxWidth, "1280px");
+  // ONE shared padding unit for all four sides (user decision 2026-06-19). MIGRATE
+  // legacy per-side units: a saved page only had `padding<Side>Unit` — treat Top's
+  // as the shared one (default rem) so old pages don't silently flip to rem.
+  const paddingUnit = str(p.paddingUnit, str(p.paddingTopUnit, "rem"));
   const bgColor = str(p.backgroundColor, "transparent");
   const colJustify = JUSTIFY[str(p.horizontalAlign, "left")] ?? "flex-start";
   const colAlignItems = ALIGN_ITEMS[str(p.verticalAlign, "top")] ?? "flex-start";
@@ -552,10 +564,10 @@ function planSection(
             display: "grid",
             gridTemplateColumns: gridCols,
             gap: `${gap}px`,
-            paddingTop: pad(p, "Top"),
-            paddingRight: pad(p, "Right"),
-            paddingBottom: pad(p, "Bottom"),
-            paddingLeft: pad(p, "Left"),
+            paddingTop: pad(p, "Top", paddingUnit),
+            paddingRight: pad(p, "Right", paddingUnit),
+            paddingBottom: pad(p, "Bottom", paddingUnit),
+            paddingLeft: pad(p, "Left", paddingUnit),
             maxWidth: maxWidth === "full" ? "100%" : maxWidth,
             margin: "0 auto",
             overflow: "hidden",

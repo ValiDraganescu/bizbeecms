@@ -186,7 +186,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   off-brand). Deleting a Section removes it and its columns+children; deleting a component removes just that
   block. EN/FI/ET for the button + confirm copy ("Delete section?", "Delete component?", Cancel/Delete).
   Gate: CMS tsc + opennext build green; regen PM cms-bundle.
-- TODO: **Section padding — ONE shared rem/px unit switch (not per-side).** USER DECISION 2026-06-19: the
+- DONE (2026-06-19 21:23): **Section padding — ONE shared rem/px unit switch (not per-side).** SectionSettings
+  renders ONE rem/px switch in the PADDING legend row; sides are plain number inputs. Stores single
+  `paddingUnit` (rem default) + clears legacy `padding<Side>Unit` on switch. `tree.ts` `pad()` gained an
+  optional `unit` arg; `planSection` passes the shared unit. MIGRATION: legacy per-side → Top's unit (both
+  shell + render). Column padding panel UNCHANGED (out of scope). render-tree 36/36 (+3), tsc 0, opennext
+  green. See JOURNAL 21:23. (Original text retained below.)
+- TODO (ORIGINAL TEXT, kept for ref): **Section padding — ONE shared rem/px unit switch (not per-side).** USER DECISION 2026-06-19: the
   current per-side unit toggle (shipped: `paddingTopUnit`/`Right`/`Bottom`/`Left`, rem default) lets units
   get MIXED across the four padding inputs. Replace with a SINGLE unit switch governing ALL padding inputs,
   so Top/Right/Bottom/Left always share one unit. Change: `SectionSettings` in `page-builder-shell.tsx`
