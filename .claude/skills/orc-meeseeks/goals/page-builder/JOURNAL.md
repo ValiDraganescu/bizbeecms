@@ -401,3 +401,30 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/components/page-builder/locale-picker.tsx (new),
   CMS/src/components/page-builder/page-builder-shell.tsx, CMS/scripts/locale-picker.test.mjs (new),
   CMS/messages/{en,fi,et}.json
+
+## 2026-06-19 20:44 — SEO per-locale META IMAGE (OG image)
+- **Status:** DONE
+- **What I did:** Added a per-content-locale OpenGraph image to pages, threaded end-to-end through the
+  EXISTING meta path (no new store/validation fork). Schema: new `metaImage` JSON-map column on `page`
+  (`meta_image text NOT NULL DEFAULT '{}'`), mirroring meta_title; drizzle migration
+  `migrations/0004_past_drax.sql` (single additive `ALTER TABLE page ADD meta_image`). Pure layer
+  (`lib/pages/page-meta.ts`): `PageMetaInput.metaImage`, `validatePageMeta` coerces+validates it (null→{},
+  non-string value → reject), `buildSeoMetaBody` takes a 4th `metaImage` arg. Store (`db/page-store.ts`):
+  `PageSummary.metaImage`, `toSummary` parses it, `upsertPageMeta` persists it on both insert & update.
+  SEO form (`page-builder-shell.tsx`): new `MetaImagePicker` component — per-active-locale, fetches the
+  existing R2 library via `GET /api/assets` (same source as media-gallery), opens a thumbnail grid, click
+  to set / Remove to clear; wired into `SeoForm` under the LocalePicker so it edits ONE locale at a time.
+  Render: `app/[[...slug]]/page.tsx` `generateMetadata` now emits `openGraph.images:[{url}]` from the
+  locale-resolved metaImage (omitted when empty). C2 `pages-manager.tsx` Draft carries metaImage through
+  (no editor there — round-trips so a C2 metadata edit doesn't wipe an OG image set in the builder).
+- **Verified:** `npx tsc --noEmit` ZERO errors (whole project clean — the sibling ai-assistant
+  chat/route.ts now type-checks too). `npx opennextjs-cloudflare build` GREEN end-to-end (dev stopped,
+  port 3601 free). Node tests: page-meta 5/5 (added metaImage round-trip + default-{} + reject-non-string),
+  page-picker 8/8 (factory got metaImage), page-store 4/4 + schema-migration 4/4 (added meta_image to the
+  hand-DDL `page` fixture per the HAND-FIXTURE DRIFT caveat). Design hook: 1 false-positive broken-image
+  (the `src={value}` <img> only renders inside a `value ?` truthy branch — never empty).
+- **Files:** CMS/src/db/schema.ts, CMS/migrations/0004_past_drax.sql (new) + meta/, 
+  CMS/src/lib/pages/page-meta.ts (+ .test.ts), CMS/src/db/page-store.ts,
+  CMS/src/components/page-builder/page-builder-shell.tsx, CMS/src/app/[[...slug]]/page.tsx,
+  CMS/src/components/pages/pages-manager.tsx, CMS/src/lib/pages/page-picker.test.ts,
+  CMS/scripts/page-store.test.mjs, CMS/messages/{en,fi,et}.json

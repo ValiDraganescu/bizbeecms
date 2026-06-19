@@ -72,9 +72,14 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const loaded = await loadPlan(await params);
   if (!loaded) return {};
+  const title = localized(loaded.page.metaTitle, loaded.locale);
+  const description = localized(loaded.page.metaDescription, loaded.locale);
+  const image = localized(loaded.page.metaImage, loaded.locale);
   return {
-    title: localized(loaded.page.metaTitle, loaded.locale),
-    description: localized(loaded.page.metaDescription, loaded.locale),
+    title,
+    description,
+    // OpenGraph image, resolved per active locale (falls back like title/desc).
+    openGraph: image ? { images: [{ url: image }] } : undefined,
   };
 }
 

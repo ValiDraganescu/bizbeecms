@@ -37,6 +37,7 @@ CREATE TABLE page (
   blocks text DEFAULT '[]' NOT NULL,
   meta_title text DEFAULT '{}' NOT NULL,
   meta_description text DEFAULT '{}' NOT NULL,
+  meta_image text DEFAULT '{}' NOT NULL,
   created_at integer DEFAULT (unixepoch() * 1000) NOT NULL,
   updated_at integer DEFAULT (unixepoch() * 1000) NOT NULL
 );

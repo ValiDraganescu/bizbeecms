@@ -39,6 +39,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   tsc + opennext build green.
 
 ## Tasks
+- DONE (2026-06-19 20:44): **SEO per-locale META IMAGE (OG image).** New `metaImage` JSON-map column on
+  `page` (migration `0004_past_drax.sql`, mirrors meta_title) threaded through `validatePageMeta`/
+  `buildSeoMetaBody` + `upsertPageMeta` (no fork). SEO form got `MetaImagePicker` (per-active-locale, browses
+  `GET /api/assets` thumbnail grid, set/remove). `generateMetadata` emits `openGraph.images` from the
+  resolved locale. C2 pages-manager Draft round-trips metaImage so it isn't wiped. tsc + opennext build +
+  node tests (page-meta 5/5, page-picker 8/8, page-store/schema-migration) all green. See JOURNAL 20:44.
 - DONE (2026-06-19): **Dark-mode preview toggle + per-Site DARK theme override editor.** Preview URL bar
   got a light/system/dark toggle (`previewTheme` state) → `?theme=` on `/preview/<id>` which wraps
   `<RenderedPage>` in `<div data-theme=...>`. Theme editor got a Light/Dark MODE tab (`ModeEditor`

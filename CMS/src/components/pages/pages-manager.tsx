@@ -30,10 +30,21 @@ type Draft = {
   publishStatus: PublishStatus;
   metaTitle: Record<string, string>;
   metaDescription: Record<string, string>;
+  // C2 doesn't edit OG images (the page-builder SEO tab does); carried through
+  // so a metadata edit here doesn't wipe an image set elsewhere.
+  metaImage: Record<string, string>;
 };
 
 function blankDraft(): Draft {
-  return { id: null, slug: "", parentSlug: "", publishStatus: "draft", metaTitle: {}, metaDescription: {} };
+  return {
+    id: null,
+    slug: "",
+    parentSlug: "",
+    publishStatus: "draft",
+    metaTitle: {},
+    metaDescription: {},
+    metaImage: {},
+  };
 }
 
 function draftOf(p: PageSummary): Draft {
@@ -44,6 +55,7 @@ function draftOf(p: PageSummary): Draft {
     publishStatus: (p.publishStatus === "published" ? "published" : "draft") as PublishStatus,
     metaTitle: { ...p.metaTitle },
     metaDescription: { ...p.metaDescription },
+    metaImage: { ...p.metaImage },
   };
 }
 
@@ -83,6 +95,7 @@ export function PagesManager({
         publishStatus: draft.publishStatus,
         metaTitle: draft.metaTitle,
         metaDescription: draft.metaDescription,
+        metaImage: draft.metaImage,
       };
       const body = draft.id ? { id: draft.id, ...meta } : meta;
       const res = await fetch("/api/pages", {

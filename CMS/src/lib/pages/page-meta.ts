@@ -132,6 +132,7 @@ export function buildSeoMetaBody(
   page: PageSeoSource,
   metaTitle: Record<string, string>,
   metaDescription: Record<string, string>,
+  metaImage: Record<string, string>,
 ): { id: string } & PageMetaInput {
   return {
     id: page.id,
@@ -140,6 +141,7 @@ export function buildSeoMetaBody(
     publishStatus: page.publishStatus === "published" ? "published" : "draft",
     metaTitle,
     metaDescription,
+    metaImage,
   };
 }
 

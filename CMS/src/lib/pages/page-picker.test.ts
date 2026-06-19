@@ -12,6 +12,7 @@ function page(over: Partial<PageSummary>): PageSummary {
     publishStatus: over.publishStatus ?? "draft",
     metaTitle: over.metaTitle ?? {},
     metaDescription: over.metaDescription ?? {},
+    metaImage: over.metaImage ?? {},
     updatedAt: over.updatedAt ?? 0,
   };
 }

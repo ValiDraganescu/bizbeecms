@@ -239,3 +239,23 @@ Read every line before working. Each entry was learned the hard way by a previou
   `previewTheme` state is `"system"|"light"|"dark"`; "system" sends NO param. The iframe `key` includes
   previewTheme so flipping it reloads. If you add per-Site dark overrides via the editor, they show in this
   forced-dark preview because they scope to `[data-theme="dark"]` which the wrapper now sets.
+
+- META IMAGE (OG image) DONE (2026-06-19): per-locale `metaImage` JSON map on `page` (migration
+  `0004_past_drax.sql` — must be applied with `wrangler d1 migrations apply`, NOT auto-run by build).
+  Threaded through the SAME meta path: `validatePageMeta`/`buildSeoMetaBody` (4th arg) + `upsertPageMeta`.
+  The SEO-form picker is `MetaImagePicker` in page-builder-shell.tsx — browses `GET /api/assets` (R2 lib,
+  same source as media-gallery), stores ONE asset url per active locale. Render emits `openGraph.images`
+  from the locale-resolved map. GOTCHA solved: C2 `pages-manager.tsx` builds a `PageMetaInput` literal
+  directly (NOT via buildSeoMetaBody) and has NO image editor — its `Draft` now carries `metaImage` purely
+  to ROUND-TRIP it, so a C2 metadata edit doesn't blank an OG image set in the builder. Any future
+  PageSummary/PageMetaInput literal MUST include `metaImage` or tsc fails (page-picker.test.ts factory +
+  page-store.test.mjs hand-DDL `page` both updated — grep both when you touch the page schema again).
+- BUILD CAVEAT LIFTED (2026-06-19 20:44): the ai-assistant `src/app/api/chat/route.ts` errors are GONE —
+  `npx tsc --noEmit` and `opennextjs-cloudflare build` are BOTH fully green again across the whole CMS.
+  (chat/route.ts still shows `M` in git status but type-checks.) If a future build fails on a file outside
+  page-builder, re-apply the old "don't chase another loop's WIP" rule, but it's clean as of this run.
+- SHARED-TREE COMMIT SWEEP (seen 2026-06-19): a SIBLING loop's `git add -A` swept up THIS run's
+  uncommitted `schema.ts` + migration `0004_past_drax.sql` into THEIR commit (6619f3d, ai-assistant). So
+  by my commit time `git diff` showed those files clean (already in HEAD) even though I'd edited them — NOT
+  a bug, the work landed, just in another commit. Lesson: stage + commit your schema/migration EARLY, and
+  don't panic if a file you edited shows no diff — `git show HEAD:<path>` to confirm it's already in.

@@ -37,6 +37,7 @@ test("buildSeoMetaBody keeps identity, swaps SEO maps, round-trips through valid
     page,
     { en: "About us" },
     { en: "Who we are" },
+    { en: "https://cdn.example/og.png" },
   );
   assert.deepEqual(body, {
     id: "p1",
@@ -45,12 +46,13 @@ test("buildSeoMetaBody keeps identity, swaps SEO maps, round-trips through valid
     publishStatus: "published",
     metaTitle: { en: "About us" },
     metaDescription: { en: "Who we are" },
+    metaImage: { en: "https://cdn.example/og.png" },
   });
 
   // The route re-validates the body; SEO-only edit must pass.
   const v = validatePageMeta(body);
   assert.equal(v.ok, true);
-  if (v.ok) assert.equal(v.meta.slug, "about");
+  if (v.ok) assert.deepEqual(v.meta.metaImage, { en: "https://cdn.example/og.png" });
 });
 
 test("buildSeoMetaBody normalizes a non-published status to draft", () => {
@@ -58,7 +60,25 @@ test("buildSeoMetaBody normalizes a non-published status to draft", () => {
     { id: "p2", slug: "blog", parentSlug: "root", publishStatus: "weird" },
     {},
     {},
+    {},
   );
   assert.equal(body.publishStatus, "draft");
   assert.equal(body.parentSlug, "root");
+  assert.deepEqual(body.metaImage, {});
+});
+
+test("validatePageMeta defaults metaImage to {} when omitted (back-compat with C2 body)", () => {
+  const v = validatePageMeta({ slug: "x", metaTitle: {}, metaDescription: {} });
+  assert.equal(v.ok, true);
+  if (v.ok) assert.deepEqual(v.meta.metaImage, {});
+});
+
+test("validatePageMeta rejects a non-string metaImage value", () => {
+  const v = validatePageMeta({
+    slug: "x",
+    metaTitle: {},
+    metaDescription: {},
+    metaImage: { en: 5 },
+  });
+  assert.equal(v.ok, false);
 });

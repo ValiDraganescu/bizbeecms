@@ -32,7 +32,16 @@
       "subtitle": "Rakenna keskustellen — millä tahansa sivulla.",
       "open": "Avaa tekoälyavustaja",
       "close": "Sulje tekoälyavustaja",
-      "minimize": "Pienennä"
+      "minimize": "Pienennä",
+      "debug": "Virheenkorjaus"
+    },
+    "debug": {
+      "context": "Sivun konteksti",
+      "tools": "Aktiiviset työkalut ({count})",
+      "noTools": "Täällä ei ole työkaluja.",
+      "prompt": "Järjestelmäkehote",
+      "loading": "Ladataan…",
+      "error": "Virhe: {message}"
     }
   },
   "contentLocales": {
@@ -318,6 +327,13 @@
     "dropSectionHint": "Pudota lisätäksesi osion",
     "seoMetaTitle": "Metaotsikko",
     "seoMetaDescription": "Metakuvaus",
+    "seoMetaImage": "OG-kuva",
+    "seoMetaImageEmpty": "Tälle kielelle ei ole asetettu kuvaa.",
+    "seoMetaImagePick": "Valitse kuva",
+    "seoMetaImageClose": "Sulje",
+    "seoMetaImageRemove": "Poista",
+    "seoMetaImageGalleryEmpty": "Mediakirjastossa ei ole vielä kuvia.",
+    "loading": "Ladataan…",
     "seoSave": "Tallenna SEO",
     "seoSaved": "SEO tallennettu.",
     "sectionSettings": "Osio",

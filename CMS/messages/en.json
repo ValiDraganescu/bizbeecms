@@ -32,7 +32,16 @@
       "subtitle": "Build with chat — on any page.",
       "open": "Open AI assistant",
       "close": "Close AI assistant",
-      "minimize": "Minimize"
+      "minimize": "Minimize",
+      "debug": "Debug"
+    },
+    "debug": {
+      "context": "Page context",
+      "tools": "Active tools ({count})",
+      "noTools": "No tools available here.",
+      "prompt": "System prompt",
+      "loading": "Loading…",
+      "error": "Error: {message}"
     }
   },
   "contentLocales": {
@@ -318,6 +327,13 @@
     "dropSectionHint": "Drop to add a Section",
     "seoMetaTitle": "Meta title",
     "seoMetaDescription": "Meta description",
+    "seoMetaImage": "OG image",
+    "seoMetaImageEmpty": "No image set for this language.",
+    "seoMetaImagePick": "Choose image",
+    "seoMetaImageClose": "Close",
+    "seoMetaImageRemove": "Remove",
+    "seoMetaImageGalleryEmpty": "No images in the media library yet.",
+    "loading": "Loading…",
     "seoSave": "Save SEO",
     "seoSaved": "SEO saved.",
     "sectionSettings": "Section",

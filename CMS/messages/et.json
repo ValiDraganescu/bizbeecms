@@ -32,7 +32,16 @@
       "subtitle": "Ehita vesteldes — igal lehel.",
       "open": "Ava tehisintellekti assistent",
       "close": "Sulge tehisintellekti assistent",
-      "minimize": "Minimeeri"
+      "minimize": "Minimeeri",
+      "debug": "Silumine"
+    },
+    "debug": {
+      "context": "Lehe kontekst",
+      "tools": "Aktiivsed tööriistad ({count})",
+      "noTools": "Siin pole tööriistu.",
+      "prompt": "Süsteemiviip",
+      "loading": "Laadimine…",
+      "error": "Viga: {message}"
     }
   },
   "contentLocales": {
@@ -318,6 +327,13 @@
     "dropSectionHint": "Lohista sektsiooni lisamiseks",
     "seoMetaTitle": "Metapealkiri",
     "seoMetaDescription": "Metakirjeldus",
+    "seoMetaImage": "OG-pilt",
+    "seoMetaImageEmpty": "Sellele keelele pole pilti määratud.",
+    "seoMetaImagePick": "Vali pilt",
+    "seoMetaImageClose": "Sulge",
+    "seoMetaImageRemove": "Eemalda",
+    "seoMetaImageGalleryEmpty": "Meediakogus pole veel pilte.",
+    "loading": "Laadimine…",
     "seoSave": "Salvesta SEO",
     "seoSaved": "SEO salvestatud.",
     "sectionSettings": "Sektsioon",

@@ -115,6 +115,7 @@ export interface PageSummary {
   publishStatus: string;
   metaTitle: Record<string, string>;
   metaDescription: Record<string, string>;
+  metaImage: Record<string, string>;
   updatedAt: number;
 }
 
@@ -141,6 +142,7 @@ function toSummary(row: Page, idToSlug: Map<string, string>): PageSummary {
     publishStatus: row.publishStatus,
     metaTitle: parseMap(row.metaTitle),
     metaDescription: parseMap(row.metaDescription),
+    metaImage: parseMap(row.metaImage),
     updatedAt: row.updatedAt.getTime(),
   };
 }
@@ -205,6 +207,7 @@ export async function upsertPageMeta(
 
   const metaTitle = JSON.stringify(meta.metaTitle);
   const metaDescription = JSON.stringify(meta.metaDescription);
+  const metaImage = JSON.stringify(meta.metaImage);
 
   // Guard the UNIQUE(parent, slug) before writing so we report a friendly error.
   const parentMatch =
@@ -235,6 +238,7 @@ export async function upsertPageMeta(
         publishStatus: meta.publishStatus,
         metaTitle,
         metaDescription,
+        metaImage,
         updatedAt: now,
       })
       .where(eq(schema.page.id, id));
@@ -250,6 +254,7 @@ export async function upsertPageMeta(
     blocks: "[]",
     metaTitle,
     metaDescription,
+    metaImage,
     createdAt: now,
     updatedAt: now,
   });
