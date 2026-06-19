@@ -93,6 +93,9 @@ States: TODO | DOING | DONE | BLOCKED. Each is ONE provable capability. Order is
 **UX. Admin shell**
 - DONE (2026-06-18): **Shared /admin nav + index page (NEXT slice #6).** Persistent `AdminNav` client component (active link via `usePathname`, Home + chat/pages/components/media/settings links + LocaleSwitcher) rendered in the auth-allowed branch of `/admin/layout.tsx` (guard intact). New `/admin` index page (force-dynamic, try/catch → safe fallback) grids each section with a one-line description from a single `ADMIN_SECTIONS` const shared with the nav. Settings sub-pages grouped under ONE "Settings" link → content-locales (simpler option). EN/FI/ET `adminNav` namespace (key-parity test-locked, `scripts/admin-nav.test.mjs`). CMS 219/219 (+2), tsc + opennext gate (`ƒ /admin` registered), PM bundle 6470KB. See JOURNAL 2026-06-18 12:39.
 
+**Housekeeping**
+- TODO: **Stop tracking `CMS/tsconfig.tsbuildinfo`.** It's a TypeScript incremental-build artifact that got committed (shows up in diffs on every build). Add it to `.gitignore` (e.g. `**/tsconfig.tsbuildinfo` or `*.tsbuildinfo`) and `git rm --cached CMS/tsconfig.tsbuildinfo` so it stops appearing in commits. Check PM/ too in case its buildinfo is also tracked.
+
 **Z. Future / parked (TBD — not scoped, just don't forget)**
 - TBD: **Z1 — shop / product management.** E-commerce: products, cart, checkout, orders. Explicitly deferred — revisit after the core AI-CMS (A–H) proves out. When picked up, decide whether it's first-class entities (the one place real domain tables might be justified) or still composed from generic content + components. No design yet.
 
