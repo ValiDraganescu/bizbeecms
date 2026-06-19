@@ -19,8 +19,12 @@
  * gateway (HITL — can't be exercised offline).
  */
 import { getAi, getGatewayId } from "@/lib/ports/ai";
-import { ToolCallAccumulator, frameEvent, parseChatBody } from "@/lib/chat/sse";
-import { reframe } from "@/lib/chat/reframe";
+import { frameEvent, parseChatBody } from "@/lib/chat/sse";
+import {
+  streamChatRounds,
+  type ChatMessage as TurnMessage,
+  type ToolResult,
+} from "@/lib/chat/reframe";
 import {
   CREATE_COMPONENT_TOOL,
   validateComponentArtifact,
@@ -168,15 +172,17 @@ export async function POST(request: Request): Promise<Response> {
   // Only if the client didn't already supply a system message.
   const messages = await withSystemPrompt(parsed.messages, context);
 
+  const tools = toolsForRequest(context);
+  const gatewayId = await getGatewayId();
+  // One model turn. Reused for the initial call AND each tool-result follow-up so
+  // the loop re-asks with the SAME model/tool scope/gateway. Tools stay enabled on
+  // every round so the model can chain (discover → act → act again).
+  const turn = (msgs: TurnMessage[]) =>
+    ai.chat(msgs as { role: string; content: string }[], { model, tools, gatewayId });
+
   let upstream: ReadableStream<Uint8Array>;
   try {
-    // OpenAI-compatible streaming call through AI Gateway (via the Ai port).
-    // Tools are scoped to the current admin page (Slice 2).
-    upstream = await ai.chat(messages, {
-      model,
-      tools: toolsForRequest(context),
-      gatewayId: await getGatewayId(),
-    });
+    upstream = await turn(messages);
   } catch (err) {
     return Response.json(
       { error: `AI request failed: ${(err as Error).message}` },
@@ -184,7 +190,9 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const stream = reframe(upstream, runTools);
+  // Multi-turn tool loop (round-tripping): a turn that calls tools gets its results
+  // fed back so the model can chain. A turn with no tool call is the final answer.
+  const stream = streamChatRounds(upstream, messages, turn, runToolsRound);
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",
@@ -226,20 +234,28 @@ async function withSystemPrompt(
 }
 
 /**
- * Run the accumulated tool calls and frame a `tool` event per call. Dispatches
- * by tool name (B2 `create_component`, B3 `create_page`). Each result is
- * `{name, ok, action|errors|...}`. Failures (validation or D1) are surfaced as
- * `ok:false` events, never thrown — one bad tool call must not kill the stream.
+ * Run one round's tool calls: frame a `tool` event per call (client contract) AND
+ * return the structured results so the loop can feed them back to the model
+ * (round-tripping). Dispatches by tool name; each result is `{name, ok,
+ * action|errors|...}`. Failures (validation or D1) are surfaced as `ok:false`
+ * events, never thrown — one bad tool call must not kill the stream.
  */
-async function runTools(
-  tools: ToolCallAccumulator,
+async function runToolsRound(
+  calls: { name: string; args: unknown }[],
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
-): Promise<void> {
-  const emit = (data: Record<string, unknown>) =>
+): Promise<ToolResult[]> {
+  const results: ToolResult[] = [];
+  const collect = (data: Record<string, unknown>) => {
     controller.enqueue(encoder.encode(frameEvent("tool", data)));
+    results.push({ name: String(data.name ?? "tool"), data });
+  };
 
-  for (const call of tools.finish()) {
+  for (const call of calls) {
+    // Each tool emits exactly one result; capture which one this call produced so
+    // the returned order matches `calls` (the loop pairs them with tool_call ids).
+    const before = results.length;
+    const emit = collect;
     try {
       if (call.name === CREATE_COMPONENT_TOOL.function.name) {
         await handleCreateComponent(call.args, emit);
@@ -279,7 +295,13 @@ async function runTools(
     } catch (err) {
       emit({ name: call.name, ok: false, errors: [(err as Error).message] });
     }
+    // Every handler emits exactly one result; guard the round-trip pairing in case
+    // one ever returns without emitting (would desync tool_call_id ↔ result order).
+    if (results.length === before) {
+      collect({ name: call.name, ok: false, errors: ["tool produced no result"] });
+    }
   }
+  return results;
 }
 
 async function handleCreateComponent(

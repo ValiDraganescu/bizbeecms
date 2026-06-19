@@ -5,6 +5,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE: **Tool-call round-tripping (multi-turn tool loop).** New `streamChatRounds` in
+  `lib/chat/reframe.ts` drives turns: stream → run tools → feed assistant `tool_calls` + each
+  `role:"tool"` result back → re-ask, until a turn calls no tool (final answer) or maxRounds(4).
+  Route `runTools`→`runToolsRound` (frames `tool` events AND returns ToolResult[]); POST uses a
+  `turn(msgs)` closure (same model/tools/gateway each round). `reframe` kept for back-compat.
+  Tests: reframe-rounds 4 (incl. result-fed-back proof + maxRounds cap), reframe/sse 21 back-compat.
+  Gates green; cms-bundle regen.
 - DONE: **Programmatic AI-translate endpoint (reuse the EXISTING translate tool + the AI Gateway).** A
   button-driven "translate these fields to all content locales" path that is NOT a chat conversation. What
   already exists: `lib/chat/translate-tool.ts` (`CREATE_TRANSLATION_TOOL`, `validateTranslationInput`,
@@ -74,3 +81,43 @@ Task states: TODO | DOING | DONE | BLOCKED.
   SIMPLEST store — a D1 table (Site already scopes the binding) is likely cleanest; KV if preferred. Save
   threads on send; load/list/delete in the widget. Pure helpers tested; UI localized EN/FI/ET. Gate: CMS
   tsc + opennext build; regen PM cms-bundle.
+- TODO: **Searchable model picker over the FULL AI Gateway catalog (grouped by provider, price-sorted).**
+  USER 2026-06-19: the picker today is a plain `<select>` over a 3-model allowlist (`lib/chat/models.ts`
+  `CHAT_MODELS` = 3 `@cf/...` ids; rendered in `components/chat/chat-widget.tsx` ~245). User wants EVERY model
+  available in the AI Gateway, in a CUSTOM select that (1) supports SEARCH/filter, (2) groups by PROVIDER
+  (section per provider), (3) within each provider section orders LOW→HIGH price. This REPLACES the 3-model
+  allowlist with a real catalog.
+  - DEPENDS ON the binding-adapters REST-`Ai` task: that switches addressing to the gateway's `provider/model`
+    ids (e.g. `openai/gpt-4.1`) instead of the Workers-AI-binding `@cf/...` ids. Build the catalog on the
+    `provider/model` scheme; don't keep the `@cf/...` allowlist. If that task isn't landed yet, this is
+    BLOCKED on it — note so and pick another task.
+  - CATALOG SOURCE (RESOLVED by curator 2026-06-20 — there IS a real API, cache it; user asked to "cache the
+    data in the DB once or twice a day"): Cloudflare's list-models endpoint is
+    `GET https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/models/search`
+    (auth `Bearer $CF_API_TOKEN` — the SAME creds the binding-adapters REST `Ai` task injects; supports
+    `task`, `search`, `per_page`, `hide_experimental`, pagination). Each model carries: `name` (the `@cf/...`
+    id), `description`, `deprecated`, `task: {name}` (USE `task.name` as the grouping axis — there's no
+    "provider" field; the realistic grouping is by TASK, e.g. "Text Generation", or by the vendor segment of
+    the id `@cf/<vendor>/...` — pick vendor-from-id for a provider-like grouping and note the choice), and
+    `properties[]` with `{property_id:"price", value:[{unit:"per M input tokens", price, currency}]}`
+    (the per-input-token price = the SORT KEY; some models have no price → sort them last). Confirmed shape
+    against the nightly public mirror `https://ai-cloudflare-com.pages.dev/api/models`.
+    - IMPORTANT SCOPE LIMIT: this endpoint returns WORKERS-AI models ONLY (`@cf/...`, incl. CF-hosted
+      openai/llama). The unified AI-Gateway multi-provider catalog (direct OpenAI/Anthropic via the gateway)
+      is NOT exposed by any API — those, if wanted, stay a small curated supplement merged on top. Start with
+      the CF list (it's the real catalog behind the gateway today); note the gap.
+    - CACHE in D1: a `model_catalog` table (or a single JSON row) populated by a refresh that runs at most
+      once/twice a day. Implement refresh as a `GET /api/chat/models` route that serves the cached rows and
+      re-fetches when the cache is older than ~12h (lazy refresh on read — simplest; ponytail: no Cron needed,
+      add a scheduled handler only if lazy refresh proves too laggy). Filter OUT `deprecated` and
+      non-text-generation tasks (the assistant needs chat models). Map to `{ provider, id, label, price }`
+      at the boundary so the UI stays clean.
+  - PURE HELPERS (node-tested): `parseModelCatalog(apiJson)` (extract id/task/price from the `properties`
+    shape, drop deprecated/no-price-where-required), `groupByProvider(catalog)`, `sortByPrice(group)`
+    (ascending, null price last), `filter(query)`. `resolveModel` must accept ANY cached-catalog id now
+    (not just the old 3) — keep the untrusted→known→default guard, validating against the cached set.
+  - UI: a small IN-HOUSE combobox (search input + grouped, scrollable option list with provider headers +
+    keyboard nav) using design-system tokens. Do NOT add a dropdown/combobox dependency for this. Replace the
+    `<select>` in the widget footer.
+  - EN/FI/ET for the picker chrome (search placeholder, "no results", any provider-header label). Gate: CMS
+    tsc + opennext build green; regen PM cms-bundle.

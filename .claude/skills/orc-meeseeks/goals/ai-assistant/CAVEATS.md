@@ -122,6 +122,21 @@ Read every line before working. Each entry was learned the hard way by a previou
   widget keeps re-saving the same thread (threadId ref). `useChat` now exposes `seed(messages)` +
   `reset()` — use those to load a thread / start fresh; do NOT add another setMessages path.
 
+- ROUND-TRIPPING (tool result → model) DONE. The chat loop is now MULTI-TURN: `streamChatRounds`
+  (lib/chat/reframe.ts), NOT `reframe`, drives the route. It streams a turn, runs its tools, and if
+  any ran feeds the assistant `tool_calls` message + one `role:"tool"` result per call back into a
+  fresh `ai.chat()` (the `turn(msgs)` closure in route.ts re-uses the SAME model/tool-scope/gateway
+  every round so the page's tool set persists). Loop ends when a turn calls NO tool (final answer) or
+  `maxRounds`(4) is hit (last round's tools still run, just no follow-up). `reframe` (single pass)
+  stays ONLY for back-compat + its 6 tests — don't route through it. The route's tool runner is now
+  `runToolsRound(calls,…)` which BOTH frames `tool` events AND RETURNS `ToolResult[]` (via a
+  collect/emit wrapper); every handler must emit EXACTLY ONE result (a `before`-length guard
+  synthesizes one if a handler emits nothing, else tool_call_id↔result pairing desyncs). When adding a
+  tool handler keep the one-emit-per-call invariant. `streamChatRounds` uses `start()` (producer-driven
+  SSE) — tokens still stream live because `consumeTurn` enqueues each delta as it arrives from upstream.
+  Workers AI's OpenAI-compat endpoint accepts the extra `tool_calls`/`tool_call_id`/`name` fields (the
+  route casts `TurnMessage[]`→`{role,content}[]` for the `Ai` port type only; runtime forwards them).
+
 - PRE-EXISTING FAILING TEST (NOT this goal): `page-blocks-sections.test.ts` →
   "planPage renders a Section as a grid of columns" expects `repeat(2, 1fr)` but gets
   `repeat(auto-fit, minmax(min(100%, 16rem), 1fr))`. Introduced by the page-builder "responsive

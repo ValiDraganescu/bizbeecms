@@ -44,6 +44,35 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/admin-sidebar.tsx (mount widget), CMS/messages/{en,fi,et}.json (chat.widget.*),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
 
+## 2026-06-20 00:06 — Tool-call round-tripping (multi-turn tool loop)
+- **Status:** DONE
+- **What I did:** Closed the single-shot gap — tool RESULTS are now fed back to the model so it
+  can chain (discover → act, e.g. list_components → create_page, or get_page → update_page_blocks).
+  Before: `reframe` ran one turn, emitted `tool` events, then `done`; the model never saw results.
+  - `lib/chat/reframe.ts`: kept `reframe` (single pass, all 6 existing tests green) for back-compat,
+    added `streamChatRounds(initial, messages, nextTurn, runTools, maxRounds=4)` that drives the loop:
+    stream a turn (forwarding `token`s + collecting text/calls via a new `consumeTurn` helper), run its
+    tools, and if any ran AND under the cap, append a synthesized assistant `tool_calls` message + one
+    `role:"tool"` result message per call (OpenAI shape, paired by `call_<i>` id) and re-ask via
+    `nextTurn`. A turn with no tool call = final answer. Exactly one `done`/`error` out. New types
+    `ChatMessage` (with tool_calls/tool_call_id/name), `ToolResult`, `RunToolsRound`, `NextTurn`.
+  - `api/chat/route.ts`: `runTools(accumulator,…)` → `runToolsRound(calls,…)` that BOTH frames each
+    `tool` event AND returns `ToolResult[]` (an `emit`/`collect` wrapper captures the emitted data;
+    a per-call `before`-length guard synthesizes a result if a handler ever emits nothing, keeping
+    tool_call_id↔result order aligned). POST builds a `turn(msgs)` closure (same model/tool-scope/
+    gateway every round so chaining keeps the page's tools) used for the initial call AND each
+    follow-up; switched `reframe(...)` → `streamChatRounds(upstream, messages, turn, runToolsRound)`.
+- **Verified:** `node --test scripts/reframe-rounds.test.mjs` 4/4 (no-tool single round; result
+  FED BACK then final answer — asserts the assistant tool_calls + role:tool messages reach nextTurn;
+  maxRounds caps a runaway loop, asks only N-1 follow-ups; mid-stream error → error not done).
+  `reframe.test.mjs`+`chat-sse.test.mjs` 21/21 (back-compat). `tsc --noEmit` clean.
+  `opennextjs-cloudflare build` green. Full CMS suite 463/464 (the ONE fail is the PRE-EXISTING
+  page-builder Section-grid CSS test, not this goal). PM `bundle:cms` regen + `bundle:selfcheck`
+  passed (only the standing static-assets live-deploy warning). NOT verified (HITL): a live model
+  actually choosing to chain tools needs a real AI binding + browser.
+- **Files:** CMS/src/lib/chat/reframe.ts, CMS/src/app/api/chat/route.ts,
+  CMS/scripts/reframe-rounds.test.mjs (new), ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
 ## 2026-06-19 20:26 — Slice 2: page-awareness (per-page system prompt + scoped tools)
 - **Status:** DONE
 - **What I did:** Ported aicms `tool_scopes.ts` to bizbee reality as a PURE module
