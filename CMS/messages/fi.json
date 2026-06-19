@@ -306,6 +306,34 @@
     "seoMetaTitle": "Metaotsikko",
     "seoMetaDescription": "Metakuvaus",
     "seoSave": "Tallenna SEO",
-    "seoSaved": "SEO tallennettu."
+    "seoSaved": "SEO tallennettu.",
+    "sectionSettings": "Osio",
+    "sectionColumnsLabel": "Sarakkeet",
+    "sectionEmptyCols": "Tyhjät sarakkeet",
+    "sectionBehavior": {
+      "equal": "Tasaiset",
+      "collapse": "Tiivistä"
+    },
+    "sectionAlign": "Sisällön tasaus",
+    "sectionPadding": "Täyte",
+    "sectionSide": {
+      "top": "Ylä",
+      "right": "Oikea",
+      "bottom": "Ala",
+      "left": "Vasen"
+    },
+    "sectionGap": "Väli (px)",
+    "sectionMaxWidth": "Enimmäisleveys",
+    "sectionMaxWidthFull": "Täysi leveys",
+    "sectionBackground": "Tausta",
+    "sectionSwatch": {
+      "bgNone": "Ei mitään",
+      "bgSurface": "Pinta",
+      "bgRaised": "Korotettu",
+      "bgMuted": "Vaimennettu",
+      "bgPrimary": "Ensisijainen",
+      "bgPrimarySubtle": "Ensisijainen hillitty",
+      "bgForeground": "Etuala"
+    }
   }
 }

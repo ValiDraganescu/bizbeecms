@@ -27,17 +27,16 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `validateBlocks` drops BOTH reserved names. page-blocks-sections.test.ts rewritten → 11/11 (grow/shrink
   reflow, collapse 0fr, grid output, unique ids). tsc + opennext build green. PM bundle:cms DEFERRED
   (cross-loop guardrail; render DID change, so the bundle is now STALE — regen owed, see NEXT.md).
-- TODO: **Right rail Block tab — Section settings panel (mirror aicms `page_structure_diagram.tsx`).** When a
-  Section is selected, the Block tab shows its settings, editing `block.props` via the existing block PUT
-  (no new store): COLUMNS segmented 1/2/3/4 (drives `setSectionColumns`), EMPTY COLS Equal/Collapse, ALIGN
-  3×3 grid (vertical×horizontal), PADDING 4 inputs (top/right/bottom/left), GAP input, MAX WIDTH select
-  (960/1024/1152/1280/1440px/Full), BACKGROUND swatches from the THEME palette (default = theme background;
-  see how the site theme exposes colors — reuse, don't hardcode). Match the screenshot layout. Localize
-  LABELS EN/FI/ET. Pure helper for any prop-set merge + a node test. Depends on the column-model task. Gate:
-  CMS tsc + opennext build green; regen PM cms-bundle.
-  - SUB-DECISION to resolve in-task: PADDING UNIT — operator picks rem or px per padding value, REM default
-    (user requirement). aicms stores raw numbers as px; bizbee must store unit too (e.g. `paddingTopUnit`).
-    Thread the unit through render (`${n}${unit}`) + the form (unit toggle next to each value, rem default).
+- DONE (2026-06-19): **Right rail Block tab — Section settings panel (mirror aicms `page_structure_diagram.tsx`).**
+  `SectionSettings` component in `page-builder-shell.tsx`: when the selected block is a Section the Block tab
+  renders COLUMNS segmented 1/2/3/4 (→`setSectionColumns` via the merge helper), EMPTY COLS Equal/Collapse,
+  3×3 ALIGN grid (verticalAlign×horizontalAlign), 4 PADDING inputs each with a rem/px unit toggle (rem
+  default, writes `padding<Side>Unit`), GAP, MAX WIDTH select (960/1024/1152/1280/1440px/Full), BACKGROUND
+  swatches from the THEME purpose tokens (`var(--color-*)`, transparent = checkerboard). New pure
+  `mergeSectionProps(blocks,id,patch)` in `page-blocks.ts` (columns routes through `setSectionColumns`;
+  `undefined` deletes a key; no-op for non-Section) + 3 node tests (14/14 in page-blocks-sections.test.ts).
+  i18n `pageBuilder.section*` EN/FI/ET. Persists via the EXISTING block PUT (Save). tsc + opennext build
+  green. PM `bundle:cms` DEFERRED (cross-loop guardrail; bundle already owed from the column-model run).
 - DONE (2026-06-19): **DnD slice 1 — drag a "Section" from the LAYOUT rail into the Layers tree.** Native
   HTML5 DnD (no dep). Shared payload layer added to `page-builder-shell.tsx` (`DND_MIME`, `DragPayload`
   union, `setDragPayload`/`readDragPayload` — slices 2/3 reuse). Rail Section button now `draggable`

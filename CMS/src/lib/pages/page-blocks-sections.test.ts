@@ -10,6 +10,7 @@ import {
   setSectionColumns,
   addComponentToColumn,
   addComponentToSection,
+  mergeSectionProps,
   targetSectionId,
   validateBlocks,
 } from "./page-blocks.ts";
@@ -170,4 +171,40 @@ test("planPage collapse behavior shrinks empty columns to 0fr", () => {
   if (grid.kind !== "element") return;
   const style = grid.props.style as Record<string, unknown>;
   assert.equal(style.gridTemplateColumns, "1fr 0fr", "filled col 1fr, empty col 0fr");
+});
+
+test("mergeSectionProps merges non-column props, undefined deletes a key", () => {
+  const s = addSection([])[0].id;
+  let t = addSection([]);
+  t = mergeSectionProps(t, s, { backgroundColor: "var(--color-surface)", gap: 24 });
+  assert.equal(t[0].props?.backgroundColor, "var(--color-surface)");
+  assert.equal(t[0].props?.gap, 24);
+  // undefined reverts (deletes) the key
+  t = mergeSectionProps(t, s, { backgroundColor: undefined });
+  assert.equal("backgroundColor" in (t[0].props ?? {}), false);
+  assert.equal(t[0].props?.gap, 24, "other props untouched");
+});
+
+test("mergeSectionProps columns patch reflows columns via setSectionColumns", () => {
+  let t = addSection([]);
+  const s = t[0].id;
+  t = addComponentToColumn(t, s, 0, "Hero");
+  // grow to 3
+  t = mergeSectionProps(t, s, { columns: 3, gap: 8 });
+  assert.equal(t[0].props?.columns, 3);
+  assert.equal(t[0].props?.gap, 8);
+  assert.equal(sectionColumns(t[0]).length, 3);
+  // shrink to 1 reflows content back into the kept column (nothing lost)
+  t = mergeSectionProps(t, s, { columns: 1 });
+  assert.equal(sectionColumns(t[0]).length, 1);
+  assert.equal(sectionColumns(t[0])[0].children?.length, 1, "Hero reflowed, not lost");
+});
+
+test("mergeSectionProps is a no-op for a non-Section id and never mutates", () => {
+  const t0 = addSection([]);
+  const t1 = mergeSectionProps(t0, "nope", { gap: 99 });
+  assert.deepEqual(t1, t0);
+  const before = JSON.stringify(t0);
+  mergeSectionProps(t0, t0[0].id, { gap: 99 });
+  assert.equal(JSON.stringify(t0), before, "input not mutated");
 });

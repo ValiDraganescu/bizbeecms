@@ -306,6 +306,34 @@
     "seoMetaTitle": "Metapealkiri",
     "seoMetaDescription": "Metakirjeldus",
     "seoSave": "Salvesta SEO",
-    "seoSaved": "SEO salvestatud."
+    "seoSaved": "SEO salvestatud.",
+    "sectionSettings": "Sektsioon",
+    "sectionColumnsLabel": "Veerud",
+    "sectionEmptyCols": "Tühjad veerud",
+    "sectionBehavior": {
+      "equal": "Võrdsed",
+      "collapse": "Ahenda"
+    },
+    "sectionAlign": "Sisu joondus",
+    "sectionPadding": "Polster",
+    "sectionSide": {
+      "top": "Üleval",
+      "right": "Parem",
+      "bottom": "All",
+      "left": "Vasak"
+    },
+    "sectionGap": "Vahe (px)",
+    "sectionMaxWidth": "Max laius",
+    "sectionMaxWidthFull": "Täislaius",
+    "sectionBackground": "Taust",
+    "sectionSwatch": {
+      "bgNone": "Puudub",
+      "bgSurface": "Pind",
+      "bgRaised": "Kõrgendatud",
+      "bgMuted": "Tuhm",
+      "bgPrimary": "Peamine",
+      "bgPrimarySubtle": "Peamine peen",
+      "bgForeground": "Esiplaan"
+    }
   }
 }

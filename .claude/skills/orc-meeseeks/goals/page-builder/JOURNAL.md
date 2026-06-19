@@ -215,3 +215,9 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/pages/page-blocks-sections.test.ts.
   DEFERRED: PM `npm run bundle:cms` — cross-loop guardrail (task message forbids touching the bundle).
   NOTE: render behavior DID change this run, so the deployable bundle is now STALE and owes a regen.
+
+## 2026-06-19 18:06 — Right-rail Block tab: Section settings panel
+- **Status:** DONE
+- **What I did:** Added `SectionSettings` to `page-builder-shell.tsx` — when the selected block is a Section, the Block tab shows columns (1–4 segmented), empty-cols Equal/Collapse, 3×3 align grid, 4 padding inputs each with a per-side rem/px unit toggle (rem default), gap, max-width select, and theme-palette background swatches (`var(--color-*)`). New pure `mergeSectionProps(blocks,id,patch)` in `page-blocks.ts` (columns→`setSectionColumns`, undefined deletes key, no-op for non-Section). 3 new tests → 14/14. i18n `pageBuilder.section*` in en/fi/et. Edits persist via the existing block PUT on Save.
+- **Verified:** node --test page-blocks-sections.test.ts 14/14; tsc clean; opennext build green (dev stopped). i18n diff +29 lines/locale (no reformat).
+- **Files:** CMS/src/components/page-builder/page-builder-shell.tsx, CMS/src/lib/pages/page-blocks.ts, CMS/src/lib/pages/page-blocks-sections.test.ts, CMS/messages/{en,fi,et}.json

@@ -306,6 +306,34 @@
     "seoMetaTitle": "Meta title",
     "seoMetaDescription": "Meta description",
     "seoSave": "Save SEO",
-    "seoSaved": "SEO saved."
+    "seoSaved": "SEO saved.",
+    "sectionSettings": "Section",
+    "sectionColumnsLabel": "Columns",
+    "sectionEmptyCols": "Empty columns",
+    "sectionBehavior": {
+      "equal": "Equal",
+      "collapse": "Collapse"
+    },
+    "sectionAlign": "Content alignment",
+    "sectionPadding": "Padding",
+    "sectionSide": {
+      "top": "Top",
+      "right": "Right",
+      "bottom": "Bottom",
+      "left": "Left"
+    },
+    "sectionGap": "Gap (px)",
+    "sectionMaxWidth": "Max width",
+    "sectionMaxWidthFull": "Full width",
+    "sectionBackground": "Background",
+    "sectionSwatch": {
+      "bgNone": "None",
+      "bgSurface": "Surface",
+      "bgRaised": "Raised",
+      "bgMuted": "Muted",
+      "bgPrimary": "Primary",
+      "bgPrimarySubtle": "Primary subtle",
+      "bgForeground": "Foreground"
+    }
   }
 }

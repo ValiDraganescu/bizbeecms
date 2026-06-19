@@ -118,3 +118,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   it's model-agnostic and unaffected. Slice 2 will need `addComponentToColumn` (replacing the
   section-direct `addComponentToSection`) per the new backlog. The column model migration is the
   prerequisite task above slices 2/3.
+
+- Section settings panel (Block tab) is the `SectionSettings` component in `page-builder-shell.tsx`; it
+  edits a Section's props through the pure `mergeSectionProps(blocks,id,patch)` in `page-blocks.ts`.
+  `columns` MUST go through that helper (it routes to `setSectionColumns` to reflow column children) — never
+  stamp `columns` straight onto `props`. A patch value of `undefined` DELETES the key (reverts to render
+  default). BG swatches use design-system purpose tokens (`var(--color-*)`), NOT hex — they resolve at
+  render because the renderer writes `style.backgroundColor` inline. Padding stores a per-side unit
+  (`padding<Side>Unit`, rem default) which `tree.ts` `pad()` already reads.
+- The Block tab only resolves the selected block at the TOP level (`blocks.find(b=>b.id===selectedBlockId)`)
+  — fine today because only Sections are selectable from Layers. When component-blocks become selectable
+  (deeper nesting), that lookup must walk children too.

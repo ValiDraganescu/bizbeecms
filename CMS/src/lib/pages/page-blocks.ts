@@ -410,6 +410,37 @@ export function addComponentToSection(
 }
 
 /**
+ * Merge a settings patch into a Section's `props` (immutable). The `columns` key
+ * is routed through `setSectionColumns` so the column children grow/shrink (and
+ * reflow) to match — never just stamped on `props`. All other keys (alignment,
+ * padding + per-side unit, gap, maxWidth, backgroundColor, columnBehavior) merge
+ * straight into `props`; a value of `undefined` deletes that key (revert to the
+ * renderer default). No-op for a non-Section id. PURE — never mutates inputs.
+ */
+export function mergeSectionProps(
+  blocks: Block[],
+  sectionId: string,
+  patch: Record<string, unknown>,
+): Block[] {
+  let next = blocks;
+  if ("columns" in patch) {
+    const n = patch.columns;
+    if (typeof n === "number") next = setSectionColumns(next, sectionId, n);
+  }
+  const rest = Object.fromEntries(Object.entries(patch).filter(([k]) => k !== "columns"));
+  if (Object.keys(rest).length === 0) return next;
+  return next.map((section) => {
+    if (section.id !== sectionId || !isSection(section)) return section;
+    const props: Record<string, unknown> = { ...(section.props ?? {}) };
+    for (const [k, v] of Object.entries(rest)) {
+      if (v === undefined) delete props[k];
+      else props[k] = v;
+    }
+    return { ...section, props };
+  });
+}
+
+/**
  * The Section to insert into when the operator clicks a rail component: the
  * explicitly-selected one if it's a Section, else the LAST section on the page,
  * else null (caller should add a Section first). PURE.
