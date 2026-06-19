@@ -44,7 +44,15 @@
   // writes it, the router reads it.
   "kv_namespaces": [
     { "binding": "HOST_MAP", "id": "1c276b01cd5a41f0b8c98ace07b4c064" }
-  ]
+  ],
+
+  // PM origin injected into every per-Site CMS Worker as PM_ORIGIN — the CMS
+  // auth guard calls PM here (SSO validate). Pinned to the stable custom domain
+  // so CMS workers don't depend on PM's .workers.dev URL. (Code falls back to
+  // PM_CALLBACK_ORIGIN if this is ever unset — deployer/src/index.ts:262.)
+  "vars": {
+    "PM_ORIGIN": "https://manager.bizbeecms.com"
+  }
 
   // Secrets (set via `wrangler secret put`, NOT committed):
   //   CF_API_TOKEN       — Workers Scripts: Edit + SSL and Certificates: Edit

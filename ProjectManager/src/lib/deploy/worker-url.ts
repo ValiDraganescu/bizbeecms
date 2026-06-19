@@ -1,18 +1,18 @@
-import { WORKERS_DEV_SUFFIX } from "@/lib/config/hosts";
+import { CMS_WORKER_PREFIX, siteUrlForSlug } from "@/lib/config/hosts";
 
 /**
- * Best-effort public URL of a deployed CMS Worker.
+ * Public URL of a deployed CMS Worker.
  *
- * A Site's CMS deploys as its own Worker on our Cloudflare account, served at
- * `https://<workerName><.account-subdomain.workers.dev>`. The account subdomain
- * is a fixed constant for our account (`hosts.ts` → WORKERS_DEV_SUFFIX), so we
- * build the URL from that — independent of `APP_ORIGIN`, which is now a custom
- * domain (`manager.bizbeecms.com`) and can no longer be parsed for the subdomain.
- *
- * ponytail: still returns the workers.dev URL; the `<slug>.site.bizbeecms.com`
- * custom-hostname scheme is a separate backlog task — switch this then.
+ * A Site's CMS deploys as worker `bizbeecms-cms-<slug>` and is served at the
+ * stable custom hostname `https://<slug>.site.bizbeecms.com` (the router derives
+ * the slug from the leftmost subdomain label). We strip the worker-name prefix
+ * to recover the slug and build the URL from `hosts.ts` — no `.workers.dev`
+ * string leaks into user-facing "Open CMS" / "open site" links.
  */
 export async function cmsWorkerUrl(workerName: string): Promise<string | null> {
   if (!workerName) return null;
-  return `https://${workerName}${WORKERS_DEV_SUFFIX}`;
+  if (!workerName.startsWith(CMS_WORKER_PREFIX)) return null;
+  const slug = workerName.slice(CMS_WORKER_PREFIX.length);
+  if (!slug) return null;
+  return siteUrlForSlug(slug);
 }

@@ -22,6 +22,22 @@ export const CMS_WORKER_PREFIX = "bizbeecms-cms-";
 export const ZONE_DOMAIN = "bizbeecms.com";
 
 /**
+ * Per-Site CMS public hostname suffix: a Site deployed as worker
+ * `bizbeecms-cms-<slug>` is served at `https://<slug>.site.bizbeecms.com`
+ * (the router derives the slug from the leftmost subdomain label). Single
+ * source of truth so no `.workers.dev` strings leak into user-facing links.
+ */
+export const SITE_HOST_SUFFIX = `.site.${ZONE_DOMAIN}`;
+
+/** Public CMS URL for a Site slug: `https://<slug>.site.bizbeecms.com`. */
+export function siteUrlForSlug(slug: string): string {
+  return `https://${slug}${SITE_HOST_SUFFIX}`;
+}
+
+/** PM's stable custom domain. PM-internal links and injected PM_ORIGIN use it. */
+export const PM_ORIGIN = `https://manager.${ZONE_DOMAIN}`;
+
+/**
  * Fallback origin for Cloudflare-for-SaaS custom hostnames — the CNAME target
  * customer domains point at, served by the router Worker. (Mirrors the deployer's
  * /attach-domain CNAME value and the router's route.)
