@@ -123,13 +123,14 @@ States: TODO | DOING | DONE | BLOCKED. Each is ONE provable capability. Order is
 **Housekeeping**
 - DONE (2026-06-19): **Stop tracking `CMS/tsconfig.tsbuildinfo`.** Added `*.tsbuildinfo` to `CMS/.gitignore` + `git rm --cached CMS/tsconfig.tsbuildinfo` (the file stays on disk, just untracked). `git check-ignore` confirms it's now ignored. PM/ was already covered (`*.tsbuildinfo` in `ProjectManager/.gitignore`). NOTE: the earlier `a07c70a` commit only edited THIS backlog note — it never actually gitignored/untracked the file; this run finished it. Doc/config-only, no app source touched → no bundle regen / build gate needed.
 
-- TODO: **Move "View site" to the top of the CMS admin sidebar + open in a new tab.** In
-  `CMS/src/components/admin-sidebar.tsx` the "View site" link is currently a footer `<Link href="/">`
-  (~line 294, no `target`). Move it to the TOP of the sidebar nav (above Home, or as a prominent first
-  item) and make it open the public site in a NEW tab: `target="_blank" rel="noopener noreferrer"`.
-  Keep the `viewSite` i18n label; give it an external-link affordance (icon, since it now leaves the
-  admin). Collapsed-sidebar state should still show it (icon-only) like the other items. Gate: CMS tsc +
-  opennextjs build green; regen PM cms-bundle.
+- DONE (2026-06-19 19:00): **Move "View site" to the top of the CMS admin sidebar + open in a new tab.**
+  In `CMS/src/components/admin-sidebar.tsx` the "View site" link was a footer `<Link href="/">` (no target).
+  Now it's the FIRST item in the nav (above Home), a plain `<a href="/" target="_blank" rel="noopener
+  noreferrer">` (external nav, leaves admin → `<a>` not `next/link`) with a new `ExternalLinkIcon`, a bordered
+  `bg-surface` look so it reads as the prominent primary action, and collapsed-sidebar shows it icon-only with
+  a `title` tooltip like the other items. Removed the duplicate footer link (footer now just theme toggle +
+  locale). Kept the `viewSite` i18n label (already in EN/FI/ET). Verified: CMS tsc clean, opennext build gate
+  PASS, CMS 353/353, PM bundle regen 6657KB + PM 79/79.
 
 - DONE (2026-06-19): **Make theme presets complete, coordinated palettes (E1).** All 5 non-default presets
   (emerald/crimson/amber/violet/slate) are now full 24-token coordinated palettes in `CMS/src/lib/render/theme.ts`:

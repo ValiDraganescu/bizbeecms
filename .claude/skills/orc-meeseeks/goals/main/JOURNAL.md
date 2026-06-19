@@ -373,3 +373,18 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/components/portfolio-kit.ts, CMS/scripts/portfolio-kit.test.mjs,
   CMS/src/app/api/components/kit/route.ts, CMS/src/components/components/components-manager.tsx,
   CMS/messages/{en,fi,et}.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-19 19:00 — UX: "View site" moved to top of CMS admin sidebar + opens in new tab
+- **Status:** DONE
+- **What I did:** In `CMS/src/components/admin-sidebar.tsx` (`SidebarShell`) moved "View site" from a
+  footer `<Link href="/">` to the FIRST item in the nav (above Home), as a plain `<a href="/"
+  target="_blank" rel="noopener noreferrer">` (it's an external/full-page nav out of admin → `<a>`, not
+  `next/link`). Added an `ExternalLinkIcon`; styled it bordered + `bg-surface` so it reads as the prominent
+  primary action; collapsed-sidebar shows it icon-only with a `title` tooltip like the other nav items.
+  Removed the now-duplicate footer link (footer = theme toggle + locale switcher only). Kept the existing
+  `viewSite` i18n key (EN/FI/ET already present). Diversifies from the 4 component-kit runs (G1–G4).
+- **Verified:** CMS tsc clean, opennextjs-cloudflare build gate PASS, CMS `npm test` 353/353, PM bundle
+  regen (6657KB) + PM `npm test` 79/79. Scoped `git add` to my own files (parallel page-builder race —
+  contested files were `binding-adapters/BACKLOG.md` + `deployer/src/index.ts`, NOT the sidebar).
+- **Files:** CMS/src/components/admin-sidebar.tsx, ProjectManager/src/lib/deploy/cms-bundle.generated.js,
+  .claude/skills/orc-meeseeks/goals/main/{BACKLOG,JOURNAL,NEXT}.md

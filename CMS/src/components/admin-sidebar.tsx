@@ -208,6 +208,13 @@ const MoonIcon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
   </svg>
 );
+const ExternalLinkIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
+  </svg>
+);
 
 export function SidebarShell({ children }: { children: React.ReactNode }) {
   const t = useTranslations("adminNav");
@@ -273,6 +280,23 @@ export function SidebarShell({ children }: { children: React.ReactNode }) {
           className="flex-1 space-y-1 overflow-y-auto p-3"
           aria-label={t("brand")}
         >
+          {/* View site — first, prominent, opens the public site in a new tab */}
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title={collapsed ? t("viewSite") : undefined}
+            className={
+              "mb-1 flex items-center rounded-md border border-border bg-surface text-sm font-medium text-foreground transition-colors hover:bg-surface-muted " +
+              (collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5")
+            }
+          >
+            <span className="shrink-0">
+              <ExternalLinkIcon />
+            </span>
+            {!collapsed && t("viewSite")}
+          </a>
+
           {links.map(({ key, href }) => {
             const active = isActive(href);
             return (
@@ -299,20 +323,10 @@ export function SidebarShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Footer — theme toggle + locale + view site */}
+        {/* Footer — theme toggle + locale (view site moved to top of nav) */}
         <div className="space-y-2 border-t border-border p-3">
           <ThemeToggle collapsed={collapsed} />
-          {!collapsed && (
-            <>
-              <LocaleSwitcher />
-              <Link
-                href="/"
-                className="block rounded-md px-3 py-2 text-sm text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
-              >
-                {t("viewSite")}
-              </Link>
-            </>
-          )}
+          {!collapsed && <LocaleSwitcher />}
         </div>
       </aside>
 
