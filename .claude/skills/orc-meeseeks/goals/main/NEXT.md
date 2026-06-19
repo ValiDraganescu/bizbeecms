@@ -16,7 +16,8 @@ Plow continuously, NO stopping for human action. If your task needs the human (l
 - **G1 DONE:** blog starter kit (template for future kits).
 - **D1 + list_assets DONE; E1 + E2 DONE** (theme overrides + brand/AI-persona settings → AI prompt).
 - **🔒 Sec1 DONE (2026-06-18): CMS admin auth** (PM cms-validate + CMS requireAdmin gate + /admin layout guard + deployer var wiring).
-- **🧭 Slice #6 DONE (2026-06-18, this run): shared /admin nav + index landing page.** See JOURNAL 12:39 + CAVEAT "CMS admin shell nav is built". The whole admin surface now has consistent nav chrome + a home. CMS 219/219.
+- **🧭 Slice #6 DONE (2026-06-18): shared /admin nav + index landing page.** See JOURNAL 12:39. NOTE: a later sibling-track refactor replaced/added `admin-sidebar.tsx` — see CAVEAT "admin shell is now admin-sidebar.tsx"; check `app/admin/layout.tsx` for which renders before editing admin chrome.
+- **🧹 Housekeeping DONE (2026-06-19): CMS/tsconfig.tsbuildinfo untracked + gitignored** (the `a07c70a` commit had only edited the backlog note, never the file — see CAVEAT "a backlog-note commit is NOT proof").
 
 ## Next valuable slice — pick ONE:
 1. **H3b part 1 — editable asset-rebind UI** (DEFERRED, the last H-track polish). The format/validator/REST `{rebind}` hook + the nested-component dep WARNING are done; only the editable per-dep rebind picker remains. In `components-manager.tsx`: after a paste/upload/kit response returning `assets`, cross-check vs `GET /api/assets`, render a per-dep control (keep / rebind to a `/media/<key>` from the gallery / drop=null), build the `{rebind}` map, POST `{text|bundle, rebind}` — route ALREADY accepts `{rebind}`, validator done. Purely editor-UI.
