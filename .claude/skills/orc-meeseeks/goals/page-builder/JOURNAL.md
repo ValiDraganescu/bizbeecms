@@ -444,3 +444,19 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   worker.js written. All 3 message JSONs parse.
 - **Files:** `CMS/src/lib/pages/page-meta.ts`, `CMS/src/lib/pages/page-meta.test.ts`,
   `CMS/src/components/page-builder/page-builder-shell.tsx`, `CMS/messages/{en,fi,et}.json`.
+
+## 2026-06-19 20:56 — Responsive Section columns — auto-stack when narrow
+- **Status:** DONE
+- **What I did:** `tree.ts` `planSection` now emits a RESPONSIVE grid for the default
+  `equal` behavior: `repeat(auto-fit, minmax(min(100%, 16rem), 1fr))` (new `MIN_COLUMN_WIDTH`
+  const, 16rem) so a multi-column Section drops columns one-below-the-other on tablet/mobile
+  instead of crushing/overflowing — no media query needed (inline styles can't hold `@media`;
+  `min(100%, MIN)` caps the track on a phone so a single track never overflows). A 1-column
+  Section keeps `"1fr"`. The `collapse` behavior is UNCHANGED (explicit fixed `1fr/0fr` tracks).
+  Deliberately did NOT touch `page-blocks.ts` `sectionGridCols` (the Layers-tree mirror): the
+  EDITOR tree always wants a fixed row preview of N tracks regardless of viewport, so auto-stack
+  there would be wrong — the two are no longer pixel-identical by design (noted in CAVEATS).
+- **Verified:** `node --test scripts/render-tree.test.mjs` 26/26 (3 new planSection grid tests:
+  equal→auto-fit, single→1fr, collapse→"1fr 0fr"). `npx tsc --noEmit` exit 0 (fully clean).
+  `npx opennextjs-cloudflare build` complete (dev stopped, 3601 free), worker.js written.
+- **Files:** `CMS/src/lib/render/tree.ts`, `CMS/scripts/render-tree.test.mjs`.

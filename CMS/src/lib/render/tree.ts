@@ -443,6 +443,17 @@ const JUSTIFY: Record<string, string> = {
   right: "flex-end",
 };
 
+/**
+ * Per-column MIN width below which `equal`-behavior columns auto-stack (wrap one
+ * below the other) instead of crushing/overflowing on a narrow viewport. The
+ * renderer emits INLINE styles which cannot hold `@media`, so responsiveness is
+ * achieved with `repeat(auto-fit, minmax(min(100%, MIN), 1fr))`: each track is at
+ * least MIN wide (but never wider than 100% on a phone), and `auto-fit` drops the
+ * row to fewer columns — ultimately one — when MIN no longer fits. ~16rem (256px)
+ * stacks 2-up around tablet and 1-up on phones. (Could later be a Section prop.)
+ */
+const MIN_COLUMN_WIDTH = "16rem";
+
 function num(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -470,11 +481,16 @@ function planSection(
   const cols = (block.children ?? []).filter(
     (c) => c.component === SECTION_COLUMN_COMPONENT,
   );
-  // collapse → empty columns shrink to 0fr; equal → N equal tracks.
+  // collapse → empty columns shrink to 0fr (explicit fixed N tracks, no wrap);
+  // equal → responsive: auto-fit tracks that are ≥MIN wide but cap at 100% so a
+  // narrow viewport drops columns one-below-the-other instead of overflowing.
+  // A 1-column Section keeps a single full-width track either way.
   const gridCols =
     columnBehavior === "collapse"
       ? cols.map((c) => ((c.children?.length ?? 0) > 0 ? "1fr" : "0fr")).join(" ")
-      : `repeat(${columns}, 1fr)`;
+      : columns <= 1
+        ? "1fr"
+        : `repeat(auto-fit, minmax(min(100%, ${MIN_COLUMN_WIDTH}), 1fr))`;
 
   return {
     kind: "element",

@@ -95,7 +95,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
     versioning lands, this tab's publish/unpublish should
     reconcile with the versioned publish (publish here = publish current draft; unpublish = take the page
     offline). Build the simple toggle now; the versioning slices fold it in. Don't duplicate publish logic.
-- TODO: **Responsive Section columns — auto-stack when there isn't room.** BUG-ish: the Section grid uses a
+- DONE (2026-06-19 20:56): **Responsive Section columns — auto-stack when there isn't room.** `tree.ts`
+  `planSection` `equal` behavior now emits `repeat(auto-fit, minmax(min(100%, 16rem), 1fr))` (new
+  `MIN_COLUMN_WIDTH` const) so multi-column Sections stack one-below-the-other on narrow viewports
+  (no `@media` — inline styles can't, `min(100%,MIN)` caps the track on a phone). 1-column → `"1fr"`;
+  `collapse` UNCHANGED (fixed 1fr/0fr). Left `sectionGridCols` (Layers-tree mirror) fixed-N on purpose —
+  the editor preview wants a fixed row. Tests: render-tree.test.mjs 26/26 (+3). tsc + opennext green.
+- (superseded) TODO: **Responsive Section columns — auto-stack when there isn't room.** BUG-ish: the Section grid uses a
   FIXED `gridTemplateColumns: repeat(N, 1fr)` (`tree.ts` planSection ~474–490) so on tablet/mobile the
   columns DON'T stack — they crush/overlap/overflow (see the mobile preview: column 2 sits on top of column
   1). Make the grid responsive so columns drop one-below-the-other when the viewport is too narrow. Use a

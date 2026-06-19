@@ -214,6 +214,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   grid math, update `sectionGridCols` too (two mirrors — there's no shared constant; a node-testable pure
   helper can't import the server-only render path). Do NOT revert the `<ul>` to `space-y-*` (that's the
   vertical-stack bug). Each column `<li>` is still its own drop target.
+- RESPONSIVE COLUMNS (2026-06-19 20:56): `tree.ts` `planSection` `equal` behavior NO LONGER mirrors
+  `page-blocks.ts` `sectionGridCols` pixel-for-pixel — ON PURPOSE. The PUBLIC render uses
+  `repeat(auto-fit, minmax(min(100%, 16rem), 1fr))` (`MIN_COLUMN_WIDTH`) so columns auto-stack on narrow
+  viewports; the LAYERS-TREE mirror (`sectionGridCols`) stays `repeat(N, 1fr)` because the EDITOR wants a
+  fixed N-track row regardless of viewport. So the old "update both mirrors" caveat applies ONLY to the
+  `collapse` branch (still identical 1fr/0fr in both) and the column COUNT — do NOT "fix" `sectionGridCols`
+  to also auto-fit; that would collapse the editor preview on a small admin window. If you change the
+  responsive min, only `planSection` + its render-tree.test.mjs tests change.
 - DARK MODE ON THE RENDERED PAGE WORKS via the ROOT LAYOUT: `CMS/src/app/layout.tsx` sets
   `<html data-theme="system">` and imports `globals.css` (which holds the `[data-theme="dark"]` +
   `@media(prefers-color-scheme:dark){[data-theme="system"]}` dark token blocks). So public `[[...slug]]` and

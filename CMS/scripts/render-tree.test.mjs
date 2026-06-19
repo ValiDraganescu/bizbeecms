@@ -311,6 +311,49 @@ test("collectTreeComponentTags: enumerates only PascalCase tags, recursing", () 
   assert.deepEqual([...collectTreeComponentTags(tree)].sort(), ["AuthorCard", "PostList"]);
 });
 
+// ── Section → Columns responsive grid ─────────────────────────────────────────
+
+// Build a Section block with `n` columns, each holding a placeholder child so
+// "collapse" doesn't zero them out.
+function section(props, n) {
+  const cols = Array.from({ length: n }, (_, i) => ({
+    id: `c${i}`,
+    component: "__section_column__",
+    children: [{ id: `x${i}`, component: "Card" }],
+  }));
+  return { id: "s", component: "Section", props, children: cols };
+}
+
+// The inner <section> grid style for a planned Section block.
+function gridOf(block) {
+  const { root } = planPage([block], mapOf(card));
+  return root[0].children[0].props.style.gridTemplateColumns;
+}
+
+test("planSection: multi-column 'equal' uses responsive auto-fit (stacks when narrow)", () => {
+  assert.equal(
+    gridOf(section({ columns: 3, gap: 16 }, 3)),
+    "repeat(auto-fit, minmax(min(100%, 16rem), 1fr))",
+  );
+});
+
+test("planSection: single column stays one full-width track (no auto-fit)", () => {
+  assert.equal(gridOf(section({ columns: 1 }, 1)), "1fr");
+});
+
+test("planSection: 'collapse' keeps explicit fixed tracks (1fr/0fr), no auto-fit", () => {
+  const block = {
+    id: "s",
+    component: "Section",
+    props: { columns: 2, columnBehavior: "collapse" },
+    children: [
+      { id: "c0", component: "__section_column__", children: [{ id: "x", component: "Card" }] },
+      { id: "c1", component: "__section_column__", children: [] }, // empty → 0fr
+    ],
+  };
+  assert.equal(gridOf(block), "1fr 0fr");
+});
+
 // ── parseJsonColumn ───────────────────────────────────────────────────────────
 
 test("parseJsonColumn: parses valid JSON", () => {
