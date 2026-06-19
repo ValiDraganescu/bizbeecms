@@ -192,7 +192,7 @@
     "imported": "Imported “{name}”.",
     "updated": "Updated “{name}”.",
     "kitsTitle": "Starter kits",
-    "kitsHint": "Install a curated set of premade components in one click. The blog kit adds a post header, body, author card and post list; the landing kit adds a hero, feature grid, CTA band, testimonial and footer.",
+    "kitsHint": "Install a curated set of premade components in one click. The blog kit adds a post header, body, author card and post list; the landing kit adds a hero, feature grid, CTA band, testimonial and footer; the docs kit adds a header, callout, code block, step list and API parameter.",
     "installBlogKit": "Install blog kit",
     "kitInstalled": "Blog kit installed: {created} created, {updated} updated.",
     "assetDepsTitle": "Asset dependencies",
@@ -208,7 +208,8 @@
     "rebindToLabel": "Rebind to a media file…",
     "applyRebind": "Re-import with rebind",
     "applyingRebind": "Re-importing…",
-    "installLandingKit": "Install landing kit"
+    "installLandingKit": "Install landing kit",
+    "installDocsKit": "Install docs kit"
   },
   "adminAuth": {
     "forbiddenTitle": "Access denied",

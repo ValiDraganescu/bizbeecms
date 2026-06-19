@@ -24,6 +24,7 @@ type ComponentSummary = { name: string; hasScript: boolean; hasCss: boolean };
 const KITS = [
   { id: "blog", labelKey: "installBlogKit" },
   { id: "landing", labelKey: "installLandingKit" },
+  { id: "docs", labelKey: "installDocsKit" },
 ] as const;
 
 export function ComponentsManager({

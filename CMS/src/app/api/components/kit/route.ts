@@ -22,6 +22,7 @@ import { missingComponentNames, upsertImportedComponent } from "@/db/component-s
 import { parsePortableComponent, type PortableComponent } from "@/lib/components/portable";
 import { BLOG_KIT_ID, blogKit, blogKitNames } from "@/lib/components/blog-kit";
 import { LANDING_KIT_ID, landingKit, landingKitNames } from "@/lib/components/landing-kit";
+import { DOCS_KIT_ID, docsKit, docsKitNames } from "@/lib/components/docs-kit";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ type Kit = { id: string; build: () => PortableComponent[]; names: () => string[]
 const KITS: Kit[] = [
   { id: BLOG_KIT_ID, build: blogKit, names: blogKitNames },
   { id: LANDING_KIT_ID, build: landingKit, names: landingKitNames },
+  { id: DOCS_KIT_ID, build: docsKit, names: docsKitNames },
 ];
 
 // The kit manifest is a STATIC list of what kits exist (no Site data, no D1) —
