@@ -3,6 +3,20 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
+- DONE (2026-06-19): **8 CMS tests failed after the component-schema update — both buckets RE-VERIFIED as
+  stale TESTS (not code regressions); fixed the tests.** Re-ran the full suite + read both test files,
+  `src/db/schema.ts`, and `parsePropsSchema` before touching anything; pre-diagnosis CONFIRMED on both:
+  • `scripts/component-store.test.mjs` (7 fails): `SQL logic error: table component has no column named
+    source_kit`. The in-memory `COMPONENT_DDL` fixture omitted the `source_kit text` nullable col added by
+    migration 0003 (`ALTER TABLE component ADD source_kit text`) + `schema.ts:48`. CODE correct, FIXTURE
+    stale → added `source_kit text` after `props_schema` (matches the ALTER-appended position) + updated
+    the DDL provenance comment to mention 0003.
+  • `scripts/page-blocks.test.mjs` (1 fail): `parsePropsSchema` intentionally returns the full `PropField`
+    (`required`/`translatable`/`label`/`description`/`options`/`defaultValue`), not the old narrow
+    `{name,type,default}` — the `deepStrictEqual` was stale. Switched it to per-field `assert.equal`s on
+    name/type/default + the new `required:false`/`translatable:false` defaults.
+  Gate met: full CMS `node --test ...` GREEN (347/347, exit 0) + `npx tsc --noEmit` clean. Staged the two
+  test files + goals/page-builder/* by explicit path (no cms-bundle/router/custom-domains, no `git add -A`).
 
 ## Tasks
 - DONE (2026-06-19): **Make `bundle:cms` an automatic step in the PM deploy (USER DECISION 2026-06-19).** Today the

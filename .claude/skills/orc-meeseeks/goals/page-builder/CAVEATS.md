@@ -184,6 +184,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   `/api/components/grouped` returns NAMES ONLY — don't try to read propsSchema from it. The shell loads the
   palette into a `name→propsSchema` map in the same mount effect as groups.
 
+- HAND-FIXTURE DRIFT (2026-06-19): node-test fixtures that hand-write a `CREATE TABLE` (e.g.
+  `scripts/component-store.test.mjs` `COMPONENT_DDL`) DON'T track drizzle migrations — a new schema column
+  (here `source_kit`, migration 0003) breaks every insert in that test with `SQL logic error: table
+  component has no column named X`. When you add a column to `src/db/schema.ts`, also append it to any such
+  hand-DDL fixture (match the ALTER's appended position, i.e. AFTER the last pre-existing col, before the
+  `created_at`/`updated_at` tail). Tests that build the table from the real schema don't have this problem;
+  only the hand-written-DDL ones do. Grep `CREATE TABLE` under `scripts/*.test.mjs` after a schema change.
+- DON'T `deepStrictEqual` a `parsePropsSchema` field — it returns the FULL `PropField` (name/type/default +
+  required/translatable/label?/description?/options?/defaultValue?), so a `deepEqual` against the old narrow
+  `{name,type,default}` fails on the now-present `required:false`/`translatable:false`/undefined keys. Assert
+  the fields you care about with per-key `assert.equal` (see `scripts/page-blocks.test.mjs`).
 - BUNDLE NOW AUTO-REGENS ON PM DEPLOY (2026-06-19): `ProjectManager/package.json` `predeploy` is
   `npm run bundle:cms && npm run preflight` — every `npm run deploy` rebuilds the CMS bundle from current
   CMS source FIRST, then preflight validates it. CONSEQUENCE: the "bundle owed-stale" debt is gone — a

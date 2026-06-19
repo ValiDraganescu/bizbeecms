@@ -49,7 +49,13 @@ test("parsePropsSchema yields one field per declared prop, type-normalized", () 
   );
   assert.equal(fields.length, 3);
   const byName = Object.fromEntries(fields.map((f) => [f.name, f]));
-  assert.deepEqual(byName.title, { name: "title", type: "string", default: "Hi" });
+  // parsePropsSchema returns the full PropField descriptor (widened from the old
+  // narrow {name,type,default}) — assert the core shape + the new defaults.
+  assert.equal(byName.title.name, "title");
+  assert.equal(byName.title.type, "string");
+  assert.equal(byName.title.default, "Hi");
+  assert.equal(byName.title.required, false, "required defaults to false");
+  assert.equal(byName.title.translatable, false, "translatable defaults to false");
   assert.equal(byName.body.type, "richtext");
   assert.equal(byName.odd.type, "string", "unknown type degrades to string");
   assert.deepEqual(parsePropsSchema(null), [], "no schema → no fields");

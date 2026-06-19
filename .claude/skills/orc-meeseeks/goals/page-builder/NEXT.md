@@ -5,11 +5,16 @@ CLICK-INSERT) + editor block-tree store + Save PERSISTS + Center Layers⟷Previe
 DnD slices 1/2/3 + Section→Columns model + Block-tab Section settings + Component props-schema FOUNDATION +
 BLOG + LANDING + DOCS kit schema upgrade + **PM deploy auto-regens the CMS bundle (THIS run)**.
 
-**THIS run:** `ProjectManager/package.json` `predeploy` is now `npm run bundle:cms && npm run preflight`
-— every PM deploy rebuilds the CMS bundle from current source, then preflight validates it. Also regen'd
-the owed-stale bundle once (builtAt 2026-06-19T15:43:46.671Z; grep-verified `data-section-column`). **The
-"bundle owed-stale" debt is CLEARED and will not recur — deploy refreshes it.** New CAVEAT records this.
-You no longer need to track "regen owed" for render changes.
+**THIS run (BUG P1 fix):** the 8 CMS test failures after the component-schema update were BOTH stale TESTS
+(re-verified, not code regressions). Fixed `scripts/component-store.test.mjs` (added the missing
+`source_kit text` col to the hand-written `COMPONENT_DDL` fixture — migration 0003 col it didn't track) and
+`scripts/page-blocks.test.mjs` (the `parsePropsSchema` deepEqual asserted the OLD narrow shape; switched to
+per-key `assert.equal` on the full `PropField`). Suite now 347/347 green, tsc clean. Two new CAVEATs record
+the hand-DDL-fixture-drift gotcha + don't-deepEqual-a-PropField. Bug flipped to DONE in BACKLOG.
+
+PRIOR run: PM `predeploy` is `npm run bundle:cms && npm run preflight` — every PM deploy rebuilds + validates
+the CMS bundle. The "bundle owed-stale" debt is CLEARED and won't recur — deploy refreshes it. Don't track
+"regen owed" for render changes; don't casually run bundle:cms / stage cms-bundle.generated.js.
 
 **Next valuable slice toward GOAL.md** (no backlog TODOs left — invent the next slice). Ideas, rough priority:
 - Sanity-check `ComponentSettings` in `page-builder-shell.tsx` against a real installed kit component:
