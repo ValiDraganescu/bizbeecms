@@ -20,7 +20,7 @@ test("classifyCmsReturnUrl accepts our own zone", () => {
   assert.ok(r && "url" in r);
 });
 
-test("classifyCmsReturnUrl accepts <slug>.site.bizbeecms.com (custom-domains scheme, own-zone)", () => {
+test("classifyCmsReturnUrl accepts <slug>.site.bizbeecms.com (per-Site custom-domains scheme, own-zone)", () => {
   const r = classifyCmsReturnUrl("https://acme.site.bizbeecms.com/api/auth/sso-callback");
   assert.ok(r && "url" in r);
 });

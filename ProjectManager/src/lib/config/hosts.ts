@@ -24,8 +24,12 @@ export const ZONE_DOMAIN = "bizbeecms.com";
 /**
  * Per-Site CMS public hostname suffix: a Site deployed as worker
  * `bizbeecms-cms-<slug>` is served at `https://<slug>.site.bizbeecms.com`
- * (the router derives the slug from the leftmost subdomain label). Single
- * source of truth so no `.workers.dev` strings leak into user-facing links.
+ * (the router derives the slug from the leftmost subdomain label). A dedicated
+ * `.site.*` namespace, NOT bare `<slug>.bizbeecms.com`: a one-level wildcard
+ * route shadows our own infra custom domains (manager/deployer). Cost: the free
+ * universal cert covers only `*.bizbeecms.com`, so `*.site.bizbeecms.com` needs
+ * an Advanced Certificate Manager cert on the zone. Single source of truth so no
+ * `.workers.dev` strings leak into user-facing links.
  */
 export const SITE_HOST_SUFFIX = `.site.${ZONE_DOMAIN}`;
 

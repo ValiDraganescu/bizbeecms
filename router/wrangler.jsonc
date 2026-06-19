@@ -13,11 +13,17 @@
   "routes": [
     { "pattern": "cf.bizbeecms.com/*", "zone_name": "bizbeecms.com" },
     // Per-Site CMS public hostnames. Every <slug>.site.bizbeecms.com lands here;
-    // the Worker derives the slug straight from the subdomain (no HOST_MAP entry
-    // needed) and proxies to the internal bizbeecms-cms-<slug> Worker.
+    // the Worker derives the slug from the leftmost subdomain label (no HOST_MAP
+    // entry needed) and proxies to the internal bizbeecms-cms-<slug> Worker.
+    //
+    // WHY .site.* and not *.bizbeecms.com: a bare `*.bizbeecms.com/*` route is too
+    // greedy — it SHADOWS our own one-level infra custom domains (manager/deployer
+    // dropped to 404 when we tried it; on this zone the wildcard route beats the
+    // Worker custom domain). A dedicated second-level namespace avoids the
+    // collision. Cost: the free universal cert only covers `*.bizbeecms.com` (one
+    // level), so `<slug>.site.bizbeecms.com` needs an Advanced Certificate Manager
+    // cert for `*.site.bizbeecms.com` on the zone.
     { "pattern": "*.site.bizbeecms.com/*", "zone_name": "bizbeecms.com" }
-    // After the fallback origin is set + the first custom hostname is live,
-    // widen to "*/*" (zone_name bizbeecms.com) so customer apex domains match.
   ],
 
   "kv_namespaces": [

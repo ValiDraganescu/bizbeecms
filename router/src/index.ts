@@ -22,7 +22,9 @@ export default {
     const host = request.headers.get("host")?.toLowerCase() ?? "";
 
     // Per-Site CMS hostnames are <slug>.site.bizbeecms.com — the slug is encoded
-    // in the subdomain, so no HOST_MAP lookup is needed. Customer-owned custom
+    // in the subdomain, so no HOST_MAP lookup is needed. A dedicated .site.*
+    // namespace (not a bare *.bizbeecms.com) so the route can't shadow our own
+    // one-level infra custom domains (manager/deployer/cf). Customer-owned custom
     // hostnames (anything else) still resolve their Site via HOST_MAP KV.
     const SITE_SUFFIX = ".site.bizbeecms.com";
     let slug: string | null = null;
