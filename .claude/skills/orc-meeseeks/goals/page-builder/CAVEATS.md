@@ -277,3 +277,21 @@ Read every line before working. Each entry was learned the hard way by a previou
   by my commit time `git diff` showed those files clean (already in HEAD) even though I'd edited them — NOT
   a bug, the work landed, just in another commit. Lesson: stage + commit your schema/migration EARLY, and
   don't panic if a file you edited shows no diff — `git show HEAD:<path>` to confirm it's already in.
+
+- PER-VIEWPORT COLUMN VISIBILITY DONE (2026-06-19 21:03): the renderer (`react.tsx`) spreads an
+  ElementPlan's `props` STRAIGHT into `createElement`, so to put a CSS class on a rendered element you
+  emit `className` (React) — NOT `class`. A Section column hides per breakpoint via per-column boolean
+  props `hideMobile/hideTablet/hideDesktop` → pure `columnVisibilityClass()` (tree.ts) → `pb-hide-*`
+  classes on the column cell. CRITICAL: inline styles CANNOT carry `@media`, AND the runtime utility
+  sheet (`utility-css.ts`) does NOT emit Tailwind responsive variants (`md:`/`lg:`), so a class only
+  works if it's in that precompiled sheet. The 3 `pb-hide-*` classes live there as full `@media` blocks
+  (bands: mobile ≤767, tablet 768–1023, desktop ≥1024 — chosen, NOT Tailwind min-width semantics). If
+  you add MORE responsive runtime classes, add the `@media` block to `generateUtilityCss` (it can't go
+  through `utilityRules` whose decls are wrapped `.cls{…}`); update the two utility-css tests that assume
+  one `.cls{…}` block per line ("selectors are valid…" + "every rule becomes exactly one block").
+- COLUMN IS NOW SELECTABLE: the Layers-tree "Column N" label is a button (`onSelect(col.id)`), and the
+  Block tab routes a selected `__section_column__` to the new `ColumnSettings` panel (was `blockEmpty`).
+  The fuller "Column settings panel" task (align/padding/margin/gap/bg) must EXTEND ColumnSettings, not
+  add a second panel. Column props patch-merge through `onUpdateColumnProps` (page-builder-shell.tsx) →
+  `mergeBlockProps` (a column is a normal tree node; `false`/`undefined` in the patch DELETES the key so
+  storage stays sparse / reverts to render default).

@@ -383,6 +383,14 @@
       "bgForeground": "Foreground"
     },
     "column": "Column",
+    "columnSettings": "Column",
+    "colVisibility": {
+      "label": "Visibility",
+      "hint": "Hide this column on the selected screen sizes.",
+      "mobile": "Mobile",
+      "tablet": "Tablet",
+      "desktop": "Desktop"
+    },
     "dropComponentHint": "Drop a component here",
     "componentNoProps": "This component has no configurable properties.",
     "localePickerLabel": "Editing language",

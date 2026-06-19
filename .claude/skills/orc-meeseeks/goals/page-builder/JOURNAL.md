@@ -460,3 +460,25 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   equal→auto-fit, single→1fr, collapse→"1fr 0fr"). `npx tsc --noEmit` exit 0 (fully clean).
   `npx opennextjs-cloudflare build` complete (dev stopped, 3601 free), worker.js written.
 - **Files:** `CMS/src/lib/render/tree.ts`, `CMS/scripts/render-tree.test.mjs`.
+
+## 2026-06-19 21:03 — Per-viewport column visibility (hide a column on mobile/tablet/desktop)
+- **Status:** DONE
+- **What I did:** Added per-column visibility — a Section column can be hidden on a chosen
+  breakpoint band. (1) Pure `columnVisibilityClass(props)` in `tree.ts` maps the booleans
+  `hideMobile`/`hideTablet`/`hideDesktop` → `pb-hide-mobile`/`pb-hide-tablet`/`pb-hide-desktop`
+  (joined in that order, "" when fully visible); `planColumn` now emits `className` on the column
+  cell when any flag is set. (2) `utility-css.ts` gained the 3 `pb-hide-*` classes as `@media`
+  blocks (mobile ≤767, tablet 768–1023, desktop ≥1024) — inline styles can't carry `@media`, so the
+  precompiled sheet owns them; `allowedClasses()`/`generateUtilityCss()` include them. (3) Editor: a
+  new `ColumnSettings` panel (page-builder-shell.tsx) shows when a column is selected — a 3-button
+  toggle (Mobile/Tablet/Desktop) that flips the hide flags via new `onUpdateColumnProps` (patch-merge
+  through `mergeBlockProps`; false/undefined deletes the key). The Layers-tree "Column N" label is now
+  a button that SELECTS the column (so the panel can open). (4) i18n `pageBuilder.columnSettings` +
+  `colVisibility.*` in EN/FI/ET.
+- **Verified:** `node --test render-tree.test.mjs utility-css.test.mjs` 39/39 (added
+  columnVisibilityClass cases, a planPage className assertion, and the @media-emission test; fixed the
+  two pre-existing utility-css tests that assumed every line is `.cls{…}`). `npx tsc --noEmit` exit 0
+  (fully clean). `npx opennextjs-cloudflare build` complete (dev stopped, 3601 free), worker.js written.
+- **Files:** `CMS/src/lib/render/tree.ts`, `CMS/src/lib/render/utility-css.ts`,
+  `CMS/src/components/page-builder/page-builder-shell.tsx`, `CMS/scripts/render-tree.test.mjs`,
+  `CMS/scripts/utility-css.test.mjs`, `CMS/messages/{en,fi,et}.json`.

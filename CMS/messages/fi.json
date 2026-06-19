@@ -383,6 +383,14 @@
       "bgForeground": "Etuala"
     },
     "column": "Sarake",
+    "columnSettings": "Sarake",
+    "colVisibility": {
+      "label": "Näkyvyys",
+      "hint": "Piilota tämä sarake valituilla näyttökoilla.",
+      "mobile": "Mobiili",
+      "tablet": "Tabletti",
+      "desktop": "Työpöytä"
+    },
     "dropComponentHint": "Pudota komponentti tähän",
     "componentNoProps": "Tällä komponentilla ei ole muokattavia ominaisuuksia.",
     "localePickerLabel": "Muokattava kieli",

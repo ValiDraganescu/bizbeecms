@@ -112,7 +112,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   switch is needed instead of auto-fit, the renderer would need a real CSS class/stylesheet path (NOT inline)
   — note that tradeoff in JOURNAL; prefer the inline auto-fit solution first (lazy + no infra change). Update
   the section-render test. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
-- DOING: **Per-viewport column visibility — hide a column on desktop/tablet/mobile.** For real
+- DONE (2026-06-19 21:03): **Per-viewport column visibility — hide a column on mobile/tablet/desktop.**
+  Pure `columnVisibilityClass(props)` (tree.ts) maps `hideMobile/hideTablet/hideDesktop` → `pb-hide-*`
+  classes; `planColumn` emits `className` on the column cell. `utility-css.ts` adds the 3 `pb-hide-*`
+  `@media` rules (≤767 / 768–1023 / ≥1024) since inline styles can't `@media`. New `ColumnSettings`
+  panel (shown when a column is selected; the "Column N" Layers label is now a SELECT button) with a
+  3-button toggle via new `onUpdateColumnProps` (patch-merge over `mergeBlockProps`). i18n
+  `columnSettings`+`colVisibility.*` EN/FI/ET. Tests: render-tree+utility-css 39/39. tsc + opennext green.
+  See JOURNAL 21:03. (Original task text retained below for reference.)
+- TODO (ORIGINAL TEXT, kept for ref): **Per-viewport column visibility — hide a column on desktop/tablet/mobile.** For real
   responsiveness the operator wants to HIDE a specific column at a given breakpoint (e.g. drop a column on
   mobile). Add per-column visibility props (e.g. `hideOnMobile`/`hideOnTablet`/`hideOnDesktop`, all default
   visible) edited in the Column settings panel (see the "Column settings panel" task — add a VISIBILITY

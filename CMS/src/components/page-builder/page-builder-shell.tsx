@@ -1157,9 +1157,19 @@ function LayersTree({
                         : "border-border bg-surface-muted")
                     }
                   >
-                    <p className="px-1 pb-1 font-mono text-[11px] uppercase tracking-wide text-foreground-muted">
+                    <button
+                      type="button"
+                      onClick={() => onSelect(col.id)}
+                      aria-pressed={selectedId === col.id}
+                      className={
+                        "w-full rounded px-1 pb-1 text-left font-mono text-[11px] uppercase tracking-wide transition-colors " +
+                        (selectedId === col.id
+                          ? "text-primary"
+                          : "text-foreground-muted hover:text-foreground")
+                      }
+                    >
                       {t("column")} {ci + 1}
-                    </p>
+                    </button>
                     {(col.children?.length ?? 0) > 0 ? (
                       <ul className="space-y-1.5">
                         {col.children!.map((c) => (

@@ -11,7 +11,43 @@ import {
   planTree,
   planPage,
   parseJsonColumn,
+  columnVisibilityClass,
 } from "../src/lib/render/tree.ts";
+
+test("columnVisibilityClass: no flags → empty string", () => {
+  assert.equal(columnVisibilityClass(undefined), "");
+  assert.equal(columnVisibilityClass({}), "");
+  assert.equal(columnVisibilityClass({ hideMobile: false, hideTablet: false }), "");
+});
+
+test("columnVisibilityClass: each flag emits its pb-hide-* class", () => {
+  assert.equal(columnVisibilityClass({ hideMobile: true }), "pb-hide-mobile");
+  assert.equal(columnVisibilityClass({ hideTablet: true }), "pb-hide-tablet");
+  assert.equal(columnVisibilityClass({ hideDesktop: true }), "pb-hide-desktop");
+});
+
+test("columnVisibilityClass: multiple flags join in mobile/tablet/desktop order", () => {
+  assert.equal(
+    columnVisibilityClass({ hideDesktop: true, hideMobile: true, hideTablet: true }),
+    "pb-hide-mobile pb-hide-tablet pb-hide-desktop",
+  );
+});
+
+test("planPage: a hidden column carries the className on its cell", () => {
+  const blocks = [
+    {
+      id: "s1",
+      component: "Section",
+      props: { columns: 1 },
+      children: [{ id: "c1", component: "__section_column__", props: { hideMobile: true }, children: [] }],
+    },
+  ];
+  const plan = planPage(blocks, new Map());
+  const section = plan.root[0]; // outer data-section div
+  const grid = section.children[0]; // <section> grid
+  const col = grid.children[0]; // the column cell
+  assert.equal(col.props.className, "pb-hide-mobile");
+});
 
 test("planTree: string node becomes a text plan", () => {
   assert.deepEqual(planTree("hello"), { kind: "text", text: "hello" });

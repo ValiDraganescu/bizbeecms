@@ -21,9 +21,33 @@ test("generator is pure/deterministic — identical output across calls", () => 
 test("every rule becomes exactly one CSS block in the sheet", () => {
   const rules = utilityRules();
   const css = generateUtilityCss();
-  // One `{...}` block per rule.
-  const blocks = css.match(/\{[^}]*\}/g) ?? [];
-  assert.equal(blocks.length, rules.length);
+  // One `{...}` block per rule. The 3 per-viewport hide rules each emit an
+  // EXTRA inner block (`@media …{.cls{display:none}}`) on top of utilityRules.
+  const blocks = css.match(/\.[a-z0-9\\:-]+\{[^}]*\}/g) ?? [];
+  assert.equal(blocks.length, rules.length + 3);
+});
+
+test("per-viewport hide classes emit a single-band @media display:none", () => {
+  const css = generateUtilityCss();
+  assert.ok(
+    css.includes("@media (max-width:767px){.pb-hide-mobile{display:none}}"),
+    "missing pb-hide-mobile media rule",
+  );
+  assert.ok(
+    css.includes(
+      "@media (min-width:768px) and (max-width:1023px){.pb-hide-tablet{display:none}}",
+    ),
+    "missing pb-hide-tablet media rule",
+  );
+  assert.ok(
+    css.includes("@media (min-width:1024px){.pb-hide-desktop{display:none}}"),
+    "missing pb-hide-desktop media rule",
+  );
+  // They're allowed classes too (so docs/validation know about them).
+  const allowed = allowedClasses();
+  for (const c of ["pb-hide-mobile", "pb-hide-tablet", "pb-hide-desktop"]) {
+    assert.ok(allowed.has(c), `${c} not in allowedClasses()`);
+  }
 });
 
 test("vocabulary is non-trivial and has no duplicate class names", () => {
@@ -70,7 +94,11 @@ test("common layout/typography/spacing classes are in the vocabulary", () => {
 test("selectors are valid and start with a dot + class name", () => {
   const css = generateUtilityCss();
   for (const line of css.split("\n")) {
-    assert.match(line, /^\.[a-zA-Z0-9\\-]+\{[^{}]+\}$/, `bad CSS line: ${line}`);
+    // Either a plain `.cls{decl}` rule, or a per-viewport `@media …{.cls{decl}}`.
+    const ok =
+      /^\.[a-zA-Z0-9\\-]+\{[^{}]+\}$/.test(line) ||
+      /^@media [^{]+\{\.[a-zA-Z0-9\\-]+\{[^{}]+\}\}$/.test(line);
+    assert.ok(ok, `bad CSS line: ${line}`);
   }
 });
 

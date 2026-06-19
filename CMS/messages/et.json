@@ -383,6 +383,14 @@
       "bgForeground": "Esiplaan"
     },
     "column": "Veerg",
+    "columnSettings": "Veerg",
+    "colVisibility": {
+      "label": "Nähtavus",
+      "hint": "Peida see veerg valitud ekraanisuurustel.",
+      "mobile": "Mobiil",
+      "tablet": "Tahvelarvuti",
+      "desktop": "Töölaud"
+    },
     "dropComponentHint": "Lohista komponent siia",
     "componentNoProps": "Sellel komponendil pole muudetavaid omadusi.",
     "localePickerLabel": "Muudetav keel",
