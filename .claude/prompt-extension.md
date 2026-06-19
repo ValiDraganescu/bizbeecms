@@ -1,3 +1,5 @@
 - The ProjectManager project runs at https://bizbee.localhost
 - Use `npm run dev` (port 3601) when iterating — it hot-reloads, no build or `rm -rf .next` needed.
 - Use `npx opennextjs-cloudflare build` (the deploy gate; runs `next build` internally) only as a pre-commit check, and never while `npm run dev` is running (it corrupts `.next` and 500s the server) — stop dev first, then build.
+- The ProjectManager, router and deployer have npm deploy scripts, use them do deploy to cloudflare, it’s fine to do so, we are on dev mode
+- The CMS is deployed by the user from the PM deployment at manager.bizbeecms.com
