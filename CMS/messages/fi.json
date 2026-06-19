@@ -347,6 +347,23 @@
       "deleteAction": "Poista",
       "cancel": "Peruuta"
     },
+    "versions": {
+      "label": "Versiohistoria",
+      "loading": "Ladataan versioita…",
+      "empty": "Ei vielä julkaistuja versioita. Julkaise luodaksesi ensimmäisen.",
+      "versionNo": "Versio {no}",
+      "current": "Julkaistu",
+      "view": "Näytä",
+      "viewing": "Näkyvissä",
+      "viewingBanner": "Esikatsellaan aiempaa versiota (vain luku).",
+      "exitView": "Takaisin luonnokseen",
+      "restore": "Luo luonnos",
+      "restoreConfirm": "Luodaanko muokattava luonnos tästä versiosta? Nykyinen luonnoksesi korvataan.",
+      "restoreAction": "Luo luonnos",
+      "restoring": "Palautetaan…",
+      "restoreError": "Tämän version palautus epäonnistui.",
+      "cancel": "Peruuta"
+    },
     "seoEmpty": "SEO-asetukset näkyvät täällä, kun sivu on valittu.",
     "saving": "Tallennetaan…",
     "addSectionFirst": "Lisää ensin osio ja pudota sitten komponentit siihen.",

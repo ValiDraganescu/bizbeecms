@@ -384,3 +384,17 @@ Read every line before working. Each entry was learned the hard way by a previou
 - The debounced auto-save REUSES the single slice-2 effect (now `void saveDraft()` instead of a bare nonce
   bump). Do NOT add a second debounce effect. It has an eslint-disable for exhaustive-deps (saveDraft is a
   fresh closure each render; deps stay [blocks,dirty,saving,selected] on purpose so it fires on edits only).
+
+- VERSIONING slice 4 DONE (2026-06-19 21:47) — ALL 4 SLICES COMPLETE. History list = PURE
+  `buildHistory(versions, publishedVersionId)` (lib/pages/version-history.ts, node-tested): filters to
+  PUBLISHED rows only (drafts excluded — versionNo 0), sorts by versionNo desc, flags `isCurrent`. Two NEW
+  routes: `GET /api/pages/[id]/versions` (listVersions→buildHistory; reads page.publishedVersionId for the
+  live flag) + `POST /api/pages/[id]/restore {versionId}` (newDraftFromVersion). The PREVIEW route now
+  honors `?version=<id>` to render a SPECIFIC version READ-ONLY — it GUARDS `v.pageId === id` (notFound on a
+  foreign/dangling id, so one page can't preview another's content). The `VersionHistory` component lives in
+  page-builder-shell.tsx in the PAGE tab (below PageSettings). VIEW sets shell `previewVersionId` +
+  `setCenterTab("preview")`; the iframe URL is built by module helper `previewSrc(id, theme, versionId)`
+  (URLSearchParams — reuse it, don't re-inline theme/version query building). RESTORE clears
+  `previewVersionId` + bumps `draftReloadNonce` (a new state added to the draft-load effect deps) to re-run
+  the load effect so the editor shows the restored blocks. `previewVersionId` also auto-clears on page change
+  (its own effect). In-app confirm for restore (NOT native window.confirm). i18n `pageBuilder.versions.*`.

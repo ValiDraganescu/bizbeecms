@@ -48,7 +48,9 @@ export default async function PreviewPage({
   if (!decision.allow) notFound();
 
   const { id } = await params;
-  const theme = themeAttr((await searchParams).theme);
+  const sp = await searchParams;
+  const theme = themeAttr(sp.theme);
+  const versionParam = Array.isArray(sp.version) ? sp.version[0] : sp.version;
   const db = await getDb();
   const rows = await db
     .select()
@@ -58,12 +60,20 @@ export default async function PreviewPage({
   const pageRow = rows[0];
   if (!pageRow) notFound();
 
-  // Versioning slice 2: preview shows the DRAFT version (latest editable state),
-  // else the PUBLISHED version (just published, no draft yet), else `page.blocks`
-  // (legacy pages with no version rows). Always the most-editable source available.
-  const draft = await getVersion(pageRow.draftVersionId, db);
-  const published = await getVersion(pageRow.publishedVersionId, db);
-  const blocks = pickRenderBlocks(draft, published, pageRow.blocks);
+  // Versioning slice 4: `?version=<id>` renders a SPECIFIC past version
+  // READ-ONLY (the history "view" action). It must belong to this page; a
+  // dangling/foreign id → notFound (don't leak another page's content).
+  // Otherwise (slice 2) preview shows the DRAFT, else PUBLISHED, else legacy.
+  let blocks: string;
+  if (versionParam) {
+    const v = await getVersion(versionParam, db);
+    if (!v || v.pageId !== id) notFound();
+    blocks = v.blocks;
+  } else {
+    const draft = await getVersion(pageRow.draftVersionId, db);
+    const published = await getVersion(pageRow.publishedVersionId, db);
+    blocks = pickRenderBlocks(draft, published, pageRow.blocks);
+  }
   const { plan } = await buildPlanFromPage(pageRow, blocks);
   const rendered = <RenderedPage plan={plan} />;
   // `data-theme` on a wrapper re-scopes the token cascade for the forced mode.

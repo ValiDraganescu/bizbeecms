@@ -1,31 +1,32 @@
 # Note to the next Meeseeks (page-builder)
 
-**THIS run (Versioning slice 3 — debounced draft auto-save + Save + Publish):** DONE.
-Shell now writes DRAFTS via NEW REST routes (NO server actions): `/api/pages/[id]/draft` (GET=getDraft
-create-if-absent, PUT=saveDraftBlocks) + `/api/pages/[id]/publish` (POST=publishDraft). On page-select the
-shell loads the DRAFT (not page.blocks). Every block edit auto-saves on a 600ms debounce (reuses the slice-2
-effect → now `void saveDraft()`, then bumps previewNonce). Top bar = [Save][Publish]: Save forces an immediate
-draft save (ALWAYS draft, never publishes); Publish saves the draft if dirty then snapshots. Status badge from
-PURE `lib/pages/draft-status.ts` (Saving…/Saved/Published/Unsaved/Save failed), i18n EN/FI/ET. tsc 0,
-draft-status+page-version tests 15/15, opennext build green (both routes in the route map). See CAVEATS
-"VERSIONING slice 3 LANDED".
+**THIS run (Versioning slice 4 — version history UI + view/restore):** DONE. **ALL 4 VERSIONING SLICES ARE
+NOW COMPLETE.** Right-rail PAGE tab now shows `VersionHistory` (below PageSettings): a list of PUBLISHED
+versions (version_no + timestamp, "Live" badge on the current one) from NEW `GET /api/pages/[id]/versions`
+(PURE `buildHistory` in lib/pages/version-history.ts). Per version: **View** (renders it read-only in the
+preview iframe via `/preview/<id>?version=<vid>` — route guards page ownership; shell switches center tab to
+preview + shows a "back to draft" banner) and **Create draft** (in-app confirm → NEW
+`POST /api/pages/[id]/restore {versionId}` → `newDraftFromVersion` copies the version into a fresh draft,
+source untouched, then the editor reloads the draft via a new `draftReloadNonce`). REST+fetch only, NO server
+actions. i18n EN/FI/ET `pageBuilder.versions.*`. tsc 0, version-history 4/4 + page-version 10/10, opennext
+build green (both routes in the map). See CAVEATS "VERSIONING slice 4 DONE".
 
 **CHECK BUGS FIRST:** ALL bugs in BACKLOG `## Bugs` are DONE. If a fresh human bug appears, take it first.
 
-**USER MUST APPLY MIGRATION 0006** (`0006_robust_wendell_rand.sql`) before versioning is live
-(`wrangler d1 migrations apply <db>` remote / `--local` dev). NOT auto-run by build. Until then getDraft/
-publishDraft hit empty version rows; the public route falls back to page.blocks (slice 2 `pickRenderBlocks`).
-NOTE: builder edits now go to the DRAFT — so they're INVISIBLE on the public page until Publish. Intended.
+**USER MUST APPLY MIGRATION 0006** (`0006_robust_wendell_rand.sql`) before versioning is live end-to-end
+(`wrangler d1 migrations apply <db>` remote / `--local` dev). NOT auto-run by build. Until applied, getDraft/
+publishDraft/listVersions hit empty version rows; public falls back to page.blocks (slice 2 pickRenderBlocks).
+All versioning is BUILD-VERIFIED ONLY — needs a real D1 binding + the migration to exercise live (HITL).
 
-**Top queued task — Versioning slice 4** (version history UI + restore/republish): a history list (top bar
-or a right-rail tab) from `listVersions(pageId)`; restore = `newDraftFromVersion(pageId, versionId)` → makes a
-new draft copied from that version (source untouched). Needs a new route, e.g. `GET /api/pages/[id]/versions`
-(listVersions) + `POST /api/pages/[id]/restore {versionId}` (newDraftFromVersion). After restore, refetch the
-draft into the shell (re-run the load effect / bump selected) so the editor shows the restored blocks. i18n
-EN/FI/ET. Show version_no + createdAt + which is currently published.
-
-Other queued: Adopt `<LocalePicker>` in C2 (pages-manager.tsx + pages/block-editor.tsx still stack locales);
-Schema field types DATE/TIME (native pickers in ComponentSettings); dark-mode preview toggle follow-on UI.
+**Top queued tasks now (no more versioning slices):**
+- Adopt `<LocalePicker>`/`useLocalePicker` in C2 `pages-manager.tsx` + `pages/block-editor.tsx` (they still
+  STACK all content locales; the builder forms already use the shared picker — full app-wide consistency).
+- Schema field types DATE/TIME — native `<input type=date/time>` in ComponentSettings (parse+validate in
+  page-blocks.ts; migrate BlogPostHeader.date etc. to `type:"date"`; node tests). Full spec in BACKLOG.
+- Component "AI translate" button — BLOCKED until the ai-assistant goal ships `POST /api/translate`. Skip
+  until then.
+- Polish: the History list shows version_no + raw `toLocaleString()` timestamp; could group/relative-time if
+  the user wants. Low priority.
 
 Gate: CMS `npx tsc --noEmit` → `node --test scripts/*.test.mjs` → `npx opennextjs-cloudflare build` (dev
 STOPPED, 3601 free). Stage ONLY CMS files + `goals/page-builder/*` by EXPLICIT PATH — NO `git add -A`. Do

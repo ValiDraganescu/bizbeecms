@@ -347,6 +347,23 @@
       "deleteAction": "Delete",
       "cancel": "Cancel"
     },
+    "versions": {
+      "label": "Version history",
+      "loading": "Loading versions…",
+      "empty": "No published versions yet. Publish to create the first.",
+      "versionNo": "Version {no}",
+      "current": "Live",
+      "view": "View",
+      "viewing": "Viewing",
+      "viewingBanner": "Previewing a past version (read-only).",
+      "exitView": "Back to draft",
+      "restore": "Create draft",
+      "restoreConfirm": "Create an editable draft from this version? Your current draft will be replaced.",
+      "restoreAction": "Create draft",
+      "restoring": "Restoring…",
+      "restoreError": "Could not restore this version.",
+      "cancel": "Cancel"
+    },
     "seoEmpty": "SEO settings appear here once a page is selected.",
     "saving": "Saving…",
     "addSectionFirst": "Add a Section first, then drop components into it.",

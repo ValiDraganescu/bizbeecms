@@ -347,6 +347,23 @@
       "deleteAction": "Kustuta",
       "cancel": "Tühista"
     },
+    "versions": {
+      "label": "Versiooniajalugu",
+      "loading": "Versioonide laadimine…",
+      "empty": "Avaldatud versioone veel pole. Avalda, et luua esimene.",
+      "versionNo": "Versioon {no}",
+      "current": "Avaldatud",
+      "view": "Vaata",
+      "viewing": "Vaatamisel",
+      "viewingBanner": "Varasema versiooni eelvaade (ainult lugemine).",
+      "exitView": "Tagasi mustandi juurde",
+      "restore": "Loo mustand",
+      "restoreConfirm": "Kas luua sellest versioonist muudetav mustand? Sinu praegune mustand asendatakse.",
+      "restoreAction": "Loo mustand",
+      "restoring": "Taastamine…",
+      "restoreError": "Selle versiooni taastamine ebaõnnestus.",
+      "cancel": "Tühista"
+    },
     "seoEmpty": "SEO sätted ilmuvad siia, kui leht on valitud.",
     "saving": "Salvestamine…",
     "addSectionFirst": "Lisa esmalt sektsioon ja seejärel lohista komponendid sinna.",

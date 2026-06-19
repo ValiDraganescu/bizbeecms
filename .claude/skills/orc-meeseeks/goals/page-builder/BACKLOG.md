@@ -273,11 +273,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   draft status (saving… / saved / published). Because of auto-save, work survives closing the tab WITHOUT a
   save click — but keep Save for explicit confidence. Keep undo/redo local. Depends on slices 1–2. i18n
   EN/FI/ET (Save, Publish, saving, saved, published). Gate: CMS tsc + opennext build green; regen PM cms-bundle.
-- TODO: **Versioning slice 4 — version history UI + restore/republish.** A history view (top bar or the
-  Page tab) listing published versions (version_no + timestamp) via `listVersions`; actions: open a past
-  version read-only, and **"Create draft from this version"** (`newDraftFromVersion`) → loads it as the
-  editable draft so the user can edit + Publish it as a new version. Depends on slices 1–3. i18n EN/FI/ET.
-  Gate: CMS tsc + opennext build green; regen PM cms-bundle.
+- DONE (2026-06-19 21:47): **Versioning slice 4 — version history UI + view/restore.** Right-rail PAGE tab now
+  shows `VersionHistory` (below PageSettings): lists PUBLISHED versions newest-first via PURE `buildHistory`
+  (lib/pages/version-history.ts) from NEW `GET /api/pages/[id]/versions`; per version VIEW it read-only in the
+  preview iframe (`/preview/<id>?version=` — route guards page ownership) and "Create draft" → NEW
+  `POST /api/pages/[id]/restore {versionId}` (newDraftFromVersion, in-app confirm) which reloads the draft into
+  the editor (draftReloadNonce). i18n `pageBuilder.versions.*` EN/FI/ET. version-history 4/4 + page-version 10/10,
+  tsc 0, opennext build green (both routes in map). See JOURNAL 21:47. ALL 4 VERSIONING SLICES NOW DONE.
 - TODO: **Component multilingual UX — "AI translate" button (manual per-locale already DONE).** The Block
   tab's `ComponentSettings` (page-builder-shell.tsx ~1434) ALREADY renders translatable string/richtext
   props one input per content locale (writes `{loc:text}` via `setLocalizedProp`) — manual translation is

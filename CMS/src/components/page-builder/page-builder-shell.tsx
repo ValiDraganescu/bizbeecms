@@ -97,6 +97,23 @@ const VIEWPORT_WIDTH: Record<Viewport, string> = {
   mobile: "375px",
 };
 
+/**
+ * Build the preview-iframe URL: `/preview/<id>` with optional `?theme=` (forced
+ * color mode) and `?version=` (Versioning slice 4 — render a past version
+ * read-only). "system" theme sends no theme param (inherits OS).
+ */
+function previewSrc(
+  id: string,
+  theme: "system" | "light" | "dark",
+  versionId: string | null,
+): string {
+  const params = new URLSearchParams();
+  if (theme !== "system") params.set("theme", theme);
+  if (versionId) params.set("version", versionId);
+  const qs = params.toString();
+  return qs ? `/preview/${id}?${qs}` : `/preview/${id}`;
+}
+
 const ICON = {
   width: 16,
   height: 16,
@@ -198,6 +215,12 @@ export function PageBuilderShell({
   // Versioning slice 3: the draft auto-save status badge (saving…/saved/published).
   const [draftStatus, setDraftStatus] = useState<DraftStatus>("saved");
   const [publishing, setPublishing] = useState(false);
+  // Versioning slice 4: bumped to re-run the draft load effect (e.g. after a
+  // restore replaces the draft with a copy of a past version).
+  const [draftReloadNonce, setDraftReloadNonce] = useState(0);
+  // Versioning slice 4: when set, the preview iframe renders this specific past
+  // version READ-ONLY (?version=) instead of the live draft. Cleared to go back.
+  const [previewVersionId, setPreviewVersionId] = useState<string | null>(null);
   // True while a draggable rail item hovers the Layers drop zone (blue indicator).
   const [layersDropActive, setLayersDropActive] = useState(false);
 
@@ -227,6 +250,26 @@ export function PageBuilderShell({
     return () => {
       live = false;
     };
+  }, [selected, draftReloadNonce]);
+
+  // Versioning slice 4: restore a past version into a new draft, then re-load the
+  // draft into the editor so it shows the restored blocks. Source untouched.
+  async function onRestoreVersion(versionId: string): Promise<boolean> {
+    if (!selected) return false;
+    const res = await fetch(`/api/pages/${selected.id}/restore`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ versionId }),
+    });
+    if (!res.ok) return false;
+    setPreviewVersionId(null); // back to the live draft view
+    setDraftReloadNonce((n) => n + 1); // re-run the load effect → fresh draft
+    return true;
+  }
+
+  // Clear the read-only version preview when the operator switches pages.
+  useEffect(() => {
+    setPreviewVersionId(null);
   }, [selected]);
 
   function onAddSection() {
@@ -699,12 +742,8 @@ export function PageBuilderShell({
                 >
                   {selected ? (
                     <iframe
-                      key={`${selected.id}-${previewNonce}-${previewTheme}`}
-                      src={
-                        previewTheme === "system"
-                          ? `/preview/${selected.id}`
-                          : `/preview/${selected.id}?theme=${previewTheme}`
-                      }
+                      key={`${selected.id}-${previewNonce}-${previewTheme}-${previewVersionId ?? ""}`}
+                      src={previewSrc(selected.id, previewTheme, previewVersionId)}
                       title={t("previewIframeTitle")}
                       className="h-full w-full border-0 bg-surface"
                     />
@@ -787,15 +826,28 @@ export function PageBuilderShell({
                   ? pages.find((p) => p.id === selected.id) ?? null
                   : null;
                 return page ? (
-                  <PageSettings
-                    key={page.id}
-                    page={page}
-                    onChanged={() => void refreshPages(page.id)}
-                    onDeleted={() => {
-                      setSelected(null);
-                      void refreshPages();
-                    }}
-                  />
+                  <div className="space-y-6">
+                    <PageSettings
+                      key={page.id}
+                      page={page}
+                      onChanged={() => void refreshPages(page.id)}
+                      onDeleted={() => {
+                        setSelected(null);
+                        void refreshPages();
+                      }}
+                    />
+                    <VersionHistory
+                      key={`vh-${page.id}-${draftReloadNonce}`}
+                      pageId={page.id}
+                      viewingVersionId={previewVersionId}
+                      onView={(versionId) => {
+                        setPreviewVersionId(versionId);
+                        setCenterTab("preview");
+                      }}
+                      onExitView={() => setPreviewVersionId(null)}
+                      onRestore={onRestoreVersion}
+                    />
+                  </div>
                 ) : (
                   <p className="text-sm text-foreground-muted">{t("pageEmpty")}</p>
                 );
@@ -2373,6 +2425,179 @@ function PageSettings({
           </button>
         )}
       </div>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+/** A published version row shape from `GET /api/pages/[id]/versions` (buildHistory). */
+interface HistoryEntry {
+  id: string;
+  versionNo: number;
+  createdAt: number;
+  isCurrent: boolean;
+}
+
+/**
+ * Right-rail PAGE tab — VERSION HISTORY (page-builder Versioning slice 4).
+ * Lists the page's PUBLISHED versions (newest first) from
+ * `GET /api/pages/[id]/versions`; per version: VIEW it read-only in the preview
+ * iframe (`?version=`), or "Create draft from this version"
+ * (`POST /api/pages/[id]/restore`) which copies it into a fresh editable draft
+ * (source untouched) and reloads the editor. The currently-live version is
+ * flagged. Restore is gated by an in-app confirm (no native window.confirm).
+ */
+function VersionHistory({
+  pageId,
+  viewingVersionId,
+  onView,
+  onExitView,
+  onRestore,
+}: {
+  pageId: string;
+  viewingVersionId: string | null;
+  onView: (versionId: string) => void;
+  onExitView: () => void;
+  onRestore: (versionId: string) => Promise<boolean>;
+}) {
+  const t = useTranslations("pageBuilder");
+  const [versions, setVersions] = useState<HistoryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/pages/${pageId}/versions`);
+        if (!live) return;
+        if (res.ok) {
+          const body = (await res.json()) as { versions?: HistoryEntry[] };
+          setVersions(body.versions ?? []);
+        } else {
+          setError(`HTTP ${res.status}`);
+        }
+      } catch (err) {
+        if (live) setError((err as Error).message);
+      } finally {
+        if (live) setLoading(false);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [pageId]);
+
+  async function restore(versionId: string) {
+    setError(null);
+    setBusyId(versionId);
+    try {
+      const ok = await onRestore(versionId);
+      if (!ok) setError(t("versions.restoreError"));
+    } finally {
+      setBusyId(null);
+      setConfirmId(null);
+    }
+  }
+
+  const btn = "rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-50";
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-border pt-4">
+      <span className="text-xs uppercase tracking-wide text-foreground-muted">
+        {t("versions.label")}
+      </span>
+
+      {viewingVersionId && (
+        <div className="flex items-center justify-between rounded-md border border-primary bg-primary-subtle px-3 py-2">
+          <span className="text-xs text-foreground">{t("versions.viewingBanner")}</span>
+          <button
+            type="button"
+            onClick={onExitView}
+            className={`${btn} border border-border text-foreground hover:bg-surface-muted`}
+          >
+            {t("versions.exitView")}
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <p className="text-sm text-foreground-muted">{t("versions.loading")}</p>
+      ) : versions.length === 0 ? (
+        <p className="text-sm text-foreground-muted">{t("versions.empty")}</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {versions.map((v) => (
+            <li
+              key={v.id}
+              className="flex flex-col gap-2 rounded-md border border-border bg-surface p-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">
+                  {t("versions.versionNo", { no: v.versionNo })}
+                  {v.isCurrent && (
+                    <span className="ml-2 rounded bg-primary-subtle px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-primary">
+                      {t("versions.current")}
+                    </span>
+                  )}
+                </span>
+                {viewingVersionId === v.id && (
+                  <span className="text-[10px] uppercase tracking-wide text-primary">
+                    {t("versions.viewing")}
+                  </span>
+                )}
+              </div>
+              <span className="text-xs text-foreground-muted">
+                {new Date(v.createdAt).toLocaleString()}
+              </span>
+              {confirmId === v.id ? (
+                <div className="flex flex-col gap-2 rounded-md border border-border bg-surface-muted p-2">
+                  <p className="text-xs text-foreground">{t("versions.restoreConfirm")}</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={busyId === v.id}
+                      onClick={() => void restore(v.id)}
+                      className={`${btn} bg-primary text-primary-foreground hover:opacity-90`}
+                    >
+                      {busyId === v.id ? t("versions.restoring") : t("versions.restoreAction")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === v.id}
+                      onClick={() => setConfirmId(null)}
+                      className={`${btn} border border-border text-foreground hover:bg-surface-muted`}
+                    >
+                      {t("versions.cancel")}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onView(v.id)}
+                    className={`${btn} border border-border text-foreground hover:bg-surface-muted`}
+                  >
+                    {t("versions.view")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmId(v.id)}
+                    className={`${btn} bg-primary text-primary-foreground hover:opacity-90`}
+                  >
+                    {t("versions.restore")}
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>

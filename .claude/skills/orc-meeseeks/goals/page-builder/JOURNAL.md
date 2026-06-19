@@ -629,3 +629,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/pages/[id]/draft/route.ts (NEW), CMS/src/app/api/pages/[id]/publish/route.ts (NEW),
   CMS/src/components/page-builder/page-builder-shell.tsx (load draft, saveDraft/onSave/onPublish, debounced
   auto-save, status badge, Publish button), CMS/messages/{en,fi,et}.json (publish + draftStatus.*).
+
+## 2026-06-19 21:47 — Versioning slice 4 — version history UI + view/restore
+- **Status:** DONE
+- **What I did:** Built the FINAL versioning slice. (1) PURE `lib/pages/version-history.ts` `buildHistory(versions,
+  publishedVersionId)` — filters to PUBLISHED rows, sorts newest version_no first, flags `isCurrent`. (2) NEW REST
+  routes (REST+fetch, no server actions): `GET /api/pages/[id]/versions` (listVersions → buildHistory, reads the
+  page's publishedVersionId for the live flag) and `POST /api/pages/[id]/restore {versionId}` (newDraftFromVersion →
+  copies a past version into a fresh draft, source untouched). (3) Preview route `?version=<id>` renders a SPECIFIC
+  version READ-ONLY (guarded: version must belong to this page else notFound). (4) Shell: new `VersionHistory`
+  component in the right-rail PAGE tab (below PageSettings) — lists versions, VIEW (sets `previewVersionId` +
+  switches center tab to preview → iframe loads `/preview/<id>?version=`), and "Create draft" / restore behind an
+  in-app confirm (no native window.confirm) → after restore, clears the view + bumps `draftReloadNonce` so the
+  draft-load effect re-runs and the editor shows the restored blocks. Added `previewSrc()` helper (composes
+  theme+version params via URLSearchParams). i18n `pageBuilder.versions.*` EN/FI/ET.
+- **Verified:** tsc 0 (whole CMS); `node --test scripts/version-history.test.mjs scripts/page-version.test.mjs`
+  14/14 (4 new buildHistory cases); all 3 message JSONs parse; `opennextjs-cloudflare build` green with both new
+  routes in the map (`ƒ /api/pages/[id]/versions`, `ƒ /api/pages/[id]/restore`); dev stopped, 3601 free. Live
+  D1 read/write needs migration 0006 applied + a real binding (HITL) — build-verified only.
+- **Files:** CMS/src/lib/pages/version-history.ts (NEW), CMS/scripts/version-history.test.mjs (NEW),
+  CMS/src/app/api/pages/[id]/versions/route.ts (NEW), CMS/src/app/api/pages/[id]/restore/route.ts (NEW),
+  CMS/src/app/preview/[id]/page.tsx (?version= read-only render), CMS/src/components/page-builder/
+  page-builder-shell.tsx (VersionHistory component, previewSrc, previewVersionId + draftReloadNonce state,
+  onRestoreVersion, Page-tab wiring), CMS/messages/{en,fi,et}.json (pageBuilder.versions.*).
