@@ -52,3 +52,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   it. DO NOT add chat-transport logic to either surface — extend `useChat`/`ChatConversation`. The
   widget is mounted once in `SidebarShell` and HIDDEN on `/admin/chat` (else two copies of the same
   conversation). `chat.widget.*` i18n keys exist in en/fi/et.
+
+- PAGE-AWARENESS lives in PURE `lib/chat/tool-scopes.ts` (Slice 2): `detectAdminContext`,
+  `isAdminContext`, `toolsForContext`, `contextPrompt`. It speaks tool NAMES (strings), NOT tool
+  objects — the route (`api/chat/route.ts`) owns `TOOL_BY_NAME` and maps names→objects so the pure
+  module stays node-testable (no @/ alias / React / D1 imports). When Slice 3 adds tools: add the
+  name to `KNOWN_TOOL_NAMES`, slot it into the right `TOOLS_BY_CONTEXT` entries, AND add it to the
+  route's `TOOL_BY_NAME` — all three or the tool is dead. `usePathname()` in bizbee returns the path
+  WITHOUT the locale prefix (cookie i18n), so `detectAdminContext` does NOT strip a locale segment
+  (aicms did). Only contexts whose tools EXIST today are wired; `/admin/sitemap` → general on purpose.
+
+- The chat route now accepts an OPTIONAL `context` (or `pathname`) in the POST body via
+  `resolveContext` — it is NEVER a 400 (untrusted → validated/detected → defaults to "general" =
+  full toolset). The full-page `/admin/chat` sends no context → general, behavior unchanged. The
+  widget sends its page context (read fresh per `send` so navigating mid-chat re-scopes). Do NOT add
+  `context` to `parseChatBody` (that's the strict messages contract); keep it separate/optional.

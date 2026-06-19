@@ -35,6 +35,14 @@ import {
   coerceLimit,
   formatAssetList,
 } from "@/lib/chat/list-assets-tool";
+import {
+  detectAdminContext,
+  isAdminContext,
+  toolsForContext,
+  contextPrompt,
+  type AdminPageContext,
+  type ToolName,
+} from "@/lib/chat/tool-scopes";
 import { listComponentNames, upsertComponent } from "@/db/component-store";
 import { missingComponents, upsertPage } from "@/db/page-store";
 import { applyTranslation } from "@/db/translate-store";
@@ -50,14 +58,20 @@ export const dynamic = "force-dynamic";
 // point at a stronger model without re-architecting if tool-calling needs it.
 const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
-// The tools the model may call this turn (B2 create_component, B3 create_page,
-// B4 translate).
-const TOOLS = [
-  CREATE_COMPONENT_TOOL,
-  CREATE_PAGE_TOOL,
-  CREATE_TRANSLATION_TOOL,
-  LIST_ASSETS_TOOL,
-];
+// The full tool catalog, keyed by the tool's function.name. Page-awareness
+// (Slice 2) scopes which subset the model sees per admin page via
+// `toolsForContext` — the names there MUST match these keys.
+const TOOL_BY_NAME: Record<ToolName, unknown> = {
+  create_component: CREATE_COMPONENT_TOOL,
+  create_page: CREATE_PAGE_TOOL,
+  translate: CREATE_TRANSLATION_TOOL,
+  list_assets: LIST_ASSETS_TOOL,
+};
+
+/** Resolve the context's tool-name list to the actual tool objects. */
+function toolsForRequest(context: AdminPageContext) {
+  return toolsForContext(context).map((name) => TOOL_BY_NAME[name]);
+}
 
 export async function POST(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);
@@ -74,6 +88,11 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: parsed.error }, { status: 400 });
   }
 
+  // Page-awareness (Slice 2): the client sends its current admin page as
+  // `context` (one of the AdminPageContext values) or a `pathname` to derive it
+  // from. Untrusted → validate / detect; unknown falls back to "general".
+  const context = resolveContext(body);
+
   const ai = await getAi();
   if (!ai) {
     // Binding missing (not yet provisioned for this Site). Don't 500 silently.
@@ -87,14 +106,15 @@ export async function POST(request: Request): Promise<Response> {
   // persona) + its existing components + the bounded utility-class vocabulary, so
   // generated artifacts match the Site and reference real components/classes.
   // Only if the client didn't already supply a system message.
-  const messages = await withSystemPrompt(parsed.messages);
+  const messages = await withSystemPrompt(parsed.messages, context);
 
   let upstream: ReadableStream<Uint8Array>;
   try {
     // OpenAI-compatible streaming call through AI Gateway (via the Ai port).
+    // Tools are scoped to the current admin page (Slice 2).
     upstream = await ai.chat(messages, {
       model: DEFAULT_MODEL,
-      tools: TOOLS,
+      tools: toolsForRequest(context),
       gatewayId: await getGatewayId(),
     });
   } catch (err) {
@@ -117,13 +137,31 @@ export async function POST(request: Request): Promise<Response> {
 type ChatMessage = { role: string; content: string };
 
 /**
- * Build the E2 system prompt (Site identity + components + utility classes) and
- * prepend it to the conversation — unless the client already sent a system
- * message (it owns the prompt then). Reads are defensive: an unbound D1 (no Site
- * provisioned, or this offline env) falls back to an empty identity / no
- * components, so the base instruction still ships.
+ * Resolve the admin page context from the raw request body. The client may send
+ * an explicit `context` (validated against the known set) or a `pathname` we
+ * detect from. Both untrusted → default to "general" (full toolset). Not part of
+ * `parseChatBody` because it's optional and never a 400.
  */
-async function withSystemPrompt(messages: ChatMessage[]): Promise<ChatMessage[]> {
+function resolveContext(body: unknown): AdminPageContext {
+  if (typeof body !== "object" || body === null) return "general";
+  const b = body as { context?: unknown; pathname?: unknown };
+  if (isAdminContext(b.context)) return b.context;
+  if (typeof b.pathname === "string") return detectAdminContext(b.pathname);
+  return "general";
+}
+
+/**
+ * Build the E2 system prompt (Site identity + components + utility classes),
+ * append the page-aware context prompt (Slice 2), and prepend it to the
+ * conversation — unless the client already sent a system message (it owns the
+ * prompt then). Reads are defensive: an unbound D1 (no Site provisioned, or this
+ * offline env) falls back to an empty identity / no components, so the base
+ * instruction still ships.
+ */
+async function withSystemPrompt(
+  messages: ChatMessage[],
+  context: AdminPageContext,
+): Promise<ChatMessage[]> {
   if (messages.some((m) => m.role === "system")) return messages;
 
   let identity;
@@ -139,11 +177,14 @@ async function withSystemPrompt(messages: ChatMessage[]): Promise<ChatMessage[]>
     /* unbound D1 → no components */
   }
 
-  const system = buildSystemPrompt({
-    identity,
-    componentNames,
-    utilityClasses: [...allowedClasses()].sort(),
-  });
+  const system =
+    buildSystemPrompt({
+      identity,
+      componentNames,
+      utilityClasses: [...allowedClasses()].sort(),
+    }) +
+    "\n\n" +
+    contextPrompt(context);
   return [{ role: "system", content: system }, ...messages];
 }
 

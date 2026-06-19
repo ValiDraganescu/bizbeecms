@@ -5,6 +5,11 @@
  * PUT  → upsert them (validated server-side via `normalizeThemeOverrides`:
  *        only known purpose tokens + safe color values survive).
  *
+ * `?mode=dark` targets the DARK override map (`theme_overrides_dark`); the
+ * default / `?mode=light` targets the LIGHT map. Dark overrides scope to
+ * `[data-theme="dark"]` so a Site can theme dark mode distinctly (see the
+ * dark-background bug fix in lib/render/theme.ts).
+ *
  * The overrides re-theme the published front-end's CSS color tokens without a
  * rebuild (injected as an inline `<style>` after globals on the public route).
  * Pure validation lives in `lib/render/theme.ts`; D1 read/write in

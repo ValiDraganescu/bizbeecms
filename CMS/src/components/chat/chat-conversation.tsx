@@ -23,8 +23,16 @@ export type ChatMsg =
   | { role: "user"; content: string }
   | { role: "assistant"; content: string; tools: ToolResult[] };
 
-/** Streaming chat state + a `send` action, shared by every chat surface. */
-export function useChat() {
+/**
+ * Streaming chat state + a `send` action, shared by every chat surface.
+ *
+ * `getContext` (optional) lets a page-aware surface tell the route which admin
+ * page it's on so the assistant scopes its tools + system prompt (Slice 2). It's
+ * read fresh per `send` (a function, not a value) so navigating mid-conversation
+ * picks up the new page. Omit it (the full-page /admin/chat) → route defaults to
+ * "general" (the full toolset).
+ */
+export function useChat(getContext?: () => string | undefined) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,10 +73,11 @@ export function useChat() {
       });
 
     try {
+      const context = getContext?.();
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify(context ? { messages: history, context } : { messages: history }),
       });
       if (!res.ok || !res.body) {
         let msg = `HTTP ${res.status}`;

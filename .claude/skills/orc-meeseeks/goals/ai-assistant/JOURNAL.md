@@ -43,3 +43,34 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/chat/chat-widget.tsx (new), CMS/src/components/chat/admin-chat.tsx (slimmed),
   CMS/src/components/admin-sidebar.tsx (mount widget), CMS/messages/{en,fi,et}.json (chat.widget.*),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-19 20:26 — Slice 2: page-awareness (per-page system prompt + scoped tools)
+- **Status:** DONE
+- **What I did:** Ported aicms `tool_scopes.ts` to bizbee reality as a PURE module
+  `CMS/src/lib/chat/tool-scopes.ts` (no React/D1/CF imports → node-testable). It speaks tool
+  NAMES (strings), so the pure boundary holds and the route maps names→tool objects:
+  - `detectAdminContext(pathOrUrl)` — bizbee admin paths are `/admin/<page>` (NO locale prefix;
+    cookie-based i18n), so it just reads the segment after `admin`; strips query/hash; accepts a
+    full URL too. Unknown/non-admin → `"general"`. Contexts: page-builder | components | pages |
+    settings | media | general (only routes that map to EXISTING tools; `sitemap` → general).
+  - `isAdminContext(v)` — guards untrusted client `context`.
+  - `toolsForContext(ctx)` — per-page subset of the FOUR existing tools (create_component,
+    create_page, translate, list_assets). page-builder=[component,page,assets],
+    components=[component,assets], pages=[page,translate,assets], settings=[translate],
+    media=[assets], general=all. (Slice 3 adds more tools + richer scopes when backends land.)
+  - `contextPrompt(ctx)` — a per-context addition appended to `buildSystemPrompt`.
+  Wired `CMS/src/app/api/chat/route.ts`: `resolveContext(body)` reads `context` (validated) or
+  `pathname` (detected), defaults `general`; replaced the static TOOLS array with `TOOL_BY_NAME`
+  + `toolsForRequest(context)`; `withSystemPrompt(messages, context)` now appends
+  `contextPrompt(context)`. The widget (`chat-widget.tsx`) reads `usePathname()` and passes
+  `useChat(() => detectAdminContext(pathname))`; `useChat(getContext?)` reads it fresh per send
+  (so navigating mid-chat re-scopes) and adds `context` to the `/api/chat` body when present.
+  Full-page `/admin/chat` passes no getContext → route defaults to general (full toolset), unchanged.
+- **Verified:** `node --test scripts/tool-scopes.test.mjs` 8/8 pass. `tsc --noEmit` clean.
+  `opennextjs-cloudflare build` green. Regenerated PM cms-bundle + selfcheck passed (only the
+  standing static-assets live-deploy warning). NOT verified (HITL): live model call honoring the
+  scoped tool list / context prompt needs a real AI binding + browser.
+- **Files:** CMS/src/lib/chat/tool-scopes.ts (new), CMS/scripts/tool-scopes.test.mjs (new),
+  CMS/src/app/api/chat/route.ts (context wiring), CMS/src/components/chat/chat-conversation.tsx
+  (useChat getContext + body), CMS/src/components/chat/chat-widget.tsx (usePathname → context),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).

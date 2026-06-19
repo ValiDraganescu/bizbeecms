@@ -28,7 +28,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
   chat core extracted to `components/chat/chat-conversation.tsx` (`useChat` + `ChatConversation`); both the
   widget and the full-page `/admin/chat` render it — ONE pipeline, no fork. Widget hidden on `/admin/chat`.
   `chat.widget.*` i18n EN/FI/ET. Gates green (tsc, opennext, cms-bundle regen + selfcheck).
-- TODO: **Slice 2 — page-awareness: per-page system prompt + scoped tools.** Port aicms
+- DONE: **Slice 2 — page-awareness: per-page system prompt + scoped tools.** Port aicms
   `lib/chat/tool_scopes.ts`: a `detectAdminContext(url)` (strip `/<locale>/` prefix, read the segment after
   `admin` → page-builder | components | pages | settings | general), a per-context prompt addition, and a
   per-context tool subset. The widget sends its current page context (or URL) with each request; the chat

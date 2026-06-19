@@ -128,6 +128,33 @@ function ViewportIcon({ kind }: { kind: Viewport }) {
   }
 }
 
+/** Preview color-mode toggle icons: sun (light) / monitor (system) / moon (dark). */
+function PreviewThemeIcon({ kind }: { kind: "light" | "system" | "dark" }) {
+  switch (kind) {
+    case "light":
+      return (
+        <svg {...ICON} width={14} height={14}>
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5" />
+        </svg>
+      );
+    case "system":
+      return (
+        <svg {...ICON} width={14} height={14}>
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      );
+    case "dark":
+      return (
+        <svg {...ICON} width={14} height={14}>
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+      );
+  }
+}
+
 export function PageBuilderShell({
   contentLocales,
 }: {
@@ -141,6 +168,9 @@ export function PageBuilderShell({
   const [rightTab, setRightTab] = useState<RightTab>("block");
   // Bumped to force the preview iframe to reload (refresh button + after Save).
   const [previewNonce, setPreviewNonce] = useState(0);
+  // Forces the preview iframe's color mode via /preview/[id]?theme=.
+  // "system" = no param (follows OS); "light"/"dark" force data-theme.
+  const [previewTheme, setPreviewTheme] = useState<"system" | "light" | "dark">("system");
 
   // Real page list + the operator's current selection. The center/right panels
   // key off `selected`; later slices load that page's blocks / settings.
@@ -519,6 +549,28 @@ export function PageBuilderShell({
                 <div className="flex-1 truncate rounded border border-border bg-surface-muted px-2 py-1 text-xs text-foreground-muted">
                   {selected ? selected.path : t("previewUrlPlaceholder")}
                 </div>
+                {/* Light / system / dark toggle — forces the iframe's color mode
+                    so the operator can SEE dark without changing their OS. */}
+                <div className="flex shrink-0 items-center gap-0.5 rounded border border-border bg-surface-muted p-0.5">
+                  {(["light", "system", "dark"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setPreviewTheme(mode)}
+                      aria-pressed={previewTheme === mode}
+                      title={t(`previewTheme.${mode}`)}
+                      aria-label={t(`previewTheme.${mode}`)}
+                      className={
+                        "rounded px-1.5 py-0.5 " +
+                        (previewTheme === mode
+                          ? "bg-surface text-foreground shadow-sm"
+                          : "text-foreground-muted hover:text-foreground")
+                      }
+                    >
+                      <PreviewThemeIcon kind={mode} />
+                    </button>
+                  ))}
+                </div>
               </div>
               {/* Responsive frame area — draft preview reuses the REAL renderer
                   via /preview/<id> (any publish status), so it's true-to-site. */}
@@ -529,8 +581,12 @@ export function PageBuilderShell({
                 >
                   {selected ? (
                     <iframe
-                      key={`${selected.id}-${previewNonce}`}
-                      src={`/preview/${selected.id}`}
+                      key={`${selected.id}-${previewNonce}-${previewTheme}`}
+                      src={
+                        previewTheme === "system"
+                          ? `/preview/${selected.id}`
+                          : `/preview/${selected.id}?theme=${previewTheme}`
+                      }
                       title={t("previewIframeTitle")}
                       className="h-full w-full border-0 bg-surface"
                     />

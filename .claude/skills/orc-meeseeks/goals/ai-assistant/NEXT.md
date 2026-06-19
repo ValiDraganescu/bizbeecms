@@ -1,25 +1,29 @@
 # Note to the next Meeseeks (ai-assistant)
 
-DONE so far: Slice 1 — the Intercom-style floating chat widget. Shared chat core is now
-`components/chat/chat-conversation.tsx` (`useChat` hook + `ChatConversation`); `chat-widget.tsx`
-(floating bubble, mounted in `SidebarShell`, hidden on /admin/chat) and the full-page
-`admin-chat.tsx` BOTH render it — ONE pipeline, no fork. `chat.widget.*` i18n in en/fi/et.
-Also DONE earlier: `POST /api/translate` programmatic AI-translate engine.
+DONE so far: Slice 1 (Intercom floating widget) + Slice 2 (page-awareness). The widget now sends
+its admin page context to `/api/chat`; the route scopes the model's TOOLS and appends a
+per-context system prompt. Pure logic lives in `CMS/src/lib/chat/tool-scopes.ts`
+(`detectAdminContext` / `isAdminContext` / `toolsForContext` / `contextPrompt`), tested in
+`scripts/tool-scopes.test.mjs` (8/8). The route maps tool NAMES→objects via `TOOL_BY_NAME`.
+Earlier: `POST /api/translate` engine.
 
-PICK NEXT: **Slice 2 — page-awareness (per-page system prompt + scoped tools).** Port aicms
-`lib/chat/tool_scopes.ts`: a pure `detectAdminContext(url)` (bizbee admin paths are `/admin/<page>`
-— NO locale prefix in the path here, the locale is cookie-driven; so just read the segment after
-`admin` → page-builder | components | pages | settings | general), a per-context prompt addition,
-and a per-context tool SUBSET. The widget should send its current page context (read from
-`usePathname()` — already available in `SidebarShell`) with each `/api/chat` request; the route
-assembles `buildSystemPrompt` + the context prompt and exposes only that context's tools. Keep the
-helpers pure with node tests. ONLY wire contexts whose tools already have backends (start with what
-exists today: create_component, create_page, translate — see CAVEATS for the full port list / Slice 3).
+PICK NEXT: **Slice 3 — port the missing CMS-structural tools (one PR's worth).** Add the tools
+bizbee LACKS but HAS backends for, so the scoped contexts get useful. Likely available backends
+(VERIFY each store/route exists before exposing — a tool with no backend is dead; see CAVEATS):
+  - page-builder/pages: `list_pages`, `get_page`, `update_page_blocks` (check `db/page-store.ts`),
+    `list_builtin_types` (check the block/builtin registry).
+  - components: `list_components` (there's `listComponentNames` already), `get_component`,
+    `update_component` (check `db/component-store.ts` — `upsertComponent` exists).
+  - settings: `get_brand_identity`/`update_brand_identity`, `get_theme`/`update_theme`,
+    `list_locales` (check `db/settings-store.ts` — `getSiteIdentity`/`getContentLocales` exist).
+For EACH new tool: define the OpenAI tool object (mirror `create_component`/`create_page` shape) +
+a validator; dispatch it in the route's `runTools`; reuse the EXISTING store (do NOT fork data
+paths). THEN register it in tool-scopes: add to `KNOWN_TOOL_NAMES`, add to the right
+`TOOLS_BY_CONTEXT` entries, and add to the route's `TOOL_BY_NAME` (all three — see CAVEATS).
+Add a node test per tool's arg-validation/execution (mock the store). Skip any tool whose backend
+doesn't exist and note it.
 
-The `ChatConversation` has a `footer` slot + the `useChat` hook sends `{ messages }` to `/api/chat`
-— extend the body with the context when you wire Slice 2 (don't change the SSE protocol).
-
-WATCH OUT (read CAVEATS): admin paths have NO `/<locale>/` prefix in bizbee (cookie-based i18n) —
-aicms's `detect_admin_context` strips a locale segment; bizbee doesn't need that strip. The `Ai`
-port is streaming-only; `applyTranslation` rejects component targets; small CF models fence JSON.
-Always: tsc + opennext build + regen PM cms-bundle on any CMS source change.
+WATCH OUT (read CAVEATS): tool-scopes speaks NAMES, route owns OBJECTS — keep that boundary so the
+pure module stays node-testable. `usePathname` has NO locale prefix in bizbee. `Ai` port is
+streaming-only; `applyTranslation` rejects component targets. Always: tsc + opennext build + regen
+PM cms-bundle on any CMS source change.

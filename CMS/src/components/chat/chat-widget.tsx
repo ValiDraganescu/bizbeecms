@@ -14,15 +14,20 @@
  */
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ChatConversation, useChat } from "@/components/chat/chat-conversation";
+import { detectAdminContext } from "@/lib/chat/tool-scopes";
 
 export function ChatWidget() {
   const t = useTranslations("chat.widget");
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
   // The conversation lives at the widget level so it SURVIVES minimize (closing
   // the panel just hides it; the transcript is intact when reopened).
-  const chat = useChat();
+  // Page-awareness (Slice 2): tell the route which admin page we're on, read
+  // fresh per send so navigating mid-chat re-scopes the assistant's tools.
+  const chat = useChat(() => detectAdminContext(pathname));
 
   return (
     <>
