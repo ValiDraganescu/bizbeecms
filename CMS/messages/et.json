@@ -351,6 +351,7 @@
     "column": "Veerg",
     "dropComponentHint": "Lohista komponent siia",
     "componentNoProps": "Sellel komponendil pole muudetavaid omadusi.",
+    "localePickerLabel": "Muudetav keel",
     "previewTheme": {
       "light": "Hele",
       "system": "Süsteem",

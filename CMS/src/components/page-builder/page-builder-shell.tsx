@@ -55,6 +55,7 @@ import {
   type PropField,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
+import { LocalePicker, useLocalePicker } from "./locale-picker";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 type CenterTab = "layers" | "preview";
@@ -1177,6 +1178,8 @@ function SeoForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const picker = useLocalePicker(locales);
+  const loc = picker.active;
 
   async function save() {
     setError(null);
@@ -1215,36 +1218,32 @@ function SeoForm({
       }}
     >
       <p className="truncate font-mono text-xs text-foreground-muted">{page.slug}</p>
-      {locales.map((loc) => (
-        <fieldset key={loc} className="flex flex-col gap-2 border-t border-border pt-3">
-          <legend className="font-mono text-xs uppercase tracking-wide text-foreground-muted">
-            {loc}
-          </legend>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-foreground-muted">{t("seoMetaTitle")}</span>
-            <input
-              className={input}
-              value={metaTitle[loc] ?? ""}
-              onChange={(e) =>
-                setMetaTitle((m) => setLocaleValue(m, loc, e.target.value))
-              }
-              aria-label={`${t("seoMetaTitle")} (${loc})`}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs text-foreground-muted">{t("seoMetaDescription")}</span>
-            <textarea
-              className={input}
-              rows={3}
-              value={metaDescription[loc] ?? ""}
-              onChange={(e) =>
-                setMetaDescription((m) => setLocaleValue(m, loc, e.target.value))
-              }
-              aria-label={`${t("seoMetaDescription")} (${loc})`}
-            />
-          </label>
-        </fieldset>
-      ))}
+      <LocalePicker state={picker} label={t("localePickerLabel")} />
+      <fieldset key={loc} className="flex flex-col gap-2 border-t border-border pt-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-foreground-muted">{t("seoMetaTitle")}</span>
+          <input
+            className={input}
+            value={metaTitle[loc] ?? ""}
+            onChange={(e) =>
+              setMetaTitle((m) => setLocaleValue(m, loc, e.target.value))
+            }
+            aria-label={`${t("seoMetaTitle")} (${loc})`}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-foreground-muted">{t("seoMetaDescription")}</span>
+          <textarea
+            className={input}
+            rows={3}
+            value={metaDescription[loc] ?? ""}
+            onChange={(e) =>
+              setMetaDescription((m) => setLocaleValue(m, loc, e.target.value))
+            }
+            aria-label={`${t("seoMetaDescription")} (${loc})`}
+          />
+        </label>
+      </fieldset>
 
       {error && (
         <p role="alert" className="text-xs text-danger">
@@ -1508,6 +1507,8 @@ function ComponentSettings({
   const props = (block.props ?? {}) as Record<string, unknown>;
   const multi = locales.length > 1;
   const defaultLocale = locales[0];
+  const picker = useLocalePicker(locales);
+  const hasTranslatable = schema.some((f) => f.translatable);
 
   const label = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
   const input =
@@ -1535,6 +1536,9 @@ function ComponentSettings({
   return (
     <div className="flex flex-col gap-4">
       <p className="font-mono text-sm text-foreground">{block.component}</p>
+      {multi && hasTranslatable && (
+        <LocalePicker state={picker} label={t("localePickerLabel")} />
+      )}
       {schema.map((f) => {
         const raw = props[f.name];
         const labelText = f.label || f.name;
@@ -1548,38 +1552,31 @@ function ComponentSettings({
               <span className="text-xs text-foreground-muted">{f.description}</span>
             )}
 
-            {/* Translatable text → one field per content locale. */}
+            {/* Translatable text → the active locale only (LocalePicker above). */}
             {f.translatable ? (
-              locales.map((loc) => {
+              (() => {
+                const loc = picker.active;
                 const value = localeFieldValue(raw, loc, defaultLocale);
-                return (
-                  <div key={loc} className="flex items-start gap-2">
-                    {multi && (
-                      <span className="mt-2 w-8 shrink-0 font-mono text-xs uppercase text-foreground-muted">
-                        {loc}
-                      </span>
-                    )}
-                    {f.type === "richtext" ? (
-                      <textarea
-                        className={`${input} min-h-16`}
-                        value={value}
-                        placeholder={f.default}
-                        aria-label={multi ? `${labelText} (${loc})` : labelText}
-                        onChange={(e) => setLocalized(f.name, loc, e.target.value)}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        className={input}
-                        value={value}
-                        placeholder={f.default}
-                        aria-label={multi ? `${labelText} (${loc})` : labelText}
-                        onChange={(e) => setLocalized(f.name, loc, e.target.value)}
-                      />
-                    )}
-                  </div>
+                const aria = multi ? `${labelText} (${loc})` : labelText;
+                return f.type === "richtext" ? (
+                  <textarea
+                    className={`${input} min-h-16`}
+                    value={value}
+                    placeholder={f.default}
+                    aria-label={aria}
+                    onChange={(e) => setLocalized(f.name, loc, e.target.value)}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    className={input}
+                    value={value}
+                    placeholder={f.default}
+                    aria-label={aria}
+                    onChange={(e) => setLocalized(f.name, loc, e.target.value)}
+                  />
                 );
-              })
+              })()
             ) : f.type === "select" ? (
               <select
                 className={input}

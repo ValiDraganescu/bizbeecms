@@ -351,6 +351,7 @@
     "column": "Column",
     "dropComponentHint": "Drop a component here",
     "componentNoProps": "This component has no configurable properties.",
+    "localePickerLabel": "Editing language",
     "previewTheme": {
       "light": "Light",
       "system": "System",

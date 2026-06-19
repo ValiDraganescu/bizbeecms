@@ -379,3 +379,25 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/settings/theme-editor.tsx, CMS/src/app/admin/settings/theme/page.tsx,
   CMS/src/app/api/settings/theme/route.ts, CMS/src/lib/render/theme.ts, CMS/src/lib/render/theme.test.ts,
   CMS/messages/{en,fi,et}.json
+
+## 2026-06-19 20:37 — Shared LOCALE SELECTOR (keystone) — SEO form + ComponentSettings refactored
+- **Status:** DONE
+- **What I did:** Built a reusable content-locale picker `CMS/src/components/page-builder/locale-picker.tsx`:
+  `useLocalePicker(locales)` (active-locale state, default = first/Site-default locale, with a pure
+  fallback when the active locale leaves the set) + `<LocalePicker>` control (renders nothing for a
+  single-locale Site, TABS for ≤4 locales, a `<select>` beyond that). Storage UNCHANGED — still
+  `{en,fi,…}` maps; the picker is purely a VIEW over one locale, callers keep `setLocaleValue`/
+  `setLocalizedProp`. Refactored the TWO builder forms in `page-builder-shell.tsx` to use it instead of
+  stacking every locale vertically: `SeoForm` (one picker above meta-title/description for the active
+  locale) and `ComponentSettings` (one shared picker above all translatable props; each translatable
+  field renders only the active locale). Non-translatable props unchanged. i18n key `localePickerLabel`
+  added to EN/FI/ET. This is the KEYSTONE the AI-translate button + per-locale meta-image sit on.
+- **Verified:** `node --test scripts/locale-picker.test.mjs` 4/4 green (active-locale resolution incl.
+  removed-locale fallback + empty/single set). `npx tsc --noEmit` reports ZERO errors in my files
+  (`grep page-builder|locale-picker` empty). The ONLY tsc/build errors are 5 in
+  `src/app/api/chat/route.ts` — an AI-ASSISTANT loop's WIP file (`M` in the initial git status, not mine,
+  not touched). `npx opennextjs-cloudflare build` halts on THAT file's type error, never reaching my code
+  (shared-tree collision, see new CAVEAT). Did NOT touch their file or the PM cms-bundle.
+- **Files:** CMS/src/components/page-builder/locale-picker.tsx (new),
+  CMS/src/components/page-builder/page-builder-shell.tsx, CMS/scripts/locale-picker.test.mjs (new),
+  CMS/messages/{en,fi,et}.json

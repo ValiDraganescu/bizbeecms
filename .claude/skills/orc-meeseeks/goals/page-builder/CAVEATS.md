@@ -6,6 +6,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   EITHER, they're the same constant). `validateBlocks` deletes "Section" from `componentNames` so the
   block PUT route never 409s on it, and `planPage` renders a Section block as a `<div data-section=id>`
   nesting its `children`. Don't re-add a D1 "Section" component or special-case it again.
+- The opennext build runs a FULL `next build` typecheck over the WHOLE CMS, so an UNRELATED file another
+  loop is mid-editing (e.g. ai-assistant's `src/app/api/chat/route.ts`) can make `opennextjs-cloudflare
+  build` FAIL even when your change is type-clean. Don't chase it / don't touch their file. Verify YOUR
+  work instead with `npx tsc --noEmit 2>&1 | grep <your-paths>` (must be empty) + your node tests, and note
+  in JOURNAL that the build's only failure is in the other loop's file.
 - Concurrency: multiple goal loops share this working tree. NEVER `git add -A`. Stage CMS page-builder
   files + your own `goals/page-builder/*` by explicit path only. `ProjectManager/src/lib/deploy/
   cms-bundle.generated.js` is frequently mid-edit by other loops — do NOT run `npm run bundle:cms` or

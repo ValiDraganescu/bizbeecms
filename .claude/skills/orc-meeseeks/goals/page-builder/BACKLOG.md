@@ -56,18 +56,16 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `setThemeOverrides`/the theme settings page) gets a DARK tab/column to edit the dark map via
   `setThemeOverridesDark`. EN/FI/ET for the toggle + dark-tab chrome. Gate: CMS tsc + opennext build green;
   regen PM cms-bundle.
-- TODO: **Shared LOCALE SELECTOR for all per-locale editing (scales past 2-3 languages).** USER DECISION
-  2026-06-19: stacking every content locale vertically doesn't scale (20 languages = unusable — see the SEO
-  tab stacking EN/FI/RO-RO). Replace with a single locale SELECTOR (tabs or dropdown) that shows ONLY the
-  selected locale's fields; one shared component used EVERYWHERE per-locale content is edited, so the UX is
-  identical across the app. Today FOUR+ places stack locales: SEO form + `ComponentSettings`
-  (page-builder-shell.tsx), `pages-manager.tsx`, `pages/block-editor.tsx` (all use `localeFieldValue`/
-  `setLocalizedProp`/`locales.map`). Build a reusable `LocalePicker` (active locale state + a small
-  `<LocaleField>` wrapper or hook) and refactor the SEO form + `ComponentSettings` to use it first (the two
-  in the builder); note the C2 `pages-manager`/`block-editor` as follow-on adopters. Default to the Site's
-  default content locale; keep `setLocalizedProp` (storage unchanged — still `{en,fi,…}` maps). This is the
-  KEYSTONE for "same approach everywhere" (the AI-translate button + meta-image-per-locale below sit on it).
-  Pure state/helpers tested. i18n EN/FI/ET. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
+- DONE (2026-06-19 20:37): **Shared LOCALE SELECTOR (keystone) — builder forms refactored.** Built
+  `CMS/src/components/page-builder/locale-picker.tsx`: `useLocalePicker(locales)` (active-locale state,
+  default = Site-default/first locale, pure fallback when active leaves the set) + `<LocalePicker>`
+  (nothing for 1 locale, TABS ≤4, `<select>` beyond). Storage unchanged ({en,fi,…} maps); picker is a VIEW
+  over one locale. Refactored `SeoForm` + `ComponentSettings` (page-builder-shell.tsx) to show only the
+  active locale instead of stacking all. i18n `localePickerLabel` EN/FI/ET. `node --test
+  scripts/locale-picker.test.mjs` 4/4. tsc clean for my files (the 5 errors are ai-assistant's
+  `api/chat/route.ts`, not mine — opennext build halts there, see CAVEAT). See JOURNAL 20:37.
+  FOLLOW-ON ADOPTERS (not done this run): the C2 `pages-manager.tsx` + `pages/block-editor.tsx` still stack
+  locales — adopt `<LocalePicker>`/`useLocalePicker` there next for full app-wide consistency.
 - TODO: **SEO: per-locale META IMAGE (OG image) — new field on the SEO tab.** Add a per-locale meta/OG image
   to page SEO (an image with baked-in text may need a different asset per language). Schema: new
   `meta_image text("meta_image").notNull().default("{}")` JSON map on `page` (drizzle migration), mirroring

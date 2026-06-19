@@ -351,6 +351,7 @@
     "column": "Sarake",
     "dropComponentHint": "Pudota komponentti tähän",
     "componentNoProps": "Tällä komponentilla ei ole muokattavia ominaisuuksia.",
+    "localePickerLabel": "Muokattava kieli",
     "previewTheme": {
       "light": "Vaalea",
       "system": "Järjestelmä",
