@@ -129,7 +129,25 @@ export function useChat(
     }
   }
 
-  return { messages, busy, error, send };
+  // History (Slice 4 sub-slice 3): seed the transcript from a loaded thread, or
+  // clear it for a new conversation. Tool cards aren't stored, so a loaded
+  // assistant turn comes back with no tools — fine, the text is what matters.
+  function seed(seedMessages: { role: string; content: string }[]) {
+    setError(null);
+    setMessages(
+      seedMessages.map((m) =>
+        m.role === "user"
+          ? { role: "user", content: m.content }
+          : { role: "assistant", content: m.content, tools: [] },
+      ),
+    );
+  }
+  function reset() {
+    setError(null);
+    setMessages([]);
+  }
+
+  return { messages, busy, error, send, seed, reset };
 }
 
 /**

@@ -137,6 +137,28 @@ export const asset = sqliteTable(
   (t) => [uniqueIndex("asset_key_unique").on(t.key)],
 );
 
+/**
+ * Chat thread — a saved AI-assistant conversation (Milestone 2, ai-assistant
+ * goal, Slice 4). Per-Site (the DB IS the Site boundary, like every other table
+ * here), so threads aren't site-scoped. `messages` is the JSON transcript
+ * (`[{role, content}, ...]` — tool cards are derived client-side and not stored;
+ * only the text is needed to reseed a conversation). `title` is derived from the
+ * first user message at save time. Defensive parse on read (see chat-history-store).
+ */
+export const chatThread = sqliteTable("chat_thread", {
+  id: text("id").primaryKey(),
+  // Short label for the history list, derived from the first user message.
+  title: text("title").notNull().default(""),
+  // JSON array of { role, content } — the transcript text to reseed `useChat`.
+  messages: text("messages").notNull().default("[]"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
 export type Component = typeof component.$inferSelect;
 export type NewComponent = typeof component.$inferInsert;
 export type Page = typeof page.$inferSelect;
@@ -144,3 +166,5 @@ export type NewPage = typeof page.$inferInsert;
 export type SiteSetting = typeof siteSettings.$inferSelect;
 export type Asset = typeof asset.$inferSelect;
 export type NewAsset = typeof asset.$inferInsert;
+export type ChatThread = typeof chatThread.$inferSelect;
+export type NewChatThread = typeof chatThread.$inferInsert;

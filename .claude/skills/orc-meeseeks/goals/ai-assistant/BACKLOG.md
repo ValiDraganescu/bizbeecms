@@ -65,7 +65,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   there a curated CF/gateway list to expose?). Widget sends a chosen `model` in the POST body; thread an
   optional VALIDATED `model` through (untrusted → allowlist → default DEFAULT_MODEL). No arbitrary strings.
   Pure allowlist helper tested; UI localized EN/FI/ET. Gate: CMS tsc + opennext build; regen PM cms-bundle.
-- TODO: **Slice 4 sub-slice 3 — per-Site conversation history.** List past threads, open/delete. Pick the
+- DONE: **Slice 4 sub-slice 3 — per-Site conversation history.** D1 `chat_thread` table (migration 0005)
+  + pure `lib/chat/history.ts` (deriveTitle/validateThreadInput/parseStoredMessages/newThreadId) +
+  `db/chat-history-store.ts` (list/get/save-upsert/delete) + REST `GET/POST/DELETE /api/chat/history`
+  (admin-only) + `useChat` `seed`/`reset` + widget new/history panel (open/delete) saving on the
+  busy→idle edge per turn. i18n `chat.widget.{new,history,historyEmpty,historyUntitled,historyDelete}`
+  EN/FI/ET. Tested (history.test.mjs, 7). Gates green; cms-bundle regen. List past threads, open/delete. Pick the
   SIMPLEST store — a D1 table (Site already scopes the binding) is likely cleanest; KV if preferred. Save
   threads on send; load/list/delete in the widget. Pure helpers tested; UI localized EN/FI/ET. Gate: CMS
   tsc + opennext build; regen PM cms-bundle.

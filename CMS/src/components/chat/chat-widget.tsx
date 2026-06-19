@@ -13,7 +13,7 @@
  * only.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ChatConversation, useChat } from "@/components/chat/chat-conversation";
@@ -21,10 +21,14 @@ import { ChatDebugPanel } from "@/components/chat/chat-debug-panel";
 import { detectAdminContext } from "@/lib/chat/tool-scopes";
 import { CHAT_MODELS, DEFAULT_MODEL } from "@/lib/chat/models";
 
+type ThreadSummary = { id: string; title: string; updatedAt: number };
+
 export function ChatWidget() {
   const t = useTranslations("chat.widget");
   const [open, setOpen] = useState(false);
   const [debug, setDebug] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [model, setModel] = useState(DEFAULT_MODEL);
   const pathname = usePathname();
   // The conversation lives at the widget level so it SURVIVES minimize (closing
@@ -36,6 +40,93 @@ export function ChatWidget() {
     () => detectAdminContext(pathname),
     () => model,
   );
+
+  // History (Slice 4 sub-slice 3): the current thread's server id (null = a new,
+  // unsaved conversation). Saved after each completed turn so refresh/reopen
+  // keeps the transcript. `busyRef` lets the save effect fire only on the
+  // busy→idle EDGE (turn finished), not on every render.
+  const threadId = useRef<string | null>(null);
+  const busyRef = useRef(false);
+  const { messages, busy } = chat;
+
+  async function loadThreads() {
+    try {
+      const res = await fetch("/api/chat/history");
+      if (!res.ok) return;
+      const j = (await res.json()) as { threads?: ThreadSummary[] };
+      setThreads(j.threads ?? []);
+    } catch {
+      /* offline / no binding — leave the list as-is */
+    }
+  }
+
+  // Save the transcript when a turn finishes (busy true→false with messages).
+  useEffect(() => {
+    const wasBusy = busyRef.current;
+    busyRef.current = busy;
+    if (!(wasBusy && !busy)) return; // only on the finish edge
+    if (messages.length === 0) return;
+    const payload = {
+      id: threadId.current,
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    };
+    void (async () => {
+      try {
+        const res = await fetch("/api/chat/history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) return;
+        const j = (await res.json()) as { id?: string };
+        if (j.id) threadId.current = j.id;
+        if (historyOpen) void loadThreads();
+      } catch {
+        /* best-effort persistence */
+      }
+    })();
+  }, [busy, messages, historyOpen]);
+
+  async function openThread(id: string) {
+    try {
+      const res = await fetch(`/api/chat/history?id=${encodeURIComponent(id)}`);
+      if (!res.ok) return;
+      const j = (await res.json()) as { thread?: { id: string; messages: { role: string; content: string }[] } };
+      if (!j.thread) return;
+      chat.seed(j.thread.messages);
+      threadId.current = j.thread.id;
+      setHistoryOpen(false);
+    } catch {
+      /* leave current transcript */
+    }
+  }
+
+  async function removeThread(id: string) {
+    try {
+      await fetch(`/api/chat/history?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    } catch {
+      /* ignore */
+    }
+    setThreads((prev) => prev.filter((th) => th.id !== id));
+    if (threadId.current === id) {
+      threadId.current = null;
+      chat.reset();
+    }
+  }
+
+  function newConversation() {
+    threadId.current = null;
+    chat.reset();
+    setHistoryOpen(false);
+  }
+
+  function toggleHistory() {
+    setHistoryOpen((h) => {
+      const next = !h;
+      if (next) void loadThreads();
+      return next;
+    });
+  }
 
   return (
     <>
@@ -51,6 +142,34 @@ export function ChatWidget() {
               <p className="truncate text-xs text-foreground-muted">{t("subtitle")}</p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={newConversation}
+                aria-label={t("new")}
+                title={t("new")}
+                className="rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={toggleHistory}
+                aria-label={t("history")}
+                aria-pressed={historyOpen}
+                title={t("history")}
+                className={
+                  "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground " +
+                  (historyOpen ? "bg-surface-muted text-foreground" : "text-foreground-muted")
+                }
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                  <path d="M3 3v5h5" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+              </button>
               <button
                 type="button"
                 onClick={() => setDebug((d) => !d)}
@@ -81,7 +200,40 @@ export function ChatWidget() {
           </header>
 
           <div className="flex min-h-0 flex-1 flex-col p-3">
-            {debug ? (
+            {historyOpen ? (
+              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto" aria-label={t("history")}>
+                {threads.length === 0 ? (
+                  <p className="text-sm text-foreground-muted">{t("historyEmpty")}</p>
+                ) : (
+                  threads.map((th) => (
+                    <div
+                      key={th.id}
+                      className="flex items-center gap-2 rounded-md border border-border bg-surface-raised px-3 py-2"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => void openThread(th.id)}
+                        className="min-w-0 flex-1 truncate text-left text-sm text-foreground hover:text-primary"
+                        title={th.title}
+                      >
+                        {th.title || t("historyUntitled")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removeThread(th.id)}
+                        aria-label={t("historyDelete")}
+                        title={t("historyDelete")}
+                        className="shrink-0 rounded p-1 text-foreground-muted transition-colors hover:bg-danger-subtle hover:text-danger"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                          <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : debug ? (
               <ChatDebugPanel />
             ) : (
               <ChatConversation

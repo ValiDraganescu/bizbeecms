@@ -112,7 +112,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
   switch is needed instead of auto-fit, the renderer would need a real CSS class/stylesheet path (NOT inline)
   — note that tradeoff in JOURNAL; prefer the inline auto-fit solution first (lazy + no infra change). Update
   the section-render test. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
-- TODO: **Per-viewport column visibility — hide a column on desktop/tablet/mobile.** For real
+- DOING: **Per-viewport column visibility — hide a column on desktop/tablet/mobile.** For real
   responsiveness the operator wants to HIDE a specific column at a given breakpoint (e.g. drop a column on
   mobile). Add per-column visibility props (e.g. `hideOnMobile`/`hideOnTablet`/`hideOnDesktop`, all default
   visible) edited in the Column settings panel (see the "Column settings panel" task — add a VISIBILITY

@@ -34,7 +34,12 @@
       "close": "Sulge tehisintellekti assistent",
       "minimize": "Minimeeri",
       "debug": "Silumine",
-      "model": "Mudel"
+      "model": "Mudel",
+      "new": "Uus vestlus",
+      "history": "Ajalugu",
+      "historyEmpty": "Salvestatud vestlusi veel pole.",
+      "historyUntitled": "Pealkirjata",
+      "historyDelete": "Kustuta vestlus"
     },
     "debug": {
       "context": "Lehe kontekst",

@@ -264,6 +264,22 @@ export function PageBuilderShell({
     setDirty(true);
   }
 
+  // Patch-merge a single column's own props (e.g. per-viewport visibility). Reads
+  // the live column, applies the patch (undefined deletes a key), and writes the
+  // full props back via the tree-walking mergeBlockProps.
+  function onUpdateColumnProps(columnId: string, patch: Record<string, unknown>) {
+    setBlocks((b) => {
+      const col = findBlock(b, columnId);
+      const next: Record<string, unknown> = { ...(col?.props ?? {}) };
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined || v === false) delete next[k];
+        else next[k] = v;
+      }
+      return mergeBlockProps(b, columnId, next);
+    });
+    setDirty(true);
+  }
+
   async function onSave() {
     if (!selected) return;
     setSaving(true);
@@ -637,6 +653,16 @@ export function PageBuilderShell({
                       key={sel.id}
                       section={sel}
                       onChange={(patch) => onUpdateSection(sel.id, patch)}
+                    />
+                  );
+                }
+                // A column shell: show its own settings (per-viewport visibility).
+                if (sel && isSectionColumn(sel)) {
+                  return (
+                    <ColumnSettings
+                      key={sel.id}
+                      column={sel}
+                      onChange={(patch) => onUpdateColumnProps(sel.id, patch)}
                     />
                   );
                 }
@@ -1415,6 +1441,61 @@ function SeoForm({
  * Padding has a rem/px unit toggle per side (rem default — render reads
  * `padding<Side>Unit`).
  */
+/**
+ * Per-column settings panel. Today it holds the per-viewport VISIBILITY control:
+ * hide this column on mobile / tablet / desktop. Storage is per-column boolean
+ * props (`hideMobile`/`hideTablet`/`hideDesktop`); the renderer (tree.ts
+ * `columnVisibilityClass`) maps them to `pb-hide-*` responsive utility classes.
+ * (When the fuller Column settings task lands — align/padding/margin/gap/bg — it
+ * extends THIS panel; keep it one panel, not two.)
+ */
+function ColumnSettings({
+  column,
+  onChange,
+}: {
+  column: Block;
+  onChange: (patch: Record<string, unknown>) => void;
+}) {
+  const t = useTranslations("pageBuilder");
+  const p = (column.props ?? {}) as Record<string, unknown>;
+  const label = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
+  const seg = "flex-1 rounded-md border px-2 py-1 text-sm transition-colors";
+  const segOn = "border-primary bg-primary-subtle text-foreground font-medium";
+  const segOff = "border-border text-foreground-muted hover:text-foreground";
+
+  const viewports: { key: "hideMobile" | "hideTablet" | "hideDesktop"; label: string }[] = [
+    { key: "hideMobile", label: t("colVisibility.mobile") },
+    { key: "hideTablet", label: t("colVisibility.tablet") },
+    { key: "hideDesktop", label: t("colVisibility.desktop") },
+  ];
+
+  return (
+    <div className="flex flex-col gap-5">
+      <h3 className="text-sm font-medium text-foreground">{t("columnSettings")}</h3>
+      <div className="flex flex-col gap-1.5">
+        <span className={label}>{t("colVisibility.label")}</span>
+        <p className="text-[11px] text-foreground-muted">{t("colVisibility.hint")}</p>
+        <div className="flex gap-1">
+          {viewports.map((v) => {
+            const hidden = Boolean(p[v.key]);
+            return (
+              <button
+                key={v.key}
+                type="button"
+                onClick={() => onChange({ [v.key]: !hidden })}
+                aria-pressed={hidden}
+                className={`${seg} ${hidden ? segOn : segOff}`}
+              >
+                {v.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SectionSettings({
   section,
   onChange,

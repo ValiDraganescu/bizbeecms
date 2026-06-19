@@ -34,7 +34,12 @@
       "close": "Sulje tekoälyavustaja",
       "minimize": "Pienennä",
       "debug": "Virheenkorjaus",
-      "model": "Malli"
+      "model": "Malli",
+      "new": "Uusi keskustelu",
+      "history": "Historia",
+      "historyEmpty": "Ei tallennettuja keskusteluja vielä.",
+      "historyUntitled": "Nimetön",
+      "historyDelete": "Poista keskustelu"
     },
     "debug": {
       "context": "Sivun konteksti",

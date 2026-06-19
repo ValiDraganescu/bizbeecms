@@ -34,7 +34,12 @@
       "close": "Close AI assistant",
       "minimize": "Minimize",
       "debug": "Debug",
-      "model": "Model"
+      "model": "Model",
+      "new": "New conversation",
+      "history": "History",
+      "historyEmpty": "No saved conversations yet.",
+      "historyUntitled": "Untitled",
+      "historyDelete": "Delete conversation"
     },
     "debug": {
       "context": "Page context",

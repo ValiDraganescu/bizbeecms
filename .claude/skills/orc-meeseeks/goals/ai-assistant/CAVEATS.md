@@ -109,3 +109,21 @@ Read every line before working. Each entry was learned the hard way by a previou
   contract as `context`); arbitrary ids never reach `env.AI.run`. The widget threads it via
   `useChat(getContext, getModel)` — `getModel` is read fresh per send (like `getContext`), and the
   `<select>` lives in `ChatConversation`'s `footer` seam (don't add transport logic to the widget).
+
+- HISTORY (Slice 4 sub-slice 3) DONE. Threads persist in a NEW D1 table `chat_thread` (migration
+  `0005_wonderful_ultragirl.sql` — `drizzle-kit generate` from `CMS/`; apply with
+  `wrangler d1 migrations apply <name>`). Only role/content TEXT is stored — tool cards are NOT
+  persisted (re-derived client-side; a loaded assistant turn comes back with empty `tools`).
+  Pure shape/validation is `lib/chat/history.ts` (node-tested); the store `db/chat-history-store.ts`
+  is the binding layer; the route `api/chat/history` is admin-only. SAVE is best-effort from the
+  CLIENT on the busy→idle EDGE (a `busyRef` in chat-widget) — NOT inside the SSE route (the full
+  assistant text only accumulates client-side, so saving server-side mid-stream is awkward; don't
+  try to move it there). `saveThread` upserts by id and MINTS an id when null, returning it so the
+  widget keeps re-saving the same thread (threadId ref). `useChat` now exposes `seed(messages)` +
+  `reset()` — use those to load a thread / start fresh; do NOT add another setMessages path.
+
+- PRE-EXISTING FAILING TEST (NOT this goal): `page-blocks-sections.test.ts` →
+  "planPage renders a Section as a grid of columns" expects `repeat(2, 1fr)` but gets
+  `repeat(auto-fit, minmax(min(100%, 16rem), 1fr))`. Introduced by the page-builder "responsive
+  Section columns" change (commit fc0b2e7) — the test wasn't updated. Fails on a clean tree, so
+  the full CMS suite is 416/417. It's a PAGE-BUILDER goal bug; flag it there, don't fix it here.

@@ -134,6 +134,7 @@ export function utilityRules(): Rule[] {
     add(v, `display:${v === "hidden" ? "none" : v}`);
   }
 
+
   // Flex / grid layout
   add("flex-row", "flex-direction:row");
   add("flex-col", "flex-direction:column");
@@ -237,9 +238,26 @@ export function utilityRules(): Rule[] {
   return rules;
 }
 
+/**
+ * Per-viewport "hide" classes — each is a `display:none` inside ONE breakpoint
+ * band. Bands match the page-builder viewport toggle (mobile / tablet / desktop).
+ * These can't go through `utilityRules` (whose decls are wrapped in `.cls{…}`)
+ * because they ARE `@media` blocks; `generateUtilityCss` appends them verbatim.
+ * The column renderer emits one or more of these class names from per-column
+ * `hideMobile`/`hideTablet`/`hideDesktop` props (inline styles can't `@media`).
+ */
+const VIEWPORT_HIDE_RULES: Array<{ cls: string; media: string }> = [
+  { cls: "pb-hide-mobile", media: "(max-width:767px)" },
+  { cls: "pb-hide-tablet", media: "(min-width:768px) and (max-width:1023px)" },
+  { cls: "pb-hide-desktop", media: "(min-width:1024px)" },
+];
+
 /** The set of every allowed class name (for validation / docs). */
 export function allowedClasses(): Set<string> {
-  return new Set(utilityRules().map((r) => r.cls));
+  return new Set([
+    ...utilityRules().map((r) => r.cls),
+    ...VIEWPORT_HIDE_RULES.map((r) => r.cls),
+  ]);
 }
 
 /**
@@ -247,7 +265,9 @@ export function allowedClasses(): Set<string> {
  * call. Injected inline on public pages so runtime artifact classes are styled.
  */
 export function generateUtilityCss(): string {
-  return utilityRules()
-    .map((r) => `${sel(r.cls)}{${r.decl}}`)
-    .join("\n");
+  const base = utilityRules().map((r) => `${sel(r.cls)}{${r.decl}}`);
+  const viewport = VIEWPORT_HIDE_RULES.map(
+    (r) => `@media ${r.media}{${sel(r.cls)}{display:none}}`,
+  );
+  return [...base, ...viewport].join("\n");
 }

@@ -198,3 +198,38 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/chat/route.ts, CMS/src/components/chat/chat-conversation.tsx,
   CMS/src/components/chat/chat-widget.tsx, CMS/messages/{en,fi,et}.json,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-19 20:59 — Slice 4 sub-slice 3: per-Site conversation history
+- **Status:** DONE
+- **What I did:** Per-Site chat thread persistence + a history panel in the widget.
+  - `db/schema.ts`: new `chat_thread` table (id, title, messages JSON, createdAt, updatedAt) +
+    ChatThread/NewChatThread types. The DB IS the Site boundary, so threads aren't site-scoped.
+    Migration `0005_wonderful_ultragirl.sql` generated via `drizzle-kit generate`.
+  - `lib/chat/history.ts` (NEW, PURE — node-testable, no @/ except types): `deriveTitle`
+    (first user msg, one-lined, ≤80c), `validateThreadInput` (UNTRUSTED body → drops malformed
+    messages, bounds count/length, derives title, nulls a bad id), `newThreadId`,
+    `parseStoredMessages` (defensive column parse). Tool cards are NOT stored — only role/content
+    text needed to reseed `useChat`.
+  - `db/chat-history-store.ts` (NEW): listThreads/getThread/saveThread(upsert, mints id when null)/
+    deleteThread. Thin binding layer over the pure helpers.
+  - `app/api/chat/history/route.ts` (NEW): GET (list / ?id=one), POST (save→{id,action}),
+    DELETE (?id). Admin-only (requireAdmin). REST, no server actions. Save body untrusted →
+    validateThreadInput → 400 only on genuinely empty/bad shape (never on minor garbage).
+  - `chat-conversation.tsx`: `useChat` now returns `seed(messages)` (reseed transcript from a
+    loaded thread) + `reset()` (new conversation). No transport fork.
+  - `chat-widget.tsx`: New-conversation + History header buttons; a history list panel
+    (open thread → seed; delete). Saves the transcript on the busy→idle EDGE per turn via a
+    `busyRef`; threadId ref tracks the current server id so re-saves upsert the same thread.
+    Best-effort persistence (offline/no-binding fetch failures swallowed).
+  - i18n `chat.widget.{new,history,historyEmpty,historyUntitled,historyDelete}` en/fi/et.
+- **Verified:** `node --test scripts/history.test.mjs` (7 pass). CMS `tsc --noEmit` clean.
+  `opennextjs-cloudflare build` green (route `/api/chat/history` registered; dev server off).
+  PM `bundle:cms` regen + `bundle:selfcheck` passed (only the pre-existing static-assets warning).
+  Full CMS suite 416/417 — the ONE failure (`planPage renders a Section as a grid of columns`)
+  is PRE-EXISTING (fails on a clean tree too; page-builder goal, not mine). Did NOT exercise live
+  D1 (no real binding here — HITL).
+- **Files:** CMS/src/db/schema.ts, CMS/src/lib/chat/history.ts (new),
+  CMS/src/db/chat-history-store.ts (new), CMS/src/app/api/chat/history/route.ts (new),
+  CMS/scripts/history.test.mjs (new), CMS/migrations/0005_wonderful_ultragirl.sql (+ meta),
+  CMS/src/components/chat/chat-conversation.tsx, CMS/src/components/chat/chat-widget.tsx,
+  CMS/messages/{en,fi,et}.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).

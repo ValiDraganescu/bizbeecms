@@ -520,17 +520,37 @@ function planSection(
   };
 }
 
+/**
+ * Per-column visibility → responsive utility classes (epic: per-viewport column
+ * visibility). A column carries optional boolean props `hideMobile`/`hideTablet`/
+ * `hideDesktop` (default false = visible everywhere). Each truthy flag emits the
+ * matching `pb-hide-*` class, whose `@media` rule (in `utility-css.ts`) sets
+ * `display:none` only within that breakpoint band. Inline styles can't hold
+ * `@media`, so visibility MUST be class-driven — that's why this returns classes,
+ * not a `style`. Returns "" when fully visible (caller omits `className`). PURE.
+ */
+export function columnVisibilityClass(props: Record<string, unknown> | undefined): string {
+  const p = props ?? {};
+  const out: string[] = [];
+  if (p.hideMobile) out.push("pb-hide-mobile");
+  if (p.hideTablet) out.push("pb-hide-tablet");
+  if (p.hideDesktop) out.push("pb-hide-desktop");
+  return out.join(" ");
+}
+
 function planColumn(
   col: Block,
   planBlock: (b: Block) => ElementPlan,
   alignItems: string,
   justifyContent: string,
 ): ElementPlan {
+  const hideClass = columnVisibilityClass(col.props);
   return {
     kind: "element",
     tag: "div",
     props: {
       "data-section-column": col.id,
+      ...(hideClass ? { className: hideClass } : {}),
       style: {
         minWidth: 0,
         width: "100%",
