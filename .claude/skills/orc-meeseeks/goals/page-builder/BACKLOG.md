@@ -30,7 +30,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
   backed by a PURE grouping helper (with a node test). The rail-UI rendering (groups, search, insert into
   section) stays in the task below. Reuse `upsertImportedComponent` + the kit registry — no second pipeline.
 
-- DOING (render+search DONE 2026-06-19; insert split into the task right below): **Components rail: show
+- DONE (render+search + insert both DONE 2026-06-19): **Components rail: show
   imported starter kits + their components, searchable, add into Sections (like aicms).**
   Make the builder's left Components rail the real component source, mirroring how aicms
   composes (`src/modules/page-builder/components/page-builder-v2/left_rail_components.tsx`): the operator
@@ -55,7 +55,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
   STATUS: render + search DONE (rail-filter.ts/.test.ts, ComponentsRail in page-builder-shell.tsx). The
   remaining INSERT half is the task right below.
 
-- TODO: **Insert components into Sections — page block-tree store + drag/click insert.** The rail now
+- DONE (2026-06-19): **Insert components into Sections — page block-tree store + drag/click insert.** The rail now
   renders kit groups + searchable component names, but the items are INERT (clicking a component does
   nothing — `ComponentsRail` in `page-builder-shell.tsx` has the `<li>`s draggable-styled only). This
   slice adds the editor's block tree: the selected page holds **Sections**, each Section holds

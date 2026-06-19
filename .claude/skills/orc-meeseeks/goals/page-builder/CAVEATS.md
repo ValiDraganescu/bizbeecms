@@ -33,3 +33,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   `0003_worthless_fallen_one.sql`) and writes `migrations/meta/*`. A new nullable column = a single
   additive `ALTER TABLE ... ADD` — safe on existing rows. Migrations are applied with
   `wrangler d1 migrations apply` (per drizzle.config comment), NOT auto-run by the build.
+- A builder "Section" is modeled as a `Block` with `component:"Section"` (reserved name
+  `SECTION_COMPONENT` in `lib/pages/page-blocks.ts`); dropped components are its `children`.
+  GOTCHA: the block PUT route (`/api/pages/[id]/blocks`) calls `missingComponents(componentNames)`
+  and 409s on any component NOT in D1 — so saving a page that contains a "Section" (or any
+  un-imported rail component) will be REJECTED until that component exists. For the builder to
+  actually persist sections, either (a) register a real "Section" layout component in D1 (and the
+  renderer must know how to render a container that renders its children), or (b) special-case the
+  reserved Section name in `missingComponents`/`validateBlocks` + the renderer. This slice wired the
+  in-editor tree + click-insert + Save call; making Save SUCCEED end-to-end is the next gap.
+- The renderer (`lib/render/tree.ts` `planPage`) doesn't yet render a Block's `children` as a
+  container — `Block.children` round-trips through validate/persist but a "Section" won't visually
+  nest its components in the public render until a Section container component renders `props`/slot
+  children. Keep that in mind for the Preview slice.

@@ -1,28 +1,33 @@
 # Note to the next Meeseeks (page-builder)
 
-DONE so far: LAYOUT shell + page select/create + kit↔component GAP closed + **Components rail UI
-(render + search) is DONE**. The left rail (`ComponentsRail` in `page-builder-shell.tsx`) fetches
-`GET /api/components/grouped`, renders expandable kit groups (blog/landing/docs +
-"individually-imported") with searchable component names. Search is the PURE
-`CMS/src/lib/components/rail-filter.ts` (`filterGroups`, tested in `rail-filter.test.ts`).
-i18n: `pageBuilder.kit.{blog,landing,docs}`, `kitIndividual`, `componentsNoMatch` in EN/FI/ET.
+DONE so far: LAYOUT shell + page select/create + kit↔component GAP + **Components rail
+(render + search + CLICK-INSERT)** + the editor **block-tree store**. The shell now loads a
+selected page's blocks (`GET /api/pages/[id]/blocks`), clicking LAYOUT "Section" adds a Section,
+clicking a rail component inserts into the selected/last Section, Save PUTs the tree, and the
+Center **Layers** panel renders the real section→component tree (new `LayersTree`, click-select).
+Pure helpers in `lib/pages/page-blocks.ts` (`addSection`, `addComponentToSection`, `targetSectionId`,
+`isSection`, `SECTION_COMPONENT`), tested in `page-blocks-sections.test.ts` (4/4).
 
-**Next backlog TODO: "Insert components into Sections — page block-tree store + drag/click insert."**
-The rail items are RENDERED but INERT (the `<li>`s in `ComponentsRail` are draggable-styled only;
-clicking does nothing). This slice adds the editor's block tree:
-- A selected page holds **Sections**; each Section holds **components** (aicms `page-builder-v2`
-  section model). Add a "Section" from the LAYOUT category; a rail component click/drag inserts into
-  the SELECTED Section.
-- Persist via the EXISTING C2/C3 block REST — do NOT fork a new block pipeline (check what block
-  endpoints already exist in `CMS/src/app/api/` before building anything; reuse the store).
-- Add a PURE tree-mutation helper + test (add-section, add-component-to-section) — relative `.ts`
-  imports (node can't resolve `@/`), mirror `page-picker.test.ts` / `grouped.test.ts` style.
-- This is ALSO the prerequisite for the Center Layers tree task (it renders the SAME tree), so build
-  the tree shape with both consumers in mind.
+**BIGGEST GAP / strongest next task: make Save actually PERSIST.** Right now Save will 409 — the
+PUT route's `missingComponents` rejects the reserved `"Section"` component because it isn't in D1
+(see CAVEATS). Pick ONE:
+  - Register a real **Section** layout component in D1 (a container whose render outputs its child
+    blocks) — then `missingComponents` passes AND the public render nests components, OR
+  - Special-case the reserved Section name in `validateBlocks`/`missingComponents` + teach
+    `lib/render/tree.ts planPage` to render a Section block's `children` as a container slot.
+The renderer also doesn't yet render `Block.children` as nested output (see 2nd new caveat) — that
+must land for Sections to show up in the public/Preview render.
 
-After that: the Center Layers⟷Preview wiring (needs a draft-preview path on the public route —
-`CMS/src/app/[[...slug]]/page.tsx` returns nothing unless `publishStatus === "published"`).
+Other open TODOs in BACKLOG (lower priority than the persist gap):
+- **Center: Layers ⟷ Preview** — Layers tree is now DONE; the remaining half is the **Preview**
+  iframe + the draft-preview path on the public route (`[[...slug]]/page.tsx` returns nothing unless
+  `publishStatus==="published"`). Add a `/preview/<id>` or `?preview=token` that reuses the SAME
+  renderer (don't fork it).
+- **Right rail: page SEO form** — per-locale metaTitle/metaDescription, reuse `validatePageMeta` +
+  `PUT /api/pages/[id]`.
+- **Right rail: Block props editor** — wire `selectedBlockId` (already tracked) to a props form using
+  `parsePropsSchema`/`validateBlockProps`/`setLocalizedProp` (all already in `page-blocks.ts`).
 
-Gate: CMS `npx tsc --noEmit` → `node --test '<helper>.test.ts'` (relative `.ts` imports) →
-`npx opennextjs-cloudflare build` (dev STOPPED, port 3601 must be free) → PM `npm run bundle:cms`.
+Gate: CMS `npx tsc --noEmit` → `node --test '<helper>.test.ts'` (RELATIVE `.ts` imports) →
+`npx opennextjs-cloudflare build` (dev STOPPED, port 3601 free) → PM `npm run bundle:cms`.
 i18n under `pageBuilder.*` in `CMS/messages/{en,fi,et}.json`.

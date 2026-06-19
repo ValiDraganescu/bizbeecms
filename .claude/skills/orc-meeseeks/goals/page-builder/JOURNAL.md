@@ -84,3 +84,25 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/components/rail-filter.ts (+ .test.ts, new),
   CMS/src/components/page-builder/page-builder-shell.tsx, CMS/messages/{en,fi,et}.json,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js.
+
+## 2026-06-19 16:54 — Insert components into Sections (block-tree store + click insert)
+- **Status:** DONE
+- **What I did:** Added section-aware tree mutations to `lib/pages/page-blocks.ts`
+  (`SECTION_COMPONENT="Section"`, `isSection`, `addSection`, `addComponentToSection`,
+  `targetSectionId` — all PURE/immutable, ids unique across the WHOLE tree via
+  `uniqueIdAcrossTree`). A Section = a top-level `Block` with `component:"Section"`
+  whose dropped components live in `children` (reuses the existing `Block` shape +
+  C3 block REST — no new pipeline). Wired the shell (`page-builder-shell.tsx`):
+  selecting a page now GETs `/api/pages/[id]/blocks`; clicking the LAYOUT "Section"
+  calls `addSection`; clicking a rail component inserts into the selected (or last)
+  Section via `targetSectionId`+`addComponentToSection`, with an "add a Section first"
+  hint when none exists. Save button enabled (PUT `/api/pages/[id]/blocks`, dirty
+  tracking). Center Layers panel now renders the real tree (new `LayersTree`:
+  sections → nested component blocks, click-to-select sets `selectedBlockId`).
+- **Verified:** CMS `npx tsc --noEmit` clean; `node --test page-blocks-sections.test.ts`
+  4/4 pass; `npx opennextjs-cloudflare build` green (port 3601 free, dev stopped);
+  PM `npm run bundle:cms` regenerated cms-bundle.generated.js. Could NOT click-test
+  in a live CMS (needs a deployed Worker + D1 binding — HITL).
+- **Files:** CMS/src/lib/pages/page-blocks.ts, CMS/src/lib/pages/page-blocks-sections.test.ts,
+  CMS/src/components/page-builder/page-builder-shell.tsx,
+  CMS/messages/{en,fi,et}.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js
