@@ -27,7 +27,15 @@ type Env = {
 type DeployBody = { siteId?: string; slug?: string; ref?: string };
 type AttachBody = { slug?: string; hostname?: string };
 
+// --- Cloudflare config constants (deployer's source of truth) ---
+// PM has its own copy in ProjectManager/src/lib/config/hosts.ts (separate package,
+// can't share an import). Keep the two in sync — both are documented in
+// DEPLOY-ARCHITECTURE.md § "Config & magic-value inventory".
 const WORKER_PREFIX = "bizbeecms-cms-";
+// Fallback-origin CNAME target customers point their domain at (router serves it).
+const CUSTOM_DOMAIN_FALLBACK_ORIGIN = "cf.bizbeecms.com";
+// CF anycast IPs for apex domains that can't CNAME — handed to the customer as A records.
+const CUSTOM_DOMAIN_APEX_IPS = ["104.21.34.242", "172.67.210.25"];
 
 // Hostname: lowercase DNS label-dotted, no scheme/path. Conservative on purpose —
 // it goes straight into the CF API body and the KV key.
@@ -209,8 +217,8 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
     dns: {
       // Subdomain → CNAME; apex → A record to CF anycast (can't CNAME an apex).
       routing: {
-        cname: { name: hostname, value: "cf.bizbeecms.com" },
-        apexA: { name: hostname, values: ["104.21.34.242", "172.67.210.25"] },
+        cname: { name: hostname, value: CUSTOM_DOMAIN_FALLBACK_ORIGIN },
+        apexA: { name: hostname, values: CUSTOM_DOMAIN_APEX_IPS },
       },
       dcv: dcv[0] ?? null,
       txt,
@@ -460,6 +468,9 @@ step_ok
 # patch the (ephemeral, cloned) wrangler.jsonc with their identifiers before
 # deploy. $SLUG is regex-validated in the Worker (^[a-z0-9](-[a-z0-9])*$), so it
 # is shell-safe to interpolate into resource names.
+# ponytail: the bizbeecms-cms[-media] name patterns are inlined here (not pulled
+# from the TS constants) because this heredoc runs in the container as bash and
+# can't import the module. Documented in DEPLOY-ARCHITECTURE.md; keep in sync.
 DB_NAME="bizbeecms-cms-$SLUG"
 BUCKET_NAME="bizbeecms-cms-media-$SLUG"
 

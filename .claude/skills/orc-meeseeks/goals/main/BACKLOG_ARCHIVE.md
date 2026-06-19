@@ -1,0 +1,56 @@
+# Backlog archive — main
+Completed tasks, compressed to one line each (10–20 words), newest at bottom.
+The full record lives in JOURNAL.md; this is the trimmed backlog trace.
+
+- [P1] CMS AI Assistant errored `2001: Please configure AI Gateway` on every message
+- [P2] CMS Theme editor swatches rendered gray
+- C3 follow-on: block-prop → component-prop binding (G1's missing half)
+- Scaffold the PM Next
+- Scaffold the default Next
+- Add Cloudflare D1 binding + initial schema/migrations for users, invites, sites, site_users
+- UI foundation
+- PM i18n foundation
+- Email+password auth
+- Invite flow
+- Site CRUD
+- CMS UI i18n
+- Pre-deploy validation script (`npm run preflight`, `scripts/preflight-deploy
+- Durable Object export gap
+- DEPLOY
+- Fix the live-deploy Durable Object blocker
+- Wire preflight into a `predeploy` npm hook
+- Audit Script-Upload metadata (bindings/assets) vs the DO-free bundle (NEXT slice 1)
+- A. Rendering foundation (no AI yet — make the artifact model real)
+- A1 — D1 schema for components + pages
+- A2 — block-tree renderer + public page route
+- A3 — precompiled Tailwind utility sheet
+- 2026-06-19 A2 follow-on — nested-component render gap CLOSED (composition-by-tag)
+- B1 — chat endpoint + streaming (no tools)
+- B2 — tool: create/update component
+- B3 — tool: create/compose page
+- B4 — tool: translate
+- C1 — per-Site content locales (offline core)
+- B-track chat UI — CMS admin chat page (`/admin/chat`)
+- C1b — content-locale settings UI
+- C2 — page management UI (metadata)
+- C3 — section/block editing UI (vertical slice)
+- C3 follow-on: per-locale block-prop editing
+- D1 — R2 asset upload + gallery (offline core)
+- D1 loop-closer — `list_assets` AI tool
+- E1 — per-Site theme overrides
+- E2 — site settings (brand identity / design system / AI persona)
+- 2026-06-18 Sec1 — CMS admin authentication
+- Sec2 — media serve stored-XSS hardening
+- 2026-06-18 H1 — export a component
+- 2026-06-18 H2 — import a component
+- 2026-06-18 H3 — asset-URL dependency handling
+- 2026-06-18 H3b part 2 — nested-component dep enumeration + missing-component warning (correctness gap)
+- 2026-06-19 H3b part 1 — editable asset-rebind UI
+- 2026-06-18 G1 — blog component kit
+- 2026-06-19 G2 — landing/marketing kit
+- 2026-06-19 G3 — docs/documentation starter kit
+- 2026-06-19 G4 — portfolio component kit
+- 2026-06-18 Shared /admin nav + index page (NEXT slice #6)
+- 2026-06-19 Stop tracking `CMS/tsconfig.tsbuildinfo`
+- 2026-06-19 Move "View site" to the top of the CMS admin sidebar + open in a new tab
+- 2026-06-19 Make theme presets complete, coordinated palettes (E1)

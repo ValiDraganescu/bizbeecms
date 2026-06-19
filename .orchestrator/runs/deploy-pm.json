@@ -1,0 +1,6 @@
+{
+  "command" : "npm run deploy",
+  "cwd" : "ProjectManager",
+  "id" : "F9563A12-3E6B-4AFE-9EE4-17989197F66F",
+  "name" : "deploy-pm"
+}

@@ -24,6 +24,7 @@ import { BLOG_KIT_ID, blogKit, blogKitNames } from "@/lib/components/blog-kit";
 import { LANDING_KIT_ID, landingKit, landingKitNames } from "@/lib/components/landing-kit";
 import { DOCS_KIT_ID, docsKit, docsKitNames } from "@/lib/components/docs-kit";
 import { PORTFOLIO_KIT_ID, portfolioKit, portfolioKitNames } from "@/lib/components/portfolio-kit";
+import { PRICING_KIT_ID, pricingKit, pricingKitNames } from "@/lib/components/pricing-kit";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,7 @@ const KITS: Kit[] = [
   { id: LANDING_KIT_ID, build: landingKit, names: landingKitNames },
   { id: DOCS_KIT_ID, build: docsKit, names: docsKitNames },
   { id: PORTFOLIO_KIT_ID, build: portfolioKit, names: portfolioKitNames },
+  { id: PRICING_KIT_ID, build: pricingKit, names: pricingKitNames },
 ];
 
 // The kit manifest is a STATIC list of what kits exist (no Site data, no D1) —

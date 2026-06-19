@@ -26,6 +26,7 @@ const KITS = [
   { id: "landing", labelKey: "installLandingKit" },
   { id: "docs", labelKey: "installDocsKit" },
   { id: "portfolio", labelKey: "installPortfolioKit" },
+  { id: "pricing", labelKey: "installPricingKit" },
 ] as const;
 
 export function ComponentsManager({
