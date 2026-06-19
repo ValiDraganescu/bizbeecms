@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { SESSION_COOKIE } from "@/lib/auth/guard-core";
 
@@ -16,17 +15,27 @@ import { SESSION_COOKIE } from "@/lib/auth/guard-core";
  */
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // mirror PM's 7-day session TTL
 
-export async function GET(request: Request): Promise<NextResponse> {
+// Redirect to /admin using a RELATIVE Location (no host). The browser resolves it
+// against the host it actually requested — restovista.com when the router proxied a
+// custom domain, or the workers.dev host otherwise. This both fixes the
+// custom-domain bounce (request.url here is the internal workers.dev origin, so an
+// absolute redirect would kick the user off their own domain) AND closes the
+// open-redirect hole: we never trust the spoofable `x-forwarded-host` to build a
+// redirect target, so a forged header can't bounce anyone to an attacker host.
+function redirectToAdmin(setCookieSid?: string): Response {
+  const res = new Response(null, { status: 302, headers: { location: "/admin" } });
+  if (setCookieSid) {
+    res.headers.append(
+      "set-cookie",
+      `${SESSION_COOKIE}=${setCookieSid}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_MAX_AGE}`,
+    );
+  }
+  return res;
+}
+
+export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const nonce = url.searchParams.get("sso") ?? "";
-  // The router proxies custom domains (e.g. restovista.com) to this Worker, so
-  // `request.url` is the INTERNAL workers.dev origin — redirecting to it would
-  // bounce the user off their own domain. Use the forwarded host the router sets
-  // (x-forwarded-host) so we land back on the host the browser is actually on.
-  const fwdHost = request.headers.get("x-forwarded-host");
-  const fwdProto = request.headers.get("x-forwarded-proto") ?? "https";
-  const adminOrigin = fwdHost ? `${fwdProto}://${fwdHost}` : url.origin;
-  const adminUrl = new URL("/admin", adminOrigin);
 
   const { env } = await getCloudflareContext({ async: true });
   const e = env as unknown as Record<string, unknown>;
@@ -34,7 +43,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const secret = typeof e.CMS_AUTH_SECRET === "string" ? e.CMS_AUTH_SECRET : "";
 
   if (!nonce || !pmOrigin || !secret) {
-    return NextResponse.redirect(adminUrl);
+    return redirectToAdmin();
   }
 
   let sid = "";
@@ -61,16 +70,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   if (!sid) {
-    return NextResponse.redirect(adminUrl);
+    return redirectToAdmin();
   }
 
-  const response = NextResponse.redirect(adminUrl);
-  response.cookies.set(SESSION_COOKIE, sid, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_MAX_AGE,
-  });
-  return response;
+  return redirectToAdmin(sid);
 }
