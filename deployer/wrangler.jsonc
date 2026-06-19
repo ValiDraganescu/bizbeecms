@@ -6,6 +6,14 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
 
+  // Stable custom domain on the bizbeecms.com zone (Cloudflare attaches the
+  // hostname + cert automatically on deploy). PM's DEPLOYER_URL points here.
+  // The old bizbeecms-deployer.<account>.workers.dev URL stays reachable as a
+  // fallback (workers.dev subdomain is not disabled).
+  "routes": [
+    { "pattern": "deployer.bizbeecms.com", "custom_domain": true }
+  ],
+
   // The on-demand container that runs the real CMS build + wrangler deploy.
   // Managed as a Durable Object (the Sandbox class) per the Sandbox SDK.
   "containers": [

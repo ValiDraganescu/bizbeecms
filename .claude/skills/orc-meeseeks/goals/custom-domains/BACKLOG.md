@@ -7,7 +7,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 Ordered: prove the two single-Worker domains first (low risk), then the per-site scheme (touches deployer+router+SSO), then verify. Each is one Meeseeks slice.
 
-- TODO: **Attach `deployer.bizbeecms.com` to the deployer Worker.** Add a custom domain / route for `deployer.bizbeecms.com` on the `bizbeecms.com` zone in `deployer/wrangler.jsonc` (or via Cloudflare API). Update PM's `DEPLOYER_URL` (`ProjectManager/wrangler.jsonc` + any default in `hosts.ts`) to `https://deployer.bizbeecms.com`. Single Worker, no SSO impact — safest first slice.
+- DONE (2026-06-19): **Attach `deployer.bizbeecms.com` to the deployer Worker.** Added `routes:[{pattern:"deployer.bizbeecms.com",custom_domain:true}]` to `deployer/wrangler.jsonc`; flipped PM's `DEPLOYER_URL` var to `https://deployer.bizbeecms.com`. No `hosts.ts` default existed (DEPLOYER_URL is env-only). Config-only; live deploy still to confirm.
 
 - TODO: **Attach `manager.bizbeecms.com` to the PM Worker.** Add the custom domain for `manager.bizbeecms.com` on the zone in `ProjectManager/wrangler.jsonc`. Set `APP_ORIGIN` to `https://manager.bizbeecms.com` (wrangler var + `hosts.ts` default). Audit every place that builds PM-facing URLs (invite emails `send-invite.ts`, SSO redirects, `PM_ORIGIN` injected to CMS) to confirm they read `APP_ORIGIN`, not a hardcoded workers.dev host.
 
