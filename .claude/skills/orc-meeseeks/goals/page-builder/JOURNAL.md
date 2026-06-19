@@ -428,3 +428,19 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/page-builder/page-builder-shell.tsx, CMS/src/app/[[...slug]]/page.tsx,
   CMS/src/components/pages/pages-manager.tsx, CMS/src/lib/pages/page-picker.test.ts,
   CMS/scripts/page-store.test.mjs, CMS/messages/{en,fi,et}.json
+
+## 2026-06-19 20:52 — Page tab: publish/unpublish toggle + delete page
+- **Status:** DONE
+- **What I did:** Filled the empty right-rail Page tab. Verified+flipped the prior META IMAGE (OG) TODO to
+  DONE (already shipped in commit 21a3874 — schema.ts:85 metaImage, MetaImagePicker, og:image emit). New pure
+  `buildPublishToggleBody(page)` in `lib/pages/page-meta.ts` (flips publishStatus draft↔published, keeps
+  slug/parent + all per-locale SEO maps). New `PageSettings` component in `page-builder-shell.tsx` wired into
+  the `rightTab==="page"` branch: status label + Publish/Unpublish button (full-meta `PUT /api/pages` via the
+  toggle body), and a Delete action behind an IN-APP confirm (state `confirming`, NOT native window.confirm)
+  → `DELETE /api/pages?id=<id>` (the route reads `id` as a query param, not a `[id]` segment), clearing
+  builder selection (`setSelected(null)`) + refetching on success. EN/FI/ET `pageBuilder.page.*` message keys.
+- **Verified:** `node --test page-meta.test.ts` 6/6 (new toggle test: flips both ways, result validates).
+  `npx tsc --noEmit` exit 0 (fully clean). `npx opennextjs-cloudflare build` complete (dev stopped, 3601 free),
+  worker.js written. All 3 message JSONs parse.
+- **Files:** `CMS/src/lib/pages/page-meta.ts`, `CMS/src/lib/pages/page-meta.test.ts`,
+  `CMS/src/components/page-builder/page-builder-shell.tsx`, `CMS/messages/{en,fi,et}.json`.

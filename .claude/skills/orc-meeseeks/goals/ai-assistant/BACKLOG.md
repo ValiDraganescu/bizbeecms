@@ -56,7 +56,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `toolsForContext`) for the current context (aicms `debug_panel.tsx`). New `lib/chat/assemble-prompt.ts`
   (shared prompt builder, no fork) + pure `resolveRequestContext` (both routes' untrusted→context
   contract) + `components/chat/chat-debug-panel.tsx`. i18n `chat.debug.*` EN/FI/ET. Gates green.
-- TODO: **Slice 4 sub-slice 2 — model picker.** Confirm the model-id list source FIRST (coordinate with
+- DONE: **Slice 4 sub-slice 2 — model picker.** New pure `lib/chat/models.ts`
+  (`DEFAULT_MODEL` + curated `CHAT_MODELS` allowlist + `isKnownModel`/`resolveModel`); route
+  reads untrusted `body.model` → `resolveModel` → `ai.chat({model})` (never 400); `useChat`
+  gained optional `getModel`; widget `<select>` in the `footer` seam; i18n `chat.widget.model`
+  EN/FI/ET. Tested (models.test.mjs, 4). Gates green; cms-bundle regen. Confirm the model-id list source FIRST (coordinate with
   binding-adapters' REST `Ai` task — DEFAULT_MODEL is `@cf/meta/llama-3.1-8b-instruct` in route.ts; is
   there a curated CF/gateway list to expose?). Widget sends a chosen `model` in the POST body; thread an
   optional VALIDATED `model` through (untrusted → allowlist → default DEFAULT_MODEL). No arbitrary strings.

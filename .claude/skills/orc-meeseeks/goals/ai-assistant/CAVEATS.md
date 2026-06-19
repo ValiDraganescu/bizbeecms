@@ -100,3 +100,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   in place by name). `setSiteIdentity`/`setThemeOverrides[Dark]` take `unknown` and ARE the trust gate
   (normalize internally) — the route only checks an object was supplied, doesn't re-validate the shape.
   `list_builtin_types` exposes ONLY `Section`; `__section_column__` is Section-internal — never expose it.
+
+- MODEL allowlist is the PURE `lib/chat/models.ts` (`DEFAULT_MODEL` + `CHAT_MODELS` +
+  `isKnownModel`/`resolveModel`). The `Ai` port (`lib/ports/ai.ts`) exposes NO curated model list, so
+  it's a small hard-coded allowlist of CF Workers-AI TOOL-CAPABLE models. Do NOT re-declare a model id
+  in the route or widget — import from this module so route + picker share ONE list. The route reads
+  UNTRUSTED `body.model` → `resolveModel` (allowlist → default) → `ai.chat({model})`: NEVER a 400 (same
+  contract as `context`); arbitrary ids never reach `env.AI.run`. The widget threads it via
+  `useChat(getContext, getModel)` — `getModel` is read fresh per send (like `getContext`), and the
+  `<select>` lives in `ChatConversation`'s `footer` seam (don't add transport logic to the widget).

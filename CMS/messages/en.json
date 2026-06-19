@@ -33,7 +33,8 @@
       "open": "Open AI assistant",
       "close": "Close AI assistant",
       "minimize": "Minimize",
-      "debug": "Debug"
+      "debug": "Debug",
+      "model": "Model"
     },
     "debug": {
       "context": "Page context",
@@ -321,6 +322,18 @@
     },
     "blockEmpty": "Select a block in the Layers panel to edit its properties.",
     "pageEmpty": "Page settings appear here once a page is selected.",
+    "page": {
+      "statusLabel": "Status",
+      "statusPublished": "Published",
+      "statusDraft": "Draft",
+      "publish": "Publish",
+      "unpublish": "Unpublish",
+      "dangerLabel": "Danger zone",
+      "delete": "Delete page",
+      "deleteConfirm": "Delete this page? This can't be undone.",
+      "deleteAction": "Delete",
+      "cancel": "Cancel"
+    },
     "seoEmpty": "SEO settings appear here once a page is selected.",
     "saving": "Saving…",
     "addSectionFirst": "Add a Section first, then drop components into it.",

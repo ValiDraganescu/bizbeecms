@@ -1,30 +1,34 @@
 # Note to the next Meeseeks (page-builder)
 
-**THIS run (SEO per-locale META IMAGE / OG image):** DONE. New `metaImage` JSON-map column on `page`
-(migration `0004_past_drax.sql`, mirrors meta_title) threaded through the SAME meta path — NOT forked:
-`validatePageMeta`/`buildSeoMetaBody` (now 4-arg) + `upsertPageMeta` (insert+update). SEO form got
-`MetaImagePicker` (page-builder-shell.tsx) — per-ACTIVE-locale, browses `GET /api/assets` (R2 lib, same
-source as media-gallery) in a thumbnail grid, set/remove. `app/[[...slug]]/page.tsx generateMetadata`
-emits `openGraph.images:[{url}]` from the locale-resolved map (omitted when empty). C2 pages-manager Draft
-round-trips metaImage (no editor there) so a C2 metadata edit doesn't wipe a builder-set image.
-REMINDER: apply migration 0004 via `wrangler d1 migrations apply` before this ships to a Site.
+**THIS run (Page tab — publish/unpublish + delete page):** DONE. Right-rail Page tab now renders
+`PageSettings` (page-builder-shell.tsx). Publish/unpublish = pure `buildPublishToggleBody(page)` (page-meta.ts)
+→ full-meta `PUT /api/pages` (SEO maps untouched). Delete = `DELETE /api/pages?id=<id>` (NOTE: `id` is a QUERY
+PARAM, there is NO `[id]/route.ts` for pages — only `[id]/blocks`) behind an IN-APP confirm (state-driven,
+never native window.confirm) that clears selection on success. EN/FI/ET under `pageBuilder.page.*`.
+COORDINATE: the page-versioning track will add a TOP-BAR publish (snapshot draft→version) — this tab stays a
+simple draft↔published toggle; when versioning lands, reconcile (publish here = publish current draft,
+unpublish = take offline). Don't duplicate publish logic.
+
+Also flipped the SEO META IMAGE (OG) backlog TODO to DONE — it was already shipped in commit 21a3874
+(schema.ts metaImage, MetaImagePicker, og:image), the line just wasn't marked.
 
 **CHECK BUGS FIRST:** ALL bugs in BACKLOG `## Bugs` are DONE. If a fresh human bug appears, take it first.
 
-**BUILD IS GREEN AGAIN:** `npx tsc --noEmit` and `npx opennextjs-cloudflare build` both pass fully (the
-ai-assistant chat/route.ts that used to break the build now type-checks). No more "build halts on their
-file" caveat — if a build fails on a non-page-builder file, re-check, but it's clean as of 20:44.
+**BUILD IS GREEN:** `npx tsc --noEmit` exit 0 (FULLY clean now — no ai-assistant chat/route.ts errors) and
+`npx opennextjs-cloudflare build` complete as of 20:52. If a future build fails on a non-page-builder file,
+re-check, but it's clean.
 
 **Top queued tasks** (bugs clear) — pick the highest:
 - **Adopt `<LocalePicker>` in C2** — `pages-manager.tsx` + `pages/block-editor.tsx` still stack locales;
-  swap to `useLocalePicker`/`<LocalePicker>` for app-wide consistency (keystone exists). NOTE
-  pages-manager now also carries `metaImage` in its Draft — if you add a LocalePicker there, you COULD
-  surface a per-locale OG image editor too (today it only round-trips).
-- **Page tab — publish/unpublish + delete page** (fill the empty Page tab).
-- **Responsive Section columns — auto-stack when there isn't room** (`repeat(auto-fit, minmax(...))`).
+  swap to `useLocalePicker`/`<LocalePicker>` for app-wide consistency (keystone exists).
+- **Responsive Section columns — auto-stack** (`repeat(auto-fit, minmax(min(100%,~16rem),1fr))` in
+  `tree.ts` planSection; keep the `collapse`/0fr behavior). Update section-render test.
+- **Delete nodes in the Layers tree** (component or whole Section) — `removeNode` exists; wire a trash
+  affordance + reuse the SAME in-app confirm pattern as PageSettings (NOT native window.confirm).
+- **Column settings panel** / **Section padding single-unit switch** / **per-viewport column visibility**.
+- **Page VERSIONING slice 1** (schema + version store) gates the whole versioning track.
 
-Gate: CMS `npx tsc --noEmit` → relevant `scripts/*.test.mjs` + `src/lib/**/*.test.ts` →
-`npx opennextjs-cloudflare build` (dev STOPPED, port 3601 free). Stage ONLY CMS files +
-`goals/page-builder/*` by EXPLICIT PATH — NO `git add -A`. Do NOT touch cms-bundle.generated.js (PM
-predeploy auto-regens) or other loops' files (custom-domains/, router/, ProjectManager/, the ai-assistant
-chat files — note chat/route.ts shows `M` but is NOT yours).
+Gate: CMS `npx tsc --noEmit` → relevant node tests (`node --test src/lib/**/*.test.ts` +
+`scripts/*.test.mjs`) → `npx opennextjs-cloudflare build` (dev STOPPED, port 3601 free). Stage ONLY CMS files
++ `goals/page-builder/*` by EXPLICIT PATH — NO `git add -A`. Do NOT touch cms-bundle.generated.js (PM
+predeploy auto-regens) or other loops' files.

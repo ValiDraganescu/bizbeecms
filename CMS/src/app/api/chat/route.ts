@@ -65,6 +65,7 @@ import {
   type ToolName,
 } from "@/lib/chat/tool-scopes";
 import { assembleSystemPrompt } from "@/lib/chat/assemble-prompt";
+import { resolveModel } from "@/lib/chat/models";
 import {
   upsertComponent,
   listComponents,
@@ -92,9 +93,9 @@ import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
-// Default Workers AI model. Swappable per the B1 risk note: AI Gateway lets us
-// point at a stronger model without re-architecting if tool-calling needs it.
-const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+// DEFAULT_MODEL + the curated allowlist live in `lib/chat/models.ts` (pure, so
+// the widget shares the same list). AI Gateway lets us point at a stronger model
+// without re-architecting if tool-calling needs it.
 
 // The full tool catalog, keyed by the tool's function.name. Page-awareness
 // (Slice 2) scopes which subset the model sees per admin page via
@@ -143,6 +144,15 @@ export async function POST(request: Request): Promise<Response> {
   // from. Untrusted → validate / detect; unknown falls back to "general".
   const context = resolveContext(body);
 
+  // Optional, UNTRUSTED `model` (the picker — Slice 4): validate against the
+  // allowlist, fall back to DEFAULT_MODEL. Never a 400 (same contract as
+  // `context`); arbitrary strings never reach `env.AI.run`.
+  const model = resolveModel(
+    typeof body === "object" && body !== null
+      ? (body as { model?: unknown }).model
+      : undefined,
+  );
+
   const ai = await getAi();
   if (!ai) {
     // Binding missing (not yet provisioned for this Site). Don't 500 silently.
@@ -163,7 +173,7 @@ export async function POST(request: Request): Promise<Response> {
     // OpenAI-compatible streaming call through AI Gateway (via the Ai port).
     // Tools are scoped to the current admin page (Slice 2).
     upstream = await ai.chat(messages, {
-      model: DEFAULT_MODEL,
+      model,
       tools: toolsForRequest(context),
       gatewayId: await getGatewayId(),
     });

@@ -31,8 +31,15 @@ export type ChatMsg =
  * read fresh per `send` (a function, not a value) so navigating mid-conversation
  * picks up the new page. Omit it (the full-page /admin/chat) → route defaults to
  * "general" (the full toolset).
+ *
+ * `getModel` (optional, Slice 4) lets a surface tell the route which allowlisted
+ * model to use (the picker). Read fresh per `send`. Omit it → route uses its
+ * default. The id is validated server-side, so an unknown value is harmless.
  */
-export function useChat(getContext?: () => string | undefined) {
+export function useChat(
+  getContext?: () => string | undefined,
+  getModel?: () => string | undefined,
+) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,10 +81,14 @@ export function useChat(getContext?: () => string | undefined) {
 
     try {
       const context = getContext?.();
+      const model = getModel?.();
+      const payload: Record<string, unknown> = { messages: history };
+      if (context) payload.context = context;
+      if (model) payload.model = model;
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(context ? { messages: history, context } : { messages: history }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok || !res.body) {
         let msg = `HTTP ${res.status}`;

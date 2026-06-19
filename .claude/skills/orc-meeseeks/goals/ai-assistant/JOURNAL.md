@@ -171,3 +171,30 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (resolveRequestContext), CMS/src/app/api/chat/route.ts (shared helpers), CMS/src/components/chat/
   chat-widget.tsx (debug toggle), CMS/messages/{en,fi,et}.json, CMS/scripts/tool-scopes.test.mjs (test),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-19 20:52 — Slice 4 sub-slice 2 — MODEL PICKER
+- **Status:** DONE
+- **What I did:** Added an operator model picker to the widget, threaded a validated
+  optional `model` through the chat route.
+  - New PURE `CMS/src/lib/chat/models.ts`: `DEFAULT_MODEL`, a curated `CHAT_MODELS`
+    allowlist (3 CF Workers-AI tool-capable models), `isKnownModel`, `resolveModel`
+    (untrusted→allowlist→default, never throws, never forwards arbitrary ids). No
+    curated list existed in the `Ai` port, so a small hard-coded allowlist (per NEXT).
+  - `api/chat/route.ts`: removed the local `DEFAULT_MODEL` const (now imported from the
+    pure module so the widget shares the SAME list), reads `body.model` and passes
+    `resolveModel(...)` into `ai.chat({ model })`. Untrusted → NEVER a 400 (same contract
+    as `context`).
+  - `chat-conversation.tsx`: `useChat` gained an optional second arg `getModel` (read
+    fresh per send, like `getContext`); send builds the POST payload conditionally.
+  - `chat-widget.tsx`: `model` state (default DEFAULT_MODEL) + a `<select>` rendered via
+    the existing `ChatConversation` `footer` seam; passes `() => model` to `useChat`.
+  - i18n `chat.widget.model` added to en/fi/et (Model / Malli / Mudel).
+- **Verified:** `node --test scripts/models.test.mjs` (4 pass) — DEFAULT in allowlist,
+  unique ids, isKnownModel, resolveModel fallback incl. injection-ish strings. CMS
+  `tsc --noEmit` clean. `opennextjs-cloudflare build` green (dev server off). PM
+  `bundle:cms` regenerated + `bundle-selfcheck` passed (only the pre-existing static-assets
+  warning). Did NOT live-call the model (no real AI binding here).
+- **Files:** CMS/src/lib/chat/models.ts (new), CMS/scripts/models.test.mjs (new),
+  CMS/src/app/api/chat/route.ts, CMS/src/components/chat/chat-conversation.tsx,
+  CMS/src/components/chat/chat-widget.tsx, CMS/messages/{en,fi,et}.json,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).

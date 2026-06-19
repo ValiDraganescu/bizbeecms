@@ -33,7 +33,8 @@
       "open": "Ava tehisintellekti assistent",
       "close": "Sulge tehisintellekti assistent",
       "minimize": "Minimeeri",
-      "debug": "Silumine"
+      "debug": "Silumine",
+      "model": "Mudel"
     },
     "debug": {
       "context": "Lehe kontekst",
@@ -321,6 +322,18 @@
     },
     "blockEmpty": "Atribuutide muutmiseks vali plokk Kihtide paneelist.",
     "pageEmpty": "Lehe sätted ilmuvad siia, kui leht on valitud.",
+    "page": {
+      "statusLabel": "Olek",
+      "statusPublished": "Avaldatud",
+      "statusDraft": "Mustand",
+      "publish": "Avalda",
+      "unpublish": "Tühista avaldamine",
+      "dangerLabel": "Ohutsoon",
+      "delete": "Kustuta leht",
+      "deleteConfirm": "Kas kustutada see leht? Seda ei saa tagasi võtta.",
+      "deleteAction": "Kustuta",
+      "cancel": "Tühista"
+    },
     "seoEmpty": "SEO sätted ilmuvad siia, kui leht on valitud.",
     "saving": "Salvestamine…",
     "addSectionFirst": "Lisa esmalt sektsioon ja seejärel lohista komponendid sinna.",

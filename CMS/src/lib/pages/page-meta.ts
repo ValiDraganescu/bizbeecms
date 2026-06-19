@@ -145,6 +145,35 @@ export function buildSeoMetaBody(
   };
 }
 
+/**
+ * Page identity + meta the Page tab needs to flip publish state without touching
+ * the per-locale SEO maps. Superset of `PageSeoSource` — also carries the meta
+ * maps so a publish toggle round-trips them unchanged (PageSummary satisfies it).
+ */
+export interface PagePublishSource extends PageSeoSource {
+  metaTitle: Record<string, string>;
+  metaDescription: Record<string, string>;
+  metaImage: Record<string, string>;
+}
+
+/**
+ * Assemble the `PUT /api/pages` body that flips a page draft↔published, keeping
+ * slug/parent and all per-locale SEO maps untouched. PURE — no fetch, no DB.
+ */
+export function buildPublishToggleBody(
+  page: PagePublishSource,
+): { id: string } & PageMetaInput {
+  return {
+    id: page.id,
+    slug: page.slug,
+    parentSlug: page.parentSlug,
+    publishStatus: page.publishStatus === "published" ? "draft" : "published",
+    metaTitle: page.metaTitle,
+    metaDescription: page.metaDescription,
+    metaImage: page.metaImage,
+  };
+}
+
 /** Object of string values (null/empty → {}); undefined if any value isn't a string. */
 function coerceStringMap(raw: unknown): Record<string, string> | undefined {
   if (raw == null) return {};

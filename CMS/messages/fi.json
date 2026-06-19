@@ -33,7 +33,8 @@
       "open": "Avaa tekoälyavustaja",
       "close": "Sulje tekoälyavustaja",
       "minimize": "Pienennä",
-      "debug": "Virheenkorjaus"
+      "debug": "Virheenkorjaus",
+      "model": "Malli"
     },
     "debug": {
       "context": "Sivun konteksti",
@@ -321,6 +322,18 @@
     },
     "blockEmpty": "Valitse lohko Tasot-paneelista muokataksesi sen ominaisuuksia.",
     "pageEmpty": "Sivun asetukset näkyvät täällä, kun sivu on valittu.",
+    "page": {
+      "statusLabel": "Tila",
+      "statusPublished": "Julkaistu",
+      "statusDraft": "Luonnos",
+      "publish": "Julkaise",
+      "unpublish": "Peru julkaisu",
+      "dangerLabel": "Vaaravyöhyke",
+      "delete": "Poista sivu",
+      "deleteConfirm": "Poistetaanko tämä sivu? Tätä ei voi kumota.",
+      "deleteAction": "Poista",
+      "cancel": "Peruuta"
+    },
     "seoEmpty": "SEO-asetukset näkyvät täällä, kun sivu on valittu.",
     "saving": "Tallennetaan…",
     "addSectionFirst": "Lisää ensin osio ja pudota sitten komponentit siihen.",

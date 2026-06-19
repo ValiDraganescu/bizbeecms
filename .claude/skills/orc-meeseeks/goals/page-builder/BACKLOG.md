@@ -72,16 +72,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `api/chat/route.ts`, not mine — opennext build halts there, see CAVEAT). See JOURNAL 20:37.
   FOLLOW-ON ADOPTERS (not done this run): the C2 `pages-manager.tsx` + `pages/block-editor.tsx` still stack
   locales — adopt `<LocalePicker>`/`useLocalePicker` there next for full app-wide consistency.
-- TODO: **SEO: per-locale META IMAGE (OG image) — new field on the SEO tab.** Add a per-locale meta/OG image
-  to page SEO (an image with baked-in text may need a different asset per language). Schema: new
-  `meta_image text("meta_image").notNull().default("{}")` JSON map on `page` (drizzle migration), mirroring
-  `meta_title`/`meta_description`; thread through `validatePageMeta` + the `PUT /api/pages` full-meta path
-  (`upsertPageMeta`) — do NOT fork a new page-store path. SEO form gets a per-locale image PICKER reusing the
-  EXISTING media gallery/assets (`components/media/media-gallery.tsx`, `GET /api/assets`) — store the asset
-  URL/id per locale via `setLocalizedProp`. Renders through the LOCALE SELECTOR (one locale at a time). Public
-  render: emit `og:image` from the resolved-locale value. Depends on the locale-selector task. Pure
-  validate/merge tested. i18n EN/FI/ET. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
-- TODO: **Page tab — publish/unpublish + delete page (fill the empty Page tab).** The right-rail Page tab is
+- DONE (2026-06-19, shipped in commit 21a3874 — backlog line was just never flipped): **SEO: per-locale META
+  IMAGE (OG image).** Verified on disk: `metaImage` JSON-map column on `page` (schema.ts:85), `MetaImagePicker`
+  in page-builder-shell.tsx (1161/1360), og:image emitted in generateMetadata. Duplicate of the 20:44 DONE entry
+  above — both describe the same shipped work.
+- DONE (2026-06-19 20:52): **Page tab — publish/unpublish + delete page.** Right-rail Page tab now renders
+  `PageSettings` (page-builder-shell.tsx) for the selected page: publish/unpublish toggle (pure
+  `buildPublishToggleBody` → full-meta `PUT /api/pages`, SEO maps untouched) + delete behind an IN-APP confirm
+  (state-driven, NOT native window.confirm) → `DELETE /api/pages?id=`, clears selection on success. EN/FI/ET
+  `pageBuilder.page.*` keys. Pure helper tested (page-meta.test.ts 6/6). tsc + opennext build green. See
+  JOURNAL 20:52.
+- (superseded) Page tab — publish/unpublish + delete page (fill the empty Page tab). The right-rail Page tab is
   a placeholder today (`pageEmpty` — page-builder-shell.tsx ~599-600). Wire it for the SELECTED page using
   EXISTING backends (no new APIs): a PUBLISH/UNPUBLISH toggle (flips `publishStatus` draft↔published via the
   existing `PUT /api/pages` full-meta path — `upsertPageMeta` already persists publishStatus; the SEO form

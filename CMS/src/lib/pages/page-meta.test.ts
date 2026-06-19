@@ -9,8 +9,30 @@ import assert from "node:assert/strict";
 import {
   setLocaleValue,
   buildSeoMetaBody,
+  buildPublishToggleBody,
   validatePageMeta,
 } from "./page-meta.ts";
+
+test("buildPublishToggleBody flips publish state, keeps slug/parent/meta", () => {
+  const page = {
+    id: "p1",
+    slug: "home",
+    parentSlug: null,
+    publishStatus: "draft",
+    metaTitle: { en: "Home" },
+    metaDescription: { en: "Welcome" },
+    metaImage: { en: "https://r2/og.png" },
+  };
+  const pub = buildPublishToggleBody(page);
+  assert.equal(pub.publishStatus, "published");
+  assert.equal(pub.slug, "home");
+  assert.equal(pub.parentSlug, null);
+  assert.deepEqual(pub.metaTitle, { en: "Home" });
+  assert.deepEqual(pub.metaImage, { en: "https://r2/og.png" });
+  const back = buildPublishToggleBody({ ...page, publishStatus: "published" });
+  assert.equal(back.publishStatus, "draft");
+  assert.equal(validatePageMeta(pub).ok, true);
+});
 
 test("setLocaleValue sets, overwrites and clears immutably", () => {
   const base = { en: "Home" };
