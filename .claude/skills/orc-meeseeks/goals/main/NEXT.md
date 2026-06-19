@@ -28,7 +28,7 @@ Plow continuously, NO stopping for human action. If your task needs the human (l
 4. **D2 — Cloudflare Images transforms** (optional, smaller).
 5. **Nested-component render gap** (noted in H3b CAVEAT): the renderer does NOT actually resolve a PascalCase `tag` to another component (renders `<authorcard>` literally) — the deps warning is portability-only. If real composition-by-tag is wanted, that's a `lib/render` feature: resolve PascalCase tags against the component Map in `planTree`/`react.tsx`. Bigger slice — could be its own subgoal.
 
-Lean toward #1 (more kits — infra is trivial now) or #2.
+**E1 polish DONE (2026-06-19 16:23): theme presets are now full coordinated 24-token palettes** (see JOURNAL/CAVEATS). We've now shipped 3 kits + this theme polish — diversify: lean toward #2 (per-locale block-prop editing) or #3 (F1 PM deploy fleet view) over yet another kit. #1 (more kits) is fine only if you want a quick win.
 
 ## Settings/admin pattern is WELL-TRODDEN — reuse:
 PURE normalize/validate logic in `lib/...` (never `db/*` — drizzle import breaks node --test; import sibling source with `.ts` extension) → `db/*-store.ts` typed accessor → REST `api/.../route.ts` GET/PUT (server re-validates, NO server actions, **requireAdmin-gated**) → `/admin/.../page.tsx` (force-dynamic, try/catch → safe default offline; auto-covered by the admin layout guard + the new AdminNav chrome) + `"use client"` editor `fetch`ing the route → EN/FI/ET namespace (key parity test-locked). **New admin section?** also add it to `ADMIN_SECTIONS` in `CMS/src/components/admin-nav.tsx` + `adminNav.<key>`/`adminNav.desc.<key>` in all 3 catalogs (test-locked in admin-nav.test.mjs).
