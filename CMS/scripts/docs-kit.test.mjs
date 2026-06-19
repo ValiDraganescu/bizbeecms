@@ -19,6 +19,7 @@ import {
   parsePortableComponent,
 } from "../src/lib/components/portable.ts";
 import { docsKit, docsKitNames } from "../src/lib/components/docs-kit.ts";
+import { parsePropsSchema } from "../src/lib/pages/page-blocks.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const msgDir = join(here, "..", "messages");
@@ -56,6 +57,40 @@ test("component names are unique within the kit", () => {
   assert.equal(new Set(names).size, names.length, "duplicate component name in kit");
   assert.ok(names.includes("DocsHeader"));
   assert.ok(names.includes("ApiParam"));
+});
+
+test("every prop's propsSchema parses to the richer field vocab", () => {
+  const KNOWN = new Set(["string", "richtext", "number", "boolean", "select"]);
+  const byName = Object.fromEntries(docsKit().map((b) => [b.component.name, b.component]));
+
+  for (const b of docsKit()) {
+    const fields = parsePropsSchema(b.component.propsSchema);
+    assert.ok(fields.length > 0, `${b.component.name}: no props parsed`);
+    for (const f of fields) {
+      assert.ok(KNOWN.has(f.type), `${b.component.name}.${f.name}: unknown field type ${f.type}`);
+    }
+  }
+
+  const field = (comp, name) =>
+    parsePropsSchema(byName[comp].propsSchema).find((f) => f.name === name);
+
+  // Required text props on the header + callout.
+  const title = field("DocsHeader", "title");
+  assert.equal(title.required, true, "DocsHeader.title should be required");
+  assert.equal(title.translatable, true, "DocsHeader.title should be translatable");
+
+  const calloutBody = field("Callout", "body");
+  assert.equal(calloutBody.translatable, true, "Callout.body should be translatable");
+
+  // richtext stays richtext.
+  assert.equal(field("CodeBlock", "code").type, "richtext", "CodeBlock.code should be richtext");
+  // code is source, not prose → NOT translatable.
+  assert.equal(field("CodeBlock", "code").translatable, false, "CodeBlock.code must not be translatable");
+
+  // ApiParam: name/type are identifiers → not translatable; description is prose → translatable.
+  assert.equal(field("ApiParam", "name").translatable, false, "ApiParam.name must not be translatable");
+  assert.equal(field("ApiParam", "paramType").translatable, false, "ApiParam.paramType must not be translatable");
+  assert.equal(field("ApiParam", "description").translatable, true, "ApiParam.description should be translatable");
 });
 
 test("kit i18n keys exist with identical keys in EN/FI/ET", () => {

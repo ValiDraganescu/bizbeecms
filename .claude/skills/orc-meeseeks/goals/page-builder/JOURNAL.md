@@ -291,3 +291,15 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (port 3601 free). PM bundle NOT regenerated — propsSchema is editor metadata, no render-output change
   (still owed from the column-model render run per CAVEATS).
 - **Files:** CMS `src/lib/components/landing-kit.ts`, `scripts/landing-kit.test.mjs`.
+
+## 2026-06-19 18:36 — Upgrade DOCS kit component schemas to the richer vocab
+- **Status:** DONE
+- **What I did:** Enriched `lib/components/docs-kit.ts` propsSchema for all 5 components (the
+  hint's "6th" component didn't exist). Added `required`/`translatable`/`label` to every
+  human-readable text prop; left code/identifier props non-translatable (CodeBlock filename+code,
+  ApiParam name+paramType). NO number/boolean/select added — markup binds only `{{slot}}` text, so
+  config fields would be dead editor metadata. Markup UNCHANGED. Extended `scripts/docs-kit.test.mjs`
+  with a `parsePropsSchema` regression test (field-type vocab + translatable assertions).
+- **Verified:** `npx tsc --noEmit` clean; `node --test scripts/docs-kit.test.mjs` 6/6;
+  `npx opennextjs-cloudflare build` green (dev port 3601 free).
+- **Files:** CMS/src/lib/components/docs-kit.ts, CMS/scripts/docs-kit.test.mjs

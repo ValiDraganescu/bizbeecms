@@ -76,9 +76,17 @@ export function docsKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        title: { type: "string", default: "Getting started" },
+        title: {
+          type: "string",
+          required: true,
+          translatable: true,
+          label: "Title",
+          default: "Getting started",
+        },
         lead: {
           type: "string",
+          translatable: true,
+          label: "Lead paragraph",
           default: "Everything you need to know to begin, in a few short minutes.",
         },
       }),
@@ -111,9 +119,18 @@ export function docsKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        label: { type: "string", default: "Note" },
+        label: {
+          type: "string",
+          required: true,
+          translatable: true,
+          label: "Label",
+          default: "Note",
+        },
         body: {
           type: "string",
+          required: true,
+          translatable: true,
+          label: "Body",
           default: "A short, helpful aside that highlights something worth knowing.",
         },
       }),
@@ -156,8 +173,9 @@ export function docsKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        filename: { type: "string", default: "example.sh" },
-        code: { type: "richtext", default: "npm install bizbeecms" },
+        // filename/code are literal source, not prose → NOT translatable.
+        filename: { type: "string", required: true, label: "Filename", default: "example.sh" },
+        code: { type: "richtext", required: true, label: "Code", default: "npm install bizbeecms" },
       }),
     }),
 
@@ -241,13 +259,13 @@ export function docsKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        heading: { type: "string", default: "How it works" },
-        step1Title: { type: "string", default: "1. Install" },
-        step1Body: { type: "string", default: "Add the package to your project." },
-        step2Title: { type: "string", default: "2. Configure" },
-        step2Body: { type: "string", default: "Set up your options once." },
-        step3Title: { type: "string", default: "3. Ship" },
-        step3Body: { type: "string", default: "Deploy and you are done." },
+        heading: { type: "string", required: true, translatable: true, label: "Heading", default: "How it works" },
+        step1Title: { type: "string", required: true, translatable: true, label: "Step 1 title", default: "1. Install" },
+        step1Body: { type: "string", translatable: true, label: "Step 1 body", default: "Add the package to your project." },
+        step2Title: { type: "string", required: true, translatable: true, label: "Step 2 title", default: "2. Configure" },
+        step2Body: { type: "string", translatable: true, label: "Step 2 body", default: "Set up your options once." },
+        step3Title: { type: "string", required: true, translatable: true, label: "Step 3 title", default: "3. Ship" },
+        step3Body: { type: "string", translatable: true, label: "Step 3 body", default: "Deploy and you are done." },
       }),
     }),
 
@@ -293,10 +311,14 @@ export function docsKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        name: { type: "string", default: "apiKey" },
-        paramType: { type: "string", default: "string" },
+        // name/paramType are code identifiers/type literals → NOT translatable.
+        name: { type: "string", required: true, label: "Parameter name", default: "apiKey" },
+        paramType: { type: "string", required: true, label: "Type", default: "string" },
         description: {
           type: "string",
+          required: true,
+          translatable: true,
+          label: "Description",
           default: "What this parameter controls and when to use it.",
         },
       }),

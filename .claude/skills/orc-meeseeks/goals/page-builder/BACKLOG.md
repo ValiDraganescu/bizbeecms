@@ -138,11 +138,18 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `scripts/landing-kit.test.mjs` (+1 test, 6/6) asserting field-type vocab + Hero.headline req+translatable,
   Hero.ctaHref NOT translatable, FeatureGrid.feature1Title + SiteFooter.tagline req+translatable. tsc +
   opennext build green. PM bundle NOT owed (editor metadata, no render change).
-- TODO: **Upgrade DOCS kit component schemas to the richer vocab** (`lib/components/docs-kit.ts`:
-  DocsHeader, Callout, CodeBlock, StepList, ApiParam, + the 6th). Same as the blog/landing tasks — enrich
-  each propsSchema (e.g. Callout variant=select, ApiParam required=boolean), **`translatable:true` on text
-  props** (header title, callout body, step text, param description), markup unchanged. Depends on
-  the FOUNDATION task. Parallelizable. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
+- DONE (2026-06-19): **Upgrade DOCS kit component schemas to the richer vocab** (`lib/components/docs-kit.ts`:
+  DocsHeader, Callout, CodeBlock, StepList, ApiParam — only 5 components, the "6th" in the hint didn't exist).
+  Enriched each propsSchema descriptor (kept bizbee's object-keyed shape): `required:true`+`translatable:true`+
+  `label` on each human-readable text prop (DocsHeader title[req]/lead, Callout label[req]/body[req], StepList
+  heading[req]+step{1,2,3}Title[req]/Body, ApiParam description[req]). NON-translatable (code/identifiers, not
+  prose): CodeBlock filename[req]/code[richtext,req], ApiParam name[req]/paramType[req]. NO number/boolean/select
+  added: the markup binds only `{{slot}}` text — there is no `{{variant}}`/`{{required}}` slot, so a Callout
+  select / ApiParam boolean would be dead editor metadata (CAVEATS). Markup UNCHANGED. Extended
+  `scripts/docs-kit.test.mjs` (+1 test) asserting every prop parses to a known field type, title=req+translatable,
+  callout body translatable, code=richtext+NOT translatable, ApiParam name/paramType NOT translatable,
+  description translatable → 6/6 green. tsc + opennext build green. PM bundle:cms NOT owed (editor metadata,
+  no render change) — bundle still stale from the column-model render run per CAVEATS.
 - DONE (2026-06-19): **Make Save PERSIST — register reserved Section as a renderer primitive.**
   `SECTION_COMPONENT` now lives in `lib/render/tree.ts` (single source); `validateBlocks` deletes it
   from `componentNames` so the block PUT route's `missingComponents` no longer 409s on a page with
