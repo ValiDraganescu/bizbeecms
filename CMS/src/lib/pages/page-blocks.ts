@@ -235,3 +235,87 @@ function uniqueBlockId(component: string, existing: Block[]): string {
     if (!taken.has(id)) return id;
   }
 }
+
+// ── Section-aware editing (page-builder visual editor) ──────────────────────
+//
+// The visual builder composes a page as a list of SECTIONS, and into each
+// Section it drops COMPONENT blocks (the aicms page-builder-v2 model). A Section
+// is just a top-level `Block` whose `component` is the reserved name below, with
+// its dropped components living in `children`. This reuses the existing Block
+// tree (no new block pipeline) — the same shape the Layers panel will render and
+// the same `validateBlocks`/`setPageBlocks` REST persists. The id collision check
+// in `uniqueBlockId` is scoped per-list, so children get ids unique within their
+// section; that's fine for rendering but page-wide uniqueness is enforced at
+// persist time by `validateBlocks` (it rejects duplicate ids across the whole
+// tree) — see `uniqueIdAcrossTree` below which keeps the editor in step.
+
+/** The reserved component name for a layout Section block. */
+export const SECTION_COMPONENT = "Section";
+
+/** True if a block is a layout Section (holds dropped components in children). */
+export function isSection(block: Block): boolean {
+  return block.component === SECTION_COMPONENT;
+}
+
+/** All ids used anywhere in the tree (top-level + nested children). */
+function allIds(blocks: Block[], into: Set<string> = new Set()): Set<string> {
+  for (const b of blocks) {
+    into.add(b.id);
+    if (b.children) allIds(b.children, into);
+  }
+  return into;
+}
+
+/** A block id unique across the WHOLE tree, derived from the component name. */
+function uniqueIdAcrossTree(component: string, tree: Block[]): string {
+  const base = component.replace(/[^a-zA-Z0-9]/g, "").slice(0, 24) || "block";
+  const taken = allIds(tree);
+  for (let n = 1; ; n++) {
+    const id = `${base}-${n}`;
+    if (!taken.has(id)) return id;
+  }
+}
+
+/** Append a new empty Section to the page (immutable). Returns the new tree. */
+export function addSection(blocks: Block[]): Block[] {
+  const section: Block = {
+    id: uniqueIdAcrossTree(SECTION_COMPONENT, blocks),
+    component: SECTION_COMPONENT,
+    children: [],
+  };
+  return [...blocks, section];
+}
+
+/**
+ * Append a component block into the Section with id `sectionId` (immutable).
+ * No-op (returns the tree unchanged) if the id isn't a Section. The new child
+ * gets an id unique across the whole tree.
+ */
+export function addComponentToSection(
+  blocks: Block[],
+  sectionId: string,
+  component: string,
+): Block[] {
+  const child: Block = { id: uniqueIdAcrossTree(component, blocks), component };
+  return blocks.map((b) =>
+    b.id === sectionId && isSection(b)
+      ? { ...b, children: [...(b.children ?? []), child] }
+      : b,
+  );
+}
+
+/**
+ * The Section to insert into when the operator clicks a rail component: the
+ * explicitly-selected one if it's a Section, else the LAST section on the page,
+ * else null (caller should add a Section first). PURE.
+ */
+export function targetSectionId(blocks: Block[], selectedId: string | null): string | null {
+  if (selectedId) {
+    const sel = blocks.find((b) => b.id === selectedId);
+    if (sel && isSection(sel)) return sel.id;
+  }
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    if (isSection(blocks[i])) return blocks[i].id;
+  }
+  return null;
+}

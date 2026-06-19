@@ -31,6 +31,13 @@ import {
 import type { PageSummary } from "@/db/page-store";
 import { filterGroups } from "@/lib/components/rail-filter";
 import type { ComponentGroup } from "@/lib/components/grouped";
+import {
+  addSection,
+  addComponentToSection,
+  isSection,
+  targetSectionId,
+} from "@/lib/pages/page-blocks";
+import type { Block } from "@/lib/render/tree";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 type CenterTab = "layers" | "preview";
@@ -93,6 +100,70 @@ export function PageBuilderShell() {
   // Components rail: the Site's kit/component groups + the search query.
   const [groups, setGroups] = useState<ComponentGroup[]>([]);
   const [search, setSearch] = useState("");
+
+  // The selected page's block tree (sections + their dropped components) and the
+  // currently-selected node id (drives which section a rail click drops into and,
+  // later, the right rail). Loaded from / persisted to the C3 block REST.
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Load the selected page's blocks (or reset when nothing is selected).
+  useEffect(() => {
+    if (!selected) {
+      setBlocks([]);
+      setSelectedBlockId(null);
+      setDirty(false);
+      return;
+    }
+    let live = true;
+    void (async () => {
+      const res = await fetch(`/api/pages/${selected.id}/blocks`);
+      if (!live) return;
+      if (res.ok) {
+        const body = (await res.json()) as { blocks?: Block[] };
+        setBlocks(body.blocks ?? []);
+      } else {
+        setBlocks([]);
+      }
+      setSelectedBlockId(null);
+      setDirty(false);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [selected]);
+
+  function onAddSection() {
+    setBlocks((b) => addSection(b));
+    setDirty(true);
+  }
+
+  // Drop a rail component into the selected section (or the last one). Returns
+  // false if there's no section yet so the caller can prompt to add one.
+  function onInsertComponent(component: string): boolean {
+    const target = targetSectionId(blocks, selectedBlockId);
+    if (!target) return false;
+    setBlocks((b) => addComponentToSection(b, target, component));
+    setDirty(true);
+    return true;
+  }
+
+  async function onSave() {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/pages/${selected.id}/blocks`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blocks }),
+      });
+      if (res.ok) setDirty(false);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     let live = true;
@@ -207,10 +278,11 @@ export function PageBuilderShell() {
           </button>
           <button
             type="button"
-            disabled
+            onClick={() => void onSave()}
+            disabled={!selected || !dirty || saving}
             className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
-            {t("save")}
+            {saving ? t("saving") : t("save")}
           </button>
         </div>
       </header>
@@ -232,7 +304,13 @@ export function PageBuilderShell() {
               className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-foreground-muted"
             />
           </div>
-          <ComponentsRail groups={groups} search={search} />
+          <ComponentsRail
+            groups={groups}
+            search={search}
+            canEdit={!!selected}
+            onAddSection={onAddSection}
+            onInsertComponent={onInsertComponent}
+          />
         </aside>
 
         {/* CENTER — Layers / Preview */}
@@ -261,18 +339,31 @@ export function PageBuilderShell() {
             {/* Layers */}
             <div
               className={
-                "absolute inset-0 flex items-center justify-center p-6 " +
+                "absolute inset-0 overflow-y-auto p-6 " +
                 (centerTab === "layers" ? "" : "hidden")
               }
             >
-              <div className="max-w-sm text-center">
-                <p className="text-lg font-medium text-foreground">
-                  {selected ? selected.path : t("title")}
-                </p>
-                <p className="mt-1 text-sm text-foreground-muted">
-                  {selected ? t("layersEmpty") : t("emptyCanvas")}
-                </p>
-              </div>
+              {!selected ? (
+                <div className="flex h-full items-center justify-center">
+                  <div className="max-w-sm text-center">
+                    <p className="text-lg font-medium text-foreground">{t("title")}</p>
+                    <p className="mt-1 text-sm text-foreground-muted">{t("emptyCanvas")}</p>
+                  </div>
+                </div>
+              ) : blocks.length === 0 ? (
+                <div className="flex h-full items-center justify-center">
+                  <div className="max-w-sm text-center">
+                    <p className="text-lg font-medium text-foreground">{selected.path}</p>
+                    <p className="mt-1 text-sm text-foreground-muted">{t("layersEmpty")}</p>
+                  </div>
+                </div>
+              ) : (
+                <LayersTree
+                  blocks={blocks}
+                  selectedId={selectedBlockId}
+                  onSelect={setSelectedBlockId}
+                />
+              )}
             </div>
 
             {/* Preview */}
@@ -359,21 +450,34 @@ export function PageBuilderShell() {
  * expandable header (kit display name or the "individually-imported" bucket)
  * listing its component names, filtered live by the search box.
  *
- * Insert-into-Section is a SEPARATE slice (needs the page block-tree store);
- * clicking a component does nothing yet — items are presented draggable-styled.
+ * Clicking the LAYOUT "Section" adds a Section to the page; clicking a component
+ * inserts it into the selected (or last) Section. Both are inert until a page is
+ * selected (`canEdit`).
  *
  * ponytail: groups expanded by default (small lists); collapse state is local
- * useState keyed by group label. Insert wiring deferred — see backlog.
+ * useState keyed by group label. Click-to-insert only this slice; drag is later.
  */
 function ComponentsRail({
   groups,
   search,
+  canEdit,
+  onAddSection,
+  onInsertComponent,
 }: {
   groups: ComponentGroup[];
   search: string;
+  canEdit: boolean;
+  onAddSection: () => void;
+  onInsertComponent: (component: string) => boolean;
 }) {
   const t = useTranslations("pageBuilder");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [hint, setHint] = useState<string | null>(null);
+
+  function insert(component: string) {
+    if (onInsertComponent(component)) setHint(null);
+    else setHint(t("addSectionFirst"));
+  }
 
   const visible = filterGroups(groups, search);
 
@@ -388,14 +492,26 @@ function ComponentsRail({
 
   return (
     <div className="flex-1 space-y-4 overflow-y-auto p-3">
+      {hint && (
+        <p role="status" className="rounded-md bg-surface-muted px-3 py-2 text-xs text-foreground-muted">
+          {hint}
+        </p>
+      )}
       {/* LAYOUT — the Section primitive (always present). */}
       <div>
         <p className="px-1 font-mono text-[11px] uppercase tracking-wide text-foreground-muted">
           {t("categoryLayout")}
         </p>
         <ul className="mt-1.5 space-y-1">
-          <li className="cursor-grab rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground">
-            {t("layoutSection")}
+          <li>
+            <button
+              type="button"
+              disabled={!canEdit}
+              onClick={onAddSection}
+              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t("layoutSection")}
+            </button>
           </li>
         </ul>
       </div>
@@ -432,11 +548,15 @@ function ComponentsRail({
                   {!isCollapsed && (
                     <ul className="mt-1 space-y-1">
                       {g.components.map((name) => (
-                        <li
-                          key={name}
-                          className="cursor-grab rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground"
-                        >
-                          {name}
+                        <li key={name}>
+                          <button
+                            type="button"
+                            disabled={!canEdit}
+                            onClick={() => insert(name)}
+                            className="w-full rounded-md border border-border bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {name}
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -610,5 +730,62 @@ function PagePicker({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Center Layers tree: the selected page's Sections and, nested under each, the
+ * component blocks dropped into it. Selecting a node sets the builder's selected
+ * block (which a rail click then inserts into, and a later slice's right rail
+ * reads). This renders the SAME `Block[]` shape the C3 block REST persists, so
+ * the Center "Layers ⟷ Preview" task can reuse it. ponytail: two fixed levels
+ * (section → component) — matches the section model; deeper nesting isn't a thing
+ * the editor exposes yet.
+ */
+function LayersTree({
+  blocks,
+  selectedId,
+  onSelect,
+}: {
+  blocks: Block[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const t = useTranslations("pageBuilder");
+
+  function nodeClass(id: string): string {
+    return (
+      "w-full rounded-md border px-3 py-2 text-left text-sm transition-colors " +
+      (selectedId === id
+        ? "border-primary bg-primary-subtle text-foreground"
+        : "border-border bg-surface text-foreground hover:bg-surface-muted")
+    );
+  }
+
+  return (
+    <ul className="mx-auto max-w-xl space-y-2">
+      {blocks.map((b, i) => (
+        <li key={b.id}>
+          <button type="button" onClick={() => onSelect(b.id)} className={nodeClass(b.id)}>
+            {isSection(b) ? `${t("layoutSection")} ${i + 1}` : b.component}
+          </button>
+          {isSection(b) && (b.children?.length ?? 0) > 0 && (
+            <ul className="mt-2 space-y-2 border-l border-border pl-4">
+              {b.children!.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => onSelect(c.id)}
+                    className={nodeClass(c.id)}
+                  >
+                    {c.component}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }

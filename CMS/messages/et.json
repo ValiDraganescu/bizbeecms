@@ -298,6 +298,8 @@
     },
     "blockEmpty": "Atribuutide muutmiseks vali plokk Kihtide paneelist.",
     "pageEmpty": "Lehe sätted ilmuvad siia, kui leht on valitud.",
-    "seoEmpty": "SEO sätted ilmuvad siia, kui leht on valitud."
+    "seoEmpty": "SEO sätted ilmuvad siia, kui leht on valitud.",
+    "saving": "Salvestamine…",
+    "addSectionFirst": "Lisa esmalt sektsioon ja seejärel lohista komponendid sinna."
   }
 }

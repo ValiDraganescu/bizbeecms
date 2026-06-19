@@ -298,6 +298,8 @@
     },
     "blockEmpty": "Valitse lohko Tasot-paneelista muokataksesi sen ominaisuuksia.",
     "pageEmpty": "Sivun asetukset näkyvät täällä, kun sivu on valittu.",
-    "seoEmpty": "SEO-asetukset näkyvät täällä, kun sivu on valittu."
+    "seoEmpty": "SEO-asetukset näkyvät täällä, kun sivu on valittu.",
+    "saving": "Tallennetaan…",
+    "addSectionFirst": "Lisää ensin osio ja pudota sitten komponentit siihen."
   }
 }

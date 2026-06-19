@@ -311,7 +311,21 @@
       "apexUseA": "Apex domain (no subdomain) — can't use a CNAME, so use these A records:",
       "showValidation": "Show validation records",
       "txtAdd": "Add this TXT record (one is enough; add all if your provider allows):",
-      "certIssued": "No validation record needed — the certificate is issued."
+      "certIssued": "No validation record needed — the certificate is issued.",
+      "guide": {
+        "heading": "Setting up a custom domain",
+        "intro": "The customer adds a DNS record at their registrar that points their domain at us. Pick the path that matches the domain they want to use.",
+        "cnameTitle": "Subdomain via CNAME (recommended)",
+        "cnameBody": "For a subdomain such as www, add a CNAME pointing it at our router:",
+        "apexRedirect": "An apex (bare) domain can't be a CNAME, so redirect the apex (e.g. example.com → www.example.com) with a 301 at the registrar or a Cloudflare redirect rule.",
+        "apexTitle": "Apex domain via A records",
+        "apexBody": "To serve the bare apex directly (no redirect), add both A records to Cloudflare's anycast IPs:",
+        "moreTitle": "Other options",
+        "moreFlatten": "Apex CNAME / CNAME flattening (ALIAS/ANAME): registrars like Cloudflare Registrar or Namecheap let the apex CNAME to cf.bizbeecms.com directly — use it instead of A records when available.",
+        "moreAAAA": "AAAA records: optional IPv6 addresses alongside the A records; Cloudflare's anycast already answers over IPv6, so they are not required.",
+        "moreDcv": "Certificate validation (DCV): after the domain is added we show a one-time TXT record to prove control. Providers that support DCV delegation can instead delegate via a _acme-challenge CNAME so renewals are automatic.",
+        "certNote": "Once the record resolves to us, Cloudflare issues and renews the HTTPS certificate automatically."
+      }
     }
   },
   "designSystem": {

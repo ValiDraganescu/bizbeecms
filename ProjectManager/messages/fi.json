@@ -311,7 +311,21 @@
       "apexUseA": "Juuriverkkotunnus (ei alidomeenia) — ei voi käyttää CNAME-tietuetta, käytä näitä A-tietueita:",
       "showValidation": "Näytä vahvistustietueet",
       "txtAdd": "Lisää tämä TXT-tietue (yksi riittää; lisää kaikki jos palveluntarjoaja sallii):",
-      "certIssued": "Vahvistustietuetta ei tarvita — varmenne on myönnetty."
+      "certIssued": "Vahvistustietuetta ei tarvita — varmenne on myönnetty.",
+      "guide": {
+        "heading": "Oman verkkotunnuksen määritys",
+        "intro": "Asiakas lisää rekisteröijällään DNS-tietueen, joka osoittaa verkkotunnuksen meille. Valitse polku sen mukaan, mitä verkkotunnusta hän haluaa käyttää.",
+        "cnameTitle": "Aliverkkotunnus CNAME:lla (suositus)",
+        "cnameBody": "Aliverkkotunnukselle, kuten www, lisää CNAME joka osoittaa reitittimeemme:",
+        "apexRedirect": "Juuriverkkotunnus (ilman aliosaa) ei voi olla CNAME, joten ohjaa juuri (esim. example.com → www.example.com) 301-uudelleenohjauksella rekisteröijällä tai Cloudflaren uudelleenohjaussäännöllä.",
+        "apexTitle": "Juuriverkkotunnus A-tietueilla",
+        "apexBody": "Jos haluat tarjota juuriverkkotunnuksen suoraan (ilman ohjausta), lisää molemmat A-tietueet Cloudflaren anycast-IP-osoitteisiin:",
+        "moreTitle": "Muut vaihtoehdot",
+        "moreFlatten": "Juuren CNAME / CNAME-litistys (ALIAS/ANAME): rekisteröijät kuten Cloudflare Registrar tai Namecheap sallivat juuren CNAME-osoituksen suoraan osoitteeseen cf.bizbeecms.com — käytä sitä A-tietueiden sijaan, kun se on mahdollista.",
+        "moreAAAA": "AAAA-tietueet: valinnaiset IPv6-osoitteet A-tietueiden rinnalle; Cloudflaren anycast vastaa jo IPv6:lla, joten niitä ei vaadita.",
+        "moreDcv": "Varmenteen vahvistus (DCV): kun verkkotunnus on lisätty, näytämme kertaluonteisen TXT-tietueen hallinnan todistamiseksi. DCV-delegointia tukevat palveluntarjoajat voivat delegoida _acme-challenge CNAME:lla, jolloin uusiminen on automaattista.",
+        "certNote": "Kun tietue osoittaa meille, Cloudflare myöntää ja uusii HTTPS-varmenteen automaattisesti."
+      }
     }
   },
   "designSystem": {

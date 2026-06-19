@@ -298,6 +298,8 @@
     },
     "blockEmpty": "Select a block in the Layers panel to edit its properties.",
     "pageEmpty": "Page settings appear here once a page is selected.",
-    "seoEmpty": "SEO settings appear here once a page is selected."
+    "seoEmpty": "SEO settings appear here once a page is selected.",
+    "saving": "Saving…",
+    "addSectionFirst": "Add a Section first, then drop components into it."
   }
 }
