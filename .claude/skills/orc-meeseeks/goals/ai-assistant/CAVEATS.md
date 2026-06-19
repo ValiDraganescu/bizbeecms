@@ -67,3 +67,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   full toolset). The full-page `/admin/chat` sends no context → general, behavior unchanged. The
   widget sends its page context (read fresh per `send` so navigating mid-chat re-scopes). Do NOT add
   `context` to `parseChatBody` (that's the strict messages contract); keep it separate/optional.
+
+- STORES LIVE AT `CMS/src/db/` (NOT `src/lib/db/`). The chat tools import them via the `@/db/*` alias
+  (`@/db/component-store`, `@/db/page-store`, `@/db/settings-store`, `@/db/translate-store`,
+  `@/db/asset-store`). Pure tool modules (read-tools.ts, *-tool.ts) must NOT import stores or @/ —
+  they stay node-testable; the ROUTE imports the stores and the pure module only shapes/validates.
+
+- Slice 3 part 1 (read tools) DONE: `read-tools.ts` holds 7 read schemas + `coerceIdArg`,
+  `formatComponentList`, `formatPageList`. Backing store fns confirmed to exist: component-store
+  `listComponents`/`getComponentByName`; page-store `listPages`/`getPageById` (PageSummary, no blocks —
+  metadata only); settings-store `getContentLocales`/`getSiteIdentity`/`getThemeOverrides`/
+  `getThemeOverridesDark`. For WRITE tools (part 2): page-store `setPageBlocks`/`upsertPageMeta`,
+  component-store `upsertComponent`, settings-store `setSiteIdentity` (normalizes)/`setThemeOverrides[Dark]`
+  (normalize to known tokens + safe colors = the trust gate, pass model map straight in).

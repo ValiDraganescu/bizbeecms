@@ -74,3 +74,36 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/chat/route.ts (context wiring), CMS/src/components/chat/chat-conversation.tsx
   (useChat getContext + body), CMS/src/components/chat/chat-widget.tsx (usePathname → context),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-19 20:31 — Slice 3 (part 1): port the read-only CMS-structural tools
+- **Status:** DONE
+- **What I did:** Added the DISCOVERY tools the assistant lacked so it can UPDATE
+  (not just CREATE) — each backed by an EXISTING store, ZERO data-corruption risk:
+  - New PURE module `CMS/src/lib/chat/read-tools.ts` (node-testable, no @/ imports):
+    7 tool schemas — `list_components`, `get_component`, `list_pages`, `get_page`,
+    `list_locales`, `get_brand_identity`, `get_theme` — plus pure helpers
+    `coerceIdArg(args,key)` (trim/validate `name`/`id` model args),
+    `formatComponentList` (rows → `{name,hasProps}`), `formatPageList` (rows →
+    compact summary + sorted locale-union of metaTitle/metaDescription keys).
+  - Wired `api/chat/route.ts`: imported the 7 schemas + `listComponents`,
+    `getComponentByName`, `listPages`, `getPageById`, `getThemeOverrides`,
+    `getThemeOverridesDark`; added all 7 to `TOOL_BY_NAME`; added 7 `else-if`
+    dispatch branches in `runTools` + 7 read-only handlers (no untrusted artifact;
+    missing name/id → ok:false, not-found → ok:false, never throws into the stream).
+  - Registered in `lib/chat/tool-scopes.ts`: added all 7 to `KNOWN_TOOL_NAMES`,
+    slotted them into the right `TOOLS_BY_CONTEXT` entries (page-builder + components
+    get discovery; pages get list/get_page + list_locales; SETTINGS now reads
+    brand/theme/locales + translate — no create tools), and updated the per-context
+    prompts to "discover first, then author / re-author by same name to update".
+  - WRITE tools (update_component, update_page_blocks, update_brand_identity,
+    update_theme) DEFERRED to Slice 3 part 2 — they carry untrusted artifacts needing
+    create_*-grade validation; not riding along with these zero-risk reads.
+- **Verified:** `node --test scripts/read-tools.test.mjs scripts/tool-scopes.test.mjs`
+  12/12 pass (stale Slice-2 tool-list assertions updated to the new scopes). `tsc
+  --noEmit` clean. `opennextjs-cloudflare build` green. Regenerated PM cms-bundle +
+  selfcheck passed (only the standing static-assets live-deploy warning). NOT verified
+  (HITL): live model actually calling these tools needs a real AI binding + D1 + browser.
+- **Files:** CMS/src/lib/chat/read-tools.ts (new), CMS/scripts/read-tools.test.mjs (new),
+  CMS/src/app/api/chat/route.ts (imports+dispatch+handlers), CMS/src/lib/chat/tool-scopes.ts
+  (KNOWN_TOOL_NAMES + scopes + prompts), CMS/scripts/tool-scopes.test.mjs (assertions),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).

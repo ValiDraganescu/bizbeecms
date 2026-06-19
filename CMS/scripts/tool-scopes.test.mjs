@@ -66,15 +66,20 @@ test("toolsForContext only ever returns EXISTING tool names", () => {
   }
 });
 
-test("toolsForContext scopes per page", () => {
-  assert.deepEqual([...toolsForContext("page-builder")], [
-    "create_component",
-    "create_page",
-    "list_assets",
-  ]);
-  assert.deepEqual([...toolsForContext("components")], ["create_component", "list_assets"]);
-  assert.deepEqual([...toolsForContext("settings")], ["translate"]);
+test("toolsForContext scopes per page (write + Slice 3 read tools)", () => {
+  // page-builder can both author and discover.
+  const pb = new Set(toolsForContext("page-builder"));
+  for (const n of ["create_component", "create_page", "list_components", "get_page"]) {
+    assert.ok(pb.has(n), `page-builder should expose ${n}`);
+  }
+  // media stays read-only-to-assets (unchanged).
   assert.deepEqual([...toolsForContext("media")], ["list_assets"]);
+  // settings reads brand/theme/locales + translate (no create tools).
+  const settings = new Set(toolsForContext("settings"));
+  for (const n of ["translate", "list_locales", "get_brand_identity", "get_theme"]) {
+    assert.ok(settings.has(n), `settings should expose ${n}`);
+  }
+  assert.ok(!settings.has("create_component"), "settings must NOT author components");
   // general gets the full catalog.
   assert.deepEqual([...toolsForContext("general")].sort(), [...KNOWN_TOOL_NAMES].sort());
 });

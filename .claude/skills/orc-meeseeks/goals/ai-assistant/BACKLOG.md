@@ -36,13 +36,21 @@ Task states: TODO | DOING | DONE | BLOCKED.
   helpers (`detectAdminContext`, `toolsForContext`, `contextPrompt`) with node tests. ONLY wire contexts
   whose tools already have backends (see CAVEATS — start with what exists: components, pages, settings).
   Gate: CMS tsc + opennext build green; regen PM cms-bundle. EN/FI/ET.
-- TODO: **Slice 3 — port the missing CMS-structural tools (one PR's worth).** Add the tools bizbee lacks
-  but has backends for, so the scoped contexts are useful: `update_page_blocks`, `list_pages`, `get_page`,
-  `list_builtin_types` (page-builder); `update_component`, `get_component`, `list_components` (components);
-  `get_brand_identity`/`update_brand_identity`, `get_theme`/`update_theme`, `list_locales` (settings).
-  Each tool calls the EXISTING store/REST (reuse page-store/component-store/settings-store; do NOT fork
-  data paths). Skip any tool whose backend doesn't exist yet (note it). Add a node test per new tool's
-  arg-validation/execution shape (mock the store). Gate: CMS tsc + opennext build green; regen PM cms-bundle.
+- DONE: **Slice 3 part 1 — read-only discovery tools.** Added `list_components`, `get_component`,
+  `list_pages`, `get_page`, `list_locales`, `get_brand_identity`, `get_theme` (new pure
+  `lib/chat/read-tools.ts` + route dispatch/handlers + tool-scopes registration). Each backed by an
+  existing store (listComponents/getComponentByName/listPages/getPageById/getContentLocales/
+  getSiteIdentity/getThemeOverrides[Dark]). Settings context now reads brand/theme/locales; page-builder +
+  components + pages contexts gained discovery. Node tests (read-tools 4 + tool-scopes refreshed). Gates green.
+- TODO: **Slice 3 part 2 — the WRITE tools (untrusted artifacts, validate like create_*).**
+  `update_component` (reuse `upsertComponent` + `validateComponentArtifact` — same name updates already),
+  `update_page_blocks` (`setPageBlocks` — validate the block tree like create_page does; check the block
+  shape validator), `update_brand_identity` (`setSiteIdentity` — it normalizes; still validate shape),
+  `update_theme` (`setThemeOverrides`/`setThemeOverridesDark` — they normalize to known tokens + safe
+  colors; pass the model's map straight in, they're the trust gate). Also `list_builtin_types` IF a
+  builtin/block-type registry exists (CHECK `listComponentPalette` / page-store — verify before exposing).
+  Each: validator + route handler + register in KNOWN_TOOL_NAMES/TOOLS_BY_CONTEXT/TOOL_BY_NAME (all three).
+  Node test per tool's arg-validation. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
 - TODO: **Slice 4 — debug panel + model picker + conversation history.** Widget gets: a DEBUG view showing
   the assembled system prompt + the active tool list for the current context (aicms `debug_panel.tsx`); a
   MODEL PICKER (the model list source — confirm whether to expose Cloudflare AI / gateway models; coordinate

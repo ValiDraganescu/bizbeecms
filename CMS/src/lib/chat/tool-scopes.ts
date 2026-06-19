@@ -39,6 +39,14 @@ export const KNOWN_TOOL_NAMES = [
   "create_page",
   "translate",
   "list_assets",
+  // Slice 3 read-only discovery tools.
+  "list_components",
+  "get_component",
+  "list_pages",
+  "get_page",
+  "list_locales",
+  "get_brand_identity",
+  "get_theme",
 ] as const;
 export type ToolName = (typeof KNOWN_TOOL_NAMES)[number];
 
@@ -85,15 +93,31 @@ export function isAdminContext(v: unknown): v is AdminPageContext {
  * everything (the assistant on a non-builder page can still do anything).
  */
 const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
-  // Building pages: author components, compose pages, reference media.
-  "page-builder": ["create_component", "create_page", "list_assets"],
-  // Component playground: just author/reference components + media.
-  components: ["create_component", "list_assets"],
-  // Pages list: compose pages from components, translate page content.
-  pages: ["create_page", "translate", "list_assets"],
-  // Settings: content-locale translation is the only existing settings-ish tool;
-  // brand/theme tools land in Slice 3.
-  settings: ["translate"],
+  // Building pages: discover then author components + pages, see brand/theme + media.
+  "page-builder": [
+    "create_component",
+    "create_page",
+    "list_assets",
+    "list_components",
+    "get_component",
+    "list_pages",
+    "get_page",
+    "get_brand_identity",
+    "get_theme",
+  ],
+  // Component playground: discover + author components, see brand/theme + media.
+  components: [
+    "create_component",
+    "list_assets",
+    "list_components",
+    "get_component",
+    "get_brand_identity",
+    "get_theme",
+  ],
+  // Pages list: discover pages, compose + translate them, reference media.
+  pages: ["create_page", "translate", "list_assets", "list_pages", "get_page", "list_locales"],
+  // Settings: read brand/theme/locales + translate content into the site's locales.
+  settings: ["translate", "list_locales", "get_brand_identity", "get_theme"],
   // Media library: list assets (upload/serve UI is separate).
   media: ["list_assets"],
   // Anywhere else: full toolset.
@@ -108,13 +132,13 @@ export function toolsForContext(context: AdminPageContext): readonly ToolName[] 
 // ── Per-context system-prompt addition ────────────────────────────────────────
 
 const CONTEXT_PROMPTS: Record<AdminPageContext, string> = {
-  "page-builder": `You are in the Page Builder. Help the operator build and modify pages: author reusable components (create_component) and compose them into pages (create_page). Always create the components a page needs BEFORE create_page. Reference real uploaded media via list_assets.`,
+  "page-builder": `You are in the Page Builder. First DISCOVER what exists (list_components, get_component, list_pages, get_page) and match the brand/palette (get_brand_identity, get_theme). Then author reusable components (create_component) and compose them into pages (create_page). Re-author an existing component under its same name to UPDATE it. Always create the components a page needs BEFORE create_page. Reference real uploaded media via list_assets.`,
 
-  components: `You are in the Component library. Help the operator author and refine reusable UI components with create_component. Reference real uploaded media via list_assets.`,
+  components: `You are in the Component library. DISCOVER existing components first (list_components, get_component) — re-author an existing name to update it instead of duplicating. Match the brand/palette (get_brand_identity, get_theme). Author/refine components with create_component. Reference real uploaded media via list_assets.`,
 
-  pages: `You are on the Pages list. Help the operator compose pages from existing components (create_page) and translate page content into the site's other content locales (translate).`,
+  pages: `You are on the Pages list. DISCOVER existing pages first (list_pages, get_page). Compose pages from existing components (create_page) and translate page content into the site's other content locales (translate); check list_locales for the target locales.`,
 
-  settings: `You are on the Settings page. Help the operator configure the site. You can translate existing content into the site's other content locales (translate). Brand identity and theme are edited in the settings forms.`,
+  settings: `You are on the Settings page. Read the current configuration (get_brand_identity, get_theme, list_locales) before advising. You can translate existing content into the site's content locales (translate). Brand identity and theme are edited in the settings forms.`,
 
   media: `You are in the Media library. Help the operator find and reference uploaded assets (list_assets) by their /media/<key> URLs.`,
 

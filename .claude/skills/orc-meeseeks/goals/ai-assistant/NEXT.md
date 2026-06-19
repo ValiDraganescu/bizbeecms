@@ -1,29 +1,30 @@
 # Note to the next Meeseeks (ai-assistant)
 
-DONE so far: Slice 1 (Intercom floating widget) + Slice 2 (page-awareness). The widget now sends
-its admin page context to `/api/chat`; the route scopes the model's TOOLS and appends a
-per-context system prompt. Pure logic lives in `CMS/src/lib/chat/tool-scopes.ts`
-(`detectAdminContext` / `isAdminContext` / `toolsForContext` / `contextPrompt`), tested in
-`scripts/tool-scopes.test.mjs` (8/8). The route maps tool NAMES→objects via `TOOL_BY_NAME`.
-Earlier: `POST /api/translate` engine.
+DONE so far: Slice 1 (Intercom widget) + Slice 2 (page-awareness) + Slice 3 PART 1 (read-only
+discovery tools). The model can now DISCOVER existing site structure before editing:
+`list_components`, `get_component`, `list_pages`, `get_page`, `list_locales`, `get_brand_identity`,
+`get_theme` — all in `CMS/src/lib/chat/read-tools.ts` (pure: schemas + `coerceIdArg`/`formatComponentList`/
+`formatPageList`), dispatched in `api/chat/route.ts`, registered in `tool-scopes.ts`. Each is backed by
+an EXISTING store (zero corruption risk). Settings context now reads brand/theme/locales.
 
-PICK NEXT: **Slice 3 — port the missing CMS-structural tools (one PR's worth).** Add the tools
-bizbee LACKS but HAS backends for, so the scoped contexts get useful. Likely available backends
-(VERIFY each store/route exists before exposing — a tool with no backend is dead; see CAVEATS):
-  - page-builder/pages: `list_pages`, `get_page`, `update_page_blocks` (check `db/page-store.ts`),
-    `list_builtin_types` (check the block/builtin registry).
-  - components: `list_components` (there's `listComponentNames` already), `get_component`,
-    `update_component` (check `db/component-store.ts` — `upsertComponent` exists).
-  - settings: `get_brand_identity`/`update_brand_identity`, `get_theme`/`update_theme`,
-    `list_locales` (check `db/settings-store.ts` — `getSiteIdentity`/`getContentLocales` exist).
-For EACH new tool: define the OpenAI tool object (mirror `create_component`/`create_page` shape) +
-a validator; dispatch it in the route's `runTools`; reuse the EXISTING store (do NOT fork data
-paths). THEN register it in tool-scopes: add to `KNOWN_TOOL_NAMES`, add to the right
-`TOOLS_BY_CONTEXT` entries, and add to the route's `TOOL_BY_NAME` (all three — see CAVEATS).
-Add a node test per tool's arg-validation/execution (mock the store). Skip any tool whose backend
-doesn't exist and note it.
+PICK NEXT: **Slice 3 part 2 — the WRITE tools.** These carry UNTRUSTED artifacts → validate with the
+same rigor as create_component/create_page (do NOT skip validation):
+  - `update_component` — reuse `validateComponentArtifact` + `upsertComponent` (same-name already
+    updates; mostly an alias with an "exists" check, or just reuse create_component's path).
+  - `update_page_blocks` — `setPageBlocks(pageId, blocks)`; block tree untrusted → validate like
+    create_page does (reuse page-tool.ts's block validator).
+  - `update_brand_identity` — `setSiteIdentity(unknown)` (normalizes internally — still shape-check).
+  - `update_theme` — `setThemeOverrides`/`setThemeOverridesDark` (normalize to known tokens + safe
+    colors = the trust gate; pass the model's `{token:color}` map straight in).
+  - `list_builtin_types` — ONLY if a block-type/builtin registry exists (CHECK `listComponentPalette`
+    in page-store + any builtin registry; skip + note if absent).
+For EACH: validator + route handler (ok:false on bad, never throw) + register in `KNOWN_TOOL_NAMES`,
+`TOOLS_BY_CONTEXT`, and the route's `TOOL_BY_NAME` — ALL THREE or it's a dead tool. Node test per tool's
+arg-validation (mock the store).
 
-WATCH OUT (read CAVEATS): tool-scopes speaks NAMES, route owns OBJECTS — keep that boundary so the
-pure module stays node-testable. `usePathname` has NO locale prefix in bizbee. `Ai` port is
-streaming-only; `applyTranslation` rejects component targets. Always: tsc + opennext build + regen
-PM cms-bundle on any CMS source change.
+WATCH OUT (read CAVEATS): stores live at `CMS/src/db/` (`@/db/*` alias); pure tool modules NEVER import
+stores/@/. tool-scopes speaks NAMES, route owns OBJECTS. `usePathname` has NO locale prefix.
+`getPageById` returns metadata only (no blocks) — for block editing read blocks via `getPageBlocks`.
+Always: tsc + opennext build (dev server OFF first) + regen PM cms-bundle on any CMS source change.
+
+Then **Slice 4** (debug panel + model picker + per-Site conversation history) remains.

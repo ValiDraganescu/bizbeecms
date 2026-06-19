@@ -36,6 +36,18 @@ import {
   formatAssetList,
 } from "@/lib/chat/list-assets-tool";
 import {
+  LIST_COMPONENTS_TOOL,
+  GET_COMPONENT_TOOL,
+  LIST_PAGES_TOOL,
+  GET_PAGE_TOOL,
+  LIST_LOCALES_TOOL,
+  GET_BRAND_IDENTITY_TOOL,
+  GET_THEME_TOOL,
+  coerceIdArg,
+  formatComponentList,
+  formatPageList,
+} from "@/lib/chat/read-tools";
+import {
   detectAdminContext,
   isAdminContext,
   toolsForContext,
@@ -43,10 +55,20 @@ import {
   type AdminPageContext,
   type ToolName,
 } from "@/lib/chat/tool-scopes";
-import { listComponentNames, upsertComponent } from "@/db/component-store";
-import { missingComponents, upsertPage } from "@/db/page-store";
+import {
+  listComponentNames,
+  upsertComponent,
+  listComponents,
+  getComponentByName,
+} from "@/db/component-store";
+import { missingComponents, upsertPage, listPages, getPageById } from "@/db/page-store";
 import { applyTranslation } from "@/db/translate-store";
-import { getContentLocales, getSiteIdentity } from "@/db/settings-store";
+import {
+  getContentLocales,
+  getSiteIdentity,
+  getThemeOverrides,
+  getThemeOverridesDark,
+} from "@/db/settings-store";
 import { listAssets } from "@/db/asset-store";
 import { buildSystemPrompt } from "@/lib/settings/site-settings";
 import { allowedClasses } from "@/lib/render/utility-css";
@@ -66,6 +88,13 @@ const TOOL_BY_NAME: Record<ToolName, unknown> = {
   create_page: CREATE_PAGE_TOOL,
   translate: CREATE_TRANSLATION_TOOL,
   list_assets: LIST_ASSETS_TOOL,
+  list_components: LIST_COMPONENTS_TOOL,
+  get_component: GET_COMPONENT_TOOL,
+  list_pages: LIST_PAGES_TOOL,
+  get_page: GET_PAGE_TOOL,
+  list_locales: LIST_LOCALES_TOOL,
+  get_brand_identity: GET_BRAND_IDENTITY_TOOL,
+  get_theme: GET_THEME_TOOL,
 };
 
 /** Resolve the context's tool-name list to the actual tool objects. */
@@ -212,6 +241,20 @@ async function runTools(
         await handleTranslate(call.args, emit);
       } else if (call.name === LIST_ASSETS_TOOL.function.name) {
         await handleListAssets(call.args, emit);
+      } else if (call.name === LIST_COMPONENTS_TOOL.function.name) {
+        await handleListComponents(emit);
+      } else if (call.name === GET_COMPONENT_TOOL.function.name) {
+        await handleGetComponent(call.args, emit);
+      } else if (call.name === LIST_PAGES_TOOL.function.name) {
+        await handleListPages(emit);
+      } else if (call.name === GET_PAGE_TOOL.function.name) {
+        await handleGetPage(call.args, emit);
+      } else if (call.name === LIST_LOCALES_TOOL.function.name) {
+        await handleListLocales(emit);
+      } else if (call.name === GET_BRAND_IDENTITY_TOOL.function.name) {
+        await handleGetBrandIdentity(emit);
+      } else if (call.name === GET_THEME_TOOL.function.name) {
+        await handleGetTheme(emit);
       } else {
         emit({ name: call.name, ok: false, errors: [`unknown tool: ${call.name}`] });
       }
@@ -318,5 +361,98 @@ async function handleListAssets(
     emit({ name, ok: true, assets });
   } catch (err) {
     emit({ name, ok: false, errors: [`failed to list assets: ${(err as Error).message}`] });
+  }
+}
+
+// ── Slice 3: read-only discovery tools (back the scoped contexts' UPDATE work) ─
+// Each reads an EXISTING store; no untrusted artifact to validate (see read-tools.ts).
+
+async function handleListComponents(emit: (d: Record<string, unknown>) => void): Promise<void> {
+  const name = LIST_COMPONENTS_TOOL.function.name;
+  try {
+    emit({ name, ok: true, components: formatComponentList(await listComponents()) });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to list components: ${(err as Error).message}`] });
+  }
+}
+
+async function handleGetComponent(
+  args: unknown,
+  emit: (d: Record<string, unknown>) => void,
+): Promise<void> {
+  const name = GET_COMPONENT_TOOL.function.name;
+  const compName = coerceIdArg(args, "name");
+  if (!compName) {
+    emit({ name, ok: false, errors: ["name is required"] });
+    return;
+  }
+  try {
+    const row = await getComponentByName(compName);
+    if (!row) {
+      emit({ name, ok: false, errors: [`no component named "${compName}"`] });
+      return;
+    }
+    emit({ name, ok: true, component: row });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to get component: ${(err as Error).message}`] });
+  }
+}
+
+async function handleListPages(emit: (d: Record<string, unknown>) => void): Promise<void> {
+  const name = LIST_PAGES_TOOL.function.name;
+  try {
+    emit({ name, ok: true, pages: formatPageList(await listPages()) });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to list pages: ${(err as Error).message}`] });
+  }
+}
+
+async function handleGetPage(
+  args: unknown,
+  emit: (d: Record<string, unknown>) => void,
+): Promise<void> {
+  const name = GET_PAGE_TOOL.function.name;
+  const id = coerceIdArg(args, "id");
+  if (!id) {
+    emit({ name, ok: false, errors: ["id is required"] });
+    return;
+  }
+  try {
+    const page = await getPageById(id);
+    if (!page) {
+      emit({ name, ok: false, errors: [`no page with id "${id}"`] });
+      return;
+    }
+    emit({ name, ok: true, page });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to get page: ${(err as Error).message}`] });
+  }
+}
+
+async function handleListLocales(emit: (d: Record<string, unknown>) => void): Promise<void> {
+  const name = LIST_LOCALES_TOOL.function.name;
+  try {
+    emit({ name, ok: true, locales: await getContentLocales() });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to list locales: ${(err as Error).message}`] });
+  }
+}
+
+async function handleGetBrandIdentity(emit: (d: Record<string, unknown>) => void): Promise<void> {
+  const name = GET_BRAND_IDENTITY_TOOL.function.name;
+  try {
+    emit({ name, ok: true, identity: await getSiteIdentity() });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to get brand identity: ${(err as Error).message}`] });
+  }
+}
+
+async function handleGetTheme(emit: (d: Record<string, unknown>) => void): Promise<void> {
+  const name = GET_THEME_TOOL.function.name;
+  try {
+    const [light, dark] = await Promise.all([getThemeOverrides(), getThemeOverridesDark()]);
+    emit({ name, ok: true, theme: { light, dark } });
+  } catch (err) {
+    emit({ name, ok: false, errors: [`failed to get theme: ${(err as Error).message}`] });
   }
 }
