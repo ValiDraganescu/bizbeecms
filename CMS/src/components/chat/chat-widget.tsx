@@ -23,6 +23,11 @@ import { CHAT_MODELS, DEFAULT_MODEL } from "@/lib/chat/models";
 
 type ThreadSummary = { id: string; title: string; updatedAt: number };
 
+// Remember which thread the widget is showing across a page reload (per-tab, so
+// two tabs don't fight over one thread). sessionStorage is fine — it's just a
+// pointer; the transcript itself lives server-side in chat_thread.
+const THREAD_KEY = "bizbee.chat.threadId";
+
 export function ChatWidget() {
   const t = useTranslations("chat.widget");
   const [open, setOpen] = useState(false);
@@ -60,6 +65,40 @@ export function ChatWidget() {
     }
   }
 
+  // On mount, resume the conversation a reload interrupted: prefer the per-tab
+  // remembered thread id, else fall back to the most recent saved thread. Only
+  // when the transcript is still empty and no thread is loaded — never clobber
+  // an in-flight convo. Runs once.
+  useEffect(() => {
+    if (threadId.current !== null) return;
+    let cancelled = false;
+    void (async () => {
+      let id: string | null = null;
+      try {
+        id = sessionStorage.getItem(THREAD_KEY);
+      } catch {
+        /* no storage */
+      }
+      if (!id) {
+        try {
+          const res = await fetch("/api/chat/history");
+          if (res.ok) {
+            const j = (await res.json()) as { threads?: ThreadSummary[] };
+            id = j.threads?.[0]?.id ?? null;
+          }
+        } catch {
+          /* offline / no binding */
+        }
+      }
+      if (cancelled || !id || threadId.current !== null) return;
+      await openThread(id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Save the transcript when a turn finishes (busy true→false with messages).
   useEffect(() => {
     const wasBusy = busyRef.current;
@@ -79,7 +118,14 @@ export function ChatWidget() {
         });
         if (!res.ok) return;
         const j = (await res.json()) as { id?: string };
-        if (j.id) threadId.current = j.id;
+        if (j.id) {
+          threadId.current = j.id;
+          try {
+            sessionStorage.setItem(THREAD_KEY, j.id);
+          } catch {
+            /* private mode / no storage — restore just won't survive reload */
+          }
+        }
         if (historyOpen) void loadThreads();
       } catch {
         /* best-effort persistence */
@@ -95,6 +141,11 @@ export function ChatWidget() {
       if (!j.thread) return;
       chat.seed(j.thread.messages);
       threadId.current = j.thread.id;
+      try {
+        sessionStorage.setItem(THREAD_KEY, j.thread.id);
+      } catch {
+        /* no storage */
+      }
       setHistoryOpen(false);
     } catch {
       /* leave current transcript */
@@ -110,12 +161,22 @@ export function ChatWidget() {
     setThreads((prev) => prev.filter((th) => th.id !== id));
     if (threadId.current === id) {
       threadId.current = null;
+      forgetThread();
       chat.reset();
+    }
+  }
+
+  function forgetThread() {
+    try {
+      sessionStorage.removeItem(THREAD_KEY);
+    } catch {
+      /* no storage */
     }
   }
 
   function newConversation() {
     threadId.current = null;
+    forgetThread();
     chat.reset();
     setHistoryOpen(false);
   }

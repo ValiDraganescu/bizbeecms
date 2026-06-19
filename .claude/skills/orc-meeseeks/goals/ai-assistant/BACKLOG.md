@@ -5,6 +5,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE: **Resume current thread on widget mount.** `chat-widget.tsx` persists the active thread id
+  to `sessionStorage` (per-tab) and a run-once mount effect restores it (else the most recent saved
+  thread via `GET /api/chat/history`), seeding the transcript with `chat.seed` so a reload doesn't
+  lose a mid-flight convo. Only when no thread is loaded (never clobbers in-flight); storage access
+  try/catch-guarded. Client-only — no new backend/route/dep. Gates green; cms-bundle regen.
 - DONE: **Tool-call round-tripping (multi-turn tool loop).** New `streamChatRounds` in
   `lib/chat/reframe.ts` drives turns: stream → run tools → feed assistant `tool_calls` + each
   `role:"tool"` result back → re-ask, until a turn calls no tool (final answer) or maxRounds(4).

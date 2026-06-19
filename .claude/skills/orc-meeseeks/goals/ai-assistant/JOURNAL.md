@@ -262,3 +262,24 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/scripts/history.test.mjs (new), CMS/migrations/0005_wonderful_ultragirl.sql (+ meta),
   CMS/src/components/chat/chat-conversation.tsx, CMS/src/components/chat/chat-widget.tsx,
   CMS/messages/{en,fi,et}.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-20 00:10 — Resume current thread on widget mount
+- **Status:** DONE
+- **What I did:** NEXT.md pick #2 — a fresh page load no longer starts the widget
+  empty when a thread was mid-flight. `chat-widget.tsx` now persists the active
+  thread id to `sessionStorage` (`bizbee.chat.threadId`, per-tab) on every save
+  and on `openThread`; clears it on new/delete-of-current (`forgetThread`). A
+  run-once mount effect resumes the conversation: prefer the remembered per-tab
+  id, else fall back to the most recent saved thread (`GET /api/chat/history`
+  → threads[0]), then `await openThread(id)` (which `chat.seed`s the transcript).
+  Guards: only restores when `threadId.current === null` (never clobbers an
+  in-flight convo); all `sessionStorage` access wrapped in try/catch (private
+  mode safe). No new backend, no new route, no new dep — pure client polish over
+  the existing history endpoints + `useChat.seed`.
+- **Verified:** CMS `tsc --noEmit` clean (exit 0); `opennextjs-cloudflare build`
+  green (dev server confirmed off first); PM `bundle:cms` regen + `bundle:selfcheck`
+  passed (only the known static-assets-gap warning). Did NOT exercise the live
+  reload-resume in a browser (no running deploy this run) — logic verified by
+  build/types + read-through.
+- **Files:** CMS/src/components/chat/chat-widget.tsx;
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).

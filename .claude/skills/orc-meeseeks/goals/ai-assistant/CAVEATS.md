@@ -137,6 +137,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   Workers AI's OpenAI-compat endpoint accepts the extra `tool_calls`/`tool_call_id`/`name` fields (the
   route casts `TurnMessage[]`→`{role,content}[]` for the `Ai` port type only; runtime forwards them).
 
+- THREAD RESUME (mount restore) DONE: `chat-widget.tsx` remembers the active thread id in
+  `sessionStorage["bizbee.chat.threadId"]` (PER-TAB on purpose — two tabs mustn't fight over one
+  thread). A run-once mount effect resumes it, else falls back to `GET /api/chat/history` threads[0],
+  then `await openThread(id)`. It only restores when `threadId.current === null` (don't clobber an
+  in-flight convo). Keep `sessionStorage` writes in sync on EVERY threadId change: save effect +
+  `openThread` set it, `forgetThread()` clears it (called by new/delete-of-current). All storage
+  access is try/catch-wrapped (private mode). `openThread` is a hoisted function decl so the mount
+  effect can call it before its textual definition — keep it a declaration, not a const arrow.
+
 - PRE-EXISTING FAILING TEST (NOT this goal): `page-blocks-sections.test.ts` →
   "planPage renders a Section as a grid of columns" expects `repeat(2, 1fr)` but gets
   `repeat(auto-fit, minmax(min(100%, 16rem), 1fr))`. Introduced by the page-builder "responsive
