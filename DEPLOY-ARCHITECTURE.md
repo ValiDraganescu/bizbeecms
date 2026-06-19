@@ -295,7 +295,7 @@ right per-Site CMS Worker by `Host`.
 | **CMS Worker** (per-Site) | `SITE_ID` / `PM_ORIGIN` / `CMS_AUTH_SECRET` (vars) | injected by deployer `--var` at deploy. `PM_ORIGIN`=`manager.bizbeecms.com`. **Baked in at deploy time — a stale origin requires a REDEPLOY (trap #5).** | auto on deploy (empty placeholders in `CMS/wrangler.jsonc`); served at `bizbeecms-cms-<slug>.vali-draganescu88.workers.dev` |
 | CMS | `DB` (per-Site D1) | the Site's content | ❌ **NOT auto-created** — manual (see below) |
 | CMS | `MEDIA` (R2 bucket) | media library | ❌ **NOT auto-created** — manual |
-| CMS | `AI` (Workers AI) + AI Gateway `bizbeecms-ai-gateway` | chat / AI tools | ❌ gateway is a manual dashboard step; binding works once it exists. Slug MUST match the gateway on the account or `env.AI.run` fails `2001: Please configure AI Gateway` (fixed 2026-06-19). |
+| CMS | `AI` (Workers AI) + AI Gateway `bizbeecms-ai-gateway` | chat / AI tools / `/api/translate` | ✅ **gateway `bizbeecms-ai-gateway` exists on the account (2026-06-19)**; `AI` binding is declared in `CMS/wrangler.jsonc` (auto on deploy, no key). Slug MUST match the gateway or `env.AI.run` fails `2001: Please configure AI Gateway`. Local dev: `env.AI` needs `wrangler login` + the route's `requireAdmin` guard passes first, so a 503/401 locally is the binding/auth gate, not the gateway. |
 | **router Worker** ✅ deployed (2026-06-18) | `HOST_MAP` (KV `1c276b01…`) | host → slug lookup | ✅ bound |
 | router | `WORKERS_SUBDOMAIN` (var) | builds the per-Site `.workers.dev` proxy target (`vali-draganescu88`) | ✅ set |
 
@@ -387,10 +387,11 @@ keep preflight green; it does not affect the container deploy.
 The deployer only builds + `wrangler deploy`s the CMS Worker; it does **not** create infra. Before
 (or as part of) a CMS deploy:
 
-- **AI Gateway** `bizbeecms-ai-gateway` — dashboard → AI → AI Gateway; enable **Workers AI**. Once, shared
-  across Sites. The slug MUST match `vars.AI_GATEWAY` / `DEFAULT_AI_GATEWAY` exactly, else `env.AI.run`
-  fails `2001: Please configure AI Gateway` on every chat message. (Override per-Site with the `AI_GATEWAY`
-  var if you use a different slug.)
+- **AI Gateway** `bizbeecms-ai-gateway` — ✅ **already created on the account (2026-06-19)**, shared across
+  Sites. (Created via dashboard → AI → AI Gateway; wrangler 4.x has no `ai-gateway` CLI — dashboard or the
+  `accounts/<id>/ai-gateway/gateways` REST API only.) The slug MUST match `vars.AI_GATEWAY` /
+  `DEFAULT_AI_GATEWAY` exactly, else `env.AI.run` fails `2001: Please configure AI Gateway` on every call.
+  (Override per-Site with the `AI_GATEWAY` var if you use a different slug.)
 - **per-Site D1**: `wrangler d1 create bizbeecms-cms-<slug>` → `wrangler d1 migrations apply …`
   (CMS migrations under `CMS/migrations/`, incl. `0002_*` asset table).
 - **per-Site R2 bucket**: `wrangler r2 bucket create bizbeecms-cms-media` (or per-Site), bound `MEDIA`.
@@ -424,8 +425,11 @@ The deployer only builds + `wrangler deploy`s the CMS Worker; it does **not** cr
   trap #8 (host chain: signed `x-bizbee-host` + relative callback redirect).
 - ✅ **Deploy callback + step-events verified** — fixed by the `PM_CALLBACK_ORIGIN` update (trap #5);
   deploys now complete (no more stuck `deploying` rows from a 404'd callback).
-- ❌ **Per-Site D1 / R2 / AI Gateway** still not auto-provisioned (manual, Part C). test-1 runs because
-  its infra was set up by hand. The `<slug>.site.bizbeecms.com` custom hostname is not live (trap #3).
+- ⚠️ **Per-Site D1 / R2** still not auto-provisioned (manual, Part C). test-1 runs because its infra was
+  set up by hand. The `<slug>.site.bizbeecms.com` custom hostname is not live (trap #3).
+- ✅ **AI Gateway `bizbeecms-ai-gateway` exists** (2026-06-19) — shared across Sites, one-time. The live
+  model call (chat / `/api/translate`) is binding+auth-gated, so verified by deploy/config, not yet by a
+  live translated round-trip.
 
 ## Pointers (don't re-derive these)
 
