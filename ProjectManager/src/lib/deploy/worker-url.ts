@@ -1,18 +1,17 @@
-import { CMS_WORKER_PREFIX, siteUrlForSlug } from "@/lib/config/hosts";
+import { WORKERS_DEV_SUFFIX } from "../config/hosts.ts";
 
 /**
  * Public URL of a deployed CMS Worker.
  *
- * A Site's CMS deploys as worker `bizbeecms-cms-<slug>` and is served at the
- * stable custom hostname `https://<slug>.site.bizbeecms.com` (the router derives
- * the slug from the leftmost subdomain label). We strip the worker-name prefix
- * to recover the slug and build the URL from `hosts.ts` — no `.workers.dev`
- * string leaks into user-facing "Open CMS" / "open site" links.
+ * ponytail: Sites are served directly on their `bizbeecms-cms-<slug>.workers.dev`
+ * URL. The custom `<slug>.site.bizbeecms.com` scheme (siteUrlForSlug in hosts.ts)
+ * stays dormant until the zone gets an Advanced Certificate Manager cert for
+ * `*.site.bizbeecms.com` — a bare `*.bizbeecms.com` route shadows our infra
+ * custom domains, and the free universal cert can't cover two levels. Customer-
+ * owned custom domains still work today via /attach-domain + HOST_MAP + router.
+ * Switch this back to siteUrlForSlug(slug) once ACM is enabled.
  */
 export async function cmsWorkerUrl(workerName: string): Promise<string | null> {
   if (!workerName) return null;
-  if (!workerName.startsWith(CMS_WORKER_PREFIX)) return null;
-  const slug = workerName.slice(CMS_WORKER_PREFIX.length);
-  if (!slug) return null;
-  return siteUrlForSlug(slug);
+  return `https://${workerName}${WORKERS_DEV_SUFFIX}`;
 }
