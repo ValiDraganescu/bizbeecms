@@ -260,3 +260,18 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS `src/lib/pages/page-blocks.ts`, `src/components/page-builder/page-builder-shell.tsx`,
   `src/app/api/components/palette/route.ts`, `src/lib/pages/page-blocks-schema.test.ts`,
   `messages/{en,fi,et}.json`.
+
+## 2026-06-19 18:29 — Upgrade BLOG kit component schemas to richer vocab
+- **Status:** DONE
+- **What I did:** Enriched every blog-kit component's `propsSchema` (kept bizbee's object-keyed shape,
+  widened the descriptors): added `required:true`+`translatable:true`+`label` to human-readable text props —
+  BlogPostHeader title[req]/date/author, BlogPostBody body[richtext,req], AuthorCard name[req]/bio,
+  PostListItem title[req]/date/excerpt (href = URL → NON-translatable), PostList heading[req]. Did NOT invent
+  number/boolean/select props: the kit markup binds `{{slot}}` TEXT only (PostList renders just `{{heading}}`,
+  its rows are static sample HTML), so config fields would be inert metadata — markup left UNCHANGED per spec.
+  Extended `scripts/blog-kit.test.mjs` with a regression test (every prop parses via `parsePropsSchema` to a
+  known field type; title=required+translatable; href NOT translatable; body=richtext+translatable).
+- **Verified:** `npx tsc --noEmit` OK; `node --test scripts/blog-kit.test.mjs` 6/6 pass;
+  `npx opennextjs-cloudflare build` green (port 3601 free, dev stopped). PM bundle NOT regenerated — propsSchema
+  is editor metadata, no render-output change (still owed from the column-model render run per CAVEATS).
+- **Files:** CMS `src/lib/components/blog-kit.ts`, `scripts/blog-kit.test.mjs`.

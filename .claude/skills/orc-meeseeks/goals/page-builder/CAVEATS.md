@@ -170,6 +170,15 @@ Read every line before working. Each entry was learned the hard way by a previou
 - The Block tab in `page-builder-shell.tsx` now resolves the selected node via PURE `findBlock` (tree-walk),
   NOT `blocks.find` — nested components in Section columns ARE selectable. Persist a component's edits with
   PURE `mergeBlockProps(blocks,id,props)` (tree-walk; `{}` drops the props key). Both live in page-blocks.ts.
+- KIT SCHEMA UPGRADES: bizbee's renderer binds `{{prop}}` TEXT slots only (`planPage`→`bindTree`) — there is
+  NO generic prop→attribute/config binding. So when enriching a kit's `propsSchema` (blog/landing/docs-kit.ts),
+  only declare props the component's `tree` actually references; a `number`/`boolean`/`select` field that
+  nothing binds is DEAD editor metadata (shows a control that does nothing). aicms's schemas have richer config
+  fields because aicms components READ them — bizbee's kit markup mostly doesn't. Keep bizbee's OBJECT-keyed
+  schema shape (`{title:{type,...}}`), widen the descriptor (`required`/`translatable`/`label`/`options`/
+  `default`), and leave the markup UNCHANGED. URL/structural props (e.g. `href`) are NOT translatable. The kit
+  regression tests are `scripts/<kit>-kit.test.mjs` — extend with a `parsePropsSchema` assertion (import it as
+  `../src/lib/pages/page-blocks.ts`; node runs `.ts` directly, `@/` won't resolve).
 - The client shell needs each component's raw propsSchema → new endpoint `GET /api/components/palette`
   ({name,propsSchema}) reusing `listComponentPalette` (same source the server-rendered C3 editor uses).
   `/api/components/grouped` returns NAMES ONLY — don't try to read propsSchema from it. The shell loads the

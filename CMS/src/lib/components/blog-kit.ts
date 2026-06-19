@@ -93,9 +93,9 @@ export function blogKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        title: { type: "string", default: "Post title" },
-        date: { type: "string", default: "January 1, 2026" },
-        author: { type: "string", default: "Author" },
+        title: { type: "string", default: "Post title", required: true, translatable: true, label: "Title" },
+        date: { type: "string", default: "January 1, 2026", translatable: true, label: "Date" },
+        author: { type: "string", default: "Author", translatable: true, label: "Author" },
       }),
     }),
 
@@ -116,7 +116,7 @@ export function blogKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        body: { type: "richtext", default: "" },
+        body: { type: "richtext", default: "", required: true, translatable: true, label: "Body" },
       }),
     }),
 
@@ -150,8 +150,8 @@ export function blogKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        name: { type: "string", default: "Author Name" },
-        bio: { type: "string", default: "" },
+        name: { type: "string", default: "Author Name", required: true, translatable: true, label: "Author name" },
+        bio: { type: "string", default: "", translatable: true, label: "Bio" },
       }),
     }),
 
@@ -186,10 +186,10 @@ export function blogKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        title: { type: "string", default: "Post title" },
-        href: { type: "string", default: "#" },
-        date: { type: "string", default: "January 1, 2026" },
-        excerpt: { type: "string", default: "" },
+        title: { type: "string", default: "Post title", required: true, translatable: true, label: "Title" },
+        href: { type: "string", default: "#", label: "Link URL" },
+        date: { type: "string", default: "January 1, 2026", translatable: true, label: "Date" },
+        excerpt: { type: "string", default: "", translatable: true, label: "Excerpt" },
       }),
     }),
 
@@ -258,7 +258,7 @@ export function blogKit(): PortableComponent[] {
       script: "",
       css: "",
       propsSchema: JSON.stringify({
-        heading: { type: "string", default: "Latest posts" },
+        heading: { type: "string", default: "Latest posts", required: true, translatable: true, label: "Heading" },
       }),
     }),
   ];

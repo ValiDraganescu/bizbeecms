@@ -118,16 +118,18 @@ Task states: TODO | DOING | DONE | BLOCKED.
     Translate" button in the aicms screenshot is OUT OF SCOPE here — separate later task.
   Gate: CMS tsc + opennext build green; regen PM cms-bundle. This is the shared backend+frontend support
   the per-kit tasks below depend on.
-- TODO: **Upgrade BLOG kit component schemas to the richer vocab** (`lib/components/blog-kit.ts`:
-  BlogPostHeader, BlogPostBody, AuthorCard, PostListItem, PostList). For each, replace the flat
-  `{type:"string"}` propsSchema with real field types/defaults/required matching what the component actually
-  renders (number/boolean/select where it fits — e.g. PostList limit=number, layout=select), modeled on
-  aicms `builtin_schemas.ts`. **Mark `translatable:true` on each human-readable text prop** (titles, body,
-  author name, labels — anything an editor would localize); leave structural/config props non-translatable.
-  Don't change component MARKUP/behavior, only its propsSchema. Depends on the
-  FOUNDATION task (needs the widened vocab). Parallelizable with the other two kit tasks. Gate: CMS tsc +
-  opennext build green; regen PM cms-bundle. (Bundle regen is shared — if run concurrently, see CAVEATS re
-  cross-loop bundle edits; defer + note in NEXT.md if blocked.)
+- DONE (2026-06-19): **Upgrade BLOG kit component schemas to the richer vocab** (`lib/components/blog-kit.ts`).
+  Enriched every component's `propsSchema` descriptors (kept bizbee's object-keyed shape): added
+  `required:true` + `translatable:true` + `label` to each human-readable text prop (BlogPostHeader
+  title[req]/date/author, BlogPostBody body[richtext,req], AuthorCard name[req]/bio, PostListItem
+  title[req]/date/excerpt, PostList heading[req]), and left structural props non-translatable
+  (PostListItem.href = URL → no translatable). NO number/boolean/select added: the kit markup only binds
+  text slots — PostList renders only `{{heading}}` (sample rows are static), so an invented limit=number /
+  layout=select would be editor metadata that binds to nothing (markup UNCHANGED per spec). Markup/behavior
+  untouched. Extended `scripts/blog-kit.test.mjs` (+1 test) asserting every prop parses via `parsePropsSchema`
+  to a known field type, title=required+translatable, href NOT translatable, body=richtext+translatable →
+  6/6 green. tsc + opennext build green. PM bundle:cms NOT owed (propsSchema is editor metadata, no render
+  output change) — bundle still stale from the column-model render run per CAVEATS.
 - TODO: **Upgrade LANDING kit component schemas to the richer vocab** (`lib/components/landing-kit.ts`:
   Hero, FeatureGrid, CTABand, Testimonial, SiteFooter). Same as the blog-kit task — enrich each propsSchema
   with real field types/defaults/required (e.g. FeatureGrid columns=select, CTABand has bool toggles),

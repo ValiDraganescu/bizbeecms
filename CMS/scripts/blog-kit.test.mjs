@@ -21,6 +21,7 @@ import {
   parsePortableComponent,
 } from "../src/lib/components/portable.ts";
 import { blogKit, blogKitNames } from "../src/lib/components/blog-kit.ts";
+import { parsePropsSchema } from "../src/lib/pages/page-blocks.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const msgDir = join(here, "..", "messages");
@@ -59,6 +60,35 @@ test("component names are unique within the kit", () => {
   assert.equal(new Set(names).size, names.length, "duplicate component name in kit");
   assert.ok(names.includes("BlogPostHeader"));
   assert.ok(names.includes("PostList"));
+});
+
+test("every component's propsSchema parses into the richer field vocab", () => {
+  const byName = Object.fromEntries(blogKit().map((b) => [b.component.name, b.component]));
+
+  // Every prop parses to a known field type; human-readable text props are translatable.
+  for (const b of blogKit()) {
+    const fields = parsePropsSchema(b.component.propsSchema);
+    assert.ok(fields.length > 0, `${b.component.name}: schema parsed to no fields`);
+    for (const f of fields) {
+      assert.ok(
+        ["string", "richtext", "number", "boolean", "select"].includes(f.type),
+        `${b.component.name}.${f.name}: unknown field type ${f.type}`,
+      );
+    }
+  }
+
+  // Spot-check the semantics the upgrade adds.
+  const header = parsePropsSchema(byName.BlogPostHeader.propsSchema);
+  const title = header.find((f) => f.name === "title");
+  assert.ok(title.required && title.translatable, "BlogPostHeader.title must be required + translatable");
+
+  const item = parsePropsSchema(byName.PostListItem.propsSchema);
+  const href = item.find((f) => f.name === "href");
+  assert.ok(!href.translatable, "PostListItem.href (a URL) must NOT be translatable");
+
+  const body = parsePropsSchema(byName.BlogPostBody.propsSchema).find((f) => f.name === "body");
+  assert.equal(body.type, "richtext");
+  assert.ok(body.translatable, "BlogPostBody.body must be translatable");
 });
 
 test("kit i18n keys exist with identical keys in EN/FI/ET", () => {
