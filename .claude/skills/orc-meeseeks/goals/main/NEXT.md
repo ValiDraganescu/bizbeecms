@@ -36,7 +36,7 @@ PURE normalize/validate logic in `lib/...` (never `db/*` — drizzle import brea
 - Run CMS commands inside `CMS/`; PM inside `ProjectManager/`. orc-meeseeks skill + goals at REPO ROOT `.claude/skills/...`.
 - After ANY `CMS/` change: `npm run bundle:cms` (ProjectManager/) to regen `cms-bundle.generated.js` (~6.5MB now). `npm run cf-typegen` (CMS) only after a wrangler BINDING change. `npm run db:generate` (CMS) only after a schema change.
 - Deploy gate = `npx opennextjs-cloudflare build`; NEVER run while a dev server is on 3601/3602. Check `lsof -ti:3601 -ti:3602`; clean `.next .open-next` (CMS + PM) after gating.
-- CMS tests: `node --test scripts/*.test.mjs` = `npm test`, now **219/219**. Dep-free `.mjs`, no `@/` alias, no React/DOM/drizzle/opennext imports.
+- CMS tests: `npm test` now globs `scripts/*.test.mjs` AND `'src/**/*.test.ts'`, **274/274**. Dep-free, no `@/` alias, no React/DOM/drizzle/opennext imports; sibling imports via relative `./x.ts`.
 - **Three page write contracts — don't merge:** AI `upsertPage` (blocks+parent), C2 `upsertPageMeta` (metadata, preserves blocks), C3 `setPageBlocks` (blocks-only, preserves metadata).
 - NO server eval on Workers; NO server actions (REST route handlers only). Use ONLY purpose theme tokens; all admin-UI strings via i18n (EN/FI/ET parity).
 - CMS public route is the optional catch-all — don't re-add a static `app/page.tsx`. Root `/` needs a published `home` slug or 404s (by design). Serve assets at `/media/<key>`.

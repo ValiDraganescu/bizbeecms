@@ -3,15 +3,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
-- BUG [P2]: CMS Theme editor (`/admin/settings/theme`, E1) — the per-token color SWATCHES all render gray,
-  even though the OKLCH text values next to them are correct (e.g. `oklch(0.5 0.19 268)`). Cause is almost
-  certainly the native `<input type="color">` in `theme-editor.tsx`: it only accepts `#rrggbb` hex, so feeding
-  it an `oklch()`/`lch()`/`rgb()` string makes it silently fall back to a default (gray/black) — the swatch
-  can't represent the actual color. Fix: render the swatch from the real CSS color value (e.g. a `<div>` /
-  background-color set to the oklch string, which the browser CAN paint), or convert oklch→hex for the
-  `<input type=color>` value (and convert back on pick). Keep the text field as the source of truth for the
-  full grammar (oklch/lab/lch/rgb/hsl) — only the swatch needs the fix. repro: open a Site → Theme tab →
-  expand any section (Brand/Surfaces/…) — swatches are gray while the oklch text is right — reported 2026-06-19
+- DONE [P2]: CMS Theme editor swatches rendered gray — the native `<input type="color">` only takes
+  `#rrggbb`, so feeding it an `oklch()` string made it fall back to neutral. FIX (`theme-editor.tsx`): the
+  swatch is now a `<label>` whose `background` is the REAL token value (the browser paints oklch/rgb/… fine),
+  with the native color `<input>` overlaid `opacity-0` so a click still opens the OS picker; text field stays
+  the source of truth for the full grammar. Regression test (`CMS/src/lib/render/theme.test.ts`) asserts every
+  DEFAULT_THEME + preset value is a paintable safe color (would have caught a non-paintable default). Also
+  widened `CMS` `npm test` to include `src/**/*.test.ts` (the orphaned `forwarded-host.test.ts` + new test
+  now run in CI). CMS deploy bundle regenerated. Verified 2026-06-19.
 
 ## Tasks
 - DONE: **C3 follow-on: block-prop → component-prop binding (G1's missing half).** `lib/render/tree.ts` now binds a block's DECLARED props into `{{prop}}` slots (text nodes + string prop values) of the referenced component's tree before planning. Allowlist = component's `propsSchema` keys; undeclared block props AND undeclared `{{slots}}` are dropped to ""; locale-object values resolved first; bound values land as plain text/data (React escapes downstream — no HTML injection, no eval). Route maps `propsSchema` into the component map. Blog-kit components rewritten to use `{{slots}}`. 6 new node tests (binds / undeclared dropped / undeclared slot empty / unsafe escaped / no-schema passthrough / locale resolve). CMS 193/193, PM 32/32, tsc clean, opennext build gate (via bundle:cms) clean, bundle regenerated.
@@ -104,6 +103,14 @@ States: TODO | DOING | DONE | BLOCKED. Each is ONE provable capability. Order is
 
 **Housekeeping**
 - TODO: **Stop tracking `CMS/tsconfig.tsbuildinfo`.** It's a TypeScript incremental-build artifact that got committed (shows up in diffs on every build). Add it to `.gitignore` (e.g. `**/tsconfig.tsbuildinfo` or `*.tsbuildinfo`) and `git rm --cached CMS/tsconfig.tsbuildinfo` so it stops appearing in commits. Check PM/ too in case its buildinfo is also tracked.
+
+- TODO: **Move "View site" to the top of the CMS admin sidebar + open in a new tab.** In
+  `CMS/src/components/admin-sidebar.tsx` the "View site" link is currently a footer `<Link href="/">`
+  (~line 294, no `target`). Move it to the TOP of the sidebar nav (above Home, or as a prominent first
+  item) and make it open the public site in a NEW tab: `target="_blank" rel="noopener noreferrer"`.
+  Keep the `viewSite` i18n label; give it an external-link affordance (icon, since it now leaves the
+  admin). Collapsed-sidebar state should still show it (icon-only) like the other items. Gate: CMS tsc +
+  opennextjs build green; regen PM cms-bundle.
 
 - TODO: **Make theme presets complete, coordinated palettes (E1).** Today every entry in `THEME_PRESETS`
   (`CMS/src/lib/render/theme.ts`) only sets the `primary*`/`ring` brand tokens — Surfaces, Text, Borders,
