@@ -43,6 +43,12 @@
     "saved": "Sisukeeled salvestatud.",
     "error": "Viga: {message}"
   },
+  "settingsNav": {
+    "label": "Seadete jaotised",
+    "contentLocales": "Sisukeeled",
+    "theme": "Teema",
+    "brand": "Bränd ja AI"
+  },
   "theme": {
     "title": "Teema",
     "subtitle": "Asenda avaldatud saidi värvitunnused ilma uuesti ehitamata. Vaikeväärtuse kasutamiseks jäta väli tühjaks. Lubatud on hex (#1a2b3c) või oklch()/rgb()/hsl() väärtused.",

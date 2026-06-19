@@ -43,6 +43,12 @@
     "saved": "Content languages saved.",
     "error": "Error: {message}"
   },
+  "settingsNav": {
+    "label": "Settings sections",
+    "contentLocales": "Content languages",
+    "theme": "Theme",
+    "brand": "Brand & AI"
+  },
   "theme": {
     "title": "Theme",
     "subtitle": "Override the published site's color tokens without a rebuild. Leave a field empty to use the default. Accepts hex (#1a2b3c) or oklch()/rgb()/hsl() values.",

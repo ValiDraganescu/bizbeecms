@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { LocaleSwitcher } from "@/components/locale-switcher";
+import { SettingsNav } from "@/components/settings/settings-nav";
 import { BrandEditor } from "@/components/settings/brand-editor";
 import { getSiteIdentity } from "@/db/settings-store";
 import { emptySiteIdentity } from "@/lib/settings/site-settings";
@@ -30,12 +30,10 @@ export default async function BrandPage() {
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">{t("title")}</h1>
-          <p className="mt-1 text-foreground-muted">{t("subtitle")}</p>
-        </div>
-        <LocaleSwitcher />
+      <SettingsNav />
+      <header>
+        <h1 className="text-2xl font-semibold text-foreground">{t("title")}</h1>
+        <p className="mt-1 text-foreground-muted">{t("subtitle")}</p>
       </header>
       <BrandEditor initial={initial} />
     </main>

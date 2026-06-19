@@ -43,6 +43,12 @@
     "saved": "Sisältökielet tallennettu.",
     "error": "Virhe: {message}"
   },
+  "settingsNav": {
+    "label": "Asetusosiot",
+    "contentLocales": "Sisältökielet",
+    "theme": "Teema",
+    "brand": "Brändi ja tekoäly"
+  },
   "theme": {
     "title": "Teema",
     "subtitle": "Korvaa julkaistun sivuston väritunnukset ilman uudelleenkäännöstä. Jätä kenttä tyhjäksi käyttääksesi oletusta. Hyväksyy hex (#1a2b3c) tai oklch()/rgb()/hsl() -arvot.",
