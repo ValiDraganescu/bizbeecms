@@ -16,7 +16,8 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 **G. Premade component kits (starter library)**
 > Built on H — a kit is a curated, versioned export bundle the CMS ships with and can import into any Site.
-- (later) Gxx — more kits (docs, portfolio, e-commerce) follow the SAME pattern: new `lib/components/<x>-kit.ts` + add `{id,build,names}` to the `KITS` registry in `api/components/kit/route.ts` + `{id,labelKey}` to the `KITS` const in `components-manager.tsx` + an `install<X>Kit` i18n key (3 catalogs) + a `scripts/<x>-kit.test.mjs`.
+- DONE (2026-06-19): **G5 — pricing / e-commerce component kit.** `CMS/src/lib/components/pricing-kit.ts` (5 bundles: PricingHeader, PricingTier, FeatureRow, ProductCard, PricingFaqItem — `{{slots}}`+propsSchema; ProductCard uses inline `style` aspectRatio/objectFit, no aspect-ratio class; money/URL props non-translatable) + `{id:"pricing",...}` to KITS registry (route) + KITS const (manager) + `installPricingKit` i18n (EN/FI/ET) + extended `kitsHint` + `scripts/pricing-kit.test.mjs` (6). No new write/validation path. CMS 359/359, tsc, opennext gate, PM bundle 6663KB + 79/79. Live D1 → HITL P1.
+- (later) Gxx — more kits (events, restaurant/menu, real-estate, team/about) follow the SAME pattern: new `lib/components/<x>-kit.ts` + add `{id,build,names}` to the `KITS` registry in `api/components/kit/route.ts` + `{id,labelKey}` to the `KITS` const in `components-manager.tsx` + an `install<X>Kit` i18n key (3 catalogs) + a `scripts/<x>-kit.test.mjs`.
 
 **UX. Admin shell**
 - Sequencing: do A (rendering) fully before B (AI), or interleave A1→A2→B1→B2 as one vertical thread?

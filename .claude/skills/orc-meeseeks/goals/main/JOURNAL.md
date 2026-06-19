@@ -388,3 +388,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   contested files were `binding-adapters/BACKLOG.md` + `deployer/src/index.ts`, NOT the sidebar).
 - **Files:** CMS/src/components/admin-sidebar.tsx, ProjectManager/src/lib/deploy/cms-bundle.generated.js,
   .claude/skills/orc-meeseeks/goals/main/{BACKLOG,JOURNAL,NEXT}.md
+
+## 2026-06-19 19:06 — G5: pricing / e-commerce component kit
+- **Status:** DONE
+- **What I did:** Fifth premade kit (after blog/landing/docs/portfolio). New
+  `CMS/src/lib/components/pricing-kit.ts` — 5 `bizbeecms.component` v1 bundles:
+  PricingHeader (eyebrow+headline+subtitle), PricingTier (plan card: name/price/
+  period/blurb/CTA), FeatureRow (✓ feature line), ProductCard (img+name+price+buy,
+  uses inline `style` aspectRatio/objectFit since no aspect-ratio class), PricingFaqItem
+  (Q/A). All `{{slot}}`-bound props in propsSchema; prose props translatable, money
+  strings + URLs (price/ctaHref/imageUrl/buyHref) NOT translatable. Wired the SAME way
+  as G2–G4: `{id:"pricing",build,names}` into the KITS registry (`api/components/kit/route.ts`)
+  + `{id:"pricing",labelKey:"installPricingKit"}` into the KITS const (`components-manager.tsx`)
+  + `installPricingKit` i18n (EN/FI/ET) + extended `kitsHint` (3 catalogs). NO new
+  write/validation path — install goes through the existing `parsePortableComponent`
+  gate + `upsertImportedComponent`. New `scripts/pricing-kit.test.mjs` (6 cases).
+- **Verified:** CMS 359/359 (+6), tsc clean, opennext build gate (via `bundle:cms`) PASS,
+  PM bundle regen 6663 KB, PM 79/79, bundle selfcheck pass (only the known vestigial
+  static-assets warning). CMS tests were green before AND after (page-builder track untouched).
+  Confirmed the gate accepts `img` tag + inline `style` object props. Live D1 install → HITL P1.
+- **Files:** CMS/src/lib/components/pricing-kit.ts (new), CMS/scripts/pricing-kit.test.mjs (new),
+  CMS/src/app/api/components/kit/route.ts, CMS/src/components/components/components-manager.tsx,
+  CMS/messages/{en,fi,et}.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js,
+  .claude/skills/orc-meeseeks/goals/main/{BACKLOG,JOURNAL,NEXT}.md
