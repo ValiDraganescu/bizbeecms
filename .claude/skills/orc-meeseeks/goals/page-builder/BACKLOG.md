@@ -15,18 +15,18 @@ Task states: TODO | DOING | DONE | BLOCKED.
 > NOTE: the current shipped Section is FLAT (`<div data-section>` nesting children directly). Slice 1 below
 > migrates it to the column model; later slices build on that.
 
-- TODO: **Section column model — migrate Section to Section→Columns and render it (pure + renderer first).**
-  Today `lib/render/tree.ts` `planPage` renders a Section as a flat `<div data-section>` nesting children
-  directly (page-blocks-sections.test.ts). Migrate to the aicms model: a Section's children are
-  `__section_column__` nodes, and components live INSIDE a column. Update: (a) `lib/pages/page-blocks.ts`
-  `addSection` to seed `columns` (default 1) and create that many `__section_column__` children; a pure
-  `setSectionColumns(section, n)` that adds/removes column children preserving existing content (extra
-  components from removed columns reflow into the last kept column — match aicms; cover with a node test);
-  (b) `tree.ts` Section render to the aicms CSS-grid output (gridTemplateColumns from columns/columnBehavior,
-  gap, 4× padding, maxWidth, bg, per-column flex with vertical/horizontal align — copy the math from
-  `BlockRenderer.tsx` ~223–266). Keep `validateBlocks` happy (Section + `__section_column__` both reserved,
-  not "missing components"). Extend page-blocks-sections.test.ts. Gate: CMS tsc + opennext build green;
-  regen PM cms-bundle. THIS IS THE PREREQUISITE FOR EVERYTHING BELOW.
+- DONE (2026-06-19): **Section column model — migrate Section to Section→Columns and render it (pure +
+  renderer first).** `tree.ts`: new reserved `SECTION_COLUMN_COMPONENT = "__section_column__"`; `planPage`
+  Section render is now the aicms CSS-grid (`<div data-section><section style="grid…">` → per-column
+  `<div data-section-column>` flex cells), gridTemplateColumns from columns/columnBehavior (collapse →
+  empty cols 0fr), gap(px), 4× padding (rem-default per-side `paddingXUnit`), maxWidth("full"→100%), bg.
+  `page-blocks.ts`: `addSection` seeds `props.columns:1` + ONE `__section_column__` child; new pure
+  `setSectionColumns(blocks,id,n)` (clamp 1–4; grow appends empty cols; shrink reflows removed cols'
+  content into the last kept col), `addComponentToColumn(blocks,id,colIndex,name)`, `sectionColumns`,
+  `isSectionColumn`; `addComponentToSection` kept as a shim → column 0 (click-insert still works);
+  `validateBlocks` drops BOTH reserved names. page-blocks-sections.test.ts rewritten → 11/11 (grow/shrink
+  reflow, collapse 0fr, grid output, unique ids). tsc + opennext build green. PM bundle:cms DEFERRED
+  (cross-loop guardrail; render DID change, so the bundle is now STALE — regen owed, see NEXT.md).
 - TODO: **Right rail Block tab — Section settings panel (mirror aicms `page_structure_diagram.tsx`).** When a
   Section is selected, the Block tab shows its settings, editing `block.props` via the existing block PUT
   (no new store): COLUMNS segmented 1/2/3/4 (drives `setSectionColumns`), EMPTY COLS Equal/Collapse, ALIGN

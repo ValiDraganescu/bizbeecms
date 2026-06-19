@@ -21,12 +21,17 @@
  * PURE (no React / D1 / CF imports). Relative `.ts` import keeps it node-loadable.
  */
 
-import { planPage, SECTION_COMPONENT, type Block } from "../render/tree.ts";
+import {
+  planPage,
+  SECTION_COMPONENT,
+  SECTION_COLUMN_COMPONENT,
+  type Block,
+} from "../render/tree.ts";
 import { isLocaleObject } from "../render/localize.ts";
 
-// Re-export so the editor/UI keeps importing the reserved Section name from here
-// (the renderer in tree.ts owns the single definition, so both layers agree).
-export { SECTION_COMPONENT };
+// Re-export so the editor/UI keeps importing the reserved names from here (the
+// renderer in tree.ts owns the single definitions, so both layers agree).
+export { SECTION_COMPONENT, SECTION_COLUMN_COMPONENT };
 
 const ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
 
@@ -66,10 +71,11 @@ export function validateBlocks(
   }
 
   if (errors.length > 0) return { ok: false, errors };
-  // The reserved Section name is a renderer primitive, not a D1 component — drop
-  // it so the route's component-existence check (`missingComponents`) never 409s
-  // on a page that contains Sections.
+  // The reserved Section + column names are renderer primitives, not D1
+  // components — drop them so the route's component-existence check
+  // (`missingComponents`) never 409s on a page that contains Sections/columns.
   names.delete(SECTION_COMPONENT);
+  names.delete(SECTION_COLUMN_COMPONENT);
   return { ok: true, blocks: value as Block[], componentNames: [...names] };
 
   function walk(block: unknown, path: string): void {
@@ -257,9 +263,14 @@ function uniqueBlockId(component: string, existing: Block[]): string {
 // persist time by `validateBlocks` (it rejects duplicate ids across the whole
 // tree) — see `uniqueIdAcrossTree` below which keeps the editor in step.
 
-/** True if a block is a layout Section (holds dropped components in children). */
+/** True if a block is a layout Section (its children are COLUMN blocks). */
 export function isSection(block: Block): boolean {
   return block.component === SECTION_COMPONENT;
+}
+
+/** True if a block is a Section COLUMN (holds dropped components in children). */
+export function isSectionColumn(block: Block): boolean {
+  return block.component === SECTION_COLUMN_COMPONENT;
 }
 
 /** All ids used anywhere in the tree (top-level + nested children). */
@@ -281,32 +292,121 @@ function uniqueIdAcrossTree(component: string, tree: Block[]): string {
   }
 }
 
-/** Append a new empty Section to the page (immutable). Returns the new tree. */
-export function addSection(blocks: Block[]): Block[] {
-  const section: Block = {
-    id: uniqueIdAcrossTree(SECTION_COMPONENT, blocks),
-    component: SECTION_COMPONENT,
+/** A fresh empty COLUMN block (used when seeding/growing a Section). */
+function makeColumn(tree: Block[]): Block {
+  return {
+    id: uniqueIdAcrossTree(SECTION_COLUMN_COMPONENT, tree),
+    component: SECTION_COLUMN_COMPONENT,
     children: [],
   };
-  return [...blocks, section];
 }
 
 /**
- * Append a component block into the Section with id `sectionId` (immutable).
- * No-op (returns the tree unchanged) if the id isn't a Section. The new child
- * gets an id unique across the whole tree.
+ * Append a new Section seeded with one COLUMN child (immutable). The Section's
+ * `props.columns` records the column count so the renderer/settings agree; the
+ * actual columns are realized as `__section_column__` children.
+ */
+export function addSection(blocks: Block[]): Block[] {
+  const id = uniqueIdAcrossTree(SECTION_COMPONENT, blocks);
+  // Seed with one column. Build the tree incrementally so the column id is
+  // unique against the just-added Section id too.
+  const withSection = [
+    ...blocks,
+    { id, component: SECTION_COMPONENT, props: { columns: 1 }, children: [] } as Block,
+  ];
+  const column = makeColumn(withSection);
+  return withSection.map((b) =>
+    b.id === id ? { ...b, children: [column] } : b,
+  );
+}
+
+/**
+ * The COLUMN children of a Section (in order). Empty array for a non-Section or
+ * a Section that somehow has no column children (legacy / hand-edited).
+ */
+export function sectionColumns(section: Block): Block[] {
+  return (section.children ?? []).filter(isSectionColumn);
+}
+
+/**
+ * Set a Section's column count to `n` (clamped 1–4), immutable.
+ *
+ * - Growing adds empty columns at the end.
+ * - Shrinking removes trailing columns but PRESERVES their content: every
+ *   component from a removed column reflows into the LAST kept column (matches
+ *   aicms — nothing is silently lost). Non-column children (shouldn't occur) are
+ *   carried as-is on the section.
+ * - `props.columns` is updated to match. No-op (returns the tree) for a
+ *   non-Section id.
+ */
+export function setSectionColumns(blocks: Block[], sectionId: string, n: number): Block[] {
+  const want = Math.max(1, Math.min(4, Math.floor(n)));
+  return blocks.map((section) => {
+    if (section.id !== sectionId || !isSection(section)) return section;
+    const cols = sectionColumns(section);
+    const other = (section.children ?? []).filter((c) => !isSectionColumn(c));
+
+    let nextCols: Block[];
+    if (want >= cols.length) {
+      // Grow: keep existing columns, append empty ones (ids unique tree-wide).
+      nextCols = [...cols];
+      let tree = blocks;
+      while (nextCols.length < want) {
+        const col = makeColumn([...tree, ...nextCols]);
+        nextCols = [...nextCols, col];
+      }
+    } else {
+      // Shrink: keep the first `want`, reflow removed columns' content into the
+      // last kept column.
+      const kept = cols.slice(0, want);
+      const removed = cols.slice(want);
+      const reflow = removed.flatMap((c) => c.children ?? []);
+      const lastIdx = kept.length - 1;
+      nextCols = kept.map((c, i) =>
+        i === lastIdx ? { ...c, children: [...(c.children ?? []), ...reflow] } : c,
+      );
+    }
+    return { ...section, props: { ...section.props, columns: want }, children: [...nextCols, ...other] };
+  });
+}
+
+/**
+ * Append a component block into a Section's column at `colIndex` (0-based),
+ * immutable. No-op if `sectionId` isn't a Section or `colIndex` is out of range.
+ * The new child gets an id unique across the whole tree.
+ */
+export function addComponentToColumn(
+  blocks: Block[],
+  sectionId: string,
+  colIndex: number,
+  component: string,
+): Block[] {
+  const child: Block = { id: uniqueIdAcrossTree(component, blocks), component };
+  return blocks.map((section) => {
+    if (section.id !== sectionId || !isSection(section)) return section;
+    const cols = sectionColumns(section);
+    if (colIndex < 0 || colIndex >= cols.length) return section;
+    const targetId = cols[colIndex].id;
+    return {
+      ...section,
+      children: (section.children ?? []).map((c) =>
+        c.id === targetId ? { ...c, children: [...(c.children ?? []), child] } : c,
+      ),
+    };
+  });
+}
+
+/**
+ * Append a component into a Section's FIRST column (immutable). Compatibility
+ * shim for the existing click-insert flow now that components live in columns;
+ * DnD slice 2 adds the real per-column drop. No-op for a non-Section id.
  */
 export function addComponentToSection(
   blocks: Block[],
   sectionId: string,
   component: string,
 ): Block[] {
-  const child: Block = { id: uniqueIdAcrossTree(component, blocks), component };
-  return blocks.map((b) =>
-    b.id === sectionId && isSection(b)
-      ? { ...b, children: [...(b.children ?? []), child] }
-      : b,
-  );
+  return addComponentToColumn(blocks, sectionId, 0, component);
 }
 
 /**

@@ -98,6 +98,20 @@ Read every line before working. Each entry was learned the hard way by a previou
   `!e.currentTarget.contains(e.relatedTarget)` (else child elements flicker the indicator off).
   `dataTransfer.getData(MIME)` returns "" during dragover in some browsers — read the payload in
   `onDrop`, gate the indicator on a boolean state set in dragover instead.
+- SECTION→COLUMNS MODEL IS NOW LIVE (2026-06-19). A Section's `children` are `__section_column__` blocks
+  (reserved `SECTION_COLUMN_COMPONENT` in `tree.ts`, re-exported from `page-blocks.ts`); the actual dropped
+  components live in a COLUMN's `children`, NOT directly on the Section. aicms tags columns with
+  `c.type === "__section_column__"` but bizbee Blocks have no `type` field — a column is a Block with
+  `component: "__section_column__"`. Use the pure helpers: `addSection` (seeds 1 col), `setSectionColumns`
+  (clamp 1–4, grow=append empty, shrink=reflow into last kept col), `addComponentToColumn(blocks,id,colIndex,name)`,
+  `sectionColumns(section)`. `addComponentToSection` is now a SHIM → column 0 (don't add new direct-to-section
+  inserts; DnD slice 2 owns per-column drop). `validateBlocks` drops BOTH `Section` + `__section_column__`
+  from componentNames (neither is a D1 component).
+- Section render math lives in `tree.ts` `planSection`/`planColumn` (ported from aicms BlockRenderer): outer
+  `<div data-section style=bg>` → `<section style=grid>` → per-column `<div data-section-column style=flex>`.
+  PADDING UNIT: per-side rem default — props are `paddingTop` + `paddingTopUnit` (default "rem"), etc. The
+  Block-tab settings panel (next task) must thread these. Don't change render in two places — `planSection`
+  is the one source (public + preview both go through `planPage`).
 - HEADS-UP (backlog reordered mid-2026-06-19): the USER adopted the aicms Section→Columns model.
   Future Section work seeds `__section_column__` children and components drop into a COLUMN, not the
   Section directly. DnD slice 1 (this one) only drags the Section primitive into Layers (append), so

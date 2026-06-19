@@ -28,6 +28,15 @@ import { resolveLocalized } from "./localize.ts";
  */
 export const SECTION_COMPONENT = "Section";
 
+/**
+ * Reserved component name for a Section's COLUMN (the aicms Section→Columns
+ * model). A Section's `children` are `__section_column__` blocks (1–4), and the
+ * actual dropped components live inside a column's `children`. Like the Section,
+ * a column is a renderer primitive (no D1 row), so the block PUT route excludes
+ * it from the component-existence check.
+ */
+export const SECTION_COLUMN_COMPONENT = "__section_column__";
+
 // ── Component element tree (what `component.tree` holds, parsed) ─────────────
 export type TreeNode =
   | string
@@ -229,15 +238,16 @@ export function planPage(
   const seenScripts = new Set<string>();
 
   function planBlock(block: Block): ElementPlan {
-    // A Section is a built-in layout container: render a <div> wrapping its
-    // child blocks. No D1 component lookup — it's a renderer primitive.
+    // A Section is a built-in layout container rendered as a CSS grid of
+    // COLUMN children (the aicms Section→Columns model). No D1 lookup — it's a
+    // renderer primitive. Component blocks live inside a column's children.
     if (block.component === SECTION_COMPONENT) {
-      return {
-        kind: "element",
-        tag: "div",
-        props: { "data-section": block.id },
-        children: (block.children ?? []).map(planBlock),
-      };
+      return planSection(block, planBlock);
+    }
+    // A column is the Section's grid cell — render as a flex column of its
+    // children. Standalone (outside a Section) it degrades to the same div.
+    if (block.component === SECTION_COLUMN_COMPONENT) {
+      return planColumn(block, planBlock, "flex-start", "flex-start");
     }
     const artifact = components.get(block.component);
     if (!artifact) {
@@ -277,6 +287,111 @@ export function planPage(
   }
 
   return { root: blocks.map(planBlock), scripts };
+}
+
+// ── Section → Columns layout (aicms model, ported to plain ElementPlan) ──────
+//
+// A Section's props (all optional, defaults in parens): columns(1),
+// columnBehavior("equal"|"collapse"), verticalAlign(top|center|bottom),
+// horizontalAlign(left|center|right), paddingTop/Right/Bottom/Left(0) with
+// matching *Unit props (rem default — the operator picks rem/px per value),
+// gap(16, px), maxWidth("1280px"|"full"), backgroundColor("transparent").
+// The grid math mirrors aicms `BlockRenderer.tsx` SectionRenderer.
+
+const ALIGN_ITEMS: Record<string, string> = {
+  top: "flex-start",
+  center: "center",
+  bottom: "flex-end",
+};
+const JUSTIFY: Record<string, string> = {
+  left: "flex-start",
+  center: "center",
+  right: "flex-end",
+};
+
+function num(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+function str(value: unknown, fallback: string): string {
+  return typeof value === "string" && value !== "" ? value : fallback;
+}
+/** A padding value + its per-side unit (rem default). */
+function pad(p: Record<string, unknown>, side: "Top" | "Right" | "Bottom" | "Left"): string {
+  return `${num(p[`padding${side}`], 0)}${str(p[`padding${side}Unit`], "rem")}`;
+}
+
+function planSection(
+  block: Block,
+  planBlock: (b: Block) => ElementPlan,
+): ElementPlan {
+  const p = (block.props ?? {}) as Record<string, unknown>;
+  const columns = num(p.columns, 1);
+  const columnBehavior = str(p.columnBehavior, "equal");
+  const gap = num(p.gap, 16);
+  const maxWidth = str(p.maxWidth, "1280px");
+  const bgColor = str(p.backgroundColor, "transparent");
+  const colJustify = JUSTIFY[str(p.horizontalAlign, "left")] ?? "flex-start";
+  const colAlignItems = ALIGN_ITEMS[str(p.verticalAlign, "top")] ?? "flex-start";
+
+  const cols = (block.children ?? []).filter(
+    (c) => c.component === SECTION_COLUMN_COMPONENT,
+  );
+  // collapse → empty columns shrink to 0fr; equal → N equal tracks.
+  const gridCols =
+    columnBehavior === "collapse"
+      ? cols.map((c) => ((c.children?.length ?? 0) > 0 ? "1fr" : "0fr")).join(" ")
+      : `repeat(${columns}, 1fr)`;
+
+  return {
+    kind: "element",
+    tag: "div",
+    props: { "data-section": block.id, style: { backgroundColor: bgColor } },
+    children: [
+      {
+        kind: "element",
+        tag: "section",
+        props: {
+          style: {
+            display: "grid",
+            gridTemplateColumns: gridCols,
+            gap: `${gap}px`,
+            paddingTop: pad(p, "Top"),
+            paddingRight: pad(p, "Right"),
+            paddingBottom: pad(p, "Bottom"),
+            paddingLeft: pad(p, "Left"),
+            maxWidth: maxWidth === "full" ? "100%" : maxWidth,
+            margin: "0 auto",
+            overflow: "hidden",
+          },
+        },
+        children: cols.map((c) => planColumn(c, planBlock, colAlignItems, colJustify)),
+      },
+    ],
+  };
+}
+
+function planColumn(
+  col: Block,
+  planBlock: (b: Block) => ElementPlan,
+  alignItems: string,
+  justifyContent: string,
+): ElementPlan {
+  return {
+    kind: "element",
+    tag: "div",
+    props: {
+      "data-section-column": col.id,
+      style: {
+        minWidth: 0,
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems,
+        justifyContent,
+      },
+    },
+    children: (col.children ?? []).map(planBlock),
+  };
 }
 
 function placeholder(message: string): ElementPlan {

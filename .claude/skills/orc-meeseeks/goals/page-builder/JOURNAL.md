@@ -189,3 +189,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (`pageBuilder.dropSectionHint`, 2-space indent). DEFERRED: PM `npm run bundle:cms` — cross-loop
   guardrail (this run's task message explicitly forbids touching the bundle); a pure UI-only change,
   no render/route behavior changed, so the bundle does not strictly need this slice yet.
+
+## 2026-06-19 18:00 — Section column model migration (pure tree + renderer first)
+- **Status:** DONE
+- **What I did:** Migrated the builder Section from a flat `<div data-section>` to the aicms
+  Section→Columns model — pure tree helpers + renderer, no UI this slice (per the backlog "pure +
+  renderer first"). `lib/render/tree.ts`: added reserved `SECTION_COLUMN_COMPONENT="__section_column__"`;
+  `planPage` Section render is now a CSS grid — outer `<div data-section style=bg>` → inner `<section>`
+  with `gridTemplateColumns` (equal `repeat(n,1fr)`, or collapse → empty cols `0fr`), `gap`(px), 4× padding
+  using a per-side rem-default unit (`paddingTopUnit` etc.), `maxWidth` ("full"→100%), `margin:0 auto`;
+  each column → `<div data-section-column>` flex column with align/justify from the section's
+  vertical/horizontal align. Math ported from aicms `BlockRenderer.tsx` SectionRenderer (~202–266).
+  `lib/pages/page-blocks.ts`: `addSection` now seeds `props.columns:1` + one `__section_column__` child;
+  new PURE `setSectionColumns(blocks,id,n)` (clamp 1–4; grow appends empty columns with tree-unique ids;
+  shrink reflows removed columns' children into the LAST kept column — matches aicms, nothing lost);
+  `addComponentToColumn(blocks,id,colIndex,name)`; `sectionColumns`, `isSectionColumn`. Kept
+  `addComponentToSection` as a thin shim → column 0 so the existing shell click-insert keeps working
+  (DnD slice 2 owns the real per-column drop UI). `validateBlocks` now drops BOTH reserved names from
+  `componentNames`.
+- **Verified:** `node --test page-blocks-sections.test.ts` 11/11 (rewritten: grow/shrink-reflow,
+  collapse 0fr, grid output shape, unique ids, no-op guards); `collect-component-names.test.ts` 4/4 (no
+  regression); CMS `npx tsc --noEmit` clean; `npx opennextjs-cloudflare build` green (port 3601 free,
+  dev stopped). Did NOT live-render (no D1/PM session offline — HITL).
+- **Files:** CMS/src/lib/render/tree.ts, CMS/src/lib/pages/page-blocks.ts,
+  CMS/src/lib/pages/page-blocks-sections.test.ts.
+  DEFERRED: PM `npm run bundle:cms` — cross-loop guardrail (task message forbids touching the bundle).
+  NOTE: render behavior DID change this run, so the deployable bundle is now STALE and owes a regen.
