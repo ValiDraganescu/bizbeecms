@@ -673,3 +673,24 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/pages/page-blocks.ts (collectTranslatableSource + mergeTranslations),
   CMS/src/components/page-builder/page-builder-shell.tsx (translateAll handler + button UI),
   CMS/scripts/page-blocks.test.mjs (+4 tests), CMS/messages/{en,fi,et}.json (pageBuilder.translate.*).
+
+## 2026-06-19 21:58 — Schema field types DATE and TIME (native pickers)
+- **Status:** DONE
+- **What I did:** Added "date"/"time" to the propsSchema field vocab. (1) page-blocks.ts:
+  `PropFieldType` union widened + both added to `FIELD_TYPES` (unknown still degrades to "string");
+  parsePropsSchema keeps date/time `translatable:false` (they fail `isText`) and reads `default` as a
+  string. New PURE `isValidDateTime(v,type)` + `DATE_RE`(YYYY-MM-DD)/`TIME_RE`(HH:mm, 0–23/0–59).
+  `validateBlockProps` schema-aware path now has a date/time branch: keep only well-formed ISO, drop
+  malformed (required → declared default if it's itself valid). Storage stays locale-agnostic ISO;
+  display formatting is the component's job. (2) ComponentSettings (page-builder-shell.tsx): new branch
+  renders native `<input type="date">`/`<input type="time">` (no dep, ponytail rung 3) pre-filled from
+  the stored ISO value. (3) Migrated blog-kit BlogPostHeader.date + PostListItem.date to `type:"date"`
+  with ISO default `2026-01-01` (was "January 1, 2026" — non-ISO would be dropped by validation; markup
+  `{{date}}` unchanged). No new i18n chrome (label comes from the schema; native picker has no extra text).
+- **Verified:** node --test scripts/*.test.mjs → 397/397 (added 2 page-blocks tests: parse + validate of
+  date/time; added date assertions to blog-kit.test.mjs; fixed the hardcoded field-vocab allowlist in all
+  5 kit tests to include date/time). `npx tsc --noEmit` fully clean. `npx opennextjs-cloudflare build`
+  GREEN (dev stopped, 3601 free).
+- **Files:** CMS/src/lib/pages/page-blocks.ts, CMS/src/components/page-builder/page-builder-shell.tsx,
+  CMS/src/lib/components/blog-kit.ts, CMS/scripts/page-blocks.test.mjs, CMS/scripts/blog-kit.test.mjs,
+  CMS/scripts/{landing,docs,portfolio,pricing}-kit.test.mjs (vocab allowlist).

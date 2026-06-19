@@ -300,7 +300,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   everywhere" — one-button = translate the source locale into all others. >>> BLOCKED-UNTIL: the ai-assistant
   goal's "Programmatic AI-translate endpoint" task ships (`POST /api/translate`). Do this AFTER that so it
   can reuse the endpoint. Gate: CMS tsc + opennext build green; regen PM cms-bundle.
-- TODO: **Schema field types for DATE and TIME — custom date/time inputs in the Block tab.** Today a
+- DONE (2026-06-19 21:58): **Schema field types for DATE and TIME.** Added `type:"date"`/`type:"time"` to
+  the propsSchema vocab (page-blocks.ts FIELD_TYPES + union; `isValidDateTime`/`DATE_RE`/`TIME_RE`).
+  validateBlockProps keeps valid ISO (date YYYY-MM-DD, time HH:mm), drops malformed (required → declared
+  default if valid); never translatable. ComponentSettings renders native `<input type=date|time>` (no dep).
+  Migrated blog-kit BlogPostHeader.date + PostListItem.date → `type:"date"` (ISO default 2026-01-01; markup
+  unchanged). +2 page-blocks tests, blog-kit date assertions, fixed hardcoded vocab allowlist in all 5 kit
+  tests. tsc clean, opennext build GREEN, 397/397. No new i18n chrome (native picker, schema-driven label).
+  No bundle regen (PM predeploy auto-regens; no D1 change). See JOURNAL 21:58.
+- ~~TODO~~: **Schema field types for DATE and TIME — custom date/time inputs in the Block tab.** Today a
   component's date is a plain string (`BlogPostHeader.date` = `{type:"string", default:"January 1, 2026"}`),
   edited as free text in `ComponentSettings`. Add `"date"` and `"time"` to the propsSchema field-type vocab
   so a component can declare a prop AS a date/time and get a proper picker instead of a text box:

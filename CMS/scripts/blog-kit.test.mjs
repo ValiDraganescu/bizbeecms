@@ -71,7 +71,7 @@ test("every component's propsSchema parses into the richer field vocab", () => {
     assert.ok(fields.length > 0, `${b.component.name}: schema parsed to no fields`);
     for (const f of fields) {
       assert.ok(
-        ["string", "richtext", "number", "boolean", "select"].includes(f.type),
+        ["string", "richtext", "number", "boolean", "select", "date", "time"].includes(f.type),
         `${b.component.name}.${f.name}: unknown field type ${f.type}`,
       );
     }
@@ -81,10 +81,15 @@ test("every component's propsSchema parses into the richer field vocab", () => {
   const header = parsePropsSchema(byName.BlogPostHeader.propsSchema);
   const title = header.find((f) => f.name === "title");
   assert.ok(title.required && title.translatable, "BlogPostHeader.title must be required + translatable");
+  const hdrDate = header.find((f) => f.name === "date");
+  assert.equal(hdrDate.type, "date", "BlogPostHeader.date is a date field (native picker)");
+  assert.ok(!hdrDate.translatable, "a date is never per-locale");
 
   const item = parsePropsSchema(byName.PostListItem.propsSchema);
   const href = item.find((f) => f.name === "href");
   assert.ok(!href.translatable, "PostListItem.href (a URL) must NOT be translatable");
+  const itemDate = item.find((f) => f.name === "date");
+  assert.equal(itemDate.type, "date", "PostListItem.date is a date field");
 
   const body = parsePropsSchema(byName.BlogPostBody.propsSchema).find((f) => f.name === "body");
   assert.equal(body.type, "richtext");

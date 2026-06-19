@@ -70,6 +70,41 @@ test("parsePropsSchema yields one field per declared prop, type-normalized", () 
   assert.deepEqual(parsePropsSchema("{bad json"), [], "bad JSON → no fields");
 });
 
+test("parsePropsSchema accepts date/time types; they are never translatable", () => {
+  const fields = parsePropsSchema(
+    JSON.stringify({
+      d: { type: "date", default: "2026-01-01", translatable: true },
+      t: { type: "time", default: "09:30" },
+    }),
+  );
+  const byName = Object.fromEntries(fields.map((f) => [f.name, f]));
+  assert.equal(byName.d.type, "date");
+  assert.equal(byName.d.default, "2026-01-01");
+  assert.equal(byName.d.translatable, false, "date is never per-locale");
+  assert.equal(byName.t.type, "time");
+  assert.equal(byName.t.default, "09:30");
+});
+
+test("validateBlockProps coerces date/time — keeps valid ISO, drops malformed", () => {
+  const schema = parsePropsSchema(
+    JSON.stringify({
+      d: { type: "date" },
+      t: { type: "time" },
+      dreq: { type: "date", required: true, default: "2026-12-25" },
+    }),
+  );
+  // valid values pass through
+  assert.deepEqual(
+    validateBlockProps({ d: "2026-06-19", t: "23:59", dreq: "2026-01-02" }, schema),
+    { d: "2026-06-19", t: "23:59", dreq: "2026-01-02" },
+  );
+  // malformed are dropped (optional) / substituted by default (required)
+  const out = validateBlockProps({ d: "June 1, 2026", t: "25:00", dreq: "nope" }, schema);
+  assert.equal(out.d, undefined, "bad date dropped");
+  assert.equal(out.t, undefined, "bad time (hour > 23) dropped");
+  assert.equal(out.dreq, "2026-12-25", "required bad date → declared default");
+});
+
 test("validateBlockProps drops undeclared keys and empty strings (renderer allowlist)", () => {
   const out = validateBlockProps(
     { title: "Hello", secret: "leak", blank: "" },

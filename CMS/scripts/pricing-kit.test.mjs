@@ -62,7 +62,7 @@ test("component names are unique within the kit", () => {
 });
 
 test("every prop's propsSchema parses to the richer field vocab", () => {
-  const KNOWN = new Set(["string", "richtext", "number", "boolean", "select"]);
+  const KNOWN = new Set(["string", "richtext", "number", "boolean", "select", "date", "time"]);
   const byName = Object.fromEntries(pricingKit().map((b) => [b.component.name, b.component]));
 
   for (const b of pricingKit()) {

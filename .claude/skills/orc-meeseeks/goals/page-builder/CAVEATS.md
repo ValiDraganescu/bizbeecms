@@ -412,3 +412,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   uses `picker.active` as the SOURCE locale (translate FROM the locale you're viewing). It renders ONLY when
   `multi && hasTranslatable`. If you add a page-level translate (kind:"page"), reuse these same helpers + the
   same endpoint — don't fork.
+
+- DATE/TIME FIELD TYPES DONE (2026-06-19 21:58): propsSchema now accepts `type:"date"`/`type:"time"`.
+  STORAGE IS ISO + locale-agnostic: date=YYYY-MM-DD, time=HH:mm (`isValidDateTime`/`DATE_RE`/`TIME_RE`
+  in page-blocks.ts). `validateBlockProps` DROPS malformed values (not valid ISO), so a kit's `default`
+  for a date/time prop MUST itself be valid ISO or it gets dropped — that's why blog-kit's date default
+  is now "2026-01-01" not "January 1, 2026". Date/time are NEVER translatable (parse forces it false).
+  DISPLAY formatting is the COMPONENT's job — bizbee's renderer binds `{{date}}` as raw text, so the
+  picker stores ISO and the page shows ISO until a component formats it; don't add locale formatting to
+  the renderer. ComponentSettings renders native `<input type=date|time>` (no dep). GOTCHA: the kit
+  regression tests (`scripts/<kit>-kit.test.mjs`) had a HARDCODED field-type allowlist
+  `["string","richtext","number","boolean","select"]` — all 5 were extended with "date","time". If you
+  add a NEW PropFieldType, grep `"string", "richtext"` across scripts/*.test.mjs and extend each.

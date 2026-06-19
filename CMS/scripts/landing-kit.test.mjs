@@ -68,7 +68,7 @@ test("every component's propsSchema parses into the richer field vocab", () => {
     assert.ok(fields.length > 0, `${b.component.name}: schema parsed to no fields`);
     for (const f of fields) {
       assert.ok(
-        ["string", "richtext", "number", "boolean", "select"].includes(f.type),
+        ["string", "richtext", "number", "boolean", "select", "date", "time"].includes(f.type),
         `${b.component.name}.${f.name}: unknown field type ${f.type}`,
       );
     }

@@ -2318,6 +2318,14 @@ function ComponentSettings({
                 />
                 {labelText}
               </label>
+            ) : f.type === "date" || f.type === "time" ? (
+              <input
+                type={f.type}
+                className={input}
+                value={typeof raw === "string" ? raw : f.default}
+                aria-label={labelText}
+                onChange={(e) => setField(f.name, e.target.value)}
+              />
             ) : f.type === "number" ? (
               <input
                 type="number"

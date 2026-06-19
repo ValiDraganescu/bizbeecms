@@ -94,7 +94,7 @@ export function blogKit(): PortableComponent[] {
       css: "",
       propsSchema: JSON.stringify({
         title: { type: "string", default: "Post title", required: true, translatable: true, label: "Title" },
-        date: { type: "string", default: "January 1, 2026", translatable: true, label: "Date" },
+        date: { type: "date", default: "2026-01-01", label: "Date" },
         author: { type: "string", default: "Author", translatable: true, label: "Author" },
       }),
     }),
@@ -188,7 +188,7 @@ export function blogKit(): PortableComponent[] {
       propsSchema: JSON.stringify({
         title: { type: "string", default: "Post title", required: true, translatable: true, label: "Title" },
         href: { type: "string", default: "#", label: "Link URL" },
-        date: { type: "string", default: "January 1, 2026", translatable: true, label: "Date" },
+        date: { type: "date", default: "2026-01-01", label: "Date" },
         excerpt: { type: "string", default: "", translatable: true, label: "Excerpt" },
       }),
     }),

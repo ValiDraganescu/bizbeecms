@@ -110,7 +110,14 @@ export function validateBlocks(
 }
 
 /** A field type the editor's settings form knows how to render. */
-export type PropFieldType = "string" | "richtext" | "number" | "boolean" | "select";
+export type PropFieldType =
+  | "string"
+  | "richtext"
+  | "number"
+  | "boolean"
+  | "select"
+  | "date"
+  | "time";
 
 /** A `{value,label}` choice for a `select` field. */
 export interface PropOption {
@@ -136,7 +143,29 @@ export interface PropField {
   options?: PropOption[];
 }
 
-const FIELD_TYPES = new Set<PropFieldType>(["string", "richtext", "number", "boolean", "select"]);
+const FIELD_TYPES = new Set<PropFieldType>([
+  "string",
+  "richtext",
+  "number",
+  "boolean",
+  "select",
+  "date",
+  "time",
+]);
+
+// ISO storage formats, locale-agnostic. DISPLAY formatting is the component's job.
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
+const TIME_RE = /^\d{2}:\d{2}$/; // HH:mm
+
+/** True if `v` is a valid stored date (YYYY-MM-DD) or time (HH:mm). PURE. */
+function isValidDateTime(v: unknown, type: "date" | "time"): boolean {
+  if (typeof v !== "string") return false;
+  if (type === "date") return DATE_RE.test(v);
+  // HH:mm with sane hour/minute ranges.
+  if (!TIME_RE.test(v)) return false;
+  const [h, m] = v.split(":").map(Number);
+  return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+}
 
 /** Normalize a raw `options` value into `{value,label}[]` (strings → value=label). */
 function parseOptions(raw: unknown): PropOption[] {
@@ -257,6 +286,10 @@ export function validateBlockProps(
       const ok = f.options?.some((o) => o.value === raw);
       if (ok) out[f.name] = raw;
       else if (f.required && f.default !== "") out[f.name] = f.default;
+    } else if (f.type === "date" || f.type === "time") {
+      // Keep only well-formed ISO values (YYYY-MM-DD / HH:mm); never per-locale.
+      if (isValidDateTime(raw, f.type)) out[f.name] = raw;
+      else if (f.required && isValidDateTime(f.default, f.type)) out[f.name] = f.default;
     } else {
       // string / richtext — string or a {loc:text} locale object; "" is dropped
       // unless required (then keep the declared default so it stays present).
