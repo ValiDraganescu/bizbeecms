@@ -16,12 +16,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   target)` and enforce it on the new delete route AND the role-change route (you
   shouldn't be able to demote/elevate above your own tier either).
 
-- **Tags are entirely absent.** No tag column/table anywhere. This goal ADDS them.
-  USER DECISION 2026-06-21: **Sites carry tags; a Manager reaches a Site when
-  country ∈ Manager.countries AND a tag ∈ Manager.tags (BOTH must match).** Model
-  tags like countries: a `user_tags` join (Manager's tags) + a `site_tags` join
-  (Site's tags), and likely a managed `tags` table so they're a pickable list (vs.
-  free-form strings — pick one in the schema slice and note why).
+- **Tags are entirely absent today.** No tag column/table anywhere. This goal ADDS
+  a dynamic, MANAGED tagging system. USER DECISIONS 2026-06-21:
+  - **Country stays EXACTLY as it is** — do NOT touch/rename/fold `COUNTRY_CODES`,
+    `user_countries`, or the Site `country` column. Tags are a SEPARATE system that
+    lives ALONGSIDE country. (The user explicitly: "we keep country as it is and
+    introduce a new tagging system.") Do not try to make country "just a tag".
+  - **Tags are MANAGED (CRUD)** — a `tags` table that Admins create/rename/delete
+    (Slice 3b), used for org labels like company group / TO channel. Pickable list,
+    not free-form per-site strings.
+  - **Manager reach = AND across dimensions**: country ∈ Manager.countries AND a
+    tag ∈ Manager.tags (within each dimension, any-of/OR; between dimensions, AND).
+    Both `user_tags` (Manager's tags) and `site_tags` (Site's tags) join by tagId.
 
 - **Reuse the country pattern, don't reinvent.** `userCountries` (PK userId+country),
   `COUNTRY_CODES`, `getUserCountries`, `canManageSiteByCountry`. Tags + the Manager

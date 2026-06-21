@@ -34,11 +34,14 @@ existing `SiteManager` rows → Editor; note in a CAVEAT.)
 - **Removal hierarchy enforced server-side**: a user can never remove someone of
   an equal-or-higher tier per the rules above (Admin↛SuperAdmin, Manager↛
   SuperAdmin/Admin). Pure, tested `canRemoveUser(actor, target)`.
-- **Tags** are a real data model: a tag set on Sites + a tag set on Managers
-  (assigned by Admins). Reuse the country-scope pattern (`user_countries`-style
-  join) for `user_tags` + `site_tags`. (Tag vocabulary: free-form strings vs. a
-  managed list — settle in the schema slice; default to a managed `tags` table so
-  they're pickable.)
+- **Tags** are a NEW dynamic, MANAGED data model that lives ALONGSIDE country —
+  country stays exactly as it is (fixed `COUNTRY_CODES` + `user_countries` + Site
+  `country` column UNCHANGED). Tags are admin-CRUD'able org labels (company group,
+  TO channel, …): a managed `tags` table + `site_tags` + `user_tags`, mirroring the
+  country-scope join shape but kept SEPARATE from country (do not fold country into
+  tags). Sites get both a country and zero+ tags; Managers get both countries and
+  tags assigned by Admins. (USER DECISION 2026-06-21 — country is its own concept;
+  tagging is additive.)
 - Manager access = country-match **AND** tag-match; Editor access = assignment.
   `listSitesForUser` + `canManageSiteByCountry` (rename → `canManageSite`) updated.
 - A **global User-Management UI + API** (NEW): list all users, change a user's

@@ -29,17 +29,36 @@ tsc + opennext build green + PM node tests + EN/FI/ET for new strings.
   tier). Node tests covering each (actor,target) pair. NO route yet (Slice 4 wires
   it) — pure + tested this slice so the rule is locked before UI.
 
-- TODO: **Slice 3 — tags data model + Manager country+tag reach.** Add tags:
-  USER DECISION — Sites carry tags; Manager reaches a Site when country ∈
-  Manager.countries AND tag ∈ Manager.tags (BOTH). Schema: a managed `tags` table
-  (pickable list) + `user_tags` (Manager's tags, PK userId+tag) + `site_tags` (PK
-  siteId+tag), mirroring `user_countries`. Drizzle migration. Update the access
-  rule: rename/extend `canManageSiteByCountry` → `canManageSite(actor, countries,
-  tags, site, siteTags)` and thread it through `listSitesForUser` so Managers see
-  only country-AND-tag matches; Editors still by assignment; SuperAdmin/Admin
-  global. Helpers to read a user's tags + a site's tags. Pure access-rule tests
-  (country-only match → denied; tag-only → denied; both → allowed; Editor by
-  assignment; Admin global). Gate.
+- TODO: **Slice 3 — dynamic tags data model + Manager country-AND-tag reach.**
+  USER DECISION 2026-06-21 (refined): **COUNTRY STAYS EXACTLY AS IT IS** — keep the
+  fixed `COUNTRY_CODES`, `user_countries`, and the Site `country` column UNCHANGED.
+  Add a SEPARATE, dynamic, MANAGED tagging system ALONGSIDE country (tags are
+  things like "company group", "TO channel", arbitrary org labels — distinct from
+  country). Sites can be tagged with a country (existing) AND with these tags (new).
+  Schema (new, parallel to country — do NOT fold country into it): a managed `tags`
+  table (id, label — admin-CRUD'able, see Slice 3b) + `user_tags` (Manager's tags,
+  PK userId+tagId) + `site_tags` (PK siteId+tagId). Drizzle migration.
+  ACCESS RULE — **AND across the two dimensions** (USER DECISION 2026-06-21): a
+  Manager reaches a Site when country ∈ Manager.countries **AND** a tag ∈
+  Manager.tags (both dimensions must match; within a dimension it's OR/any-of).
+  Extend (don't break country) `canManageSiteByCountry` → `canManageSite(actor,
+  actorCountries, actorTagIds, site, siteTagIds)` keeping the existing country logic
+  and adding the tag conjunction; thread through `listSitesForUser`. Editors still
+  by assignment; SuperAdmin/Admin global (no scope). Helpers to read a user's tagIds
+  + a site's tagIds. Pure access-rule tests: country-match-only → DENIED, tag-only →
+  DENIED, both → ALLOWED, Editor by assignment, Admin global. Gate.
+
+- TODO: **Slice 3b — tag management (CRUD the dynamic tags).** USER 2026-06-21:
+  "tags can be managed". A small admin surface to create/rename/delete tags in the
+  `tags` table (the managed list Slice 3 references), so Admins curate the
+  vocabulary (company groups, TO channels, …) before assigning them to Sites/
+  Managers. `GET/POST/PATCH/DELETE /api/tags` gated to Admin+ (deleting a tag
+  cascades its `site_tags`/`user_tags` rows — confirm onDelete cascade in schema).
+  Tiny UI (list + add + rename + delete behind an in-app confirm modal). Reuse
+  design-system + purpose tokens; EN/FI/ET. Pure validation (non-empty/unique
+  label) node-tested. Gate. (Can land right after Slice 3's schema; the
+  user-management UI in Slice 5 consumes this list for the Manager tag picker, and
+  the Site detail page gets a tag picker too — note that as part of Slice 5/site UI.)
 
 - TODO: **Slice 4 — global User-Management API.** NEW REST under
   `app/api/users/*`: `GET` list all users (with role, countries, tags — scoped to
