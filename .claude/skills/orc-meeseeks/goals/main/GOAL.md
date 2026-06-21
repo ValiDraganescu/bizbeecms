@@ -24,6 +24,14 @@ The CMS is **no longer "just the default Next.js install"** — it is the produc
 
 **Reference (`../aicms`) — mine these solved features (Postgres→D1, keep R2):** hierarchical pages (slugs, publish status, per-locale SEO, redirects, templates, nav menus), section/block trees + custom components, per-Site **content locales** (data-driven, distinct from admin UI), AI translate tool, R2 asset gallery (upload + CDN serve), and site settings (brand identity, design system, AI persona, theme).
 
+### Delivered subgoals (consolidated into main, archived 2026-06-21)
+Five M2 tracks are done; their files moved to `goals/archive/<slug>/` for reference (full journals preserved there).
+- **page-builder** (`archive/page-builder/`) — visual page builder: top-bar + 3-col shell, layers/preview, block/page/SEO tabs, responsive columns + per-viewport visibility, per-locale SEO + OG image, versioning (draft/publish/history/restore), AI-translate.
+- **ai-assistant** (`archive/ai-assistant/`) — page-aware Intercom-style CMS chat widget: per-page prompt + scoped read/write tools, debug view, searchable model picker over the full Workers-AI catalog, per-Site history, multi-turn tool loop.
+- **binding-adapters** (`archive/binding-adapters/`) — ports-and-adapters seam (Db/Storage/Ai interfaces + CF adapters + mocked-port test); CF-native, no second plug. AI-over-REST path delivered via ai-assistant.
+- **deploy-audit-trail** (`archive/deploy-audit-trail/`) — persisted per-step deploy events (start/duration/error + run totals), ingest API, localized timeline UI. Only a live end-to-end deploy spot-check remains (non-codeable).
+- **custom-domains** (`archive/custom-domains/`) — custom-domain SSO allowlist + always-visible DNS setup guide. `*.site.bizbeecms.com` ruled out (USER DECISION 2026-06-19); sites stay permanently on `bizbeecms-cms-<slug>.workers.dev`.
+
 ---
 
 ## Milestone 1 capability spec (reference)
