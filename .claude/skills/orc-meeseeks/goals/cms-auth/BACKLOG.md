@@ -33,43 +33,68 @@ green + regen PM cms-bundle + EN/FI/ET for new strings.
   password hash/verify round-trip (no live crypto-cap surprise) + session
   create/read. NO UI yet.
 
-- TODO: **Slice 2 — in-CMS login page replaces the auto-redirect; conditional SSO
-  button.** Replace the auto-redirect in `CMS/src/app/admin/layout.tsx`: when
-  signed-out, render an in-CMS **login page** (email + password form → a new
-  `POST /api/auth/login` on the CMS that verifies against the Slice 1 user table
-  and mints the CMS session). Show a **"Sign in with BizbeeCMS" SSO button ONLY
-  when the visitor arrived from PM** — detect via `Referer`/an explicit `?from=pm`
-  param matched against `PM_ORIGIN` from config (study `forwarded-host`/`guard.ts`
-  for the existing host-from-config pattern; NEVER hardcode the domain). The button
-  triggers the EXISTING cms-sso → sso-callback handoff (keep it intact). Reconcile
-  the SSO-callback session with the local-login session per Slice 0 (one cookie).
-  EN/FI/ET for the page + button. Node test the SSO-button visibility helper
-  (origin match true/false).
+- TODO: **Slice 2 — in-CMS login page replaces the auto-redirect; email/password +
+  conditional SSO button (Google added in Slice 2b).** Replace the auto-redirect in
+  `CMS/src/app/admin/layout.tsx`: when signed-out, render an in-CMS **login page**
+  (email + password form → a new `POST /api/auth/login` on the CMS that verifies
+  against the Slice 1 user table and mints the CMS session). Show a **"Sign in with
+  BizbeeCMS" SSO button ONLY when the visitor arrived from PM** — detect via
+  `Referer`/an explicit `?from=pm` param matched against `PM_ORIGIN` from config
+  (study `forwarded-host`/`guard.ts` for the existing host-from-config pattern;
+  NEVER hardcode the domain). The button triggers the EXISTING cms-sso →
+  sso-callback handoff (keep it intact). Reconcile the SSO-callback session with the
+  local-login session per Slice 0 (one cookie). Leave a placeholder slot for the
+  Google button (Slice 2b). EN/FI/ET for the page + button. Node test the SSO-button
+  visibility helper (origin match true/false).
 
-- TODO: **Slice 3 — CMS roles + server-side authorization (mirror PM minus
-  country).** Define the CMS role set (RECOMMEND `Owner` | `Editor` — Owner can
-  invite + manage users + everything; Editor edits content only; settle exact names
-  in the PR and note why). Pure role-check helpers (`canInvite`, `canManageUsers`,
-  `canEditContent`) with node tests. Wire them into BOTH guard layers: the
-  `/admin/*` page gate (`admin/layout.tsx`/guard) AND the `/api/*` route guard — a
-  page-only check is bypassable. SSO-provisioned operators get a role per Slice 0.
-  EN/FI/ET for any role label/error.
+- TODO: **Slice 2b — Google sign-in (OAuth 2.0, own client) on the login page.**
+  USER 2026-06-21: the login page must also offer **Sign in with Google**. NO Google
+  auth exists anywhere in the repo today — this is net-new. Register a Google Cloud
+  OAuth 2.0 client; add `GET /api/auth/google/start` (redirect to Google's consent
+  with state/PKCE) + `GET /api/auth/google/callback` (exchange code, verify the
+  id_token, read the VERIFIED email). On callback: match an existing CMS user by
+  email → sign in; else create a CMS user (role per Slice 0/3 — an UNINVITED Google
+  user with no prior row: decide whether to allow self-signup or require a matching
+  invite; RECOMMEND require an existing user/invite so randoms can't get in — note
+  the choice). Mint the same CMS session cookie (one session notion). Client
+  id/secret + redirect origin from Worker vars/secrets (deployer-injected, NEVER
+  hardcoded — thread like PM_ORIGIN/CMS_AUTH_SECRET). Pure helpers (state/nonce
+  verify, id_token email extraction) node-tested; do NOT call live Google in tests.
+  EN/FI/ET for the button. Gate.
 
-- TODO: **Slice 4 — invitation flow (token + email + accept), mirror PM minus
-  country.** Add an `invites` table (id, email, role, invitedBy, token 64-hex,
+- TODO: **Slice 3 — CMS roles + server-side authorization (mirror PM's role SET,
+  drop scope).** Use PM's role set from the `pm-roles` subgoal
+  (`SuperAdmin | Admin | Manager | Editor` + `canRemoveUser` hierarchy) — copy the
+  NAMES + the removal helper, DROP country/tag scope (a single CMS = one Site).
+  USER RULE 2026-06-21: a PM user reaching the CMS via SSO/cms-validate = **Admin**
+  (auto-provisioned per Slice 0). CMS-local users get their role from their invite.
+  Pure role-check helpers (`canInvite`, `canManageUsers`, `canEditContent`,
+  `canRemoveUser`) with node tests. Wire into BOTH guard layers: the `/admin/*` page
+  gate (`admin/layout.tsx`/guard) AND the `/api/*` route guard — page-only is
+  bypassable. EN/FI/ET for role labels/errors. (Coordinate with pm-roles: same role
+  names so the CMS can mirror; if pm-roles hasn't landed the names yet, this is
+  loosely BLOCKED — note it and you may proceed with the agreed names.)
+
+- TODO: **Slice 4 — invitation flow (token + email + accept) via Cloudflare Email
+  Service.** Add an `invites` table (id, email, role, invitedBy, token 64-hex,
   acceptedAt, expiresAt 7-day TTL — copy PM's shape, drop `invite_countries`).
-  `POST /api/invite` (Owner-only per Slice 3) creates the invite + sends the accept
-  email via the Cloudflare EMAIL binding with an `APP_ORIGIN`-based accept URL
-  (mirror PM `lib/mail/send-invite.ts`; confirm the CMS Worker has an EMAIL binding
-  + `APP_ORIGIN` var — if not, that's a deployer-wiring sub-task, note it).
-  `POST /api/invite/accept/[token]` validates expiry/accepted, the invitee sets a
-  password (10-char min), creates the CMS user with the invited role, mints a
-  session. Node test: invite create → accept happy path + expired/already-accepted
-  rejection (mock email). EN/FI/ET for the invite email + accept page.
+  `POST /api/invite` (gated by `canInvite`, Slice 3) creates the invite + sends the
+  accept email via the **Cloudflare Email Service**
+  (https://developers.cloudflare.com/email-service/ — the `send_email` binding;
+  mirror PM `lib/mail/send-invite.ts`, which already targets `env.EMAIL.send`).
+  Confirm the CMS Worker has the `send_email` binding + a verified sender +
+  `APP_ORIGIN` var; PM's `wrangler.jsonc` has the binding COMMENTED OUT — provision
+  it for the CMS (deployer-wiring sub-task; note it if blocked). Accept URL is
+  `APP_ORIGIN`-based. `POST /api/invite/accept/[token]` validates expiry/accepted,
+  the invitee sets a password (10-char min) OR links Google (Slice 2b), creates the
+  CMS user with the invited role, mints a session. Node test: invite create →
+  accept happy path + expired/already-accepted rejection (mock email; no live send).
+  EN/FI/ET for the invite email + accept page.
 
-- TODO: **Slice 5 — CMS member management UI (list / invite / change role /
-  revoke).** An admin page (Owner-only) listing CMS users + pending invites, with
-  invite-by-email + role select, change-role, and revoke-invite / remove-user.
-  Reuse the design-system components + purpose tokens. Deletions use an IN-APP
-  confirm modal (NO native confirm — breaks browser-review sessions). EN/FI/ET.
-  Gate as usual.
+- TODO: **Slice 5 — CMS user management UI (list / invite / change role / remove).**
+  An admin page (gated by `canManageUsers`) listing CMS users + pending invites,
+  with invite-by-email + role select (the Slice 3 role set), change-role, and
+  revoke-invite / remove-user — every mutation enforcing `canRemoveUser` /
+  role-change rules. Reuse the design-system components + purpose tokens. Deletions
+  use an IN-APP confirm modal (NO native confirm — breaks browser-review sessions).
+  EN/FI/ET. Gate as usual. (Mirrors pm-roles Slice 5, CMS-local, no country/tag.)

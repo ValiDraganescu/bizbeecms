@@ -11,12 +11,35 @@ Read every line before working. Each entry was learned the hard way by a previou
   runs migrations per-Site at deploy time (confirm the migration path in the
   deployer before assuming it auto-applies).
 
-- **PM is the blueprint — copy the mechanics, NOT the country scope.** Mirror PM's
-  `password.ts` (PBKDF2 **100k cap** — exceeding it throws at runtime ONLY on
-  Workers, see memory `pm-workers-pbkdf2-100k-cap`), `session.ts`
-  (`bizbee_session` cookie + KV, 7-day TTL), and the invite token/TTL/accept flow.
-  DROP `user_countries`, `invite_countries`, `COUNTRY_CODES`,
-  `canManageSiteByCountry`, `getUserCountries`.
+- **PM is the blueprint — copy the mechanics + the ROLE SET, drop the SCOPE.**
+  Mirror PM's `password.ts` (PBKDF2 **100k cap** — exceeding it throws at runtime
+  ONLY on Workers, see memory `pm-workers-pbkdf2-100k-cap`), `session.ts`
+  (`bizbee_session` cookie + KV, 7-day TTL), the invite token/TTL/accept flow, AND
+  the `pm-roles` role set (`SuperAdmin | Admin | Manager | Editor` + the
+  `canRemoveUser` removal hierarchy). DROP all country/tag SCOPE
+  (`user_countries`, `invite_countries`, `COUNTRY_CODES`, `user_tags`, `site_tags`,
+  `canManageSiteByCountry`, `getUserCountries`) — a single deployed CMS is ONE Site,
+  so scope is meaningless here. Coordinate role NAMES with the `pm-roles` subgoal so
+  the two stay identical.
+
+- **PM-with-CMS-site-access = Admin (USER RULE 2026-06-21).** A PM user who reaches
+  the CMS via SSO/cms-validate is a CMS **Admin** — wire that role on the
+  auto-provisioned SSO user (Slice 0/3). CMS-local (email/Google/invited) users get
+  their role from their invite, defaulting per Slice 0.
+
+- **Google sign-in is net-new (Slice 2b).** No Google/OAuth exists anywhere today.
+  Use an own OAuth 2.0 client; verify the id_token email server-side; client
+  id/secret + redirect from deployer-injected Worker vars, never hardcoded. Decide
+  whether an uninvited Google user can self-signup — RECOMMEND no (require a
+  matching user/invite) so randoms can't walk in.
+
+- **Invite email = Cloudflare Email Service `send_email` binding** (the user's
+  link: https://developers.cloudflare.com/email-service/). PM's `send-invite.ts`
+  already calls `env.EMAIL.send` but PM's `wrangler.jsonc` has the `send_email`
+  binding COMMENTED OUT (needs a verified sender on a paid plan). The CMS Worker
+  must get the binding + a verified sender provisioned by the deployer — treat
+  missing-binding as a deploy-wiring sub-task, and degrade to logging the link in
+  dev (as PM does) so tests/dev don't hard-fail.
 
 - **Cookie-name collision risk.** PM's session cookie is `bizbee_session` on the PM
   host; the CMS guard already FORWARDS that cookie to PM. If the CMS now mints its
