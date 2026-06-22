@@ -41,7 +41,7 @@ const statusTone: Record<SiteStatus, BadgeTone> = {
  * country (SuperAdmin/global → all; scoped Admin → their countries) OR by
  * assignment (site_users). Users who can manage the Site (country reach) also
  * get the edit form and the user-assignment panel; assigned-only viewers
- * (e.g. SiteManagers) see the read-only overview.
+ * (e.g. Editors) see the read-only overview.
  */
 export default async function SiteDetailPage({
   params,

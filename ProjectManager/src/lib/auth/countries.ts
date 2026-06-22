@@ -1,6 +1,6 @@
 /**
  * Fixed set of country scopes for PM users/invites. `country` on a user/invite
- * scopes an Admin/SiteManager to that country; `null` means global (no scope).
+ * scopes an Admin/Manager to that country; `null` means global (no scope).
  *
  * This is the server-side source of truth — invite validation rejects any code
  * not in this list. The display names are i18n-agnostic ISO short names; the

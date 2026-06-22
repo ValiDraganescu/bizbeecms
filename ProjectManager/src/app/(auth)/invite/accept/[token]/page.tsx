@@ -17,7 +17,8 @@ import { AcceptForm } from "./accept-form";
 const roleKey: Record<Role, string> = {
   SuperAdmin: "superAdmin",
   Admin: "admin",
-  SiteManager: "siteManager",
+  Manager: "manager",
+  Editor: "editor",
 };
 
 /**

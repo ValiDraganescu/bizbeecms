@@ -11,11 +11,12 @@ import {
  * bizbeecms ProjectManager — D1 (SQLite) schema.
  *
  * Tables: users, invites, sites, site_users.
- * Roles: SuperAdmin (first registrant), Admin, SiteManager.
- * `country` scopes Admin/SiteManager; null = global.
+ * Roles: SuperAdmin (first registrant), Admin, Manager, Editor.
+ * `country` scopes Admin/Manager; null = global. Editor reaches Sites only by
+ * assignment (site_users) — it is the renamed old "SiteManager".
  */
 
-export type Role = "SuperAdmin" | "Admin" | "SiteManager";
+export type Role = "SuperAdmin" | "Admin" | "Manager" | "Editor";
 export type SiteStatus = "draft" | "deploying" | "deployed" | "failed";
 
 export const users = sqliteTable(

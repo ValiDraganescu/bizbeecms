@@ -25,7 +25,7 @@ import { DeployStatusBadge } from "./deploy-status-badge";
 
 /**
  * Sites list + create. The list is scoped server-side to what the user may see
- * (SuperAdmin/global → all; scoped Admin → their countries; SiteManager → their
+ * (SuperAdmin/global → all; scoped Admin → their countries; Editor → their
  * assignments). The create card only shows for users who may create Sites; the
  * action re-enforces authz regardless.
  */

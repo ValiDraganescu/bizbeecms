@@ -18,7 +18,7 @@ import { cn } from "./cn";
  *
  * Features: searchable, single or multiple selection, min/max selected items,
  * custom item rendering, custom search predicate, and a configurable selected-
- * items preview ("Admin", "SiteManager", "+3").
+ * items preview ("Admin", "Editor", "+3").
  *
  * Item model: works out of the box with the default Option shape
  * `{ id, label, data? }` (zero config), or with any custom item type T via the

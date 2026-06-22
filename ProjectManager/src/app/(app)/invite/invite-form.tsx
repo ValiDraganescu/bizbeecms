@@ -45,9 +45,9 @@ export function InviteForm({ inviter }: { inviter: InviterCtx }) {
     () =>
       INVITABLE_ROLES.map((r) => ({
         id: r,
-        label: tRoles(
-          r === "Admin" ? "admin" : "siteManager",
-        ),
+        // role i18n keys are the role name with a lowercased first letter
+        // (Admin → admin, Editor → editor, Manager → manager).
+        label: tRoles(r.charAt(0).toLowerCase() + r.slice(1)),
       })),
     [tRoles],
   );

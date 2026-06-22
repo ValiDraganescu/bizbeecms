@@ -21,7 +21,8 @@ import { Caption } from "./specimen";
 const ROLES: DefaultOption[] = [
   { id: "superadmin", label: "SuperAdmin" },
   { id: "admin", label: "Admin" },
-  { id: "sitemanager", label: "SiteManager" },
+  { id: "manager", label: "Manager" },
+  { id: "editor", label: "Editor" },
 ];
 
 // --- Custom item type T (no {id,label} shape) — exercises accessors + renderOption ---
@@ -208,7 +209,8 @@ export function DisabledOptionDemo() {
   const roles: DefaultOption[] = [
     { id: "superadmin", label: "SuperAdmin" },
     { id: "admin", label: "Admin" },
-    { id: "sitemanager", label: "SiteManager" },
+    { id: "manager", label: "Manager" },
+    { id: "editor", label: "Editor" },
   ];
   return (
     <div className="flex flex-col items-start gap-2">

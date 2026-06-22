@@ -9,16 +9,16 @@ import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
  * countries). Rules:
  *  - SuperAdmin may invite any invitable role, any country set (incl. global).
  *  - A global Admin (own scope empty) with `canInvite` may invite Admin or
- *    SiteManager with any country set, including global.
- *  - A country-scoped Admin with `canInvite` may invite Admin or SiteManager,
+ *    Editor with any country set, including global.
+ *  - A country-scoped Admin with `canInvite` may invite Admin or Editor,
  *    but the granted set must be a NON-EMPTY SUBSET of the Admin's own
  *    countries — they can't grant global, nor a country outside their scope.
- *  - SiteManagers (and Admins without canInvite) may not invite at all.
+ *  - Editors (and Admins without canInvite) may not invite at all.
  *  - No one can mint another SuperAdmin via invite (only the first registrant).
  */
 
 /** Roles that can be granted through an invite (SuperAdmin is excluded). */
-export const INVITABLE_ROLES: Role[] = ["Admin", "SiteManager"];
+export const INVITABLE_ROLES: Role[] = ["Admin", "Editor"];
 
 export function canUserInvite(user: User): boolean {
   if (user.role === "SuperAdmin") return true;

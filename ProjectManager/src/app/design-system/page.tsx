@@ -245,7 +245,8 @@ export default function DesignSystemPage() {
                 <Select id="ds-role" defaultValue="Admin">
                   <option value="SuperAdmin">SuperAdmin</option>
                   <option value="Admin">Admin</option>
-                  <option value="SiteManager">SiteManager</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Editor">Editor</option>
                 </Select>
                 <FieldHint>{t("inputs.roleHint")}</FieldHint>
               </Field>
@@ -344,7 +345,8 @@ export default function DesignSystemPage() {
             <Specimen label={t("badges.roles")} hint={t("badges.rolesHint")}>
               <Badge tone="primary" dot={false}>SuperAdmin</Badge>
               <Badge tone="neutral" dot={false}>Admin</Badge>
-              <Badge tone="neutral" dot={false}>SiteManager</Badge>
+              <Badge tone="neutral" dot={false}>Manager</Badge>
+              <Badge tone="neutral" dot={false}>Editor</Badge>
               <Badge tone="neutral" dot={false}>{t("badges.sites", { count: 12 })}</Badge>
             </Specimen>
           </Section>
@@ -472,7 +474,7 @@ export default function DesignSystemPage() {
                   <TableRow>
                     <TableCell>juhan@bizbee.example</TableCell>
                     <TableCell>
-                      <Badge tone="neutral" dot={false}>SiteManager</Badge>
+                      <Badge tone="neutral" dot={false}>Editor</Badge>
                     </TableCell>
                     <TableCell>EE</TableCell>
                     <TableCell>

@@ -91,14 +91,14 @@ export async function updateSite(
  * Sites visible to `user`, newest first.
  *  - SuperAdmin / global Admin: every Site.
  *  - Country-scoped Admin: Sites whose country is in their scope.
- *  - SiteManager (and as a union for scoped Admins): Sites they're assigned to
+ *  - Editor (and as a union for scoped Admins): Sites they're assigned to
  *    via site_users.
  */
 export async function listSitesForUser(user: User): Promise<Site[]> {
   const db = await getDb();
   const countries = await getUserCountries(user.id);
 
-  if (hasGlobalScope(user, countries) && user.role !== "SiteManager") {
+  if (hasGlobalScope(user, countries) && user.role !== "Editor") {
     return db
       .select()
       .from(schema.sites)
@@ -200,7 +200,7 @@ export type AssignableUser = { id: string; email: string };
 
 /**
  * Users that may be assigned to a Site of the given country, for the "managed
- * by" list. The candidate pool is every role (SuperAdmin, Admin, SiteManager)
+ * by" list. The candidate pool is every role (SuperAdmin, Admin, Manager, Editor)
  * bounded by country: a user with global scope (no rows — every SuperAdmin, and
  * global Admins) fits any Site; a country-scoped user fits only Sites in their
  * scope; a global Site accepts only globally-scoped users.

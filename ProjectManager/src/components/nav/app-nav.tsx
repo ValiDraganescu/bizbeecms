@@ -10,7 +10,8 @@ import { canUserInvite } from "@/lib/invite/authz";
 const roleKey: Record<Role, string> = {
   SuperAdmin: "superAdmin",
   Admin: "admin",
-  SiteManager: "siteManager",
+  Manager: "manager",
+  Editor: "editor",
 };
 
 /**

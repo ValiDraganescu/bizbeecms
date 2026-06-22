@@ -15,7 +15,7 @@ import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
  *    own countries (never global, never an outside country), and may see/edit
  *    only Sites whose country is in their scope. Global Sites are NOT visible to
  *    a scoped Admin.
- *  - SiteManagers may not create or edit Sites; they only see Sites they're
+ *  - Editors may not create or edit Sites; they only see Sites they're
  *    assigned to (handled in the data layer via site_users, not here).
  */
 
@@ -63,7 +63,7 @@ export function authorizeSiteCountry(
  * (Admin reach). SuperAdmin and global Admins reach every Site; a scoped Admin
  * reaches only Sites whose country is in their scope (global Sites excluded).
  *
- * NOTE: SiteManagers reach Sites via assignment (site_users), which this does
+ * NOTE: Editors reach Sites via assignment (site_users), which this does
  * NOT cover — the data layer unions assignment in for the list/detail.
  */
 export function canManageSiteByCountry(
