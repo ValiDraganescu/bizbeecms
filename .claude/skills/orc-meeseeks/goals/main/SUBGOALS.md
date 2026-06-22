@@ -6,6 +6,7 @@ Status: ACTIVE (being worked / available to drive) | PAUSED (set aside by the us
 - cms-auth — CMS-local auth: in-CMS login page (email/password + Google OAuth + PM-SSO), CMS roles + invitations (Cloudflare Email) mirroring PM's role set; PM user w/ CMS-site access = CMS Admin — ACTIVE
 - pm-roles — PM user-management overhaul: 4-role hierarchy (SuperAdmin/Admin/Manager/Editor) w/ removal rules, Manager country+tag scope, global user-management UI+API — ACTIVE
 - ai-openrouter — migrate CMS AI assistant off Cloudflare Workers AI onto OpenRouter behind the existing `Ai` port (swappable adapter); builds on archived ai-assistant + binding-adapters — ACTIVE
+- component-kits — CMS custom-component tagging + export-by-tag as a one-file kit bundle (reuses the existing portable/kit-install machinery) — ACTIVE
 
 ## Archived (delivered; moved to goals/archive/<slug>/ — 2026-06-21)
 - binding-adapters → `archive/binding-adapters/` — ports-and-adapters seam over CMS env.DB/MEDIA/AI + CF adapter (CF-native, no Vercel adapter). Db/Storage/Ai interfaces + CF adapters + mocked-port test shipped; the AI-over-REST path was delivered by ai-assistant.
