@@ -1,38 +1,32 @@
 # Note to the next Meeseeks (component-kits)
 
-Slices 1 + 2 + 3 are DONE (2026-06-22).
-- Slice 3: pure `buildKitBundle(rows, tag, meta?)` in `lib/components/portable.ts`
-  (`KIT_FORMAT="bizbeecms.kit"`, `KIT_VERSION=1`, `KitBundle` type) — reuses
-  `serializeComponent`, unions+dedupes assets, drops in-kit componentDeps (only
-  external remain). New `GET /api/components/export?tag=<tag>` → one `*.kit.json`.
-  UI: "Export kit" button by the tag filter. en/fi/et `exportKit`+`exportKitPickTag`.
-  Tests: `scripts/build-kit-bundle.test.mjs` (5).
+Slices 1 + 2 + 3 + 4 are DONE (2026-06-22). The core goal (tag → export kit →
+import kit) is fully delivered end-to-end:
+- Slice 4: pure `parseKitBundle(raw)` trust helper in `lib/components/portable.ts`
+  (validates `bizbeecms.kit` envelope, loops `parsePortableComponent` per component,
+  partial-tolerant — skips + reports bad components, fails whole on bad envelope).
+  `/api/components` POST auto-detects `format==="bizbeecms.kit"` → `importKit()` →
+  `upsertImportedComponent(c, undefined, kitName)` (sourceKit groups them in the
+  rail). UI paste/upload box auto-handles `.kit.json`; reports kitImported+kitSkipped.
+  Tests: `scripts/parse-kit-bundle.test.mjs` (8). en/fi/et `kitImported`/`kitSkipped`.
 
-PICK NEXT: **Slice 4 — import a kit bundle (multi-component, one step).**
-- Accept the `bizbeecms.kit` envelope on import. Cleanest: a new pure trust helper
-  `parseKitBundle(raw)` in `portable.ts` that validates `format===KIT_FORMAT` +
-  `version===KIT_VERSION` + `components` is an array, then runs EACH element through
-  the EXISTING `parsePortableComponent` (per-component trust boundary — never bypass
-  it). Return `{ok, components: ImportedComponent[], assets, componentDeps, errors}`
-  (union deps, collect per-component errors with the component index/name).
-- Wire it into the import path. Two options: (a) extend the `/api/components` POST to
-  detect a kit envelope and loop, or (b) a new endpoint. Either way install EACH via
-  `upsertImportedComponent(c, undefined, kitName)` so `sourceKit` groups them in the
-  rail (mirror `api/components/kit/route.ts`'s loop — validate ALL first, then write).
-  Carry the kit's tag onto each component too (the envelope already has per-component
-  `tags`, so they round-trip; just make sure import persists them — it does).
-- UI: the existing paste/upload box could auto-detect a `.kit.json` (check `format`)
-  and call the kit-import path; report per-component created/updated + skipped.
-- Pure `parseKitBundle` node-tested (good bundle, bad format/version, one bad
-  component fails just that one or the whole batch — decide + test it). EN/FI/ET.
-- THEN Slice 5 (optional) — rail grouping by tag in `lib/components/grouped.ts`.
+PICK NEXT: **Slice 5 (optional) — rail grouping by tag.** `lib/components/grouped.ts`
+`groupComponentsByKit` could gain a by-TAG grouping so the page-builder component
+rail shows components grouped by tag, not just kit origin. Small, additive. Decide
+if it reads as useful — the core goal is already met, so this is polish. If you do
+it: pure grouping fn + node test, EN/FI/ET for any new labels, gate (tsc + opennext
++ cms-bundle regen). If it doesn't add value, invent the next worthwhile slice
+toward GOAL.md (e.g. a "preview kit contents before install" affordance, or surfacing
+the kit's `skipped`/`missingComponents` more richly in the UI).
 
 WATCH OUT:
-- A parallel pm-roles worker edits ProjectManager/src/** + migrations; a CMS-ports
-  worker edits CMS/src/lib/ports/** + CMS/wrangler.jsonc. STAGE ONLY YOUR OWN PATHS
-  (your only PM file = `cms-bundle.generated.js`). NEVER `git add -A`.
-- `bundle:cms` (from ProjectManager/) runs the CMS opennext build internally — that
-  IS the opennext gate AND regens the PM bundle in one step. NEVER run it (or the raw
-  opennext build) while `npm run dev` is up.
-- Pre-existing unrelated failure: `scripts/ports-sole-reader.guard.test.mjs` (content-db.ts,
-  content-collections goal) — not this goal. Don't chase it.
+- STAY OUT of `CMS/src/lib/chat/**` + `CMS/src/app/api/chat/**` — a parallel CMS chat
+  worker edits those (saw `models.ts`, `api/chat/models/route.ts`, `models.test.mjs`
+  dirty this run). A pm-roles worker edits `ProjectManager/src/**` + migrations.
+  STAGE ONLY YOUR OWN PATHS (your only PM file = `cms-bundle.generated.js`). NEVER `git add -A`.
+- `bundle:cms` (from ProjectManager/) IS the opennext gate AND regens the PM bundle in
+  one step. NEVER run it (or raw opennext) while CMS `npm run dev` (port 3601) is up.
+- `parseKitBundle` is defined ABOVE `ImportedComponent`/`parsePortableComponent` in
+  portable.ts — fine (function/type hoisting), but keep it that way or move all three.
+- `t()` is strict: optional message args (`string|undefined`) need a `?? ""` fallback
+  or tsc fails (hit this on `j.name` when I widened the import-response type).

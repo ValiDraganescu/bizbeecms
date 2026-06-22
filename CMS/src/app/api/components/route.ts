@@ -22,7 +22,12 @@ import {
   updateComponentTags,
   upsertImportedComponent,
 } from "@/db/component-store";
-import { parsePortableComponent, serializeComponent } from "@/lib/components/portable";
+import {
+  KIT_FORMAT,
+  parseKitBundle,
+  parsePortableComponent,
+  serializeComponent,
+} from "@/lib/components/portable";
 import { normalizeTags } from "@/lib/components/tags";
 import { requireAdmin } from "@/lib/auth/guard";
 
@@ -112,6 +117,24 @@ export async function POST(request: Request): Promise<Response> {
       ? (obj.rebind as Record<string, string | null>)
       : undefined;
 
+  // A kit bundle (`bizbeecms.kit`) installs MANY components in one step
+  // (component-kits Slice 4). Detect the envelope and route to the kit path,
+  // which re-validates EACH component through the SAME single-import trust
+  // boundary (`parseKitBundle` loops `parsePortableComponent`).
+  const rawObj =
+    typeof raw === "string"
+      ? (() => {
+          try {
+            return JSON.parse(raw) as unknown;
+          } catch {
+            return null;
+          }
+        })()
+      : raw;
+  if (rawObj && typeof rawObj === "object" && (rawObj as { format?: unknown }).format === KIT_FORMAT) {
+    return importKit(raw);
+  }
+
   const parsed = parsePortableComponent(raw, { rebind });
   if (!parsed.ok) {
     return Response.json({ error: parsed.errors.join("; ") }, { status: 400 });
@@ -131,6 +154,53 @@ export async function POST(request: Request): Promise<Response> {
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to import component" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Install a kit bundle (component-kits Slice 4): validate the envelope + EACH
+ * component through `parseKitBundle` (which loops the single-import trust
+ * boundary), then upsert every valid component with `sourceKit=<kit name>` so the
+ * page-builder rail groups them — mirroring the premade-kit route's loop. Skips
+ * (and reports) any component that fails validation rather than failing the whole
+ * import, like single-import's skip posture.
+ */
+async function importKit(raw: unknown): Promise<Response> {
+  const parsed = parseKitBundle(raw);
+  if (!parsed.ok) {
+    return Response.json({ error: parsed.errors.join("; ") }, { status: 400 });
+  }
+  if (parsed.components.length === 0) {
+    return Response.json(
+      { error: `no valid components in kit: ${parsed.errors.join("; ") || "empty"}` },
+      { status: 400 },
+    );
+  }
+  try {
+    const results = [];
+    for (const c of parsed.components) {
+      results.push(await upsertImportedComponent(c, undefined, parsed.name));
+    }
+    const created = results.filter((r) => r.action === "created").length;
+    const updated = results.filter((r) => r.action === "updated").length;
+    const missingComponents = await missingComponentNames(parsed.componentDeps);
+    return Response.json(
+      {
+        kit: parsed.name,
+        installed: results,
+        created,
+        updated,
+        skipped: parsed.errors,
+        assets: parsed.assets,
+        missingComponents,
+      },
+      { status: 200 },
+    );
+  } catch (err) {
+    return Response.json(
+      { error: (err as Error).message ?? "failed to import kit" },
       { status: 500 },
     );
   }

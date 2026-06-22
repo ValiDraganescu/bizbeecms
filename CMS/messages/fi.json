@@ -223,6 +223,8 @@
     "kitsHint": "Asenna valmis joukko komponentteja yhdellä napsautuksella. Blogipaketti lisää artikkelin otsikon, rungon, kirjoittajakortin ja artikkelilistan; laskeutumispaketti lisää hero-osion, ominaisuusruudukon, CTA-palkin, suosittelun ja alatunnisteen; dokumentaatiopaketti lisää otsikon, huomiolaatikon, koodilohkon, vaiheluettelon ja API-parametrin; portfoliopaketti lisää hero-osion, projektikortin, taitoluettelon, työaikajanan ja yhteydenottokehotteen; hinnoittelupaketti lisää osio-otsikon, hintatason, ominaisuusrivin, tuotekortin ja UKK-kohdan.",
     "installBlogKit": "Asenna blogipaketti",
     "kitInstalled": "Blogipaketti asennettu: {created} luotu, {updated} päivitetty.",
+    "kitImported": "Paketti “{kit}” tuotu: {created} luotu, {updated} päivitetty.",
+    "kitSkipped": "{count} komponentti(a) ohitettu (virheellinen).",
     "assetDepsTitle": "Mediariippuvuudet",
     "assetDepsHint": "Tämä komponentti viittaa alla oleviin mediatiedostoihin. Varmista, että ne ovat tällä sivustolla (lataa ne, muuten ne näkyvät rikkinäisinä).",
     "componentDepsTitle": "Puuttuvat komponenttiriippuvuudet",

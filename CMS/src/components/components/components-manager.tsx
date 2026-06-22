@@ -194,21 +194,42 @@ export function ComponentsManager({
         return;
       }
       const j = (await res.json()) as {
-        action: "created" | "updated";
-        name: string;
+        // Single-component import.
+        action?: "created" | "updated";
+        name?: string;
+        // Kit import (Slice 4): many components in one step.
+        kit?: string;
+        created?: number;
+        updated?: number;
+        skipped?: string[];
         assets?: string[];
         missingComponents?: string[];
       };
-      setNotice(
-        j.action === "created"
-          ? t("imported", { name: j.name })
-          : t("updated", { name: j.name }),
-      );
+      if (j.kit !== undefined) {
+        // Kit bundle installed — report counts (+ any skipped components).
+        setNotice(
+          t("kitImported", {
+            kit: j.kit,
+            created: j.created ?? 0,
+            updated: j.updated ?? 0,
+          }) +
+            ((j.skipped?.length ?? 0) > 0
+              ? " " + t("kitSkipped", { count: j.skipped!.length })
+              : ""),
+        );
+        setLastBundle(null); // a kit has no single re-importable bundle
+      } else {
+        setNotice(
+          j.action === "created"
+            ? t("imported", { name: j.name ?? "" })
+            : t("updated", { name: j.name ?? "" }),
+        );
+        // Keep the bundle source + reset rebind choices so the (possibly still
+        // dangling) deps can be rebound and re-imported again.
+        setLastBundle(text);
+      }
       setAssetDeps(j.assets ?? []);
       setMissingComponents(j.missingComponents ?? []);
-      // Keep the bundle source + reset rebind choices so the (possibly still
-      // dangling) deps can be rebound and re-imported again.
-      setLastBundle(text);
       setRebind({});
       void loadSiteAssetKeys();
       setPaste("");

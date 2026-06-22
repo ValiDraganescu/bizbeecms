@@ -308,6 +308,91 @@ export function buildKitBundle(
   };
 }
 
+/**
+ * Parse + validate an UNTRUSTED kit bundle (component-kits Slice 4). PURE — never
+ * throws, never writes. The kit envelope (`bizbeecms.kit`) is checked for
+ * format/version + a `components` array, then EACH element runs through the
+ * EXISTING `parsePortableComponent` per-component trust boundary (never bypassed —
+ * a kit is no more trusted than a single import).
+ *
+ * Partial-tolerant by design (mirrors single-import's "report skipped" posture):
+ * a component that fails validation is collected in `errors` (with its index +
+ * name) and SKIPPED; the valid components are returned ready to upsert. A bad
+ * envelope (wrong format/version/shape) fails the WHOLE bundle (no components).
+ * `assets`/`componentDeps` are the deduped union across the VALID components.
+ */
+export function parseKitBundle(
+  raw: unknown,
+):
+  | {
+      ok: true;
+      name: string;
+      tag: string;
+      components: ImportedComponent[];
+      assets: string[];
+      componentDeps: string[];
+      errors: string[];
+    }
+  | { ok: false; errors: string[] } {
+  let obj: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      obj = JSON.parse(raw);
+    } catch {
+      return { ok: false, errors: ["kit bundle is not valid JSON"] };
+    }
+  }
+  if (typeof obj !== "object" || obj === null) {
+    return { ok: false, errors: ["kit bundle must be a JSON object"] };
+  }
+  const b = obj as Record<string, unknown>;
+
+  // ── envelope (a malformed envelope fails the whole bundle) ──
+  const envErrors: string[] = [];
+  if (b.format !== KIT_FORMAT) envErrors.push(`format must be "${KIT_FORMAT}"`);
+  if (b.version !== KIT_VERSION) {
+    envErrors.push(`unsupported version (expected ${KIT_VERSION}, got ${String(b.version)})`);
+  }
+  if (!Array.isArray(b.components)) envErrors.push("kit.components must be an array");
+  if (envErrors.length > 0) return { ok: false, errors: envErrors };
+
+  const tag = typeof b.tag === "string" ? b.tag : "";
+  const name = typeof b.name === "string" && b.name !== "" ? b.name : tag;
+
+  // ── per-component trust boundary: validate EACH, skip + record the bad ones ──
+  const components: ImportedComponent[] = [];
+  const assets = new Set<string>();
+  const componentDeps = new Set<string>();
+  const errors: string[] = [];
+  const list = b.components as unknown[];
+  list.forEach((raw, i) => {
+    const parsed = parsePortableComponent(raw);
+    if (!parsed.ok) {
+      const nm =
+        raw && typeof raw === "object"
+          ? String((raw as { component?: { name?: unknown } }).component?.name ?? "?")
+          : "?";
+      errors.push(`component #${i} (${nm}): ${parsed.errors.join("; ")}`);
+      return;
+    }
+    components.push(parsed.component);
+    for (const a of parsed.assets) assets.add(a);
+    for (const d of parsed.componentDeps) componentDeps.add(d);
+  });
+
+  // In-kit deps are satisfied by the kit itself → only EXTERNAL deps remain.
+  const installed = new Set(components.map((c) => c.name));
+  return {
+    ok: true,
+    name,
+    tag,
+    components,
+    assets: [...assets].sort(),
+    componentDeps: [...componentDeps].filter((d) => !installed.has(d)).sort(),
+    errors,
+  };
+}
+
 /** The validated, ready-to-upsert import result. */
 export interface ImportedComponent {
   name: string;

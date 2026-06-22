@@ -77,6 +77,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   src/lib/site/scope.ts,scope.test.ts}` that are NOT this goal's. Stage ONLY your own
   paths — your single PM file is `src/lib/deploy/cms-bundle.generated.js`. NEVER `git add -A`.
 
+- **next-intl `t()` is strict on object args.** Passing `{ name: maybeUndefined }`
+  where the type is `string | undefined` fails `tsc` (`Type 'undefined' not assignable
+  to string|number|Date`). Use a `?? ""` (or `?? 0`) fallback. Slice 4 hit this after
+  widening the import-response type to add the optional kit fields.
+
+- **A parallel CMS CHAT worker leaves `CMS/src/lib/chat/**` + `CMS/src/app/api/chat/**`
+  dirty.** Slice 4 saw uncommitted `lib/chat/models.ts`, `api/chat/models/route.ts`,
+  `scripts/models.test.mjs` that are NOT this goal. STAY OUT of chat; stage ONLY your
+  own component-kit paths. NEVER `git add -A`.
+
 - **A new column on `component` ripples to all 5 premade kits.** Their `bundle()`
   wrappers build a `PortableComponent` literal; a new REQUIRED envelope field (Slice 1's
   `tags`) breaks `tsc` in blog/docs/landing/pricing/portfolio-kit.ts until each sets it.

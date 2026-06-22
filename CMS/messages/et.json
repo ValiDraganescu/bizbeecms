@@ -223,6 +223,8 @@
     "kitsHint": "Paigalda valmis komplekt komponente ühe klõpsuga. Blogipakett lisab postituse päise, sisu, autorikaardi ja postituste loendi; maandumispakett lisab hero-ploki, omaduste ruudustiku, CTA-riba, soovituse ja jaluse; dokumentatsioonipakett lisab päise, märkuse, koodiploki, sammude loendi ja API-parameetri; portfooliopakett lisab hero-ploki, projektikaardi, oskuste loendi, töö ajajoone ja kontaktikutse; hinnapakett lisab sektsiooni päise, hinnaastme, omaduste rea, tootekaardi ja KKK-kirje.",
     "installBlogKit": "Paigalda blogipakett",
     "kitInstalled": "Blogipakett paigaldatud: {created} loodud, {updated} uuendatud.",
+    "kitImported": "Komplekt “{kit}” imporditud: {created} loodud, {updated} uuendatud.",
+    "kitSkipped": "{count} komponent(i) vahele jäetud (vigane).",
     "assetDepsTitle": "Meediasõltuvused",
     "assetDepsHint": "See komponent viitab allolevatele meediafailidele. Veendu, et need on sellel saidil olemas (laadi need üles, muidu kuvatakse need katkistena).",
     "componentDepsTitle": "Puuduvad komponendisõltuvused",

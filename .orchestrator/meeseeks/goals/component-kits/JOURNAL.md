@@ -103,3 +103,39 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/components/components-manager.tsx,
   CMS/messages/{en,fi,et}.json, CMS/scripts/build-kit-bundle.test.mjs,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-22 13:38 — Slice 4: import a kit bundle (multi-component, one step)
+- **Status:** DONE
+- **What I did:**
+  - Added pure `parseKitBundle(raw)` trust helper to `lib/components/portable.ts`:
+    validates the `bizbeecms.kit` envelope (format/version + `components` is an array
+    → a bad envelope fails the WHOLE bundle), then runs EACH element through the
+    EXISTING `parsePortableComponent` per-component trust boundary (never bypassed).
+    PARTIAL-TOLERANT (mirrors single-import's skip posture): a component that fails
+    validation is recorded in `errors` ("component #i (name): …") and SKIPPED; valid
+    ones returned ready to upsert. Returns `{ok,name,tag,components,assets,
+    componentDeps,errors}` — assets unioned/deduped, in-kit componentDeps dropped
+    (only external remain). Accepts a JSON string or object.
+  - Wired into the import path: `/api/components` POST now detects a `format===
+    "bizbeecms.kit"` envelope and routes to a new `importKit()` that upserts EACH valid
+    component via `upsertImportedComponent(c, undefined, kitName)` so `sourceKit`
+    groups them in the rail (mirrors `api/components/kit/route.ts`'s loop). Single-
+    component import path unchanged. Returns `{kit,installed,created,updated,skipped,
+    assets,missingComponents}`.
+  - UI (`components-manager.tsx`): `importBundle` detects the kit response shape and
+    reports `kitImported {kit,created,updated}` + `kitSkipped {count}` if any failed.
+    The existing paste/upload box auto-handles `.kit.json` (no new control needed).
+  - i18n: +2 keys `kitImported`/`kitSkipped` in EN/FI/ET.
+- **Verified:**
+  - New `scripts/parse-kit-bundle.test.mjs` (8 tests): good round-trip, JSON string,
+    dep union/dedupe + in-kit drop, bad format/version/non-array envelope, ONE bad
+    component skipped (rest install), non-object rejected. All pass.
+  - `npx tsc --noEmit` clean. Full `npm test` = 601/601 pass (the previously-noted
+    `ports-sole-reader.guard` failure was NOT failing this run).
+  - `npm run bundle:cms` (from ProjectManager/) = opennext build green + cms-bundle
+    regenerated (7170 KB, builtAt 2026-06-22T10:38:32Z).
+- **Files:** CMS/src/lib/components/portable.ts,
+  CMS/src/app/api/components/route.ts,
+  CMS/src/components/components/components-manager.tsx,
+  CMS/messages/{en,fi,et}.json, CMS/scripts/parse-kit-bundle.test.mjs,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js

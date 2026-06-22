@@ -223,6 +223,8 @@
     "kitsHint": "Install a curated set of premade components in one click. The blog kit adds a post header, body, author card and post list; the landing kit adds a hero, feature grid, CTA band, testimonial and footer; the docs kit adds a header, callout, code block, step list and API parameter; the portfolio kit adds a hero, project card, skill list, work timeline and contact callout; the pricing kit adds a section header, plan tier, feature row, product card and FAQ item.",
     "installBlogKit": "Install blog kit",
     "kitInstalled": "Blog kit installed: {created} created, {updated} updated.",
+    "kitImported": "Kit “{kit}” imported: {created} created, {updated} updated.",
+    "kitSkipped": "{count} component(s) skipped (invalid).",
     "assetDepsTitle": "Asset dependencies",
     "assetDepsHint": "This component references the media assets below. Make sure they exist on this site (upload them, or they will appear broken).",
     "componentDepsTitle": "Missing component dependencies",

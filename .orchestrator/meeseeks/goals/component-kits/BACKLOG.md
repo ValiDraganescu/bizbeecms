@@ -35,7 +35,7 @@ export-by-tag, then kit import. Each slice gates on CMS tsc + opennext build gre
   the UI (per tag, or a tag picker → download). Pure `buildKitBundle(components,
   tag)` helper node-tested (shape + dep inclusion + dedupe). EN/FI/ET.
 
-- TODO: **Slice 4 — import a kit bundle (multi-component, one step).** Accept the
+- DONE (2026-06-22): **Slice 4 — import a kit bundle (multi-component, one step).** Accept the
   `bizbeecms.kit` envelope on import (extend the existing import UI/route, or the
   kit-install route `api/components/kit`): validate `format`/`version`, then install
   EACH component through the EXISTING trust boundary
