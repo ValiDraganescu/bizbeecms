@@ -66,6 +66,16 @@ export function canEditContent(role: CmsRole): boolean {
 }
 
 /**
+ * Can this role manage API keys (mint/revoke programmatic-access keys)? Admin+.
+ * A key grants the FULL tool set over MCP for this Site, so it's a higher bar
+ * than user management — Managers manage people, only Admins hand out machine
+ * access to the whole Site.
+ */
+export function canManageApiKeys(role: CmsRole): boolean {
+  return RANK[role] >= RANK.Admin;
+}
+
+/**
  * Can `actor` remove `target`? True only when the actor strictly outranks the
  * target AND they are different users. (Editor, the bottom tier, outranks no one,
  * so it can never remove anyone — falls out of the strict `>` automatically.)

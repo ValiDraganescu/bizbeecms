@@ -17,7 +17,7 @@ import { getSession } from "@/db/session-store";
 import { findUserById } from "@/db/user-store";
 import type { CmsRole } from "@/db/schema";
 import { SESSION_COOKIE, readSessionCookie, type GuardDecision } from "./guard-core";
-import { canManageUsers } from "./roles";
+import { canManageUsers, canManageApiKeys } from "./roles";
 
 /**
  * Resolve the current session cookie (read via `next/headers`, so it works for
@@ -97,6 +97,11 @@ export function requireUserManager(request: Request): Promise<Response | null> {
   return requireRole(request, canManageUsers);
 }
 
+/** Convenience: the API-key surface requires Admin+ (`canManageApiKeys`). */
+export function requireApiKeyManager(request: Request): Promise<Response | null> {
+  return requireRole(request, canManageApiKeys);
+}
+
 /**
  * Page-layer role gate (cms-auth Slice 3). Returns the same `GuardDecision` shape
  * `checkAdminFromHeaders` does, but flips an allowed signed-in user whose role
@@ -116,4 +121,4 @@ export async function checkRoleFromHeaders(
 
 // Re-exported for callers that still want the raw cookie name/extractor.
 export { SESSION_COOKIE, readSessionCookie };
-export { canManageUsers, canEditContent, canInvite, canRemoveUser, canChangeRole } from "./roles";
+export { canManageUsers, canManageApiKeys, canEditContent, canInvite, canRemoveUser, canChangeRole } from "./roles";

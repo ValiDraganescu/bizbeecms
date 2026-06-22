@@ -14,6 +14,7 @@ const TABS = [
   { key: "contentLocales", href: "/admin/settings/content-locales" },
   { key: "theme", href: "/admin/settings/theme" },
   { key: "brand", href: "/admin/settings/brand" },
+  { key: "apiKeys", href: "/admin/settings/api-keys" },
 ] as const;
 
 export function SettingsNav() {

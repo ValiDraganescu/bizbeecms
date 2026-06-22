@@ -82,6 +82,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   (`tsc --noEmit | grep src/app/mcp` → 0) and DEFER the bundle regen to a follow-up run
   once the tree's tsc is green. The bundle catch-up is a tracked follow-up, not a blocker.
 
+- **API-key management is Admin+, NOT Manager.** cms-auth roles ARE landed. A key
+  grants the FULL tool set over MCP for the Site, so it's gated by `canManageApiKeys`
+  (Admin tier) — deliberately ABOVE `canManageUsers` (Manager). Use `requireApiKeyManager`
+  on `/api/keys` and `checkRoleFromHeaders(canManageApiKeys)` on the page (defense-in-depth;
+  the API guard is the real enforcement).
+
+- **There is no CMS users PAGE yet** — `requireRole`/`checkRoleFromHeaders` existed in
+  guard.ts but no /admin page used them before this slice. The api-keys page is the first
+  role-gated PAGE; the settings pages still only `requireAdmin` at the API layer.
+
+- **Reuse `components/content/confirm-modal.tsx` for any in-app confirm.** It's the
+  shared danger/confirm overlay (Esc/backdrop cancel, busy state). Don't re-roll a modal.
+
 - **Gate every slice:** CMS `tsc` + `npx opennextjs-cloudflare build` green (NEVER
   while `npm run dev` is up). Regen the PM `cms-bundle`. EN/FI/ET for new UI strings.
   No native confirm()/alert() — in-app modal for key revoke (browser-review sessions

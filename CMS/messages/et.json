@@ -71,7 +71,8 @@
     "label": "Seadete jaotised",
     "contentLocales": "Sisukeeled",
     "theme": "Teema",
-    "brand": "Bränd ja AI"
+    "brand": "Bränd ja AI",
+    "apiKeys": "API-võtmed"
   },
   "theme": {
     "title": "Teema",
@@ -526,5 +527,25 @@
     "saving": "Salvestan…",
     "cancel": "Tühista",
     "confirmDeleteItem": "Kas kustutada see element? Seda ei saa tagasi võtta."
+  },
+  "apiKeys": {
+    "title": "API-võtmed",
+    "subtitle": "Bearer-võtmed kaug-MCP-serverile. Iga võti annab täieliku programmilise juurdepääsu sellele saidile — jaga seda ainult usaldusväärsete tööriistadega.",
+    "forbidden": "Sul pole õigust API-võtmeid hallata. Küsi administraatorilt.",
+    "labelPlaceholder": "Võtme nimi (nt Claude Code)",
+    "create": "Loo võti",
+    "creating": "Loomine…",
+    "loading": "Võtmete laadimine…",
+    "empty": "API-võtmeid veel pole.",
+    "createdAt": "Loodud {date}",
+    "lastUsedAt": "Viimati kasutatud {date}",
+    "revoke": "Tühista",
+    "revoked": "Tühistatud",
+    "cancel": "Loobu",
+    "revokeConfirm": "Kas tühistada võti „{label}”? Seda kasutavad tööriistad lõpetavad kohe töötamise.",
+    "mintedTitle": "Kopeeri oma uus võti kohe",
+    "mintedWarning": "See on ainus kord, kui võtit näidatakse. Kopeeri see ja hoia turvalises kohas — sa ei näe seda enam.",
+    "copy": "Kopeeri",
+    "done": "Valmis"
   }
 }

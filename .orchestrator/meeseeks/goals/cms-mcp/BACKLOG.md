@@ -35,12 +35,17 @@ node tests + EN/FI/ET for new strings.
   untouched. ⚠️ PM `cms-bundle` regen DEFERRED — shared gate was RED on the renderer's
   in-flight `binding.ts`; a later cms-mcp run regens once that tsc is green.
 
-- TODO: **Slice 4 — API-key management UI (CMS admin).** CMS → Settings → API Keys:
-  list keys (label, created, last used, revoked), generate (show the key ONCE in an
-  in-app modal — never again), revoke (in-app confirm modal, NO native confirm).
-  Admin-only via the cms-auth role model (or requireAdmin until roles land — note).
-  `GET/POST/DELETE /api/keys`. Reuse design-system + purpose tokens. EN/FI/ET.
-  Pure validation (label) node-tested. Gate.
+- DONE (2026-06-22): **Slice 4 — API-key management UI (CMS admin).** CMS → Settings →
+  API Keys page (`admin/settings/api-keys/page.tsx` + client `api-keys-manager.tsx`):
+  list (label, prefix…, created/lastUsed, revoked badge), create (show-once in-app
+  modal w/ copy), revoke (reuses shared `ConfirmModal` — NO native confirm).
+  `GET/POST/DELETE /api/keys` over the existing `api-key-store`. Admin-only:
+  cms-auth roles ARE landed → added `canManageApiKeys` (Admin+, a tier above
+  canManageUsers since a key = full tool set) + `requireApiKeyManager` (API) +
+  page-layer `checkRoleFromHeaders(canManageApiKeys)`. Pure `isValidLabel`/
+  `normalizeLabel` (MAX 80) node-tested. EN/FI/ET (`apiKeys` block + settingsNav tab).
+  Gate green (tsc + opennext + 656 node tests); bundle regen (incl. the Slice 3
+  `/mcp` CARRY-OVER, now in the manifest).
 
 - TODO: **Slice 5 — connection docs + onboarding snippet.** A small in-UI snippet
   on the API Keys page showing how to wire this site into Claude Code (the `/mcp`

@@ -97,3 +97,36 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   Claude-Code-connects-over-the-network handshake can't be exercised offline (needs a
   deployed Worker + a minted key) — that's the only HITL spot-check, noted in NEXT.
 - **Files:** CMS/src/app/mcp/{mcp-core.ts, route.ts, mcp-core.test.ts}
+
+## 2026-06-22 14:00 — Slice 4: API-key management UI + bundle carry-over
+- **Status:** DONE
+- **What I did:**
+  - CARRY-OVER: shared tsc gate is GREEN now → regenerated the PM
+    `cms-bundle.generated.js`, so the Slice 3 `/mcp` route is finally in the Worker
+    manifest. (Re-regenerated again after Slice 4's new route/strings.)
+  - Slice 4 — API-key admin surface:
+    - `GET/POST/DELETE /api/keys` (`CMS/src/app/api/keys/route.ts`) over the existing
+      `db/api-key-store.ts` (list/create/revoke). POST returns the plaintext ONCE
+      (`{key,item}`); DELETE takes `?id=` or `{id}`; POST stamps `createdBy` from the
+      signed-in admin. Admin-only via `requireApiKeyManager`.
+    - Page `admin/settings/api-keys/page.tsx` (role-gated via
+      `checkRoleFromHeaders(canManageApiKeys)` — UI defense-in-depth; API is the real
+      gate) + client `components/settings/api-keys-manager.tsx`: list, create, show-once
+      copy modal, revoke via the SHARED `ConfirmModal` (no native confirm). Added the
+      "API keys" tab to `settings-nav.tsx`.
+    - Roles: `canManageApiKeys` (Admin+, deliberately a tier above `canManageUsers` —
+      a key grants the full tool set) in `roles.ts`, re-exported + `requireApiKeyManager`
+      wrapper in `guard.ts`.
+    - Pure label validation `isValidLabel`/`normalizeLabel`/`MAX_LABEL_LEN` in
+      `api-key-core.ts` (stays node-loadable).
+    - i18n: `apiKeys` block + `settingsNav.apiKeys` in EN/FI/ET.
+- **Verified:** `tsc --noEmit` clean; `npm test` 656/656 pass (added label + role tests);
+  `npx opennextjs-cloudflare build` green (dev NOT running); PM `npm run bundle:cms`
+  regenerated twice (carry-over /mcp + Slice 4). Could NOT exercise live D1 (needs a
+  real binding) or the deployed-Worker MCP handshake (HITL — needs a deployed site +
+  minted key).
+- **Files:** CMS/src/app/api/keys/route.ts, CMS/src/app/admin/settings/api-keys/page.tsx,
+  CMS/src/components/settings/api-keys-manager.tsx, CMS/src/components/settings/settings-nav.tsx,
+  CMS/src/lib/auth/{roles.ts, guard.ts, api-key-core.ts}, CMS/scripts/api-key-core.test.mjs,
+  CMS/src/lib/auth/roles.test.ts, CMS/messages/{en,fi,et}.json,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js

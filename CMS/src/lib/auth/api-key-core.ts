@@ -85,3 +85,23 @@ export function parseBearer(header: string | null | undefined): string | null {
 export function looksLikeKey(token: string | null | undefined): boolean {
   return typeof token === "string" && token.startsWith(KEY_PREFIX) && token.length > DISPLAY_PREFIX_LEN;
 }
+
+/** Max label length — a human-readable note, not free-form storage. */
+export const MAX_LABEL_LEN = 80;
+
+/**
+ * Trim a key label. The store already trims, but the route validates the trimmed
+ * form so an all-whitespace label is rejected, not silently stored as "".
+ */
+export function normalizeLabel(label: unknown): string {
+  return typeof label === "string" ? label.trim() : "";
+}
+
+/**
+ * A label is valid when, trimmed, it is non-empty and within MAX_LABEL_LEN.
+ * Pure (node-testable); the POST /api/keys route gates on it before minting.
+ */
+export function isValidLabel(label: unknown): boolean {
+  const trimmed = normalizeLabel(label);
+  return trimmed.length > 0 && trimmed.length <= MAX_LABEL_LEN;
+}

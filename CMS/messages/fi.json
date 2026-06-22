@@ -71,7 +71,8 @@
     "label": "Asetusosiot",
     "contentLocales": "Sisältökielet",
     "theme": "Teema",
-    "brand": "Brändi ja tekoäly"
+    "brand": "Brändi ja tekoäly",
+    "apiKeys": "API-avaimet"
   },
   "theme": {
     "title": "Teema",
@@ -526,5 +527,25 @@
     "saving": "Tallennetaan…",
     "cancel": "Peruuta",
     "confirmDeleteItem": "Poistetaanko tämä kohde? Tätä ei voi kumota."
+  },
+  "apiKeys": {
+    "title": "API-avaimet",
+    "subtitle": "Bearer-avaimet etä-MCP-palvelimelle. Jokainen avain antaa täyden ohjelmallisen pääsyn tähän sivustoon — jaa se vain luotetuille työkaluille.",
+    "forbidden": "Sinulla ei ole oikeutta hallita API-avaimia. Pyydä järjestelmänvalvojaa.",
+    "labelPlaceholder": "Avaimen nimi (esim. Claude Code)",
+    "create": "Luo avain",
+    "creating": "Luodaan…",
+    "loading": "Ladataan avaimia…",
+    "empty": "Ei API-avaimia vielä.",
+    "createdAt": "Luotu {date}",
+    "lastUsedAt": "Viimeksi käytetty {date}",
+    "revoke": "Peruuta",
+    "revoked": "Peruutettu",
+    "cancel": "Kumoa",
+    "revokeConfirm": "Peruutetaanko avain ”{label}”? Sitä käyttävät työkalut lakkaavat toimimasta heti.",
+    "mintedTitle": "Kopioi uusi avaimesi nyt",
+    "mintedWarning": "Tämä on ainoa kerta, kun avain näytetään. Kopioi se ja säilytä turvallisessa paikassa — et näe sitä enää.",
+    "copy": "Kopioi",
+    "done": "Valmis"
   }
 }

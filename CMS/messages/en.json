@@ -71,7 +71,8 @@
     "label": "Settings sections",
     "contentLocales": "Content languages",
     "theme": "Theme",
-    "brand": "Brand & AI"
+    "brand": "Brand & AI",
+    "apiKeys": "API keys"
   },
   "theme": {
     "title": "Theme",
@@ -526,5 +527,25 @@
     "saving": "Saving…",
     "cancel": "Cancel",
     "confirmDeleteItem": "Delete this item? This cannot be undone."
+  },
+  "apiKeys": {
+    "title": "API keys",
+    "subtitle": "Bearer keys for the remote MCP server. Each key gives full programmatic access to this site — share it only with trusted tools.",
+    "forbidden": "You don't have permission to manage API keys. Ask an Admin.",
+    "labelPlaceholder": "Key label (e.g. Claude Code)",
+    "create": "Create key",
+    "creating": "Creating…",
+    "loading": "Loading keys…",
+    "empty": "No API keys yet.",
+    "createdAt": "Created {date}",
+    "lastUsedAt": "Last used {date}",
+    "revoke": "Revoke",
+    "revoked": "Revoked",
+    "cancel": "Cancel",
+    "revokeConfirm": "Revoke the key “{label}”? Any tool using it will stop working immediately.",
+    "mintedTitle": "Copy your new key now",
+    "mintedWarning": "This is the only time the key is shown. Copy it and store it somewhere safe — you can't see it again.",
+    "copy": "Copy",
+    "done": "Done"
   }
 }

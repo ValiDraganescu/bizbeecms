@@ -16,6 +16,9 @@ import {
   timingSafeEqualHex,
   parseBearer,
   looksLikeKey,
+  isValidLabel,
+  normalizeLabel,
+  MAX_LABEL_LEN,
 } from "../src/lib/auth/api-key-core.ts";
 
 test("generateKey: bzb_-prefixed, unique, base64url body", () => {
@@ -84,4 +87,23 @@ test("round-trip: generate → hash → verify holds, prefix never authenticates
   assert.equal(await verifyKey(key, stored), true);
   // The stored display prefix must NOT verify as the key.
   assert.equal(await verifyKey(keyPrefix(key), stored), false);
+});
+
+test("normalizeLabel: trims; non-strings → empty", () => {
+  assert.equal(normalizeLabel("  hi  "), "hi");
+  assert.equal(normalizeLabel("x"), "x");
+  assert.equal(normalizeLabel(""), "");
+  assert.equal(normalizeLabel(null), "");
+  assert.equal(normalizeLabel(undefined), "");
+  assert.equal(normalizeLabel(42), "");
+});
+
+test("isValidLabel: non-empty (trimmed), within MAX_LABEL_LEN", () => {
+  assert.equal(isValidLabel("Claude Code"), true);
+  assert.equal(isValidLabel("  spaced  "), true);
+  assert.equal(isValidLabel(""), false);
+  assert.equal(isValidLabel("   "), false, "all-whitespace → invalid");
+  assert.equal(isValidLabel(null), false);
+  assert.equal(isValidLabel("a".repeat(MAX_LABEL_LEN)), true, "at the limit");
+  assert.equal(isValidLabel("a".repeat(MAX_LABEL_LEN + 1)), false, "over the limit");
 });
