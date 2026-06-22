@@ -48,6 +48,18 @@ import {
   splitThemeArgs,
   coerceIdentityArg,
 } from "./write-tools";
+import {
+  CREATE_COLLECTION_TOOL,
+  ADD_COLLECTION_ITEM_TOOL,
+  UPDATE_COLLECTION_ITEM_TOOL,
+  ARCHIVE_COLLECTION_ITEM_TOOL,
+  QUERY_COLLECTION_TOOL,
+  validateCreateCollection,
+  validateAddItem,
+  validateUpdateItem,
+  validateArchiveItem,
+  validateQuery,
+} from "./collection-tools";
 import { validateBlocks } from "@/lib/pages/page-blocks";
 import {
   toolsForContext,
@@ -83,6 +95,15 @@ import {
   setThemeOverridesDark,
 } from "@/db/settings-store";
 import { listAssets } from "@/db/asset-store";
+import { createCollection } from "@/db/collection-store";
+import {
+  createItem,
+  updateItem,
+  archiveItem,
+  unarchiveItem,
+  deleteItem,
+} from "@/db/item-store";
+import { queryCollection } from "@/db/query-store";
 
 export type { DispatchResult } from "./tool-dispatch-core";
 
@@ -106,6 +127,11 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   update_page_blocks: UPDATE_PAGE_BLOCKS_TOOL,
   update_brand_identity: UPDATE_BRAND_IDENTITY_TOOL,
   update_theme: UPDATE_THEME_TOOL,
+  create_collection: CREATE_COLLECTION_TOOL,
+  add_collection_item: ADD_COLLECTION_ITEM_TOOL,
+  update_collection_item: UPDATE_COLLECTION_ITEM_TOOL,
+  archive_collection_item: ARCHIVE_COLLECTION_ITEM_TOOL,
+  query_collection: QUERY_COLLECTION_TOOL,
 };
 
 /** The tool SCHEMAS the assistant may use in this admin-page context (chat route). */
@@ -311,6 +337,76 @@ async function handleUpdateTheme(args: unknown): Promise<Record<string, unknown>
   }
 }
 
+// ── content-collections (Slice 6): structured collection data tools ───────────
+// Each validates the model's args into the exact shape a Slice 2-4 store expects,
+// then calls that store (NO forked data path, NO raw SQL to the model). The stores
+// return PlanResult<T> ({ok,plan} | {ok:false,status,error}); we map !ok → an error
+// payload the model can recover from.
+
+async function handleCreateCollection(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateCreateCollection(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  try {
+    const res = await createCollection(valid.value.name, valid.value.fields);
+    if (!res.ok) return { ok: false, errors: [res.error] };
+    return { ok: true, action: "created", collection: res.plan.tableName, name: res.plan.name, fields: res.plan.fields };
+  } catch (err) {
+    return { ok: false, errors: [`failed to create collection: ${(err as Error).message}`] };
+  }
+}
+
+async function handleAddCollectionItem(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateAddItem(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  try {
+    const res = await createItem(valid.value.collection, valid.value.values);
+    if (!res.ok) return { ok: false, errors: [res.error] };
+    return { ok: true, action: "created", item: res.plan };
+  } catch (err) {
+    return { ok: false, errors: [`failed to add item: ${(err as Error).message}`] };
+  }
+}
+
+async function handleUpdateCollectionItem(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateUpdateItem(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  try {
+    const res = await updateItem(valid.value.collection, valid.value.id, valid.value.values);
+    if (!res.ok) return { ok: false, errors: [res.error] };
+    return { ok: true, action: "updated", item: res.plan };
+  } catch (err) {
+    return { ok: false, errors: [`failed to update item: ${(err as Error).message}`] };
+  }
+}
+
+async function handleArchiveCollectionItem(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateArchiveItem(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const { collection, id, op } = valid.value;
+  try {
+    const res =
+      op === "delete" ? await deleteItem(collection, id)
+      : op === "unarchive" ? await unarchiveItem(collection, id)
+      : await archiveItem(collection, id);
+    if (!res.ok) return { ok: false, errors: [res.error] };
+    return { ok: true, action: op, item: res.plan };
+  } catch (err) {
+    return { ok: false, errors: [`failed to ${op} item: ${(err as Error).message}`] };
+  }
+}
+
+async function handleQueryCollection(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateQuery(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  try {
+    const res = await queryCollection(valid.value.collection, valid.value.spec);
+    if (!res.ok) return { ok: false, errors: [res.error] };
+    return { ok: true, items: res.plan.items, total: res.plan.total, limit: res.plan.limit, offset: res.plan.offset };
+  } catch (err) {
+    return { ok: false, errors: [`failed to query collection: ${(err as Error).message}`] };
+  }
+}
+
 // ── The handler map + dispatcher ──────────────────────────────────────────────
 // Keyed by tool name (== function.name == TOOL_BY_NAME key). Read tools ignore
 // args; we wrap the no-arg handlers so every entry is `(args) => Promise<…>`.
@@ -331,6 +427,11 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   update_page_blocks: handleUpdatePageBlocks,
   update_brand_identity: handleUpdateBrandIdentity,
   update_theme: handleUpdateTheme,
+  create_collection: handleCreateCollection,
+  add_collection_item: handleAddCollectionItem,
+  update_collection_item: handleUpdateCollectionItem,
+  archive_collection_item: handleArchiveCollectionItem,
+  query_collection: handleQueryCollection,
 };
 
 /**

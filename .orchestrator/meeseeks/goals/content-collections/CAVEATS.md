@@ -205,6 +205,22 @@ Read every line before working. Each entry was learned the hard way by a previou
   the `cms-bundle` regen (`npm run bundle:cms` from ProjectManager/) was finally
   needed here. Slices 2-4 added none. Any future slice that adds CMS UI strings MUST
   regen the bundle or the deployed CMS ships stale copy.
+- **(Slice 6) AI tools reuse the Slice 2-4 STORES directly (not the REST routes) —
+  one shared registry, no fork.** New tools land in `lib/chat/collection-tools.ts`
+  (PURE schemas + arg validators, node-testable) + are wired in `tool-dispatch.ts`
+  (TOOL_BY_NAME registry + HANDLERS map) + named in `tool-scopes.ts`
+  (KNOWN_TOOL_NAMES + a context's TOOLS_BY_CONTEXT). The chat route auto-derives
+  schemas/dispatch from the registry → it needs NO edits when you add a tool; just
+  keep the name in all THREE places (KNOWN_TOOL_NAMES, TOOL_BY_NAME, HANDLERS) or a
+  test/registry-coverage check fails. `archive_collection_item` is ONE tool that
+  op-switches archive|unarchive|delete (the USER asked for archive/delete combined).
+- **(Slice 6) Tool descriptions are MODEL-facing, NOT UI strings — NO cms-bundle
+  regen, NO EN/FI/ET.** Only CMS *UI* copy (messages/*.json, admin-nav) triggers the
+  bundle regen (Slice 5 did). A slice that ONLY adds AI-tool schemas/prompts skips it.
+- **(Slice 6) The stores return `PlanResult<T>` (`{ok,plan}` | `{ok:false,status,
+  error}`)** — map `!ok` → `{ok:false, errors:[res.error]}` in the handler so the
+  model gets a recoverable message; the dispatcher tags `name` and never throws.
+
 - **(Slice 5) Admin UI talks to the Slice 2-4 REST routes only — no new data path.**
   Item create OMITS empty-string field values so column DEFAULTs apply; edit sends
   all keys (PATCH semantics). multiselect round-trips as a JSON-array string (parse on

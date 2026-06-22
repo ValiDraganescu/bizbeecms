@@ -96,15 +96,23 @@ gates on CMS tsc + opennext build green + node tests + EN/FI/ET for new strings.
   opennext build green (both pages in manifest), bundle strings verified. Live D1 =
   HITL (pages render empty/offline notice without a binding).
 
-- TODO: **Slice 6 — AI assistant collection tools (structured only).** Register in
-  the existing pipeline (KNOWN_TOOL_NAMES + TOOLS_BY_CONTEXT + TOOL_BY_NAME):
-  `create_collection`, `add_collection_item`, `update_collection_item`,
-  `archive_collection_item`/`delete_collection_item`, `query_collection`
-  (structured filter/sort/text-LIKE). Each calls the SAME store/API as the UI
-  (reuse Slices 2-4 — do NOT fork data paths) and is STRUCTURED — NO raw SQL reaches
-  the model (USER DECISION). New context `collections` in tool-scopes. Node tests
-  per tool's arg-validation/execution (mock the store). (No FTS search tool in v1 —
-  FTS deferred.) Gate.
+- DONE (2026-06-22): **Slice 6 — AI assistant collection tools (structured only).**
+  PURE `lib/chat/collection-tools.ts`: 5 tool schemas + arg validators
+  (`validateCreateCollection`/`validateAddItem`/`validateUpdateItem`/
+  `validateArchiveItem`/`validateQuery`) that shape the model's loose args into the
+  EXACT store shapes (no `@/` imports → node-testable). Wired into the shared
+  registry (`tool-dispatch.ts` TOOL_BY_NAME + HANDLERS) calling the Slice 2-4 stores
+  directly — `createCollection`, `createItem`/`updateItem`/`archiveItem`/
+  `unarchiveItem`/`deleteItem`, `queryCollection` — mapping PlanResult `!ok`→error.
+  `archive_collection_item` op-switches archive|unarchive|delete (one tool, USER's
+  combined verb). New `collections` context in tool-scopes (KNOWN_TOOL_NAMES +
+  KNOWN_CONTEXTS + TOOLS_BY_CONTEXT + CONTEXT_PROMPTS) — assistant on /admin/
+  collections is auto-scoped to these 5. NO raw SQL to the model; NO forked data
+  path. Chat route needed NO edits (auto-derives schemas+dispatch from the
+  registry). 11 node tests (arg-shaping/rejection per tool); 78 content+tool tests
+  total; tsc 0; opennext build green. Tool descriptions are MODEL-facing not UI
+  strings → no cms-bundle regen, no EN/FI/ET. Live D1 = HITL (stores are
+  build-verified).
 
 ## Phase 2 — Component ↔ Collection data BINDING (greenlit 2026-06-22)
 DESIGN (settled with user 2026-06-22). The renderer is PURE+SYNC (`planPage`) and

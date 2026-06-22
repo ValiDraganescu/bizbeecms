@@ -22,6 +22,7 @@ export type AdminPageContext =
   | "pages"
   | "settings"
   | "media"
+  | "collections"
   | "general";
 
 const KNOWN_CONTEXTS: AdminPageContext[] = [
@@ -30,6 +31,7 @@ const KNOWN_CONTEXTS: AdminPageContext[] = [
   "pages",
   "settings",
   "media",
+  "collections",
 ];
 
 // The tools that EXIST in bizbee today (must match each tool's function.name).
@@ -53,6 +55,12 @@ export const KNOWN_TOOL_NAMES = [
   "update_page_blocks",
   "update_brand_identity",
   "update_theme",
+  // Slice 6 (content-collections): structured collection data tools.
+  "create_collection",
+  "add_collection_item",
+  "update_collection_item",
+  "archive_collection_item",
+  "query_collection",
 ] as const;
 export type ToolName = (typeof KNOWN_TOOL_NAMES)[number];
 
@@ -161,6 +169,14 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
   ],
   // Media library: list assets (upload/serve UI is separate).
   media: ["list_assets"],
+  // Collections: define collections + CRUD/query their items (structured only).
+  collections: [
+    "create_collection",
+    "add_collection_item",
+    "update_collection_item",
+    "archive_collection_item",
+    "query_collection",
+  ],
   // Anywhere else: full toolset.
   general: [...KNOWN_TOOL_NAMES],
 };
@@ -182,6 +198,8 @@ const CONTEXT_PROMPTS: Record<AdminPageContext, string> = {
   settings: `You are on the Settings page. Read the current configuration first (get_brand_identity, get_theme, list_locales). You can UPDATE the brand identity (update_brand_identity — read it first, then pass the full object) and the theme colors (update_theme — pass light and/or dark token→color maps). You can also translate existing content into the site's content locales (translate).`,
 
   media: `You are in the Media library. Help the operator find and reference uploaded assets (list_assets) by their /media/<key> URLs.`,
+
+  collections: `You are in Collections — the site's structured data. You can define a new typed collection (create_collection: name + typed fields; each collection gets system fields id/slug/status/created_at/updated_at automatically). You can add, update, archive/unarchive/delete items (add_collection_item / update_collection_item / archive_collection_item), and find items with structured filters/sort/search (query_collection — collections are addressed by their content_<slug> table name). Prefer query_collection to discover a collection's table name and item ids before editing. Prefer archiving over deleting.`,
 
   general: `You are the site's AI assistant. You can author components, compose pages, translate content, and reference uploaded media. Help the operator with whatever they need.`,
 };

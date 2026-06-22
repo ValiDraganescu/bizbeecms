@@ -176,3 +176,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/content/{collections-manager,collection-items,field-input,confirm-modal}.tsx,
   CMS/src/components/admin-sections.ts, CMS/messages/{en,fi,et}.json,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js.
+
+## 2026-06-22 13:45 — Slice 6: AI assistant collection tools (structured only)
+- **Status:** DONE
+- **What I did:** Added the 5 structured collection tools to the existing CMS AI
+  tool pipeline. PURE `CMS/src/lib/chat/collection-tools.ts` holds the tool schemas
+  + arg validators (create_collection, add_collection_item, update_collection_item,
+  archive_collection_item, query_collection) that coerce the model's args into the
+  exact Slice 2-4 store shapes. Wired registry + handlers in
+  `CMS/src/lib/chat/tool-dispatch.ts` (TOOL_BY_NAME + HANDLERS) calling
+  `createCollection` / item-store CRUD / `queryCollection` directly — NO forked data
+  path, NO raw SQL to the model. `archive_collection_item` op-switches
+  archive|unarchive|delete (one combined tool). New `collections` context in
+  `tool-scopes.ts` (KNOWN_TOOL_NAMES, KNOWN_CONTEXTS, TOOLS_BY_CONTEXT,
+  CONTEXT_PROMPTS) so the assistant on /admin/collections is auto-scoped. Chat route
+  needed NO edits (it auto-derives schemas + dispatch from the registry).
+- **Verified:** `node --test` 11 new tests (arg-shaping/rejection per tool) pass;
+  tool-dispatch + tool-scopes tests still green (registry coverage holds); 78
+  content+tool tests total. `npx tsc --noEmit` clean. `npx opennextjs-cloudflare
+  build` green. Could NOT exercise the live store calls (need a real D1 binding =
+  HITL); the stores themselves were build-verified in Slices 2-4.
+- **Files:** CMS/src/lib/chat/collection-tools.ts (new),
+  CMS/src/lib/chat/tool-dispatch.ts, CMS/src/lib/chat/tool-scopes.ts,
+  CMS/scripts/collection-tools.test.mjs (new).
