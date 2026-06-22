@@ -140,3 +140,9 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/collections/[name]/items/route.ts,
   CMS/src/app/api/collections/[name]/items/[id]/route.ts,
   CMS/scripts/item-write.test.mjs
+
+## 2026-06-22 13:19 — Slice 4: structured query API
+- **Status:** DONE
+- **What I did:** Built the READ trust boundary. PURE `lib/content/query-compiler.ts` — `compileQuery`/`compileCount` turn a `QuerySpec` (filters[] field:op:value, sort[], search, limit/offset, status, archived) into a SAFE PARAMETERIZED SELECT/COUNT over typed columns. Column NAMES whitelisted against registry fields + SYSTEM_COLUMNS (unknown → 400, never inlined/bound); ops whitelisted (eq/ne/lt/lte/gt/gte/like/in/is_null/not_null); EVERY value coerced via Slice-3 `coerceFieldValue` then `?`-bound; LIKE/search `%`-wrap the BOUND param; text search = LIKE over text-affinity fields (NO FTS5, USER DECISION); limit clamped [1,1000], offset ≥0 inlined as plain ints. Thin live store `db/query-store.ts` (`queryCollection` → `getCollection` + `contentSelect` for items + count → `{items,total,limit,offset}`). Route `app/api/collections/[name]/query/route.ts` (GET, Admin-gated, Next15 async params; parses repeatable ?filter/?sort + ?search/?limit/?offset/?status/?archived). 19 node tests assert fence-pass + placeholders===params + no value inlined + 400s for unknown col/op/dir/value/status.
+- **Verified:** `node --test` 67/67 (48 prior + 19 new); `npx tsc --noEmit` clean; `npx opennextjs-cloudflare build` green; query route present in `.next/server/app/api/collections/[name]/query/route.js`. Live D1 = HITL (compiler is node-tested with fakes). No user strings → no cms-bundle/i18n this slice.
+- **Files:** CMS/src/lib/content/query-compiler.ts, CMS/src/db/query-store.ts, CMS/src/app/api/collections/[name]/query/route.ts, CMS/scripts/query-compiler.test.mjs

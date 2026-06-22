@@ -1,25 +1,27 @@
 # Note to the next Meeseeks (content-collections)
 
-BUGS: NONE OPEN. Slices 0 + 1 + 2 + 3 are DONE.
+BUGS: NONE OPEN. Slices 0 + 1 + 2 + 3 + 4 are DONE.
 
 WHAT EXISTS NOW (use it, don't reinvent):
-- `CMS/src/lib/content/fence.ts` — pure SQL validators (Slice 0). Route ALL runtime SQL through them.
-- `CMS/src/lib/content/content-db.ts` — `contentSelect`/`contentWrite`/`contentDdl`, the ONLY runtime-SQL→D1 site; fences before each call; injectable `D1Like` for node tests.
-- `CMS/src/lib/content/collection-schema.ts` (Slice 1, PURE) — DDL generator + `SYSTEM_COLUMNS` (id, slug, status, archived_at, created_at, updated_at), `MAX_COLUMNS=100`.
-- `CMS/src/lib/content/collection-plan.ts` (Slice 2, PURE) — `planCreate`/`planAddField`/`normalizeField(s)`, `MAX_COLLECTIONS=100`.
-- `CMS/src/db/collection-store.ts` (Slice 2) — collection CRUD; `CollectionView` = {id,name,tableName,fields,createdAt,updatedAt}.
-- **Slice 3 (NEW):** `CMS/src/lib/content/item-write.ts` (PURE) — `coerceFieldValue` (per-type validate/coerce, see CAVEATS for rules), `coerceStatus`, and parameterized builders `buildInsert`/`buildUpdate`/`buildArchive`/`buildUnarchive`/`buildDelete`/`buildGet`/`buildList`. `CMS/src/db/item-store.ts` (live) — `listItems`/`getItem`/`createItem`/`updateItem`/`archiveItem`/`unarchiveItem`/`deleteItem`, all `PlanResult<T>`.
-- Item routes: `app/api/collections/[name]/items/route.ts` (GET list ?status=&archived=live|archived|all&limit= / POST create→201), `.../items/[id]/route.ts` (GET / PATCH {changes}|{_op:archive|unarchive} / DELETE). Admin-gated. `[name]` = content_<slug> table name; `[id]` = item system id.
-- Tests: `scripts/item-write.test.mjs` (12). Gate: `node --test scripts/item-write.test.mjs scripts/collection-plan.test.mjs scripts/collection-schema.test.mjs scripts/content-fence.test.mjs` (48).
+- `CMS/src/lib/content/fence.ts` — pure SQL validators (Slice 0). ALL runtime SQL through it.
+- `CMS/src/lib/content/content-db.ts` — `contentSelect`/`contentWrite`/`contentDdl`, the ONLY runtime-SQL→D1 site; injectable `D1Like` for node tests.
+- `CMS/src/lib/content/collection-schema.ts` (Slice 1, PURE) — DDL gen + `SYSTEM_COLUMNS`, `MAX_COLUMNS=100`, `CollectionField`.
+- `CMS/src/lib/content/collection-plan.ts` (Slice 2, PURE) — `planCreate`/`planAddField`/`normalizeField(s)`, `MAX_COLLECTIONS=100`, `PlanResult<T>`.
+- `CMS/src/db/collection-store.ts` (Slice 2) — collection CRUD; `CollectionView` = {id,name,tableName,fields,createdAt,updatedAt}; `listCollections`/`getCollection`/`createCollection`/`addCollectionField`/`deleteCollection`.
+- `CMS/src/lib/content/item-write.ts` (Slice 3, PURE) — `coerceFieldValue`/`coerceStatus` + builders; `ITEM_STATUSES`.
+- `CMS/src/db/item-store.ts` (Slice 3) — items CRUD, all `PlanResult<T>`.
+- **Slice 4 (NEW):** `CMS/src/lib/content/query-compiler.ts` (PURE) — `compileQuery`/`compileCount`, types `QuerySpec`/`FilterClause`/`SortClause`/`FilterOp`, `FILTER_OPS`. Whitelists columns vs registry+SYSTEM_COLUMNS, coerces values via `coerceFieldValue`, binds everything; search = LIKE over text fields (NO FTS5). `CMS/src/db/query-store.ts` — `queryCollection(tableName, spec) → {items,total,limit,offset}`.
+- Routes: `app/api/collections/route.ts`, `.../[name]/route.ts`, `.../[name]/items/route.ts`, `.../[name]/items/[id]/route.ts`, `.../[name]/query/route.ts` (GET, Admin-gated; ?filter=field:op:value repeatable, ?sort=field:asc|desc repeatable, ?search, ?limit, ?offset, ?status, ?archived). `[name]` = content_<slug> table name.
+- Tests gate: `node --test scripts/query-compiler.test.mjs scripts/item-write.test.mjs scripts/collection-plan.test.mjs scripts/collection-schema.test.mjs scripts/content-fence.test.mjs` (67).
 
-PICK NEXT: **Slice 4 — structured query API (NO FTS5 v1 — USER DECISION).**
-- `GET /api/collections/[name]/query` — filter (field op value) + sort + paginate + count, compiled to a safe PARAMETERIZED SELECT over typed columns. Text search = simple `LIKE`/`instr` on text fields (NOT FTS5).
-- Build a PURE SQL-compiler module (filter/sort/paginate/text-LIKE → SQL + bound params), node-tested; assert it NEVER emits unbound user input (mirror Slice-3's "no value inlined" + "placeholders === params" tests). Whitelist filter ops + sort columns against the registry fields + SYSTEM_COLUMNS; reject unknown columns/ops with 400 — column NAMES go in the SQL so they MUST be validated against the registry, never bound or raw.
-- Reuse `coerceFieldValue` from item-write.ts to coerce filter VALUES to the field type before binding. Don't re-coerce differently.
-- Same split: PURE compiler (node-tested with fakes) + thin live store using `contentSelect` + `getCollection` for the schema. Live D1 = HITL.
+PICK NEXT: **Slice 5 — admin UI: manage collections + rich item editor.**
+- Pages under `app/admin/collections/`: list collections, create/edit schema (type picker → POST /api/collections + PATCH .../[name] add-field), per-collection item table with create/edit forms using the CORRECT input per type (reuse page-builder type-aware inputs: native date/time, number, select, bool toggle, textarea/richtext).
+- Wire filter/sort + a text-search box to the Slice-4 query route (`GET .../[name]/query`). Archive/delete behind an IN-APP confirm modal (NO native confirm()/alert() — browser-review sessions hang).
+- **This is the FIRST slice with user strings** → cms-bundle regen in PM + EN/FI/ET for ALL new strings (Slices 2-4 added none). Design-system + purpose tokens.
+- Admin UI pattern: `components/pages/pages-manager.tsx`, `components/settings/brand-editor.tsx` — REST + fetch, no form lib.
 
-GATE every slice: `node --test scripts/...` + `npx tsc --noEmit` + `npx opennextjs-cloudflare build` (dev server DOWN first — it corrupts .next). Slice 5 UI is where cms-bundle regen + EN/FI/ET kick in (Slices 2-4 add no user strings).
+GATE every slice: `node --test scripts/...` + `npx tsc --noEmit` + `npx opennextjs-cloudflare build` (dev server DOWN first — corrupts .next). Slice 5 adds cms-bundle regen + EN/FI/ET.
 
 KEY DECISIONS (settled — don't relitigate): one real table/collection; runtime DDL fenced to content_* + system-generated; 100-collection cap; registry canonical; ADD-ONLY evolution v1; AI gets STRUCTURED tools only; NO FTS5 v1 (LIKE); refs/page-binding = Phase 2.
 
-GOTCHAS: imports inside src/ need the `.ts` extension or node --test can't resolve them. `[name]` URL segment IS the content_<slug> table name. Date/datetime values store as ISO TEXT (NOT ms — system timestamps ARE ms; mind the difference when querying). Multiselect stored as JSON-array TEXT — a LIKE search on it works but is naive. Live D1 can't be unit-tested without a binding — node-test the PURE compiler, build-verify the store + routes.
+GOTCHAS: imports inside src/ need `.ts` extension or node --test can't resolve. `[name]` URL segment IS the content_<slug> table name. Date/datetime stored as ISO TEXT (system timestamps ARE ms). Query column NAMES are whitelisted (can't be bound) — reuse the compiler, don't inline raw column names. LIMIT/OFFSET inline as plain ints (mind "no-inline" tests). Live D1 = HITL — node-test the PURE compiler.

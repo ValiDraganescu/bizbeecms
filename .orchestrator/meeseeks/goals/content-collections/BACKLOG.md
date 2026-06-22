@@ -63,13 +63,20 @@ gates on CMS tsc + opennext build green + node tests + EN/FI/ET for new strings.
   green; both routes in the manifest. Live D1 = HITL. No user strings (Slice 5 UI
   does cms-bundle + EN/FI/ET).
 
-- TODO: **Slice 4 — structured query (NO FTS5 in v1 — USER DECISION 2026-06-22).**
-  STRUCTURED query API only: filter (field op value), sort, paginate, count →
-  compiled to safe PARAMETERIZED SELECT over the typed columns. `GET
-  /api/collections/[name]/query`. Pure SQL-compiler (filter/sort/paginate → SQL +
-  bound params) node-tested; verify it NEVER emits unbound user input. Text search
-  in v1 = a simple `LIKE`/`instr` filter on text fields (good enough without FTS);
-  FTS5 is deferred (see Phase 2 below). Gate.
+- DONE (2026-06-22): **Slice 4 — structured query (NO FTS5 in v1 — USER DECISION
+  2026-06-22).** PURE `lib/content/query-compiler.ts` (`compileQuery`/`compileCount`):
+  QuerySpec (filters[] field:op:value, sort[], search, limit/offset, status,
+  archived) → safe PARAMETERIZED SELECT/COUNT. Column names whitelisted vs registry
+  fields + SYSTEM_COLUMNS (unknown→400, never inlined/bound); ops whitelisted
+  (eq/ne/lt/lte/gt/gte/like/in/is_null/not_null); every value coerced via Slice-3
+  `coerceFieldValue` then `?`-bound; search = LIKE over text-affinity fields (no
+  FTS5); limit clamped [1,1000], offset≥0 inlined as ints. Thin store
+  `db/query-store.ts` (`queryCollection` → items+total). Route `GET
+  /api/collections/[name]/query` (Admin-gated, repeatable ?filter/?sort + ?search/
+  ?limit/?offset/?status/?archived). 19 node tests (fence-pass, placeholders===
+  params, no-inline, 400s). 67 content tests total; tsc + opennext build green;
+  route in manifest. Live D1 = HITL. No user strings (Slice 5 UI does cms-bundle +
+  EN/FI/ET).
 
 - TODO: **Slice 5 — admin UI: manage collections + rich item editor.** Pages under
   `app/admin/collections/`: list collections, create/edit schema (add fields with

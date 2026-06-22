@@ -171,6 +171,25 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **(Slice 3) write ops return 404 on 0 changes** (`contentWrite` returns
   `meta.changes`) — that's how update/archive/delete distinguish "item not found"
   from success. Don't assume a write succeeded; check the change count.
+- **(Slice 4) Column NAMES go into the query SQL — they MUST be whitelisted, not
+  bound.** `compileQuery`/`compileCount` build a `queryableColumns` map (user
+  registry fields + the 6 SYSTEM_COLUMNS as synthetic descriptors); a filter/sort
+  field NOT in that map → 400, never reaches the SQL. Identifiers can't be `?`-bound
+  in SQLite, so this whitelist IS the safety. Slice 5/6 + Phase-2 binding (List
+  query) must reuse this compiler — don't build a second query path that inlines a
+  raw column name.
+- **(Slice 4) Every filter VALUE is coerced via Slice-3 `coerceFieldValue` then
+  bound.** Reuse it — don't re-coerce differently. `like`/`search` wrap `%needle%`
+  on the BOUND PARAM, never in the SQL string. `in` → N placeholders (one bound,
+  coerced value each; empty array = 400). `is_null`/`not_null` take NO value/param.
+- **(Slice 4) `LIMIT 1000`/`OFFSET 40` are inlined as PLAIN integers** (clamped,
+  validated finite) — so a "no user value inlined" test that does
+  `!sql.includes("10")` false-fails on `LIMIT 1000`/value 10. Strip the LIMIT/OFFSET
+  clause before that assertion (the test does).
+- **(Slice 4) search with NO text fields emits `0 = 1`** (matches nothing) rather
+  than silently dropping the search intent. Text-affinity types scanned:
+  string/text/richtext/select/multiselect/ref/asset.
+
 - **(Slice 2) Treat the POST/PATCH JSON body as UNTRUSTED** — `normalizeField(s)`
   coerces it to a clean `CollectionField[]` (drops unknown props, requires
   name+type) BEFORE the generator sees it; the generator's strict `COLUMN_NAME_RE`
