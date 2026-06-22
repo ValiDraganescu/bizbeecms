@@ -33,7 +33,7 @@ green; EN/FI/ET for new PM strings).
   deploy --dry-run` bundles clean. NOTE: real-remote verification waits on
   `cms-v0.6.0` being pushed (it's local only).
 
-- TODO: **Slice 3 — PM: record deployed CMS version end-to-end.** Add
+- DONE: **Slice 3 — PM: record deployed CMS version end-to-end.** Add
   `deployedCmsVersion` (text, nullable) to the `sites` table
   (`ProjectManager/src/db/schema.ts`) + Drizzle migration. Thread the chosen version
   through: PM deploy route sends `ref` = `cms-v<ver>` to the deployer; the deployer

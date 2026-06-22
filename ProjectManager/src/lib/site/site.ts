@@ -296,14 +296,20 @@ export async function setSiteDeployStatus(
   id: string,
   status: SiteStatus,
   workerName?: string | null,
+  deployedCmsVersion?: string | null,
 ): Promise<Site | null> {
   const db = await getDb();
   const patch: {
     status: SiteStatus;
     workerName?: string | null;
     deployStartedAt?: Date;
+    deployedCmsVersion?: string | null;
   } = { status };
   if (workerName !== undefined) patch.workerName = workerName;
+  // Only stamp the deployed CMS version on a successful deploy that reported one;
+  // `undefined` leaves the column untouched (a `failed`/`deploying` transition
+  // must NOT wipe the last good version).
+  if (deployedCmsVersion !== undefined) patch.deployedCmsVersion = deployedCmsVersion;
   // Stamp the start time when a deploy is latched, so staleness is measurable.
   if (status === "deploying") patch.deployStartedAt = new Date();
   const [site] = await db

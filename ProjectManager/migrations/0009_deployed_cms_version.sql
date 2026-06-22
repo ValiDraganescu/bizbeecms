@@ -1,0 +1,1 @@
+ALTER TABLE `sites` ADD `deployed_cms_version` text;

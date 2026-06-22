@@ -462,7 +462,7 @@ report() {
   # $1=status (deployed|failed) ; $2=optional error
   if [ -z "$CALLBACK_URL" ]; then return; fi
   if [ "$1" = "deployed" ]; then
-    body="{\\"siteId\\":\\"$SITE_ID\\",\\"deployId\\":\\"$DEPLOY_ID\\",\\"status\\":\\"deployed\\",\\"workerName\\":\\"$WORKER_NAME\\"}"
+    body="{\\"siteId\\":\\"$SITE_ID\\",\\"deployId\\":\\"$DEPLOY_ID\\",\\"status\\":\\"deployed\\",\\"workerName\\":\\"$WORKER_NAME\\",\\"deployedRef\\":\\"$REF\\"}"
   else
     # keep error short + JSON-safe
     # Include the build log so the failure is self-explanatory in PM. A plain

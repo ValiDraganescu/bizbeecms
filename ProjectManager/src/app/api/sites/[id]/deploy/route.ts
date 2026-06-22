@@ -28,10 +28,23 @@ export type DeployError =
  * `deployed`/`failed`. The page reflects status on refresh.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id: siteId } = await params;
+
+  // Optional chosen CMS release ref (a `cms-v<x.y.z>` tag, picked in Slice 5's
+  // version picker). Absent → the deployer defaults to `main`. Validated against
+  // the same charset the deployer accepts so we never forward junk.
+  let ref: string | undefined;
+  try {
+    const parsed = (await request.json()) as { ref?: unknown };
+    if (typeof parsed?.ref === "string" && /^[\w.\-/]+$/.test(parsed.ref)) {
+      ref = parsed.ref;
+    }
+  } catch {
+    // No/invalid JSON body — fine, deploy with the default ref.
+  }
 
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "notAllowed" }, { status: 403 });
@@ -72,7 +85,7 @@ export async function POST(
         "content-type": "application/json",
         authorization: `Bearer ${deployerSecret}`,
       },
-      body: JSON.stringify({ siteId, slug: site.slug }),
+      body: JSON.stringify({ siteId, slug: site.slug, ...(ref ? { ref } : {}) }),
     });
     if (!res.ok) {
       await setSiteDeployStatus(siteId, "failed");

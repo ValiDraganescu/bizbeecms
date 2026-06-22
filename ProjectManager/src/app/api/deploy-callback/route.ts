@@ -5,11 +5,15 @@ import {
   buildFailedCallbackEvent,
   insertDeployEvent,
 } from "@/lib/deploy/deploy-events";
+import { deployedVersionFromCallback } from "@/lib/deploy/cms-version";
 
 type Body = {
   siteId?: unknown;
   status?: unknown;
   workerName?: unknown;
+  // The CMS release ref (git tag / branch) the deployer cloned + deployed.
+  // Recorded onto the Site so the list/detail can show its CMS version.
+  deployedRef?: unknown;
   error?: unknown;
 };
 
@@ -79,7 +83,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     status === "deployed" && typeof body.workerName === "string"
       ? body.workerName
       : undefined;
-  await setSiteDeployStatus(siteId, status, workerName ?? undefined);
+  // Record the deployed CMS version only on success (the deployer echoes the
+  // ref it cloned as `deployedRef`). On `failed` leave it untouched so the last
+  // good version survives.
+  const deployedCmsVersion =
+    status === "deployed"
+      ? (deployedVersionFromCallback(body.deployedRef) ?? undefined)
+      : undefined;
+  await setSiteDeployStatus(
+    siteId,
+    status,
+    workerName ?? undefined,
+    deployedCmsVersion,
+  );
 
   return NextResponse.json({ ok: true });
 }

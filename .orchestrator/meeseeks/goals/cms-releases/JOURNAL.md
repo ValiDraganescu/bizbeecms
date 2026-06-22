@@ -39,3 +39,41 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `git ls-remote` won't list it yet — that verification waits on the tag being
   pushed (see CAVEATS). No tsc in deployer (TS not installed); dry-run is the gate.
 - **Files:** `deployer/src/index.ts`, goal memory.
+
+## 2026-06-22 13:12 — Slice 3: record deployed CMS version end-to-end
+- **Status:** DONE
+- **What I did:** Threaded the deployed CMS ref from deployer → callback → `sites`:
+  - **Schema + migration:** added `deployedCmsVersion` (text, nullable) to `sites`
+    (`ProjectManager/src/db/schema.ts`); `drizzle-kit generate` →
+    `migrations/0009_deployed_cms_version.sql` (`ALTER TABLE sites ADD ...`) +
+    `meta/` snapshot.
+  - **Deployer success callback** (`deployer/src/index.ts`, `buildScript()` ~465):
+    added `"deployedRef":"$REF"` to the `deployed` JSON body. `$REF` was already in
+    the script env — no clone/build change.
+  - **Pure helper** `ProjectManager/src/lib/deploy/cms-version.ts`:
+    `parseCmsTag` (cms-v<x.y.z>→x.y.z), `deployedVersionFromCallback` (validate the
+    ref against `^[\w.\-/]+$`, cap 80, null on absent/junk), `displayCmsVersion`
+    (tag→x.y.z, else verbatim) — node-testable, no CF/db deps.
+  - **Callback ingest** (`api/deploy-callback/route.ts`): added `deployedRef` to
+    `Body`; on `status==="deployed"` derives the version via the helper and passes it
+    to `setSiteDeployStatus`. On `failed`/`deploying` it stays `undefined` → column
+    untouched (last good version survives).
+  - **`setSiteDeployStatus`** (`lib/site/site.ts`): new optional 4th arg
+    `deployedCmsVersion`; `undefined` leaves the column alone, a value sets it.
+  - **Deploy route** (`api/sites/[id]/deploy/route.ts`): now reads an optional `ref`
+    from the POST body (validated), forwards it to the deployer when present (Slice 5's
+    picker will send `cms-v<ver>`); absent body → deployer defaults to `main` (the
+    documented Slice-3 default — records whatever was deployed). Client deploy-form
+    sends no body today; route's try/catch tolerates that — NO client change.
+- **Verified:** `cms-version.test.ts` (7 cases: tag parse, callback record/reject
+  shell-unsafe/length-cap, display) pass; full PM suite 122 pass (was 115). `tsc
+  --noEmit` 0 errors. `opennextjs-cloudflare build` green. Deployer `wrangler deploy
+  --dry-run` bundles clean. Could NOT live-verify an actual deploy callback writing the
+  column (needs a real deploy + DB).
+- **Files:** `ProjectManager/src/db/schema.ts`,
+  `ProjectManager/migrations/0009_deployed_cms_version.sql` (+ `meta/`),
+  `ProjectManager/src/lib/deploy/cms-version.ts` (+`.test.ts`),
+  `ProjectManager/src/app/api/deploy-callback/route.ts`,
+  `ProjectManager/src/lib/site/site.ts`,
+  `ProjectManager/src/app/api/sites/[id]/deploy/route.ts`,
+  `deployer/src/index.ts`, goal memory.

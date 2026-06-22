@@ -80,3 +80,21 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **`/tags` reads the REMOTE — won't list `cms-v0.6.0` until it's PUSHED.** The tag
   is still local-only (Meeseeks don't push). End-to-end verifying Slice 2 against the
   real deployer requires the user (or a non-Meeseeks run) to push `cms-v0.6.0` first.
+
+- **Slice 3 is DONE — version is recorded end-to-end now.** Deployer success
+  callback sends `deployedRef:"$REF"`; `sites.deployedCmsVersion` (text, migration
+  `0009_deployed_cms_version.sql`) stores it. The parse/validate/display logic is the
+  PURE helper `ProjectManager/src/lib/deploy/cms-version.ts` —
+  `displayCmsVersion(stored)` turns `cms-v0.6.0`→`0.6.0` (else verbatim, e.g.
+  `main`). USE IT in Slice 4's list/detail UI; don't re-parse.
+- **`setSiteDeployStatus` now takes an optional 4th arg `deployedCmsVersion`** —
+  `undefined` leaves the column UNTOUCHED (so a `failed`/`deploying` transition keeps
+  the last good version). Only `status==="deployed"` callbacks set it.
+- **The deploy route reads an optional `ref` from the POST body** (validated
+  `^[\w.\-/]+$`, forwarded to the deployer). Slice 5's picker just POSTs
+  `{ref:"cms-v<ver>"}` — the route + deployer + callback already carry it through.
+  No body → deployer defaults to `main`, callback records `main`.
+- **Run `drizzle-kit generate`, don't hand-write migrations** — it updates
+  `migrations/meta/_journal.json` + the snapshot too. `npm test` is 122 now (Slice 3
+  added 7). Gates: PM `tsc` + `opennextjs-cloudflare build`; deployer `wrangler deploy
+  --dry-run`. Build only when no `npm run dev` is on 3601 (it corrupts `.next`).

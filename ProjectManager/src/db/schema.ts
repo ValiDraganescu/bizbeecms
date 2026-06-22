@@ -71,6 +71,10 @@ export const sites = sqliteTable(
     deployStartedAt: integer("deploy_started_at", { mode: "timestamp_ms" }),
     // Cloudflare Worker name this Site's CMS is/will be deployed as.
     workerName: text("worker_name"),
+    // The CMS release ref (git tag, e.g. `cms-v0.6.0`) this Site is currently
+    // deployed from — recorded by the deploy callback on success. Null until the
+    // first successful deploy. (cms-releases: shown in the site list + detail.)
+    deployedCmsVersion: text("deployed_cms_version"),
     country: text("country"),
     createdBy: text("created_by")
       .notNull()
