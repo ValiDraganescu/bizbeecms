@@ -27,24 +27,17 @@ tsc + opennext build green + PM node tests + EN/FI/ET for new strings.
   cover the full 4×4 matrix + role-change guards. NO route (Slice 4). Scope check
   deferred to Slice 3. All gates green.
 
-- TODO: **Slice 3 — dynamic tags data model + Manager country-AND-tag reach.**
-  USER DECISION 2026-06-21 (refined): **COUNTRY STAYS EXACTLY AS IT IS** — keep the
-  fixed `COUNTRY_CODES`, `user_countries`, and the Site `country` column UNCHANGED.
-  Add a SEPARATE, dynamic, MANAGED tagging system ALONGSIDE country (tags are
-  things like "company group", "TO channel", arbitrary org labels — distinct from
-  country). Sites can be tagged with a country (existing) AND with these tags (new).
-  Schema (new, parallel to country — do NOT fold country into it): a managed `tags`
-  table (id, label — admin-CRUD'able, see Slice 3b) + `user_tags` (Manager's tags,
-  PK userId+tagId) + `site_tags` (PK siteId+tagId). Drizzle migration.
-  ACCESS RULE — **AND across the two dimensions** (USER DECISION 2026-06-21): a
-  Manager reaches a Site when country ∈ Manager.countries **AND** a tag ∈
-  Manager.tags (both dimensions must match; within a dimension it's OR/any-of).
-  Extend (don't break country) `canManageSiteByCountry` → `canManageSite(actor,
-  actorCountries, actorTagIds, site, siteTagIds)` keeping the existing country logic
-  and adding the tag conjunction; thread through `listSitesForUser`. Editors still
-  by assignment; SuperAdmin/Admin global (no scope). Helpers to read a user's tagIds
-  + a site's tagIds. Pure access-rule tests: country-match-only → DENIED, tag-only →
-  DENIED, both → ALLOWED, Editor by assignment, Admin global. Gate.
+- DONE (2026-06-22): **Slice 3 — dynamic tags data model + Manager country-AND-tag
+  reach.** New tables `tags`/`user_tags`/`site_tags` (schema.ts) + Drizzle migration
+  `0007_tags.sql` (scaffolded by `drizzle-kit generate`, journal/snapshot chain auto-
+  updated; onDelete cascade on both joins — Slice 3b relies on it). Pure alias-free
+  `lib/site/scope.ts` `canManageSite(actor, countries, tagIds, {country, tagIds})` =
+  the single source of truth: SuperAdmin/global-Admin global, scoped-Admin country-
+  only, Manager country AND tag (any-of within a dim), Editor nothing. 8 node tests
+  (`scope.test.ts`). `lib/site/authz.ts` `canManageSiteByCountry` → `canManageSite`
+  (delegates to scope.ts; old name kept as alias so all routes still compile).
+  `getUserTagIds`/`getSiteTagIds` DB helpers; `listSitesForUser` Manager branch
+  (country ∈ scope AND tag overlap). tsc + 98 node tests + opennext build green.
 
 - TODO: **Slice 3b — tag management (CRUD the dynamic tags).** USER 2026-06-21:
   "tags can be managed". A small admin surface to create/rename/delete tags in the

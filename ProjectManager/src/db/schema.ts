@@ -183,6 +183,53 @@ export const inviteCountries = sqliteTable(
   (t) => [primaryKey({ columns: [t.inviteId, t.country] })],
 );
 
+/**
+ * Dynamic, MANAGED org tags (pm-roles Slice 3) — a SEPARATE dimension that lives
+ * ALONGSIDE country (country stays exactly as it is; do NOT fold it into tags).
+ * Admins CRUD this vocabulary (company group, TO channel, …) in Slice 3b. A Site
+ * carries zero+ tags (`site_tags`); a Manager is scoped to zero+ tags (`user_tags`).
+ * Manager reach = country-match AND tag-match (both dimensions; any-of within one).
+ */
+export const tags = sqliteTable(
+  "tags",
+  {
+    id: text("id").primaryKey(),
+    label: text("label").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [uniqueIndex("tags_label_unique").on(t.label)],
+);
+
+/** A Manager's tag scope: one row per tag. No rows = no tag reach (Manager only). */
+export const userTags = sqliteTable(
+  "user_tags",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.tagId] })],
+);
+
+/** A Site's tags: one row per tag. */
+export const siteTags = sqliteTable(
+  "site_tags",
+  {
+    siteId: text("site_id")
+      .notNull()
+      .references(() => sites.id, { onDelete: "cascade" }),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.siteId, t.tagId] })],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Invite = typeof invites.$inferSelect;
@@ -195,5 +242,11 @@ export type UserCountry = typeof userCountries.$inferSelect;
 export type NewUserCountry = typeof userCountries.$inferInsert;
 export type InviteCountry = typeof inviteCountries.$inferSelect;
 export type NewInviteCountry = typeof inviteCountries.$inferInsert;
+export type Tag = typeof tags.$inferSelect;
+export type NewTag = typeof tags.$inferInsert;
+export type UserTag = typeof userTags.$inferSelect;
+export type NewUserTag = typeof userTags.$inferInsert;
+export type SiteTag = typeof siteTags.$inferSelect;
+export type NewSiteTag = typeof siteTags.$inferInsert;
 export type DeployEvent = typeof deployEvents.$inferSelect;
 export type NewDeployEvent = typeof deployEvents.$inferInsert;

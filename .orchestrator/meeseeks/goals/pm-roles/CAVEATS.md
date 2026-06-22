@@ -87,3 +87,20 @@ Read every line before working. Each entry was learned the hard way by a previou
   `{ id, role }`. Self-removal is blocked by the `id` equality check, so routes MUST
   pass real ids (a Manager removing another Manager with a different id IS still
   denied by tier — the self-check only matters for same-tier same-user).
+
+- **Slice 3 done — the SCOPE rule lives in `lib/site/scope.ts` (pure, alias-free).**
+  `canManageSite(actor, countries, tagIds, {country, tagIds})` is the SINGLE source of
+  truth for reach-by-scope. `lib/site/authz.ts` wraps it (with a runtime `User`) and
+  STILL exports `canManageSiteByCountry` as a deprecated alias — DON'T delete the alias
+  until Slice 4/5 migrate every route caller to pass `actorTagIds`+`site.tagIds`. Today
+  all route callers pass the defaults (`actorTagIds=[]`, `site.tagIds=[]`), which is
+  CORRECT for SuperAdmin/Admin/Editor and is why no route changed; a Manager with
+  empty tags reaches nothing (intended). When Slice 4/5 add Manager-aware routes, pass
+  the real tag ids via `getUserTagIds`/`getSiteTagIds`.
+- **Tags reach is AND-with-country and tags ONLY gate Manager.** For Admin, tags are
+  ignored (country is the only scope). Don't add a tag gate to the Admin path — GOAL
+  says Admins set Managers' tags but Admin reach itself stays country-only.
+- **`0007_tags.sql` WAS scaffolded by `drizzle-kit generate`** (unlike Slice 1's
+  hand-authored data-only 0006) because new tables are a real structural diff. The
+  meta journal + 0007_snapshot.json were auto-written. Future tag-schema tweaks: just
+  re-run `drizzle-kit generate`.

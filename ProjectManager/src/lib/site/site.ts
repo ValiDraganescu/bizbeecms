@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, or, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Site, SiteStatus, User } from "@/db/schema";
 import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
-import { getUserCountries } from "@/lib/auth/user";
+import { getUserCountries, getUserTagIds } from "@/lib/auth/user";
 import { hasGlobalScope } from "./authz";
 
 // Pure slug helpers live in ./slug (client-safe). Re-export for existing callers.
@@ -91,8 +91,10 @@ export async function updateSite(
  * Sites visible to `user`, newest first.
  *  - SuperAdmin / global Admin: every Site.
  *  - Country-scoped Admin: Sites whose country is in their scope.
- *  - Editor (and as a union for scoped Admins): Sites they're assigned to
- *    via site_users.
+ *  - Manager: Sites whose country ∈ scope AND that carry one of the Manager's
+ *    tags (pm-roles Slice 3 — AND across the two dimensions).
+ *  - Editor (and as a union for scoped Admins/Managers): Sites they're assigned
+ *    to via site_users.
  */
 export async function listSitesForUser(user: User): Promise<Site[]> {
   const db = await getDb();
@@ -105,17 +107,33 @@ export async function listSitesForUser(user: User): Promise<Site[]> {
       .orderBy(desc(schema.sites.createdAt));
   }
 
-  // Scoped reach: by country (Admins only) UNION by assignment (anyone).
+  // Scoped reach: by country (Admin), by country AND tag (Manager), UNION by
+  // assignment (anyone).
   const assignedIds = await getAssignedSiteIds(user.id);
 
-  const byCountry =
-    user.role === "Admin" && countries.length > 0
-      ? inArray(schema.sites.country, countries)
-      : undefined;
+  let byScope;
+  if (user.role === "Admin" && countries.length > 0) {
+    byScope = inArray(schema.sites.country, countries);
+  } else if (user.role === "Manager" && countries.length > 0) {
+    // Manager: country AND tag both required. Find Site ids tagged with one of
+    // the Manager's tags, then intersect with the country filter.
+    const tagIds = await getUserTagIds(user.id);
+    if (tagIds.length > 0) {
+      const taggedIds = await getSiteIdsWithAnyTag(tagIds);
+      byScope =
+        taggedIds.length > 0
+          ? and(
+              inArray(schema.sites.country, countries),
+              inArray(schema.sites.id, taggedIds),
+            )
+          : undefined;
+    }
+  }
+
   const byAssignment =
     assignedIds.length > 0 ? inArray(schema.sites.id, assignedIds) : undefined;
 
-  const clauses = [byCountry, byAssignment].filter(Boolean);
+  const clauses = [byScope, byAssignment].filter(Boolean);
   if (clauses.length === 0) return [];
 
   return db
@@ -123,6 +141,27 @@ export async function listSitesForUser(user: User): Promise<Site[]> {
     .from(schema.sites)
     .where(clauses.length === 1 ? clauses[0] : or(...clauses))
     .orderBy(desc(schema.sites.createdAt));
+}
+
+/** Site ids carrying at least one of the given tag ids (pm-roles Slice 3). */
+async function getSiteIdsWithAnyTag(tagIds: string[]): Promise<string[]> {
+  if (tagIds.length === 0) return [];
+  const db = await getDb();
+  const rows = await db
+    .select({ siteId: schema.siteTags.siteId })
+    .from(schema.siteTags)
+    .where(inArray(schema.siteTags.tagId, tagIds));
+  return [...new Set(rows.map((r) => r.siteId))];
+}
+
+/** A Site's tag ids (pm-roles Slice 3). */
+export async function getSiteTagIds(siteId: string): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({ tagId: schema.siteTags.tagId })
+    .from(schema.siteTags)
+    .where(eq(schema.siteTags.siteId, siteId));
+  return rows.map((r) => r.tagId);
 }
 
 /** Site ids this user is assigned to (via site_users). */

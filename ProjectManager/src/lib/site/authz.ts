@@ -1,5 +1,6 @@
 import type { Site, User } from "@/db/schema";
 import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
+import { canManageSite as canManageSiteScope } from "@/lib/site/scope";
 
 /**
  * Server-side authorization for Sites. Enforced in the site actions — never
@@ -59,20 +60,31 @@ export function authorizeSiteCountry(
 }
 
 /**
- * Whether `actor` may see/edit a Site by virtue of its country scope alone
- * (Admin reach). SuperAdmin and global Admins reach every Site; a scoped Admin
- * reaches only Sites whose country is in their scope (global Sites excluded).
+ * Whether `actor` reaches a Site by SCOPE (pm-roles Slice 3). Delegates to the
+ * pure, alias-free `canManageSite` rule (lib/site/scope.ts) — the single source
+ * of truth — passing both scope dimensions:
+ *  - SuperAdmin / global Admin → every Site.
+ *  - country-scoped Admin → country match (tags ignored for Admin).
+ *  - Manager → country match AND tag overlap (both required).
+ *  - Editor → nothing here (reaches assigned Sites via site_users in the data
+ *    layer, which this does NOT cover).
  *
- * NOTE: Editors reach Sites via assignment (site_users), which this does
- * NOT cover — the data layer unions assignment in for the list/detail.
+ * `actorTagIds` / the Site's `tagIds` matter only for the Manager tier; Admin and
+ * SuperAdmin callers may pass `[]` for both (kept for backward-compat). The old
+ * name `canManageSiteByCountry` is retained as an alias so existing routes still
+ * compile while Slice 4/5 migrate them to the tag-aware form.
  */
-export function canManageSiteByCountry(
+export function canManageSite(
   actor: User,
   actorCountries: CountryCode[],
-  site: Pick<Site, "country">,
+  site: Pick<Site, "country"> & { tagIds?: string[] },
+  actorTagIds: string[] = [],
 ): boolean {
-  if (!canUserCreateSite(actor)) return false;
-  if (hasGlobalScope(actor, actorCountries)) return true;
-  if (site.country === null) return false; // global Site, scoped Admin
-  return isCountryCode(site.country) && actorCountries.includes(site.country);
+  return canManageSiteScope(actor, actorCountries, actorTagIds, {
+    country: isCountryCode(site.country) ? site.country : null,
+    tagIds: site.tagIds ?? [],
+  });
 }
+
+/** @deprecated Use `canManageSite`. Country-only alias for pre-Slice-3 callers. */
+export const canManageSiteByCountry = canManageSite;

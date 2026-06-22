@@ -86,3 +86,13 @@ export async function getUserCountries(userId: string): Promise<CountryCode[]> {
     .where(eq(schema.userCountries.userId, userId));
   return rows.map((r) => r.country).filter(isCountryCode);
 }
+
+/** A user's tag scope (pm-roles Slice 3) — tag ids. Empty = no tag reach. */
+export async function getUserTagIds(userId: string): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({ tagId: schema.userTags.tagId })
+    .from(schema.userTags)
+    .where(eq(schema.userTags.userId, userId));
+  return rows.map((r) => r.tagId);
+}

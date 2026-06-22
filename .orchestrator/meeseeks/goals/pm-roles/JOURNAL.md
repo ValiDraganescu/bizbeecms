@@ -61,3 +61,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `src/app/(auth)/invite/accept/[token]/page.tsx`, `src/app/(app)/sites/page.tsx`,
   `src/app/(app)/sites/[id]/page.tsx`, `src/app/design-system/page.tsx`,
   `messages/{en,fi,et}.json`, `src/lib/roles.test.ts`.
+
+## 2026-06-22 12:36 — Slice 3: dynamic tags data model + Manager country-AND-tag reach
+- **Status:** DONE
+- **What I did:** Added the tag system ALONGSIDE country (country untouched).
+  - Schema: `tags` (id, unique label, createdAt), `user_tags` (PK userId+tagId),
+    `site_tags` (PK siteId+tagId), all with onDelete cascade. + their `$inferSelect/Insert`
+    types. Migration `0007_tags.sql` scaffolded by `drizzle-kit generate --name tags`
+    (journal/snapshot chain auto-updated — this is a real structural change, NOT a
+    data-only migration like Slice 1's 0006).
+  - PURE rule `src/lib/site/scope.ts` `canManageSite(actor, countries, tagIds, {country, tagIds})`
+    — alias-free, the single source of truth. SuperAdmin/global-Admin → all; scoped-Admin
+    → country-only (tags ignored for Admin per GOAL); Manager → country AND tag (any-of
+    within a dimension, AND between); Editor → nothing by scope. 8 node tests `scope.test.ts`.
+  - `lib/site/authz.ts`: `canManageSiteByCountry` → `canManageSite` (now delegates to
+    scope.ts, accepts optional `site.tagIds` + `actorTagIds`); kept `canManageSiteByCountry`
+    as a deprecated alias so ALL existing routes compile unchanged (they pass tagIds=[]
+    → no Manager users exist yet, so Admin/SuperAdmin/Editor behavior is byte-identical).
+  - DB helpers: `getUserTagIds` (user.ts), `getSiteTagIds` + private `getSiteIdsWithAnyTag`
+    (site.ts). `listSitesForUser` got a Manager branch: country ∈ scope AND tag overlap,
+    UNION assignment.
+- **Verified:** `npx tsc --noEmit` exit 0; `npm test` 98/98 (8 new); `npx opennextjs-cloudflare build` green (port 3601 confirmed free first).
+- **Files:** `ProjectManager/src/db/schema.ts`, `ProjectManager/migrations/0007_tags.sql`
+  (+ meta/_journal.json, meta/0007_snapshot.json auto-gen),
+  `ProjectManager/src/lib/site/scope.ts` (new), `ProjectManager/src/lib/site/scope.test.ts` (new),
+  `ProjectManager/src/lib/site/authz.ts`, `ProjectManager/src/lib/site/site.ts`,
+  `ProjectManager/src/lib/auth/user.ts`.
