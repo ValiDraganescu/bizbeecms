@@ -51,9 +51,14 @@
     //  - CMS_AUTH_SECRET: shared bearer PM checks (peer of DEPLOYER_SECRET). It's
     //    a secret in practice — the deployer injects the real value; never commit
     //    a real one here.
+    //  - OPENROUTER_API_KEY: the AI provider key (ai-openrouter). Empty here =>
+    //    getAi() falls back to the CF `AI` binding; the deployer injects the real
+    //    key per-Site so OpenRouter becomes the active provider. Secret in
+    //    practice — never commit a real one.
     "SITE_ID": "",
     "PM_ORIGIN": "",
-    "CMS_AUTH_SECRET": ""
+    "CMS_AUTH_SECRET": "",
+    "OPENROUTER_API_KEY": ""
   },
   "observability": {
     "enabled": true

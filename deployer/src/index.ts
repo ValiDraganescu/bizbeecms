@@ -17,6 +17,10 @@ type Env = {
   // /api/auth/cms-validate lives (falls back to PM_CALLBACK_ORIGIN).
   CMS_AUTH_SECRET?: string;
   PM_ORIGIN?: string;
+  // AI provider key (ai-openrouter): injected into each CMS Worker as a var so
+  // getAi() selects OpenRouter. Empty/absent => CMS falls back to the CF `AI`
+  // binding. Set as a deployer secret (`wrangler secret put OPENROUTER_API_KEY`).
+  OPENROUTER_API_KEY?: string;
   // Custom-domain attach (Cloudflare for SaaS): the zone whose custom_hostnames
   // API we register against, and the Host->slug map the router reads. CF_API_TOKEN
   // must additionally hold "SSL and Certificates: Edit" for the custom_hostnames call.
@@ -441,6 +445,8 @@ async function startDeploy(
       CMS_AUTH_SECRET: env.CMS_AUTH_SECRET ?? "",
       // The CMS guard calls PM at PM_ORIGIN; default to the callback origin.
       PM_ORIGIN: (env.PM_ORIGIN ?? env.PM_CALLBACK_ORIGIN ?? "").replace(/\/+$/, ""),
+      // AI provider key (ai-openrouter) → injected into the CMS Worker as a var.
+      OPENROUTER_API_KEY: env.OPENROUTER_API_KEY ?? "",
     },
   });
 }
@@ -650,7 +656,8 @@ step_start deploy
 npx wrangler deploy --name "$WORKER_NAME" --compatibility-date 2025-09-01 \
   --var "SITE_ID:$SITE_ID" \
   --var "PM_ORIGIN:$PM_ORIGIN" \
-  --var "CMS_AUTH_SECRET:$CMS_AUTH_SECRET"
+  --var "CMS_AUTH_SECRET:$CMS_AUTH_SECRET" \
+  --var "OPENROUTER_API_KEY:$OPENROUTER_API_KEY"
 if [ $? -ne 0 ]; then step_fail "wrangler deploy failed"; report failed "wrangler deploy failed"; exit 1; fi
 step_ok
 

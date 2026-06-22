@@ -145,15 +145,38 @@ export class OpenRouterAi implements Ai {
 }
 
 /**
- * The adapter factory: resolve the live `Ai` from the Cloudflare context. The
- * single reader of `env.AI` in the app. Returns `null` when the binding is absent
- * (not yet provisioned for this Site) so the route can answer 503 instead of 500
- * — matching the previous in-route `if (!ai)` guard.
+ * The adapter factory + SOLE reader of `env.OPENROUTER_API_KEY` / `env.AI`.
+ * Provider selection is ONE switch: prefer OpenRouter when its key is present
+ * (the ai-openrouter default), else fall back to the CF Workers AI binding, else
+ * `null` (neither provisioned) so the route answers 503 instead of 500 — matching
+ * the previous in-route `if (!ai)` guard.
+ *
+ * ponytail: key-presence is the switch — no extra provider flag. Add an explicit
+ * `AI_PROVIDER` var only if a Site ever needs CfAi despite having an OpenRouter key.
  */
 export async function getAi(): Promise<Ai | null> {
   const { env } = await getCloudflareContext({ async: true });
-  const ai = (env as unknown as { AI?: AiBinding }).AI;
-  return ai ? new CfAi(ai) : null;
+  const e = env as unknown as { OPENROUTER_API_KEY?: string; AI?: AiBinding };
+  const key = pickSelection(e);
+  if (key.provider === "openrouter") return new OpenRouterAi(key.apiKey);
+  if (key.provider === "cf") return new CfAi(e.AI as AiBinding);
+  return null;
+}
+
+/**
+ * Pure provider-selection rule, separated so it's unit-testable without the
+ * Cloudflare context. OpenRouter wins when its key is a non-empty string; else
+ * CF when the `AI` binding exists; else none.
+ */
+export function pickSelection(env: {
+  OPENROUTER_API_KEY?: string;
+  AI?: unknown;
+}): { provider: "openrouter"; apiKey: string } | { provider: "cf" | "none" } {
+  if (typeof env.OPENROUTER_API_KEY === "string" && env.OPENROUTER_API_KEY) {
+    return { provider: "openrouter", apiKey: env.OPENROUTER_API_KEY };
+  }
+  if (env.AI) return { provider: "cf" };
+  return { provider: "none" };
 }
 
 /**

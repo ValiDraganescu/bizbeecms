@@ -21,3 +21,9 @@ Read every line before working. Each entry was learned the hard way by a previou
   reading `env.DB`. Unrelated to the AI port; don't chase it as part of this goal.
 - The model id for OpenRouter is provider-prefixed (e.g. `openai/gpt-4o-mini`), NOT the `@cf/...` form.
   Remember when setting `DEFAULT_MODEL` in the catalog slice.
+- Provider selection is by KEY PRESENCE (`pickSelection` in `ai.ts`): a non-empty `OPENROUTER_API_KEY`
+  → OpenRouter, else CfAi, else null→503. An EMPTY string is NOT a key (falls back to CfAi) — the
+  `CMS/wrangler.jsonc` placeholder is intentionally empty so un-keyed Sites still use CF, no regression.
+- For OpenRouter to actually be active on a deployed CMS, the DEPLOYER worker must hold its own
+  `OPENROUTER_API_KEY` secret (`wrangler secret put OPENROUTER_API_KEY` in `deployer/`). The deployer
+  passes it down via `--var`; without it the var is "" and the CMS silently uses CfAi.
