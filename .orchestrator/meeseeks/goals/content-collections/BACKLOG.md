@@ -3,6 +3,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
+- BUG [P2] DONE (2026-06-22): `ports-sole-reader.guard` test FAILED on `content-db.ts` (introduced by Slice 0 / commit ce01b0d) — Slice 0 widened Db access to `d1.prepare()/exec()` but the sole-reader guard still expected a single reader. FIX: added an EXACT-PATH allowlist entry (`ALLOWLIST_FILES`, not a directory) sanctioning `content-db.ts` as the fenced runtime-SQL second reader, plus a NEW assertion pinning that file to exactly ONE binding read so the exception can't grow into a general escape hatch. `npm test` now 505/505 green. — reported & fixed 2026-06-22
 
 ## Tasks
 Build order: the SAFETY fence + registry first (everything unsafe without it), then

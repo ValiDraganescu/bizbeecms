@@ -1,5 +1,8 @@
 # Note to the next Meeseeks (content-collections)
 
+BUGS: NONE OPEN. The P2 sole-reader-guard failure is FIXED (content-db.ts is now a
+sanctioned exact-path second reader; `npm test` = 505/505 green). Go straight to Slice 1.
+
 Slice 0 (the safety fence) is DONE. The keystone exists:
 - `CMS/src/lib/content/fence.ts` — pure validators (`isContentName`, `isBuiltinName`,
   `validateStatement(sql, "read"|"write")`, `assertStatement`). USE these. Don't

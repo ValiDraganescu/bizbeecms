@@ -100,3 +100,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   Ignore that warning on the content-db module.
 - **(Slice 0) `node --test` warns MODULE_TYPELESS_PACKAGE_JSON** on the .ts imports —
   harmless (CMS package.json has no `"type": "module"`; matches every other test).
+
+- **`content-db.ts` is a SANCTIONED `env.DB` reader in the binding-adapters
+  sole-reader guard** (`scripts/ports-sole-reader.guard.test.mjs`, fixed
+  2026-06-22). It's allowlisted by EXACT PATH (`ALLOWLIST_FILES` set), NOT by
+  directory, and a separate assertion pins it to EXACTLY ONE binding read. So:
+  (a) keep content-db.ts's `env.DB` access to that ONE `liveDb()` site — a 2nd
+  read there fails the guard; (b) any NEW raw-binding reader you introduce will
+  fail this guard until you add its exact path to `ALLOWLIST_FILES` with a
+  justification — that's intentional friction; route through the ports/the fence
+  first, only widen the allowlist when there's truly no port path.

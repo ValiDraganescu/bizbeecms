@@ -28,3 +28,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   no errors; dev server confirmed down first). No new UI strings → no i18n/cms-bundle work.
 - **Files:** CMS/src/lib/content/fence.ts, CMS/src/lib/content/content-db.ts,
   CMS/scripts/content-fence.test.mjs
+
+## 2026-06-22 12:29 — BUG [P2]: ports-sole-reader.guard fails on content-db.ts
+- **Status:** DONE
+- **What I did:** Slice 0's `content-db.ts` legitimately reads `env.DB` (line 39,
+  the fenced runtime-SQL widening), which tripped the binding-adapters sole-reader
+  guard (it allowlisted only `lib/ports/`). Sanctioned content-db.ts WITHOUT
+  blunting the invariant:
+  - Added `ALLOWLIST_FILES` (a Set keyed by EXACT path, not a directory) +
+    `isAllowlisted(file)` helper; the violation scan now skips ports OR a
+    sanctioned exact-path file. Documented WHY in a new "SANCTIONED SECOND READER"
+    header note.
+  - Added a NEW assertion: the sanctioned fence file must contain EXACTLY ONE
+    binding read — so the exception stays narrow (a 2nd read inside content-db.ts,
+    or any other stray reader anywhere, still flips the guard red). The invariant
+    stays load-bearing, not a blank check.
+- **Verified:** `node --test scripts/ports-sole-reader.guard.test.mjs` → 4/4 pass.
+  `npm test` (full CMS suite) → **505/505 green** (was 499/500). Test-only change
+  (no TS source / runtime code touched) → no tsc/opennext build or i18n needed.
+- **Files:** CMS/scripts/ports-sole-reader.guard.test.mjs

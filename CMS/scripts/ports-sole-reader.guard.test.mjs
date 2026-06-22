@@ -18,6 +18,15 @@
  * Scope note (see goal CAVEATS): only the DB/MEDIA/AI *bindings* are in scope.
  * `env.PM_ORIGIN` / `env.CMS_AUTH_SECRET` / `env.SITE_ID` / `env.AI_GATEWAY`
  * are CONFIG VARS, not bindings — deliberately NOT matched here.
+ *
+ * SANCTIONED SECOND READER (content-collections Slice 0): the runtime-SQL fence
+ * (`lib/content/content-db.ts`) is a DELIBERATE, narrow second `env.DB` reader —
+ * the ONE controlled widening to `d1.prepare()/exec()` for `content_*` tables,
+ * behind the statement fence (`lib/content/fence.ts`). The Drizzle `Db` port
+ * exposes no raw SQL, so the content path can't go through it. This file is
+ * allowlisted by exact path (not by directory) so the invariant stays sharp:
+ * any OTHER stray binding read — including a second read inside content-db.ts —
+ * still flips the guard red.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -29,6 +38,16 @@ const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src")
 
 // The ONLY files allowed to read env.DB / env.MEDIA / env.AI: the port factory.
 const ALLOWLIST_DIR = path.join(SRC, "lib", "ports");
+
+// Sanctioned second readers, allowlisted by EXACT path (not directory) so the
+// invariant stays sharp. See the SANCTIONED SECOND READER note in the header:
+// the runtime-SQL fence needs raw d1 access the Drizzle port can't give it.
+const ALLOWLIST_FILES = new Set([path.join(SRC, "lib", "content", "content-db.ts")]);
+
+/** True if `file` is allowed to read a binding (port factory or a sanctioned file). */
+function isAllowlisted(file) {
+  return file.startsWith(ALLOWLIST_DIR + path.sep) || ALLOWLIST_FILES.has(file);
+}
 
 // A real binding read: `env.DB` / `env.MEDIA` / `env.AI` as a property access,
 // with a word boundary after so `env.AI_GATEWAY` (a config var) does NOT match.
@@ -88,7 +107,7 @@ function* walk(dir) {
 function findViolations() {
   const violations = [];
   for (const file of walk(SRC)) {
-    if (file.startsWith(ALLOWLIST_DIR + path.sep)) continue; // ports are the sole reader
+    if (isAllowlisted(file)) continue; // ports + sanctioned content-db fence
     const code = stripComments(readFileSync(file, "utf8"));
     code.split("\n").forEach((line, idx) => {
       const m = line.match(BINDING_READ);
@@ -120,6 +139,23 @@ test("the ports allowlist actually contains the binding reads (guard isn't vacuo
     for (const line of code.split("\n")) if (BINDING_READ.test(line)) portReads++;
   }
   assert.ok(portReads >= 1, "expected the ports factory to contain real env.DB/MEDIA/AI reads");
+});
+
+test("the sanctioned content-db fence has exactly ONE binding read (exception stays narrow)", () => {
+  // The content-db.ts allowlist entry is a DELIBERATE exception (the fenced
+  // runtime-SQL site). Pin it to exactly ONE env.DB read so the exception can't
+  // quietly grow into a general raw-binding escape hatch — a second read here
+  // means someone widened the fence and must justify it.
+  const fence = [...ALLOWLIST_FILES][0];
+  const reads = stripComments(readFileSync(fence, "utf8"))
+    .split("\n")
+    .filter((line) => BINDING_READ.test(line));
+  assert.equal(
+    reads.length,
+    1,
+    `expected exactly 1 sanctioned binding read in ${path.relative(SRC, fence)}, found ${reads.length}:\n` +
+      reads.join("\n"),
+  );
 });
 
 test("stripComments removes doc-comment mentions but keeps real code reads", () => {
