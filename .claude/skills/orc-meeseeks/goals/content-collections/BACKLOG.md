@@ -50,33 +50,31 @@ gates on CMS tsc + opennext build green + node tests + EN/FI/ET for new strings.
   /api/collections/[name]/items`. Pure value-validation/coercion per field type,
   node-tested. Gate.
 
-- TODO: **Slice 4 — query + FTS5.** Per content table, create a CONTENTLESS/
-  external-content `content_<slug>_fts` virtual table (USING fts5) over the
-  text-indexable fields + triggers to keep it in sync (or rebuild-on-write) — note
-  the D1 export limitation (CAVEATS). STRUCTURED query API: filter (field op value),
-  sort, paginate, count → compiled to safe parameterized SELECT; and FTS search →
-  `… WHERE rowid IN (SELECT rowid FROM content_x_fts WHERE content_x_fts MATCH ?)`.
-  `GET /api/collections/[name]/query` + `/search`. Pure SQL-compiler
-  (filter/sort/paginate → SQL + bound params) node-tested; verify it NEVER emits
-  unbound user input. Gate.
+- TODO: **Slice 4 — structured query (NO FTS5 in v1 — USER DECISION 2026-06-22).**
+  STRUCTURED query API only: filter (field op value), sort, paginate, count →
+  compiled to safe PARAMETERIZED SELECT over the typed columns. `GET
+  /api/collections/[name]/query`. Pure SQL-compiler (filter/sort/paginate → SQL +
+  bound params) node-tested; verify it NEVER emits unbound user input. Text search
+  in v1 = a simple `LIKE`/`instr` filter on text fields (good enough without FTS);
+  FTS5 is deferred (see Phase 2 below). Gate.
 
 - TODO: **Slice 5 — admin UI: manage collections + rich item editor.** Pages under
   `app/admin/collections/`: list collections, create/edit schema (add fields with
   type picker), and a per-collection item table with create/edit forms using the
   CORRECT input per type (reuse the page-builder type-aware inputs: native
-  date/time, number, select, bool toggle, textarea/richtext). Filter/sort/FTS search
-  box wired to Slice 4. Archive/delete behind in-app confirm modal. Design-system +
-  purpose tokens. EN/FI/ET. Gate.
+  date/time, number, select, bool toggle, textarea/richtext). Filter/sort + a simple
+  text-search box (LIKE filter, Slice 4) wired up. Archive/delete behind in-app
+  confirm modal. Design-system + purpose tokens. EN/FI/ET. Gate.
 
 - TODO: **Slice 6 — AI assistant collection tools (structured only).** Register in
   the existing pipeline (KNOWN_TOOL_NAMES + TOOLS_BY_CONTEXT + TOOL_BY_NAME):
   `create_collection`, `add_collection_item`, `update_collection_item`,
   `archive_collection_item`/`delete_collection_item`, `query_collection`
-  (structured filter/sort), `search_collection` (FTS5). Each calls the SAME
-  store/API as the UI (reuse Slices 2-4 — do NOT fork data paths) and is
-  STRUCTURED — NO raw SQL reaches the model (USER DECISION). New context
-  `collections` in tool-scopes. Node tests per tool's arg-validation/execution
-  (mock the store). Gate.
+  (structured filter/sort/text-LIKE). Each calls the SAME store/API as the UI
+  (reuse Slices 2-4 — do NOT fork data paths) and is STRUCTURED — NO raw SQL reaches
+  the model (USER DECISION). New context `collections` in tool-scopes. Node tests
+  per tool's arg-validation/execution (mock the store). (No FTS search tool in v1 —
+  FTS deferred.) Gate.
 
 - TODO: **Phase 2 (later) — references + page/component BINDING.** Cross-collection
   `ref` fields (post→author) + binding collections to pages/components: list views,
@@ -88,3 +86,11 @@ gates on CMS tsc + opennext build green + node tests + EN/FI/ET for new strings.
 - TODO: **Phase 2 (later) — drop/rename/retype field (schema rebuild).**
   System-generated safe table-rebuild (create content_x_new + copy + drop + rename),
   fenced to content_*. Deferred from v1's add-only.
+
+- TODO: **Phase 2 (later) — FTS5 full-text search (DEFERRED from v1, USER DECISION
+  2026-06-22).** Per content table, a CONTENTLESS/external-content `content_<slug>_fts`
+  virtual table (USING fts5) over text-indexable fields + sync triggers (or
+  rebuild-on-write), a `search_collection` AI tool + a `/search` route + UI search.
+  WATCH the D1 export limitation (CAVEATS): D1 couldn't export a DB containing fts5
+  virtual tables (open bug as of 2026-06-22) — re-check if fixed; use contentless/
+  external-content so the index is rebuildable from source after a restore.

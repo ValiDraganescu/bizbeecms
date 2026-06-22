@@ -7,7 +7,7 @@ Status: ACTIVE (being worked / available to drive) | PAUSED (set aside by the us
 - pm-roles — PM user-management overhaul: 4-role hierarchy (SuperAdmin/Admin/Manager/Editor) w/ removal rules, Manager country+tag scope, global user-management UI+API — ACTIVE
 - ai-openrouter — migrate CMS AI assistant off Cloudflare Workers AI onto OpenRouter behind the existing `Ai` port (swappable adapter); builds on archived ai-assistant + binding-adapters — ACTIVE
 - component-kits — CMS custom-component tagging + export-by-tag as a one-file kit bundle (reuses the existing portable/kit-install machinery) — ACTIVE
-- content-collections — user/AI-defined data collections: ONE real D1 table per collection via FENCED runtime DDL (content_* namespace, 100-table cap, system-generated), typed schema, SQL+FTS5 query, rich UI + structured AI tools — ACTIVE
+- content-collections — user/AI-defined data collections: ONE real D1 table per collection via FENCED runtime DDL (content_* namespace, 100-table cap, system-generated), typed schema, structured SQL query (FTS5 + page-binding deferred to Phase 2), rich UI + structured AI tools — ACTIVE
 
 ## Archived (delivered; moved to goals/archive/<slug>/ — 2026-06-21)
 - binding-adapters → `archive/binding-adapters/` — ports-and-adapters seam over CMS env.DB/MEDIA/AI + CF adapter (CF-native, no Vercel adapter). Db/Storage/Ai interfaces + CF adapters + mocked-port test shipped; the AI-over-REST path was delivered by ai-assistant.

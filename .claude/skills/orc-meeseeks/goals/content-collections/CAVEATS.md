@@ -43,14 +43,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   system-generated rebuild (create content_x_new + copy + drop + rename). Don't try
   the rebuild dance in v1.
 
-- **D1 FTS5 EXPORT/BACKUP LIMITATION (verified 2026-06-22).** D1 currently CANNOT
-  export/backup a database that contains FTS5 virtual tables (open workers-sdk bug:
-  "cannot export databases with Virtual Tables (fts5)"). Each per-Site CMS has its
-  own D1, so the FIRST FTS collection breaks `wrangler d1 export` / Time Travel
-  restore for that Site. Mitigate: make FTS tables CONTENTLESS / external-content
-  (indexing the real `content_*` table) so they're REBUILDABLE from source data
-  after a restore, and document the limitation. Confirm current D1 behavior before
-  finalizing the FTS approach (the bug may be fixed by the time this is built).
+- **FTS5 is OUT of v1 (USER DECISION 2026-06-22).** v1 text search = a simple `LIKE`
+  filter on text fields — DO NOT create fts5 virtual tables in v1. FTS5 is a Phase-2
+  backlog item. When it returns, mind the D1 limitation below.
+- **(Phase 2 only) D1 FTS5 EXPORT/BACKUP LIMITATION (verified 2026-06-22).** D1
+  could not export/backup a database containing FTS5 virtual tables (open
+  workers-sdk bug: "cannot export databases with Virtual Tables (fts5)"). Each
+  per-Site CMS has its own D1, so the first FTS collection would break `wrangler d1
+  export` / Time Travel for that Site. When FTS lands: make FTS tables CONTENTLESS /
+  external-content so they're REBUILDABLE from source after a restore, and re-check
+  whether the bug is fixed.
 
 - **The Db port is Drizzle-only today** (`lib/ports/db.ts` exposes no raw SQL). It
   must be widened to allow controlled `d1.prepare()/exec()` for the content path.

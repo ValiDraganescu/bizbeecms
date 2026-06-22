@@ -13,8 +13,9 @@ add/update/delete/archive items, and query via sql and FTS5."
 
 ## The settled architecture (decided with user 2026-06-22)
 - **One real table per collection** (NOT a generic JSON-payload table). Real typed
-  columns → real indexes, clean SELECTs, native FTS5. This is the "best possible
-  SQL + FTS5" the user asked for.
+  columns → real indexes, clean SELECTs. (Native FTS5 was the original draw but is
+  DEFERRED — USER DECISION 2026-06-22: no FTS5 in v1; v1 text search = a simple
+  `LIKE` filter. FTS5 returns as a Phase-2 task.)
 - **Runtime DDL is ALLOWED but fenced** (the user reversed the earlier "no DDL"
   rule once the namespace guard made it safe). Verified 2026-06-22: D1's binding
   supports `exec()` `CREATE TABLE` and `CREATE VIRTUAL TABLE … USING fts5(…)` at
@@ -50,11 +51,12 @@ add/update/delete/archive items, and query via sql and FTS5."
   reuse the page-builder field-type inputs).
 - Items support **archive** (soft) + delete; likely **slug** + **status**
   (draft/published) per item (confirm in the schema slice).
-- Query: normal SELECT (typed columns) and FTS5 MATCH, exposed as structured
-  query tools to the AI and as filter/sort/search in the UI.
+- Query: normal SELECT over typed columns (filter/sort/paginate/count + a simple
+  text `LIKE`), exposed as structured query tools to the AI and as filter/sort/
+  search in the UI. (FTS5 MATCH deferred to Phase 2.)
 - The AI assistant gets tools: create_collection, add/update item, delete/archive
-  item, query (structured filter/sort), search (FTS5) — registered in the existing
-  tool-scopes pipeline.
+  item, query (structured filter/sort/text-LIKE) — registered in the existing
+  tool-scopes pipeline. (No FTS search tool in v1.)
 - Gate every slice: CMS `tsc` + `opennextjs-cloudflare build` green; regen the PM
   `cms-bundle`; EN/FI/ET for all new strings.
 
