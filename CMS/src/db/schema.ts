@@ -293,6 +293,41 @@ export const session = sqliteTable(
 );
 
 /**
+ * Invite — a pending CMS-user invitation (cms-auth Slice 4). Mirrors PM's invite
+ * shape with country/tag SCOPE DROPPED (a single deployed CMS = ONE Site). An
+ * Admin/Manager invites by email + role; we email an accept link carrying the
+ * opaque `token` (64 hex chars). The invitee opens it, sets a password (or links
+ * Google, Slice 2b), and a `user` row is created with the invited `role`. The
+ * email is unique among PENDING invites (enforced in the store, not a DB index —
+ * an accepted invite keeps its row for history, so a re-invite is allowed once
+ * the prior one is consumed). `acceptedAt` set = consumed; `expiresAt` is a
+ * 7-day TTL like PM. `invitedBy` is the inviter's CMS user id (no FK — the app
+ * owns lifecycle). The DB IS the Site boundary — no siteId column.
+ */
+export const invite = sqliteTable(
+  "invite",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    role: text("role").notNull().$type<CmsRole>().default("Editor"),
+    // Inviter's CMS user id (from the guard decision). No FK.
+    invitedBy: text("invited_by").notNull(),
+    // Opaque 64-hex accept token (32 random bytes). Unique so a token lookup is
+    // unambiguous.
+    token: text("token").notNull(),
+    acceptedAt: integer("accepted_at", { mode: "timestamp_ms" }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [
+    uniqueIndex("invite_token_unique").on(t.token),
+    index("invite_email_idx").on(t.email),
+  ],
+);
+
+/**
  * Collection — the canonical registry for a user-defined data collection
  * (content-collections goal, Slice 1). Each collection is backed by a REAL,
  * runtime-created D1 table named `content_<slug>` (the `tableName` here). This
@@ -343,5 +378,7 @@ export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;
 export type Session = typeof session.$inferSelect;
 export type NewSession = typeof session.$inferInsert;
+export type Invite = typeof invite.$inferSelect;
+export type NewInvite = typeof invite.$inferInsert;
 export type Collection = typeof collection.$inferSelect;
 export type NewCollection = typeof collection.$inferInsert;

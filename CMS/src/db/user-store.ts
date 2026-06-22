@@ -9,7 +9,7 @@
  * password never touches this layer — callers hash it via `hashPassword` first.
  */
 import { eq } from "drizzle-orm";
-import { getDb, schema } from "../lib/ports/db.ts";
+import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import type { CmsRole, User } from "./schema.ts";
 
 /** Canonical email form used for storage + lookup (case-insensitive logins). */
@@ -17,9 +17,12 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-/** Find a user by email (normalised), or null. */
-export async function findUserByEmail(email: string): Promise<User | null> {
-  const db = await getDb();
+/** Find a user by email (normalised), or null. `injectedDb` is for tests only. */
+export async function findUserByEmail(
+  email: string,
+  injectedDb?: Db,
+): Promise<User | null> {
+  const db = injectedDb ?? (await getDb());
   const [row] = await db
     .select()
     .from(schema.user)
@@ -37,14 +40,17 @@ export async function findUserById(id: string): Promise<User | null> {
 /**
  * Create a user. `passwordHash` is null for SSO-only / Google-only users.
  * Throws if the email already exists (the unique index enforces it). Returns the
- * stored row.
+ * stored row. `injectedDb` is for tests only (prod resolves via the Db port).
  */
-export async function createUser(input: {
-  email: string;
-  passwordHash: string | null;
-  role: CmsRole;
-}): Promise<User> {
-  const db = await getDb();
+export async function createUser(
+  input: {
+    email: string;
+    passwordHash: string | null;
+    role: CmsRole;
+  },
+  injectedDb?: Db,
+): Promise<User> {
+  const db = injectedDb ?? (await getDb());
   const id = crypto.randomUUID();
   await db.insert(schema.user).values({
     id,

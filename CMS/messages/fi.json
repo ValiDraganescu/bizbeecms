@@ -580,5 +580,26 @@
     "mintedWarning": "Tämä on ainoa kerta, kun avain näytetään. Kopioi se ja säilytä turvallisessa paikassa — et näe sitä enää.",
     "copy": "Kopioi",
     "done": "Valmis"
+  },
+  "inviteEmail": {
+    "subject": "Sinut on kutsuttu BizbeeCMS:ään",
+    "body": "Sinut on kutsuttu hallinnoimaan tätä sivustoa. Hyväksy kutsu ja aseta salasana täällä:\n\n{url}\n\nLinkki vanhenee 7 päivässä."
+  },
+  "acceptInvite": {
+    "title": "Hyväksy kutsusi",
+    "subtitle": "Aseta salasana osoitteelle {email} viimeistelläksesi tilisi luonnin.",
+    "passwordLabel": "Salasana",
+    "confirmLabel": "Vahvista salasana",
+    "passwordHint": "Vähintään 10 merkkiä.",
+    "submit": "Luo tili",
+    "submitting": "Luodaan tiliä…",
+    "errorTooShort": "Salasanan on oltava vähintään 10 merkkiä.",
+    "errorMismatch": "Salasanat eivät täsmää.",
+    "errorExpired": "Tämä kutsu on vanhentunut. Pyydä uusi.",
+    "errorAccepted": "Tämä kutsu on jo käytetty.",
+    "errorNotFound": "Tämä kutsulinkki on virheellinen.",
+    "errorEmailTaken": "Tälle sähköpostille on jo olemassa tili.",
+    "errorGeneric": "Kutsun hyväksyminen epäonnistui. Yritä uudelleen.",
+    "errorNetwork": "Palvelimeen ei saatu yhteyttä. Yritä uudelleen."
   }
 }

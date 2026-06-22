@@ -580,5 +580,26 @@
     "mintedWarning": "See on ainus kord, kui võtit näidatakse. Kopeeri see ja hoia turvalises kohas — sa ei näe seda enam.",
     "copy": "Kopeeri",
     "done": "Valmis"
+  },
+  "inviteEmail": {
+    "subject": "Sind on kutsutud BizbeeCMS-i",
+    "body": "Sind on kutsutud seda saiti haldama. Võta kutse vastu ja määra parool siin:\n\n{url}\n\nLink aegub 7 päeva pärast."
+  },
+  "acceptInvite": {
+    "title": "Võta kutse vastu",
+    "subtitle": "Määra parool aadressile {email}, et oma konto loomine lõpetada.",
+    "passwordLabel": "Parool",
+    "confirmLabel": "Kinnita parool",
+    "passwordHint": "Vähemalt 10 tähemärki.",
+    "submit": "Loo konto",
+    "submitting": "Konto loomine…",
+    "errorTooShort": "Parool peab olema vähemalt 10 tähemärki.",
+    "errorMismatch": "Paroolid ei ühti.",
+    "errorExpired": "See kutse on aegunud. Küsi uus.",
+    "errorAccepted": "See kutse on juba kasutatud.",
+    "errorNotFound": "See kutselink on vigane.",
+    "errorEmailTaken": "Selle e-posti jaoks on juba konto olemas.",
+    "errorGeneric": "Kutse vastuvõtmine ebaõnnestus. Proovi uuesti.",
+    "errorNetwork": "Serveriga ühenduse loomine ebaõnnestus. Proovi uuesti."
   }
 }

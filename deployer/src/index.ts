@@ -36,6 +36,12 @@ type AttachBody = { slug?: string; hostname?: string };
 // can't share an import). Keep the two in sync — both are documented in
 // DEPLOY-ARCHITECTURE.md § "Config & magic-value inventory".
 const WORKER_PREFIX = "bizbeecms-cms-";
+// Our Cloudflare account's workers.dev subdomain; every deployed CMS Worker is
+// reachable at `https://<worker-name>.<this>.workers.dev`. Mirrors PM's
+// ACCOUNT_WORKERS_SUBDOMAIN in ProjectManager/src/lib/config/hosts.ts — keep in
+// sync. Used to compute the CMS's own public origin (APP_ORIGIN) for building
+// trusted invite-accept links (cms-auth Slice 4).
+const WORKERS_DEV_SUFFIX = ".vali-draganescu88.workers.dev";
 // Fallback-origin CNAME target customers point their domain at (router serves it).
 const CUSTOM_DOMAIN_FALLBACK_ORIGIN = "cf.bizbeecms.com";
 // CF anycast IPs for apex domains that can't CNAME — handed to the customer as A records.
@@ -445,6 +451,9 @@ async function startDeploy(
       CMS_AUTH_SECRET: env.CMS_AUTH_SECRET ?? "",
       // The CMS guard calls PM at PM_ORIGIN; default to the callback origin.
       PM_ORIGIN: (env.PM_ORIGIN ?? env.PM_CALLBACK_ORIGIN ?? "").replace(/\/+$/, ""),
+      // The CMS's OWN public origin — used to build trusted invite-accept links
+      // (cms-auth Slice 4). It's the deployed workers.dev URL for this Site.
+      APP_ORIGIN: `https://${workerName}${WORKERS_DEV_SUFFIX}`,
       // AI provider key (ai-openrouter) → injected into the CMS Worker as a var.
       OPENROUTER_API_KEY: env.OPENROUTER_API_KEY ?? "",
     },
@@ -657,7 +666,8 @@ npx wrangler deploy --name "$WORKER_NAME" --compatibility-date 2025-09-01 \
   --var "SITE_ID:$SITE_ID" \
   --var "PM_ORIGIN:$PM_ORIGIN" \
   --var "CMS_AUTH_SECRET:$CMS_AUTH_SECRET" \
-  --var "OPENROUTER_API_KEY:$OPENROUTER_API_KEY"
+  --var "OPENROUTER_API_KEY:$OPENROUTER_API_KEY" \
+  --var "APP_ORIGIN:$APP_ORIGIN"
 if [ $? -ne 0 ]; then step_fail "wrangler deploy failed"; report failed "wrangler deploy failed"; exit 1; fi
 step_ok
 

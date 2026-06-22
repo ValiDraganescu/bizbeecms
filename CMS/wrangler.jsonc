@@ -55,11 +55,23 @@
     //    getAi() falls back to the CF `AI` binding; the deployer injects the real
     //    key per-Site so OpenRouter becomes the active provider. Secret in
     //    practice — never commit a real one.
+    //  - APP_ORIGIN: this CMS's own public origin, used to build trusted
+    //    invite-accept links (cms-auth Slice 4). The deployer injects the
+    //    per-Site worker URL. Empty here => dev falls back to the request host;
+    //    production refuses to guess (Host Header Injection guard).
     "SITE_ID": "",
     "PM_ORIGIN": "",
     "CMS_AUTH_SECRET": "",
-    "OPENROUTER_API_KEY": ""
+    "OPENROUTER_API_KEY": "",
+    "APP_ORIGIN": ""
   },
+  // Cloudflare Email Sending binding for transactional invite emails (cms-auth
+  // Slice 4). COMMENTED until a verified sender domain is onboarded on a Paid
+  // plan (`wrangler email sending enable <domain>`); until then the invite flow
+  // degrades to logging the accept link (see lib/mail/send-invite.ts). When
+  // enabling: uncomment, set a real `destination_address`/sender domain, and
+  // rerun typegen so `env.EMAIL` is typed.
+  // "send_email": [{ "name": "EMAIL" }],
   "observability": {
     "enabled": true
   }

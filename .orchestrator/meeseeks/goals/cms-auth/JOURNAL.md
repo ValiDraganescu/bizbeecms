@@ -142,3 +142,53 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (Slice 4/5 wire them), so the worker bundle is unchanged.
 - **Files:** CMS/src/lib/auth/roles.ts (new), CMS/src/lib/auth/roles.test.ts (new),
   CMS/src/lib/auth/guard.ts, CMS/src/lib/auth/guard-core.ts.
+
+## 2026-06-22 14:23 — Slice 4: invitation flow (token + email + accept) via CF Email Service
+- **Status:** DONE
+- **What I did:** Full token-based invite flow mirroring PM, country/tag scope
+  DROPPED.
+  - Schema: added an `invite` table (id, email, role, invited_by, token 64-hex
+    UNIQUE, accepted_at, expires_at 7-day TTL, created_at) + types. Migration
+    `0011_silky_micromacro.sql` (deployer auto-applies per-Site, CAVEAT-confirmed).
+  - PURE `lib/invite/invite-core.ts` (no `@/`, type-only `CmsRole`): `newInviteToken`
+    (32 bytes hex), `INVITE_TTL_MS` (7d), `buildInviteTimes`, `classifyInvite`
+    (notFound/valid/expired/accepted, accepted-wins, `<=` expiry boundary).
+  - CF-coupled `db/invite-store.ts` (Db port, NEVER env.DB): createInvite,
+    findInviteByToken, hasPendingInvite (pending only, email-normalised),
+    listPendingInvites, checkInvite, acceptInvite (re-validates token, creates the
+    CMS user with the invited role + supplied HASH, marks accepted; email-unique
+    backstop). Added an optional trailing `injectedDb` param (page-store pattern)
+    to these + to user-store's `findUserByEmail`/`createUser` for node-testing —
+    inject doesn't read env, so the sole-reader guard stays green.
+  - `lib/mail/send-invite.ts`: Cloudflare Email Sending `send_email` binding
+    (`env.EMAIL.send({to, from:{email,name}, subject, text})` — the Workers shape
+    per the cloudflare-email-service skill). Degrades to logging the accept link +
+    `delivered:false` when no binding (dev / not yet provisioned). Accept URL from
+    `APP_ORIGIN` (Host-Header-Injection-safe; dev falls back to request host).
+  - `POST /api/invite`: `checkAdmin` → `canInvite(inviterRole)` → `canInviteRole`
+    (granted role strictly below inviter tier) → emailTaken/alreadyInvited 409s →
+    create + send. `POST /api/invite/accept/[token]`: password (10-char min via
+    `isPasswordLongEnough`) + confirm → hash → acceptInvite → mint session cookie.
+  - Public `app/invite/accept/[token]/page.tsx` (no /admin guard — token IS the
+    credential): gates on status, renders `AcceptInviteForm` (client) or a notice.
+  - i18n: `inviteEmail` (subject/body) + `acceptInvite` namespaces, EN/FI/ET (parity
+    verified). Regenerated the PM cms-bundle (runtime routes added).
+  - Deploy wiring: declared the `send_email` binding (COMMENTED, like PM — needs a
+    verified sender domain on Paid) + `APP_ORIGIN` var in CMS/wrangler.jsonc; the
+    deployer now injects `APP_ORIGIN=https://<worker>.<WORKERS_DEV_SUFFIX>` (new
+    const mirroring PM hosts.ts) via `--var`.
+- **Verified:** `node --test scripts/invite.test.mjs` 9/9 (pure core + full
+  create→accept lifecycle + expired/accepted/notFound/emailTaken rejections over
+  in-memory sqlite); full `npm test` 690/690; `npx tsc --noEmit` clean;
+  `npx opennextjs-cloudflare build` + `next build` green (all 3 invite routes
+  present); sole-reader guard 4/4; deployer `wrangler deploy --dry-run` builds.
+  Email NOT live-sent (no verified sender domain — out of codeable scope; binding
+  stays commented, flow degrades to logging).
+- **Files:** CMS/src/db/schema.ts, CMS/migrations/0011_silky_micromacro.sql (+meta),
+  CMS/src/lib/invite/invite-core.ts (new), CMS/src/db/invite-store.ts (new),
+  CMS/src/db/user-store.ts (injectedDb param), CMS/src/lib/mail/send-invite.ts (new),
+  CMS/src/app/api/invite/route.ts (new), CMS/src/app/api/invite/accept/[token]/route.ts
+  (new), CMS/src/app/invite/accept/[token]/page.tsx (new),
+  CMS/src/components/accept-invite-form.tsx (new), CMS/messages/{en,fi,et}.json,
+  CMS/wrangler.jsonc, deployer/src/index.ts,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js, CMS/scripts/invite.test.mjs (new).

@@ -176,3 +176,37 @@ Read every line before working. Each entry was learned the hard way by a previou
   not yet imported by a worker entrypoint doesn't need a manual regen — PM's
   `predeploy` runs `bundle:cms` automatically. Regen once a slice adds a real
   route/UI the worker serves (Slice 2 login route).
+
+- **INVITE FLOW LANDED (Slice 4).** Pure `lib/invite/invite-core.ts`
+  (token/TTL/`classifyInvite`) + CF `db/invite-store.ts` (create/find/checkInvite/
+  acceptInvite/hasPendingInvite/listPendingInvites). `acceptInvite(token,
+  passwordHash)` takes an ALREADY-HASHED password (the pure/CF crypto split — the
+  route hashes via `hashPassword` first). `POST /api/invite` gates with
+  `checkAdmin` → `canInvite` → `canInviteRole` (granted role strictly below the
+  inviter's tier). `POST /api/invite/accept/[token]` mints a session. Public accept
+  page is `app/invite/accept/[token]/page.tsx` (NOT under /admin — token is the
+  credential; don't add a guard).
+
+- **injectedDb test seam (Slice 4).** invite-store fns + user-store's
+  `findUserByEmail`/`createUser` now take an OPTIONAL trailing `injectedDb?: Db`
+  (page-store pattern: `injectedDb ?? await getDb()`). It does NOT read `env.DB`, so
+  the sole-reader guard stays green. Use it to node-test store logic over in-memory
+  `node:sqlite` (see `scripts/invite.test.mjs`). Don't make it required.
+
+- **CF Email binding shape is the WORKERS shape, not PM's old one.** CMS
+  `send-invite.ts` calls `env.EMAIL.send({ to, from: { email, name }, subject,
+  text })` — the `send_email` Workers binding (per cloudflare-email-service skill).
+  PM's older code used `{ from: string, ... }`; don't copy PM's `from` shape. The
+  binding is COMMENTED in CMS/wrangler.jsonc until a verified sender DOMAIN is
+  onboarded (`wrangler email sending enable <domain>`, Paid plan) — until then the
+  flow degrades to logging the accept link (`delivered:false`). Enabling it +
+  rerunning typegen is a deploy-ops task, not codeable here.
+
+- **APP_ORIGIN is deployer-injected (Slice 4).** The CMS's own public origin for
+  building trusted invite-accept links comes from the `APP_ORIGIN` Worker var. The
+  deployer sets it to `https://<worker-name>.<WORKERS_DEV_SUFFIX>` (a new const in
+  `deployer/src/index.ts` mirroring PM's `ACCOUNT_WORKERS_SUBDOMAIN` in
+  ProjectManager/src/lib/config/hosts.ts — KEEP THE TWO IN SYNC if the account
+  subdomain changes). NEVER derive the link origin from request Host headers in prod
+  (Host Header Injection) — `buildAcceptUrl` only falls back to the request host in
+  dev.

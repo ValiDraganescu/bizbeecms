@@ -97,8 +97,17 @@ green + regen PM cms-bundle + EN/FI/ET for new strings.
   names so the CMS can mirror; if pm-roles hasn't landed the names yet, this is
   loosely BLOCKED — note it and you may proceed with the agreed names.)
 
-- TODO: **Slice 4 — invitation flow (token + email + accept) via Cloudflare Email
-  Service.** Add an `invites` table (id, email, role, invitedBy, token 64-hex,
+- DONE: **Slice 4 — invitation flow (token + email + accept) via Cloudflare Email
+  Service.** See JOURNAL 2026-06-22 14:23. `invite` table + migration 0011, pure
+  `invite-core.ts` (token/TTL/classify) + CF `invite-store.ts` (create/accept
+  lifecycle, injectedDb-testable), `send-invite.ts` over the `send_email` binding
+  (degrades to logging; `APP_ORIGIN`-based accept URL), `POST /api/invite` (gated
+  by canInvite + canInviteRole) + `POST /api/invite/accept/[token]` (hash + mint
+  session) + public accept page/form, EN/FI/ET, cms-bundle regen. Deployer injects
+  `APP_ORIGIN`; `send_email` binding declared COMMENTED in wrangler (needs verified
+  sender domain on Paid). 9 invite tests, 690 total, tsc + opennext build green.
+  Original spec below.
+  Add an `invites` table (id, email, role, invitedBy, token 64-hex,
   acceptedAt, expiresAt 7-day TTL — copy PM's shape, drop `invite_countries`).
   `POST /api/invite` (gated by `canInvite`, Slice 3) creates the invite + sends the
   accept email via the **Cloudflare Email Service**

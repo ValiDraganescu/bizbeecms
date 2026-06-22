@@ -580,5 +580,26 @@
     "mintedWarning": "This is the only time the key is shown. Copy it and store it somewhere safe — you can't see it again.",
     "copy": "Copy",
     "done": "Done"
+  },
+  "inviteEmail": {
+    "subject": "You're invited to BizbeeCMS",
+    "body": "You've been invited to manage this site. Accept your invitation and set a password here:\n\n{url}\n\nThis link expires in 7 days."
+  },
+  "acceptInvite": {
+    "title": "Accept your invitation",
+    "subtitle": "Set a password for {email} to finish creating your account.",
+    "passwordLabel": "Password",
+    "confirmLabel": "Confirm password",
+    "passwordHint": "At least 10 characters.",
+    "submit": "Create account",
+    "submitting": "Creating account…",
+    "errorTooShort": "Password must be at least 10 characters.",
+    "errorMismatch": "The passwords don't match.",
+    "errorExpired": "This invitation has expired. Ask for a new one.",
+    "errorAccepted": "This invitation has already been used.",
+    "errorNotFound": "This invitation link is invalid.",
+    "errorEmailTaken": "An account already exists for this email.",
+    "errorGeneric": "Couldn't accept the invitation. Try again.",
+    "errorNetwork": "Couldn't reach the server. Try again."
   }
 }
