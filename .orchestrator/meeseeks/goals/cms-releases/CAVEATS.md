@@ -98,3 +98,22 @@ Read every line before working. Each entry was learned the hard way by a previou
   `migrations/meta/_journal.json` + the snapshot too. `npm test` is 122 now (Slice 3
   added 7). Gates: PM `tsc` + `opennextjs-cloudflare build`; deployer `wrangler deploy
   --dry-run`. Build only when no `npm run dev` is on 3601 (it corrupts `.next`).
+
+- **Slice 5 DONE — the PICKER is wired.** PM proxy routes
+  `ProjectManager/src/app/api/cms-releases/tags/route.ts` (→ deployer `/tags`) and
+  `.../release-notes/route.ts` (→ deployer `/release-notes?version=`) are
+  session-authed and add the `Bearer DEPLOYER_SECRET` server-side — the client NEVER
+  sees the secret; it fetches PM's own routes. `/tags` returns `{releases:[{version,
+  tag}]}` (normalized by the pure `lib/deploy/cms-releases.ts`); `/release-notes`
+  returns `{version, markdown}`. Reuse these for Slice 6, don't re-proxy.
+- **`normalizeReleases` (lib/deploy/cms-releases.ts) is the trust boundary for the
+  tag list** — it semver-sorts newest-first and drops non-`cms-v` / non-semver / dupe
+  entries. The deployer already sorts, but PM re-sorts defensively. `refForVersion(v)`
+  builds the `cms-v<v>` ref the deploy POST sends.
+- **The picker is EMPTY until `cms-v0.6.0` (and future tags) are PUSHED to origin** —
+  `/tags` reads the REMOTE via the deployer. With no tags, deploy-form disables the
+  Deploy button and shows `version.none`. This is correct, not a bug; ask the user to
+  push the tag to see it populate.
+- **Release-notes modal renders RAW markdown in a `<pre>`** (no md lib — ponytail).
+  If rich rendering is ever wanted, add react-markdown in `ReleaseNotesModal` in
+  deploy-form.tsx; the route already serves the markdown string.

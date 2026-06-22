@@ -373,7 +373,17 @@
       },
       "inProgress": "Julkaisu käynnissä… tämä voi kestää pari minuuttia.",
       "stuck": "Tämä julkaisu on kestänyt liian kauan ja on todennäköisesti jumissa. Voit peruuttaa sen tai aloittaa uuden.",
-      "cancel": "Peruuta julkaisu"
+      "cancel": "Peruuta julkaisu",
+      "version": {
+        "label": "CMS-versio",
+        "loading": "Ladataan saatavilla olevia versioita…",
+        "viewNotes": "Näytä julkaisutiedot",
+        "none": "CMS-julkaisuja ei ole vielä saatavilla. Tee ensin tagattu julkaisu.",
+        "notesTitle": "Julkaisutiedot — {version}",
+        "notesEmpty": "Tälle versiolle ei ole julkaisutietoja.",
+        "notesError": "Julkaisutietojen lataaminen epäonnistui. Yritä uudelleen.",
+        "close": "Sulje"
+      }
     },
     "created": "Sivusto luotu.",
     "updated": "Sivusto päivitetty.",

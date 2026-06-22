@@ -373,7 +373,17 @@
       },
       "inProgress": "Deploy in progress… this can take a couple of minutes.",
       "stuck": "This deploy has been running too long and is likely stuck. You can cancel it or start a new one.",
-      "cancel": "Cancel deploy"
+      "cancel": "Cancel deploy",
+      "version": {
+        "label": "CMS version",
+        "loading": "Loading available versions…",
+        "viewNotes": "View release notes",
+        "none": "No CMS releases are available yet. Cut a tagged release first.",
+        "notesTitle": "Release notes — {version}",
+        "notesEmpty": "No release notes for this version.",
+        "notesError": "Couldn't load the release notes. Please try again.",
+        "close": "Close"
+      }
     },
     "created": "Site created.",
     "updated": "Site updated.",

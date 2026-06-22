@@ -51,13 +51,18 @@ green; EN/FI/ET for new PM strings).
   pair; both UIs call `displayCmsVersion(site.deployedCmsVersion)`; null → muted
   "Not deployed". tsc 0, 122 tests, opennext build green.)
 
-- TODO: **Slice 5 — PM: CMS version PICKER + release-notes viewer on deploy.** In the
+- DONE: **Slice 5 — PM: CMS version PICKER + release-notes viewer on deploy.** In the
   deploy flow (the deploy button/dialog in site detail): a version `<select>`
   populated from the deployer `GET /tags` (Slice 2) — TAGGED RELEASES ONLY (USER
   DECISION; no `main` option), default to latest; a "view release notes" action that
   fetches `GET /release-notes?version=` (Slice 2) and renders the markdown in a
   panel/modal; Deploy passes the chosen `cms-v<ver>` as `ref`. Reuse design-system +
   purpose tokens; in-app modal (no native dialog). EN/FI/ET. Gate.
+  (Done 2026-06-22: PM proxy routes `/api/cms-releases/{tags,release-notes}` keep
+  DEPLOYER_SECRET server-side; pure `lib/deploy/cms-releases.ts` normalizes/sorts the
+  tag list (+5 node tests); deploy-form.tsx `<select>` defaults latest + in-app notes
+  modal (Escape/backdrop close, raw md in `<pre>`); POSTs `{ref:"cms-v<ver>"}`. tsc 0,
+  127 tests, opennext build green. Live-verify waits on `cms-v0.6.0` being PUSHED.)
 
 - TODO (optional, later) — **upgrade indicator.** In the site list, flag sites whose
   `deployedCmsVersion` < the latest `cms-v*` tag ("update available"). Small,

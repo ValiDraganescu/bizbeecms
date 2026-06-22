@@ -93,3 +93,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** ProjectManager/src/app/(app)/sites/page.tsx,
   ProjectManager/src/app/(app)/sites/[id]/page.tsx,
   ProjectManager/messages/{en,fi,et}.json
+
+## 2026-06-22 13:22 — Slice 5: PM CMS version picker + release-notes viewer
+- **Status:** DONE
+- **What I did:** Wired the deploy flow to TAGGED RELEASES ONLY.
+  - Two PM proxy routes (session-authed; DEPLOYER_SECRET stays server-side):
+    `GET /api/cms-releases/tags` → deployer `/tags` with Bearer DEPLOYER_SECRET →
+    `{releases:[{version,tag}]}` via `normalizeReleases`; `GET /api/cms-releases/
+    release-notes?version=x.y.z` → deployer `/release-notes` → `{version,markdown}`
+    (validates bare semver, maps 404→notesNotFound).
+  - Pure helper `lib/deploy/cms-releases.ts` — `normalizeReleases(payload)` filters
+    to valid `cms-v<x.y.z>` releases, de-dupes, semver-sorts newest-first (defends
+    against malformed deployer output); `refForVersion(v)→cms-v<v>`. 5 node tests.
+  - `deploy-form.tsx`: version `<select>` (loaded once from /tags, defaults to
+    latest), "view release notes" → in-app modal (`role=dialog`, Escape-to-close,
+    backdrop click; raw markdown in `<pre>` — no md lib). Deploy POSTs
+    `{ref:"cms-v<ver>"}` (route already forwards ref). Deploy disabled when no
+    releases. EN/FI/ET `sites.deploy.version.*` block.
+- **Verified:** `npm test` 127 (was 122, +5); `npx tsc --noEmit` clean; `npx
+  opennextjs-cloudflare build` green (port 3601 free). NOT live-verified: /tags reads
+  the REMOTE and `cms-v0.6.0` is still LOCAL-only — picker will be empty until the
+  user pushes the tag. Scope: ProjectManager/src/ only (deployer untouched).
+- **Files:** ProjectManager/src/lib/deploy/cms-releases.ts(+test),
+  src/app/api/cms-releases/{tags,release-notes}/route.ts,
+  src/app/(app)/sites/deploy-form.tsx, messages/{en,fi,et}.json

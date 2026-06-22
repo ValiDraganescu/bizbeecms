@@ -373,7 +373,17 @@
       },
       "inProgress": "Juurutamine käib… see võib võtta paar minutit.",
       "stuck": "See juurutamine on kestnud liiga kaua ja on tõenäoliselt kinni jäänud. Saad selle tühistada või alustada uut.",
-      "cancel": "Tühista juurutamine"
+      "cancel": "Tühista juurutamine",
+      "version": {
+        "label": "CMS-i versioon",
+        "loading": "Laaditakse saadaolevaid versioone…",
+        "viewNotes": "Vaata väljalaskemärkmeid",
+        "none": "Ühtegi CMS-i väljalaset pole veel saadaval. Loo esmalt sildistatud väljalase.",
+        "notesTitle": "Väljalaskemärkmed — {version}",
+        "notesEmpty": "Selle versiooni jaoks pole väljalaskemärkmeid.",
+        "notesError": "Väljalaskemärkmete laadimine ebaõnnestus. Proovi uuesti.",
+        "close": "Sulge"
+      }
     },
     "created": "Sait loodud.",
     "updated": "Sait uuendatud.",
