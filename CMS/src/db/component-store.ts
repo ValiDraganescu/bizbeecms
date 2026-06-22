@@ -13,6 +13,9 @@ import { eq, inArray } from "drizzle-orm";
 import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import type { ComponentArtifactInput } from "@/lib/chat/component-tool";
 import type { ComponentRow, ImportedComponent } from "@/lib/components/portable";
+// Relative .ts import (not @/) — node --test can't resolve the @/ alias for a
+// RUNTIME import (the @/ imports here are type-only and erased). See CAVEATS.
+import { serializeTags } from "../lib/components/tags.ts";
 
 /**
  * List the Site's component names (for the AI system prompt — so the model
@@ -41,6 +44,7 @@ export async function listComponents(): Promise<ComponentRow[]> {
       script: schema.component.script,
       css: schema.component.css,
       propsSchema: schema.component.propsSchema,
+      tags: schema.component.tags,
     })
     .from(schema.component);
   return rows.sort((a, b) => a.name.localeCompare(b.name));
@@ -95,6 +99,7 @@ export async function getComponentByName(name: string): Promise<ComponentRow | n
       script: schema.component.script,
       css: schema.component.css,
       propsSchema: schema.component.propsSchema,
+      tags: schema.component.tags,
     })
     .from(schema.component)
     .where(eq(schema.component.name, name))
@@ -128,6 +133,7 @@ export async function upsertImportedComponent(
     css: c.css,
     propsSchema: c.propsSchema,
     sourceKit,
+    tags: serializeTags(c.tags),
     updatedAt: now,
   };
 

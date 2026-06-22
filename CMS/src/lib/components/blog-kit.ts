@@ -53,6 +53,7 @@ function bundle(component: PortableComponent["component"]): PortableComponent {
     componentDeps: enumerateComponentDeps(component.tree).filter(
       (n) => n !== component.name,
     ),
+    tags: [], // premade kits carry no operator tags; install sets sourceKit instead
     component,
   };
 }

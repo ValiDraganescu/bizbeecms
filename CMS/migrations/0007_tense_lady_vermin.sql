@@ -1,0 +1,1 @@
+ALTER TABLE `component` ADD `tags` text DEFAULT '[]' NOT NULL;

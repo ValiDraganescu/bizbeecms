@@ -33,8 +33,9 @@ import {
 import { cfDb } from "../src/lib/ports/db.ts";
 
 // Real `component` table DDL (from migrations/0000_worried_nextwave.sql +
-// the `source_kit text` column added by migration 0003). The UNIQUE index on
-// `name` is what makes the upsert-by-name branching real.
+// the `source_kit text` column added by migration 0003 + the `tags` column added
+// by migration 0007). The UNIQUE index on `name` is what makes the
+// upsert-by-name branching real.
 const COMPONENT_DDL = `
 CREATE TABLE component (
   id text PRIMARY KEY NOT NULL,
@@ -44,6 +45,7 @@ CREATE TABLE component (
   css text DEFAULT '' NOT NULL,
   props_schema text,
   source_kit text,
+  tags text DEFAULT '[]' NOT NULL,
   created_at integer DEFAULT (unixepoch() * 1000) NOT NULL,
   updated_at integer DEFAULT (unixepoch() * 1000) NOT NULL
 );

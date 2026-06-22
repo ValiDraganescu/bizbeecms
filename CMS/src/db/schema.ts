@@ -46,6 +46,11 @@ export const component = sqliteTable(
     // as part of a premade kit; NULL for individually-imported / AI-authored
     // components. Lets the page-builder rail group components by their kit.
     sourceKit: text("source_kit"),
+    // Free-form operator labels for kit-building (component-kits goal). JSON string
+    // array, e.g. `["marketing","dark"]`. Drives export-by-tag and the admin filter.
+    // ponytail: JSON array column + autocomplete from distinctTags; a managed tag
+    // table only if a real governance need shows up.
+    tags: text("tags").notNull().default("[]"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

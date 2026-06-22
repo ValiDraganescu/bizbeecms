@@ -22,6 +22,7 @@
 import { validateComponentArtifact } from "../chat/component-tool.ts";
 import type { TreeNode } from "../render/tree.ts";
 import { ASSET_URL_PREFIX, isValidAssetKey } from "../render/asset.ts";
+import { normalizeTags } from "./tags.ts";
 
 /** Current bundle format version. Bump when the envelope shape changes. */
 export const PORTABLE_FORMAT = "bizbeecms.component";
@@ -91,6 +92,12 @@ export interface PortableComponent {
    * installs them first (we never auto-install). Self-references are excluded.
    */
   componentDeps: string[];
+  /**
+   * Free-form operator tags carried across export/import (component-kits goal).
+   * Normalized on serialize and re-normalized on parse, so tags survive the
+   * round-trip but an untrusted bundle can't smuggle junk into the column.
+   */
+  tags: string[];
   component: {
     name: string;
     tree: TreeNode;
@@ -196,6 +203,8 @@ export interface ComponentRow {
   script: string;
   css: string;
   propsSchema: string | null;
+  /** JSON-string array of operator tags in D1; normalized on serialize. */
+  tags?: string | null;
 }
 
 /**
@@ -216,6 +225,12 @@ export function serializeComponent(
   }
   const script = row.script ?? "";
   const css = row.css ?? "";
+  let tags: string[];
+  try {
+    tags = normalizeTags(row.tags ? JSON.parse(row.tags) : []);
+  } catch {
+    tags = [];
+  }
   return {
     format: PORTABLE_FORMAT,
     version: PORTABLE_VERSION,
@@ -223,6 +238,7 @@ export function serializeComponent(
     assets: enumerateAssetDeps({ tree, script, css }),
     // Other components this one renders, minus a self-reference.
     componentDeps: enumerateComponentDeps(tree).filter((n) => n !== row.name),
+    tags,
     component: {
       name: row.name,
       tree,
@@ -240,6 +256,8 @@ export interface ImportedComponent {
   script: string;
   css: string;
   propsSchema: string | null;
+  /** Operator tags, re-normalized from the bundle envelope (untrusted input). */
+  tags: string[];
 }
 
 /** Options for the import trust boundary (H3). */
@@ -338,9 +356,13 @@ export function parsePortableComponent(
 
   if (errors.length > 0 || !v.ok) return { ok: false, errors };
 
+  // Tags are advisory metadata (top-level envelope field). Re-normalize the
+  // untrusted value — never trust the bundle's spelling/shape into the column.
+  const tags = normalizeTags(b.tags);
+
   return {
     ok: true,
-    component: { ...v.artifact, propsSchema },
+    component: { ...v.artifact, propsSchema, tags },
     // Deps remaining AFTER any rebind — what the target Site must actually have.
     assets: enumerateAssetDeps(v.artifact),
     // Other components this one renders, minus a self-reference (H3b).

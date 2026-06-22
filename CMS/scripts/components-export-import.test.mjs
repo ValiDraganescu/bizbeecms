@@ -74,6 +74,28 @@ test("serialize → parse round-trips a valid component", () => {
   assert.equal(parsed.component.propsSchema, '{"title":"string"}');
 });
 
+test("tags round-trip through serialize → parse, re-normalized (component-kits)", () => {
+  // Stored tags column is a JSON string; serialize normalizes it into the envelope.
+  const bundle = serializeComponent({ ...goodRow, tags: '["  Marketing ","blog","BLOG"]' });
+  assert.deepEqual(bundle.tags, ["blog", "Marketing"]); // trimmed, deduped, sorted
+  const parsed = parsePortableComponent(bundle);
+  assert.ok(parsed.ok, parsed.ok ? "" : parsed.errors.join("; "));
+  assert.deepEqual(parsed.component.tags, ["blog", "Marketing"]);
+});
+
+test("import re-normalizes untrusted envelope tags (trust boundary)", () => {
+  const bundle = serializeComponent(goodRow);
+  // Inject a junk tags array onto the envelope as an untrusted importer would.
+  bundle.tags = ["good", "", 42, null, " good "];
+  const parsed = parsePortableComponent(bundle);
+  assert.ok(parsed.ok, parsed.ok ? "" : parsed.errors.join("; "));
+  assert.deepEqual(parsed.component.tags, ["good"]);
+});
+
+test("missing/empty tags serialize to [] (no tags column)", () => {
+  assert.deepEqual(serializeComponent(goodRow).tags, []);
+});
+
 test("parse accepts a JSON string of a bundle (paste/upload)", () => {
   const text = JSON.stringify(serializeComponent(goodRow));
   const parsed = parsePortableComponent(text);
