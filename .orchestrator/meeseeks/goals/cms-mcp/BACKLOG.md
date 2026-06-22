@@ -15,13 +15,15 @@ node tests + EN/FI/ET for new strings.
   `lib/chat/tool-dispatch-core.ts` (`makeDispatcher`, `selectToolSchemas`). Chat
   route now calls `runTool`; SSE framing stays in the route. Gate green; bundle regen.
 
-- TODO: **Slice 2 — per-site API keys: schema + auth guard.** Add an `api_keys`
-  table to the per-Site D1 (`db/schema.ts`): id, keyHash (hash of the key — NEVER
-  plaintext), label, createdBy, createdAt, lastUsedAt, revokedAt. Drizzle migration.
-  Pure helpers (node-tested): generate a key (prefix `bzb_` + random), hash + verify,
-  `parseBearer(header)`. A guard `requireApiKey(request)` → hash the bearer → lookup
-  non-revoked → allow/deny (constant-time compare). Keep SEPARATE from the cookie
-  guard. NO MCP yet — just the table + the auth primitive + tests.
+- DONE (2026-06-22): **Slice 2 — per-site API keys: schema + auth guard.**
+  `api_key` table on per-Site D1 (`db/schema.ts` + migration `0008_famous_vertigo`):
+  id, keyHash (HASH only), keyPrefix (display), label, createdBy, createdAt,
+  lastUsedAt, revokedAt; UNIQUE(keyHash). Pure node-tested helpers
+  `lib/auth/api-key-core.ts` (generateKey `bzb_`+random, keyPrefix, hashKey SHA-256,
+  verifyKey constant-time, parseBearer, looksLikeKey). Store `db/api-key-store.ts`
+  (list/create/revoke/findActiveKeyByHash via the Db port). Guard
+  `lib/auth/api-key-guard.ts` `requireApiKey` — SEPARATE from the cookie guard,
+  fail-closed. Gate green; bundle regen. No MCP/UI yet.
 
 - TODO: **Slice 3 — MCP server endpoint on the Worker (the core).** Mount an MCP
   remote-server endpoint (`/mcp`) on the CMS Worker, auth-gated by `requireApiKey`

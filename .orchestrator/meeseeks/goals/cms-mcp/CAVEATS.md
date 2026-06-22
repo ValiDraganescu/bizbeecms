@@ -52,6 +52,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   `cd ProjectManager && npm run bundle:cms` (it rebuilds CMS via opennext then
   esbuild-bundles the worker) and commit the regenerated `.generated.js`.
 
+- **Migrations dir is `CMS/migrations/`, NOT `drizzle/`.** `drizzle.config.ts`
+  has `out: "./migrations"`. Generate with `npm run db:generate` (drizzle-kit) —
+  it auto-numbers (next was `0008_*`) and updates `migrations/meta/_journal.json`.
+  Commit the new `.sql` AND the meta journal/snapshot. D1 apply is HITL/deployer.
+
+- **API-key crypto uses Web Crypto (`globalThis.crypto`), not node:crypto.** Works
+  on both the Worker and Node 20+ so `api-key-core.ts` stays pure + node-`--test`
+  loadable. SHA-256 hex via `crypto.subtle.digest`; random via `getRandomValues`.
+  `requireApiKey` (api-key-guard.ts) is a SECOND guard, fully separate from the
+  cookie `requireAdmin`. The store uses the `getDb()` Db port (never raw `env.DB`),
+  so it doesn't trip the sole-reader env.DB guard.
+
 - **Gate every slice:** CMS `tsc` + `npx opennextjs-cloudflare build` green (NEVER
   while `npm run dev` is up). Regen the PM `cms-bundle`. EN/FI/ET for new UI strings.
   No native confirm()/alert() — in-app modal for key revoke (browser-review sessions

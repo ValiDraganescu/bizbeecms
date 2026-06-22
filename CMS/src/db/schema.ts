@@ -201,6 +201,39 @@ export const chatThread = sqliteTable("chat_thread", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+/**
+ * API key — a per-Site bearer credential for the remote MCP server (cms-mcp).
+ * A local agent (Claude Code) authenticates to THIS site's CMS Worker with
+ * `Authorization: Bearer <key>`; the key authorizes managing this one Site only
+ * (the DB IS the Site boundary). Only the HASH is stored — the plaintext key is
+ * shown ONCE at creation and never recoverable. `revokedAt` set = denied.
+ * `keyPrefix` is the leading public segment (e.g. `bzb_AbCd…`) for the admin list
+ * so an operator can tell keys apart without ever seeing the secret.
+ */
+export const apiKey = sqliteTable(
+  "api_key",
+  {
+    id: text("id").primaryKey(),
+    // SHA-256 hex of the full plaintext key. NEVER store the plaintext.
+    keyHash: text("key_hash").notNull(),
+    // Public, non-secret leading chars of the key (e.g. "bzb_AbCd1234") for the
+    // admin list. Safe to show; not enough to authenticate.
+    keyPrefix: text("key_prefix").notNull().default(""),
+    // Operator-supplied label ("Vali's laptop"). Free text.
+    label: text("label").notNull().default(""),
+    // PM user id of the admin who minted it (from the cms-validate decision).
+    createdBy: text("created_by"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    // Last time this key authenticated a request; null = unused.
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+    // Set when revoked; a non-null value denies the key. Null = active.
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [uniqueIndex("api_key_hash_unique").on(t.keyHash)],
+);
+
 export type Component = typeof component.$inferSelect;
 export type NewComponent = typeof component.$inferInsert;
 export type Page = typeof page.$inferSelect;
@@ -212,3 +245,5 @@ export type ChatThread = typeof chatThread.$inferSelect;
 export type NewChatThread = typeof chatThread.$inferInsert;
 export type PageVersion = typeof pageVersion.$inferSelect;
 export type NewPageVersion = typeof pageVersion.$inferInsert;
+export type ApiKey = typeof apiKey.$inferSelect;
+export type NewApiKey = typeof apiKey.$inferInsert;

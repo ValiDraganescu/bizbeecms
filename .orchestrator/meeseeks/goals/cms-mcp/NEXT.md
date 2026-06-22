@@ -2,31 +2,36 @@
 
 Read `../main/GOAL.md`, then this goal's `GOAL.md` + `CAVEATS.md` first.
 
-DONE so far: **Slice 1** — shared tool dispatch landed. The chat route and the
-future MCP server now share ONE tool path:
-- `CMS/src/lib/chat/tool-dispatch.ts` — `runTool(name,args) → {name,ok,…}` (the
-  real validated handlers), `TOOL_BY_NAME` registry, `toolSchemasForContext(ctx)`,
-  `allToolSchemas()` (the MCP full surface). CF-coupled (imports `@/db/*`).
-- `CMS/src/lib/chat/tool-dispatch-core.ts` — PURE: `makeDispatcher`,
-  `selectToolSchemas`. Node-testable (`scripts/tool-dispatch.test.mjs`).
-- The chat route just frames `runTool` results as SSE `tool` events.
+DONE so far:
+- **Slice 1** — shared tool dispatch: `lib/chat/tool-dispatch.ts` (`runTool`,
+  `TOOL_BY_NAME`, `toolSchemasForContext`/`allToolSchemas`) + pure core
+  `tool-dispatch-core.ts`. Chat route frames `runTool` results as SSE events.
+- **Slice 2** — per-site API keys (schema + auth primitive):
+  - `api_key` table on per-Site D1 (`db/schema.ts`, migration
+    `migrations/0008_famous_vertigo.sql`): keyHash (HASH only), keyPrefix, label,
+    createdBy, createdAt, lastUsedAt, revokedAt; UNIQUE(keyHash).
+  - PURE node-tested crypto: `lib/auth/api-key-core.ts` — `generateKey()` (`bzb_`+
+    32 random bytes), `keyPrefix`, `hashKey` (SHA-256 hex), `verifyKey`/
+    `timingSafeEqualHex` (constant-time), `parseBearer`, `looksLikeKey`.
+  - Store `db/api-key-store.ts`: `listApiKeys` (no secrets), `createApiKey`
+    (returns plaintext ONCE), `revokeApiKey`, `findActiveKeyByHash` (non-revoked
+    only + lastUsedAt stamp). Uses the `getDb()` Db port.
+  - Guard `lib/auth/api-key-guard.ts`: `requireApiKey(request)` → bearer → hash →
+    lookup → allow/deny. SEPARATE from the cookie `requireAdmin`; fail-closed.
 
-PICK NEXT: **Slice 2 — per-site API keys: schema + auth guard.** (No MCP yet.)
-- Add an `api_keys` table to the per-Site D1 (`CMS/src/db/schema.ts`): id, keyHash
-  (HASH only — never plaintext), label, createdBy, createdAt, lastUsedAt, revokedAt.
-  Drizzle migration (check `CMS/drizzle/` for the next migration number/convention).
-- PURE helpers, node-tested: `generateKey()` (prefix `bzb_` + crypto-random),
-  `hashKey`/`verifyKey` (constant-time compare), `parseBearer(header)`. Put the pure
-  bits in their own module (no `@/`) so node `--test` can load them — same pattern as
-  tool-dispatch-core (CAVEAT: tests can't import `@/db/*`).
-- Guard `requireApiKey(request)` → parse bearer → hash → lookup non-revoked → allow/
-  deny. Keep SEPARATE from the cookie guard (`lib/auth/guard.ts requireAdmin`);
-  the chat route stays cookie-authed.
-
-THE ONE UNKNOWN (still open, for Slice 3): the MCP remote-server transport Claude
-Code expects on a Worker (streamable-HTTP / SSE). SPIKE it before committing Slice 3;
-check whether a Cloudflare MCP SDK fits or hand-roll JSON-RPC over HTTP.
+PICK NEXT: **Slice 3 — MCP server endpoint on the Worker (the core).**
+- Mount `/mcp` on the CMS Worker (a Next route handler, e.g.
+  `app/mcp/route.ts`), auth-gated by `requireApiKey` (Slice 2).
+- THE ONE UNKNOWN — SPIKE FIRST: the MCP remote-server transport Claude Code
+  expects (streamable-HTTP vs SSE). Check current docs + whether a Cloudflare MCP
+  SDK fits or hand-roll JSON-RPC over HTTP. Note the choice in JOURNAL.
+- Expose the SHARED registry from Slice 1: `tools/list` from `allToolSchemas()`,
+  `tools/call` → `runTool(name,args)` → structured MCP result. Don't fork tool
+  logic. New tools (content-collections) appear for free since dispatch enumerates
+  the shared registry.
+- Test the JSON-RPC shapes WITHOUT a live agent (list returns tools; call routes
+  to a handler; bad key → 401). The browser `/api/chat` stays unchanged.
 
 GATE every slice: CMS `tsc` + `npx opennextjs-cloudflare build` (NEVER while
 `npm run dev` is up) + `node --test` + EN/FI/ET for new UI strings, then regen the
-PM bundle (`cd ProjectManager && npm run bundle:cms`).
+PM bundle (`cd ProjectManager && npm run bundle:cms`). You are the sole CMS worker.
