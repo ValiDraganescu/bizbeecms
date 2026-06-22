@@ -210,3 +210,25 @@ Read every line before working. Each entry was learned the hard way by a previou
   subdomain changes). NEVER derive the link origin from request Host headers in prod
   (Host Header Injection) — `buildAcceptUrl` only falls back to the request host in
   dev.
+
+- **USER-MGMT UI + ROLE LABELS LANDED (Slice 5).** Pure
+  `lib/auth/user-mgmt.ts` (`ASSIGNABLE_ROLES`=[Admin,Manager,Editor] — SuperAdmin
+  never assignable; `assignableRolesFor`; `userRowControls`) wraps the Slice-3 tier
+  rules into per-row UI controls AND the API re-checks the SAME `canChangeRole`/
+  `canRemoveUser` (UI is defense-in-depth, /api/* is enforcement). Routes:
+  `GET /api/users` (+`PATCH`/`DELETE /api/users/[id]`) + `DELETE /api/invite/[id]`,
+  all `requireUserManager` (Manager+). Page `/admin/settings/users` + client
+  `users-manager.tsx`. The `roles` i18n namespace (lowercase-first keys mirroring
+  PM) IS now translated EN/FI/ET — role LABELS no longer deferred. SettingsNav has
+  a `users` tab. When adding a new role-bearing UI, use `userRowControls`/
+  `assignableRolesFor`, don't re-derive the tier math.
+
+- **`deleteUser` SWEEPS SESSIONS (Slice 5).** `db/user-store.ts deleteUser(id)`
+  deletes the user's `session` rows too (no FK cascade on D1), so a removed user is
+  signed out immediately on their next request. If you add another credential table
+  keyed on userId (e.g. a future Google-link table), sweep it here too.
+
+- **SSO users show as `<uuid>@pm.sso` in the user list (Slice 5 surfaces the Slice-2
+  stopgap).** The list flags `ssoOnly` (passwordHash==null) → UI shows "Single
+  sign-on". When PM's cms-validate is extended to return the real verified email
+  (the Slice-2 FOLLOW-UP), backfill these rows and the list shows the real email.

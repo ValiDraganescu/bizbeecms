@@ -192,3 +192,42 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/accept-invite-form.tsx (new), CMS/messages/{en,fi,et}.json,
   CMS/wrangler.jsonc, deployer/src/index.ts,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js, CMS/scripts/invite.test.mjs (new).
+
+## 2026-06-22 14:32 — Slice 5: CMS user-management UI (list/invite/change-role/remove)
+- **Status:** DONE
+- **What I did:** Built the Manager+ user-management surface consuming Slice-3
+  gates + Slice-4 invite API.
+  - Pure `lib/auth/user-mgmt.ts` (`ASSIGNABLE_ROLES`, `assignableRolesFor`,
+    `userRowControls`) — type-only `CmsRole`, node-loadable; wraps the Slice-3 tier
+    rules into the exact per-row controls the UI renders AND the API re-checks.
+  - Store fns: `listUsers`/`updateUserRole`/`deleteUser` (deleteUser also sweeps the
+    user's `session` rows so a removed user is signed out — no FK cascade) in
+    user-store; `deleteInvite` in invite-store. All take optional `injectedDb?` for
+    node tests (same seam as Slice 4).
+  - Routes: `GET /api/users` (list users incl. `ssoOnly` flag for `<uuid>@pm.sso`
+    rows + pending invites + `me`, gated `requireUserManager`); `PATCH/DELETE
+    /api/users/[id]` (re-run `canChangeRole`/`canRemoveUser` server-side, 403/404);
+    `DELETE /api/invite/[id]` (revoke, `requireUserManager`).
+  - UI: `/admin/settings/users` page (gated `checkRoleFromHeaders(canManageUsers)`)
+    + client `users-manager.tsx` — invite form (role select bounded by
+    `canInviteRole`), inline role `<select>` per row (options from
+    `userRowControls`), remove + revoke via shared in-app `ConfirmModal` (NO native
+    confirm). Added `users` tab to SettingsNav.
+  - i18n: NEW `roles` namespace (lowercase-first keys, mirrors PM) + `users`
+    namespace + `settingsNav.users`, EN/FI/ET parity (34 user keys + 4 role keys
+    each). Role LABELS now translated (was deferred from Slice 3).
+- **Verified:** `npm test` 716/716 green (12 new: pure gating + store CRUD over
+  in-memory node:sqlite incl. session-sweep on delete). `npx tsc --noEmit` clean.
+  `npx opennextjs-cloudflare build` green — all 5 new routes
+  (/admin/settings/users, /api/users, /api/users/[id], /api/invite/[id]) present.
+  cms-bundle regenerated (worker now serves the new routes). i18n parity asserted
+  by key-count check. Could NOT live-test against a deployed Worker (no D1 binding
+  offline) — store logic covered by node tests instead.
+- **Files:** CMS/src/lib/auth/user-mgmt.ts (new), CMS/src/db/user-store.ts,
+  CMS/src/db/invite-store.ts, CMS/src/app/api/users/route.ts (new),
+  CMS/src/app/api/users/[id]/route.ts (new), CMS/src/app/api/invite/[id]/route.ts
+  (new), CMS/src/app/admin/settings/users/page.tsx (new),
+  CMS/src/components/settings/users-manager.tsx (new),
+  CMS/src/components/settings/settings-nav.tsx, CMS/messages/{en,fi,et}.json,
+  CMS/scripts/user-mgmt.test.mjs (new),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js.

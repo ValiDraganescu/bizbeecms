@@ -1,42 +1,38 @@
 # Note to the next Meeseeks (cms-auth)
 
-Slices 0, 1, 2, 3, AND 4 are DONE. Don't re-litigate the four Slice-0 decisions
+Slices 0,1,2,3,4 AND 5 are DONE. Don't re-litigate the four Slice-0 decisions
 (GOAL.md "Settled identity model").
 
-## What Slice 4 left you (all green — 690 tests, tsc + opennext build)
-- `invite` table + migration 0011 (deployer auto-applies per-Site).
-- PURE `lib/invite/invite-core.ts` (token/TTL/`classifyInvite`) + CF
-  `db/invite-store.ts` (create/find/checkInvite/`acceptInvite(token, passwordHash)`/
-  hasPendingInvite/listPendingInvites). `acceptInvite` takes an ALREADY-HASHED
-  password (pure/CF crypto split). Store fns + user-store `findUserByEmail`/
-  `createUser` take an optional `injectedDb?: Db` for node tests (CAVEAT).
-- `POST /api/invite` (checkAdmin → canInvite → canInviteRole) + `POST
-  /api/invite/accept/[token]` (10-char min, hash, mint session). Public accept
-  page `app/invite/accept/[token]/page.tsx` + `components/accept-invite-form.tsx`.
-- `lib/mail/send-invite.ts` over the `send_email` Workers binding (degrades to
-  logging; `APP_ORIGIN`-based link). Binding COMMENTED in wrangler (needs verified
-  sender domain on Paid). Deployer injects `APP_ORIGIN`. EN/FI/ET: `inviteEmail` +
-  `acceptInvite` namespaces. cms-bundle regenerated.
+## What Slice 5 left you (all green — 716 tests, tsc + opennext build, cms-bundle regen)
+- Pure `lib/auth/user-mgmt.ts` (ASSIGNABLE_ROLES / assignableRolesFor /
+  userRowControls) — UI + API compute per-row controls from it; API re-checks the
+  SAME canChangeRole/canRemoveUser (UI is defense-in-depth).
+- Store: `listUsers`/`updateUserRole`/`deleteUser`(+session sweep) in user-store,
+  `deleteInvite` in invite-store. All injectedDb-testable.
+- Routes (all `requireUserManager`, Manager+): `GET /api/users`,
+  `PATCH/DELETE /api/users/[id]`, `DELETE /api/invite/[id]`.
+- Page `/admin/settings/users` + client `users-manager.tsx` (invite form, inline
+  role select, remove/revoke via in-app ConfirmModal). SettingsNav `users` tab.
+- i18n: NEW `roles` (lowercase-first, mirrors PM) + `users` namespaces EN/FI/ET.
+  Role labels now translated (Slice-3 deferral resolved).
 
-## PICK NEXT: Slice 5 (user-mgmt UI) OR Slice 2b (Google sign-in)
-- **Slice 5 — CMS user management UI** is the natural continuation (it consumes the
-  Slice 3 role gates + the Slice 4 invite API): an admin page gated by
-  `canManageUsers` listing users (incl. the synthetic `<uuid>@pm.sso` SSO rows —
-  CAVEAT) + pending invites (`listPendingInvites`), with invite-by-email + role
-  select (reuse `POST /api/invite`), change-role (`canChangeRole`), and
-  revoke-invite / remove-user (`canRemoveUser`). NEEDS the `roles` i18n namespace
-  (role LABELS still untranslated — CAVEAT, deferred from Slice 3): add it mirroring
-  PM `messages/*.json` `roles` block, then regen cms-bundle. Deletions = IN-APP
-  confirm modal, NO native confirm (CAVEAT). You'll need a `DELETE`/`PATCH` user
-  route + a revoke-invite route, both gated by `requireUserManager`/`canRemoveUser`.
-- **Slice 2b — Google sign-in** is independent (OAuth 2.0 own client; see BACKLOG).
+## PICK NEXT: Slice 2b — Google sign-in (the last open BACKLOG task)
+The only remaining TODO. OAuth 2.0 OWN client, net-new (no Google auth in the repo).
+`GET /api/auth/google/start` (redirect w/ state+PKCE) + `GET /api/auth/google/callback`
+(exchange code, verify id_token, read VERIFIED email). On callback: match a CMS user
+by email → sign in; UNINVITED user with no row → REJECT (no self-signup, per Slice-0
+decision 3 — randoms can't walk in). Mint the same `bizbee_session` CMS-local session.
+Client id/secret + redirect from deployer-injected Worker vars (thread like
+PM_ORIGIN/APP_ORIGIN — see deployer/src/index.ts). Pure helpers (state/nonce verify,
+id_token email extraction) node-tested; do NOT call live Google in tests. EN/FI/ET
+for the Google button (login page already has a placeholder slot from Slice 2). Gate.
 
-## Heads-up / gotchas
-- CF Email binding uses the WORKERS shape `{to, from:{email,name}, subject, text}`
-  — NOT PM's old `{from:string}` shape (CAVEAT). Binding commented until a verified
-  sender domain exists; flow degrades to logging.
-- Don't reintroduce the PM forward in the guard. Local/invited users have no PM row.
-- Sole CMS worker; a PM worker may be in ProjectManager/src/. Only run bundle:cms
-  from ProjectManager once a slice adds runtime code the worker serves.
+## Heads-up / gotchas (still true)
+- Don't reintroduce the PM forward in the guard — local/Google users have no PM row.
+- CF Email binding uses WORKERS shape `{to, from:{email,name}, subject, text}`;
+  commented in wrangler until a verified sender domain exists (degrades to logging).
 - Gate every slice: CMS `npm test` + `npx tsc --noEmit` + `npx opennextjs-cloudflare
-  build` (NEVER while `npm run dev` is up) + EN/FI/ET parity + regen cms-bundle.
+  build` (NEVER while `npm run dev` is up) + EN/FI/ET parity + regen cms-bundle from
+  ProjectManager (`npm run bundle:cms`) once a slice adds runtime routes.
+- SSO users appear as `<uuid>@pm.sso` in the user list — backfill when PM's
+  cms-validate returns the real email (Slice-2 follow-up).

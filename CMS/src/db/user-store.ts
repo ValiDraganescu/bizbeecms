@@ -8,7 +8,7 @@
  * write and lookup so casing can't create duplicate accounts. The plaintext
  * password never touches this layer — callers hash it via `hashPassword` first.
  */
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import type { CmsRole, User } from "./schema.ts";
 
@@ -60,4 +60,47 @@ export async function createUser(
   });
   const [stored] = await db.select().from(schema.user).where(eq(schema.user.id, id));
   return stored;
+}
+
+/** All CMS users, newest first — for the user-management list (Slice 5). */
+export async function listUsers(injectedDb?: Db): Promise<User[]> {
+  const db = injectedDb ?? (await getDb());
+  return db.select().from(schema.user).orderBy(desc(schema.user.createdAt));
+}
+
+/**
+ * Set a user's role. Returns the updated row, or null if no such user. The tier
+ * rules (`canChangeRole`) are enforced in the route BEFORE this is called — the
+ * store just writes. `injectedDb` is for tests only.
+ */
+export async function updateUserRole(
+  id: string,
+  role: CmsRole,
+  injectedDb?: Db,
+): Promise<User | null> {
+  const db = injectedDb ?? (await getDb());
+  await db.update(schema.user).set({ role }).where(eq(schema.user.id, id));
+  const [row] = await db.select().from(schema.user).where(eq(schema.user.id, id));
+  return row ?? null;
+}
+
+/**
+ * Delete a user AND any live sessions they hold (so a removed user is signed
+ * out immediately — sessions have no FK cascade). Returns true if a user row was
+ * removed. `injectedDb` is for tests only.
+ */
+export async function deleteUser(
+  id: string,
+  injectedDb?: Db,
+): Promise<boolean> {
+  const db = injectedDb ?? (await getDb());
+  const existed = (await findById(db, id)) != null;
+  await db.delete(schema.session).where(eq(schema.session.userId, id));
+  await db.delete(schema.user).where(eq(schema.user.id, id));
+  return existed;
+}
+
+async function findById(db: Db, id: string): Promise<User | null> {
+  const [row] = await db.select().from(schema.user).where(eq(schema.user.id, id));
+  return row ?? null;
 }

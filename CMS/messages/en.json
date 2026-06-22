@@ -72,7 +72,8 @@
     "contentLocales": "Content languages",
     "theme": "Theme",
     "brand": "Brand & AI",
-    "apiKeys": "API keys"
+    "apiKeys": "API keys",
+    "users": "Users"
   },
   "theme": {
     "title": "Theme",
@@ -601,5 +602,48 @@
     "errorEmailTaken": "An account already exists for this email.",
     "errorGeneric": "Couldn't accept the invitation. Try again.",
     "errorNetwork": "Couldn't reach the server. Try again."
+  },
+  "roles": {
+    "superAdmin": "SuperAdmin",
+    "admin": "Admin",
+    "manager": "Manager",
+    "editor": "Editor"
+  },
+  "users": {
+    "title": "Users",
+    "subtitle": "Manage who can access this site's CMS. Invite teammates, set their role, or remove access.",
+    "forbidden": "You don't have permission to manage users. Ask an Admin or Manager.",
+    "loading": "Loading users…",
+    "loadFailed": "Couldn't load users. Try again.",
+    "inviteHeading": "Invite a teammate",
+    "cannotInvite": "Your role can't invite users.",
+    "emailPlaceholder": "teammate@example.com",
+    "roleLabel": "Role",
+    "invite": "Send invite",
+    "inviting": "Sending…",
+    "inviteSent": "Invite sent. They'll get an email with an accept link.",
+    "inviteCreatedNoEmail": "Invite created. Email isn't configured yet — share the accept link from the server logs.",
+    "usersHeading": "Users",
+    "pendingHeading": "Pending invites",
+    "you": "you",
+    "ssoUser": "Single sign-on",
+    "passwordUser": "Email + password",
+    "joined": "Joined {date}",
+    "expires": "Expires {date}",
+    "remove": "Remove",
+    "removeConfirm": "Remove {email}? They'll lose access to this site's CMS immediately.",
+    "revokeInvite": "Revoke",
+    "revokeConfirm": "Revoke the invite for {email}? Their accept link will stop working.",
+    "cancel": "Cancel",
+    "err": {
+      "emailRequired": "Enter an email address.",
+      "emailInvalid": "That doesn't look like a valid email.",
+      "roleInvalid": "Pick a valid role.",
+      "notAllowed": "You're not allowed to invite users.",
+      "roleNotAllowed": "You can't grant that role.",
+      "emailTaken": "That person already has an account.",
+      "alreadyInvited": "That person already has a pending invite.",
+      "unknown": "Something went wrong. Try again."
+    }
   }
 }

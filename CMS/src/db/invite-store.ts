@@ -105,6 +105,25 @@ export async function listPendingInvites(): Promise<Invite[]> {
     .orderBy(desc(schema.invite.createdAt));
 }
 
+/**
+ * Revoke (delete) a pending invite by id. Returns true if a row was removed.
+ * Used by the user-management UI's revoke-invite control (Slice 5). `injectedDb`
+ * is for tests only.
+ */
+export async function deleteInvite(
+  id: string,
+  injectedDb?: Db,
+): Promise<boolean> {
+  const db = injectedDb ?? (await getDb());
+  const [existing] = await db
+    .select({ id: schema.invite.id })
+    .from(schema.invite)
+    .where(eq(schema.invite.id, id))
+    .limit(1);
+  await db.delete(schema.invite).where(eq(schema.invite.id, id));
+  return existing != null;
+}
+
 /** Classify an invite token for the accept page (gate before showing the form). */
 export async function checkInvite(
   token: string,

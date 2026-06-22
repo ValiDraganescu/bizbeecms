@@ -15,6 +15,7 @@ const TABS = [
   { key: "theme", href: "/admin/settings/theme" },
   { key: "brand", href: "/admin/settings/brand" },
   { key: "apiKeys", href: "/admin/settings/api-keys" },
+  { key: "users", href: "/admin/settings/users" },
 ] as const;
 
 export function SettingsNav() {

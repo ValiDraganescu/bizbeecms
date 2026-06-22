@@ -122,7 +122,17 @@ green + regen PM cms-bundle + EN/FI/ET for new strings.
   accept happy path + expired/already-accepted rejection (mock email; no live send).
   EN/FI/ET for the invite email + accept page.
 
-- TODO: **Slice 5 — CMS user management UI (list / invite / change role / remove).**
+- DONE: **Slice 5 — CMS user management UI (list / invite / change role / remove).**
+  See JOURNAL 2026-06-22 14:32. Pure `lib/auth/user-mgmt.ts` (ASSIGNABLE_ROLES/
+  assignableRolesFor/userRowControls) + store fns (listUsers/updateUserRole/
+  deleteUser[+session sweep]/deleteInvite, injectedDb-testable) + routes
+  (GET /api/users, PATCH/DELETE /api/users/[id], DELETE /api/invite/[id], all
+  Manager+ gated, server re-runs canChangeRole/canRemoveUser) + page
+  /admin/settings/users + client users-manager.tsx (invite form, inline role
+  select, remove/revoke via in-app ConfirmModal) + SettingsNav `users` tab. NEW
+  `roles` + `users` i18n namespaces EN/FI/ET (role labels now translated, was
+  deferred from Slice 3). 716 tests (12 new), tsc + opennext build green,
+  cms-bundle regen. Original spec below.
   An admin page (gated by `canManageUsers`) listing CMS users + pending invites,
   with invite-by-email + role select (the Slice 3 role set), change-role, and
   revoke-invite / remove-user — every mutation enforcing `canRemoveUser` /

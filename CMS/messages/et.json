@@ -72,7 +72,8 @@
     "contentLocales": "Sisukeeled",
     "theme": "Teema",
     "brand": "Bränd ja AI",
-    "apiKeys": "API-võtmed"
+    "apiKeys": "API-võtmed",
+    "users": "Kasutajad"
   },
   "theme": {
     "title": "Teema",
@@ -601,5 +602,48 @@
     "errorEmailTaken": "Selle e-posti jaoks on juba konto olemas.",
     "errorGeneric": "Kutse vastuvõtmine ebaõnnestus. Proovi uuesti.",
     "errorNetwork": "Serveriga ühenduse loomine ebaõnnestus. Proovi uuesti."
+  },
+  "roles": {
+    "superAdmin": "Superadministraator",
+    "admin": "Administraator",
+    "manager": "Haldur",
+    "editor": "Toimetaja"
+  },
+  "users": {
+    "title": "Kasutajad",
+    "subtitle": "Halda, kellel on juurdepääs selle saidi CMS-ile. Kutsu kaaslasi, määra nende roll või eemalda juurdepääs.",
+    "forbidden": "Sul pole õigust kasutajaid hallata. Küsi administraatorilt või haldurilt.",
+    "loading": "Laadin kasutajaid…",
+    "loadFailed": "Kasutajaid ei õnnestunud laadida. Proovi uuesti.",
+    "inviteHeading": "Kutsu kaaslane",
+    "cannotInvite": "Sinu roll ei saa kasutajaid kutsuda.",
+    "emailPlaceholder": "kaaslane@näide.ee",
+    "roleLabel": "Roll",
+    "invite": "Saada kutse",
+    "inviting": "Saadan…",
+    "inviteSent": "Kutse saadetud. Nad saavad e-kirja koos nõustumislingiga.",
+    "inviteCreatedNoEmail": "Kutse loodud. E-post pole veel seadistatud — jaga nõustumislinki serveri logidest.",
+    "usersHeading": "Kasutajad",
+    "pendingHeading": "Ootel kutsed",
+    "you": "sina",
+    "ssoUser": "Ühekordne sisselogimine",
+    "passwordUser": "E-post + parool",
+    "joined": "Liitus {date}",
+    "expires": "Aegub {date}",
+    "remove": "Eemalda",
+    "removeConfirm": "Eemaldada {email}? Ta kaotab kohe juurdepääsu selle saidi CMS-ile.",
+    "revokeInvite": "Tühista",
+    "revokeConfirm": "Tühistada kutse aadressile {email}? Tema nõustumislink lakkab töötamast.",
+    "cancel": "Loobu",
+    "err": {
+      "emailRequired": "Sisesta e-posti aadress.",
+      "emailInvalid": "See ei tundu kehtiv e-post.",
+      "roleInvalid": "Vali kehtiv roll.",
+      "notAllowed": "Sul pole õigust kasutajaid kutsuda.",
+      "roleNotAllowed": "Sa ei saa seda rolli anda.",
+      "emailTaken": "Sellel inimesel on juba konto.",
+      "alreadyInvited": "Sellel inimesel on juba ootel kutse.",
+      "unknown": "Midagi läks valesti. Proovi uuesti."
+    }
   }
 }

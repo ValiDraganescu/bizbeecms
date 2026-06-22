@@ -72,7 +72,8 @@
     "contentLocales": "Sisältökielet",
     "theme": "Teema",
     "brand": "Brändi ja tekoäly",
-    "apiKeys": "API-avaimet"
+    "apiKeys": "API-avaimet",
+    "users": "Käyttäjät"
   },
   "theme": {
     "title": "Teema",
@@ -601,5 +602,48 @@
     "errorEmailTaken": "Tälle sähköpostille on jo olemassa tili.",
     "errorGeneric": "Kutsun hyväksyminen epäonnistui. Yritä uudelleen.",
     "errorNetwork": "Palvelimeen ei saatu yhteyttä. Yritä uudelleen."
+  },
+  "roles": {
+    "superAdmin": "Pääkäyttäjä",
+    "admin": "Ylläpitäjä",
+    "manager": "Hallinnoija",
+    "editor": "Muokkaaja"
+  },
+  "users": {
+    "title": "Käyttäjät",
+    "subtitle": "Hallitse, kenellä on pääsy tämän sivuston CMS:ään. Kutsu tiimiläisiä, aseta heidän roolinsa tai poista pääsy.",
+    "forbidden": "Sinulla ei ole oikeutta hallita käyttäjiä. Pyydä ylläpitäjää tai hallinnoijaa.",
+    "loading": "Ladataan käyttäjiä…",
+    "loadFailed": "Käyttäjiä ei voitu ladata. Yritä uudelleen.",
+    "inviteHeading": "Kutsu tiimiläinen",
+    "cannotInvite": "Roolisi ei voi kutsua käyttäjiä.",
+    "emailPlaceholder": "tiimilainen@esimerkki.fi",
+    "roleLabel": "Rooli",
+    "invite": "Lähetä kutsu",
+    "inviting": "Lähetetään…",
+    "inviteSent": "Kutsu lähetetty. He saavat sähköpostin, jossa on hyväksymislinkki.",
+    "inviteCreatedNoEmail": "Kutsu luotu. Sähköpostia ei ole vielä määritetty — jaa hyväksymislinkki palvelimen lokeista.",
+    "usersHeading": "Käyttäjät",
+    "pendingHeading": "Odottavat kutsut",
+    "you": "sinä",
+    "ssoUser": "Kertakirjautuminen",
+    "passwordUser": "Sähköposti + salasana",
+    "joined": "Liittyi {date}",
+    "expires": "Vanhenee {date}",
+    "remove": "Poista",
+    "removeConfirm": "Poistetaanko {email}? Hän menettää heti pääsyn tämän sivuston CMS:ään.",
+    "revokeInvite": "Peru",
+    "revokeConfirm": "Perutaanko kutsu osoitteelle {email}? Hyväksymislinkki lakkaa toimimasta.",
+    "cancel": "Peruuta",
+    "err": {
+      "emailRequired": "Anna sähköpostiosoite.",
+      "emailInvalid": "Tämä ei näytä kelvolliselta sähköpostilta.",
+      "roleInvalid": "Valitse kelvollinen rooli.",
+      "notAllowed": "Sinulla ei ole oikeutta kutsua käyttäjiä.",
+      "roleNotAllowed": "Et voi myöntää tätä roolia.",
+      "emailTaken": "Tällä henkilöllä on jo tili.",
+      "alreadyInvited": "Tällä henkilöllä on jo odottava kutsu.",
+      "unknown": "Jotain meni pieleen. Yritä uudelleen."
+    }
   }
 }
