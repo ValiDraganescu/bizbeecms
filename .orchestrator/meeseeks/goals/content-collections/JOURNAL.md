@@ -285,3 +285,36 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/pages/page-blocks.ts, CMS/src/lib/content/binding.ts,
   CMS/src/components/page-builder/page-builder-shell.tsx, CMS/messages/{en,fi,et}.json,
   CMS/scripts/binding-ui.test.mjs, ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-22 14:19 — P2-bind Slice D: AI tools for binding (bind_component / create_list / bind_list)
+- **Status:** DONE (code + tests; shared opennext build gate blocked by a PARALLEL worker's
+  in-flight file, see Verified)
+- **What I did:** Added the three AI binding tools so the assistant authors the SAME
+  bindings the operator UI (Slice C) does — no forked data path, no raw SQL to the model.
+  - PURE `CMS/src/lib/chat/binding-tools.ts`: 3 tool schemas + arg validators
+    (`validateBindComponent`/`validateCreateList`/`validateBindList`) that shape the
+    model's loose args into the page-blocks helper shapes (filter/sort/map/limit
+    reused from collection-tools' pattern; FILTER_OPS-gated; no `@/` imports →
+    node-testable). bind_component supports clear (omit collection → revert to static).
+  - Wired into the shared registry like Slice 6: `tool-dispatch.ts` TOOL_BY_NAME +
+    HANDLERS. Handlers MUTATE A PAGE's draft block tree (not a collection store):
+    `getPageBlocks` → `findBlock` → validate via the SHARED `validateBinding`/
+    `validateListBinding` (registry fields via `getCollection`, declared props via
+    `getComponentByName`+`declaredPropNames`) → apply via Slice-C `setBlockField`/
+    `addListToSection`/`setBlockChildren` → `validateBlocks` renderable gate →
+    `setPageBlocks`. bind_component sets `bindings.item`; create_list inserts a List +
+    stamps listSource/listMap + a `${listId}-tpl` template child; bind_list PATCH-merges
+    config + can replace the template (preserving any empty-state child).
+  - `tool-scopes.ts`: 3 names in KNOWN_TOOL_NAMES + added to page-builder & pages
+    TOOLS_BY_CONTEXT (with query_collection for discovery) + extended both context prompts.
+- **Verified:** `node --test scripts/binding-tools.test.mjs scripts/tool-scopes.test.mjs
+  scripts/tool-dispatch.test.mjs` green (23+6); full binding/page-block/render/tool subset
+  123/123 green; `npx tsc --noEmit` reports ZERO errors on MY files. The shared
+  `opennextjs-cloudflare build` FAILS but ONLY on a PARALLEL worker's uncommitted file
+  `src/app/api/invite/route.ts` (imports `canInviteRole` which doesn't exist yet in their
+  in-flight guard.ts) — nothing in content-collections code. Build re-verifies once that
+  lands. NO cms-bundle regen / NO EN/FI/ET (AI-tool descriptions are MODEL-facing, Slice-6
+  rule). Live D1/visual = HITL.
+- **Files:** CMS/src/lib/chat/binding-tools.ts (new),
+  CMS/src/lib/chat/tool-dispatch.ts, CMS/src/lib/chat/tool-scopes.ts,
+  CMS/scripts/binding-tools.test.mjs (new)

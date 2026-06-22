@@ -184,13 +184,19 @@ stable id + slug (Slice 3) so this isn't a retrofit.
   + `bind.*` + `list.*` + cms-bundle regen. 11 node tests (binding-ui), full suite 176;
   tsc 0; opennext build green; bundle string verified. Live D1/visual = HITL.
 
-- TODO: **P2-bind Slice D — AI tools for binding.** Tools so the assistant can do
-  the same: `bind_component` (set a block's single-item binding: collection,
-  first-match query, field→prop map) and `create_list` / `bind_list` (insert a
-  `List` block with query + template component + map). Validate against the registry
-  + the target component's `propsSchema` (reject unknown collection/field/prop).
-  Register in the existing tool pipeline; reuse the Slice-A/B stores — no forked
-  data path. Node tests per tool's validation/execution (mock stores). Gate.
+- DONE (2026-06-22): **P2-bind Slice D — AI tools for binding.** `bind_component`
+  (single-item binding under key "item"), `create_list` (insert a built-in List +
+  template child + query/map), `bind_list` (PATCH-reconfigure a List + optional
+  template swap). PURE `lib/chat/binding-tools.ts` (3 schemas + arg validators,
+  node-testable) wired into the shared registry (`tool-dispatch.ts` TOOL_BY_NAME +
+  HANDLERS) + `tool-scopes.ts` (KNOWN_TOOL_NAMES + page-builder & pages contexts +
+  prompts). Handlers MUTATE a page's draft blocks (getPageBlocks→findBlock→shared
+  validateBinding/validateListBinding against registry+propsSchema→Slice-C
+  setBlockField/addListToSection/setBlockChildren→validateBlocks→setPageBlocks); NO
+  forked data path, NO raw SQL to the model. 16 node tests; full subset 123 green;
+  tsc 0 on MY files. opennext build blocked ONLY by a parallel worker's in-flight
+  api/invite/route.ts (canInviteRole) — re-verify once that lands. NO bundle regen /
+  NO EN/FI/ET (AI-tool descs are model-facing). Live D1/visual = HITL.
 
 - TODO: **Phase 3 (later, not greenlit) — route-driven detail pages + cross-collection
   refs.** "The item for the current route" (dynamic `/blog/[slug]` → the matching

@@ -294,6 +294,38 @@ Read every line before working. Each entry was learned the hard way by a previou
   the Slice-4 query-compiler op whitelist — keep them in step if the compiler's op set
   changes (the compiler is the runtime authority; the UI list is just for authoring).
 
+- **(Slice D) The binding AI tools MUTATE A PAGE's blocks, NOT a collection store.**
+  Unlike Slice 6 (collection-tools → collection/item/query stores), bind_component/
+  create_list/bind_list edit a page's draft block tree: `getPageBlocks(pageId)` →
+  `findBlock` → mutate via Slice-C page-blocks helpers (`setBlockField` for non-prop
+  fields bindings/listSource/listMap, `addListToSection`+`setBlockChildren` for a
+  List) → `validateBlocks` (renderable gate) → `setPageBlocks(pageId, blocks)`. The
+  model addresses by PAGE id + BLOCK id (it learns them from get_page). Reuse this
+  path for any future page-mutating AI tool — don't re-load/re-persist differently.
+- **(Slice D) Validate bindings with the SHARED `validateBinding`/`validateListBinding`
+  (lib/content/binding.ts), not a re-implementation.** The handler loads the
+  registry fields (`getCollection(table).fields`, null if absent) + the target/
+  template component's declared props (`getComponentByName` → `declaredPropNames`)
+  and passes them in. AUTHORING rejects unknown collection/field/prop (the model
+  gets a recoverable error); runtime stays graceful (renderer skips unresolved).
+- **(Slice D) create_list seeds the List template child id as `${listId}-tpl` with
+  `listRole:"template"`; bind_list's template-swap keeps any `listRole:"empty"`
+  child.** `addListToSection` appends a List with NO children; the handler derives
+  the new List id (diff before/after by id, component===List) then stamps the
+  template. If you change the List child conventions, keep these handlers in step
+  with the Slice-C operator UI (page-builder-shell `onUpdateList`) — both author the
+  SAME shape.
+- **(Slice D) bind_component clears via OMITTING collection** (or empty map →
+  validation rejects; omit it) → `setBlockField(blocks, id, {bindings: undefined})`
+  reverts the block to static props. The single-item binding lives under key
+  "item" (matches the Slice-C operator UI).
+- **(Parallel-worker build clash, 2026-06-22) The shared `opennextjs-cloudflare
+  build` can fail on ANOTHER worker's uncommitted file** — this run it died on
+  `src/app/api/invite/route.ts` importing `canInviteRole` (cms-auth's in-flight
+  guard). `npx tsc --noEmit` lists the offending file → if it's NOT a
+  content-collections path, your slice is sound; the build re-verifies once their
+  file lands. Don't touch api/invite/** or lib/auth/guard.ts to "fix" it.
+
 - **(Slice 5) Admin UI talks to the Slice 2-4 REST routes only — no new data path.**
   Item create OMITS empty-string field values so column DEFAULTs apply; edit sends
   all keys (PATCH semantics). multiselect round-trips as a JSON-array string (parse on

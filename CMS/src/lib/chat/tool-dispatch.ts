@@ -60,7 +60,30 @@ import {
   validateArchiveItem,
   validateQuery,
 } from "./collection-tools";
-import { validateBlocks } from "@/lib/pages/page-blocks";
+import {
+  BIND_COMPONENT_TOOL,
+  CREATE_LIST_TOOL,
+  BIND_LIST_TOOL,
+  validateBindComponent,
+  validateCreateList,
+  validateBindList,
+} from "./binding-tools";
+import {
+  validateBlocks,
+  findBlock,
+  setBlockField,
+  setBlockChildren,
+  addListToSection,
+  isList,
+  isSection,
+  LIST_COMPONENT,
+} from "@/lib/pages/page-blocks";
+import type { Block } from "@/lib/render/tree";
+import {
+  validateBinding,
+  validateListBinding,
+  declaredPropNames,
+} from "@/lib/content/binding";
 import {
   toolsForContext,
   type AdminPageContext,
@@ -82,8 +105,10 @@ import {
   upsertPage,
   listPages,
   getPageById,
+  getPageBlocks,
   setPageBlocks,
 } from "@/db/page-store";
+import { getCollection } from "@/db/collection-store";
 import { applyTranslation } from "@/db/translate-store";
 import {
   getContentLocales,
@@ -132,6 +157,9 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   update_collection_item: UPDATE_COLLECTION_ITEM_TOOL,
   archive_collection_item: ARCHIVE_COLLECTION_ITEM_TOOL,
   query_collection: QUERY_COLLECTION_TOOL,
+  bind_component: BIND_COMPONENT_TOOL,
+  create_list: CREATE_LIST_TOOL,
+  bind_list: BIND_LIST_TOOL,
 };
 
 /** The tool SCHEMAS the assistant may use in this admin-page context (chat route). */
@@ -407,6 +435,164 @@ async function handleQueryCollection(args: unknown): Promise<Record<string, unkn
   }
 }
 
+// ── content-collections (Slice D): component↔collection BINDING tools ─────────
+// These mutate a PAGE's draft block tree (NOT a collection store): load the
+// blocks, find the target block, validate the binding against the registry + the
+// target/template component's propsSchema (the SHARED validateBinding/
+// validateListBinding — no forked validation), apply via the Slice-C page-blocks
+// helpers, persist via setPageBlocks. Graceful at runtime (the renderer skips
+// unresolved), but AUTHORING rejects unknown collection/field/prop so the model
+// gets a recoverable message and doesn't author dead bindings.
+
+/** The bound collection's registry fields, or null if it doesn't exist. */
+async function collectionFields(table: string) {
+  const view = await getCollection(table);
+  return view ? view.fields : null;
+}
+
+/** A component's declared prop names (the binding allowlist), empty set if absent. */
+async function declaredProps(component: string): Promise<Set<string>> {
+  const row = await getComponentByName(component);
+  return declaredPropNames(row?.propsSchema ?? null);
+}
+
+async function handleBindComponent(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateBindComponent(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const { page, block } = valid.value;
+  try {
+    const loaded = await getPageBlocks(page);
+    if (!loaded) return { ok: false, errors: [`no page with id "${page}"`] };
+    const target = findBlock(loaded.blocks, block);
+    if (!target) return { ok: false, errors: [`no block with id "${block}" on this page`] };
+
+    // Clear → drop the "item" binding (revert to static props).
+    if (valid.value.clear) {
+      const next = setBlockField(loaded.blocks, block, { bindings: undefined });
+      const res = await setPageBlocks(page, next);
+      if (!res.ok) return { ok: false, errors: res.errors };
+      return { ok: true, action: "cleared", page, block };
+    }
+
+    const binding = {
+      source: { collection: valid.value.collection!, filter: valid.value.filter, sort: valid.value.sort },
+      map: valid.value.map!,
+    };
+    const fields = await collectionFields(valid.value.collection!);
+    const declared = await declaredProps(target.component);
+    const check = validateBinding(binding, fields, declared);
+    if (!check.ok) return { ok: false, errors: check.errors };
+
+    const next = setBlockField(loaded.blocks, block, { bindings: { item: binding } });
+    const res = await setPageBlocks(page, next);
+    if (!res.ok) return { ok: false, errors: res.errors };
+    return { ok: true, action: "bound", page, block, collection: valid.value.collection };
+  } catch (err) {
+    return { ok: false, errors: [`failed to bind component: ${(err as Error).message}`] };
+  }
+}
+
+async function handleCreateList(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateCreateList(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const { page, section, collection, template, filter, sort, limit, map } = valid.value;
+  try {
+    const loaded = await getPageBlocks(page);
+    if (!loaded) return { ok: false, errors: [`no page with id "${page}"`] };
+    const sectionBlock = findBlock(loaded.blocks, section);
+    if (!sectionBlock) return { ok: false, errors: [`no block with id "${section}" on this page`] };
+    if (!isSection(sectionBlock)) return { ok: false, errors: [`block "${section}" is not a Section (insert a Section first)`] };
+
+    const listSource = { collection, filter, sort, limit };
+    const fields = await collectionFields(collection);
+    const declared = await declaredProps(template);
+    const check = validateListBinding(listSource, map, fields, declared);
+    if (!check.ok) return { ok: false, errors: check.errors };
+
+    // Insert the built-in List, then stamp its query/map + a template child.
+    let next = addListToSection(loaded.blocks, section);
+    const listId = newListId(loaded.blocks, next);
+    next = setBlockField(next, listId, { listSource, listMap: map });
+    const tpl: Block = { id: `${listId}-tpl`, component: template, listRole: "template" };
+    next = setBlockChildren(next, listId, [tpl]);
+
+    // Renderable check (mirror the page-blocks editor / setPageBlocks contract).
+    const shape = validateBlocks(next);
+    if (!shape.ok) return { ok: false, errors: shape.errors };
+
+    const res = await setPageBlocks(page, shape.blocks);
+    if (!res.ok) return { ok: false, errors: res.errors };
+    return { ok: true, action: "created", page, list: listId, collection, template };
+  } catch (err) {
+    return { ok: false, errors: [`failed to create list: ${(err as Error).message}`] };
+  }
+}
+
+async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateBindList(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const { page, block } = valid.value;
+  try {
+    const loaded = await getPageBlocks(page);
+    if (!loaded) return { ok: false, errors: [`no page with id "${page}"`] };
+    const listBlock = findBlock(loaded.blocks, block);
+    if (!listBlock) return { ok: false, errors: [`no block with id "${block}" on this page`] };
+    if (!isList(listBlock)) return { ok: false, errors: [`block "${block}" is not a List`] };
+
+    // Merge the patch onto the existing config so partial updates work.
+    const prevSource = listBlock.listSource ?? { collection: "" };
+    const collection = valid.value.collection ?? prevSource.collection;
+    if (!collection) return { ok: false, errors: ["this list has no collection yet — pass `collection`"] };
+    const listSource = {
+      collection,
+      filter: valid.value.filter ?? prevSource.filter,
+      sort: valid.value.sort ?? prevSource.sort,
+      limit: valid.value.limit ?? prevSource.limit,
+    };
+    const listMap = valid.value.map ?? listBlock.listMap ?? {};
+
+    // Template: the existing template child's component, unless replacing it.
+    const prevTpl = (listBlock.children ?? []).find((c) => c.listRole !== "empty");
+    const template = valid.value.template ?? prevTpl?.component;
+    if (!template) return { ok: false, errors: ["this list has no template yet — pass `template`"] };
+
+    const fields = await collectionFields(collection);
+    const declared = await declaredProps(template);
+    const check = validateListBinding(listSource, listMap, fields, declared);
+    if (!check.ok) return { ok: false, errors: check.errors };
+
+    let next = setBlockField(loaded.blocks, block, { listSource, listMap });
+    // Replace the template component if requested, preserving any empty-state child.
+    if (valid.value.template) {
+      const emptyChild = (listBlock.children ?? []).find((c) => c.listRole === "empty");
+      const tpl: Block = { id: `${block}-tpl`, component: template, listRole: "template" };
+      next = setBlockChildren(next, block, emptyChild ? [tpl, emptyChild] : [tpl]);
+    }
+
+    const shape = validateBlocks(next);
+    if (!shape.ok) return { ok: false, errors: shape.errors };
+    const res = await setPageBlocks(page, shape.blocks);
+    if (!res.ok) return { ok: false, errors: res.errors };
+    return { ok: true, action: "bound", page, list: block, collection, template };
+  } catch (err) {
+    return { ok: false, errors: [`failed to bind list: ${(err as Error).message}`] };
+  }
+}
+
+/** The id of the List just appended by addListToSection (the new block in `after`). */
+function newListId(before: Block[], after: Block[]): string {
+  const had = new Set<string>();
+  const collect = (bs: Block[]) => bs.forEach((b) => { had.add(b.id); if (b.children) collect(b.children); });
+  collect(before);
+  let found = "";
+  const scan = (bs: Block[]) => bs.forEach((b) => {
+    if (!had.has(b.id) && b.component === LIST_COMPONENT) found = b.id;
+    if (b.children) scan(b.children);
+  });
+  scan(after);
+  return found;
+}
+
 // ── The handler map + dispatcher ──────────────────────────────────────────────
 // Keyed by tool name (== function.name == TOOL_BY_NAME key). Read tools ignore
 // args; we wrap the no-arg handlers so every entry is `(args) => Promise<…>`.
@@ -432,6 +618,9 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   update_collection_item: handleUpdateCollectionItem,
   archive_collection_item: handleArchiveCollectionItem,
   query_collection: handleQueryCollection,
+  bind_component: handleBindComponent,
+  create_list: handleCreateList,
+  bind_list: handleBindList,
 };
 
 /**

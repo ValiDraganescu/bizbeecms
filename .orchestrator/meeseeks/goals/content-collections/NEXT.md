@@ -1,43 +1,36 @@
 # Note to the next Meeseeks (content-collections)
 
-BUGS: NONE OPEN. v1 (Slices 0–6) DONE. Phase-2 binding: **Slices A + B + C DONE**.
+BUGS: NONE OPEN. v1 (Slices 0–6) DONE. Phase-2 binding: **Slices A + B + C + D DONE.**
+The whole P2 binding track (operator UI + AI tools) is complete.
 
-WHAT SLICE C ADDED (use it, don't reinvent):
-- `lib/pages/page-blocks.ts`: `isList`, `addListBlock`/`addListToSection`,
-  `setBlockField` (set/clear bindings/listSource/listMap/listRole — NON-prop fields,
-  tree-walk, undefined deletes), `setBlockChildren` (List template/empty children).
-- `lib/content/binding.ts`: `validateListBinding` (List analog of `validateBinding`).
-- `page-builder-shell.tsx`: `/api/collections` fetch (graceful); rail List insert
-  button; Block-tab `ListSettings` (List) + `BindingPanel` (single-item, key "item")
-  + a reusable `QueryBuilder` (filter[]/sort[] over a collection's columns). All
-  graceful. EN/FI/ET `pageBuilder.layoutList`/`bind.*`/`list.*` + cms-bundle regen.
-- Tests: `node --test scripts/binding-ui.test.mjs` (11). Full suite (176):
-  `node --test scripts/{binding,query-compiler,item-write,collection-plan,collection-schema,content-fence,collection-tools,render-tree,list-block,page-blocks,binding-ui}.test.mjs`.
+WHAT SLICE D ADDED (Slice 6's wiring pattern, applied to PAGE block mutation):
+- `lib/chat/binding-tools.ts`: PURE schemas + `validateBindComponent`/`validateCreateList`/
+  `validateBindList` (arg shaping only; node-testable). 16 tests in
+  `scripts/binding-tools.test.mjs`.
+- `tool-dispatch.ts`: 3 handlers that load a page's blocks → validate via SHARED
+  `validateBinding`/`validateListBinding` → mutate via Slice-C page-blocks helpers →
+  `setPageBlocks`. `tool-scopes.ts`: names in KNOWN_TOOL_NAMES + page-builder/pages contexts.
+- NO cms-bundle regen / NO EN/FI/ET (AI-tool descs are model-facing — Slice-6 rule).
 
-PICK NEXT: **P2-bind Slice D — AI tools for binding.** Tools so the assistant authors
-the SAME bindings: `bind_component` (set a block's single-item binding: collection +
-first-match query + field→prop map) and `create_list`/`bind_list` (insert/configure a
-`List` block: query + template component + map). REUSE `validateBinding`/
-`validateListBinding` (lib/content/binding.ts) + `declaredPropNames`; reuse the Slice-A/B
-data shapes — NO forked data path. Follow Slice 6's tool wiring EXACTLY (CAVEATS): PURE
-`lib/chat/*-tools.ts` (no @/ imports → node-testable) + register in tool-dispatch.ts
-(TOOL_BY_NAME + HANDLERS) + tool-scopes.ts (KNOWN_TOOL_NAMES + a context's
-TOOLS_BY_CONTEXT) — name in ALL THREE or registry-coverage fails. Tool descriptions are
-MODEL-facing → NO cms-bundle regen, NO EN/FI/ET (like Slice 6). The tools must MUTATE a
-page's blocks — Slice 6 tools hit the collection STORES, but binding tools edit a page's
-draft block tree; check how create_page/page tools persist blocks (likely the draft REST
-/ a page-store mutate) and reuse that. Node tests per tool's validation + the block-edit.
+⚠ BUILD: `npx opennextjs-cloudflare build` could NOT be completed this run — it failed on a
+PARALLEL worker's uncommitted `src/app/api/invite/route.ts` (`canInviteRole` not yet in
+guard.ts). NONE of content-collections is at fault (tsc clean on our files). Once cms-auth's
+invite slice lands, RE-RUN the build to confirm Slice D compiles end-to-end (dev server DOWN
+first). If it still fails on a content-collections path, that's a real regression.
 
-GATE: `node --test scripts/...` + `npx tsc --noEmit` + `npx opennextjs-cloudflare build`
-(dev server DOWN first). Slice D = AI-tool descs only → NO bundle regen, NO EN/FI/ET.
+PICK NEXT (no greenlit binding work left — choose the highest-value Phase-2 slice):
+1. **RE-VERIFY Slice D's build** once api/invite is committed (cheap, do it first if blocked).
+2. **Phase-2 — drop/rename/retype field (schema rebuild)** — system-generated safe
+   table-rebuild (create content_x_new + copy + drop + rename), fenced to content_*.
+   Deferred from v1's add-only. PURE planner + thin store (Slice-2 split pattern).
+3. **Phase-2 — per-locale collection fields** (content data is per content-locale).
+4. **Phase-2 — pagination/sort/count in the operator items UI** (query store already
+   returns total; the UI doesn't page yet).
+5. **FTS5** (DEFERRED, see CAVEATS for the D1 export limitation) — bigger, re-confirm with user.
+Phase 3 (route-driven detail pages + cross-collection refs) is NOT greenlit — needs the user.
 
-PARALLEL-SAFETY: another CMS worker owns `CMS/src/app/mcp/**` + `app/api/keys/**` +
-settings UI + the cms-bundle regen. Slice D is `lib/chat/**` — Slice 6 collection-tools
-already live there; the MCP worker also touches lib/chat tool-registry → COORDINATE
-(message them) before editing tool-dispatch.ts/tool-scopes.ts to avoid a clash.
-
-GOTCHAS: binding/list config lives OUTSIDE props (setBlockField, not mergeBlockProps).
-renderer is lib/render/ NOT lib/content/. imports inside src/ need `.ts` ext.
-List/binding filter `op` is loose `string` (compiler whitelists at runtime). Keep
-planPage/planTree PURE+SYNC — hydrate in the async buildPlanFromPage. Empty-state List
-child (`listRole:"empty"`) has NO operator UI yet (renderer supports it) — add if needed.
+GOTCHAS: binding/list config lives OUTSIDE props (setBlockField). renderer is lib/render/ NOT
+lib/content/. src/ imports need `.ts` ext. AI binding tools mutate a PAGE (getPageBlocks/
+setPageBlocks), unlike Slice-6 collection tools that hit the data stores. STAY OUT of
+api/invite/**, lib/auth/guard.ts, db/schema, and don't run bundle:cms if a cms-auth worker
+is active.
