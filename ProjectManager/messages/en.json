@@ -303,6 +303,12 @@
       "globalCountry": "Global (all countries)",
       "countryHintGlobal": "Pick a country, or leave as Global for all countries.",
       "countryHintScoped": "Pick one of your countries.",
+      "openrouterKey": "OpenRouter API key",
+      "openrouterKeyPlaceholder": "sk-or-…",
+      "openrouterKeyClear": "Clear key",
+      "openrouterKeySet": "A key is set. Enter a new one to replace it; leave blank to keep it.",
+      "openrouterKeyNone": "No key set. The Site falls back to the shared AI provider.",
+      "openrouterKeyWillClear": "The stored key will be removed when you save.",
       "create": "Create Site",
       "save": "Save changes",
       "cancel": "Cancel"

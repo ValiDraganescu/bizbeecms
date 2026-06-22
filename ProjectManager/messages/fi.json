@@ -303,6 +303,12 @@
       "globalCountry": "Globaali (kaikki maat)",
       "countryHintGlobal": "Valitse maa tai jätä globaaliksi kaikille maille.",
       "countryHintScoped": "Valitse yksi maistasi.",
+      "openrouterKey": "OpenRouter API -avain",
+      "openrouterKeyPlaceholder": "sk-or-…",
+      "openrouterKeyClear": "Poista avain",
+      "openrouterKeySet": "Avain on asetettu. Syötä uusi korvataksesi sen tai jätä tyhjäksi säilyttääksesi nykyisen.",
+      "openrouterKeyNone": "Avainta ei ole asetettu. Sivusto käyttää jaettua tekoälypalvelua.",
+      "openrouterKeyWillClear": "Tallennettu avain poistetaan, kun tallennat.",
       "create": "Luo sivusto",
       "save": "Tallenna muutokset",
       "cancel": "Peruuta"

@@ -3,6 +3,7 @@ import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { authorizeSiteCountry, canUserCreateSite } from "@/lib/site/authz";
 import { createSite, isSlugTaken, isValidSlug } from "@/lib/site/site";
+import { parseOpenrouterKey } from "@/lib/site/openrouter-key";
 
 export type SiteErrorKey =
   | "nameRequired"
@@ -15,7 +16,15 @@ export type SiteErrorKey =
   | "notFound"
   | "unknown";
 
-export type SiteBody = { name?: unknown; slug?: unknown; country?: unknown };
+export type SiteBody = {
+  name?: unknown;
+  slug?: unknown;
+  country?: unknown;
+  /** Plaintext OpenRouter key to set/replace (write-only; blank ≠ clear). */
+  openrouterApiKey?: unknown;
+  /** Explicit clear — only this wipes an existing key. */
+  clearOpenrouterKey?: unknown;
+};
 
 /** Parse the country field: empty / "GLOBAL" → null; else a validated code. */
 function parseCountry(raw: string): CountryCode | null | "invalid" {
@@ -23,7 +32,15 @@ function parseCountry(raw: string): CountryCode | null | "invalid" {
   return isCountryCode(raw) ? raw : "invalid";
 }
 
-export type ParsedSite = { name: string; slug: string; country: CountryCode | null };
+export type ParsedSite = {
+  name: string;
+  slug: string;
+  country: CountryCode | null;
+  /** Trimmed plaintext to set, or undefined if not provided / blank. */
+  openrouterApiKey?: string;
+  /** True only when the caller explicitly asked to clear the key. */
+  clearOpenrouterKey: boolean;
+};
 
 /** Shared field parse + validation for create/update. Returns an error key or the value. */
 export function parseSiteBody(
@@ -42,7 +59,14 @@ export function parseSiteBody(
   const country = parseCountry(countryRaw);
   if (country === "invalid") return { ok: false, error: "countryInvalid" };
 
-  return { ok: true, value: { name, slug, country } };
+  // Write-only OpenRouter key: a blank field is "no change", NOT a clear. Only
+  // the explicit clearOpenrouterKey flag wipes an existing key.
+  const { openrouterApiKey, clearOpenrouterKey } = parseOpenrouterKey(body);
+
+  return {
+    ok: true,
+    value: { name, slug, country, openrouterApiKey, clearOpenrouterKey },
+  };
 }
 
 /**

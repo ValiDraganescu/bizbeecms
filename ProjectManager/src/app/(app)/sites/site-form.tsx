@@ -49,12 +49,15 @@ export function SiteForm({
   actor,
   mode,
   initial,
+  hasOpenrouterKey = false,
 }: {
   /** Required in edit mode — the Site being updated. */
   siteId?: string;
   actor: ActorCtx;
   mode: "create" | "edit";
   initial?: SiteFormValues;
+  /** Edit mode only: whether a key is already stored (never the key itself). */
+  hasOpenrouterKey?: boolean;
 }) {
   const t = useTranslations("sites");
   const router = useRouter();
@@ -89,6 +92,10 @@ export function SiteForm({
   const [country, setCountry] = useState<DefaultOption | null>(
     initialCountryOption,
   );
+  // Write-only OpenRouter key (edit mode). `keyCleared` arms the explicit clear;
+  // a blank `openrouterKey` is "no change". Either field resets on a fresh edit.
+  const [openrouterKey, setOpenrouterKey] = useState("");
+  const [keyCleared, setKeyCleared] = useState(false);
 
   // Auto-derive slug from name until the user takes over the slug field.
   useEffect(() => {
@@ -110,7 +117,15 @@ export function SiteForm({
     e.preventDefault();
     setError(null);
     setPending(true);
-    const payload = { name, slug, country: countryValue };
+    const payload: Record<string, unknown> = {
+      name,
+      slug,
+      country: countryValue,
+    };
+    if (mode === "edit") {
+      if (keyCleared) payload.clearOpenrouterKey = true;
+      else if (openrouterKey.trim()) payload.openrouterApiKey = openrouterKey;
+    }
     try {
       const res =
         mode === "edit"
@@ -225,6 +240,54 @@ export function SiteForm({
           </FieldHint>
         )}
       </Field>
+
+      {mode === "edit" ? (
+        <Field>
+          <FieldLabel htmlFor="site-openrouter-key">
+            {t("form.openrouterKey")}
+          </FieldLabel>
+          <div className="flex items-center gap-2">
+            <Input
+              id="site-openrouter-key"
+              name="openrouterApiKey"
+              type="password"
+              autoComplete="off"
+              value={openrouterKey}
+              disabled={keyCleared}
+              onChange={(e) => setOpenrouterKey(e.target.value)}
+              placeholder={t("form.openrouterKeyPlaceholder")}
+            />
+            {hasOpenrouterKey && !keyCleared ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setKeyCleared(true);
+                  setOpenrouterKey("");
+                }}
+              >
+                {t("form.openrouterKeyClear")}
+              </Button>
+            ) : null}
+            {keyCleared ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setKeyCleared(false)}
+              >
+                {t("form.cancel")}
+              </Button>
+            ) : null}
+          </div>
+          <FieldHint>
+            {keyCleared
+              ? t("form.openrouterKeyWillClear")
+              : hasOpenrouterKey
+                ? t("form.openrouterKeySet")
+                : t("form.openrouterKeyNone")}
+          </FieldHint>
+        </Field>
+      ) : null}
 
       <div className="flex items-center gap-2">
         <Button type="submit" loading={pending} className="w-fit">

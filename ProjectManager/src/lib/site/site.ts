@@ -88,6 +88,22 @@ export async function updateSite(
 }
 
 /**
+ * Set or clear a Site's encrypted OpenRouter key. Pass the already-encrypted
+ * ciphertext to set it, or `null` to clear. Never receives plaintext (the route
+ * encrypts first) and never reads the column back out.
+ */
+export async function setSiteOpenrouterKey(
+  id: string,
+  ciphertextOrNull: string | null,
+): Promise<void> {
+  const db = await getDb();
+  await db
+    .update(schema.sites)
+    .set({ openrouterApiKeyEncrypted: ciphertextOrNull })
+    .where(eq(schema.sites.id, id));
+}
+
+/**
  * Sites visible to `user`, newest first.
  *  - SuperAdmin / global Admin: every Site.
  *  - Country-scoped Admin: Sites whose country is in their scope.

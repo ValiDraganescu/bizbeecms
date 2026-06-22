@@ -83,3 +83,35 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** `ProjectManager/src/lib/crypto/secret-box.ts`, `ProjectManager/scripts/secret-box.test.mjs`,
   `ProjectManager/src/db/schema.ts`, `ProjectManager/migrations/0010_bizarre_madrox.sql`,
   `ProjectManager/wrangler.jsonc`, `HITL.md`
+
+## 2026-06-22 — per-Site OpenRouter key TRACK, Slice 2 (PM write-only key UI + encrypt-on-PATCH)
+- **Status:** DONE
+- **What I did:** Slice 2 of 4. (1) `ProjectManager/src/lib/site/openrouter-key.ts` — pure,
+  alias-free `parseOpenrouterKey(body)` → `{ openrouterApiKey?: string (trimmed, undefined when
+  blank), clearOpenrouterKey: boolean (only `=== true`) }`. Extracted so it's importable from a bare
+  `node --test`. (2) Extended `parseSiteBody` (`src/app/api/sites/route.ts`) — `SiteBody` +
+  `ParsedSite` now carry the two new fields via `parseOpenrouterKey`. POST ignores them (create has no
+  key UI). (3) PATCH `src/app/api/sites/[id]/route.ts` — after `updateSite`: `clearOpenrouterKey` →
+  `setSiteOpenrouterKey(id, null)`; else non-blank `openrouterApiKey` → read `env.SITE_SECRET_KEY`
+  (via `getCloudflareContext` + `(env as unknown as Record<string,unknown>).SITE_SECRET_KEY`),
+  `encryptSecret(plaintext, kek)` → `setSiteOpenrouterKey(id, ciphertext)`. Missing/empty KEK → 500.
+  Gated by the EXISTING Site-edit authz (`canUserCreateSite` + `canManageSiteByCountry` + country
+  scope) — same path as name/slug/country. (4) `setSiteOpenrouterKey(id, ciphertextOrNull)` in
+  `src/lib/site/site.ts` (never reads the column back). (5) `SiteForm` (edit mode only): password
+  `Input` + "Clear key" button + status hint (set/none/will-clear) driven by a `hasOpenrouterKey`
+  prop; submit blank ≠ clear, only the Clear button arms `clearOpenrouterKey: true`. (6) Detail page
+  passes `hasOpenrouterKey={site.openrouterApiKeyEncrypted != null}` (boolean, never ciphertext).
+  (7) EN/FI/ET parity for 6 new `sites.form.openrouter*` strings.
+- **REQUEST/RESPONSE CONTRACT for Slice 3:** request body fields = `openrouterApiKey` (plaintext
+  set/replace) + `clearOpenrouterKey: true`. The "is a key set" signal exposed to the client =
+  `hasOpenrouterKey: boolean` (the detail page derives it server-side from
+  `openrouterApiKeyEncrypted != null`; there's no JSON Site-list endpoint that needed changing —
+  PM Site pages are server-rendered). Ciphertext/plaintext are NEVER returned.
+- **Verified:** Inside ProjectManager/: `npx tsc --noEmit` clean, `npm test` 140/140 pass (incl. 5
+  new in `src/lib/site/openrouter-key.test.ts`: trim/set, blank≠clear over ["","   ",undefined],
+  only `=== true` clears + truthy-not-true does NOT, neither-present), `npx opennextjs-cloudflare
+  build` green (dev confirmed off via lsof 3601/3602). Did NOT touch CMS/ or deployer/.
+- **Files:** `ProjectManager/src/lib/site/openrouter-key.ts` (+`.test.ts`),
+  `ProjectManager/src/app/api/sites/route.ts`, `ProjectManager/src/app/api/sites/[id]/route.ts`,
+  `ProjectManager/src/lib/site/site.ts`, `ProjectManager/src/app/(app)/sites/site-form.tsx`,
+  `ProjectManager/src/app/(app)/sites/[id]/page.tsx`, `ProjectManager/messages/{en,fi,et}.json`

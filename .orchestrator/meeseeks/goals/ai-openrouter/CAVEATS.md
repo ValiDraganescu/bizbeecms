@@ -43,6 +43,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   take `(text, keyB64)`; KEK is the PM secret `SITE_SECRET_KEY` (32-byte base64, used directly — NO
   PBKDF2). It THROWS on tamper/wrong-key/short — never returns garbage. Read the secret via the
   `(env as unknown as Record<string,unknown>).SITE_SECRET_KEY` pattern (same as DEPLOYER_SECRET).
+- PER-SITE KEY Slice 2 CONTRACT (Slice 3 must match): the Site PATCH body accepts `openrouterApiKey`
+  (plaintext set/replace; TRIMMED; a blank/whitespace field is NO-CHANGE, never a clear) and
+  `clearOpenrouterKey` (only the literal `=== true` wipes — truthy strings/numbers do NOT, by design).
+  The client-facing "is a key set" signal is `hasOpenrouterKey: boolean`, derived server-side from
+  `openrouterApiKeyEncrypted != null`. The encrypted/plaintext key is NEVER returned to the client.
+  PM Site pages are server-rendered (no JSON Site-list endpoint exposes the key). Pure parse lives in
+  `src/lib/site/openrouter-key.ts`; DB write in `src/lib/site/site.ts#setSiteOpenrouterKey`.
 - For `crypto.subtle` on the Workers types, byte arrays passed to encrypt/decrypt/importKey must be
   `Uint8Array<ArrayBuffer>` (allocate via `new Uint8Array(new ArrayBuffer(n))` / `getRandomValues(new
   Uint8Array(new ArrayBuffer(n)))`), else tsc errors on SharedArrayBuffer-vs-ArrayBuffer BufferSource.

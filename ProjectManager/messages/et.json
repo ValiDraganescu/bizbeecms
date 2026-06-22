@@ -303,6 +303,12 @@
       "globalCountry": "Globaalne (kõik riigid)",
       "countryHintGlobal": "Vali riik või jäta globaalseks kõigi riikide jaoks.",
       "countryHintScoped": "Vali üks oma riikidest.",
+      "openrouterKey": "OpenRouteri API-võti",
+      "openrouterKeyPlaceholder": "sk-or-…",
+      "openrouterKeyClear": "Eemalda võti",
+      "openrouterKeySet": "Võti on määratud. Sisesta uus selle asendamiseks või jäta tühjaks, et praegune säilitada.",
+      "openrouterKeyNone": "Võtit pole määratud. Sait kasutab jagatud AI-teenust.",
+      "openrouterKeyWillClear": "Salvestatud võti eemaldatakse salvestamisel.",
       "create": "Loo sait",
       "save": "Salvesta muudatused",
       "cancel": "Tühista"
