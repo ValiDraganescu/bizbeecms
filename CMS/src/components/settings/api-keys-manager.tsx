@@ -24,7 +24,7 @@ function fmt(ts: number | null): string {
   return ts == null ? "—" : new Date(ts).toLocaleDateString();
 }
 
-export function ApiKeysManager() {
+export function ApiKeysManager({ mcpUrl }: { mcpUrl: string }) {
   const t = useTranslations("apiKeys");
   const [keys, setKeys] = useState<ApiKeyListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,6 +193,37 @@ export function ApiKeysManager() {
         </ul>
       )}
 
+      {/* Connect Claude Code — copy-pasteable wiring for this site's MCP server */}
+      <section className="mt-2 flex flex-col gap-3 rounded-md border border-border bg-surface-raised p-4">
+        <header>
+          <h2 className="text-lg font-semibold text-foreground">
+            {t("connectTitle")}
+          </h2>
+          <p className="mt-1 text-sm text-foreground-muted">
+            {t("connectIntro")}
+          </p>
+        </header>
+
+        <CopyBlock label={t("connectCliLabel")} copyLabel={t("copy")}>
+          {`claude mcp add --transport http ${mcpUrl} \\\n  --header "Authorization: Bearer bzb_YOUR_KEY"`}
+        </CopyBlock>
+
+        <p className="text-sm text-foreground-muted">{t("connectJsonLabel")}</p>
+        <CopyBlock label={t("connectEndpoint")} copyLabel={t("copy")}>
+          {`{
+  "mcpServers": {
+    "bizbeecms": {
+      "type": "http",
+      "url": "${mcpUrl}",
+      "headers": { "Authorization": "Bearer bzb_YOUR_KEY" }
+    }
+  }
+}`}
+        </CopyBlock>
+
+        <p className="text-sm text-foreground-muted">{t("connectHint")}</p>
+      </section>
+
       {/* Show-once minted-key modal */}
       {minted && (
         <div
@@ -247,6 +278,45 @@ export function ApiKeysManager() {
           onCancel={() => setRevoking(null)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * A monospace code block with a copy button. ponytail: tiny local helper — no
+ * syntax highlighting, just copy-to-clipboard for the connection snippets.
+ */
+function CopyBlock({
+  children,
+  label,
+  copyLabel,
+}: {
+  children: string;
+  label: string;
+  copyLabel: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs font-medium uppercase tracking-wide text-foreground-muted">
+        {label}
+      </span>
+      <div className="relative">
+        <pre className="overflow-x-auto rounded-md border border-border bg-surface px-3 py-2 pr-20 font-mono text-sm text-foreground">
+          {children}
+        </pre>
+        <button
+          type="button"
+          className="absolute right-2 top-2 rounded border border-border bg-surface-raised px-2 py-1 text-xs text-foreground"
+          onClick={() => {
+            void navigator.clipboard?.writeText(children);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+        >
+          {copied ? "✓" : copyLabel}
+        </button>
+      </div>
     </div>
   );
 }

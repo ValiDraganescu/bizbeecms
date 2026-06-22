@@ -584,7 +584,13 @@
     "mintedTitle": "Kopeeri oma uus võti kohe",
     "mintedWarning": "See on ainus kord, kui võtit näidatakse. Kopeeri see ja hoia turvalises kohas — sa ei näe seda enam.",
     "copy": "Kopeeri",
-    "done": "Valmis"
+    "done": "Valmis",
+    "connectTitle": "Ühenda Claude Code",
+    "connectIntro": "Lisa see sait Claude Code'i kaug-MCP-serverina. Asenda bzb_YOUR_KEY võtmega, mille lõid ülal — kõik CMS-i abilise tööriistad ilmuvad seejärel Claude Code'i.",
+    "connectCliLabel": "Käsurida (soovituslik)",
+    "connectJsonLabel": "Või lisa see MCP seadistusse (.mcp.json):",
+    "connectEndpoint": "MCP seadistus",
+    "connectHint": "Üks võti = üks sait. See URL haldab ainult seda saiti. Tühista võti ülal, et juurdepääs kohe katkestada."
   },
   "inviteEmail": {
     "subject": "Sind on kutsutud BizbeeCMS-i",

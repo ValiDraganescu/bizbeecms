@@ -584,7 +584,13 @@
     "mintedTitle": "Copy your new key now",
     "mintedWarning": "This is the only time the key is shown. Copy it and store it somewhere safe — you can't see it again.",
     "copy": "Copy",
-    "done": "Done"
+    "done": "Done",
+    "connectTitle": "Connect Claude Code",
+    "connectIntro": "Add this site to Claude Code as a remote MCP server. Replace bzb_YOUR_KEY with a key you created above — all the CMS assistant tools then appear in Claude Code.",
+    "connectCliLabel": "CLI (recommended)",
+    "connectJsonLabel": "Or add it to your MCP config (.mcp.json):",
+    "connectEndpoint": "MCP config",
+    "connectHint": "One key = one site. This URL manages only this site. Revoke a key above to cut off access immediately."
   },
   "inviteEmail": {
     "subject": "You're invited to BizbeeCMS",

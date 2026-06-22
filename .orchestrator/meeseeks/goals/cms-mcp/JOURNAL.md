@@ -130,3 +130,24 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/auth/{roles.ts, guard.ts, api-key-core.ts}, CMS/scripts/api-key-core.test.mjs,
   CMS/src/lib/auth/roles.test.ts, CMS/messages/{en,fi,et}.json,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-22 14:51 — Slice 5: connection docs / onboarding snippet on the API-Keys page
+- **Status:** DONE
+- **What I did:** Added a "Connect Claude Code" section to the API-Keys page. The
+  page derives THIS site's MCP URL server-side from the request host
+  (`mcpUrlFromRequest()` in page.tsx: `x-forwarded-host`/`host` + proto → `…/mcp`;
+  placeholder fallback) and passes it as a `mcpUrl` prop to `ApiKeysManager`. The
+  manager renders two copy-pasteable blocks via a tiny local `CopyBlock` helper:
+  (1) the `claude mcp add --transport http <url> --header "Authorization: Bearer
+  bzb_YOUR_KEY"` CLI command, and (2) an `.mcp.json` config snippet with the same
+  url + bearer header. Both copy to clipboard. No new backend. ponytail: a snippet,
+  not an onboarding flow; reused the host header (no router HMAC needed since sites
+  stay on workers.dev). Added `connectTitle/Intro/CliLabel/JsonLabel/Endpoint/Hint`
+  to the `apiKeys` block in EN/FI/ET.
+- **Verified:** CMS `tsc --noEmit` fully clean; `npm test` 733/733 pass; `npx
+  opennextjs-cloudflare build` green; `cd ProjectManager && npm run bundle:cms`
+  regenerated `cms-bundle.generated.js`. All three message JSONs parse. NOT verified
+  live (needs a deployed Worker + minted key — that's the remaining HITL item).
+- **Files:** CMS/src/app/admin/settings/api-keys/page.tsx,
+  CMS/src/components/settings/api-keys-manager.tsx, CMS/messages/{en,fi,et}.json,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js

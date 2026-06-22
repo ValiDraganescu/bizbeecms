@@ -584,7 +584,13 @@
     "mintedTitle": "Kopioi uusi avaimesi nyt",
     "mintedWarning": "Tämä on ainoa kerta, kun avain näytetään. Kopioi se ja säilytä turvallisessa paikassa — et näe sitä enää.",
     "copy": "Kopioi",
-    "done": "Valmis"
+    "done": "Valmis",
+    "connectTitle": "Yhdistä Claude Code",
+    "connectIntro": "Lisää tämä sivusto Claude Codeen etä-MCP-palvelimena. Korvaa bzb_YOUR_KEY yllä luomallasi avaimella — kaikki CMS-avustajan työkalut ilmestyvät tällöin Claude Codeen.",
+    "connectCliLabel": "Komentorivi (suositeltu)",
+    "connectJsonLabel": "Tai lisää se MCP-asetuksiin (.mcp.json):",
+    "connectEndpoint": "MCP-asetukset",
+    "connectHint": "Yksi avain = yksi sivusto. Tämä osoite hallinnoi vain tätä sivustoa. Peruuta avain yllä katkaistaksesi pääsyn heti."
   },
   "inviteEmail": {
     "subject": "Sinut on kutsuttu BizbeeCMS:ään",

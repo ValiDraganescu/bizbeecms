@@ -47,11 +47,17 @@ node tests + EN/FI/ET for new strings.
   Gate green (tsc + opennext + 656 node tests); bundle regen (incl. the Slice 3
   `/mcp` CARRY-OVER, now in the manifest).
 
-- TODO: **Slice 5 — connection docs + onboarding snippet.** A small in-UI snippet
-  on the API Keys page showing how to wire this site into Claude Code (the `/mcp`
-  URL for THIS site + the bearer header), copy-pasteable. Optionally a short
-  CMS/README section. No new backend. EN/FI/ET. Gate. (ponytail: docs+snippet, not a
-  whole onboarding flow.)
+- DONE (2026-06-22): **Slice 5 — connection docs + onboarding snippet.** API-Keys
+  page derives THIS site's MCP URL server-side (`mcpUrlFromRequest()`: request host
+  + proto → `…/mcp`) and passes it to `ApiKeysManager`. New "Connect Claude Code"
+  section renders two copy-pasteable blocks (local `CopyBlock` helper): the
+  `claude mcp add --transport http <url> --header "Authorization: Bearer bzb_…"`
+  CLI command + an `.mcp.json` config snippet. No backend. EN/FI/ET (`connect*`).
+  Gate green (tsc + 733 tests + opennext); bundle regen.
+
+- HITL (only open item): **live spot-check** — deployed Worker + minted key → add
+  the `/mcp` URL + bearer to Claude Code, confirm tools/list + a tools/call
+  round-trip. Non-codeable; see HITL.md.
 
 - TODO (later) — **scoped / least-privilege keys.** If needed: per-key tool scopes
   (read-only key vs. full) reusing the tool-scopes contexts. Only if a real need
