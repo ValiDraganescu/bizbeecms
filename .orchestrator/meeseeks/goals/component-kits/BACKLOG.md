@@ -26,7 +26,7 @@ export-by-tag, then kit import. Each slice gates on CMS tsc + opennext build gre
   input (datalist autocomplete from distinctTags) + tag FILTER select. en/fi/et 6 new
   keys. tsc + opennext build green; 17/17 tests; cms-bundle regenerated.
 
-- TODO: **Slice 3 — export by tag → one kit bundle.** New `GET
+- DONE (2026-06-22): **Slice 3 — export by tag → one kit bundle.** New `GET
   /api/components/export?tag=<tag>` that returns a single `*.kit.json`:
   `{ format:"bizbeecms.kit", version:1, name:<tag>, components: PortableComponent[] }`
   built from every component carrying `<tag>`, REUSING the existing per-component

@@ -245,7 +245,9 @@
     "noneForTag": "Yksikään komponentti ei käytä tätä tunnistetta.",
     "addTagPlaceholder": "Lisää tunniste…",
     "addTagFor": "Lisää tunniste komponenttiin {name}",
-    "removeTag": "Poista tunniste {tag}"
+    "removeTag": "Poista tunniste {tag}",
+    "exportKit": "Vie paketti",
+    "exportKitPickTag": "Valitse vietävä tunniste"
   },
   "adminAuth": {
     "forbiddenTitle": "Pääsy estetty",

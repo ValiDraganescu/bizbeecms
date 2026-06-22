@@ -69,3 +69,37 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/components/route.ts, CMS/src/components/components/components-manager.tsx,
   CMS/src/app/admin/components/page.tsx, CMS/messages/{en,fi,et}.json,
   CMS/scripts/component-store.test.mjs, ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-22 13:33 — Slice 3: export by tag → ONE kit bundle
+- **Status:** DONE
+- **What I did:**
+  - `lib/components/portable.ts`: new `KIT_FORMAT="bizbeecms.kit"` + `KIT_VERSION=1`,
+    `KitBundle` interface, and pure `buildKitBundle(rows, tag, meta?)`. It REUSES
+    `serializeComponent` per row (each component keeps its own envelope + asset/
+    component deps + tags) and unions+dedupes deps across the kit: `assets` = sorted
+    union of every component's `/media/<key>` deps; `componentDeps` = sorted union of
+    nested-component deps MINUS any satisfied within the same kit (so only EXTERNAL
+    deps the target Site must already have remain). No second serialization path.
+  - New route `app/api/components/export/route.ts`: `GET ?tag=<tag>` (admin-gated,
+    force-dynamic) → `listComponents()` → `filterByTag` → `buildKitBundle` → a single
+    `*.kit.json` with a `Content-Disposition` attachment filename (safe slug of the
+    tag). 400 missing tag, 404 no components for tag. Read-only (output, not input —
+    no trust boundary; import re-validation is Slice 4).
+  - UI `components-manager.tsx`: an "Export kit" button next to the tag FILTER select.
+    Exports the currently-selected tag (disabled until a tag is picked; title hint).
+    Reuses the existing `<a download>` Blob pattern (`exportKit`).
+  - i18n: 2 new `components` keys (`exportKit`, `exportKitPickTag`) in en/fi/et.
+  - Tests: new `scripts/build-kit-bundle.test.mjs` (5 cases: envelope shape + reused
+    component envelope, asset dedupe, in-kit vs external componentDep, empty kit, meta).
+  - Regenerated PM `cms-bundle.generated.js` (its build:cms runs the CMS opennext
+    build internally → that's the opennext gate; export route present in manifest).
+- **Verified:** `node --test build-kit-bundle.test.mjs components-export-import.test.mjs`
+  26/26 green; CMS `tsc --noEmit` clean; `npm run bundle:cms` (runs opennext build) green;
+  `.open-next/.../app/api/components/export/` present in build output. No native
+  confirm()/alert(). Did NOT touch the parallel pm-roles/CMS-ports worker's files;
+  my only PM file is cms-bundle.generated.js.
+- **Files:** CMS/src/lib/components/portable.ts,
+  CMS/src/app/api/components/export/route.ts,
+  CMS/src/components/components/components-manager.tsx,
+  CMS/messages/{en,fi,et}.json, CMS/scripts/build-kit-bundle.test.mjs,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js

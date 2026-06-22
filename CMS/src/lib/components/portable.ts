@@ -28,6 +28,10 @@ import { normalizeTags } from "./tags.ts";
 export const PORTABLE_FORMAT = "bizbeecms.component";
 export const PORTABLE_VERSION = 1 as const;
 
+/** Kit-bundle format version (a tag exported as a multi-component UI kit). */
+export const KIT_FORMAT = "bizbeecms.kit";
+export const KIT_VERSION = 1 as const;
+
 /**
  * H3 — asset-URL dependency handling.
  *
@@ -246,6 +250,61 @@ export function serializeComponent(
       css,
       propsSchema: row.propsSchema ?? null,
     },
+  };
+}
+
+/**
+ * A UI kit: a tag exported as ONE bundle of portable components (component-kits
+ * Slice 3). It just wraps the EXISTING per-component `PortableComponent` envelope
+ * — no second serialization path. `assets` / `componentDeps` are the deduped
+ * union across every component (so the importer sees the whole kit's deps), and
+ * `tag` records which tag produced it (also the default name).
+ */
+export interface KitBundle {
+  format: typeof KIT_FORMAT;
+  version: typeof KIT_VERSION;
+  name: string;
+  tag: string;
+  meta?: { exportedAt?: string; note?: string };
+  /** Deduped, sorted union of every component's `/media/<key>` asset deps. */
+  assets: string[];
+  /** Deduped, sorted union of nested-component deps NOT satisfied within the kit. */
+  componentDeps: string[];
+  components: PortableComponent[];
+}
+
+/**
+ * Build a kit bundle from the component rows carrying `tag` (component-kits
+ * Slice 3). REUSES `serializeComponent` per component (so each carries its own
+ * asset/component deps + tags) and unions+dedupes the deps across the kit. The
+ * caller is responsible for selecting the rows (e.g. `filterByTag`); this is
+ * PURE so it's offline-testable. Component deps satisfied by ANOTHER component in
+ * the same kit are dropped from the kit-level `componentDeps` (the kit installs
+ * them itself), leaving only EXTERNAL deps the target Site must already have.
+ */
+export function buildKitBundle(
+  rows: ComponentRow[],
+  tag: string,
+  meta?: { exportedAt?: string; note?: string },
+): KitBundle {
+  const components = rows.map((r) => serializeComponent(r, meta));
+  const names = new Set(components.map((c) => c.component.name));
+  const assets = new Set<string>();
+  const componentDeps = new Set<string>();
+  for (const c of components) {
+    for (const a of c.assets) assets.add(a);
+    // Only deps NOT installed by the kit itself are external (target must have).
+    for (const d of c.componentDeps) if (!names.has(d)) componentDeps.add(d);
+  }
+  return {
+    format: KIT_FORMAT,
+    version: KIT_VERSION,
+    name: tag,
+    tag,
+    ...(meta ? { meta } : {}),
+    assets: [...assets].sort(),
+    componentDeps: [...componentDeps].sort(),
+    components,
   };
 }
 

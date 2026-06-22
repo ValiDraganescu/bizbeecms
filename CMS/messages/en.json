@@ -245,7 +245,9 @@
     "noneForTag": "No components carry this tag.",
     "addTagPlaceholder": "Add tag…",
     "addTagFor": "Add a tag to {name}",
-    "removeTag": "Remove tag {tag}"
+    "removeTag": "Remove tag {tag}",
+    "exportKit": "Export kit",
+    "exportKitPickTag": "Pick a tag to export as a kit"
   },
   "adminAuth": {
     "forbiddenTitle": "Access denied",

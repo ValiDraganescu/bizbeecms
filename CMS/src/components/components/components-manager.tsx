@@ -122,6 +122,30 @@ export function ComponentsManager({
     }
   }
 
+  // Slice 3: export every component carrying `tag` as ONE *.kit.json bundle.
+  // Reuses the same <a download> Blob pattern as exportOne.
+  async function exportKit(tag: string) {
+    setError(null);
+    setNotice(null);
+    if (!tag) return;
+    try {
+      const res = await fetch(`/api/components/export?tag=${encodeURIComponent(tag)}`);
+      if (!res.ok) {
+        setError(await errorOf(res));
+        return;
+      }
+      const text = await res.text();
+      const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${tag.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "kit"}.kit.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   async function exportOne(name: string) {
     setError(null);
     setNotice(null);
@@ -380,21 +404,33 @@ export function ComponentsManager({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-foreground">{t("listTitle")}</h2>
           {allTags.length > 0 && (
-            <label className="flex items-center gap-2 text-sm text-foreground-muted">
-              {t("filterByTag")}
-              <select
-                className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-foreground"
-                value={tagFilter}
-                onChange={(e) => setTagFilter(e.target.value)}
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm text-foreground-muted">
+                {t("filterByTag")}
+                <select
+                  className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-foreground"
+                  value={tagFilter}
+                  onChange={(e) => setTagFilter(e.target.value)}
+                >
+                  <option value="">{t("filterAllTags")}</option>
+                  {allTags.map((tg) => (
+                    <option key={tg} value={tg}>
+                      {tg}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {/* Slice 3: export the selected tag as a single UI-kit bundle. */}
+              <button
+                type="button"
+                className="rounded-md border border-border px-3 py-1 text-sm text-foreground hover:bg-surface disabled:opacity-40"
+                disabled={busy || !tagFilter}
+                title={tagFilter ? undefined : t("exportKitPickTag")}
+                onClick={() => void exportKit(tagFilter)}
               >
-                <option value="">{t("filterAllTags")}</option>
-                {allTags.map((tg) => (
-                  <option key={tg} value={tg}>
-                    {tg}
-                  </option>
-                ))}
-              </select>
-            </label>
+                {t("exportKit")}
+              </button>
+            </div>
           )}
         </div>
         {/* Shared autocomplete source for all per-component add-tag inputs. */}

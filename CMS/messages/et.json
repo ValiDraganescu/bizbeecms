@@ -245,7 +245,9 @@
     "noneForTag": "Ükski komponent ei kanna seda silti.",
     "addTagPlaceholder": "Lisa silt…",
     "addTagFor": "Lisa silt komponendile {name}",
-    "removeTag": "Eemalda silt {tag}"
+    "removeTag": "Eemalda silt {tag}",
+    "exportKit": "Ekspordi komplekt",
+    "exportKitPickTag": "Vali eksporditav silt"
   },
   "adminAuth": {
     "forbiddenTitle": "Juurdepääs keelatud",
