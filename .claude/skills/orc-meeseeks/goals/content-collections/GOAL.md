@@ -60,11 +60,22 @@ add/update/delete/archive items, and query via sql and FTS5."
 - Gate every slice: CMS `tsc` + `opennextjs-cloudflare build` green; regen the PM
   `cms-bundle`; EN/FI/ET for all new strings.
 
-## Open / later (tracked, not v1 unless noted)
-- **References between collections + page/component BINDING** (list views, detail
-  pages, dynamic routes like `/blog/[slug]`) — the rendering payoff. Deferred to a
-  later phase but DESIGN the item schema (stable id + slug) so it's not painful to
-  add. (User hasn't yet chosen full-vs-phased; default phased.)
+## Phase 2 — Component ↔ Collection BINDING (greenlit 2026-06-22, see BACKLOG)
+- The rendering payoff: connect components to collection data. SETTLED design:
+  - **LIST binding = a new BUILT-IN `List` block modeled on the existing `Section`
+    primitive** (built-in, special-cased in `tree.ts` like `planSection`, NOT a user
+    component): a query (collection + filter/sort/limit) + ONE child slot = the
+    component stamped per result row, with field→declared-prop mapping.
+  - **SINGLE-ITEM binding = pick by QUERY, FIRST MATCH** (a `bindings` map on the
+    block, separate from `props`).
+  - **GRACEFUL** resolution everywhere (empty/dead/unknown → placeholder/blank,
+    never 500).
+  - **Hydrate-before-walk**: fetch bound data in the async `buildPlanFromPage`, keep
+    `planPage`/`planTree` pure+sync, bind via the existing `{{slot}}`/allowlist.
+  - Operator UI + AI tools both author bindings (P2-bind Slices C/D).
+- **Phase 3 (not greenlit): route-driven detail pages** (`/blog/[slug]` → matching
+  item) + cross-collection `ref` fields. v1/v2 single-item is query-first-match, NOT
+  route-driven — deliberate boundary. Item schema already has id+slug so it's addable.
 - Per-locale fields; import/export (CSV/JSON); pagination/sort/count everywhere;
   per-field uniqueness (no-DDL-safe approach); operator raw-SELECT console.
 

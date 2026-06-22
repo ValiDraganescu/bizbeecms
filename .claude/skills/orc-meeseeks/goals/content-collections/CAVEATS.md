@@ -62,6 +62,20 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **Each CMS Worker has its own D1** — the registry table change is a normal Drizzle
   migration (deployer applies per-Site); the `content_*` tables are runtime-created.
 
+- **(Phase 2 binding) Keep the renderer PURE+SYNC — hydrate BEFORE the walk.**
+  `planPage`/`planTree` (`tree.ts`) are pure & synchronous; data is fetched in the
+  async `buildPlanFromPage` (`render-page.tsx`) BEFORE the walk. Binding MUST follow
+  this: scan blocks → run the structured query → hydrate resolved values into props
+  → THEN the pure walk binds via the existing `{{slot}}`/`bindTree`/`declaredProps`
+  allowlist. DO NOT make the tree-walker async or fetch mid-walk.
+- **(Phase 2 binding) `List` is a BUILT-IN block modeled on `Section`, not a user
+  component** (USER DECISION 2026-06-22). Mirror `SECTION_COMPONENT`/`planSection`:
+  a reserved type special-cased in `tree.ts` (`planList`), with a query + ONE child
+  slot stamped per row. Single-item binding = a `bindings` map on the block
+  (SEPARATE from `props`), pick by query FIRST MATCH. Binding metadata is validated
+  on BOTH sides (collection/field exists in the registry; target prop is declared in
+  the component's `propsSchema`). All resolution is GRACEFUL (empty/dead/unknown →
+  placeholder/blank, never 500 — mirror the unknown-component→hidden behavior).
 - **Gate every slice:** CMS `tsc` + `npx opennextjs-cloudflare build` green (NEVER
   while `npm run dev` is up). Regen the PM `cms-bundle`. EN/FI/ET for new strings.
   No native confirm()/alert() — in-app modals only (browser-review sessions hang).

@@ -76,12 +76,72 @@ gates on CMS tsc + opennext build green + node tests + EN/FI/ET for new strings.
   per tool's arg-validation/execution (mock the store). (No FTS search tool in v1 —
   FTS deferred.) Gate.
 
-- TODO: **Phase 2 (later) — references + page/component BINDING.** Cross-collection
-  `ref` fields (post→author) + binding collections to pages/components: list views,
-  per-item detail pages, dynamic routes (`/blog/[slug]`), `{{collection.field}}`
-  binding in the renderer. This is the rendering payoff; design the item schema
-  (stable id + slug, Slice 3) so it's not painful to add. Break into real slices
-  when the user greenlights the phase.
+## Phase 2 — Component ↔ Collection data BINDING (greenlit 2026-06-22)
+DESIGN (settled with user 2026-06-22). The renderer is PURE+SYNC (`planPage`) and
+data is fetched BEFORE the walk in the async `buildPlanFromPage` — KEEP that shape:
+hydrate bound data first, then the pure walk binds it via the EXISTING `{{slot}}` /
+`bindTree` + `propsSchema` allowlist. Two binding shapes:
+- LIST binding = a NEW BUILT-IN `List` block modeled EXACTLY like the existing
+  `Section` primitive (built-in block, special-cased in `tree.ts` like `planSection`,
+  NOT a user component). It carries a QUERY (collection + filter/sort/limit, reusing
+  Slice-4's structured query compiler) and has ONE child SLOT = the component to
+  stamp per result row. Each row's fields map → the slotted component's DECLARED
+  props (reuse `declaredProps` allowlist + the registry fields — both sides
+  validated). Renderer iterates rows, clones the slot subtree per row, binds row
+  props, injects as children (the existing `block.children` append path).
+- SINGLE-ITEM binding = pick by QUERY, FIRST MATCH (USER DECISION — not by stored
+  id). A block grows an optional `bindings` map (alongside `props`, NOT inside it):
+  `{ source: { collection, filter[], sort[] }, map: { propName: fieldName } }`. The
+  first matching row's fields fill the mapped props before the pure walk.
+- GRACEFUL everywhere (USER DECISION): empty list → render nothing (optional
+  empty-state slot); dead/unresolved single-item → static fallback prop or blank;
+  unknown field → blank (allowlist). NEVER 500 — mirror the existing
+  unknown-component→hidden-placeholder behavior.
+DEPENDS ON Slices 1-4 (registry, items, structured query). Item schema already has
+stable id + slug (Slice 3) so this isn't a retrofit.
+
+- TODO: **P2-bind Slice A — block `bindings` model + hydrate-before-walk seam.**
+  Add optional `bindings?: Record<string, BindingRef>` to the `Block` type
+  (`tree.ts:50`) — separate from `props`. Pure `BindingRef` type + validators
+  (collection exists in registry, mapped fields exist, mapped props are declared on
+  the target component). Extend `buildPlanFromPage` (`render-page.tsx`) to SCAN
+  blocks for bindings, run the Slice-4 query/first-match to fetch rows, and HYDRATE
+  the resolved field values into the block's `props` (mapped names) BEFORE
+  `planPage`. Keep `planPage`/`planTree` pure+sync. Single-item (first-match) only
+  this slice — List is Slice B. Pure tests: bindings validate, hydration fills props,
+  unresolved → graceful blank. Gate.
+
+- TODO: **P2-bind Slice B — built-in `List` block (Section-style) + per-row stamp.**
+  Add a reserved built-in `List` block type (like `SECTION_COMPONENT`/
+  `__section_column__`) special-cased in `tree.ts` (a `planList` mirroring
+  `planSection`). It holds a query (collection + filter/sort/limit) + ONE child slot
+  (the per-item template component) + the field→prop `map`. `buildPlanFromPage`
+  runs the query (Slice 4), and `planList` stamps the slot subtree once per row,
+  binding each row's mapped fields into the slotted component's declared props
+  (reuse `bindTree`). Empty result → nothing (or an optional empty-state child).
+  `list_builtin_types` exposes `List`. Pure tests: N rows → N stamped subtrees,
+  empty → empty, field map respects the allowlist. Gate.
+
+- TODO: **P2-bind Slice C — UI to author bindings (operator).** In the page-builder:
+  for a normal component block, a "Bind to collection" panel (pick collection →
+  build a first-match query → map fields to the component's declared props). For a
+  `List` block, a panel to pick collection + filter/sort/limit + drop the per-item
+  template component + map its props. Reuse the Slice-4 query-builder UI bits + the
+  design-system. Show the binding state on the block. EN/FI/ET. Gate.
+
+- TODO: **P2-bind Slice D — AI tools for binding.** Tools so the assistant can do
+  the same: `bind_component` (set a block's single-item binding: collection,
+  first-match query, field→prop map) and `create_list` / `bind_list` (insert a
+  `List` block with query + template component + map). Validate against the registry
+  + the target component's `propsSchema` (reject unknown collection/field/prop).
+  Register in the existing tool pipeline; reuse the Slice-A/B stores — no forked
+  data path. Node tests per tool's validation/execution (mock stores). Gate.
+
+- TODO: **Phase 3 (later, not greenlit) — route-driven detail pages + cross-collection
+  refs.** "The item for the current route" (dynamic `/blog/[slug]` → the matching
+  item) and `ref` fields (post→author) resolved during binding. Bigger (dynamic
+  routing); spec when the user greenlights. v1 single-item is query-first-match, not
+  route-driven — that's the deliberate boundary.
 
 - TODO: **Phase 2 (later) — drop/rename/retype field (schema rebuild).**
   System-generated safe table-rebuild (create content_x_new + copy + drop + rename),
