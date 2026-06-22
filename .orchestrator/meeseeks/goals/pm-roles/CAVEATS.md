@@ -73,3 +73,17 @@ Read every line before working. Each entry was learned the hard way by a previou
 
 - **FI/ET role labels (use these, don't re-translate):** Manager = FI `Päällikkö`,
   ET `Haldur`; Editor = FI `Toimittaja`, ET `Toimetaja`. SuperAdmin/Admin unchanged.
+
+- **`canRemoveUser`/`canChangeRole` are TIER-ONLY (Slice 2, `lib/auth/removal.ts`).**
+  They answer "does the actor outrank the target?" and nothing else. They do NOT take
+  scope — a Manager's country+tag reach is a SEPARATE, ADDITIONAL gate (Slice 3). When
+  Slice 4 wires the delete/role-change routes, the route must check BOTH
+  `canRemoveUser(...)` AND scope (`canManageSite`/the country+tag rule). Don't fold
+  scope into removal.ts — keep the tier rule pure and mirror-able for cms-auth.
+
+- **`removal.ts` uses `RoleActor = {id, role}`, NOT the full `User`.** `User` =
+  `typeof users.$inferSelect` drags in the Drizzle runtime, which would break the bare
+  node test (alias/runtime import). Keep the minimal structural shape; callers pass
+  `{ id, role }`. Self-removal is blocked by the `id` equality check, so routes MUST
+  pass real ids (a Manager removing another Manager with a different id IS still
+  denied by tier — the self-check only matters for same-tier same-user).

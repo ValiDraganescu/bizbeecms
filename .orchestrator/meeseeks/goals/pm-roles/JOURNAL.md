@@ -19,6 +19,30 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
     invite-form role-label map generalized to `firstLowercase(role)`, design-system
     page options/badges, combobox demos). Only 1 intentional history mention left in
     a schema.ts comment.
+
+## 2026-06-22 12:30 — Slice 2: removal hierarchy `canRemoveUser` + `canChangeRole` (pure, tested)
+- **Status:** DONE
+- **What I did:**
+  - NEW alias-free pure module `src/lib/auth/removal.ts`: a `RANK` map
+    (SuperAdmin 3 > Admin 2 > Manager 1 > Editor 0) + two pure helpers.
+    `canRemoveUser(actor, target)`: strict `RANK[actor] > RANK[target]` AND
+    different `id` (no self-removal) — gives exactly SuperAdmin↛SuperAdmin,
+    Admin↛SuperAdmin, Manager↛(SuperAdmin/Admin), Editor↛anyone.
+    `canChangeRole(actor, target, newRole)`: same self-check + must outrank the
+    target's CURRENT tier AND the DESTINATION tier (no elevating to/above own peerage).
+  - Imports ONLY `import type { Role }` (erased at runtime) → node-test importable.
+    Local `RoleActor = {id, role}` shape, NO drizzle/`@/` runtime dep, so cms-auth
+    can copy it verbatim.
+  - Test `src/lib/auth/removal.test.ts` (8 tests): full 4×4 removal matrix, self-
+    removal, spec sentences, and canChangeRole (self, current-tier, dest-tier
+    elevate guard, SuperAdmin grants, Editor-no-op).
+  - NO route wired (Slice 4's job) — pure logic + tests this slice.
+- **Verified:** `tsc --noEmit` clean; `npm test` 90/90 (8 new removal tests pass);
+  `npx opennextjs-cloudflare build` complete (dev server confirmed down first).
+  Scope (Manager country+tag reach) NOT enforced here by design — Slice 3 adds it
+  as an additional gate on top of this tier rule.
+- **Files:** `ProjectManager/src/lib/auth/removal.ts`,
+  `ProjectManager/src/lib/auth/removal.test.ts`.
   - i18n EN/FI/ET: `roles.siteManager` → `roles.manager` + `roles.editor`
     (EN Manager/Editor, FI Päällikkö/Toimittaja, ET Haldur/Toimetaja). Parity verified.
   - Regression test `src/lib/roles.test.ts` (3 tests): Role union is the 4-role set/no

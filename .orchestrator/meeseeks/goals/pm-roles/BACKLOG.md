@@ -20,14 +20,12 @@ tsc + opennext build green + PM node tests + EN/FI/ET for new strings.
   SiteManager: assigned-sites only); Manager-specific scope comes in Slice 3. Pure
   helpers untouched except the type. Tests updated to the new names. Gate.
 
-- TODO: **Slice 2 — removal hierarchy (the core new rule).** Add ONE pure helper
-  `canRemoveUser(actor: User, target: User): boolean` enforcing: SuperAdmin removes
-  anyone; Admin removes anyone EXCEPT SuperAdmin; Manager removes anyone EXCEPT
-  SuperAdmin/Admin (and only within their own country+tag scope — wire the scope
-  check once Slice 3 lands tags; until then, scope by country); Editor removes no
-  one. Same rule guards ROLE CHANGES (can't elevate/demote to or above your own
-  tier). Node tests covering each (actor,target) pair. NO route yet (Slice 4 wires
-  it) — pure + tested this slice so the rule is locked before UI.
+- DONE (2026-06-22): **Slice 2 — removal hierarchy (the core new rule).** Pure
+  alias-free module `src/lib/auth/removal.ts`: `canRemoveUser(actor, target)` +
+  `canChangeRole(actor, target, newRole)` over a RANK map (SuperAdmin>Admin>Manager>
+  Editor, strict-greater removes, no self-removal). 8 node tests (`removal.test.ts`)
+  cover the full 4×4 matrix + role-change guards. NO route (Slice 4). Scope check
+  deferred to Slice 3. All gates green.
 
 - TODO: **Slice 3 — dynamic tags data model + Manager country-AND-tag reach.**
   USER DECISION 2026-06-21 (refined): **COUNTRY STAYS EXACTLY AS IT IS** — keep the
