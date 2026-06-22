@@ -39,8 +39,16 @@ green + regen PM cms-bundle + EN/FI/ET for new strings.
   password hash/verify round-trip (no live crypto-cap surprise) + session
   create/read. NO UI yet.
 
-- TODO: **Slice 2 — in-CMS login page replaces the auto-redirect; email/password +
-  conditional SSO button (Google added in Slice 2b).** Replace the auto-redirect in
+- DONE: **Slice 2 — in-CMS login page replaces the auto-redirect; email/password +
+  conditional SSO button (Google added in Slice 2b).** See JOURNAL 2026-06-22 13:01.
+  Login page + `POST /api/auth/login` + guard resolves sessions LOCALLY (no more
+  per-request PM forward) + sso-callback rewired (nonce→sid→cms-validate handshake→
+  upsert Admin user→mint local session) + pure `shouldShowSsoButton` (node-tested) +
+  EN/FI/ET `login` namespace + cms-bundle regenerated. tsc + opennext build green,
+  544 tests. SSO user keyed by synthetic `<pmUserId>@pm.sso` email (cms-validate
+  returns no email; can't touch PM this slice) — backfill caveat noted. Original
+  spec below.
+  Replace the auto-redirect in
   `CMS/src/app/admin/layout.tsx`: when signed-out, render an in-CMS **login page**
   (email + password form → a new `POST /api/auth/login` on the CMS that verifies
   against the Slice 1 user table and mints the CMS session). Show a **"Sign in with

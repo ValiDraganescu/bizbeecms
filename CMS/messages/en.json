@@ -251,6 +251,18 @@
     "forbiddenTitle": "Access denied",
     "forbiddenBody": "You're signed in, but your account doesn't have access to manage this site. Ask a site administrator to grant you access."
   },
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Sign in to manage this site.",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "errorInvalid": "Incorrect email or password.",
+    "errorNetwork": "Couldn't reach the server. Try again.",
+    "or": "or",
+    "ssoButton": "Sign in with BizbeeCMS"
+  },
   "adminNav": {
     "brand": "CMS admin",
     "home": "Home",

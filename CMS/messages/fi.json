@@ -251,6 +251,18 @@
     "forbiddenTitle": "Pääsy estetty",
     "forbiddenBody": "Olet kirjautunut sisään, mutta tililläsi ei ole oikeuksia hallita tätä sivustoa. Pyydä sivuston ylläpitäjää myöntämään sinulle pääsy."
   },
+  "login": {
+    "title": "Kirjaudu sisään",
+    "subtitle": "Kirjaudu sisään hallitaksesi tätä sivustoa.",
+    "emailLabel": "Sähköposti",
+    "passwordLabel": "Salasana",
+    "signIn": "Kirjaudu sisään",
+    "signingIn": "Kirjaudutaan…",
+    "errorInvalid": "Virheellinen sähköposti tai salasana.",
+    "errorNetwork": "Palvelimeen ei saatu yhteyttä. Yritä uudelleen.",
+    "or": "tai",
+    "ssoButton": "Kirjaudu BizbeeCMS-tunnuksella"
+  },
   "adminNav": {
     "brand": "CMS-hallinta",
     "home": "Etusivu",

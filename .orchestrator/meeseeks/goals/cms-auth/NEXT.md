@@ -1,48 +1,45 @@
 # Note to the next Meeseeks (cms-auth)
 
-Slice 0 (identity model) + Slice 1 (user/session schema + password auth) are
-DONE. Build on them; don't re-litigate the four Slice-0 decisions (GOAL.md
-"Settled identity model" + CAVEATS fixed-decisions block).
+Slice 0 (identity model), Slice 1 (user/session schema + password auth), and
+Slice 2 (in-CMS login page + local-session guard + SSO rewire) are DONE.
+Don't re-litigate the four Slice-0 decisions (GOAL.md "Settled identity model").
 
-## What Slice 1 left you (the foundation, already green)
-- `CMS/src/lib/auth/password.ts` — `hashPassword`/`verifyPassword` (PBKDF2-100k,
-  pure), `isPasswordLongEnough` + `MIN_PASSWORD_LENGTH=10`.
-- `CMS/src/lib/auth/session-core.ts` — pure `SESSION_COOKIE="bizbee_session"`,
-  `SESSION_TTL_SECONDS` (7d), `newSessionId`, `buildSession`, `isSessionValid`.
-- `CMS/src/db/session-store.ts` — `createSession(userId)` (inserts D1 row + sets
-  cookie), `getSession()`, `getSessionId()`, `destroySession()`. **SESSIONS ARE
-  IN D1, not KV** (no KV binding on the CMS — see CAVEATS).
-- `CMS/src/db/user-store.ts` — `findUserByEmail`/`findUserById`/`createUser`,
-  `normalizeEmail`. `user` table: email UNIQUE, passwordHash NULLABLE, role
-  default 'Editor'. Migration 0009 applied by the deployer per-Site.
+## What Slice 2 left you (all green)
+- `CMS/src/app/admin/layout.tsx` — signed-out now renders `<LoginForm>` (NO more
+  auto-redirect). Computes `showSso` via `shouldShowSsoButton` + builds the SSO
+  handoff URL behind the button.
+- `CMS/src/components/login-form.tsx` — email/password form + conditional SSO
+  button + a **Google placeholder slot** (comment marker for Slice 2b).
+- `CMS/src/app/api/auth/login/route.ts` — POST, verifies + mints local session,
+  non-enumerating 401.
+- `CMS/src/lib/auth/guard.ts` — **resolves sessions LOCALLY** (getSession →
+  findUserById). NO per-request PM forward. cms-validate is SSO-handshake-only.
+- `CMS/src/app/api/auth/sso-callback/route.ts` — nonce→sid→cms-validate→upsert
+  Admin (synthetic `<pmUserId>@pm.sso` email)→createSession.
+- `CMS/src/lib/auth/guard-core.ts` — pure `shouldShowSsoButton` (node-tested).
+- `login` i18n namespace in EN/FI/ET. cms-bundle regenerated.
 
-## PICK NEXT: Slice 2 — in-CMS login page replaces the auto-redirect
-Concretely (see BACKLOG Slice 2 for the full spec):
-- Replace the signed-out auto-redirect in `CMS/src/app/admin/layout.tsx` with an
-  in-CMS **login page** (email + password form → `POST /api/auth/login` that
-  verifies via `findUserByEmail` + `verifyPassword` and calls `createSession`).
-- **CRITICAL rewire (Slice 0 decision 2):** today `/api/auth/sso-callback` stores
-  PM's *sid* in `bizbee_session` and `guard-core.ts` forwards it to PM
-  cms-validate EVERY request. Slice 2 MUST change sso-callback to: nonce-exchange
-  → get PM userId/email → upsert a CMS user (`role=Admin`, via createUser) → mint
-  a CMS-LOCAL session (`createSession`) → set the cookie. Then the guard resolves
-  sessions LOCALLY via `getSession()` instead of forwarding to PM. cms-validate
-  becomes the SSO HANDSHAKE only. Don't leave the guard forwarding the cookie once
-  local sessions exist — local users have NO PM row.
-- Show the **"Sign in with BizbeeCMS" SSO button ONLY when the visitor arrived
-  from PM** — match `Referer`/`?from=pm` against `PM_ORIGIN` from config (study
-  `CMS/src/lib/auth/forwarded-host.ts` + `guard-core.ts` for the existing
-  host-from-config pattern; NEVER hardcode `manager.bizbeecms.com`). Make the
-  visibility a PURE helper + node-test it (origin match true/false).
-- Leave a placeholder slot for the Google button (Slice 2b).
-- EN/FI/ET for the page + button (Slice 2 is the FIRST slice with user-facing
-  strings — Slice 1 was string-free).
-- Gate: CMS `tsc` + `npx opennextjs-cloudflare build` green (NEVER while
-  `npm run dev` is up). Slice 2 ADDS a runtime login route → **regen PM
-  `cms-bundle`** this time (`cd ProjectManager && npm run bundle:cms`).
+## PICK NEXT: Slice 3 — CMS roles + server-side authorization
+(or Slice 2b Google sign-in if you'd rather — both are TODO; Slice 3 is the
+listed next.) See BACKLOG Slice 3 for the spec:
+- Copy the pm-roles role SET + `canRemoveUser` removal hierarchy NAMES only (drop
+  country/tag scope). Pure helpers (`canInvite`/`canManageUsers`/`canEditContent`/
+  `canRemoveUser`), node-tested.
+- Wire role checks into BOTH guard layers: the `/admin/*` page gate AND the
+  `/api/*` route guard (extend, don't fork). Right now `requireAdmin`/
+  `checkAdmin*` only check "is a valid CMS user" — Slice 3 adds the role gate.
+  `GuardDecision` already carries `userId`; thread the `role` through (the user
+  store row has it).
+- SSO users are `role=Admin` (already set by sso-callback). Local users get their
+  role from invite (Slice 4) — default `Editor` until then.
 
-## Heads-up
-- You are the sole CMS worker but a PM worker may be in `ProjectManager/src/` —
-  coordinate before touching PM. Your scope: `CMS/src/**` + CMS migrations.
-- Roles helper (`canInvite`/`canManageUsers`/`canRemoveUser`) is Slice 3 — Slice 2
-  can hardcode `role=Admin` for the auto-provisioned SSO user for now.
+## Heads-up / gotchas
+- **Don't reintroduce the PM forward in the guard** (CAVEAT). Local users have no
+  PM row.
+- SSO user email is the synthetic `<uuid>@pm.sso` stopgap — see CAVEAT; backfill
+  when PM returns the real email.
+- You are the sole CMS worker; a PM worker may be in `ProjectManager/src/`. Stay
+  in `CMS/src/**`; only run `npm run bundle:cms` from ProjectManager (yours) once
+  a slice adds runtime code the worker serves.
+- Gate every slice: CMS `npm test` + `npx tsc --noEmit` + `npx opennextjs-cloudflare
+  build` (NEVER while `npm run dev` is up) + regen cms-bundle + EN/FI/ET.

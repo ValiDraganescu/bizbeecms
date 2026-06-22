@@ -83,3 +83,38 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/migrations/0009_motionless_night_thrasher.sql,
   CMS/migrations/meta/_journal.json, CMS/migrations/meta/0009_snapshot.json,
   CMS/scripts/password.test.mjs, CMS/scripts/session-core.test.mjs.
+
+## 2026-06-22 13:01 — Slice 2: in-CMS login page + guard goes local + SSO rewire
+- **Status:** DONE
+- **What I did:** Replaced the signed-out auto-redirect in `admin/layout.tsx` with
+  an in-CMS LOGIN PAGE (email/password form + conditional SSO button + a Google
+  placeholder slot for 2b). New `POST /api/auth/login` verifies via
+  `findUserByEmail`+`verifyPassword` and mints a CMS-local session (`createSession`);
+  rejects SSO/Google users (null passwordHash) and unknown emails with the SAME
+  generic 401 (no email enumeration). **Guard now resolves sessions LOCALLY** —
+  `guard.ts` `decide()` reads `getSession()` → `findUserById` instead of forwarding
+  the cookie to PM cms-validate every request (local users have no PM row, so the
+  old forward would have locked them out). Both entry points (`checkAdmin` for /api,
+  `checkAdminFromHeaders` for pages) funnel through it; the `Request` arg on
+  checkAdmin is now unused (kept for call-site compat). **Rewired
+  `/api/auth/sso-callback`** per Slice-0 decision 2: nonce→PM sid → cms-validate
+  handshake (with sid + SITE_ID) to get the PM userId → UPSERT a CMS user
+  (role=Admin, passwordHash=NULL, keyed by a synthetic `<userId>@pm.sso` email
+  since cms-validate doesn't return the email and I can't touch PM this slice) →
+  `createSession` mints the local session cookie. cms-validate is now the SSO
+  HANDSHAKE only, never a per-request authz call. Added pure
+  `shouldShowSsoButton(referer, fromParam, pmOrigin)` to `guard-core.ts` (origin
+  match against PM_ORIGIN from config — `?from=pm` hint OR Referer origin; missing
+  origin = fail-closed hide). EN/FI/ET `login` namespace. Regenerated PM cms-bundle.
+- **Verified:** `npm test` 544 pass (added 6 tests: shouldShowSsoButton true/false +
+  fail-closed, login i18n parity). `npx tsc --noEmit` clean. `npx opennextjs-cloudflare
+  build` green (dev confirmed not running first) — `/api/auth/login` +
+  `/api/auth/sso-callback` both in the route manifest. `npm run bundle:cms` from
+  ProjectManager regenerated `cms-bundle.generated.js`. Could NOT verify the live
+  cross-host SSO handshake or a real login round-trip (needs a deployed Worker +
+  PM) — HITL.
+- **Files:** CMS/src/app/admin/layout.tsx, CMS/src/app/api/auth/login/route.ts (new),
+  CMS/src/app/api/auth/sso-callback/route.ts, CMS/src/lib/auth/guard.ts,
+  CMS/src/lib/auth/guard-core.ts, CMS/src/components/login-form.tsx (new),
+  CMS/messages/{en,fi,et}.json, CMS/scripts/auth-guard.test.mjs,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js.

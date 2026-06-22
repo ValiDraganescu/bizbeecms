@@ -1,84 +1,47 @@
 /**
- * CMS admin auth guard (Sec1) — the impure wiring around `guard-core.ts`.
+ * CMS admin auth guard (Sec1 → cms-auth Slice 2) — impure wiring around
+ * `guard-core.ts`.
  *
  * The whole CMS admin surface (/admin/* pages + /api/* admin routes) is gated by
- * `requireAdmin`. The CMS Worker can't read PM's KV session or D1, so it forwards
- * the incoming `bizbee_session` cookie to PM's `/api/auth/cms-validate` with the
- * shared `CMS_AUTH_SECRET` bearer + `{ siteId: env.SITE_ID }`. PM resolves the
- * session → user and runs the Site-reach authz; only `{ok:true}` allows.
+ * `requireAdmin`. As of Slice 2 the CMS has its OWN user + session store, so the
+ * guard resolves the `bizbee_session` cookie LOCALLY (D1 `session` → `user`)
+ * instead of forwarding it to PM's cms-validate every request. PM's cms-validate
+ * is now only the SSO HANDSHAKE (used once by `/api/auth/sso-callback` to upsert
+ * the operator + mint a local session) — local email/password/Google users have
+ * NO PM row, so a per-request PM forward would lock them out.
  *
- * Fail-closed: missing config, no cookie, a non-200 / non-ok answer, or any
- * network/parse error all DENY. A misconfigured CMS locks itself rather than
- * exposing the admin surface.
+ * Fail-closed: no cookie, an expired/absent session row, or a deleted user all
+ * DENY. A signed-in user with a live session+row = allow.
  */
-import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { cookies } from "next/headers";
-import {
-  SESSION_COOKIE,
-  cmsValidateUrl,
-  decideFromValidate,
-  isGuardConfigured,
-  readSessionCookie,
-  type GuardConfig,
-  type GuardDecision,
-} from "./guard-core";
-
-function readConfig(env: Record<string, unknown>): GuardConfig {
-  const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-  return {
-    pmOrigin: str(env.PM_ORIGIN),
-    authSecret: str(env.CMS_AUTH_SECRET),
-    siteId: str(env.SITE_ID),
-  };
-}
+import { getSession } from "@/db/session-store";
+import { findUserById } from "@/db/user-store";
+import { SESSION_COOKIE, readSessionCookie, type GuardDecision } from "./guard-core";
 
 /**
- * Authorize against PM given the session cookie value already extracted. Shared
- * by the Request-based (API) and headers-based (page/layout) entry points.
+ * Resolve the current session cookie (read via `next/headers`, so it works for
+ * both page/layout renders AND /api/* route handlers in the App Router) to a CMS
+ * user. Both entry points below funnel through here.
  */
-async function decide(session: string): Promise<GuardDecision> {
-  const { env } = await getCloudflareContext({ async: true });
-  const cfg = readConfig(env as unknown as Record<string, unknown>);
+async function decide(): Promise<GuardDecision> {
+  const session = await getSession();
+  if (!session) return { allow: false, reason: "noSession" };
 
-  if (!isGuardConfigured(cfg)) {
-    return { allow: false, reason: "unconfigured" };
-  }
-  if (!session) {
-    return { allow: false, reason: "noSession" };
-  }
+  const user = await findUserById(session.userId);
+  if (!user) return { allow: false, reason: "noSession" };
 
-  try {
-    const res = await fetch(cmsValidateUrl(cfg.pmOrigin), {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${cfg.authSecret}`,
-        // Forward ONLY the session cookie (not the whole request cookie jar).
-        cookie: `${SESSION_COOKIE}=${session}`,
-      },
-      body: JSON.stringify({ siteId: cfg.siteId }),
-    });
-    let body: { ok?: unknown; userId?: unknown } | null = null;
-    try {
-      body = (await res.json()) as { ok?: unknown; userId?: unknown };
-    } catch {
-      body = null;
-    }
-    return decideFromValidate(res.status, body);
-  } catch {
-    return { allow: false, reason: "error" };
-  }
+  return { allow: true, userId: user.id };
 }
 
-/** Authorize an incoming /api/* `Request` (reads the Cookie header). */
-export async function checkAdmin(request: Request): Promise<GuardDecision> {
-  return decide(readSessionCookie(request.headers.get("cookie")));
+/** Authorize an incoming /api/* `Request`. Resolves the cookie locally. */
+export async function checkAdmin(_request: Request): Promise<GuardDecision> {
+  // The cookie is read via next/headers inside getSession(); the Request arg is
+  // kept for the existing call sites (and to assert the route is request-scoped).
+  return decide();
 }
 
-/** Authorize a page/layout render (reads the cookie via `next/headers`). */
+/** Authorize a page/layout render. */
 export async function checkAdminFromHeaders(): Promise<GuardDecision> {
-  const jar = await cookies();
-  return decide(jar.get(SESSION_COOKIE)?.value ?? "");
+  return decide();
 }
 
 /**
@@ -96,3 +59,6 @@ export async function requireAdmin(request: Request): Promise<Response | null> {
     { status: 401 },
   );
 }
+
+// Re-exported for callers that still want the raw cookie name/extractor.
+export { SESSION_COOKIE, readSessionCookie };

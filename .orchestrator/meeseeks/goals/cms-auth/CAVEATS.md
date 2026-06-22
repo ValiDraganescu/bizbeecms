@@ -126,6 +126,35 @@ Read every line before working. Each entry was learned the hard way by a previou
   Site deploy. New Drizzle migrations (run `npm run db:generate` in CMS/)
   auto-apply per-Site. No extra wiring needed for new tables.
 
+- **GUARD NOW RESOLVES SESSIONS LOCALLY (Slice 2) — do NOT reintroduce the PM
+  forward.** `guard.ts` `decide()` reads `getSession()` → `findUserById` (D1), NOT
+  PM cms-validate. Local email/password/Google users have NO PM row, so forwarding
+  every request to PM would lock them out. `cms-validate` is now ONLY the SSO
+  handshake (used once inside `sso-callback`). `guard-core.ts` still exports
+  `cmsValidateUrl`/`decideFromValidate`/`isGuardConfigured`/`readSessionCookie` —
+  those are kept for the sso-callback handshake + tests; don't delete them.
+
+- **SSO operator's CMS email is SYNTHETIC: `<pmUserId>@pm.sso` (Slice 2 stopgap).**
+  cms-validate returns `userId` but NOT the email, and Slice 2 couldn't touch PM
+  (parallel PM worker). So `sso-callback` upserts the SSO user keyed on a synthetic
+  email derived from the PM userId — unique + idempotent, and SSO users never log
+  in by email (passwordHash=NULL). **FOLLOW-UP:** when PM's cms-validate (or
+  cms-sso-exchange) is extended to return the real verified email, switch the
+  upsert to match/store that, and backfill existing `@pm.sso` rows. Until then a
+  PM user appears in the CMS user list as `<uuid>@pm.sso` — note this in Slice 5.
+
+- **Login API is non-enumerating — keep it that way.** `/api/auth/login` returns
+  the SAME generic 401 `invalidCredentials` for unknown email, SSO/Google user
+  (null passwordHash), AND wrong password. Don't add a distinct "no such user"
+  branch (it leaks which emails exist). No self-signup here — unknown email = 401.
+
+- **No middleware-level current-URL in the layout.** The admin layout reads
+  `from`/`Referer` from `headers()` to decide the SSO-button visibility; there's no
+  reliable "current request URL" header on OpenNext, so `?from=pm` is read
+  best-effort from `x-forwarded-url`/`referer`. The robust signal is `Referer`
+  origin === PM_ORIGIN (always present on a PM-link click). Don't rely on `?from=pm`
+  being the only path.
+
 - **cms-bundle regen is for RUNTIME code only.** `bundle:cms` bundles
   `CMS/.open-next/worker.js`, NOT migrations. A slice that only adds schema/libs
   not yet imported by a worker entrypoint doesn't need a manual regen — PM's

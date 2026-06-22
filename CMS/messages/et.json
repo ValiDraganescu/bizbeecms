@@ -251,6 +251,18 @@
     "forbiddenTitle": "Juurdepääs keelatud",
     "forbiddenBody": "Olete sisse logitud, kuid teie kontol pole õigust seda saiti hallata. Paluge saidi administraatoril teile juurdepääs anda."
   },
+  "login": {
+    "title": "Logi sisse",
+    "subtitle": "Logi sisse selle saidi haldamiseks.",
+    "emailLabel": "E-post",
+    "passwordLabel": "Parool",
+    "signIn": "Logi sisse",
+    "signingIn": "Sisselogimine…",
+    "errorInvalid": "Vale e-post või parool.",
+    "errorNetwork": "Serveriga ei õnnestunud ühendust luua. Proovi uuesti.",
+    "or": "või",
+    "ssoButton": "Logi sisse BizbeeCMS-iga"
+  },
   "adminNav": {
     "brand": "CMS-i haldus",
     "home": "Avaleht",

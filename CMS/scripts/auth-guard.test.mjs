@@ -15,6 +15,7 @@ import {
   cmsValidateUrl,
   readSessionCookie,
   decideFromValidate,
+  shouldShowSsoButton,
 } from "../src/lib/auth/guard-core.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -46,6 +47,50 @@ test("adminAuth namespace exists with identical non-empty keys in EN/FI/ET", () 
       assert.ok(typeof v === "string" && v.trim() !== "", `${l}: ${path} empty`);
     }
   }
+});
+
+// ── login i18n parity (Slice 2 login page strings) ──────────────────────────
+test("login namespace exists with identical non-empty keys in EN/FI/ET", () => {
+  const cats = { en: load("en"), fi: load("fi"), et: load("et") };
+  for (const [l, cat] of Object.entries(cats)) {
+    assert.ok(cat.login, `${l}.json missing login namespace`);
+  }
+  const en = keys(cats.en.login).sort();
+  assert.ok(en.includes("ssoButton") && en.includes("errorInvalid"));
+  for (const l of ["fi", "et"]) {
+    assert.deepEqual(keys(cats[l].login).sort(), en, `${l} login keys differ`);
+  }
+  for (const [l, cat] of Object.entries(cats)) {
+    for (const path of keys(cat.login)) {
+      const v = path.split(".").reduce((o, k) => o[k], cat.login);
+      assert.ok(typeof v === "string" && v.trim() !== "", `${l}: ${path} empty`);
+    }
+  }
+});
+
+// ── SSO button visibility (origin match from config, never hardcoded) ────────
+const PM = "https://manager.bizbeecms.com";
+
+test("shouldShowSsoButton: ?from=pm hint → show (any referer)", () => {
+  assert.equal(shouldShowSsoButton(null, "pm", PM), true);
+  assert.equal(shouldShowSsoButton("https://evil.example.com/x", "pm", PM), true);
+});
+
+test("shouldShowSsoButton: referer origin === PM_ORIGIN → show", () => {
+  assert.equal(shouldShowSsoButton(`${PM}/sites/abc`, null, PM), true);
+  // trailing slash / path on the configured origin don't matter (origin compared)
+  assert.equal(shouldShowSsoButton(`${PM}/`, null, `${PM}/`), true);
+});
+
+test("shouldShowSsoButton: foreign / absent referer → hide", () => {
+  assert.equal(shouldShowSsoButton("https://other.example.com/x", null, PM), false);
+  assert.equal(shouldShowSsoButton(null, null, PM), false);
+  assert.equal(shouldShowSsoButton("not-a-url", null, PM), false);
+});
+
+test("shouldShowSsoButton: missing pmOrigin → never show (fail-closed)", () => {
+  assert.equal(shouldShowSsoButton(`${PM}/x`, "pm", undefined), false);
+  assert.equal(shouldShowSsoButton(`${PM}/x`, "pm", ""), false);
 });
 
 // ── config gate (fail-closed when unconfigured) ─────────────────────────────

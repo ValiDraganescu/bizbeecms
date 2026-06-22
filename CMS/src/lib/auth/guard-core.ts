@@ -52,6 +52,33 @@ export function readSessionCookie(cookieHeader: string | null): string {
   return "";
 }
 
+/**
+ * Should the login page show the "Sign in with BizbeeCMS" SSO button? Only when
+ * the visitor arrived from PM. We detect that from an explicit `?from=pm` query
+ * hint OR a `Referer` whose origin matches the configured `PM_ORIGIN` (NEVER a
+ * hardcoded domain — same config-driven host handling as `forwarded-host`). The
+ * SSO handoff itself stays gated behind this button so operators keep their flow
+ * while a client's own team just sees email/password.
+ *
+ * Pure + node-testable: takes the raw `Referer` header, the `from` param, and the
+ * configured origin; no fetch/env. Missing `pmOrigin` ⇒ never show (fail-closed:
+ * an unconfigured CMS can't honor the SSO handoff anyway).
+ */
+export function shouldShowSsoButton(
+  referer: string | null,
+  fromParam: string | null,
+  pmOrigin: string | undefined,
+): boolean {
+  if (!pmOrigin) return false;
+  if (fromParam === "pm") return true;
+  if (!referer) return false;
+  try {
+    return new URL(referer).origin === new URL(pmOrigin).origin;
+  } catch {
+    return false;
+  }
+}
+
 export type ValidateResponse = { ok?: unknown; userId?: unknown };
 
 export type GuardDecision =
