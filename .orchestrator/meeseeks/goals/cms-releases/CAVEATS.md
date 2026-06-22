@@ -62,3 +62,21 @@ Read every line before working. Each entry was learned the hard way by a previou
 
 - **Verify a tag is annotated** with `git cat-file -t cms-v<ver>` → must be `tag` (not
   `commit`). Use `git tag -a ... -m ...`, never a lightweight `git tag <name>`.
+
+- **Deployer has NO tsc** (TypeScript isn't a dep; `npx tsc` errors out). Gate the
+  deployer with `npx wrangler deploy --dry-run --outdir=/tmp/x` — it runs esbuild and
+  FAILS on type/syntax errors, so it's a real typecheck-ish gate without uploading.
+  (It does build the Sandbox Docker image first — slow first run, cached after.)
+
+- **Deployer GET /tags + /release-notes EXIST now** (Slice 2,
+  `deployer/src/index.ts`). Both auth with the existing Bearer `DEPLOYER_SECRET`.
+  `/tags` uses `sandbox.exec('git ls-remote --tags "$REPO_URL"')` (no clone);
+  `/release-notes?version=` shallow-clones the one tag + cats the notes. Git auth
+  goes through the shared `gitAuthEnv()` (http.extraHeader + $GITHUB_TOKEN, same as
+  the deploy clone). When wiring PM (Slice 5), call these with `Bearer
+  DEPLOYER_SECRET`; `/tags` returns `{tags:[{version,tag}]}`, `/release-notes`
+  returns `{version, markdown}`.
+
+- **`/tags` reads the REMOTE — won't list `cms-v0.6.0` until it's PUSHED.** The tag
+  is still local-only (Meeseeks don't push). End-to-end verifying Slice 2 against the
+  real deployer requires the user (or a non-Meeseeks run) to push `cms-v0.6.0` first.

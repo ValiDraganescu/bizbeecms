@@ -22,14 +22,16 @@ green; EN/FI/ET for new PM strings).
   tooling foundation.) Cut the FIRST real `cms-v*` tag with it so later slices have
   something to list.
 
-- TODO: **Slice 2 — deployer: list tags + serve release notes.** Add to
+- DONE: **Slice 2 — deployer: list tags + serve release notes.** Added to
   `deployer/src/index.ts` (auth: existing deployer bearer):
-  `GET /tags` → `git ls-remote --tags $REPO_URL`, filter `cms-v*`, return sorted
-  (newest first) `[{version, tag}]`; and `GET /release-notes?version=x.y.z` →
-  `git show cms-v<x.y.z>:release-notes/<x.y.z>.md` (or GitHub raw at the tag) →
-  return the markdown. Reuse the existing `REPO_URL`/`GITHUB_TOKEN`. Don't clone for
-  listing (`ls-remote` is enough). Verify the running deployer container has `git`
-  (it clones already, so yes). Gate: deployer builds/deploys clean.
+  `GET /tags` → `git ls-remote --tags $REPO_URL` (no clone), filter `cms-v<x.y.z>`,
+  dedupe `^{}` peeled refs, return `{tags:[{version,tag}]}` newest-first; and
+  `GET /release-notes?version=x.y.z` → shallow `git clone --depth 1 --branch
+  cms-v<ver>` + `cat release-notes/<ver>.md` → `{version, markdown}` (404
+  notesNotFound / 400 badRequest). Reuses `REPO_URL`/`GITHUB_TOKEN` via shared
+  `gitAuthEnv()`; `exec({env})` so nothing is shell-interpolated. Gate: `wrangler
+  deploy --dry-run` bundles clean. NOTE: real-remote verification waits on
+  `cms-v0.6.0` being pushed (it's local only).
 
 - TODO: **Slice 3 — PM: record deployed CMS version end-to-end.** Add
   `deployedCmsVersion` (text, nullable) to the `sites` table

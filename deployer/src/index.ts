@@ -101,6 +101,24 @@ export default {
       return Response.json({ accepted: true, slug });
     }
 
+    if (url.pathname === "/tags" && request.method === "GET") {
+      const auth = request.headers.get("authorization") ?? "";
+      const token = auth.replace(/^Bearer\s+/i, "");
+      if (!env.DEPLOYER_SECRET || token !== env.DEPLOYER_SECRET) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+      return listTags(env);
+    }
+
+    if (url.pathname === "/release-notes" && request.method === "GET") {
+      const auth = request.headers.get("authorization") ?? "";
+      const token = auth.replace(/^Bearer\s+/i, "");
+      if (!env.DEPLOYER_SECRET || token !== env.DEPLOYER_SECRET) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+      return releaseNotes(url.searchParams.get("version") ?? "", env);
+    }
+
     if (url.pathname === "/attach-domain" && request.method === "POST") {
       const auth = request.headers.get("authorization") ?? "";
       const token = auth.replace(/^Bearer\s+/i, "");
@@ -224,6 +242,129 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
       txt,
     },
   });
+}
+
+// cms-v<x.y.z> — the only tag scheme PM can deploy (CMS-scoped; monorepo).
+const CMS_TAG_RE = /^cms-v(\d+\.\d+\.\d+)$/;
+// A bare semver, used to validate the ?version= query before building a git ref.
+const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+
+/**
+ * Git auth env for read-only remote ops against the private monorepo, mirroring
+ * the clone path in buildScript(): the token rides an http.extraHeader so it
+ * never lands in argv/ps or a stored remote URL. Passed to sandbox.exec({env}).
+ */
+function gitAuthEnv(env: Env): Record<string, string> {
+  const basic = btoa(`x-access-token:${env.GITHUB_TOKEN ?? ""}`);
+  return {
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: "http.extraHeader",
+    GIT_CONFIG_VALUE_0: `Authorization: Basic ${basic}`,
+    GIT_TERMINAL_PROMPT: "0",
+  };
+}
+
+/**
+ * GET /tags — list the deployable CMS releases. Reads the REMOTE with
+ * `git ls-remote --tags` (no clone), filters to `cms-v*`, and returns them
+ * newest-first by semver. $REPO_URL is a deployer secret, never caller-supplied.
+ */
+async function listTags(env: Env): Promise<Response> {
+  if (!env.REPO_URL) {
+    return Response.json({ error: "notConfigured" }, { status: 503 });
+  }
+  const sandbox = getSandbox(env.Sandbox, "release-meta");
+  let out: { stdout: string; exitCode: number };
+  try {
+    // REPO_URL goes via env ($REPO_URL) so nothing is interpolated into the shell.
+    out = await sandbox.exec('git ls-remote --tags "$REPO_URL"', {
+      env: { ...gitAuthEnv(env), REPO_URL: env.REPO_URL },
+      timeout: 30_000,
+    });
+  } catch (err) {
+    return Response.json(
+      { error: "lsRemoteFailed", detail: String(err).slice(0, 200) },
+      { status: 502 },
+    );
+  }
+  if (out.exitCode !== 0) {
+    return Response.json({ error: "lsRemoteFailed" }, { status: 502 });
+  }
+
+  // Each line: "<sha>\trefs/tags/<tag>" (and "<sha>\trefs/tags/<tag>^{}" for the
+  // peeled annotated-tag commit — same tag, dedupe via the Set).
+  const seen = new Set<string>();
+  const tags: { version: string; tag: string }[] = [];
+  for (const line of out.stdout.split("\n")) {
+    const m = line.match(/refs\/tags\/(.+?)(?:\^\{\})?$/);
+    if (!m) continue;
+    const tag = m[1];
+    const sv = tag.match(CMS_TAG_RE);
+    if (!sv || seen.has(tag)) continue;
+    seen.add(tag);
+    tags.push({ version: sv[1], tag });
+  }
+  tags.sort((a, b) => cmpSemver(b.version, a.version)); // newest first
+  return Response.json({ tags });
+}
+
+// Numeric semver compare (x.y.z). Returns >0 if a>b, <0 if a<b, 0 if equal.
+function cmpSemver(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] !== pb[i]) return pa[i] - pb[i];
+  }
+  return 0;
+}
+
+/**
+ * GET /release-notes?version=x.y.z — the markdown for a released CMS version.
+ * Fetches the file AT its tag with `git archive cms-v<ver> -- release-notes/...`
+ * (a shallow-ish remote read; no working clone needed beyond a temp fetch). We
+ * use a tiny clone of just that ref so `git show` works against a private remote
+ * without a full checkout.
+ */
+async function releaseNotes(version: string, env: Env): Promise<Response> {
+  if (!env.REPO_URL) {
+    return Response.json({ error: "notConfigured" }, { status: 503 });
+  }
+  if (!SEMVER_RE.test(version)) {
+    return Response.json({ error: "badRequest" }, { status: 400 });
+  }
+  const sandbox = getSandbox(env.Sandbox, "release-meta");
+  // Shallow-clone ONLY the one tag (--depth 1 --branch cms-v<ver>), then read the
+  // notes file from the checkout. $VER is validated semver, passed via env; the
+  // dir name embeds it but it's [0-9.] only so it's shell-safe regardless.
+  // ponytail: a fresh shallow clone per request is the lazy correct path —
+  // ls-remote can't stream file contents, and a full clone is wasteful. Notes are
+  // small + requested rarely (deploy dialog), so the clone cost is fine.
+  const script = `
+set -uo pipefail
+DIR="/workspace/notes-$VER"
+rm -rf "$DIR"
+git clone --depth 1 --branch "cms-v$VER" "$REPO_URL" "$DIR" >/dev/null 2>&1 || exit 21
+cat "$DIR/release-notes/$VER.md" 2>/dev/null || exit 22
+`;
+  let out: { stdout: string; exitCode: number };
+  try {
+    out = await sandbox.exec(script, {
+      env: { ...gitAuthEnv(env), REPO_URL: env.REPO_URL, VER: version },
+      timeout: 60_000,
+    });
+  } catch (err) {
+    return Response.json(
+      { error: "fetchFailed", detail: String(err).slice(0, 200) },
+      { status: 502 },
+    );
+  }
+  if (out.exitCode === 22) {
+    return Response.json({ error: "notesNotFound", version }, { status: 404 });
+  }
+  if (out.exitCode !== 0) {
+    return Response.json({ error: "fetchFailed", version }, { status: 502 });
+  }
+  return Response.json({ version, markdown: out.stdout });
 }
 
 type CfCustomHostname = {
