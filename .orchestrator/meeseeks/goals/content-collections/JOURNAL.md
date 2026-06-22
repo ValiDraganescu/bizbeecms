@@ -223,3 +223,37 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   rule). Stayed OUT of CMS/src/app/mcp/** + lib/chat/** (parallel worker's scope).
 - **Files:** CMS/src/lib/render/tree.ts, CMS/src/lib/render/render-page.tsx,
   CMS/src/lib/content/binding.ts (new), CMS/scripts/binding.test.mjs (new).
+
+## 2026-06-22 13:57 — P2-bind Slice B: built-in `List` block + per-row stamp
+- **Status:** DONE
+- **What I did:** Added the built-in `List` collection-repeater block, modeled
+  EXACTLY on the Section primitive (special-cased in the renderer, NOT a user
+  component).
+  - `lib/render/tree.ts`: `LIST_COMPONENT = "List"` + `BUILTIN_COMPONENTS`
+    array + `isBuiltinComponent()`. New `Block` fields (List-only): `listSource`
+    (collection + filter/sort/limit query), `listMap` (rowField→templateProp),
+    `listRows` (rows hydrated by the host — NOT authored), `listRole`
+    ("template"|"empty"). PURE `planList` (dispatched from `planBlock` like
+    `planSection`): partitions children into template vs empty-state, stamps the
+    template once per row via `stampRow` (clones the subtree, injects mapped row
+    fields into each block's `props`; `planBlock`/`bindTree` then gate them by the
+    component's declared propsSchema allowlist). Empty/dead/un-hydrated → the
+    empty-state slot if authored, else nothing. Renders `<div data-list={id}>`.
+  - `lib/render/render-page.tsx`: `buildPlanFromPage` now fetches List rows in the
+    SAME hydrate-before-walk pass as Slice A (`hydrateBlockBindings`): for a List
+    block with `listSource`, runs `queryCollection` and stashes `res.plan.items`
+    onto `listRows` (graceful empty on error). `List` deleted from the component
+    fetch set (built-in, no D1 row). `planPage`/`planTree` stay PURE+SYNC.
+  - `lib/pages/page-blocks.ts`: the component-existence drop now loops
+    `isBuiltinComponent` (covers Section/column/List) so a saved page with a List
+    never 409s on missing-component.
+- **Verified:** 10 new node tests (`scripts/list-block.test.mjs`): N rows→N
+  stamped subtrees + mapped bind, empty→nothing, empty→empty-state slot,
+  non-empty→no empty-state, listMap respects declared-prop allowlist (undeclared
+  prop can't leak), missing field→graceful blank, un-hydrated→empty container,
+  unknown template→hidden placeholder. Full suite 165 (binding/query/item/
+  collection*/content-fence/render-tree/list-block/page-blocks). `tsc --noEmit`
+  0; `npx opennextjs-cloudflare build` green (dev server down). NO user strings →
+  NO cms-bundle regen. Live D1 = HITL.
+- **Files:** CMS/src/lib/render/tree.ts, CMS/src/lib/render/render-page.tsx,
+  CMS/src/lib/pages/page-blocks.ts, CMS/scripts/list-block.test.mjs

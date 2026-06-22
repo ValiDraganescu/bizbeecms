@@ -245,6 +245,30 @@ Read every line before working. Each entry was learned the hard way by a previou
   unresolved one (no match / dead collection / query error) leaves the static value
   (or blank). `hydrateProps` is pure; the async shell catches query errors → null row.
 
+- **(Slice B) `List` is a BUILT-IN block (`LIST_COMPONENT="List"`), NOT a D1
+  component — drop it from EVERY component-existence check.** It's now in
+  `BUILTIN_COMPONENTS` + `isBuiltinComponent()` (`render/tree.ts`). `page-blocks.ts`
+  already loops `isBuiltinComponent` so any NEW built-in is auto-excluded. The List
+  block carries List-ONLY fields: `listSource` (query: collection+filter/sort/limit),
+  `listMap` (rowField→templateProp), `listRole` ("template"|"empty" on children),
+  and `listRows` (host-hydrated, NEVER authored). Don't put the query under `props`.
+- **(Slice B) List rows are hydrated in `buildPlanFromPage`, stamped in PURE
+  `planList`.** Same hydrate-before-walk seam as Slice A: the async shell runs
+  `queryCollection(listSource.collection, {filters,sort,limit} as QuerySpec)` and
+  stashes `res.plan.items` onto `block.listRows`; `planList` (sync, in `planBlock`)
+  partitions children into template (`listRole !== "empty"`) vs empty-state, and
+  for each row clones the template via `stampRow` injecting `listMap` fields into
+  each block's `props`. The PER-PROP allowlist is enforced DOWNSTREAM by
+  `planBlock`/`bindTree` (the component's propsSchema) — `planList`/`stampRow` set
+  props loosely; an undeclared/unknown mapped prop simply never reaches a slot.
+  GRACEFUL: empty/dead/un-hydrated → empty-state slot or nothing, never a throw.
+  Cast `as QuerySpec` (listSource filter `op` is loose `string`, compiler
+  whitelists at runtime — same reason as Slice A's `bindingQuerySpec`).
+- **(Slice B) Renderer logic, NO new user strings → NO cms-bundle regen.** The
+  OPERATOR UI to author Lists (collection picker, drop template, map props,
+  empty-state) is Slice C and WILL add EN/FI/ET + need the regen. Slice C also wires
+  the page-builder to actually EMIT List blocks (today nothing produces one).
+
 - **(Slice 5) Admin UI talks to the Slice 2-4 REST routes only — no new data path.**
   Item create OMITS empty-string field values so column DEFAULTs apply; edit sends
   all keys (PATCH semantics). multiselect round-trips as a JSON-array string (parse on

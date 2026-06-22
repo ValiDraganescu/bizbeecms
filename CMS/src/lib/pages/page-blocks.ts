@@ -25,13 +25,15 @@ import {
   planPage,
   SECTION_COMPONENT,
   SECTION_COLUMN_COMPONENT,
+  LIST_COMPONENT,
+  isBuiltinComponent,
   type Block,
 } from "../render/tree.ts";
 import { isLocaleObject } from "../render/localize.ts";
 
 // Re-export so the editor/UI keeps importing the reserved names from here (the
 // renderer in tree.ts owns the single definitions, so both layers agree).
-export { SECTION_COMPONENT, SECTION_COLUMN_COMPONENT };
+export { SECTION_COMPONENT, SECTION_COLUMN_COMPONENT, LIST_COMPONENT };
 
 const ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
 
@@ -71,11 +73,12 @@ export function validateBlocks(
   }
 
   if (errors.length > 0) return { ok: false, errors };
-  // The reserved Section + column names are renderer primitives, not D1
-  // components — drop them so the route's component-existence check
-  // (`missingComponents`) never 409s on a page that contains Sections/columns.
-  names.delete(SECTION_COMPONENT);
-  names.delete(SECTION_COLUMN_COMPONENT);
+  // The reserved built-ins (Section / column / List) are renderer primitives,
+  // not D1 components — drop them so the route's component-existence check
+  // (`missingComponents`) never 409s on a page that contains them.
+  for (const n of [...names]) {
+    if (isBuiltinComponent(n)) names.delete(n);
+  }
   return { ok: true, blocks: value as Block[], componentNames: [...names] };
 
   function walk(block: unknown, path: string): void {

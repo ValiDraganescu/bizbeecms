@@ -27,6 +27,7 @@ import {
   type TreeNode,
   SECTION_COMPONENT,
   SECTION_COLUMN_COMPONENT,
+  LIST_COMPONENT,
   collectComponentNames,
   collectTreeComponentTags,
   parseJsonColumn,
@@ -73,6 +74,7 @@ export async function buildPlanFromPage(
   let pending = collectComponentNames(blocks);
   pending.delete(SECTION_COMPONENT);
   pending.delete(SECTION_COLUMN_COMPONENT);
+  pending.delete(LIST_COMPONENT);
   for (let wave = 0; wave < MAX_FETCH_WAVES && pending.size > 0; wave++) {
     const want = [...pending].filter((n) => !components.has(n));
     if (want.length === 0) break;
@@ -130,6 +132,26 @@ async function hydrateBlockBindings(blocks: Block[]): Promise<Block[]> {
       const children = block.children
         ? await hydrateBlockBindings(block.children)
         : block.children;
+
+      // List block (Slice B): fetch the per-row query and stash the rows onto
+      // `listRows` for the pure `planList` to stamp. Same hydrate-before-walk
+      // seam as single-item bindings. GRACEFUL: a dead collection / query error /
+      // missing source → no rows → the List's empty-state slot (or nothing).
+      if (block.component === LIST_COMPONENT && block.listSource?.collection) {
+        const src = block.listSource;
+        let listRows: Array<Record<string, unknown>> = [];
+        try {
+          const res = await queryCollection(src.collection, {
+            filters: src.filter,
+            sort: src.sort,
+            limit: src.limit,
+          } as QuerySpec);
+          if (res.ok) listRows = res.plan.items;
+        } catch {
+          listRows = []; // graceful: dead collection / runtime error → empty
+        }
+        return { ...block, children, listRows };
+      }
 
       if (!block.bindings || Object.keys(block.bindings).length === 0) {
         return children === block.children ? block : { ...block, children };

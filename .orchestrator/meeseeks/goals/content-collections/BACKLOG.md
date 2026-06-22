@@ -153,16 +153,20 @@ stable id + slug (Slice 3) so this isn't a retrofit.
   hint said `lib/content/tree.ts` but the renderer lives at `lib/render/tree.ts` +
   `lib/render/render-page.tsx`. List binding = Slice B (next). Live D1 = HITL.
 
-- TODO: **P2-bind Slice B — built-in `List` block (Section-style) + per-row stamp.**
-  Add a reserved built-in `List` block type (like `SECTION_COMPONENT`/
-  `__section_column__`) special-cased in `tree.ts` (a `planList` mirroring
-  `planSection`). It holds a query (collection + filter/sort/limit) + ONE child slot
-  (the per-item template component) + the field→prop `map`. `buildPlanFromPage`
-  runs the query (Slice 4), and `planList` stamps the slot subtree once per row,
-  binding each row's mapped fields into the slotted component's declared props
-  (reuse `bindTree`). Empty result → nothing (or an optional empty-state child).
-  `list_builtin_types` exposes `List`. Pure tests: N rows → N stamped subtrees,
-  empty → empty, field map respects the allowlist. Gate.
+- DONE (2026-06-22): **P2-bind Slice B — built-in `List` block (Section-style) +
+  per-row stamp.** Reserved `LIST_COMPONENT="List"` + `BUILTIN_COMPONENTS`/
+  `isBuiltinComponent()` in `render/tree.ts`; `Block` grows List-only `listSource`
+  (collection+filter/sort/limit), `listMap` (rowField→templateProp), `listRows`
+  (host-hydrated), `listRole`("template"|"empty"). PURE `planList` (dispatched from
+  `planBlock` like `planSection`) partitions children into template vs empty-state,
+  stamps the template once per row via `stampRow` (injects mapped row fields into
+  each stamped block's props; `planBlock`/`bindTree` gate by the component's
+  propsSchema allowlist). Empty/dead/un-hydrated → empty-state slot if authored,
+  else nothing. `render-page.tsx` fetches List rows in the SAME hydrate-before-walk
+  pass as Slice A (`queryCollection` → `listRows`, graceful), and drops `List` from
+  the component fetch set. `page-blocks.ts` existence-check drop now loops
+  `isBuiltinComponent` (Section/column/List). 10 node tests; full suite 165; tsc 0;
+  opennext build green. NO user strings → NO cms-bundle regen. Live D1 = HITL.
 
 - TODO: **P2-bind Slice C — UI to author bindings (operator).** In the page-builder:
   for a normal component block, a "Bind to collection" panel (pick collection →

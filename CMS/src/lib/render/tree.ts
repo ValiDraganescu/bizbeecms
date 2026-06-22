@@ -37,6 +37,33 @@ export const SECTION_COMPONENT = "Section";
  */
 export const SECTION_COLUMN_COMPONENT = "__section_column__";
 
+/**
+ * Reserved component name for a List — a BUILT-IN data-binding block (Phase 2,
+ * Slice B), modeled EXACTLY on the Section primitive: special-cased in this
+ * renderer (`planList`), NOT an AI-authored D1 component. A List carries a
+ * structured query (`listSource`: collection + filter/sort/limit) and ONE child
+ * SLOT = the template component to STAMP once per result row. The renderer host
+ * runs the query in the async `buildPlanFromPage` (hydrate-before-walk, same seam
+ * as Slice A's single-item bindings) and stashes the rows onto `listRows`; the
+ * PURE `planList` then clones the slot subtree per row, binding each row's mapped
+ * fields into the slotted component's DECLARED props (`map`, allowlist-gated).
+ * GRACEFUL: an empty/dead result renders nothing (or an optional empty-state
+ * slot). Like Section, the block PUT route excludes it from the component check.
+ */
+export const LIST_COMPONENT = "List";
+
+/** The reserved built-in block component names (not D1 component rows). */
+export const BUILTIN_COMPONENTS = [
+  SECTION_COMPONENT,
+  SECTION_COLUMN_COMPONENT,
+  LIST_COMPONENT,
+] as const;
+
+/** Is this block component a built-in renderer primitive (no D1 row needed)? */
+export function isBuiltinComponent(name: string): boolean {
+  return (BUILTIN_COMPONENTS as readonly string[]).includes(name);
+}
+
 // ── Component element tree (what `component.tree` holds, parsed) ─────────────
 export type TreeNode =
   | string
@@ -66,10 +93,28 @@ export type BindingRef = {
   map: Record<string, string>;
 };
 
+// ── Built-in `List` block: collection → repeated component (Phase 2, Slice B) ─
+//
+// A List block (component === LIST_COMPONENT) repeats a TEMPLATE component once
+// per query result row. `source` is the structured query (collection + optional
+// filter/sort/limit, reusing the Slice-4 query-compiler vocabulary). `map` is the
+// row-field → template-prop binding (`{ templatePropName: collectionFieldName }`),
+// allowlist-gated against the template's declared props at stamp time. The rows
+// themselves are fetched in the async `buildPlanFromPage` (NOT in the pure walk)
+// and stashed onto `Block.listRows`, mirroring Slice A's hydrate-before-walk seam.
+export type ListSource = {
+  /** The collection's `content_<slug>` table name (registry `table_name`). */
+  collection: string;
+  filter?: Array<{ field: string; op: string; value?: unknown }>;
+  sort?: Array<{ field: string; dir?: "asc" | "desc" }>;
+  /** Max rows to stamp. Clamped by the query store; default = the store default. */
+  limit?: number;
+};
+
 // ── Page block instances (what `page.blocks` holds, parsed) ──────────────────
 export type Block = {
   id: string;
-  // References a `component.name`.
+  // References a `component.name`, OR a built-in (Section/column/List).
   component: string;
   props?: Record<string, unknown>;
   children?: Block[];
@@ -80,6 +125,27 @@ export type Block = {
    * Unresolved (no match / dead collection / unknown field) → graceful blank.
    */
   bindings?: Record<string, BindingRef>;
+  /**
+   * List block (Slice B) ONLY: the structured query for the rows to repeat.
+   * Ignored on non-List blocks.
+   */
+  listSource?: ListSource;
+  /**
+   * List block (Slice B) ONLY: `{ templatePropName: collectionFieldName }` — how
+   * each row's fields fill the per-row template component's declared props.
+   */
+  listMap?: Record<string, string>;
+  /**
+   * List block (Slice B) ONLY, set by the renderer host (`buildPlanFromPage`):
+   * the fetched rows for `listSource`. The PURE `planList` reads this; it is NOT
+   * authored. Absent/empty → the List renders its empty-state slot (or nothing).
+   */
+  listRows?: Array<Record<string, unknown>>;
+  /**
+   * Marks a List child as the EMPTY-STATE slot (rendered only when there are no
+   * rows). All other List children form the per-row TEMPLATE. Ignored elsewhere.
+   */
+  listRole?: "template" | "empty";
 };
 
 // A component artifact as stored (the fields the renderer needs).
@@ -410,6 +476,12 @@ export function planPage(
     if (block.component === SECTION_COLUMN_COMPONENT) {
       return planColumn(block, planBlock, "flex-start", "flex-start");
     }
+    // A List repeats its TEMPLATE children once per fetched row (Slice B). The
+    // rows were hydrated into `block.listRows` by buildPlanFromPage; planList
+    // stamps + binds per row and delegates each stamped block back to planBlock.
+    if (block.component === LIST_COMPONENT) {
+      return planList(block, planBlock);
+    }
     const artifact = components.get(block.component);
     if (!artifact) {
       return placeholder(`unknown component "${block.component}"`);
@@ -448,6 +520,76 @@ export function planPage(
   }
 
   return { root: blocks.map(planBlock), scripts };
+}
+
+// ── Built-in List → per-row stamp (Phase 2, Slice B) ─────────────────────────
+//
+// A List has a per-row TEMPLATE (its children that are NOT the empty-state slot)
+// and an optional empty-state slot (a child with `listRole === "empty"`). The
+// rows are in `block.listRows` (hydrated by buildPlanFromPage). For each row we
+// CLONE the template blocks and inject the mapped fields (`listMap`) into each
+// stamped block's `props` — `planBlock` then binds those into the template
+// component's `{{slots}}`, GATED by the component's own declared props (the same
+// allowlist the static path uses), so an unmapped/unknown prop can't leak in.
+//
+// GRACEFUL: no rows → the empty-state slot if present, else nothing. The List
+// itself renders as a plain container `<div data-list>` wrapping the stamped rows
+// (mirrors Section's `data-section` wrapper — a stable, style-free hook).
+
+/**
+ * Inject a row's mapped fields into a template block's props (recursively into
+ * its children, so a nested template still receives the row's values). For each
+ * `templatePropName → fieldName` in `map`, set `props[templatePropName] =
+ * row[fieldName]` when the row actually HAS that field (graceful: a missing field
+ * leaves the prop untouched, so an author's static default survives). PURE — a
+ * NEW block tree; the originals are untouched. A bound row value OVERWRITES a
+ * static prop (the row is the live source of truth, mirroring Slice A).
+ */
+function stampRow(
+  block: Block,
+  row: Record<string, unknown>,
+  map: Record<string, string>,
+): Block {
+  const props: Record<string, unknown> = { ...(block.props ?? {}) };
+  for (const [propName, fieldName] of Object.entries(map)) {
+    if (Object.prototype.hasOwnProperty.call(row, fieldName)) {
+      props[propName] = row[fieldName];
+    }
+  }
+  return {
+    ...block,
+    props,
+    ...(block.children
+      ? { children: block.children.map((c) => stampRow(c, row, map)) }
+      : {}),
+  };
+}
+
+function planList(
+  block: Block,
+  planBlock: (b: Block) => ElementPlan,
+): ElementPlan {
+  const children = block.children ?? [];
+  const template = children.filter((c) => c.listRole !== "empty");
+  const emptySlot = children.filter((c) => c.listRole === "empty");
+  const rows = Array.isArray(block.listRows) ? block.listRows : [];
+  const map = block.listMap ?? {};
+
+  // Empty / dead / un-hydrated result → the empty-state slot if authored, else
+  // nothing (an empty container). NEVER a throw — mirrors Section's graceful path.
+  const stampedChildren: ElementPlan[] =
+    rows.length === 0
+      ? emptySlot.map(planBlock)
+      : rows.flatMap((row) =>
+          template.map((t) => planBlock(stampRow(t, row, map))),
+        );
+
+  return {
+    kind: "element",
+    tag: "div",
+    props: { "data-list": block.id },
+    children: stampedChildren,
+  };
 }
 
 // ── Section → Columns layout (aicms model, ported to plain ElementPlan) ──────
