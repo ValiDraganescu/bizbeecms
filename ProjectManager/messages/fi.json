@@ -341,6 +341,15 @@
       "save": "Tallenna liitokset",
       "saved": "Liitokset päivitetty."
     },
+    "tags": {
+      "title": "Tunnisteet",
+      "description": "Organisaatiotunnisteet rajaavat tämän sivuston päälliköille. Päällikkö näkee tämän sivuston vain, kun maa täsmää JA sivustolla on jokin päällikön tunnisteista.",
+      "label": "Tunnisteet",
+      "placeholder": "Valitse tunnisteita…",
+      "none": "Ei tunnisteita vielä. Luo tunnisteita ensin tunnistehallinnassa.",
+      "save": "Tallenna tunnisteet",
+      "saved": "Tunnisteet päivitetty."
+    },
     "deploy": {
       "title": "Julkaisu",
       "cardDescription": "Luo tai päivitä tämän sivuston CMS-Worker Cloudflaressa.",

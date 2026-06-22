@@ -168,3 +168,17 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **The deployer applies migrations** (confirmed earlier in cms-auth Slice 1). The
   new 0008 ships in `migrations/` and gets applied on next Site/PM deploy — no manual
   D1 step needed locally beyond build.
+
+- **Slice 7 done — Site-detail tag picker makes Manager reach usable.** `setSiteTags`
+  in `lib/site/site.ts` (delete-all+insert, mirrors `setUserTags`); route is
+  `PUT /api/sites/[id]/tags` gated `canUserCreateSite` (Admin+, SuperAdmin|Admin —
+  SAME tier as tag mgmt, NOT Editor/Manager), and re-validates posted ids against
+  `listTags()` (so a forged id can't be inserted). UI is `SiteTagsForm` (a copy of
+  `assign-form.tsx`'s Combobox-multiselect pattern), placed in `sites/[id]/page.tsx`
+  inside the `canManage` block but with its OWN `canUserCreateSite(user)` gate — a
+  scoped Admin who reaches the site by country still sees it; a Manager/Editor never
+  does. No new migration (site_tags already existed since Slice 3).
+- **Site tag picker needs tags to EXIST first.** `sites.tags.none` tells the admin to
+  create tags in Tag management (`/tags`) when `listTags()` is empty — a Site can't be
+  tagged before the vocabulary exists. The picker hides the form (not an error) in that
+  case, matching `assign-form`'s `noneAssignable` empty-state.

@@ -68,6 +68,16 @@ tsc + opennext build green + PM node tests + EN/FI/ET for new strings.
   user is allowed (hide/disable remove on higher tiers). Reuse PM design-system
   components + purpose tokens. EN/FI/ET for all chrome. Gate.
 
+- DONE (2026-06-22): **Slice 7 — Site-detail tag picker (closes Manager reach end-to-end).**
+  `setSiteTags(siteId, tagIds)` helper in `lib/site/site.ts` (delete-all+insert,
+  mirrors `setUserTags`) + `PUT /api/sites/[id]/tags/route.ts` (Admin+ via
+  `canUserCreateSite`, re-validates ids against `listTags()`) + `SiteTagsForm`
+  Combobox multiselect (mirrors `assign-form.tsx`) wired into the Site detail page
+  inside the `canManage` block, gated `canUserCreateSite(user)` (Admin+). EN/FI/ET
+  `sites.tags.*`. `lib/site/site-tags-slice7.test.ts` (source-text + i18n). Without
+  this a Site could never carry a tag, so Manager tag-reach was always empty.
+  tsc 0, 115 node tests, opennext build green.
+
 - DONE (2026-06-22): **Slice 6 — extend the INVITE flow to the new roles + tags.** Update
   `authorizeInvite` + the invite UI so an inviter can invite at the new roles
   (Manager/Editor) and, for Manager invites, set the invited countries + tags

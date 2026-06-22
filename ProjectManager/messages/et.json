@@ -341,6 +341,15 @@
       "save": "Salvesta määramised",
       "saved": "Määramised uuendatud."
     },
+    "tags": {
+      "title": "Sildid",
+      "description": "Organisatsiooni sildid piiritlevad selle saidi halduritele. Haldur näeb seda saiti ainult siis, kui riik kattub JA saidil on mõni halduri silt.",
+      "label": "Sildid",
+      "placeholder": "Vali sildid…",
+      "none": "Silte veel pole. Loo sildid esmalt sildihalduses.",
+      "save": "Salvesta sildid",
+      "saved": "Sildid uuendatud."
+    },
     "deploy": {
       "title": "Juurutamine",
       "cardDescription": "Loo või uuenda selle saidi CMS-Worker Cloudflare'is.",

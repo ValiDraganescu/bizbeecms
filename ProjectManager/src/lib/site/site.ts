@@ -164,6 +164,15 @@ export async function getSiteTagIds(siteId: string): Promise<string[]> {
   return rows.map((r) => r.tagId);
 }
 
+/** Replace a Site's tags with `tagIds` (delete-all + insert, full replace). */
+export async function setSiteTags(siteId: string, tagIds: string[]): Promise<void> {
+  const db = await getDb();
+  await db.delete(schema.siteTags).where(eq(schema.siteTags.siteId, siteId));
+  if (tagIds.length > 0) {
+    await db.insert(schema.siteTags).values(tagIds.map((tagId) => ({ siteId, tagId })));
+  }
+}
+
 /** Site ids this user is assigned to (via site_users). */
 async function getAssignedSiteIds(userId: string): Promise<string[]> {
   const db = await getDb();

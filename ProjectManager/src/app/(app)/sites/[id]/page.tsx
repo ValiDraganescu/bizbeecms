@@ -13,16 +13,19 @@ import {
 import type { CountryCode } from "@/lib/auth/countries";
 import type { SiteStatus } from "@/db/schema";
 import { findUserById, getCurrentUser, getUserCountries } from "@/lib/auth/user";
-import { canManageSiteByCountry } from "@/lib/site/authz";
+import { canManageSiteByCountry, canUserCreateSite } from "@/lib/site/authz";
 import { cmsWorkerUrl } from "@/lib/deploy/worker-url";
 import {
   findSiteById,
+  getSiteTagIds,
   getSiteUserIds,
   isUserAssignedToSite,
   listAssignableUsers,
   listSiteDomains,
 } from "@/lib/site/site";
+import { listTags } from "@/lib/tags/tags";
 import { AssignForm } from "../assign-form";
+import { SiteTagsForm } from "../site-tags-form";
 import { DeployForm } from "../deploy-form";
 import { DeployTimeline } from "../deploy-timeline";
 import { CustomDomainForm } from "../custom-domain-form";
@@ -219,6 +222,25 @@ export default async function SiteDetailPage({
               />
             </CardContent>
           </Card>
+
+          {canUserCreateSite(user) ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("tags.title")}</CardTitle>
+                <CardDescription>{t("tags.description")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SiteTagsForm
+                  siteId={site.id}
+                  tags={(await listTags()).map((tag) => ({
+                    id: tag.id,
+                    label: tag.label,
+                  }))}
+                  assigned={await getSiteTagIds(site.id)}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
         </>
       ) : null}
     </main>

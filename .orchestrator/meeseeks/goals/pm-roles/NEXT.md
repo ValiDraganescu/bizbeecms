@@ -1,33 +1,29 @@
 # Note to the next Meeseeks (pm-roles)
 
-Slices 1–5 + 6 are all DONE. The role overhaul (SuperAdmin/Admin/Manager/Editor),
-removal hierarchy, tags model + Manager country-AND-tag reach, tag CRUD, the global
-user-management API + UI, AND the invite flow (now grants Manager/Editor + tags)
-are all delivered and gated (tsc 0, 112 node tests, opennext build green).
+Slices 1–7 are all DONE. The full GOAL.md "what good looks like" list is now met
+end-to-end: role overhaul (SuperAdmin/Admin/Manager/Editor), removal hierarchy,
+tags model + Manager country-AND-tag reach, tag CRUD, global user-mgmt API+UI,
+invite flow with Manager/Editor+tags, AND (Slice 7) the Site-detail tag picker —
+so Sites can actually carry tags and Manager reach works in practice.
+All gated: tsc 0, 115 node tests, opennext build green.
 
-Slice 6 delivered:
-- `invite_tags` table + migration `0008_ambiguous_carnage.sql`.
-- `authorizeInvite` reuses `authorizeAssign` (single subset source of truth);
-  `INVITABLE_ROLES = [Admin, Manager, Editor]`; tags only for Manager invites.
-- `createInvite`/`acceptInvite` carry tags; `createUser` takes `tagIds`.
-- invite-form shows a tag multiselect when role=Manager; pending list has a Tags
-  column; EN/FI/ET strings added; `lib/invite/authz-slice6.test.ts`.
+Slice 7 delivered:
+- `setSiteTags` helper (`lib/site/site.ts`), `PUT /api/sites/[id]/tags` (Admin+,
+  re-validates ids vs `listTags()`), `SiteTagsForm` Combobox multiselect wired
+  into `sites/[id]/page.tsx` (Admin+ gated). EN/FI/ET `sites.tags.*`.
+  `lib/site/site-tags-slice7.test.ts`.
 
-PICK NEXT — the GOAL.md "what good looks like" list is essentially met, but two
-gaps are worth a slice:
-1. **Site detail tag picker.** GOAL/Slice-3b note says "the Site detail page gets a
-   tag picker too" — a Site carries zero+ tags (`site_tags`) but I did NOT see a UI
-   to assign them at `app/(app)/sites/[id]`. Without it, Managers can be tag-scoped
-   but no Site ever HAS a tag, so Manager reach is always empty in practice. Add a
-   tag multiselect on the Site detail page + a `setSiteTags` helper + route (mirror
-   `setUserTags` + the tags GET). This is the highest-value remaining slice — it
-   makes the whole Manager tag dimension actually usable end-to-end.
-2. **Editor invites + assignment.** Editor is invitable now, but an Editor only
-   reaches Sites it's ASSIGNED to (`site_users`). Check the invite/accept path
-   doesn't need a follow-up site-assignment step, and that the per-Site assign UI
-   at `sites/[id]` lists Editors correctly.
-
-Do #1 first — it closes the last functional gap in the Manager scope story.
+PICK NEXT — the core goal is complete; candidate polish slices (none urgent):
+1. **End-to-end Manager smoke (manual/browser).** No live-D1 run has exercised the
+   full chain: create a tag → tag a Site → invite/assign a Manager with that country
+   + tag → confirm the Manager's `/sites` list shows ONLY matching Sites and the
+   detail page is reachable. All the pieces are unit/source-tested but never run
+   together against real D1. Worth a browser pass at https://bizbee.localhost.
+2. **Editor invite→assignment follow-up.** Editor is invitable but only reaches
+   ASSIGNED sites; verify the accept path + per-Site assign UI list Editors right
+   (NEXT.md item #2 from the prior run — still unverified end-to-end).
+3. **Promote the overlay-dialog/confirm-modal pattern to components/ui** — it's now
+   copy-pasted in tags-manager + users-manager (2 copies); a 3rd would justify it.
 
 PARALLEL-SAFETY: stay OUT of CMS/ and don't run bundle:cms — another worker owns it.
 PM commands run inside ProjectManager/. tsc + npm test + opennext build, NOT while

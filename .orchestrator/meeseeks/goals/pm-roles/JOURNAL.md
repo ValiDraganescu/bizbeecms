@@ -184,3 +184,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   src/lib/invite/authz-slice6.test.ts, src/lib/auth/user.ts,
   src/app/api/invite/route.ts, src/app/(app)/invite/{page,invite-form}.tsx,
   messages/{en,fi,et}.json.
+
+## 2026-06-22 13:07 — Slice 7: Site-detail tag picker
+- **Status:** DONE
+- **What I did:** Closed the last functional gap in the Manager scope story — a Site
+  can now carry org tags from the UI, making Manager country-AND-tag reach usable
+  end-to-end (previously no Site could ever HAVE a tag, so every Manager's set was
+  empty). Added `setSiteTags(siteId, tagIds)` to `lib/site/site.ts` (delete-all+insert
+  full replace, mirrors `setUserTags`); `PUT /api/sites/[id]/tags/route.ts` gated
+  Admin+ via `canUserCreateSite` and re-validating ids against `listTags()`;
+  `SiteTagsForm` client component (Combobox multiselect, mirrors `assign-form.tsx`)
+  wired into `sites/[id]/page.tsx` inside the `canManage` block, additionally gated
+  `canUserCreateSite(user)` (Admin+, matches tag-management tier). EN/FI/ET
+  `sites.tags.*` strings. Regression test `lib/site/site-tags-slice7.test.ts`
+  (source-text + i18n, alias-free pattern per CAVEATS).
+- **Verified:** PM `tsc --noEmit` exit 0; `npm test` 115 pass / 0 fail (+3 new);
+  `npx opennextjs-cloudflare build` green (dev not on 3601). Could not exercise the
+  route at runtime (no live D1 in this run) — gated by tsc+build like Slice 4's routes.
+- **Files:** ProjectManager/src/lib/site/site.ts,
+  ProjectManager/src/app/api/sites/[id]/tags/route.ts,
+  ProjectManager/src/app/(app)/sites/site-tags-form.tsx,
+  ProjectManager/src/app/(app)/sites/[id]/page.tsx,
+  ProjectManager/src/lib/site/site-tags-slice7.test.ts,
+  ProjectManager/messages/{en,fi,et}.json

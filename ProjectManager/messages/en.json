@@ -341,6 +341,15 @@
       "save": "Save assignments",
       "saved": "Assignments updated."
     },
+    "tags": {
+      "title": "Tags",
+      "description": "Org tags scope this Site for Managers. A Manager sees this Site only when its country matches AND it carries one of the Manager's tags.",
+      "label": "Tags",
+      "placeholder": "Pick tags…",
+      "none": "No tags yet. Create tags in Tag management first.",
+      "save": "Save tags",
+      "saved": "Tags updated."
+    },
     "deploy": {
       "title": "Deployment",
       "cardDescription": "Provision or update this Site's CMS Worker on Cloudflare.",
