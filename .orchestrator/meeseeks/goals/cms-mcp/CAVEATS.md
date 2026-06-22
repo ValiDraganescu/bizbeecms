@@ -64,6 +64,24 @@ Read every line before working. Each entry was learned the hard way by a previou
   cookie `requireAdmin`. The store uses the `getDb()` Db port (never raw `env.DB`),
   so it doesn't trip the sole-reader env.DB guard.
 
+- **MCP transport = Streamable HTTP, stateless JSON mode (SETTLED Slice 3).** The
+  `/mcp` route POSTs one JSON-RPC 2.0 message → one JSON-RPC response as
+  `application/json`. NO session id, NO standing SSE stream, NO server-initiated
+  notifications (our tools are pure request/response). Protocol version `2025-06-18`.
+  Hand-rolled in `app/mcp/mcp-core.ts` — do NOT add `@modelcontextprotocol/sdk`
+  (Node-coupled/heavy; we need ~5 methods). MCP tool entries are `{name, description,
+  inputSchema}`; our function-calling schemas are `{type:function, function:{name,
+  description, parameters}}` — `toMcpTools` maps them (parameters→inputSchema, missing
+  →empty object schema). Keep `listTools`/`runTool` INJECTED into `handleRpc` so the
+  pure core stays node-testable and the data path stays the shared one.
+
+- **A RED shared tsc/opennext gate may be a PARALLEL worker's in-flight file, not
+  yours.** Slice 3 hit `src/lib/content/binding.ts:37` TS2339 — the RENDERER worker's
+  UNTRACKED file. Don't retry the shared opennext/bundle gate against another worker's
+  transient error and don't touch their files; verify YOUR files are tsc-clean
+  (`tsc --noEmit | grep src/app/mcp` → 0) and DEFER the bundle regen to a follow-up run
+  once the tree's tsc is green. The bundle catch-up is a tracked follow-up, not a blocker.
+
 - **Gate every slice:** CMS `tsc` + `npx opennextjs-cloudflare build` green (NEVER
   while `npm run dev` is up). Regen the PM `cms-bundle`. EN/FI/ET for new UI strings.
   No native confirm()/alert() — in-app modal for key revoke (browser-review sessions

@@ -60,3 +60,40 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/db/api-key-store.ts, CMS/src/lib/auth/api-key-guard.ts,
   CMS/scripts/api-key-core.test.mjs,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-22 13:50 — Slice 3: remote MCP server endpoint (/mcp) on the CMS Worker
+- **Status:** DONE (code+tests; PM bundle regen DEFERRED — see below)
+- **Transport SPIKE result (the one unknown):** remote MCP on a Worker = **Streamable
+  HTTP** (current MCP transport, supersedes the old HTTP+SSE pair). Our tool surface is
+  pure request/response (no server-initiated notifications), so we use the simplest
+  spec-compliant mode: client POSTs one JSON-RPC 2.0 message, server replies with ONE
+  JSON-RPC response as `application/json` (no session, no standing SSE stream).
+  **Hand-rolled the JSON-RPC** — did NOT add `@modelcontextprotocol/sdk` (Node-coupled,
+  heavy; the methods we need are ~5). Claude Code adds the site URL + bearer header as a
+  remote MCP server and the tools appear.
+- **What I did:**
+  - `CMS/src/app/mcp/mcp-core.ts` (PURE, no `@/` → node-testable): protocol version
+    `2025-06-18`, JSON-RPC types/codes, `parseJsonRpc` (envelope shape-check),
+    `toMcpTools` (maps our `{type:function,function:{name,description,parameters}}`
+    schemas → MCP `{name,description,inputSchema}`; missing params → empty object schema;
+    junk skipped), `parseToolCall`, `toMcpToolResult` (wraps the `{name,ok,…}` dispatch
+    payload as one JSON text content block, `isError = ok===false`), and `handleRpc`
+    (dispatch: initialize / tools/list / tools/call / ping / notifications → null).
+    `listTools`+`runTool` are INJECTED so the data path stays the SHARED one.
+  - `CMS/src/app/mcp/route.ts` (CF-coupled): `POST /mcp` gated by `requireApiKey`
+    (Slice 2, SEPARATE from the cookie guard); `tools/list` from `allToolSchemas()`,
+    `tools/call` → `runTool` (shared dispatch — NOT forked; new tools like
+    content-collections appear for free). Notification → 202 no-body; parse/internal
+    errors → JSON-RPC error envelopes. `GET /mcp` → 405 (no standing SSE in JSON mode).
+    Browser `/api/chat` untouched (still cookie-authed).
+  - `CMS/src/app/mcp/mcp-core.test.ts`: 10 node `--test` cases — schema mapping, envelope
+    validation, initialize/list/call routing, arg defaulting, missing-name reject,
+    isError flagging, notification null, unknown-method error, parseToolCall guards.
+- **Verified:** `node --test src/app/mcp/*.test.ts` → 10/10 pass. `tsc --noEmit` → **0
+  errors in src/app/mcp/**** (the only tsc error in the tree is `src/lib/content/
+  binding.ts:37`, the RENDERER worker's in-flight UNTRACKED file — out of my scope).
+  Could NOT run the full `opennextjs-cloudflare build` / PM `bundle:cms` because that
+  gate is RED on the renderer's binding.ts AND would race their shared `.next`. The live
+  Claude-Code-connects-over-the-network handshake can't be exercised offline (needs a
+  deployed Worker + a minted key) — that's the only HITL spot-check, noted in NEXT.
+- **Files:** CMS/src/app/mcp/{mcp-core.ts, route.ts, mcp-core.test.ts}

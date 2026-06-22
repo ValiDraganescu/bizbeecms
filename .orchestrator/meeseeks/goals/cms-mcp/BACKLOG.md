@@ -25,15 +25,15 @@ node tests + EN/FI/ET for new strings.
   `lib/auth/api-key-guard.ts` `requireApiKey` — SEPARATE from the cookie guard,
   fail-closed. Gate green; bundle regen. No MCP/UI yet.
 
-- TODO: **Slice 3 — MCP server endpoint on the Worker (the core).** Mount an MCP
-  remote-server endpoint (`/mcp`) on the CMS Worker, auth-gated by `requireApiKey`
-  (Slice 2). Implement the MCP transport Claude Code expects for a REMOTE server
-  (streamable-HTTP / SSE — VERIFY current expectation + whether to use an SDK vs.
-  hand-rolled JSON-RPC; spike this first, note the choice in JOURNAL). Expose the
-  SHARED tool registry (Slice 1): MCP `tools/list` from the registry schemas, MCP
-  `tools/call` → the shared dispatch → structured result. The browser `/api/chat`
-  stays unchanged. Test the JSON-RPC shape (list returns the tools; call routes to a
-  handler; bad key rejected) without a live agent. Gate.
+- DONE (2026-06-22): **Slice 3 — MCP server endpoint on the Worker (the core).**
+  SPIKE → Streamable HTTP, stateless JSON mode (POST one JSON-RPC 2.0 msg → one JSON
+  response); hand-rolled (no SDK). `CMS/src/app/mcp/mcp-core.ts` (pure: schema→MCP
+  mapping, envelope parse, `handleRpc` for initialize/tools.list/tools.call/ping/
+  notifications) + `route.ts` (`POST /mcp` gated by `requireApiKey`, enumerates the
+  SHARED `allToolSchemas()`, `tools/call`→`runTool` shared dispatch; GET→405) +
+  `mcp-core.test.ts` (10 node tests). `tsc` clean for my files, browser `/api/chat`
+  untouched. ⚠️ PM `cms-bundle` regen DEFERRED — shared gate was RED on the renderer's
+  in-flight `binding.ts`; a later cms-mcp run regens once that tsc is green.
 
 - TODO: **Slice 4 — API-key management UI (CMS admin).** CMS → Settings → API Keys:
   list keys (label, created, last used, revoked), generate (show the key ONCE in an
