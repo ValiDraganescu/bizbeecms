@@ -3,10 +3,11 @@
  * subgoal). CMS code depends on this small interface instead of touching the
  * Cloudflare `env.AI` Workers AI binding directly.
  *
- * In scope: the interface + a single Cloudflare adapter (`CfAi`) that wraps the
- * `env.AI.run(...)` call 1:1 — ZERO behavior change. NOT in scope: a second
- * (OpenAI/Anthropic-direct) adapter — main is "fully Cloudflare-native". We build
- * the socket, not the second plug.
+ * In scope: the interface + TWO adapters — `CfAi` (wraps `env.AI.run(...)` 1:1)
+ * and `OpenRouterAi` (OpenAI-compatible HTTP call to openrouter.ai). The ORIGINAL
+ * note said "no second adapter — CF-native"; the ai-openrouter goal INTENTIONALLY
+ * reverses that: OpenRouter becomes the default provider, `CfAi` stays as the
+ * fallback. The point of the port is exactly this swappability.
  *
  * The port exposes ONLY what the chat route actually needs: one streaming chat
  * completion. It is the OpenAI-compatible Workers AI call — `messages` in, an SSE
@@ -77,6 +78,69 @@ export class CfAi implements Ai {
       inputs,
       runOptions,
     )) as ReadableStream<Uint8Array>;
+  }
+}
+
+/** OpenRouter's OpenAI-compatible chat-completions endpoint. */
+export const OPENROUTER_CHAT_URL =
+  "https://openrouter.ai/api/v1/chat/completions";
+
+/** Minimal `fetch` surface the OpenRouter adapter needs (so tests can fake it). */
+type FetchLike = (
+  url: string,
+  init: {
+    method: string;
+    headers: Record<string, string>;
+    body: string;
+  },
+) => Promise<{ ok: boolean; status: number; body: ReadableStream<Uint8Array> | null }>;
+
+/**
+ * OpenRouter adapter — same streaming OpenAI-compatible `Ai` contract as `CfAi`,
+ * over HTTP. POSTs `{ messages, model, stream: true, tools? }` to OpenRouter with
+ * `Authorization: Bearer <key>` and returns the raw upstream SSE byte stream
+ * (`response.body`) UNCHANGED — no buffering, tool-calls round-trip as deltas.
+ *
+ * `gatewayId` is accepted for interface parity but unused here: OpenRouter has its
+ * own gateway/spend controls; the CF AI Gateway slug doesn't apply.
+ *
+ * ponytail: injects `fetch` so the adapter is unit-testable against a fake; the
+ * factory passes the global `fetch`.
+ */
+export class OpenRouterAi implements Ai {
+  private readonly apiKey: string;
+  private readonly fetchImpl: FetchLike;
+  constructor(apiKey: string, fetchImpl: FetchLike = fetch as unknown as FetchLike) {
+    this.apiKey = apiKey;
+    this.fetchImpl = fetchImpl;
+  }
+
+  async chat(
+    messages: ChatMessage[],
+    options: ChatOptions,
+  ): Promise<ReadableStream<Uint8Array>> {
+    const body: Record<string, unknown> = {
+      model: options.model,
+      messages,
+      stream: true,
+    };
+    if (options.tools) body.tools = options.tools;
+
+    const res = await this.fetchImpl(OPENROUTER_CHAT_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok || !res.body) {
+      throw new Error(
+        `OpenRouter chat failed: HTTP ${res.status}${res.body ? "" : " (no body)"}`,
+      );
+    }
+    return res.body;
   }
 }
 
