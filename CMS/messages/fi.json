@@ -267,7 +267,11 @@
     "errorInvalid": "Virheellinen sähköposti tai salasana.",
     "errorNetwork": "Palvelimeen ei saatu yhteyttä. Yritä uudelleen.",
     "or": "tai",
-    "ssoButton": "Kirjaudu BizbeeCMS-tunnuksella"
+    "ssoButton": "Kirjaudu BizbeeCMS-tunnuksella",
+    "googleButton": "Kirjaudu Google-tilillä",
+    "googleDenied": "Tällä Google-tilillä ei ole oikeutta kirjautua tänne. Pyydä kutsua sivuston ylläpitäjältä.",
+    "googleInvitePending": "Sinulla on odottava kutsu — viimeistele tilisi avaamalla sähköpostissasi oleva kutsulinkki.",
+    "googleError": "Google-kirjautuminen epäonnistui. Yritä uudelleen."
   },
   "adminNav": {
     "brand": "CMS-hallinta",

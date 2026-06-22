@@ -267,7 +267,11 @@
     "errorInvalid": "Incorrect email or password.",
     "errorNetwork": "Couldn't reach the server. Try again.",
     "or": "or",
-    "ssoButton": "Sign in with BizbeeCMS"
+    "ssoButton": "Sign in with BizbeeCMS",
+    "googleButton": "Sign in with Google",
+    "googleDenied": "That Google account isn't allowed to sign in here. Ask a site administrator for an invitation.",
+    "googleInvitePending": "You have a pending invitation — open the invite link in your email to finish setting up your account.",
+    "googleError": "Google sign-in failed. Try again."
   },
   "adminNav": {
     "brand": "CMS admin",

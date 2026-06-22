@@ -1,0 +1,108 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import {
+  GOOGLE_TOKEN_ENDPOINT,
+  decideGoogleSignIn,
+  verifiedEmailFromIdToken,
+  verifyState,
+} from "@/lib/auth/google-core";
+import { createSession } from "@/db/session-store";
+import { findUserByEmail } from "@/db/user-store";
+import { hasPendingInvite } from "@/db/invite-store";
+
+/**
+ * Google sign-in CALLBACK (cms-auth Slice 2b). Google redirects the browser here
+ * with `?code=…&state=…`. We:
+ *   1. verify the signed `state` (CSRF — must match what start issued, unexpired),
+ *   2. exchange the `code` at Google's token endpoint (server-to-server, holds
+ *      the client_secret) for an id_token,
+ *   3. extract the VERIFIED email from the id_token (aud === our client, Google
+ *      issuer, email_verified === true),
+ *   4. allow sign-in ONLY if that email matches a CMS user OR a pending invite —
+ *      NO self-signup (Slice-0 decision 3; randoms can't walk in). A pending
+ *      invite is consumed by upgrading it: we mint a session for the matched user
+ *      if one exists; an invited-but-not-yet-a-user email is sent to the invite
+ *      accept flow to finish (it has no password yet). For the simple case we
+ *      sign in an EXISTING user; an invited-only email is redirected to /admin
+ *      with a hint so the invite-accept page can complete (keeps one user-creation
+ *      path — the invite flow).
+ *   5. mint the same `bizbee_session` CMS-local session (one session notion).
+ *
+ * Fail-closed: bad state, failed exchange, unverified email, or an uninvited
+ * email → redirect to /admin with an `?error=` the login page surfaces. The
+ * redirect_uri MUST match start's (APP_ORIGIN-based) or Google rejects the
+ * exchange.
+ *
+ * REST route handler, not a server action (server actions 500 on OpenNext).
+ */
+function redirect(to: string): Response {
+  return new Response(null, { status: 302, headers: { location: to } });
+}
+
+export async function GET(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  const code = url.searchParams.get("code") ?? "";
+  const state = url.searchParams.get("state") ?? "";
+
+  const { env } = await getCloudflareContext({ async: true });
+  const e = env as unknown as Record<string, unknown>;
+  const clientId = typeof e.GOOGLE_CLIENT_ID === "string" ? e.GOOGLE_CLIENT_ID : "";
+  const clientSecret = typeof e.GOOGLE_CLIENT_SECRET === "string" ? e.GOOGLE_CLIENT_SECRET : "";
+  const cmsSecret = typeof e.CMS_AUTH_SECRET === "string" ? e.CMS_AUTH_SECRET : "";
+  const appOrigin = typeof e.APP_ORIGIN === "string" ? e.APP_ORIGIN : "";
+
+  if (!code || !state || !clientId || !clientSecret || !cmsSecret || !appOrigin) {
+    return redirect("/admin?error=google");
+  }
+
+  // 1. CSRF: the state must be one we signed and not expired.
+  if (!(await verifyState(state, cmsSecret))) {
+    return redirect("/admin?error=google");
+  }
+
+  // 2. Exchange the code for tokens (server-to-server; client_secret never leaves
+  //    the Worker). redirect_uri MUST equal the one start sent.
+  const redirectUri = `${appOrigin.replace(/\/+$/, "")}/api/auth/google/callback`;
+  let idToken = "";
+  try {
+    const res = await fetch(GOOGLE_TOKEN_ENDPOINT, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+      }).toString(),
+    });
+    const body = (await res.json().catch(() => null)) as { id_token?: unknown } | null;
+    if (res.status === 200 && body && typeof body.id_token === "string") {
+      idToken = body.id_token;
+    }
+  } catch {
+    idToken = "";
+  }
+  if (!idToken) return redirect("/admin?error=google");
+
+  // 3. Verified email from the id_token.
+  const email = verifiedEmailFromIdToken(idToken, clientId);
+
+  // 4. Resolve existence (user / pending invite) and apply the no-self-signup rule.
+  const user = email ? await findUserByEmail(email) : null;
+  const pendingInvite = email && !user ? await hasPendingInvite(email) : false;
+  const decision = decideGoogleSignIn(email, { user: user != null, pendingInvite });
+  if (!decision.ok) {
+    return redirect(`/admin?error=${decision.reason === "notInvited" ? "googleDenied" : "google"}`);
+  }
+
+  // An invited-but-not-yet-a-user email: finish via the invite-accept flow (it has
+  // no CMS user / password yet). Existing users sign in directly.
+  if (!user) {
+    // Pending invite only → they still need to accept (sets up their account).
+    return redirect("/admin?error=googleInvitePending");
+  }
+
+  // 5. Mint the CMS-local session (sets the bizbee_session cookie).
+  await createSession(user.id);
+  return redirect("/admin");
+}

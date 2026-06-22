@@ -43,10 +43,28 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   // Not signed in → show the in-CMS login page (no auto-redirect to PM).
   const { env } = await getCloudflareContext({ async: true });
-  const e = env as unknown as { PM_ORIGIN?: string; CMS_AUTH_SECRET?: string };
+  const e = env as unknown as {
+    PM_ORIGIN?: string;
+    CMS_AUTH_SECRET?: string;
+    GOOGLE_CLIENT_ID?: string;
+    APP_ORIGIN?: string;
+  };
   const pmOrigin = e.PM_ORIGIN;
+  // Google button shows only when the OAuth client is configured (id + the
+  // APP_ORIGIN the redirect_uri is built from). The button just links to
+  // /api/auth/google/start — no secret reaches the client.
+  const showGoogle = Boolean(e.GOOGLE_CLIENT_ID && e.APP_ORIGIN);
 
   const h = await headers();
+
+  // Surface a Google callback error (?error=…) as a banner on the login page.
+  const reqForError = h.get("x-forwarded-url") ?? h.get("referer");
+  let loginError: string | null = null;
+  try {
+    if (reqForError) loginError = new URL(reqForError).searchParams.get("error");
+  } catch {
+    loginError = null;
+  }
 
   // Show the SSO button ONLY when the visitor came from PM — matched against the
   // configured PM_ORIGIN (never a hardcoded domain). `?from=pm` is the explicit
@@ -82,5 +100,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       `?return=${encodeURIComponent(returnUrl)}`;
   }
 
-  return <LoginForm showSso={showSso && ssoUrl !== ""} ssoUrl={ssoUrl} />;
+  return (
+    <LoginForm
+      showSso={showSso && ssoUrl !== ""}
+      ssoUrl={ssoUrl}
+      showGoogle={showGoogle}
+      error={loginError}
+    />
+  );
 }

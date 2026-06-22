@@ -61,7 +61,19 @@ green + regen PM cms-bundle + EN/FI/ET for new strings.
   Google button (Slice 2b). EN/FI/ET for the page + button. Node test the SSO-button
   visibility helper (origin match true/false).
 
-- TODO: **Slice 2b — Google sign-in (OAuth 2.0, own client) on the login page.**
+- DONE: **Slice 2b — Google sign-in (OAuth 2.0, own client) on the login page.**
+  See JOURNAL 2026-06-22 (Slice 2b). Pure `lib/auth/google-core.ts`
+  (buildGoogleAuthUrl + signed-state CSRF signState/verifyState +
+  verifiedEmailFromIdToken[aud/iss/email_verified/exp] + decideGoogleSignIn
+  no-self-signup rule), routes `GET /api/auth/google/{start,callback}` (start →
+  consent w/ signed state; callback → token exchange → verify id_token → allow ONLY
+  if a CMS user OR pending invite exists, else `?error=googleDenied`; mints the same
+  `bizbee_session` session). Login page Google button (shown when GOOGLE_CLIENT_ID +
+  APP_ORIGIN set) + `?error=` banner. EN/FI/ET `login.google*` keys. Deployer injects
+  GOOGLE_CLIENT_ID/SECRET (env type + container env + `--var`) + wrangler.jsonc
+  placeholders. 17 new node tests (733 total), tsc + opennext build green,
+  cms-bundle regen. Live OAuth round-trip + Google-client provisioning → HITL.md.
+  Original spec below.
   USER 2026-06-21: the login page must also offer **Sign in with Google**. NO Google
   auth exists anywhere in the repo today — this is net-new. Register a Google Cloud
   OAuth 2.0 client; add `GET /api/auth/google/start` (redirect to Google's consent

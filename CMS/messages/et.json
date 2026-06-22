@@ -267,7 +267,11 @@
     "errorInvalid": "Vale e-post või parool.",
     "errorNetwork": "Serveriga ei õnnestunud ühendust luua. Proovi uuesti.",
     "or": "või",
-    "ssoButton": "Logi sisse BizbeeCMS-iga"
+    "ssoButton": "Logi sisse BizbeeCMS-iga",
+    "googleButton": "Logi sisse Google'iga",
+    "googleDenied": "Sellel Google'i kontol pole õigust siia sisse logida. Küsi saidi administraatorilt kutset.",
+    "googleInvitePending": "Sul on ootel kutse — konto seadistuse lõpetamiseks ava oma e-kirjas olev kutselink.",
+    "googleError": "Google'iga sisselogimine ebaõnnestus. Proovi uuesti."
   },
   "adminNav": {
     "brand": "CMS-i haldus",

@@ -7,7 +7,9 @@
  *   - email + password → POST /api/auth/login (mints a CMS-local session).
  *   - "Sign in with BizbeeCMS" SSO → only rendered when `showSso` (the server
  *     computed it from the PM origin); kicks off the existing cms-sso handoff.
- *   - Google → placeholder slot (wired in Slice 2b).
+ *   - Google (OAuth 2.0) → only rendered when `showGoogle` (the server saw a
+ *     configured Google client); links to /api/auth/google/start. A callback
+ *     error (no self-signup, expired state, …) comes back as `error` → banner.
  *
  * REST-only (no server actions). All copy via next-intl (EN/FI/ET). Purpose-token
  * Tailwind utilities only. On success we hard-navigate to /admin so the new
@@ -20,18 +22,37 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
+/** Map a Google callback `?error=` code to a user-facing message. */
+function googleErrorMessage(code: string, t: (k: string) => string): string {
+  switch (code) {
+    case "googleDenied":
+      return t("googleDenied");
+    case "googleInvitePending":
+      return t("googleInvitePending");
+    default:
+      return t("googleError");
+  }
+}
+
 export function LoginForm({
   showSso,
   ssoUrl,
+  showGoogle = false,
+  error: initialError = null,
 }: {
   showSso: boolean;
   ssoUrl: string;
+  showGoogle?: boolean;
+  /** A callback error code (e.g. "googleDenied") surfaced from the server. */
+  error?: string | null;
 }) {
   const t = useTranslations("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    initialError ? googleErrorMessage(initialError, t) : null,
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -109,21 +130,29 @@ export function LoginForm({
         </button>
       </form>
 
-      {/* Google sign-in slot — wired in Slice 2b. */}
-
-      {showSso && (
+      {(showGoogle || showSso) && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-xs text-foreground-muted">
             <span className="h-px flex-1 bg-border" />
             {t("or")}
             <span className="h-px flex-1 bg-border" />
           </div>
-          <a
-            href={ssoUrl}
-            className="rounded-md border border-border bg-surface px-4 py-2 text-center text-sm font-medium text-foreground hover:bg-surface-raised"
-          >
-            {t("ssoButton")}
-          </a>
+          {showGoogle && (
+            <a
+              href="/api/auth/google/start"
+              className="rounded-md border border-border bg-surface px-4 py-2 text-center text-sm font-medium text-foreground hover:bg-surface-raised"
+            >
+              {t("googleButton")}
+            </a>
+          )}
+          {showSso && (
+            <a
+              href={ssoUrl}
+              className="rounded-md border border-border bg-surface px-4 py-2 text-center text-sm font-medium text-foreground hover:bg-surface-raised"
+            >
+              {t("ssoButton")}
+            </a>
+          )}
         </div>
       )}
     </main>

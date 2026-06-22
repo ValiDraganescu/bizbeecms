@@ -231,3 +231,36 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/settings/settings-nav.tsx, CMS/messages/{en,fi,et}.json,
   CMS/scripts/user-mgmt.test.mjs (new),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js.
+
+## 2026-06-22 14:47 — Slice 2b: Google sign-in (OAuth 2.0, own client)
+- **Status:** DONE (offline code+tests+gate; live OAuth round-trip → HITL.md)
+- **What I did:** Net-new "Sign in with Google" on the CMS login page. Pure
+  `lib/auth/google-core.ts`: `buildGoogleAuthUrl` (scope `openid email`),
+  stateless signed-state CSRF (`signState`/`verifyState` — HMAC over nonce+ts with
+  CMS_AUTH_SECRET, 10-min TTL, NO server store needed), `verifiedEmailFromIdToken`
+  (decodes the JWT payload + enforces Google iss, `aud===clientId`,
+  `email_verified===true`, `exp` not past; normalises email), and the PURE
+  `decideGoogleSignIn` rule — **no self-signup**: allowed ONLY if a CMS user OR a
+  pending invite exists (Slice-0 decision 3). Routes: `GET /api/auth/google/start`
+  (302 → consent w/ signed state; redirect_uri from APP_ORIGIN so it matches the
+  registered client) + `GET /api/auth/google/callback` (verify state → token
+  exchange holding client_secret → verify id_token → existence check via
+  findUserByEmail/hasPendingInvite → mint `bizbee_session` for an existing user;
+  uninvited→`?error=googleDenied`, invite-only→`?error=googleInvitePending`,
+  failures→`?error=google`). Login page: Google button shown when GOOGLE_CLIENT_ID
+  + APP_ORIGIN are set (server flag), `?error=` surfaced as a banner; the `or`
+  divider now wraps Google+SSO. EN/FI/ET `login.google{Button,Denied,InvitePending,
+  Error}`. Deployer threaded GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET (Env type +
+  container env injection + two `--var` lines) + CMS wrangler.jsonc placeholders.
+- **Verified:** 17 new node tests (auth-URL params, state round-trip/tamper/
+  wrong-secret/expiry/garbage, id_token aud/iss/verified/exp/malformed, decision
+  matrix) — 733 total green. `npx tsc --noEmit` clean. `npx opennextjs-cloudflare
+  build` green. cms-bundle regenerated from PM. COULD NOT verify the live Google
+  consent/token round-trip or redirect-URI registration (needs a real Google OAuth
+  client + deployed Worker) → appended to HITL.md ## Open (P1).
+- **Files:** CMS/src/lib/auth/google-core.ts (new),
+  CMS/src/app/api/auth/google/{start,callback}/route.ts (new),
+  CMS/src/app/admin/layout.tsx, CMS/src/components/login-form.tsx,
+  CMS/messages/{en,fi,et}.json, CMS/wrangler.jsonc,
+  CMS/scripts/google-auth.test.mjs (new), deployer/src/index.ts,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js, HITL.md.

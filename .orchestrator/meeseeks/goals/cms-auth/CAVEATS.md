@@ -232,3 +232,28 @@ Read every line before working. Each entry was learned the hard way by a previou
   stopgap).** The list flags `ssoOnly` (passwordHash==null) → UI shows "Single
   sign-on". When PM's cms-validate is extended to return the real verified email
   (the Slice-2 FOLLOW-UP), backfill these rows and the list shows the real email.
+
+- **GOOGLE SIGN-IN LANDED (Slice 2b).** Pure `lib/auth/google-core.ts`
+  (buildGoogleAuthUrl / signState+verifyState / verifiedEmailFromIdToken /
+  decideGoogleSignIn) is node-testable (type-only `CmsRole` not even needed; no
+  `@/`, only `globalThis.crypto`). Routes `app/api/auth/google/{start,callback}`.
+  KEY RULES, don't break:
+  • **redirect_uri = `<APP_ORIGIN>/api/auth/google/callback`** in BOTH start and
+    callback — Google rejects a mismatch, AND it must equal the URI registered in
+    the Google client. NEVER derive it from request Host headers (registration
+    mismatch + redirect-URI poisoning). APP_ORIGIN is the deployer-injected
+    stable workers.dev origin (same var Slice 4 uses for invite links).
+  • **NO self-signup (Slice-0 decision 3):** `decideGoogleSignIn` allows a verified
+    email ONLY if a CMS user OR a pending invite exists. An invited-but-not-yet-a-
+    user email is NOT auto-created here — it's redirected to `?error=googleInvite
+    Pending` to finish via the invite-accept flow (keeps ONE user-creation path).
+    Existing users sign in directly (mint `bizbee_session`).
+  • **state CSRF is STATELESS** — HMAC(nonce.timestamp) with CMS_AUTH_SECRET, 10-min
+    TTL. No store (the CMS has no KV; D1 would be overkill for a 10-min token).
+  • id_token is decoded, NOT JWK-signature-verified — provenance is the TLS direct
+    server-to-server token exchange (we hold client_secret). Full JWK verify is a
+    hardening follow-up, not required for the direct-exchange threat model.
+  • Google client id/secret are deployer-injected vars GOOGLE_CLIENT_ID/
+    GOOGLE_CLIENT_SECRET (Env type + container env + `--var` in deployer/src/index.ts;
+    wrangler.jsonc placeholders). Empty => button hidden + routes no-op. Live
+    provisioning + round-trip is in HITL.md ## Open (P1).
