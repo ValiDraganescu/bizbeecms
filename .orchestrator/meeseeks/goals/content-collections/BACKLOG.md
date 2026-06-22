@@ -204,9 +204,20 @@ stable id + slug (Slice 3) so this isn't a retrofit.
   routing); spec when the user greenlights. v1 single-item is query-first-match, not
   route-driven — that's the deliberate boundary.
 
-- TODO: **Phase 2 (later) — drop/rename/retype field (schema rebuild).**
-  System-generated safe table-rebuild (create content_x_new + copy + drop + rename),
-  fenced to content_*. Deferred from v1's add-only.
+- PARTIAL (2026-06-22): **Phase 2 — drop/rename field (schema rebuild) — PURE
+  PLANNER DONE.** `lib/content/schema-rebuild.ts` `planRebuild(schema, change)` →
+  ordered fence-safe statements (CREATE content_<slug>_new → INSERT…SELECT kept/
+  renamed cols → DROP old → RENAME new) + updated registry schema. Drop omits the
+  col; rename maps old→new positionally; system cols always carried; every stmt
+  asserted through the Slice-0 fence; rejections (404 unknown / 400 system-col,
+  bad-name, non-content / 409 collision). 16 node tests
+  (scripts/schema-rebuild.test.mjs), tsc clean. REMAINING for a follow-up slice:
+  the thin LIVE store (run the 4 stmts via `contentDdl` inside whatever atomic
+  boundary D1 gives — ideally one batch; D1 has no nested TXN, so on partial
+  failure the temp table is an orphan — decide cleanup) + write `newSchema` to the
+  registry; route (PATCH/DELETE field on /api/collections/[name]); operator UI +
+  AI tool + EN/FI/ET + cms-bundle regen. RETYPE is still NOT covered (needs value
+  coercion between affinities — separate slice).
 
 - TODO: **Phase 2 (later) — FTS5 full-text search (DEFERRED from v1, USER DECISION
   2026-06-22).** Per content table, a CONTENTLESS/external-content `content_<slug>_fts`

@@ -326,6 +326,27 @@ Read every line before working. Each entry was learned the hard way by a previou
   content-collections path, your slice is sound; the build re-verifies once their
   file lands. Don't touch api/invite/** or lib/auth/guard.ts to "fix" it.
 
+- **(Schema-rebuild planner) The drop/rename planner is PURE — `lib/content/
+  schema-rebuild.ts` `planRebuild(schema, change)`.** It emits the FOUR-statement
+  table-rebuild (CREATE content_<slug>_new → INSERT…SELECT → DROP old → RENAME
+  new) as an ORDERED `string[]`, ALL fenced. The live store (not built yet) MUST
+  run them IN ORDER. D1 has NO nested transactions; the safe atomic run is a
+  single `d1.batch()` of the 4 fenced statements (still one statement each so each
+  clears the fence). On partial failure mid-batch the `content_<slug>_new` temp
+  table can orphan — mirror Slice-2's "surface the real error, orphan cleanup is a
+  deliberate v1 non-concern" stance, OR DROP the temp on a caught error. RENAME
+  uses `ALTER … RENAME TO` — the fence ALLOWS it (`rename` is a keyword, `to` rides
+  as a non-builtin token, both names are content_*). The planner returns the
+  updated registry schema (`plan.newSchema.fields`) — the store writes that to the
+  `collection` registry ONLY after all 4 statements succeed. RETYPE is NOT covered
+  (affinity change needs per-row value coercion — its own slice).
+- **(Schema-rebuild planner) INSERT…SELECT copies by POSITION, names whitelisted.**
+  Both column lists are `[...SYSTEM_COLUMNS, ...userCols]` in the SAME order; the
+  new list uses renamed names, the old list uses original names. Every name is
+  re-checked against `^[a-z][a-z0-9_]*$` even though they came from the registry
+  (a corrupted registry name → 400, never inlined). Don't reorder one side without
+  the other — the copy is positional, not name-matched.
+
 - **(Slice 5) Admin UI talks to the Slice 2-4 REST routes only — no new data path.**
   Item create OMITS empty-string field values so column DEFAULTs apply; edit sends
   all keys (PATCH semantics). multiselect round-trips as a JSON-array string (parse on

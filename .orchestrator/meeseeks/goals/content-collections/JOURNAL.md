@@ -318,3 +318,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/chat/binding-tools.ts (new),
   CMS/src/lib/chat/tool-dispatch.ts, CMS/src/lib/chat/tool-scopes.ts,
   CMS/scripts/binding-tools.test.mjs (new)
+
+## 2026-06-22 14:29 — Phase-2 EXTRA: drop/rename-field schema-rebuild PLANNER (PURE)
+- **Status:** DONE
+- **What I did:** Built the PURE planner that v1's add-only schema evolution
+  deferred. `lib/content/schema-rebuild.ts`: `planRebuild(schema, change)` →
+  `PlanResult<RebuildPlan>` where a `drop`/`rename` of ONE user field emits the
+  canonical safe table-rebuild as an ORDERED, fence-safe statement list:
+  (1) `CREATE TABLE content_<slug>_new (...)` via the Slice-1 generator over the
+  revised field list, (2) `INSERT INTO content_<slug>_new (newcols) SELECT
+  (oldcols) FROM content_<slug>` (6 system cols verbatim + kept/renamed user cols,
+  positional copy maps old→new on rename, omits the col on drop), (3) `DROP TABLE
+  content_<slug>`, (4) `ALTER TABLE content_<slug>_new RENAME TO content_<slug>`.
+  Plus the updated registry schema (`newSchema.fields`) to persist after success.
+  Validation: non-content table→400, unknown field→404, system-column
+  drop/rename→400, rename-to-system/existing→400/409, bad new name (charset/
+  injection)→400, corrupted registry name in the kept set→400. EVERY emitted
+  statement is asserted through `assertStatement(sql,"write")` inside the planner
+  (don't trust "fence-safe by construction" — CAVEAT) → a generator slip is a 500.
+- **Verified:** 16 new node tests in `scripts/schema-rebuild.test.mjs` all green
+  (order, drop-omits-col, rename-maps-values, system cols carried, every stmt
+  passes the fence for drop+rename incl. last-field-drop, content_* only, all
+  rejection/attack paths incl. injection via field name). `npx tsc --noEmit` clean.
+  Did NOT run opennextjs build / bundle:cms — task said pure planner + tests ONLY,
+  and a parallel CMS worker owns the build + bundle regen (no user strings here).
+- **Files:** CMS/src/lib/content/schema-rebuild.ts (new),
+  CMS/scripts/schema-rebuild.test.mjs (new).
