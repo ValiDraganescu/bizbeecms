@@ -147,6 +147,30 @@ Read every line before working. Each entry was learned the hard way by a previou
   `table_name`. `DROP TABLE ${tableName}` is still fenced (it's a content_* identifier
   from the registry) — `contentDdl` re-validates, so even a corrupted registry name
   can't escape the namespace.
+- **(Slice 3) Item value COERCION rules (documented — Slices 4/5/6 depend on
+  them):** bool/boolean→0|1; int→trunc; number→REAL; date/datetime/time→**ISO
+  string TEXT** (accepts an ISO string OR an epoch-ms number, converts to ISO —
+  NOT stored as ms, unlike the system timestamp columns which ARE ms); select→must
+  match a declared option value; multiselect→**JSON-stringified array** of allowed
+  values (TEXT); required rejects null/undefined/empty-string. `coerceFieldValue`
+  is the single source — reuse it in Slice 4/6, don't re-coerce differently.
+- **(Slice 3) ALL item SQL is `?`-parameterized via the PURE builders in
+  `item-write.ts`** → `contentWrite`/`contentSelect`. The builders inline ONLY
+  fixed table names + system column names + enum-derived clauses; EVERY user value
+  is a bound param. Tests assert placeholder-count === params-length AND that no
+  user value string appears in the SQL. Keep that invariant — never string-concat a
+  value into item SQL.
+- **(Slice 3) Archive is a PATCH `_op` control key, not a separate verb.** `PATCH
+  .../items/[id]` with `{_op:"archive"|"unarchive"}` toggles `archived_at`; any
+  other body = a field UPDATE (PATCH semantics: only supplied keys; `_op` is
+  stripped before field updates). Don't add a separate archive route — Slice 5/6
+  call this `_op` path.
+- **(Slice 3) The `_op` key is reserved on item PATCH bodies** — a user field can't
+  be named `_op` anyway (field names must match `^[a-z][a-z0-9_]*$`, no leading
+  underscore), so there's no collision.
+- **(Slice 3) write ops return 404 on 0 changes** (`contentWrite` returns
+  `meta.changes`) — that's how update/archive/delete distinguish "item not found"
+  from success. Don't assume a write succeeded; check the change count.
 - **(Slice 2) Treat the POST/PATCH JSON body as UNTRUSTED** — `normalizeField(s)`
   coerces it to a clean `CollectionField[]` (drops unknown props, requires
   name+type) BEFORE the generator sees it; the generator's strict `COLUMN_NAME_RE`

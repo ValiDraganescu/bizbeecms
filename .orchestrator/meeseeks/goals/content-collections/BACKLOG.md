@@ -44,14 +44,24 @@ gates on CMS tsc + opennext build green + node tests + EN/FI/ET for new strings.
   the manifest. Live D1 = HITL. No user strings yet (Slice 5 UI does cms-bundle +
   EN/FI/ET).
 
-- TODO: **Slice 3 — collection ITEMS CRUD (structured, validated).** Per item:
-  insert/update/get/list/delete + ARCHIVE (soft) — likely an `id`, `slug`, `status`
-  (draft/published), `archived_at`, timestamps as system columns on every content
-  table (decide + document; the binding phase needs id+slug). All writes are
-  STRUCTURED: validate each field value against the registry schema, build a
-  PARAMETERIZED insert/update (never freeform SQL). `GET/POST/PATCH/DELETE
-  /api/collections/[name]/items`. Pure value-validation/coercion per field type,
-  node-tested. Gate.
+- DONE (2026-06-22): **Slice 3 — collection ITEMS CRUD (structured, validated).**
+  PURE `lib/content/item-write.ts` (`coerceFieldValue` per registry field type:
+  bool→0/1, int→trunc, number→REAL, date/datetime/time→ISO TEXT (accepts ISO str
+  or epoch-ms), select→options-validated, multiselect→JSON array TEXT; required
+  rejects empty; `coerceStatus` default draft) + parameterized builders
+  `buildInsert`/`buildUpdate`(PATCH semantics)/`buildArchive`/`buildUnarchive`/
+  `buildDelete`/`buildGet`/`buildList` — all `?`-placeholdered, EVERY string
+  asserted to pass the Slice-0 fence + no user value inlined. Live `db/item-store.ts`
+  (`listItems`/`getItem`/`createItem`/`updateItem`/`archiveItem`/`unarchiveItem`/
+  `deleteItem`, loads registry via `getCollection`, runs through `contentSelect`/
+  `contentWrite`, returns `PlanResult<T>`). Routes `app/api/collections/[name]/
+  items/route.ts` (GET list ?status=&archived=live|archived|all&limit= / POST
+  create 201) + `.../items/[id]/route.ts` (GET / PATCH {changes} or {_op:archive|
+  unarchive} / DELETE), Admin-gated, Next15 async params. 12 node tests
+  (coerce/status/insert/update/archive/delete/get/list, fence-safe + parallel
+  params + no-inline assertions); 48 content tests total. tsc + opennext build
+  green; both routes in the manifest. Live D1 = HITL. No user strings (Slice 5 UI
+  does cms-bundle + EN/FI/ET).
 
 - TODO: **Slice 4 — structured query (NO FTS5 in v1 — USER DECISION 2026-06-22).**
   STRUCTURED query API only: filter (field op value), sort, paginate, count →

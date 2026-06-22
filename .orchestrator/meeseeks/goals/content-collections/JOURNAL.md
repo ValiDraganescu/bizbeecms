@@ -106,3 +106,37 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/content/collection-plan.ts, CMS/src/db/collection-store.ts,
   CMS/src/app/api/collections/route.ts, CMS/src/app/api/collections/[name]/route.ts,
   CMS/scripts/collection-plan.test.mjs
+
+## 2026-06-22 13:14 — Slice 3: collection ITEMS CRUD (structured, validated)
+- **Status:** DONE
+- **What I did:** Built the items write/read path on Slice 2's split (PURE
+  builders/validators + thin live store + routes).
+  - `CMS/src/lib/content/item-write.ts` (PURE) — `coerceFieldValue` validates +
+    COERCES each value by registry field type (bool→0/1, int→trunc, number→REAL,
+    date/datetime/time→ISO TEXT accepting ISO str OR epoch-ms, select→must match
+    declared options, multiselect→allowed-values JSON array TEXT, string/text/
+    richtext/ref/asset→String; required rejects null/undefined/empty) + `coerceStatus`
+    (default 'draft', enum draft|published). Parameterized builders: `buildInsert`
+    (system cols id(uuid)/slug/status/archived_at NULL/created_at/updated_at + user
+    cols, `?` placeholders), `buildUpdate` (PATCH — only supplied keys, always sets
+    updated_at, id bound last, 400 on empty), `buildArchive`/`buildUnarchive`
+    (archived_at=now / NULL), `buildDelete`, `buildGet`, `buildList` (simple:
+    live|archived|all + status filter bound + capped LIMIT, newest first). Uses
+    EXACTLY the Slice-1 SYSTEM_COLUMNS (asserted at module load).
+  - `CMS/src/db/item-store.ts` (live I/O) — loads the registry schema via
+    `getCollection`, runs builders → `contentSelect`/`contentWrite` (Slice-0 fence),
+    returns `PlanResult<T>`; create/update re-fetch the row, write ops 404 on 0 changes.
+  - Routes: `app/api/collections/[name]/items/route.ts` (GET list w/ status/archived/
+    limit query params; POST create → 201) + `.../items/[id]/route.ts` (GET; PATCH
+    {changes} or {_op:"archive"|"unarchive"}; DELETE). Admin-gated, Next15 async params.
+- **Verified:** `node --test scripts/item-write.test.mjs` 12/12; full content suite
+  48/48 (item-write + collection-plan + collection-schema + content-fence). KEY
+  assertions: every built INSERT/UPDATE/archive/delete passes `validateStatement(_,
+  "write")`, GET/list pass read mode, placeholder count === params length, user
+  values are NEVER inlined (e.g. "Hello"/"DROP TABLE" absent from SQL). `npx tsc
+  --noEmit` clean. `npx opennextjs-cloudflare build` green (dev confirmed down);
+  both new routes in app-paths-manifest. Live D1 writes are HITL (need a real binding).
+- **Files:** CMS/src/lib/content/item-write.ts, CMS/src/db/item-store.ts,
+  CMS/src/app/api/collections/[name]/items/route.ts,
+  CMS/src/app/api/collections/[name]/items/[id]/route.ts,
+  CMS/scripts/item-write.test.mjs
