@@ -1,45 +1,42 @@
 # Note to the next Meeseeks (cms-auth)
 
-Slice 0 (identity model), Slice 1 (user/session schema + password auth), and
-Slice 2 (in-CMS login page + local-session guard + SSO rewire) are DONE.
-Don't re-litigate the four Slice-0 decisions (GOAL.md "Settled identity model").
+Slices 0, 1, 2, AND 3 are DONE. Don't re-litigate the four Slice-0 decisions
+(GOAL.md "Settled identity model").
 
-## What Slice 2 left you (all green)
-- `CMS/src/app/admin/layout.tsx` — signed-out now renders `<LoginForm>` (NO more
-  auto-redirect). Computes `showSso` via `shouldShowSsoButton` + builds the SSO
-  handoff URL behind the button.
-- `CMS/src/components/login-form.tsx` — email/password form + conditional SSO
-  button + a **Google placeholder slot** (comment marker for Slice 2b).
-- `CMS/src/app/api/auth/login/route.ts` — POST, verifies + mints local session,
-  non-enumerating 401.
-- `CMS/src/lib/auth/guard.ts` — **resolves sessions LOCALLY** (getSession →
-  findUserById). NO per-request PM forward. cms-validate is SSO-handshake-only.
-- `CMS/src/app/api/auth/sso-callback/route.ts` — nonce→sid→cms-validate→upsert
-  Admin (synthetic `<pmUserId>@pm.sso` email)→createSession.
-- `CMS/src/lib/auth/guard-core.ts` — pure `shouldShowSsoButton` (node-tested).
-- `login` i18n namespace in EN/FI/ET. cms-bundle regenerated.
+## What Slice 3 left you (all green — 608 tests, tsc + opennext build)
+- `CMS/src/lib/auth/roles.ts` — pure role tier helpers (scope-free mirror of PM
+  `removal.ts`): `canRemoveUser`, `canChangeRole`, `canInvite` (Manager+),
+  `canInviteRole(actor, target)`, `canManageUsers` (Manager+), `canEditContent`
+  (all), `INVITABLE_ROLES`. Type-only-imports `CmsRole` → node-testable.
+- `GuardDecision` now carries `role?: CmsRole` on allow + a `forbidden`/403 deny.
+- `guard.ts` exposes: `requireRole(req, allowed)` + `requireUserManager` for
+  /api/* (401 unsigned, 403 forbidden) and `checkRoleFromHeaders(allowed)` for
+  /admin pages. Role helpers re-exported from guard.ts.
+- `requireAdmin` is UNCHANGED = "any signed-in CMS user" — Editors still pass it
+  (they edit content). Use the role gates only on the NEW user-mgmt surface.
 
-## PICK NEXT: Slice 3 — CMS roles + server-side authorization
-(or Slice 2b Google sign-in if you'd rather — both are TODO; Slice 3 is the
-listed next.) See BACKLOG Slice 3 for the spec:
-- Copy the pm-roles role SET + `canRemoveUser` removal hierarchy NAMES only (drop
-  country/tag scope). Pure helpers (`canInvite`/`canManageUsers`/`canEditContent`/
-  `canRemoveUser`), node-tested.
-- Wire role checks into BOTH guard layers: the `/admin/*` page gate AND the
-  `/api/*` route guard (extend, don't fork). Right now `requireAdmin`/
-  `checkAdmin*` only check "is a valid CMS user" — Slice 3 adds the role gate.
-  `GuardDecision` already carries `userId`; thread the `role` through (the user
-  store row has it).
-- SSO users are `role=Admin` (already set by sso-callback). Local users get their
-  role from invite (Slice 4) — default `Editor` until then.
+## PICK NEXT: Slice 2b (Google sign-in) OR Slice 4 (invitation flow)
+Both are TODO. Slice 4 is the natural continuation now that roles exist:
+- Add `invites` table (id, email, role, invitedBy, token 64-hex, acceptedAt,
+  expiresAt 7-day TTL — copy PM shape, DROP invite_countries). Drizzle migration.
+- `POST /api/invite` gated by `requireRole(req, canInvite)`, validate the granted
+  role with `canInviteRole(actorRole, targetRole)`. Send accept email via the
+  Cloudflare Email Service `send_email` binding (PM's send-invite.ts targets
+  `env.EMAIL.send` but the binding is COMMENTED in wrangler — provision for CMS,
+  degrade to logging the link in dev). Accept URL = `APP_ORIGIN`-based.
+- `POST /api/invite/accept/[token]` — validate expiry/accepted, invitee sets a
+  10-char-min password (or links Google, Slice 2b), createUser with invited role,
+  mint session. Node-test create→accept happy + expired/already-accepted.
+- This slice ADDS user strings (invite email + accept page) → THEN regen
+  cms-bundle from ProjectManager (`npm run bundle:cms`).
 
 ## Heads-up / gotchas
-- **Don't reintroduce the PM forward in the guard** (CAVEAT). Local users have no
-  PM row.
-- SSO user email is the synthetic `<uuid>@pm.sso` stopgap — see CAVEAT; backfill
-  when PM returns the real email.
-- You are the sole CMS worker; a PM worker may be in `ProjectManager/src/`. Stay
-  in `CMS/src/**`; only run `npm run bundle:cms` from ProjectManager (yours) once
-  a slice adds runtime code the worker serves.
+- Role LABELS not translated yet — deferred to Slice 5 (CAVEAT). Add the `roles`
+  i18n namespace when the user-mgmt UI needs labels.
+- Don't reintroduce the PM forward in the guard (CAVEAT). Local users have no PM row.
+- SSO user email is the synthetic `<uuid>@pm.sso` stopgap (CAVEAT) — backfill when
+  PM returns the real email.
+- Sole CMS worker; a PM worker may be in ProjectManager/src/. Only run
+  bundle:cms from ProjectManager once a slice adds runtime code the worker serves.
 - Gate every slice: CMS `npm test` + `npx tsc --noEmit` + `npx opennextjs-cloudflare
-  build` (NEVER while `npm run dev` is up) + regen cms-bundle + EN/FI/ET.
+  build` (NEVER while `npm run dev` is up) + EN/FI/ET + regen cms-bundle when runtime.

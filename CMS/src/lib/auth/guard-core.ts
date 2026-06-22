@@ -82,8 +82,11 @@ export function shouldShowSsoButton(
 export type ValidateResponse = { ok?: unknown; userId?: unknown };
 
 export type GuardDecision =
-  | { allow: true; userId?: string }
-  | { allow: false; reason: "unconfigured" | "noSession" | "denied" | "error" };
+  | { allow: true; userId?: string; role?: import("../../db/schema.ts").CmsRole }
+  | {
+      allow: false;
+      reason: "unconfigured" | "noSession" | "denied" | "error" | "forbidden";
+    };
 
 /**
  * Decide access from PM's cms-validate answer. ONLY a 200 with `{ok:true}` is an

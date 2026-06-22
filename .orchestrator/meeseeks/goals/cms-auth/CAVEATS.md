@@ -155,6 +155,22 @@ Read every line before working. Each entry was learned the hard way by a previou
   origin === PM_ORIGIN (always present on a PM-link click). Don't rely on `?from=pm`
   being the only path.
 
+- **ROLES + GUARD GATES LANDED (Slice 3).** Role logic is pure in
+  `lib/auth/roles.ts` (type-only-imports `CmsRole` → node-testable; mirrors PM
+  `removal.ts`, scope DROPPED). `GuardDecision` now carries `role?: CmsRole` on
+  allow + a `forbidden` deny reason. `guard.ts` exposes `requireRole(req,
+  allowed)` (401 unsigned / 403 forbidden) + `requireUserManager` for /api/* AND
+  `checkRoleFromHeaders(allowed)` for /admin pages. **`requireAdmin` is still the
+  "any signed-in CMS user" gate — DON'T tighten it to a role check** (Editors must
+  still edit content via existing routes). Use `requireRole`/`requireUserManager`
+  for the NEW user-mgmt routes (Slice 5) and `canInviteRole` for invite-grant
+  validation (Slice 4). The helpers are re-exported from `guard.ts`.
+
+- **Role LABELS are NOT translated yet (Slice 3 deferred them to Slice 5).** No
+  EN/FI/ET strings exist for SuperAdmin/Admin/Manager/Editor in the CMS yet — add
+  a `roles` namespace (mirror PM's `messages/*.json` `roles` block: lowercase-first
+  keys) when Slice 5's user-mgmt UI needs them, and regen cms-bundle THEN.
+
 - **cms-bundle regen is for RUNTIME code only.** `bundle:cms` bundles
   `CMS/.open-next/worker.js`, NOT migrations. A slice that only adds schema/libs
   not yet imported by a worker entrypoint doesn't need a manual regen — PM's

@@ -118,3 +118,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/auth/guard-core.ts, CMS/src/components/login-form.tsx (new),
   CMS/messages/{en,fi,et}.json, CMS/scripts/auth-guard.test.mjs,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js.
+
+## 2026-06-22 13:43 — Slice 3: CMS roles + server-side authorization
+- **Status:** DONE
+- **What I did:** Added `CMS/src/lib/auth/roles.ts` — pure, dep-free role-tier
+  helpers mirroring PM's `removal.ts` VERBATIM with country/tag scope DROPPED:
+  `canRemoveUser`, `canChangeRole` (strictly-greater RANK + no self), `canInvite`
+  (Manager+), `canInviteRole` (must outrank grant + never SuperAdmin),
+  `canManageUsers` (Manager+), `canEditContent` (all users), `INVITABLE_ROLES`.
+  Type-only-imports `CmsRole` from schema so it runs under bare `node --test`.
+  Threaded `role` through `GuardDecision` (guard-core.ts: allow branch gains
+  `role?: CmsRole`; deny branch gains a `forbidden` reason → 403). `guard.ts`
+  `decide()` now returns `user.role`; added the API-layer role gate
+  `requireRole(request, allowed)` (401 unsigned / 403 forbidden) +
+  `requireUserManager` convenience, and the page-layer `checkRoleFromHeaders`
+  (defense-in-depth so /admin pages can render a forbidden notice). Re-exported
+  the role helpers from guard.ts for route call sites.
+- **Verified:** `node --test roles.test.ts` 7/7 green; full `npm test` 608/608;
+  `npx tsc --noEmit` clean; `npx opennextjs-cloudflare build` green. NO migration
+  needed — the `role` column already exists (Slice 1, defaults Editor). NO new
+  user strings → no cms-bundle regen (deferred role labels to Slice 5 per hint;
+  parallel worker owns bundle:cms). New helpers aren't imported by a route yet
+  (Slice 4/5 wire them), so the worker bundle is unchanged.
+- **Files:** CMS/src/lib/auth/roles.ts (new), CMS/src/lib/auth/roles.test.ts (new),
+  CMS/src/lib/auth/guard.ts, CMS/src/lib/auth/guard-core.ts.

@@ -76,8 +76,16 @@ green + regen PM cms-bundle + EN/FI/ET for new strings.
   verify, id_token email extraction) node-tested; do NOT call live Google in tests.
   EN/FI/ET for the button. Gate.
 
-- TODO: **Slice 3 — CMS roles + server-side authorization (mirror PM's role SET,
-  drop scope).** Use PM's role set from the `pm-roles` subgoal
+- DONE: **Slice 3 — CMS roles + server-side authorization.** See JOURNAL
+  2026-06-22 13:43. Added pure `lib/auth/roles.ts` (canRemoveUser/canChangeRole/
+  canInvite/canInviteRole/canManageUsers/canEditContent + INVITABLE_ROLES,
+  scope-free mirror of PM removal.ts), threaded `role` through `GuardDecision`
+  (+ `forbidden`/403 reason), added API gate `requireRole`/`requireUserManager`
+  + page gate `checkRoleFromHeaders`. 7 new node tests, 608 total green, tsc +
+  opennext build green. No migration (role col exists Slice 1), no new strings
+  (role LABELS deferred to Slice 5), no bundle regen (helpers not yet
+  route-imported). Original spec below.
+  Use PM's role set from the `pm-roles` subgoal
   (`SuperAdmin | Admin | Manager | Editor` + `canRemoveUser` hierarchy) — copy the
   NAMES + the removal helper, DROP country/tag scope (a single CMS = one Site).
   USER RULE 2026-06-21: a PM user reaching the CMS via SSO/cms-validate = **Admin**

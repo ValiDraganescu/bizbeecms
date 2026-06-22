@@ -15,7 +15,9 @@
  */
 import { getSession } from "@/db/session-store";
 import { findUserById } from "@/db/user-store";
+import type { CmsRole } from "@/db/schema";
 import { SESSION_COOKIE, readSessionCookie, type GuardDecision } from "./guard-core";
+import { canManageUsers } from "./roles";
 
 /**
  * Resolve the current session cookie (read via `next/headers`, so it works for
@@ -29,7 +31,7 @@ async function decide(): Promise<GuardDecision> {
   const user = await findUserById(session.userId);
   if (!user) return { allow: false, reason: "noSession" };
 
-  return { allow: true, userId: user.id };
+  return { allow: true, userId: user.id, role: user.role };
 }
 
 /** Authorize an incoming /api/* `Request`. Resolves the cookie locally. */
@@ -60,5 +62,58 @@ export async function requireAdmin(request: Request): Promise<Response | null> {
   );
 }
 
+/**
+ * Role-gated /api/* guard (cms-auth Slice 3). Like `requireAdmin` it first
+ * requires a signed-in CMS user (401 if not), then additionally requires the
+ * user's role to satisfy `allowed` — a 403 `forbidden` otherwise. Use this for
+ * routes that are not open to every CMS user (e.g. user management):
+ *
+ *   const denied = await requireRole(request, canManageUsers);
+ *   if (denied) return denied;
+ *
+ * Distinct status codes: 401 = not signed in (re-auth), 403 = signed in but the
+ * role isn't permitted (no re-auth helps). The page layer mirrors this via
+ * `checkRoleFromHeaders`.
+ */
+export async function requireRole(
+  request: Request,
+  allowed: (role: CmsRole) => boolean,
+): Promise<Response | null> {
+  const decision = await checkAdmin(request);
+  if (!decision.allow) {
+    return Response.json(
+      { error: "unauthorized", reason: decision.reason },
+      { status: 401 },
+    );
+  }
+  if (!decision.role || !allowed(decision.role)) {
+    return Response.json({ error: "forbidden", reason: "forbidden" }, { status: 403 });
+  }
+  return null;
+}
+
+/** Convenience: the user-management surface requires Manager+ (`canManageUsers`). */
+export function requireUserManager(request: Request): Promise<Response | null> {
+  return requireRole(request, canManageUsers);
+}
+
+/**
+ * Page-layer role gate (cms-auth Slice 3). Returns the same `GuardDecision` shape
+ * `checkAdminFromHeaders` does, but flips an allowed signed-in user whose role
+ * fails `allowed` to a `forbidden` deny — so an /admin/* page can render a
+ * "you don't have access" notice instead of its content. The /api/* layer
+ * (`requireRole`) is the real enforcement; this is defense-in-depth for the UI.
+ */
+export async function checkRoleFromHeaders(
+  allowed: (role: CmsRole) => boolean,
+): Promise<GuardDecision> {
+  const decision = await decide();
+  if (decision.allow && (!decision.role || !allowed(decision.role))) {
+    return { allow: false, reason: "forbidden" };
+  }
+  return decision;
+}
+
 // Re-exported for callers that still want the raw cookie name/extractor.
 export { SESSION_COOKIE, readSessionCookie };
+export { canManageUsers, canEditContent, canInvite, canRemoveUser, canChangeRole } from "./roles";
