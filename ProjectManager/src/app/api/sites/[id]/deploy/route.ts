@@ -8,6 +8,8 @@ import {
   setSiteDeployStatus,
 } from "@/lib/site/site";
 import { canStartDeploy } from "@/lib/deploy";
+import { decryptSecret } from "@/lib/crypto/secret-box";
+import { decideDeployOpenrouterField } from "@/lib/site/deploy-openrouter-key";
 
 export type DeployError =
   | "notAllowed"
@@ -74,6 +76,36 @@ export async function POST(
     return NextResponse.json({ error: "notConfigured" }, { status: 500 });
   }
 
+  // Per-Site OpenRouter key (Slice 3): if the Site has one stored encrypted,
+  // decrypt it and pass the PLAINTEXT to the deployer over the existing HTTPS
+  // call. A decrypt failure (bad/rotated/unset SITE_SECRET_KEY, corrupt blob)
+  // MUST NOT fail the deploy — we omit the field and let the deployer fall back
+  // to its global OPENROUTER_API_KEY. Decrypt up-front so the helper stays pure.
+  const kek =
+    typeof bag.SITE_SECRET_KEY === "string" ? bag.SITE_SECRET_KEY : "";
+  let decrypted: string | null = null;
+  if (site.openrouterApiKeyEncrypted) {
+    try {
+      decrypted = await decryptSecret(site.openrouterApiKeyEncrypted, kek);
+    } catch {
+      decrypted = null; // signal failure to the helper below
+    }
+  }
+  const { body: openrouterBody, degraded } = decideDeployOpenrouterField(
+    site.openrouterApiKeyEncrypted,
+    // decryption already happened above; the thunk just surfaces success/failure
+    () => {
+      if (decrypted === null) throw new Error("decrypt failed");
+      return decrypted;
+    },
+  );
+  if (degraded) {
+    console.warn(
+      `[deploy] Site ${siteId}: OpenRouter key present but failed to decrypt; ` +
+        `omitting it and falling back to the deployer's global key.`,
+    );
+  }
+
   // Latch to `deploying` before dispatching, so a refresh shows progress and
   // re-clicks are guarded by canStartDeploy.
   await setSiteDeployStatus(siteId, "deploying");
@@ -85,7 +117,12 @@ export async function POST(
         "content-type": "application/json",
         authorization: `Bearer ${deployerSecret}`,
       },
-      body: JSON.stringify({ siteId, slug: site.slug, ...(ref ? { ref } : {}) }),
+      body: JSON.stringify({
+        siteId,
+        slug: site.slug,
+        ...(ref ? { ref } : {}),
+        ...openrouterBody,
+      }),
     });
     if (!res.ok) {
       await setSiteDeployStatus(siteId, "failed");
