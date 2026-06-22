@@ -29,15 +29,20 @@ gates on CMS tsc + opennext build green + node tests + EN/FI/ET for new strings.
   Slice-0 fence + content_ prefix + cap + injection-safe DEFAULTs. NO execution
   (Slice 2 wires it). tsc + opennext build green.
 
-- TODO: **Slice 2 — create/list/describe collections at runtime (DDL execution).**
-  `POST /api/collections` (create): enforce the 100-table cap (registry count),
-  generate DDL (Slice 1), run it through the Slice-0 fenced exec, create the real
-  `content_<slug>` table, write the registry row. `GET /api/collections` (list from
-  registry) + `GET /api/collections/[name]` (describe schema). Add-field:
-  `PATCH /api/collections/[name]` → `ALTER TABLE content_x ADD COLUMN` (ADD-ONLY v1,
-  fenced). Drop collection = drop table + registry row (in-app confirm). Gated to
-  CMS Admin (cms-auth roles). Node tests (create→registry+table, cap rejection,
-  add-column, name-collision). Gate.
+- DONE (2026-06-22): **Slice 2 — create/list/describe collections at runtime (DDL
+  execution).** PURE `lib/content/collection-plan.ts` (`planCreate` w/ 100-cap +
+  `content_<slug>` derive + collision-409/slugless-400/generator-error-400 +
+  fence-safe CREATE; `planAddField` ADD-ONLY w/ dup-409/system-clash-400/col-cap;
+  `normalizeField(s)` untrusted-JSON coercion) + `db/collection-store.ts` (live
+  Drizzle registry I/O; ALL DDL via `contentDdl` — count→CREATE→insert,
+  ALTER→update schema JSON, DROP→delete row) + routes `app/api/collections/route.ts`
+  (GET list / POST create, Admin-gated) and `app/api/collections/[name]/route.ts`
+  (GET describe / PATCH add-field / DELETE drop, Admin-gated, Next15 async params;
+  `[name]` = the content_<slug> table name). 10 node tests (create→fence-safe DDL,
+  cap-409, collision-409, add-field, dup, system-clash, normalize); every generated
+  DDL asserted to pass the Slice-0 fence. tsc + opennext build green; both routes in
+  the manifest. Live D1 = HITL. No user strings yet (Slice 5 UI does cms-bundle +
+  EN/FI/ET).
 
 - TODO: **Slice 3 — collection ITEMS CRUD (structured, validated).** Per item:
   insert/update/get/list/delete + ARCHIVE (soft) — likely an `id`, `slug`, `status`

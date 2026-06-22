@@ -129,3 +129,26 @@ Read every line before working. Each entry was learned the hard way by a previou
   before exec. `unixepoch()`/column names are non-keyword bare tokens the fence
   ALLOWS (they're not builtins); that's why `created_at INTEGER DEFAULT
   (unixepoch() * 1000)` clears the guard.
+
+- **(Slice 2) SPLIT the route logic: PURE planner + thin live store.** Live D1
+  (Drizzle reads + `contentDdl` exec) can't be unit-tested without a CF binding, so
+  ALL the decisions (cap, `content_<slug>` derive, collision, DDL gen, value
+  coercion) live in a PURE module (`collection-plan.ts`) returning a `PlanResult<T>`
+  = `{ok:true,plan}` | `{ok:false,status,error}`; the store maps `!ok` → that HTTP
+  status, `ok` → the effect. Routes just call the store + map status. Node-test the
+  planner; build-verify the store/routes (HITL for live D1). Reuse this shape in 3/4.
+- **(Slice 2) `createCollection` runs `contentDdl(CREATE)` BEFORE the registry
+  INSERT** so a failed DDL leaves no orphan row; the `collection_table_name_unique`
+  index is the final collision backstop → a unique-violation on insert returns 409
+  (the table was created — orphan-table cleanup is a deliberate non-concern for v1,
+  surface the real error rather than masking it with a DROP).
+- **(Slice 2) The `[name]` URL segment IS the `content_<slug>` table name**, not the
+  display name. `getCollection`/`addCollectionField`/`deleteCollection` look up by
+  `table_name`. `DROP TABLE ${tableName}` is still fenced (it's a content_* identifier
+  from the registry) — `contentDdl` re-validates, so even a corrupted registry name
+  can't escape the namespace.
+- **(Slice 2) Treat the POST/PATCH JSON body as UNTRUSTED** — `normalizeField(s)`
+  coerces it to a clean `CollectionField[]` (drops unknown props, requires
+  name+type) BEFORE the generator sees it; the generator's strict `COLUMN_NAME_RE`
+  + system-column guard are the trust boundary. Don't pass raw body objects into
+  the DDL generator.

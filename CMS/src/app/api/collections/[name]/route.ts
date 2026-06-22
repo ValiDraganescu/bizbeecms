@@ -1,0 +1,77 @@
+/**
+ * content-collections — Slice 2: single-collection REST endpoint.
+ *
+ *   GET                       → describe one collection (registry row + fields)
+ *   PATCH { field: {...} }     → ADD a field (ADD-ONLY v1): ALTER TABLE ADD COLUMN
+ *                                (fenced) + update the registry schema JSON
+ *   DELETE                     → drop the table (fenced) + delete the registry row
+ *
+ * `[name]` is the `content_<slug>` table name (the collection's stable handle).
+ * Gated to CMS Admin. DDL is SYSTEM-generated and runs ONLY through the fence.
+ * REST-only, no server actions.
+ */
+import { requireAdmin } from "@/lib/auth/guard";
+import {
+  addCollectionField,
+  deleteCollection,
+  getCollection,
+} from "@/db/collection-store";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ name: string }> },
+): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+  const { name } = await params;
+  try {
+    const view = await getCollection(name);
+    if (!view) return Response.json({ error: "collection not found" }, { status: 404 });
+    return Response.json(view);
+  } catch (err) {
+    return Response.json({ error: (err as Error).message ?? "failed to load collection" }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ name: string }> },
+): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+  const { name } = await params;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+  const obj = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+
+  try {
+    const result = await addCollectionField(name, obj.field);
+    if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
+    return Response.json(result.plan);
+  } catch (err) {
+    return Response.json({ error: (err as Error).message ?? "failed to add field" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ name: string }> },
+): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+  const { name } = await params;
+  try {
+    const result = await deleteCollection(name);
+    if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
+    return Response.json(result.plan);
+  } catch (err) {
+    return Response.json({ error: (err as Error).message ?? "failed to delete collection" }, { status: 500 });
+  }
+}

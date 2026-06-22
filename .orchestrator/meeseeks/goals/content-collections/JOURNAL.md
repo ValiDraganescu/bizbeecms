@@ -73,3 +73,36 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/db/schema.ts, CMS/migrations/0010_light_emma_frost.sql,
   CMS/migrations/meta/0010_snapshot.json, CMS/migrations/meta/_journal.json,
   CMS/src/lib/content/collection-schema.ts, CMS/scripts/collection-schema.test.mjs
+
+## 2026-06-22 13:08 — Slice 2: create/list/describe collections at runtime (DDL execution)
+- **Status:** DONE
+- **What I did:** Wired the registry + DDL generator into real runtime effects.
+  - `CMS/src/lib/content/collection-plan.ts` (PURE planner) — `planCreate`
+    (enforces MAX_COLLECTIONS=100 cap against registry count, derives
+    `content_<slug>` via `tableNameForSlug`, rejects name-collision 409 +
+    slugless/empty name 400, surfaces generator errors as 400, returns the
+    fence-safe CREATE DDL) + `planAddField` (ADD-ONLY: dup-field 409, system-clash
+    400, column-cap 409, returns the ALTER DDL + merged field list) +
+    `normalizeField`/`normalizeFields` (coerce untrusted JSON → clean
+    CollectionField[], drop junk). All decisions live here, node-tested.
+  - `CMS/src/db/collection-store.ts` (live I/O) — `listCollections`/`getCollection`
+    (Drizzle reads of the `collection` registry, schema JSON parsed),
+    `createCollection` (count+collision read → `contentDdl(createSql)` FIRST →
+    insert registry row; unique-index race → 409), `addCollectionField`
+    (`contentDdl(alterSql)` → update schema JSON), `deleteCollection`
+    (`contentDdl("DROP TABLE content_x")` → delete row). ALL DDL via `contentDdl`
+    (the Slice-0 fence) — never raw d1.
+  - `CMS/src/app/api/collections/route.ts` — GET (list) + POST (create), Admin-gated.
+  - `CMS/src/app/api/collections/[name]/route.ts` — GET (describe) + PATCH
+    (add-field) + DELETE (drop), Admin-gated, Next15 async params. `[name]` = the
+    `content_<slug>` table name.
+- **Verified:** `node --test` 36/36 (10 new planner tests: create→content_<slug>+
+  fence-safe DDL, cap-409, collision-409, slugless-400, generator-error-400,
+  add-field fence-safe ALTER+merge, dup-409, system-clash-400, normalize). Every
+  generated CREATE/ALTER asserted to PASS `validateStatement(_, "write")`. `npx
+  tsc --noEmit` clean. `npx opennextjs-cloudflare build` green (dev down); both
+  `/api/collections` + `/api/collections/[name]` in the route manifest. Live D1
+  writes are build-verified only (HITL — needs a real binding).
+- **Files:** CMS/src/lib/content/collection-plan.ts, CMS/src/db/collection-store.ts,
+  CMS/src/app/api/collections/route.ts, CMS/src/app/api/collections/[name]/route.ts,
+  CMS/scripts/collection-plan.test.mjs
