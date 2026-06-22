@@ -4,6 +4,10 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
 
+## per-Site OpenRouter key TRACK
+- DONE: **Slice 4 — deployer sets the per-Site key as a CMS Worker SECRET.** `deployer/src/index.ts`: `DeployBody.openrouterApiKey?` read in the `/deploy` handler → `startDeploy`. Pure `effectiveOpenrouterKey(perSite, global)` picks perSite-non-empty ?? global ?? "" and whether to set the secret (non-empty). Bash DROPS `--var OPENROUTER_API_KEY`; after `wrangler deploy` succeeds, `printf '%s' "$KEY" | wrangler secret put OPENROUTER_API_KEY --name "$WORKER_NAME"` (gated on a flag so blank keys skip). Value via stdin, never logged. Gate: `wrangler deploy --dry-run` clean + `scripts/openrouter-key.test.mjs` (8 assertions). TRACK COMPLETE; HITL live-verify in root HITL.md.
+- DONE: **Slice 3 — thread the decrypted Site key into the deploy POST.** Deploy route loads `site.openrouterApiKeyEncrypted`; non-null → `decryptSecret(it, env.SITE_SECRET_KEY)` and add `openrouterApiKey: <plaintext>` to the deployer POST body; null → omit. Decrypt failure (bad/rotated/unset key, corrupt blob) MUST NOT crash the deploy — catch, warn, omit, proceed (graceful degrade to deployer global key). Pure helper decides the body field from (encryptedOrNull, decryptResultOrThrow); dep-free `.mjs` test. Body field = `openrouterApiKey`.
+
 ## Tasks
 Ordered tracer-first: prove the adapter + test in isolation, then wire selection + secret, then swap the catalog, then verify end-to-end. Each is one Meeseeks slice.
 

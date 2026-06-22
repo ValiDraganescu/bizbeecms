@@ -115,3 +115,52 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `ProjectManager/src/app/api/sites/route.ts`, `ProjectManager/src/app/api/sites/[id]/route.ts`,
   `ProjectManager/src/lib/site/site.ts`, `ProjectManager/src/app/(app)/sites/site-form.tsx`,
   `ProjectManager/src/app/(app)/sites/[id]/page.tsx`, `ProjectManager/messages/{en,fi,et}.json`
+
+## 2026-06-22 15:31 — per-Site OpenRouter key TRACK, Slice 3 (thread decrypted key into deploy POST)
+- **Status:** DONE
+- **What I did:** Slice 3 of 4. PM deploy route now passes each Site's OWN OpenRouter key
+  (plaintext) to the deployer over the EXISTING HTTPS `/deploy` call — no deployer changes this slice.
+  (1) `ProjectManager/src/lib/site/deploy-openrouter-key.ts` — pure `decideDeployOpenrouterField(
+  encryptedOrNull, decryptThunk)` → `{ body: { openrouterApiKey? }, degraded }`. null/empty → omit;
+  decrypt-ok → include plaintext under `openrouterApiKey`; decrypt-throws → omit + `degraded: true`.
+  (2) `src/app/api/sites/[id]/deploy/route.ts` — after the deployer-config check: read
+  `bag.SITE_SECRET_KEY` (same `(env as Record<...>)` boundary as DEPLOYER_SECRET); if
+  `site.openrouterApiKeyEncrypted` set, `await decryptSecret(blob, kek)` in a try/catch (failure →
+  `decrypted=null`); feed both into the pure helper; on `degraded` log a `console.warn` and proceed.
+  Merge `...openrouterBody` into the POST `JSON.stringify({ siteId, slug, ...ref, ...openrouterBody })`.
+  Decrypt happens BEFORE the `setSiteDeployStatus("deploying")` latch but can NEVER fail the deploy.
+  (3) `scripts/deploy-openrouter-key.test.mjs` — 6 dep-free tests (present→include, null/undefined/
+  ""→omit, throws→omit+degraded, spread-merge safety). Uses a FAKE plaintext + injected thunk; no
+  real key, no Web Crypto. `findSiteById` already returns the full `Site` row incl.
+  `openrouterApiKeyEncrypted` — no DB change needed.
+- **CONTRACT for Slice 4 (deployer):** the deploy POST body MAY now carry `openrouterApiKey: string`
+  (plaintext, present ONLY when the Site has a key that decrypts cleanly). Absent when the Site has no
+  key OR decryption failed (graceful degrade). Slice 4 sets it as the CMS Worker SECRET and drops the
+  `--var`, falling back to the deployer's own global `OPENROUTER_API_KEY` when the field is absent.
+- **Verified:** Inside ProjectManager/: `npx tsc --noEmit` clean, `npm test` 146/146 pass (incl. 6
+  new), `npx opennextjs-cloudflare build` green (dev confirmed off via lsof 3601/3602 before build).
+  Did NOT touch CMS/ or deployer/.
+- **Files:** `ProjectManager/src/lib/site/deploy-openrouter-key.ts` (+`scripts/*.test.mjs`),
+  `ProjectManager/src/app/api/sites/[id]/deploy/route.ts`
+
+## 2026-06-22 — per-Site OpenRouter key Slice 4: deployer sets OPENROUTER_API_KEY as a CMS Worker SECRET
+- **Status:** DONE
+- **What I did:** In `deployer/src/index.ts` ONLY: (1) `DeployBody` now accepts optional
+  `openrouterApiKey?: string`; the `/deploy` handler reads it (only when it's a string) and threads it
+  into `startDeploy`. (2) Added pure `effectiveOpenrouterKey(perSite, global)` → `{ key, setSecret }`:
+  per-Site body key wins when non-empty, else the deployer's own `env.OPENROUTER_API_KEY`, else "";
+  `setSecret = key.length > 0`. (3) The container process env now carries the EFFECTIVE key in
+  `OPENROUTER_API_KEY` plus a `SET_OPENROUTER_SECRET` flag ("1"/""). (4) In the generated bash: REMOVED
+  the `--var "OPENROUTER_API_KEY:$OPENROUTER_API_KEY"` line; AFTER `wrangler deploy` succeeds, when
+  `SET_OPENROUTER_SECRET` is non-empty, run `printf '%s' "$OPENROUTER_API_KEY" | npx wrangler secret put
+  OPENROUTER_API_KEY --name "$WORKER_NAME"` (own `secret` step with fail handling). Empty effective key
+  → secret-put skipped entirely (no blank secret; CMS then falls back to Workers AI). The value goes via
+  stdin (printf|), NEVER inlined into argv, and is never echoed in any log/audit line. SITE_ID /
+  PM_ORIGIN / CMS_AUTH_SECRET / APP_ORIGIN / GOOGLE_* stay as `--var` unchanged.
+- **Verified:** `npx wrangler deploy --dry-run` in deployer/ → bundle clean (deployer has no tsc per
+  project memory; dry-run is the gate). New `deployer/scripts/openrouter-key.test.mjs` (8 assertions,
+  dep-free) → all pass. The helper is MIRRORED in the test because `src/index.ts` can't import under
+  Node (pulls @cloudflare/containers, Workers-only). Did NOT touch CMS/ or ProjectManager/.
+- **HITL:** appended a P1 item to root `HITL.md` to live-verify a per-Site key reaches a deployed CMS
+  (the `wrangler secret put` + live OpenRouter call are HITL).
+- **Files:** `deployer/src/index.ts`, `deployer/scripts/openrouter-key.test.mjs`

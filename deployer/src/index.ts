@@ -35,7 +35,15 @@ type Env = {
   HOST_MAP?: KVNamespace;
 };
 
-type DeployBody = { siteId?: string; slug?: string; ref?: string };
+type DeployBody = {
+  siteId?: string;
+  slug?: string;
+  ref?: string;
+  // Per-Site OpenRouter key (ai-openrouter Slice 4): plaintext, present ONLY
+  // when the Site has its own key that PM decrypted cleanly. Set as the CMS
+  // Worker SECRET OPENROUTER_API_KEY; absent → fall back to the deployer global.
+  openrouterApiKey?: string;
+};
 type AttachBody = { slug?: string; hostname?: string };
 
 // --- Cloudflare config constants (deployer's source of truth) ---
@@ -107,8 +115,19 @@ export default {
         return Response.json({ error: "badRequest" }, { status: 400 });
       }
 
+      // Per-Site OpenRouter key: plaintext from PM, present only sometimes.
+      const perSiteOpenrouterKey =
+        typeof body.openrouterApiKey === "string"
+          ? body.openrouterApiKey
+          : undefined;
+
       try {
-        await startDeploy(env, { siteId, slug, ref });
+        await startDeploy(env, {
+          siteId,
+          slug,
+          ref,
+          openrouterApiKey: perSiteOpenrouterKey,
+        });
       } catch (err) {
         return Response.json(
           { error: "startFailed", detail: String(err).slice(0, 200) },
@@ -411,9 +430,28 @@ type CfCustomHostname = {
  * script self-reports to the PM callback on exit (success or failure), so the
  * Worker doesn't need to wait. Returns once the process is started.
  */
+/**
+ * Pick the effective OPENROUTER_API_KEY for a deploy and whether to set it as a
+ * Worker secret. Per-Site body key wins; else the deployer's own global; else
+ * empty (CMS then falls back to Workers AI). Only set the secret when non-empty
+ * (don't overwrite a real secret with a blank). Pure — unit-tested.
+ */
+export function effectiveOpenrouterKey(
+  perSite: string | undefined | null,
+  global: string | undefined | null,
+): { key: string; setSecret: boolean } {
+  const key = (perSite && perSite.length > 0 ? perSite : global) ?? "";
+  return { key, setSecret: key.length > 0 };
+}
+
 async function startDeploy(
   env: Env,
-  input: { siteId: string; slug: string; ref: string },
+  input: {
+    siteId: string;
+    slug: string;
+    ref: string;
+    openrouterApiKey?: string;
+  },
 ): Promise<void> {
   const workerName = `${WORKER_PREFIX}${input.slug}`.slice(0, 63);
   const sandbox = getSandbox(env.Sandbox, `deploy-${input.slug}`);
@@ -461,8 +499,20 @@ async function startDeploy(
       // The CMS's OWN public origin — used to build trusted invite-accept links
       // (cms-auth Slice 4). It's the deployed workers.dev URL for this Site.
       APP_ORIGIN: `https://${workerName}${WORKERS_DEV_SUFFIX}`,
-      // AI provider key (ai-openrouter) → injected into the CMS Worker as a var.
-      OPENROUTER_API_KEY: env.OPENROUTER_API_KEY ?? "",
+      // AI provider key (ai-openrouter Slice 4): per-Site key (from PM body)
+      // wins, else the deployer's own global, else empty. Set as a Worker
+      // SECRET below (not a --var) so it never lands in CMS/wrangler.jsonc or a
+      // logged command. SET_OPENROUTER_SECRET gates the secret-put (skip blank).
+      OPENROUTER_API_KEY: effectiveOpenrouterKey(
+        input.openrouterApiKey,
+        env.OPENROUTER_API_KEY,
+      ).key,
+      SET_OPENROUTER_SECRET: effectiveOpenrouterKey(
+        input.openrouterApiKey,
+        env.OPENROUTER_API_KEY,
+      ).setSecret
+        ? "1"
+        : "",
       // CMS "Sign in with Google" OAuth client (cms-auth Slice 2b).
       GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID ?? "",
       GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET ?? "",
@@ -676,12 +726,24 @@ npx wrangler deploy --name "$WORKER_NAME" --compatibility-date 2025-09-01 \
   --var "SITE_ID:$SITE_ID" \
   --var "PM_ORIGIN:$PM_ORIGIN" \
   --var "CMS_AUTH_SECRET:$CMS_AUTH_SECRET" \
-  --var "OPENROUTER_API_KEY:$OPENROUTER_API_KEY" \
   --var "APP_ORIGIN:$APP_ORIGIN" \
   --var "GOOGLE_CLIENT_ID:$GOOGLE_CLIENT_ID" \
   --var "GOOGLE_CLIENT_SECRET:$GOOGLE_CLIENT_SECRET"
 if [ $? -ne 0 ]; then step_fail "wrangler deploy failed"; report failed "wrangler deploy failed"; exit 1; fi
 step_ok
+
+# OPENROUTER_API_KEY is a WORKER SECRET, not a --var (it never belongs in
+# wrangler.jsonc or a logged command). Set it AFTER deploy succeeds; persists
+# across redeploys and this overwrites each deploy (correct). Piped via stdin so
+# the value never appears in argv/process listing; SET_OPENROUTER_SECRET is ""
+# when the effective key is empty → skip so we don't set a blank secret. Never
+# echo $OPENROUTER_API_KEY anywhere.
+if [ -n "$SET_OPENROUTER_SECRET" ]; then
+  step_start secret
+  printf '%s' "$OPENROUTER_API_KEY" | npx wrangler secret put OPENROUTER_API_KEY --name "$WORKER_NAME"
+  if [ $? -ne 0 ]; then step_fail "openrouter secret put failed"; report failed "openrouter secret put failed"; exit 1; fi
+  step_ok
+fi
 
 report deployed
 echo "DONE"

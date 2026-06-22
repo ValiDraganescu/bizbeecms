@@ -56,3 +56,23 @@ Read every line before working. Each entry was learned the hard way by a previou
 - Dep-free `.mjs` tests CAN import a `.ts` source directly under Node 24 (native type-stripping) — e.g.
   `import { encryptSecret } from "../src/lib/crypto/secret-box.ts"`. No loader/flag needed. The PM test
   glob is `scripts/**/*.test.mjs` (run via `npm test`).
+- PER-SITE KEY Slice 3 DONE: PM deploy route (`src/app/api/sites/[id]/deploy/route.ts`) now puts
+  `openrouterApiKey: <plaintext>` into the deployer POST body when the Site has a key that decrypts
+  cleanly (KEK = `SITE_SECRET_KEY` via the `(env as Record<...>)` boundary). Decrypt failure → field
+  OMITTED + a `console.warn` + the deploy STILL proceeds (graceful degrade to the deployer global key).
+  The deploy must NEVER 500 because of the key. Decision logic is the pure
+  `src/lib/site/deploy-openrouter-key.ts#decideDeployOpenrouterField` — keep it pure/testable.
+- Slice 4 (deployer) CONTRACT: deploy POST body field is exactly `openrouterApiKey` (plaintext,
+  present only sometimes). Deployer must set it as the CMS Worker SECRET `OPENROUTER_API_KEY` and drop
+  the `--var`, falling back to its own global `OPENROUTER_API_KEY` when the field is absent.
+- PER-SITE KEY Slice 4 DONE: `deployer/src/index.ts`. Pure `effectiveOpenrouterKey(perSite, global)`
+  → `{ key, setSecret }` (perSite-non-empty ?? global ?? ""; setSecret = key.length>0). The bash sets
+  the key as a Worker SECRET (`printf '%s' "$OPENROUTER_API_KEY" | npx wrangler secret put
+  OPENROUTER_API_KEY --name "$WORKER_NAME"`) AFTER `wrangler deploy` succeeds, gated on the
+  `SET_OPENROUTER_SECRET` process-env flag so a blank key skips the secret-put. The `--var
+  OPENROUTER_API_KEY` line is GONE — all other CMS vars stay `--var`. Value flows via process env →
+  stdin only; NEVER echoed/inlined into argv. The deployer has NO tsc (it imports @cloudflare/sandbox,
+  Workers-only) — `npx wrangler deploy --dry-run` is the gate. `src/index.ts` CANNOT be imported under
+  Node, so the helper is MIRRORED in `deployer/scripts/openrouter-key.test.mjs` (keep in sync if you
+  change the source helper). The deployer track is now COMPLETE (all 4 slices); only HITL live-verify
+  remains (see root HITL.md).
