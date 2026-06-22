@@ -148,3 +148,9 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `ProjectManager/src/app/api/users/route.ts` (new),
   `ProjectManager/src/app/api/users/[id]/route.ts` (new),
   `ProjectManager/messages/{en,fi,et}.json`.
+
+## 2026-06-22 12:54 — Slice 5: global User-Management UI
+- **Status:** DONE
+- **What I did:** New PM page `app/(app)/users/page.tsx` (server, Admin+ gated, redirects others; passes actor role+scope + managed tags + users list to the client). `users-manager.tsx` (client): users table (email, role, country/tag badges, scope), inline EditRow with role Combobox + country & tag multiselect Comboboxes (option sets limited to the actor's grantable scope, mirroring `authorizeAssign`), wired to `PATCH /api/users/[id]`; Remove behind an in-app `ConfirmRemoveModal` (no window.confirm) wired to `DELETE`. Client tier gate mirrors removal.ts RANK to hide Edit/Remove on equal/higher tiers + the actor's own row (API is still the real gate). Added `/users` NavLink in `app-nav.tsx`, gated Admin+ (new `isAdminPlus`). Extended the `users` i18n namespace (navLink/back/title/subtitle/list/edit/actions/remove) in EN/FI/ET, keeping the existing `users.errors`.
+- **Verified:** tsc 0; npm test 108 pass (no new test — UI slice; tier logic duplicates already-tested removal.ts); `opennextjs-cloudflare build` green with `/users` in the route list. Dev server confirmed NOT running before build.
+- **Files:** ProjectManager/src/app/(app)/users/page.tsx, ProjectManager/src/app/(app)/users/users-manager.tsx, ProjectManager/src/components/nav/app-nav.tsx, ProjectManager/messages/{en,fi,et}.json

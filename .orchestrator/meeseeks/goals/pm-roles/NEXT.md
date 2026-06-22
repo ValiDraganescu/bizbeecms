@@ -1,35 +1,32 @@
 # Note to the next Meeseeks (pm-roles)
 
 Slices 1 (role enum + migration), 2 (removal hierarchy), 3 (tags model +
-Manager country-AND-tag reach), 3b (tag CRUD API+UI), and 4 (user-management
-API) are all DONE.
+Manager country-AND-tag reach), 3b (tag CRUD API+UI), 4 (user-management API),
+and 5 (user-management UI) are all DONE.
 
-Slice 4 delivered:
-- `GET /api/users` — list every user w/ role+countries+tags (`listUsersWithScope`),
-  Admin+ gated.
-- `PATCH /api/users/[id]` — change role + set countries + set tags. Enforces BOTH
-  `canChangeRole` (tier, removal.ts) AND `authorizeAssign` (subset rule, NEW pure
-  `lib/auth/manage-users.ts`). Role omitted = keep current (still needs to outrank).
-- `DELETE /api/users/[id]` — `canRemoveUser` (tier). Cascades scope rows.
-- New DB helpers in `lib/auth/user.ts`: setUserCountries/setUserTags/setUserRole/
-  deleteUser/listUsersWithScope.
-- `users.errors` namespace EN/FI/ET (for the Slice 5 UI to surface 403/400 keys).
-- Gate: tsc 0, npm test 108 (was 103), opennext build green w/ both routes.
+Slice 5 delivered:
+- `app/(app)/users/page.tsx` — Admin+ gated server page (redirects others);
+  passes actor role+scope + managed tags + users list to the client.
+- `app/(app)/users/users-manager.tsx` — users table (email, role, country/tag
+  badges), inline EditRow (role Combobox + country & tag multiselects limited to
+  the actor's grantable scope, mirroring authorizeAssign), Remove behind an
+  in-app ConfirmRemoveModal (no window.confirm). Client tier gate mirrors
+  removal.ts RANK to hide actions on equal/higher tiers + the actor's own row.
+- `/users` NavLink in app-nav.tsx, gated Admin+.
+- `users` i18n namespace extended (navLink/back/title/subtitle/list/edit/
+  actions/remove) EN/FI/ET; existing `users.errors` kept.
+- Gate: tsc 0, npm test 108, opennext build green with /users in the route list.
 
-PICK NEXT: **Slice 5 — global User-Management UI** at `app/(app)/users/`:
-- Users table (email, role, countries, tags) from `GET /api/users`.
-- Inline role change (select over the 4 roles), a countries picker (reuse the
-  invite/site country picker) + a TAG multiselect from the managed `tags` list
-  (`GET /api/tags`), wired to `PATCH /api/users/[id]`.
-- Remove action behind an IN-APP confirm modal (NEVER window.confirm) — consider
-  promoting `tags-manager.tsx`'s `ConfirmDeleteModal` into `components/ui` rather
-  than copy-pasting a third time (see CAVEATS).
-- HIDE/disable actions the API would 403 (you can compute tier client-side from
-  removal.ts's rank, but the server is the real gate). Show `/users` nav link to
-  Admin+ only (mirror the `/tags` link gating in `components/nav/app-nav.tsx`).
-- Reuse design-system + purpose tokens. EN/FI/ET for all chrome (extend the
-  `users` namespace — only `users.errors` exists so far). Gate (tsc + npm test +
+PICK NEXT: **Slice 6 — extend the INVITE flow to the new roles + tags.**
+- `authorizeInvite` + invite UI: allow inviting at Manager/Editor; for Manager
+  invites, set countries + tags (subset of the inviter's own scope — REUSE
+  `manage-users.ts authorizeAssign`, same subset rule Slice 5's UI mirrors).
+- The invite-accept path must store role + countries + tags on the new user
+  (today it stores role + country only — check `invite/route.ts` + the accept
+  page). Add a tag multiselect to invite-form.tsx (copy the pattern from
+  users-manager.tsx EditRow — `GET /api/tags` for the list).
+- Node tests for the subset/authz rules. EN/FI/ET. Gate (tsc + npm test +
   opennext build, NOT while dev on 3601 is up).
+- Keep in sync with cms-auth's invite flow (same shape, CMS-local).
 
-After 5: Slice 6 (extend invite to Manager/Editor + tags). PARALLEL-SAFETY:
-stay OUT of CMS/ and don't run bundle:cms — another worker owns it.
+PARALLEL-SAFETY: stay OUT of CMS/ and don't run bundle:cms — another worker owns it.

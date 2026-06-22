@@ -53,6 +53,38 @@
     "editor": "Editor"
   },
   "users": {
+    "navLink": "Users",
+    "back": "Back to dashboard",
+    "title": "User management",
+    "subtitle": "Manage roles, country and tag scope, and remove users.",
+    "list": {
+      "title": "Users",
+      "description": "Every user, their role and scope. You can only act on users below your own tier.",
+      "email": "Email",
+      "role": "Role",
+      "scope": "Scope",
+      "actions": "Actions",
+      "you": "(you)",
+      "global": "All countries",
+      "noActions": "—"
+    },
+    "edit": {
+      "role": "Role",
+      "countries": "Countries",
+      "countriesPlaceholder": "All countries",
+      "tags": "Tags",
+      "tagsPlaceholder": "No tags"
+    },
+    "actions": {
+      "edit": "Edit",
+      "remove": "Remove",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "remove": {
+      "title": "Remove user",
+      "body": "Remove {email}? This permanently deletes the user and all their access. This can’t be undone."
+    },
     "errors": {
       "notAllowed": "You don't have permission to manage this user.",
       "notFound": "That user no longer exists.",

@@ -53,6 +53,38 @@
     "editor": "Toimittaja"
   },
   "users": {
+    "navLink": "Käyttäjät",
+    "back": "Takaisin hallintapaneeliin",
+    "title": "Käyttäjien hallinta",
+    "subtitle": "Hallitse rooleja, maa- ja tunnistelaajuutta ja poista käyttäjiä.",
+    "list": {
+      "title": "Käyttäjät",
+      "description": "Kaikki käyttäjät, heidän roolinsa ja laajuutensa. Voit hallita vain itseäsi alemman tason käyttäjiä.",
+      "email": "Sähköposti",
+      "role": "Rooli",
+      "scope": "Laajuus",
+      "actions": "Toiminnot",
+      "you": "(sinä)",
+      "global": "Kaikki maat",
+      "noActions": "—"
+    },
+    "edit": {
+      "role": "Rooli",
+      "countries": "Maat",
+      "countriesPlaceholder": "Kaikki maat",
+      "tags": "Tunnisteet",
+      "tagsPlaceholder": "Ei tunnisteita"
+    },
+    "actions": {
+      "edit": "Muokkaa",
+      "remove": "Poista",
+      "save": "Tallenna",
+      "cancel": "Peruuta"
+    },
+    "remove": {
+      "title": "Poista käyttäjä",
+      "body": "Poistetaanko {email}? Tämä poistaa käyttäjän ja kaikki hänen oikeutensa pysyvästi. Tätä ei voi kumota."
+    },
     "errors": {
       "notAllowed": "Sinulla ei ole oikeutta hallita tätä käyttäjää.",
       "notFound": "Käyttäjää ei enää ole olemassa.",

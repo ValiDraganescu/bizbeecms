@@ -137,6 +137,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   fine at PM scale; batch if user counts ever explode. These import `@/db` so they
   are NOT bare-node-testable — that's why the subset RULE lives in the alias-free
   `manage-users.ts` and the routes are gated by tsc+build only, not a route test.
+- **Slice 5 done — user-mgmt UI at `app/(app)/users/` + `/users` NavLink (Admin+).**
+  `page.tsx` is Admin+ gated (redirects others) and passes the actor's own role+
+  countries+tags so the client can pre-hide actions. The client tier gate in
+  `users-manager.tsx` (`RANK` map) is a COPY of `lib/auth/removal.ts` RANK — if you
+  ever change ranks, change BOTH (the API route is the real gate, this is only UX).
+  The Edit row's country/tag option sets are limited to the actor's grantable scope,
+  mirroring `manage-users.ts authorizeAssign` (global actor = SuperAdmin or
+  country-empty Admin grants anything; scoped actor grants only its own). The remove
+  modal is still a hand-rolled `ConfirmRemoveModal` (NOT promoted to components/ui —
+  that's now a THIRD copy of the overlay-dialog pattern; promote it if a 4th appears).
 - **The delete confirm modal is hand-rolled in `tags-manager.tsx` (`ConfirmDeleteModal`).**
   There's NO shared Modal/Dialog component in `components/ui` yet. If Slice 5 needs another
   confirm modal, consider promoting this overlay-dialog pattern (fixed inset bg-black/50,

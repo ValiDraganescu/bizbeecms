@@ -60,7 +60,7 @@ tsc + opennext build green + PM node tests + EN/FI/ET for new strings.
   countries/tags within its own scope (mirror `authorizeInvite`'s subset rule).
   Node tests for each route's authz (forbidden + allowed paths). Gate.
 
-- TODO: **Slice 5 — global User-Management UI.** NEW PM page (e.g.
+- DONE (2026-06-22): **Slice 5 — global User-Management UI.** NEW PM page (e.g.
   `app/(app)/users/`): a users table (email, role, countries, tags), inline role
   change, a countries+tags picker (reuse/extend the country picker; add a tag
   multiselect from the managed `tags` table), and a remove action behind an

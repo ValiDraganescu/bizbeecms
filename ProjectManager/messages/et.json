@@ -53,6 +53,38 @@
     "editor": "Toimetaja"
   },
   "users": {
+    "navLink": "Kasutajad",
+    "back": "Tagasi töölauale",
+    "title": "Kasutajate haldus",
+    "subtitle": "Halda rolle, riigi- ja sildiulatust ning eemalda kasutajaid.",
+    "list": {
+      "title": "Kasutajad",
+      "description": "Kõik kasutajad, nende roll ja ulatus. Saad hallata ainult endast madalama taseme kasutajaid.",
+      "email": "E-post",
+      "role": "Roll",
+      "scope": "Ulatus",
+      "actions": "Tegevused",
+      "you": "(sina)",
+      "global": "Kõik riigid",
+      "noActions": "—"
+    },
+    "edit": {
+      "role": "Roll",
+      "countries": "Riigid",
+      "countriesPlaceholder": "Kõik riigid",
+      "tags": "Sildid",
+      "tagsPlaceholder": "Sildid puuduvad"
+    },
+    "actions": {
+      "edit": "Muuda",
+      "remove": "Eemalda",
+      "save": "Salvesta",
+      "cancel": "Tühista"
+    },
+    "remove": {
+      "title": "Eemalda kasutaja",
+      "body": "Kas eemaldada {email}? See kustutab kasutaja ja kõik tema õigused jäädavalt. Seda ei saa tagasi võtta."
+    },
     "errors": {
       "notAllowed": "Sul pole õigust seda kasutajat hallata.",
       "notFound": "Seda kasutajat enam ei eksisteeri.",
