@@ -199,3 +199,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/chat/collection-tools.ts (new),
   CMS/src/lib/chat/tool-dispatch.ts, CMS/src/lib/chat/tool-scopes.ts,
   CMS/scripts/collection-tools.test.mjs (new).
+
+## 2026-06-22 13:51 — P2-bind Slice A: block `bindings` model + hydrate-before-walk seam
+- **Status:** DONE
+- **What I did:** Added SINGLE-ITEM (first-match) component↔collection binding,
+  hydrate-before-walk. (1) `tree.ts`: new `BindingRef` type + optional
+  `bindings?: Record<string,BindingRef>` on `Block`, SEPARATE from `props`
+  (`{ source:{collection,filter?,sort?}, map:{propName→fieldName} }`). (2) New PURE
+  `lib/content/binding.ts`: `validateBinding` (collection exists / mapped+filter+sort
+  fields exist as user-field OR system-column / mapped prop declared on the target
+  component → ok|errors[]), `bindingQuerySpec` (→ first-match QuerySpec, limit 1),
+  `hydrateProps` (copy row[field]→props[prop], binding OVERWRITES static prop when it
+  resolves, unresolved/absent → graceful blank, never throws), `declaredPropNames`
+  (propsSchema → allowlist set, exported so binding validator doesn't reach into the
+  renderer). (3) `render-page.tsx`: `buildPlanFromPage` now `await hydrateBlockBindings(blocks)`
+  BEFORE `planPage` — recursive walk, runs each binding's first-match `queryCollection`
+  (Slice-4, limit 1) in parallel, hydrates via the pure `hydrateProps`; `planPage`/
+  `planTree` stay PURE+SYNC. Graceful: query error/empty → that prop stays blank.
+- **Verified:** node --test scripts/binding.test.mjs (15) + full content+render suite
+  (129) green; `npx tsc --noEmit` clean; `npx opennextjs-cloudflare build` green (dev
+  server confirmed down first). Live D1 = HITL (queryCollection is build-verified).
+  Renderer logic only, NO new user strings → NO cms-bundle regen (per CAVEATS Slice 6
+  rule). Stayed OUT of CMS/src/app/mcp/** + lib/chat/** (parallel worker's scope).
+- **Files:** CMS/src/lib/render/tree.ts, CMS/src/lib/render/render-page.tsx,
+  CMS/src/lib/content/binding.ts (new), CMS/scripts/binding.test.mjs (new).

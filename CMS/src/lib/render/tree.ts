@@ -46,6 +46,26 @@ export type TreeNode =
       children?: TreeNode[];
     };
 
+// ── Component ↔ collection data binding (Phase 2, Slice A) ───────────────────
+//
+// A block can BIND a collection item's fields into its own declared props. This
+// is SINGLE-ITEM binding: a structured query picks the FIRST matching row, and
+// each `map` entry copies that row's `fieldName` into the block prop `propName`
+// BEFORE the pure walk (hydrate-before-walk — see render-page.tsx). The binding
+// is data only (no SQL); the live query is compiled + run by the renderer host.
+// Validation (collection/field/prop exist) is in `lib/content/binding.ts`.
+export type BindingRef = {
+  source: {
+    /** The collection's `content_<slug>` table name (registry `table_name`). */
+    collection: string;
+    /** Structured filter/sort clauses (query-compiler `QuerySpec` shape). */
+    filter?: Array<{ field: string; op: string; value?: unknown }>;
+    sort?: Array<{ field: string; dir?: "asc" | "desc" }>;
+  };
+  /** `{ blockPropName: collectionFieldName }` — which row field fills which prop. */
+  map: Record<string, string>;
+};
+
 // ── Page block instances (what `page.blocks` holds, parsed) ──────────────────
 export type Block = {
   id: string;
@@ -53,6 +73,13 @@ export type Block = {
   component: string;
   props?: Record<string, unknown>;
   children?: Block[];
+  /**
+   * Optional single-item collection binding (Phase 2, Slice A) — SEPARATE from
+   * `props`. The renderer fetches the first matching row and hydrates the mapped
+   * field values into `props` (under the mapped prop names) before the pure walk.
+   * Unresolved (no match / dead collection / unknown field) → graceful blank.
+   */
+  bindings?: Record<string, BindingRef>;
 };
 
 // A component artifact as stored (the fields the renderer needs).

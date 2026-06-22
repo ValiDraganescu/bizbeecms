@@ -138,16 +138,20 @@ hydrate bound data first, then the pure walk binds it via the EXISTING `{{slot}}
 DEPENDS ON Slices 1-4 (registry, items, structured query). Item schema already has
 stable id + slug (Slice 3) so this isn't a retrofit.
 
-- TODO: **P2-bind Slice A — block `bindings` model + hydrate-before-walk seam.**
-  Add optional `bindings?: Record<string, BindingRef>` to the `Block` type
-  (`tree.ts:50`) — separate from `props`. Pure `BindingRef` type + validators
-  (collection exists in registry, mapped fields exist, mapped props are declared on
-  the target component). Extend `buildPlanFromPage` (`render-page.tsx`) to SCAN
-  blocks for bindings, run the Slice-4 query/first-match to fetch rows, and HYDRATE
-  the resolved field values into the block's `props` (mapped names) BEFORE
-  `planPage`. Keep `planPage`/`planTree` pure+sync. Single-item (first-match) only
-  this slice — List is Slice B. Pure tests: bindings validate, hydration fills props,
-  unresolved → graceful blank. Gate.
+- DONE (2026-06-22): **P2-bind Slice A — block `bindings` model + hydrate-before-walk
+  seam.** Added `BindingRef` type + optional `bindings?: Record<string,BindingRef>` on
+  `Block` (`render/tree.ts`, SEPARATE from `props`: `{source:{collection,filter?,sort?},
+  map:{propName→fieldName}}`). PURE `lib/content/binding.ts`: `validateBinding`
+  (collection/mapped+filter+sort fields exist [user field OR system column] / mapped
+  prop declared on target → ok|errors[]), `bindingQuerySpec` (→ first-match QuerySpec
+  limit 1), `hydrateProps` (row→props, binding overwrites static when resolved,
+  unresolved/absent → graceful blank), `declaredPropNames` (propsSchema allowlist).
+  `render-page.tsx` `buildPlanFromPage` now `await hydrateBlockBindings(blocks)` BEFORE
+  `planPage` (recursive, parallel first-match `queryCollection`, graceful on error/
+  empty); `planPage`/`planTree` stay PURE+SYNC. 15 node tests; 129 content+render
+  total; tsc 0; opennext build green. NO user strings → NO cms-bundle regen. NOTE: the
+  hint said `lib/content/tree.ts` but the renderer lives at `lib/render/tree.ts` +
+  `lib/render/render-page.tsx`. List binding = Slice B (next). Live D1 = HITL.
 
 - TODO: **P2-bind Slice B — built-in `List` block (Section-style) + per-row stamp.**
   Add a reserved built-in `List` block type (like `SECTION_COMPONENT`/

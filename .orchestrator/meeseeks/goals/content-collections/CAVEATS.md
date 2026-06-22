@@ -221,6 +221,30 @@ Read every line before working. Each entry was learned the hard way by a previou
   error}`)** — map `!ok` → `{ok:false, errors:[res.error]}` in the handler so the
   model gets a recoverable message; the dispatcher tags `name` and never throws.
 
+- **(Slice A) The renderer lives at `CMS/src/lib/render/`, NOT `lib/content/`.**
+  `tree.ts` (`Block`/`BindingRef`/`planPage`/`planTree`, PURE+SYNC) + `render-page.tsx`
+  (`buildPlanFromPage`, the async D1+hydrate seam). Backlog hints that say
+  `lib/content/tree.ts` mean `lib/render/tree.ts`. `lib/content/` is the collections
+  data layer (fence/registry/items/query/binding).
+- **(Slice A) Binding hydration happens in `buildPlanFromPage` BEFORE `planPage`** —
+  `hydrateBlockBindings(blocks)` recursively walks the tree, runs each binding's
+  first-match `queryCollection` (Slice-4, limit 1) in parallel, and `hydrateProps`
+  copies `row[field]→props[prop]`. NEVER make `planPage`/`planTree` async. Slice B
+  (`List` block) must add its per-row query the SAME way: fetch rows in
+  `buildPlanFromPage`, then stamp in a PURE `planList`.
+- **(Slice A) `BindingRef.source.filter[].op` is loosely typed `string`** on purpose
+  (author/AI supplies it); the Slice-4 query compiler whitelists ops at RUNTIME
+  (unknown op → 400 → graceful blank). That's why `render-page.tsx` casts
+  `bindingQuerySpec(b) as QuerySpec` — don't tighten the BindingRef op type or you'll
+  duplicate the compiler's whitelist.
+- **(Slice A) `SYSTEM_COLUMNS` is a string[] (`["id","slug",...]`), NOT objects** —
+  `columnNames()` spreads it directly. (Mapped/filter/sort fields may target a system
+  column OR a user field; binding validation allows both.)
+- **(Slice A) Binding hydration is GRACEFUL by design and is the LIVE source of truth
+  when it resolves:** a resolved binding OVERWRITES a static `props` value; an
+  unresolved one (no match / dead collection / query error) leaves the static value
+  (or blank). `hydrateProps` is pure; the async shell catches query errors → null row.
+
 - **(Slice 5) Admin UI talks to the Slice 2-4 REST routes only — no new data path.**
   Item create OMITS empty-string field values so column DEFAULTs apply; edit sends
   all keys (PATCH semantics). multiselect round-trips as a JSON-array string (parse on

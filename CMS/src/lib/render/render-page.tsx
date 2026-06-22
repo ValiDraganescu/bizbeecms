@@ -34,6 +34,9 @@ import {
 } from "@/lib/render/tree";
 import { renderPlans } from "@/lib/render/react";
 import { generateUtilityCss } from "@/lib/render/utility-css";
+import { bindingQuerySpec, hydrateProps } from "@/lib/content/binding";
+import { queryCollection } from "@/db/query-store";
+import type { QuerySpec } from "@/lib/content/query-compiler";
 import {
   getContentLocales,
   getThemeOverrides,
@@ -103,8 +106,57 @@ export async function buildPlanFromPage(
     fallback: contentLocales.default,
   };
 
-  const plan = planPage(blocks, components, locale);
+  // Phase-2 binding (Slice A): hydrate single-item collection bindings INTO the
+  // blocks' props BEFORE the pure walk. `planPage`/`planTree` stay pure+sync; all
+  // the async D1 work (first-match query per binding) happens right here. Graceful:
+  // any failed/empty query leaves the bound props blank (never throws / 500s).
+  const hydratedBlocks = await hydrateBlockBindings(blocks);
+
+  const plan = planPage(hydratedBlocks, components, locale);
   return { plan, locale };
+}
+
+/**
+ * Walk the block tree, and for every block carrying a `bindings` map, run each
+ * binding's FIRST-MATCH structured query (Slice-4 `queryCollection`, limit 1) and
+ * hydrate the resolved field values into the block's `props` (mapped names). Pure
+ * `hydrateProps` does the field→prop copy; this async shell only fetches the rows.
+ * Returns a NEW block tree (the originals are untouched). GRACEFUL: a query error
+ * or empty result → that binding resolves to no row → the prop stays blank.
+ */
+async function hydrateBlockBindings(blocks: Block[]): Promise<Block[]> {
+  return Promise.all(
+    blocks.map(async (block): Promise<Block> => {
+      const children = block.children
+        ? await hydrateBlockBindings(block.children)
+        : block.children;
+
+      if (!block.bindings || Object.keys(block.bindings).length === 0) {
+        return children === block.children ? block : { ...block, children };
+      }
+
+      const rows: Record<string, Record<string, unknown> | null> = {};
+      await Promise.all(
+        Object.entries(block.bindings).map(async ([key, binding]) => {
+          try {
+            // The binding's filter `op` is loosely typed (string); the query
+            // compiler whitelists ops at runtime (unknown op → 400 → graceful
+            // blank here), so this cast is safe.
+            const res = await queryCollection(
+              binding.source.collection,
+              bindingQuerySpec(binding) as QuerySpec,
+            );
+            rows[key] = res.ok ? (res.plan.items[0] ?? null) : null;
+          } catch {
+            rows[key] = null; // graceful: dead collection / runtime error → blank
+          }
+        }),
+      );
+
+      const props = hydrateProps(block.props, block.bindings, rows);
+      return { ...block, props, children };
+    }),
+  );
 }
 
 /**

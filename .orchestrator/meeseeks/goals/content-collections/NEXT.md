@@ -1,46 +1,41 @@
 # Note to the next Meeseeks (content-collections)
 
-BUGS: NONE OPEN. Slices 0–6 are ALL DONE. v1 is COMPLETE: fence + registry +
-runtime create + items CRUD + structured query + admin UI + **AI tools**.
+BUGS: NONE OPEN. v1 (Slices 0–6) DONE. Phase-2 binding: **Slice A DONE** (this run).
 
-WHAT EXISTS NOW (use it, don't reinvent):
-- Pure libs: `CMS/src/lib/content/{fence,collection-schema,collection-plan,item-write,query-compiler}.ts`.
-- Stores: `CMS/src/db/{collection-store,item-store,query-store}.ts` (all `PlanResult<T>`).
-- REST: `app/api/collections/...` (Admin-gated; `[name]` = content_<slug> table name).
-- Admin UI (Slice 5): `app/admin/collections/{page,[name]/page}.tsx` +
-  `components/content/{collections-manager,collection-items,field-input,confirm-modal}.tsx`.
-- **AI tools (Slice 6, NEW):** `lib/chat/collection-tools.ts` (5 PURE tool schemas +
-  validators) wired into the SHARED registry (`tool-dispatch.ts` TOOL_BY_NAME +
-  HANDLERS) calling the Slice 2-4 stores directly; `collections` context in
-  `tool-scopes.ts`. Tools: create_collection, add_collection_item,
-  update_collection_item, archive_collection_item (op-switches archive|unarchive|
-  delete), query_collection. NO raw SQL to the model; NO forked data path.
-- Tests gate: `node --test scripts/query-compiler.test.mjs scripts/item-write.test.mjs
-  scripts/collection-plan.test.mjs scripts/collection-schema.test.mjs
-  scripts/content-fence.test.mjs scripts/collection-tools.test.mjs` (78). Also keep
-  `scripts/{tool-dispatch,tool-scopes}.test.mjs` green (registry coverage).
+WHAT SLICE A ADDED (use it, don't reinvent):
+- `CMS/src/lib/render/tree.ts`: `BindingRef` type + optional `bindings?:
+  Record<string,BindingRef>` on `Block` (SEPARATE from `props`):
+  `{ source:{collection, filter?, sort?}, map:{propName→fieldName} }`.
+- PURE `CMS/src/lib/content/binding.ts`: `validateBinding(binding, fields|null, declared)`
+  → ok|{errors[]}; `bindingQuerySpec(binding)` → first-match QuerySpec (limit 1);
+  `hydrateProps(props, bindings, rows)` → new props (binding overwrites static when
+  resolved, unresolved → graceful blank); `declaredPropNames(propsSchema)` → allowlist.
+- `CMS/src/lib/render/render-page.tsx`: `buildPlanFromPage` now `await
+  hydrateBlockBindings(blocks)` BEFORE `planPage` — recursive, parallel first-match
+  `queryCollection`, graceful. `planPage`/`planTree` stay PURE+SYNC.
+- Tests: `node --test scripts/binding.test.mjs` (15). Full suite (129):
+  `node --test scripts/{binding,query-compiler,item-write,collection-plan,collection-schema,content-fence,collection-tools,render-tree}.test.mjs`.
 
-PICK NEXT: **Phase 2 — Component ↔ Collection BINDING (greenlit).** Start with
-**P2-bind Slice A — block `bindings` model + hydrate-before-walk seam** (single-item
-first-match binding only this slice). See BACKLOG Phase-2 section + the CAVEATS on
-keeping `planPage`/`planTree` PURE+SYNC (hydrate in async `buildPlanFromPage` BEFORE
-the walk) and `List` being a BUILT-IN block modeled on `Section`. P2-bind A→B→C→D
-is the remaining track; Phase 3 (route-driven detail pages + cross-collection refs)
-and the deferred drop/rename-field + FTS5 items are later/not-greenlit.
+PICK NEXT: **P2-bind Slice B — built-in `List` block (Section-style) + per-row stamp.**
+Model it EXACTLY on `SECTION_COMPONENT`/`planSection` in `tree.ts` (a reserved built-in
+type special-cased, NOT a user component). It holds a query (collection+filter/sort/
+limit) + ONE child slot (template component) + field→prop `map`. Fetch rows in
+`buildPlanFromPage` (same seam as Slice A's `hydrateBlockBindings` — add a List query
+pass), then a PURE `planList` stamps the slot subtree once per row, binding each row's
+mapped fields into the slotted component's declared props (reuse `bindTree` +
+`declaredProps`). Empty result → nothing (optional empty-state child). Expose `List`
+via a `list_builtin_types`-style export. Pure tests: N rows → N stamped subtrees,
+empty → empty, map respects allowlist. Then Slice C (operator UI) + Slice D (AI tools).
 
-GATE every slice: `node --test scripts/...` + `npx tsc --noEmit` +
-`npx opennextjs-cloudflare build` (dev server DOWN first — corrupts .next). Regen
-cms-bundle (`npm run bundle:cms` from ProjectManager/) ONLY if the slice adds CMS
-*UI* strings — AI-tool descriptions are model-facing, NOT UI strings (no regen).
+GATE every slice: `node --test scripts/...` + `npx tsc --noEmit` + `npx
+opennextjs-cloudflare build` (dev server DOWN first). cms-bundle regen ONLY if the
+slice adds CMS *UI* strings (Slice A/B = renderer logic, none → no regen).
 
-KEY DECISIONS (settled — don't relitigate): one real table/collection; runtime DDL
-fenced to content_* + system-generated; 100-collection cap; registry canonical;
-ADD-ONLY evolution v1; AI gets STRUCTURED tools only; NO FTS5 v1 (LIKE);
-refs/page-binding = Phase 2 (single-item = query first-match, List = Section-style
-built-in block).
+PARALLEL-SAFETY: another CMS worker owns `CMS/src/app/mcp/**` + `CMS/src/lib/chat/**`
++ the cms-bundle regen — STAY OUT of those for renderer slices (A/B). Slice D (AI
+binding tools) WILL touch lib/chat — coordinate then.
 
-GOTCHAS: imports inside src/ need `.ts` extension or node --test can't resolve.
-`[name]` / the `collection` tool arg IS the content_<slug> table name. New AI tools
-go in THREE places (KNOWN_TOOL_NAMES, TOOL_BY_NAME, HANDLERS) — chat route
-auto-derives, no route edit. Live D1 = HITL — node-test the PURE modules, the
-UI/stores/tools are build-verified.
+GOTCHAS: renderer is `lib/render/` NOT `lib/content/`. imports inside src/ need `.ts`
+extension. `SYSTEM_COLUMNS` is a string[]. BindingRef op is loose `string` (compiler
+whitelists at runtime — cast to QuerySpec). Keep `planPage`/`planTree` PURE+SYNC —
+hydrate/fetch ALWAYS in the async `buildPlanFromPage` before the walk.
