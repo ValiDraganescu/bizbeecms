@@ -1,70 +1,81 @@
 /**
- * Model catalog for the CMS AI assistant (Milestone 2, ai-assistant goal).
+ * Model catalog for the CMS AI assistant (ai-openrouter goal — provider swap).
  *
- * Originally a tiny hard-coded allowlist (Slice 4 sub-slice 2). Now the picker
- * is backed by the FULL Cloudflare Workers-AI catalog, fetched from the CF
- * list-models API, parsed by the PURE helpers here, cached in D1, and served by
- * `GET /api/chat/models`. The static list below stays as the FALLBACK (and the
- * default) for when the catalog can't be fetched (no CF creds / offline) or the
- * cache is empty — the picker is never empty and the default is always known.
+ * The picker is backed by the OpenRouter catalog, fetched from OpenRouter's
+ * `GET https://openrouter.ai/api/v1/models` endpoint, parsed by the PURE helpers
+ * here, cached in D1, and served by `GET /api/chat/models`. The static list
+ * below stays as the FALLBACK (and the default) for when the catalog can't be
+ * fetched (offline / upstream down) or the cache is empty — the picker is never
+ * empty and the default is always known.
+ *
+ * (Was Cloudflare Workers-AI: ids like `@cf/<vendor>/...` via the CF list-models
+ * API. The ai-openrouter goal moved the assistant onto OpenRouter, whose ids are
+ * provider-prefixed `vendor/model` and whose `/api/v1/models` returns an OpenAI-
+ * style `{ data: [{ id, name, pricing: { prompt } }] }` payload.)
  *
  * The `model` field on the chat route is UNTRUSTED, so it must NEVER 400: the
  * route validates the chosen id against the cached catalog ids (or the static
  * fallback) and falls back to DEFAULT_MODEL for anything unknown. Arbitrary
- * model strings are never forwarded to `env.AI.run`.
+ * model strings are never forwarded upstream.
  *
  * PURE module: no React / D1 / CF imports, so it's node-testable (see
  * `scripts/models.test.mjs`) and importable by both the route and the widget.
  */
 
-/** Default Workers AI model — the route's fallback. Must be in CHAT_MODELS. */
-export const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+/** Default OpenRouter model — the route's fallback. Must be in CHAT_MODELS. */
+export const DEFAULT_MODEL = "openai/gpt-4o-mini";
 
 /** A catalog entry as the UI + route consume it (the clean boundary shape). */
 export interface CatalogModel {
-  /** Exact `env.AI.run(model, ...)` id, e.g. `@cf/meta/llama-3.1-8b-instruct`. */
+  /** Exact OpenRouter model id, e.g. `openai/gpt-4o-mini`. */
   id: string;
-  /** Display label (the human-ish tail of the id, or the description). */
+  /** Display label (the model's human name, or the tail of the id). */
   label: string;
-  /** Provider grouping axis — the vendor segment of `@cf/<vendor>/...`. */
+  /** Provider grouping axis — the vendor segment of `<vendor>/model`. */
   provider: string;
   /** Per-input-token USD price (sort key); null when the API exposes none. */
   price: number | null;
 }
 
 /**
- * Static fallback catalog of Cloudflare Workers-AI chat models known to support
- * OpenAI-style tool calling (the assistant relies on tools). Used when the live
- * catalog is unavailable. `provider`/`price` filled to match the catalog shape.
+ * Static fallback catalog of OpenRouter chat models that support OpenAI-style
+ * tool calling (the assistant relies on tools). Used when the live catalog is
+ * unavailable. `price` left null — sorted purely by the live catalog when present.
  */
 export const CHAT_MODELS: ReadonlyArray<CatalogModel> = [
   {
-    id: "@cf/meta/llama-3.1-8b-instruct",
-    label: "Llama 3.1 8B (fast)",
-    provider: "meta",
+    id: "openai/gpt-4o-mini",
+    label: "GPT-4o mini (fast)",
+    provider: "openai",
     price: null,
   },
   {
-    id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-    label: "Llama 3.3 70B (strong)",
-    provider: "meta",
+    id: "openai/gpt-4o",
+    label: "GPT-4o (strong)",
+    provider: "openai",
     price: null,
   },
   {
-    id: "@hf/nousresearch/hermes-2-pro-mistral-7b",
-    label: "Hermes 2 Pro 7B (tools)",
-    provider: "nousresearch",
+    id: "anthropic/claude-3.5-sonnet",
+    label: "Claude 3.5 Sonnet",
+    provider: "anthropic",
+    price: null,
+  },
+  {
+    id: "google/gemini-flash-1.5",
+    label: "Gemini Flash 1.5",
+    provider: "google",
     price: null,
   },
 ];
 
 // ── Pure catalog helpers (node-tested) ──────────────────────────────────────
 
-/** The vendor segment of a CF model id: `@cf/<vendor>/rest` → `vendor`. */
+/** The vendor segment of an OpenRouter id: `<vendor>/rest` → `vendor`. */
 export function providerOf(id: string): string {
-  // ids look like "@cf/meta/llama-3.1-8b-instruct" or "@hf/nous/...".
+  // ids look like "openai/gpt-4o-mini" or "anthropic/claude-3.5-sonnet".
   const parts = id.split("/");
-  return parts.length >= 2 ? parts[1] : "other";
+  return parts.length >= 1 && parts[0] ? parts[0] : "other";
 }
 
 /** Human label from an id: the last path segment (the model name). */
@@ -74,76 +85,43 @@ function labelOf(id: string): string {
 }
 
 /**
- * The CF list-models payload shape we care about (loose — the API carries far
- * more; we read only what we need so it's resilient to additions).
+ * The OpenRouter list-models payload shape we care about (loose — the API
+ * carries far more; we read only what we need so it's resilient to additions).
+ * `pricing.prompt` is a USD-per-token string, e.g. "0.00000015".
  */
 interface RawModel {
+  id?: unknown;
   name?: unknown;
-  description?: unknown;
-  deprecated?: unknown;
-  task?: { name?: unknown } | null;
-  properties?: Array<{ property_id?: unknown; value?: unknown }> | null;
+  pricing?: { prompt?: unknown } | null;
 }
 
-/** Extract the per-input-token price from a model's `properties[]`, or null. */
+/** Extract the per-input-token price (USD/token) from `pricing.prompt`, or null. */
 function priceOf(m: RawModel): number | null {
-  const props = Array.isArray(m.properties) ? m.properties : [];
-  const price = props.find((p) => p && p.property_id === "price");
-  if (!price) return null;
-  // `value` is either an array of {unit, price, currency} or a scalar.
-  const val = price.value;
-  const pick = (entry: unknown): number | null => {
-    if (entry && typeof entry === "object") {
-      const e = entry as { unit?: unknown; price?: unknown };
-      const unit = typeof e.unit === "string" ? e.unit.toLowerCase() : "";
-      const n = typeof e.price === "string" ? Number(e.price) : (e.price as number);
-      if (typeof n === "number" && Number.isFinite(n) && unit.includes("input")) {
-        return n;
-      }
-    }
-    return null;
-  };
-  if (Array.isArray(val)) {
-    // Prefer an input-token price; else the first finite price.
-    for (const entry of val) {
-      const p = pick(entry);
-      if (p != null) return p;
-    }
-    for (const entry of val) {
-      if (entry && typeof entry === "object") {
-        const e = entry as { price?: unknown };
-        const n = typeof e.price === "string" ? Number(e.price) : (e.price as number);
-        if (typeof n === "number" && Number.isFinite(n)) return n;
-      }
-    }
-  }
-  return null;
+  const p = m.pricing;
+  if (!p || typeof p !== "object") return null;
+  const raw = (p as { prompt?: unknown }).prompt;
+  const n = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : NaN;
+  return Number.isFinite(n) ? n : null;
 }
 
 /**
- * Parse the CF list-models JSON (`{ result: RawModel[] }` or `RawModel[]`) into
- * the clean `CatalogModel[]`. Drops deprecated models and anything that isn't a
- * Text-Generation task (the assistant needs chat models). Resilient to a missing
- * `result` wrapper (the public mirror returns a bare array).
+ * Parse the OpenRouter list-models JSON (`{ data: RawModel[] }` or a bare
+ * `RawModel[]`) into the clean `CatalogModel[]`. Resilient to a missing `data`
+ * wrapper and junk entries (anything without a string `id` is dropped).
  */
 export function parseModelCatalog(apiJson: unknown): CatalogModel[] {
   const raw: unknown =
-    apiJson && typeof apiJson === "object" && "result" in (apiJson as object)
-      ? (apiJson as { result: unknown }).result
+    apiJson && typeof apiJson === "object" && "data" in (apiJson as object)
+      ? (apiJson as { data: unknown }).data
       : apiJson;
   const list: RawModel[] = Array.isArray(raw) ? (raw as RawModel[]) : [];
   const out: CatalogModel[] = [];
   for (const m of list) {
-    if (!m || typeof m.name !== "string" || m.name.length === 0) continue;
-    if (m.deprecated === true) continue;
-    const task = m.task && typeof m.task === "object" ? String(m.task.name ?? "") : "";
-    if (task && task.toLowerCase() !== "text generation") continue;
+    if (!m || typeof m.id !== "string" || m.id.length === 0) continue;
     out.push({
-      id: m.name,
-      label: typeof m.description === "string" && m.description.trim()
-        ? labelOf(m.name)
-        : labelOf(m.name),
-      provider: providerOf(m.name),
+      id: m.id,
+      label: typeof m.name === "string" && m.name.trim() ? m.name.trim() : labelOf(m.id),
+      provider: providerOf(m.id),
       price: priceOf(m),
     });
   }

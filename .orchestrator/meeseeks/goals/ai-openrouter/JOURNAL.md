@@ -37,3 +37,28 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   absent => empty => CMS auto-falls-back to CfAi. No regression for un-keyed Sites.
 - **Files:** `CMS/src/lib/ports/ai.ts`, `CMS/scripts/openrouter-ai.test.mjs`, `CMS/wrangler.jsonc`,
   `deployer/src/index.ts`
+
+## 2026-06-22 — Slice 3: point the model catalog at OpenRouter
+- **Did:** Swapped the catalog source from CF Workers-AI to OpenRouter, shape-only — the
+  `CatalogModel` boundary + all pure helpers (`groupByProvider`/`sortByPrice`/`filterCatalog`/
+  `isKnownModel`/`resolveModel`) and the picker/route consumers are untouched. In
+  `CMS/src/lib/chat/models.ts`: `parseModelCatalog` now reads OpenRouter's `{ data: [{ id, name,
+  pricing: { prompt } }] }` (tolerates a bare array + junk w/o `id`); `providerOf` takes the FIRST
+  `vendor/model` segment (was the 2nd of `@cf/<vendor>/...`); `priceOf` reads `pricing.prompt`
+  (USD/token string→number); `DEFAULT_MODEL = "openai/gpt-4o-mini"`; static `CHAT_MODELS` = 4
+  OpenRouter chat models (openai/gpt-4o-mini, openai/gpt-4o, anthropic/claude-3.5-sonnet,
+  google/gemini-flash-1.5). In `GET /api/chat/models`: `fetchLiveCatalog` now hits
+  `https://openrouter.ai/api/v1/models` (public endpoint; sends `env.OPENROUTER_API_KEY` as Bearer
+  when present, read via the SAME `getCloudflareContext` env boundary — still tries un-keyed if no
+  CF context); kept the D1 cache + 12h lazy refresh + static fallback exactly. Chat route needed NO
+  change: it already validates untrusted `model` via `resolveModel(cachedIds ∪ static) → DEFAULT_MODEL`,
+  so it now resolves to OpenRouter ids automatically and never forwards arbitrary strings.
+- **Verified:** rewrote `scripts/models.test.mjs` for the OpenRouter shape → `node --test
+  scripts/models.test.mjs` 12/12 pass; AI port suites still green (`openrouter-ai` + `ai-port` 11/11).
+  CMS `tsc --noEmit`: 0 errors in MY files (chat catalog). The only 2 tsc errors are pre-existing in
+  the PARALLEL worker's `src/components/components/components-manager.tsx` (date typing) — not mine,
+  out of my scope. Did NOT run `opennextjs-cloudflare build` (deploy gate; reserved for slice 4
+  end-to-end + parallel worker owns the bundle/components & dev may be up). Did NOT run bundle:cms —
+  catalog swap has zero new user strings.
+- **Files:** `CMS/src/lib/chat/models.ts`, `CMS/src/app/api/chat/models/route.ts`,
+  `CMS/scripts/models.test.mjs`

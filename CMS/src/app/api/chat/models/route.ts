@@ -1,19 +1,15 @@
 /**
- * AI model catalog endpoint (ai-assistant goal — searchable model picker).
+ * AI model catalog endpoint (ai-openrouter goal — searchable model picker).
  *
  *   GET /api/chat/models  → { models: CatalogModel[], fetchedAt, source }
  *
- * Serves the FULL Cloudflare Workers-AI catalog for the picker. The catalog is
- * CACHED in D1 (one `site_settings` row) and lazily REFRESHED on read when the
- * cache is older than ~12h (ponytail: lazy refresh, no Cron — add a scheduled
- * handler only if this proves too laggy). The live fetch hits Cloudflare's
- * list-models API with `env.CF_ACCOUNT_ID` + `env.CF_API_TOKEN`; when those
- * aren't provisioned (or the fetch fails) we fall back to the static
- * `CHAT_MODELS` allowlist so the picker is NEVER empty.
- *
- * SCOPE: this returns Workers-AI models only (`@cf/...`) — the CF API exposes no
- * multi-provider AI-Gateway catalog. Those, if wanted later, are a small curated
- * supplement merged on top (not built here).
+ * Serves the OpenRouter catalog for the picker. The catalog is CACHED in D1 (one
+ * `site_settings` row) and lazily REFRESHED on read when the cache is older than
+ * ~12h (ponytail: lazy refresh, no Cron — add a scheduled handler only if this
+ * proves too laggy). The live fetch hits OpenRouter's `/api/v1/models` (public,
+ * but we send `env.OPENROUTER_API_KEY` as a Bearer when present — read via the
+ * same env boundary the Ai port uses); when the fetch fails we fall back to the
+ * static `CHAT_MODELS` allowlist so the picker is NEVER empty.
  *
  * Admin-only (it's CMS-internal config). REST-only (PM directive).
  */
@@ -30,28 +26,24 @@ export const dynamic = "force-dynamic";
 /** Refresh the cache after this many ms (12h — "once or twice a day"). */
 const MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
-/** Fetch + parse the live CF catalog, or null when creds/fetch unavailable. */
+/** OpenRouter's public model catalog endpoint. */
+const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
+
+/** Fetch + parse the live OpenRouter catalog, or null when the fetch fails. */
 async function fetchLiveCatalog(): Promise<CatalogModel[] | null> {
-  let accountId = "";
-  let apiToken = "";
+  // OpenRouter /api/v1/models is public; send the key as Bearer when present so
+  // the call is attributed (read via the same env boundary the Ai port uses).
+  let apiKey = "";
   try {
     const { env } = await getCloudflareContext({ async: true });
-    // CF_ACCOUNT_ID / CF_API_TOKEN are injected per-Site by the deployer (same
-    // creds the binding-adapters REST `Ai` task uses); absent in local/default.
-    const e = env as unknown as Record<string, unknown>;
-    accountId = String(e.CF_ACCOUNT_ID ?? "");
-    apiToken = String(e.CF_API_TOKEN ?? "");
+    apiKey = String((env as unknown as Record<string, unknown>).OPENROUTER_API_KEY ?? "");
   } catch {
-    return null;
+    // No CF context (e.g. local dev) → still try the public endpoint un-keyed.
   }
-  if (!accountId || !apiToken) return null;
 
-  const url =
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models/search` +
-    `?task=Text+Generation&hide_experimental=true&per_page=100`;
   try {
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${apiToken}` },
+    const res = await fetch(OPENROUTER_MODELS_URL, {
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
     });
     if (!res.ok) return null;
     const json = await res.json();

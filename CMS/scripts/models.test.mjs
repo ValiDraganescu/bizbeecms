@@ -1,8 +1,9 @@
 /**
- * Pure unit tests for the AI model allowlist (ai-assistant goal, Slice 4
- * sub-slice 2 — model picker). The route's `model` field is UNTRUSTED, so
- * `resolveModel` must accept only allowlisted ids and fall back to the default
- * for everything else — never throw, never forward arbitrary strings.
+ * Pure unit tests for the AI model catalog (ai-openrouter goal — catalog swap).
+ * The catalog is now OpenRouter (`vendor/model` ids, `{ data: [...] }` payload).
+ * The route's `model` field is UNTRUSTED, so `resolveModel` must accept only
+ * allowlisted ids and fall back to the default for everything else — never
+ * throw, never forward arbitrary strings.
  *
  * Run: node --test scripts/models.test.mjs
  */
@@ -43,12 +44,17 @@ test("isKnownModel accepts allowlisted ids only", () => {
   assert.equal(isKnownModel(null), false);
 });
 
+test("DEFAULT_MODEL is an OpenRouter-style provider-prefixed id", () => {
+  assert.ok(!DEFAULT_MODEL.startsWith("@cf/"), "should not be a CF id");
+  assert.ok(DEFAULT_MODEL.includes("/"), "should be vendor/model");
+});
+
 test("resolveModel returns allowlisted value, else the default", () => {
   const other = CHAT_MODELS.find((m) => m.id !== DEFAULT_MODEL);
   if (other) assert.equal(resolveModel(other.id), other.id);
   // untrusted / unknown → default (never a throw, never the raw string)
   assert.equal(resolveModel("'; DROP TABLE pages; --"), DEFAULT_MODEL);
-  assert.equal(resolveModel("@cf/not/real"), DEFAULT_MODEL);
+  assert.equal(resolveModel("vendor/not-real"), DEFAULT_MODEL);
   assert.equal(resolveModel(undefined), DEFAULT_MODEL);
   assert.equal(resolveModel(null), DEFAULT_MODEL);
   assert.equal(resolveModel(123), DEFAULT_MODEL);
@@ -56,103 +62,93 @@ test("resolveModel returns allowlisted value, else the default", () => {
 });
 
 test("resolveModel accepts ids from the dynamic catalog allowlist", () => {
-  const allowed = new Set(["@cf/some/new-model", "@cf/another/model"]);
-  assert.equal(resolveModel("@cf/some/new-model", allowed), "@cf/some/new-model");
+  const allowed = new Set(["mistralai/mistral-large", "x-ai/grok-beta"]);
+  assert.equal(resolveModel("mistralai/mistral-large", allowed), "mistralai/mistral-large");
   // unknown even with a catalog → default
-  assert.equal(resolveModel("@cf/not/in-catalog", allowed), DEFAULT_MODEL);
+  assert.equal(resolveModel("vendor/not-in-catalog", allowed), DEFAULT_MODEL);
   // static ids still pass even with a catalog set supplied
   assert.equal(resolveModel(DEFAULT_MODEL, allowed), DEFAULT_MODEL);
-  assert.equal(isKnownModel("@cf/some/new-model", allowed), true);
-  assert.equal(isKnownModel("@cf/some/new-model"), false); // no catalog arg
+  assert.equal(isKnownModel("mistralai/mistral-large", allowed), true);
+  assert.equal(isKnownModel("mistralai/mistral-large"), false); // no catalog arg
 });
 
-test("providerOf extracts the vendor segment of a CF id", () => {
-  assert.equal(providerOf("@cf/meta/llama-3.1-8b-instruct"), "meta");
-  assert.equal(providerOf("@hf/nousresearch/hermes-2-pro"), "nousresearch");
-  assert.equal(providerOf("weird"), "other");
+test("providerOf extracts the vendor segment of an OpenRouter id", () => {
+  assert.equal(providerOf("openai/gpt-4o-mini"), "openai");
+  assert.equal(providerOf("anthropic/claude-3.5-sonnet"), "anthropic");
+  assert.equal(providerOf("weird"), "weird"); // single-segment id → itself
+  assert.equal(providerOf("/leading-slash"), "other"); // empty vendor → other
 });
 
-// Sample CF list-models payload (the shape the helpers must survive).
+// Sample OpenRouter /api/v1/models payload (the shape the helpers must survive).
 const SAMPLE = {
-  result: [
+  data: [
     {
-      name: "@cf/meta/llama-3.3-70b-instruct",
-      description: "strong",
-      task: { name: "Text Generation" },
-      properties: [
-        { property_id: "price", value: [{ unit: "per M input tokens", price: "0.29" }] },
-      ],
+      id: "anthropic/claude-3.5-sonnet",
+      name: "Anthropic: Claude 3.5 Sonnet",
+      pricing: { prompt: "0.000003", completion: "0.000015" },
     },
     {
-      name: "@cf/meta/llama-3.1-8b-instruct",
-      task: { name: "Text Generation" },
-      properties: [
-        { property_id: "price", value: [{ unit: "per M input tokens", price: "0.05" }] },
-      ],
+      id: "openai/gpt-4o-mini",
+      name: "OpenAI: GPT-4o-mini",
+      pricing: { prompt: "0.00000015", completion: "0.0000006" },
     },
     {
-      name: "@cf/openai/whisper",
-      task: { name: "Automatic Speech Recognition" }, // dropped: not text gen
+      id: "google/gemini-flash-1.5",
+      name: "Google: Gemini Flash 1.5",
+      pricing: {}, // no prompt price → sorts last
     },
     {
-      name: "@cf/old/deprecated-model",
-      deprecated: true, // dropped
-      task: { name: "Text Generation" },
-    },
-    {
-      name: "@hf/google/gemma-7b",
-      task: { name: "Text Generation" },
-      properties: [], // no price → sorts last
+      // junk entry: no id → dropped
+      name: "Mystery model",
+      pricing: { prompt: "0.001" },
     },
   ],
 };
 
-test("parseModelCatalog extracts id/provider/price; drops deprecated + non-text-gen", () => {
+test("parseModelCatalog extracts id/name/provider/price from the OpenRouter shape", () => {
   const cat = parseModelCatalog(SAMPLE);
   const ids = cat.map((m) => m.id);
-  assert.ok(ids.includes("@cf/meta/llama-3.3-70b-instruct"));
-  assert.ok(ids.includes("@cf/meta/llama-3.1-8b-instruct"));
-  assert.ok(ids.includes("@hf/google/gemma-7b"));
-  assert.ok(!ids.includes("@cf/openai/whisper")); // not text generation
-  assert.ok(!ids.includes("@cf/old/deprecated-model")); // deprecated
-  const small = cat.find((m) => m.id === "@cf/meta/llama-3.1-8b-instruct");
-  assert.equal(small.provider, "meta");
-  assert.equal(small.price, 0.05);
-  const noPrice = cat.find((m) => m.id === "@hf/google/gemma-7b");
+  assert.ok(ids.includes("anthropic/claude-3.5-sonnet"));
+  assert.ok(ids.includes("openai/gpt-4o-mini"));
+  assert.ok(ids.includes("google/gemini-flash-1.5"));
+  assert.equal(cat.length, 3); // junk (no id) dropped
+  const small = cat.find((m) => m.id === "openai/gpt-4o-mini");
+  assert.equal(small.provider, "openai");
+  assert.equal(small.label, "OpenAI: GPT-4o-mini");
+  assert.equal(small.price, 0.00000015);
+  const noPrice = cat.find((m) => m.id === "google/gemini-flash-1.5");
   assert.equal(noPrice.price, null);
 });
 
-test("parseModelCatalog tolerates a bare array (no result wrapper) + junk", () => {
+test("parseModelCatalog tolerates a bare array (no data wrapper) + junk", () => {
   assert.deepEqual(parseModelCatalog(null), []);
   assert.deepEqual(parseModelCatalog({}), []);
-  assert.deepEqual(parseModelCatalog([{ task: { name: "Text Generation" } }]), []); // no name
-  const bare = parseModelCatalog([
-    { name: "@cf/x/y", task: { name: "Text Generation" } },
-  ]);
+  assert.deepEqual(parseModelCatalog([{ name: "no id" }]), []); // no id
+  const bare = parseModelCatalog([{ id: "x/y" }]);
   assert.equal(bare.length, 1);
+  assert.equal(bare[0].label, "y"); // no name → tail of id
 });
 
 test("sortByPrice orders LOW→HIGH; null price last", () => {
-  const cat = parseModelCatalog(SAMPLE).filter((m) => m.provider === "meta");
-  cat.push({ id: "@cf/meta/z", label: "z", provider: "meta", price: null });
+  const cat = parseModelCatalog(SAMPLE);
   const sorted = sortByPrice(cat);
-  assert.equal(sorted[0].price, 0.05);
-  assert.equal(sorted[1].price, 0.29);
-  assert.equal(sorted[sorted.length - 1].price, null);
+  assert.equal(sorted[0].price, 0.00000015); // gpt-4o-mini cheapest
+  assert.equal(sorted[1].price, 0.000003); // claude
+  assert.equal(sorted[sorted.length - 1].price, null); // gemini (no price) last
 });
 
 test("groupByProvider groups + sorts within group + sorts providers", () => {
   const groups = groupByProvider(parseModelCatalog(SAMPLE));
   const providers = groups.map((g) => g.provider);
-  assert.deepEqual(providers, ["google", "meta"]); // alpha
-  const meta = groups.find((g) => g.provider === "meta");
-  assert.equal(meta.models[0].price, 0.05); // cheapest first
+  assert.deepEqual(providers, ["anthropic", "google", "openai"]); // alpha
+  const openai = groups.find((g) => g.provider === "openai");
+  assert.equal(openai.models[0].id, "openai/gpt-4o-mini");
 });
 
 test("filterCatalog matches id/label/provider; empty query → all", () => {
   const cat = parseModelCatalog(SAMPLE);
   assert.equal(filterCatalog(cat, "").length, cat.length);
-  assert.ok(filterCatalog(cat, "llama").every((m) => m.id.includes("llama")));
+  assert.ok(filterCatalog(cat, "gpt").every((m) => m.id.includes("gpt")));
   assert.ok(filterCatalog(cat, "google").length >= 1); // provider match
   assert.equal(filterCatalog(cat, "zzz-nothing").length, 0);
 });

@@ -27,3 +27,13 @@ Read every line before working. Each entry was learned the hard way by a previou
 - For OpenRouter to actually be active on a deployed CMS, the DEPLOYER worker must hold its own
   `OPENROUTER_API_KEY` secret (`wrangler secret put OPENROUTER_API_KEY` in `deployer/`). The deployer
   passes it down via `--var`; without it the var is "" and the CMS silently uses CfAi.
+- CATALOG SHAPE (slice 3): `parseModelCatalog` now expects OpenRouter's `{ data: [...] }` (id, name,
+  pricing.prompt) — NOT the CF `{ result: [...] }` (name, task, properties[]). `providerOf` takes the
+  FIRST `vendor/model` segment now (was the 2nd of `@cf/...`). If you ever re-enable CfAi's catalog
+  you'd need a per-provider parser; don't assume one shape fits both.
+- `GET /api/chat/models` hits OpenRouter's PUBLIC `/api/v1/models` (no key strictly required) — it
+  works un-keyed in local dev. The key is sent only for attribution. So the picker shows the live
+  OpenRouter list even before the deployer secret is set; only actual chat completions need the key.
+- `CMS/src/app/api/translate/route.ts` STILL has its own hardcoded `@cf/...` DEFAULT_MODEL and calls
+  CF directly — it's NOT part of the assistant catalog and was left as-is (out of this goal's scope).
+  If translate should also move to OpenRouter, that's a separate task.
