@@ -19,24 +19,24 @@ You are a **Mr. Meeseeks**. You were summoned to do **one task** toward a GOAL, 
 
 ## Where everything lives (goals tree)
 
-All Meeseeks state lives **inside this skill's own folder**, under `goals/`. It is runtime state — Orchestrator's re-init / "Restore Default" never touches it (the bundled skill ships no `goals/`). The shape is a **tree**: one root goal (`main`) is the north star; subgoals are children that decompose it.
+All Meeseeks state lives under `.orchestrator/meeseeks/goals/` at the project root. The shape is a **tree**: one root goal (`main`) is the north star; subgoals are children that decompose it. Archived subgoals are moved aside under `goals/archive/`.
 
 ```
-.claude/skills/orc-meeseeks/
-├── SKILL.md                       ← this file (the playbook; versioned, don't edit for state)
-└── goals/
-    ├── main/                      ← the root goal
-    │   ├── GOAL.md                ← the north star: what we're ultimately building
-    │   ├── SUBGOALS.md            ← index of child subgoals (slug → one-line purpose, status)
-    │   ├── JOURNAL.md  CAVEATS.md  BACKLOG.md  NEXT.md   ← main goal's memory
-    └── <subgoal-slug>/            ← a child goal (0..N of them)
-        ├── GOAL.md                ← what this subgoal delivers; opens by referencing ../main/GOAL.md
-        └── JOURNAL.md  CAVEATS.md  BACKLOG.md  NEXT.md   ← this subgoal's own memory
+.orchestrator/meeseeks/goals/
+├── main/                      ← the root goal
+│   ├── GOAL.md                ← the north star: what we're ultimately building
+│   ├── SUBGOALS.md            ← index of child subgoals (slug → one-line purpose, status)
+│   ├── JOURNAL.md  CAVEATS.md  BACKLOG.md  NEXT.md   ← main goal's memory
+├── <subgoal-slug>/            ← an active child goal (0..N of them)
+│   ├── GOAL.md                ← what this subgoal delivers; opens by referencing ../main/GOAL.md
+│   └── JOURNAL.md  CAVEATS.md  BACKLOG.md  NEXT.md   ← this subgoal's own memory
+└── archive/                   ← subgoals the curator retired (read-only history; never work these)
+    └── <slug>/                ← a moved-aside subgoal tree, unchanged
 ```
 
 Each goal directory is **self-contained**: its own `GOAL.md` and its own four memory files. A run touches exactly one goal directory's memory. Subgoals stay aware of the parent by **reading `../main/GOAL.md` first** — the root is always the ultimate yardstick; a subgoal that drifts from it is wrong.
 
-> **Resolve the skill dir robustly.** You are running with the project's working directory; the skill lives at `<projectRoot>/.claude/skills/orc-meeseeks/`. If you're unsure of the project root, `git rev-parse --show-toplevel` gives it. The `goals/` dir is **relative to this skill**, NOT a project-root `.meeseeks/` (that old location is dead — migrate it if you find it; see the appendix).
+> **Resolve the goals dir robustly.** It lives at `<projectRoot>/.orchestrator/meeseeks/goals/`; the project root is `git rev-parse --show-toplevel`. `goals/archive/` holds retired subgoals — **never select work from `archive/` and never write there.**
 
 ---
 
@@ -55,9 +55,9 @@ The **first token** is the goal slug. The rest (if any) is a free-text hint that
 - **Empty / first token is `main`** → work the **main** goal (`goals/main/`).
 - **First token is a subgoal slug** (e.g. `audio-polish`) → work that subgoal (`goals/audio-polish/`).
 
-Set `GOAL_DIR = goals/<resolved-slug>/` and use it for every read/write below. **You do not work more than one goal per run.**
+Set `GOAL_DIR = goals/<resolved-slug>/` and use it for every read/write below. **You do not work more than one goal per run.** If the resolved slug lives under `goals/archive/`, it's a retired goal — refuse to work it and say so in your `result`; archived goals are read-only history.
 
-> **The driver owns the goal tree, not you.** Goal directories are created and seeded by the `/orc-meeseeks-loop` driver before you're summoned, so `GOAL_DIR` should already exist with its `GOAL.md` + memory. You **never** create a subgoal, edit `goals/main/SUBGOALS.md`, or restructure the tree. If `GOAL_DIR` is somehow missing (you were run standalone via `/orc-meeseeks <slug>` with no driver), seed *just that one goal's* files from the appendix templates so you can work — but still do **not** invent sibling subgoals or touch the index; leave structure to the driver and note it in your result.
+> **The curator owns the goal tree, not you.** Goal directories are created and seeded by the `/orc-meeseeks-curator` before any worker runs, so `GOAL_DIR` should already exist with its `GOAL.md` + memory. You **never** create a subgoal, edit `goals/main/SUBGOALS.md`, archive a goal, or restructure the tree. If `GOAL_DIR` is somehow missing, seed *just that one goal's* files from the appendix templates so you can work this run — but still do **not** invent sibling subgoals or touch the index; leave structure to the curator and note it in your result.
 
 ### 0b. Rebuild context for that goal, in this order
 
@@ -93,7 +93,7 @@ Selection priority:
 - In the `## Bugs` section, flip the bug to `DONE` (or `BLOCKED` with the reason). Record the root cause in the JOURNAL entry.
 - If you genuinely can't fix it this run, mark it `BLOCKED` with what you tried and what's needed, write it into `NEXT.md`, and treat that as your completed run. Do **not** silently skip an open bug to do feature work.
 
-**Scope discipline:** one task = something completable in a single run and verifiable. If a candidate is too big, split it: add the sub-tasks to this goal's `BACKLOG.md`, and take only the first this run. A well-decomposed backlog is itself valuable work. (If the work is big enough to be its *own* track — a coherent body of work that deserves its own backlog and memory — that's a **new subgoal**, which is the *driver's* job to create, not yours. Don't make a `goals/<slug>/` dir or touch `SUBGOALS.md`. Instead, do a fitting smaller task this run and **flag the new-track in your `result`** so the driver can carve out the subgoal.)
+**Scope discipline:** one task = something completable in a single run and verifiable. If a candidate is too big, split it: add the sub-tasks to this goal's `BACKLOG.md`, and take only the first this run. A well-decomposed backlog is itself valuable work. (If the work is big enough to be its *own* track — a coherent body of work that deserves its own backlog and memory — that's a **new subgoal**, which is the **curator's** job to create, not yours. Don't make a `goals/<slug>/` dir or touch `SUBGOALS.md`. Instead, do a fitting smaller task this run and **flag the new-track in your `result`** so the user can have the curator carve out the subgoal.)
 
 Before committing, **double-check against the JOURNAL and the filesystem** that this exact work hasn't already been done. If it has, mark it `DONE` in the backlog (housekeeping) and pick the next.
 
@@ -109,6 +109,7 @@ Execute it — build the feature, write the code, fix the bug, add the test, wri
 
 While working:
 - Respect every entry in `<GOAL_DIR>/CAVEATS.md`.
+- **Track every file you create or edit.** Another Meeseeks may share this branch, so at commit time (Step 5) you stage *only your own* paths — never `git add -A`. Keep a running list now so you don't have to reconstruct it later.
 - A new gotcha, dead end, wrong assumption, or surprising tool behavior → that's a caveat. Hold it for Step 4.
 - Verify your work to the extent you can in one run (build, run tests, sanity-check output). Record what you verified and what you couldn't.
 
@@ -150,16 +151,25 @@ Your direct message to the *next* Meeseeks on this goal. **Overwrite** it. Name 
 
 A Meeseeks **always commits** before popping out. The loop driver and every future Meeseeks rely on `git` being the durable record. An uncommitted run didn't happen.
 
+**Commit ONLY the files YOU touched — never `git add -A`.** Another Meeseeks may be working the same branch concurrently; `git add -A` would sweep up *their* in-flight, uncommitted changes into your commit, corrupting both runs' histories. You stage an explicit list of the paths you created or modified this run, and nothing else.
+
+So, **as you work, keep a running list of every path you create or edit** — your code/asset changes plus your four goal-memory files (`<GOAL_DIR>/JOURNAL.md`, `BACKLOG.md`, `CAVEATS.md`, `NEXT.md`, and `goals/main/CAVEATS.md` if you added a project-wide caveat). At commit time, stage exactly those paths:
+
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-git add -A
+# PATHS = the explicit list of files THIS run created/modified (repo-relative).
+# Never `git add -A` / `git add .` — that would grab a concurrent Meeseeks's work.
+git add -- <path1> <path2> … <GOAL_DIR>/JOURNAL.md <GOAL_DIR>/BACKLOG.md <GOAL_DIR>/CAVEATS.md <GOAL_DIR>/NEXT.md
 git diff --cached --quiet || git commit -m "meeseeks(<goal-slug>): <one-line summary of what this run did>"
 ```
 
 Notes:
-- The `git diff --cached --quiet ||` guard makes the commit a no-op if there's genuinely nothing to commit (a pure-blocker run still updates the goal's memory, so usually there IS something).
-- Staging includes the goal's memory updates (JOURNAL/BACKLOG/CAVEATS/NEXT) — good, memory and code land in one atomic commit.
-- If the repo isn't initialized yet (`git rev-parse` fails), `git init && git add -A && git commit -m "..."`, and record that in `CAVEATS.md`.
+- **Sanity-check before committing:** run `git status --short` and confirm every staged (`A`/`M`) path is one you actually touched. If you see staged changes you didn't make, `git restore --staged <path>` them out — they belong to another Meeseeks. Leave them unstaged; their owner commits them.
+- Stage your goal-memory updates alongside your code so memory and code land in one atomic commit — but stage them by their explicit paths too, not via `-A`.
+- The `git diff --cached --quiet ||` guard makes the commit a no-op if there's genuinely nothing to commit (a pure-blocker run still updates the goal's memory, so usually there IS something staged).
+- If you genuinely lost track of which files you touched, reconstruct the list from `git status --short` and your own JOURNAL entry — still stage explicitly; do not fall back to `git add -A`.
+- If the repo isn't initialized yet (`git rev-parse` fails), `git init` then stage your explicit paths and commit, and record that in `CAVEATS.md`.
+- Do **not** `git stash`, `git checkout`, reset, or otherwise touch files you didn't create — a concurrent Meeseeks's uncommitted work lives in the same working tree. Only ever add/restore-staged *your own* paths.
 - Do **not** push, bump a version, or create branches. One local commit per run.
 
 ---
@@ -175,7 +185,7 @@ End with a summary to the user (and in your `result` to the driver):
 - `TASK:` what you did
 - `STATUS:` DONE / BLOCKED  *(this is the **task's** status — never the goal's; goals never end)*
 - `NEXT:` what the next Meeseeks on this goal should pick up
-- `STRUCTURE:` (only if relevant) anything the **driver** must handle — a new track that deserves its own subgoal, a stray `.meeseeks/` to migrate, a missing `main`/`SUBGOALS.md`. Omit if nothing structural came up.
+- `STRUCTURE:` (only if relevant) anything the **curator** must handle — a new track that deserves its own subgoal, a missing `main`/`SUBGOALS.md`. Omit if nothing structural came up.
 
 A fresh Meeseeks will be summoned for the next task — by `/loop /orc-meeseeks <goal>`, or (preferred) by the `/orc-meeseeks-loop` driver, which spawns each Meeseeks in its own separate terminal so every run gets a genuinely clean context.
 
@@ -183,7 +193,7 @@ A fresh Meeseeks will be summoned for the next task — by `/loop /orc-meeseeks 
 
 ## Appendix — standalone fallback seed templates
 
-**Normally you never need this.** The `/orc-meeseeks-loop` driver owns the goal tree and seeds `GOAL_DIR` (and `main`, and `SUBGOALS.md`) before summoning you. These templates are **only** for the standalone fallback — you were run via `/orc-meeseeks <slug>` with no driver and `GOAL_DIR` is missing. In that case seed **just your one goal's** files so you can work this run; do **not** create sibling subgoals, do **not** create or edit `goals/main/SUBGOALS.md`, do **not** migrate anything — leave all tree structure to the driver and say in your `result` that the tree needs the driver's attention.
+**Normally you never need this.** The `/orc-meeseeks-curator` owns the goal tree and seeds `GOAL_DIR` (and `main`, and `SUBGOALS.md`) before any worker runs. These templates are **only** for the standalone fallback — `GOAL_DIR` is missing when you start. In that case seed **just your one goal's** files so you can work this run; do **not** create sibling subgoals, do **not** create or edit `goals/main/SUBGOALS.md` — leave all tree structure to the curator and say in your `result` that the tree needs the curator's attention.
 
 ### Seed `<GOAL_DIR>`'s files
 
@@ -226,4 +236,4 @@ Task states: TODO | DOING | DONE | BLOCKED.
 First run — no prior context. Read main/GOAL.md, then this goal's GOAL.md, decompose into a backlog, take the first slice.
 ```
 
-> Seeding `goals/main/`, `goals/main/SUBGOALS.md`, creating sibling subgoals, and migrating a legacy project-root `.meeseeks/` are all the **driver's** responsibilities (`/orc-meeseeks-loop`), not yours. If you notice a stray `.meeseeks/` or a missing `main`/`SUBGOALS.md`, flag it in your `result` and let the driver handle the structure.
+> Seeding `goals/main/`, `goals/main/SUBGOALS.md`, creating sibling subgoals, and archiving goals are all the **curator's** responsibilities (`/orc-meeseeks-curator`), not yours. If you notice a missing `main`/`SUBGOALS.md`, flag it in your `result` and let the curator handle the structure.
