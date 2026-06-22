@@ -6,6 +6,7 @@ import {
   getCurrentUser,
   findUserByEmail,
   getUserCountries,
+  getUserTagIds,
 } from "@/lib/auth/user";
 import { normalizeEmail, validateEmail } from "@/lib/auth/validation";
 import { authorizeInvite, INVITABLE_ROLES } from "@/lib/invite/authz";
@@ -20,6 +21,7 @@ export type InviteErrorKey =
   | "notAllowed"
   | "roleNotAllowed"
   | "countryNotAllowed"
+  | "tagNotAllowed"
   | "emailTaken"
   | "alreadyInvited"
   | "unknown";
@@ -30,7 +32,12 @@ export type InviteSuccess = {
   delivered: boolean;
 };
 
-type Body = { email?: unknown; role?: unknown; countries?: unknown };
+type Body = {
+  email?: unknown;
+  role?: unknown;
+  countries?: unknown;
+  tagIds?: unknown;
+};
 
 /** Parse + dedupe the selected country codes (empty = global). */
 function parseCountries(raw: unknown): CountryCode[] | "invalid" {
@@ -42,6 +49,12 @@ function parseCountries(raw: unknown): CountryCode[] | "invalid" {
     out.add(value);
   }
   return [...out];
+}
+
+/** Parse + dedupe the selected tag ids (non-empty strings). */
+function parseTagIds(raw: unknown): string[] {
+  const list = Array.isArray(raw) ? raw.map(String) : [];
+  return [...new Set(list.filter((v) => v !== ""))];
 }
 
 function fail(error: InviteErrorKey, status: number): NextResponse {
@@ -76,10 +89,23 @@ export async function POST(request: Request): Promise<NextResponse> {
   const countries = parseCountries(body.countries);
   if (countries === "invalid") return fail("countryInvalid", 400);
 
-  // Authorization: who may grant this role + country set, bounded by the
-  // inviter's own country scope (server-enforced).
-  const inviterCountries = await getUserCountries(inviter.id);
-  const authzError = authorizeInvite(inviter, inviterCountries, role, countries);
+  // Tags only apply to Manager invites; ignore them for any other role.
+  const tagIds = role === "Manager" ? parseTagIds(body.tagIds) : [];
+
+  // Authorization: who may grant this role + country/tag set, bounded by the
+  // inviter's own country + tag scope (server-enforced).
+  const [inviterCountries, inviterTagIds] = await Promise.all([
+    getUserCountries(inviter.id),
+    getUserTagIds(inviter.id),
+  ]);
+  const authzError = authorizeInvite(
+    inviter,
+    inviterCountries,
+    role,
+    countries,
+    inviterTagIds,
+    tagIds,
+  );
   if (authzError) return fail(authzError, 403);
 
   if (await findUserByEmail(email)) return fail("emailTaken", 409);
@@ -90,6 +116,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       email,
       role,
       countries,
+      tagIds,
       invitedBy: inviter.id,
     });
 

@@ -68,7 +68,7 @@ tsc + opennext build green + PM node tests + EN/FI/ET for new strings.
   user is allowed (hide/disable remove on higher tiers). Reuse PM design-system
   components + purpose tokens. EN/FI/ET for all chrome. Gate.
 
-- TODO: **Slice 6 — extend the INVITE flow to the new roles + tags.** Update
+- DONE (2026-06-22): **Slice 6 — extend the INVITE flow to the new roles + tags.** Update
   `authorizeInvite` + the invite UI so an inviter can invite at the new roles
   (Manager/Editor) and, for Manager invites, set the invited countries + tags
   (subset of the inviter's own scope, like the existing country subset rule). The

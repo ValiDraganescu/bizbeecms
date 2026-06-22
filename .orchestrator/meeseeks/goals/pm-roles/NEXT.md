@@ -1,32 +1,34 @@
 # Note to the next Meeseeks (pm-roles)
 
-Slices 1 (role enum + migration), 2 (removal hierarchy), 3 (tags model +
-Manager country-AND-tag reach), 3b (tag CRUD API+UI), 4 (user-management API),
-and 5 (user-management UI) are all DONE.
+Slices 1–5 + 6 are all DONE. The role overhaul (SuperAdmin/Admin/Manager/Editor),
+removal hierarchy, tags model + Manager country-AND-tag reach, tag CRUD, the global
+user-management API + UI, AND the invite flow (now grants Manager/Editor + tags)
+are all delivered and gated (tsc 0, 112 node tests, opennext build green).
 
-Slice 5 delivered:
-- `app/(app)/users/page.tsx` — Admin+ gated server page (redirects others);
-  passes actor role+scope + managed tags + users list to the client.
-- `app/(app)/users/users-manager.tsx` — users table (email, role, country/tag
-  badges), inline EditRow (role Combobox + country & tag multiselects limited to
-  the actor's grantable scope, mirroring authorizeAssign), Remove behind an
-  in-app ConfirmRemoveModal (no window.confirm). Client tier gate mirrors
-  removal.ts RANK to hide actions on equal/higher tiers + the actor's own row.
-- `/users` NavLink in app-nav.tsx, gated Admin+.
-- `users` i18n namespace extended (navLink/back/title/subtitle/list/edit/
-  actions/remove) EN/FI/ET; existing `users.errors` kept.
-- Gate: tsc 0, npm test 108, opennext build green with /users in the route list.
+Slice 6 delivered:
+- `invite_tags` table + migration `0008_ambiguous_carnage.sql`.
+- `authorizeInvite` reuses `authorizeAssign` (single subset source of truth);
+  `INVITABLE_ROLES = [Admin, Manager, Editor]`; tags only for Manager invites.
+- `createInvite`/`acceptInvite` carry tags; `createUser` takes `tagIds`.
+- invite-form shows a tag multiselect when role=Manager; pending list has a Tags
+  column; EN/FI/ET strings added; `lib/invite/authz-slice6.test.ts`.
 
-PICK NEXT: **Slice 6 — extend the INVITE flow to the new roles + tags.**
-- `authorizeInvite` + invite UI: allow inviting at Manager/Editor; for Manager
-  invites, set countries + tags (subset of the inviter's own scope — REUSE
-  `manage-users.ts authorizeAssign`, same subset rule Slice 5's UI mirrors).
-- The invite-accept path must store role + countries + tags on the new user
-  (today it stores role + country only — check `invite/route.ts` + the accept
-  page). Add a tag multiselect to invite-form.tsx (copy the pattern from
-  users-manager.tsx EditRow — `GET /api/tags` for the list).
-- Node tests for the subset/authz rules. EN/FI/ET. Gate (tsc + npm test +
-  opennext build, NOT while dev on 3601 is up).
-- Keep in sync with cms-auth's invite flow (same shape, CMS-local).
+PICK NEXT — the GOAL.md "what good looks like" list is essentially met, but two
+gaps are worth a slice:
+1. **Site detail tag picker.** GOAL/Slice-3b note says "the Site detail page gets a
+   tag picker too" — a Site carries zero+ tags (`site_tags`) but I did NOT see a UI
+   to assign them at `app/(app)/sites/[id]`. Without it, Managers can be tag-scoped
+   but no Site ever HAS a tag, so Manager reach is always empty in practice. Add a
+   tag multiselect on the Site detail page + a `setSiteTags` helper + route (mirror
+   `setUserTags` + the tags GET). This is the highest-value remaining slice — it
+   makes the whole Manager tag dimension actually usable end-to-end.
+2. **Editor invites + assignment.** Editor is invitable now, but an Editor only
+   reaches Sites it's ASSIGNED to (`site_users`). Check the invite/accept path
+   doesn't need a follow-up site-assignment step, and that the per-Site assign UI
+   at `sites/[id]` lists Editors correctly.
+
+Do #1 first — it closes the last functional gap in the Manager scope story.
 
 PARALLEL-SAFETY: stay OUT of CMS/ and don't run bundle:cms — another worker owns it.
+PM commands run inside ProjectManager/. tsc + npm test + opennext build, NOT while
+dev (3601) is up.

@@ -152,3 +152,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   confirm modal, consider promoting this overlay-dialog pattern (fixed inset bg-black/50,
   stopPropagation on the panel, role=dialog aria-modal) into `components/ui` instead of
   copy-pasting a third time.
+
+- **Slice 6 done — invite flow grants Manager/Editor + tags.** `INVITABLE_ROLES`
+  is now `["Admin","Manager","Editor"]` (NEVER add SuperAdmin). `authorizeInvite`
+  no longer hand-rolls the country subset — it DELEGATES country+tag to
+  `authorizeAssign` (manage-users.ts), the SAME rule PATCH uses. If you touch the
+  subset rule, change it in ONE place (manage-users.ts) and both invite+PATCH follow.
+  Tags are gated by `role === "Manager"` in BOTH the route and the form — a
+  non-Manager invite carries no tags by construction.
+- **`invite_tags` mirrors `invite_countries`** (PK inviteId+tagId, onDelete cascade
+  on both FKs). Migration `0008_ambiguous_carnage.sql` was AUTO-scaffolded by
+  `drizzle-kit generate` (new table = real diff; journal+snapshot auto-chained — no
+  hand-authoring like the data-only 0006). `createUser` now takes optional `tagIds`
+  (inserts userTags on create); `acceptInvite` copies invite tags → user.
+- **The deployer applies migrations** (confirmed earlier in cms-auth Slice 1). The
+  new 0008 ships in `migrations/` and gets applied on next Site/PM deploy — no manual
+  D1 step needed locally beyond build.

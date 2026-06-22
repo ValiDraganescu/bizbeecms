@@ -24,7 +24,8 @@ import {
 import { INVITABLE_ROLES } from "@/lib/invite/authz";
 import type { InviteErrorKey, InviteSuccess } from "@/app/api/invite/route";
 
-type InviterCtx = { role: Role; countries: CountryCode[] };
+type InviterCtx = { role: Role; countries: CountryCode[]; tagIds: string[] };
+type Tag = { id: string; label: string };
 
 /**
  * Invite form. Role is single-select; country is MULTI-select. The option sets
@@ -33,7 +34,13 @@ type InviterCtx = { role: Role; countries: CountryCode[] };
  * SuperAdmin / global Admins) so the UI doesn't offer choices the action would
  * reject — the action remains the real gate.
  */
-export function InviteForm({ inviter }: { inviter: InviterCtx }) {
+export function InviteForm({
+  inviter,
+  managedTags,
+}: {
+  inviter: InviterCtx;
+  managedTags: Tag[];
+}) {
   const t = useTranslations("invites");
   const tRoles = useTranslations("roles");
   const [error, setError] = useState<InviteErrorKey | null>(null);
@@ -70,8 +77,22 @@ export function InviteForm({ inviter }: { inviter: InviterCtx }) {
   const canBeGlobal =
     inviter.role === "SuperAdmin" || inviter.countries.length === 0;
 
+  // Tag options mirror authorizeAssign: a global actor (SuperAdmin / global
+  // Admin) may grant any managed tag; a scoped actor only tags they hold.
+  const grantableTags: Tag[] = canBeGlobal
+    ? managedTags
+    : managedTags.filter((tg) => inviter.tagIds.includes(tg.id));
+  const tagOptions: DefaultOption[] = useMemo(
+    () => grantableTags.map((tg) => ({ id: tg.id, label: tg.label })),
+    [grantableTags],
+  );
+
   const [role, setRole] = useState<DefaultOption | null>(null);
   const [countries, setCountries] = useState<DefaultOption[]>([]);
+  const [tagSel, setTagSel] = useState<DefaultOption[]>([]);
+
+  // Tags only apply to Manager invites; clear the selection when leaving Manager.
+  const isManager = role?.id === "Manager";
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -88,6 +109,7 @@ export function InviteForm({ inviter }: { inviter: InviterCtx }) {
           email,
           role: role?.id ?? "",
           countries: countries.map((c) => String(c.id)),
+          tagIds: isManager ? tagSel.map((tg) => String(tg.id)) : [],
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -215,6 +237,26 @@ export function InviteForm({ inviter }: { inviter: InviterCtx }) {
           </FieldHint>
         )}
       </Field>
+
+      {isManager ? (
+        <Field>
+          <FieldLabel htmlFor="invite-tags">{t("form.tags")}</FieldLabel>
+          <Combobox<DefaultOption>
+            id="invite-tags"
+            multiple
+            options={tagOptions}
+            value={tagSel}
+            onChange={setTagSel}
+            searchable={tagOptions.length > 6}
+            placeholder={t("form.tagsPlaceholder")}
+          />
+          {fieldError("tagNotAllowed") ? (
+            <FieldError>{fieldError("tagNotAllowed")}</FieldError>
+          ) : (
+            <FieldHint>{t("form.tagsHint")}</FieldHint>
+          )}
+        </Field>
+      ) : null}
 
       <Button type="submit" loading={pending} className="w-fit">
         {t("form.submit")}

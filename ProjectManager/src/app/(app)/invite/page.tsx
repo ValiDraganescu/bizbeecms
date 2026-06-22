@@ -18,9 +18,18 @@ import {
   TableRow,
 } from "@/components/ui";
 import type { Role } from "@/db/schema";
-import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
+import {
+  getCurrentUser,
+  getUserCountries,
+  getUserTagIds,
+} from "@/lib/auth/user";
 import { canUserInvite } from "@/lib/invite/authz";
-import { listPendingInvites, getInviteCountriesMap } from "@/lib/invite/invite";
+import { listTags } from "@/lib/tags/tags";
+import {
+  listPendingInvites,
+  getInviteCountriesMap,
+  getInviteTagsMap,
+} from "@/lib/invite/invite";
 import { InviteForm } from "./invite-form";
 
 const roleKey: Record<Role, string> = {
@@ -43,8 +52,14 @@ export default async function InvitePage() {
   const allowed = canUserInvite(user);
 
   const inviterCountries = allowed ? await getUserCountries(user.id) : [];
+  const inviterTagIds = allowed ? await getUserTagIds(user.id) : [];
+  const managedTags = allowed ? await listTags() : [];
   const pending = allowed ? await listPendingInvites() : [];
-  const countriesByInvite = await getInviteCountriesMap(pending.map((i) => i.id));
+  const inviteIds = pending.map((i) => i.id);
+  const countriesByInvite = await getInviteCountriesMap(inviteIds);
+  const tagsByInvite = await getInviteTagsMap(inviteIds);
+  const tagLabel = (id: string) =>
+    managedTags.find((tg) => tg.id === id)?.label ?? id;
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-10">
@@ -86,7 +101,15 @@ export default async function InvitePage() {
             </CardHeader>
             <CardContent>
               <InviteForm
-                inviter={{ role: user.role, countries: inviterCountries }}
+                inviter={{
+                  role: user.role,
+                  countries: inviterCountries,
+                  tagIds: inviterTagIds,
+                }}
+                managedTags={managedTags.map((tg) => ({
+                  id: tg.id,
+                  label: tg.label,
+                }))}
               />
             </CardContent>
           </Card>
@@ -108,6 +131,7 @@ export default async function InvitePage() {
                       <TableHead>{t("pending.email")}</TableHead>
                       <TableHead>{t("pending.role")}</TableHead>
                       <TableHead>{t("pending.country")}</TableHead>
+                      <TableHead>{t("pending.tags")}</TableHead>
                       <TableHead>{t("pending.expires")}</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -124,6 +148,19 @@ export default async function InvitePage() {
                           {(countriesByInvite.get(inv.id) ?? []).length > 0
                             ? countriesByInvite.get(inv.id)!.join(", ")
                             : t("pending.global")}
+                        </TableCell>
+                        <TableCell>
+                          {(tagsByInvite.get(inv.id) ?? []).length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {tagsByInvite.get(inv.id)!.map((id) => (
+                                <Badge key={id} tone="primary">
+                                  {tagLabel(id)}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-foreground-muted">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="tabular-nums text-foreground-muted">
                           {inv.expiresAt.toISOString().slice(0, 10)}

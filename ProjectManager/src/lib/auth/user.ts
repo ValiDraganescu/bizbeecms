@@ -51,6 +51,8 @@ export type CreateUserInput = {
   role: Role;
   /** Country scope set; empty/omitted = global (all countries). */
   countries?: CountryCode[];
+  /** Tag scope (Manager only); empty/omitted = no tag reach. */
+  tagIds?: string[];
   canInvite?: boolean;
 };
 
@@ -73,6 +75,12 @@ export async function createUser(input: CreateUserInput): Promise<User> {
     await db
       .insert(schema.userCountries)
       .values(countries.map((country) => ({ userId: user.id, country })));
+  }
+  const tagIds = input.tagIds ?? [];
+  if (tagIds.length > 0) {
+    await db
+      .insert(schema.userTags)
+      .values(tagIds.map((tagId) => ({ userId: user.id, tagId })));
   }
   return user;
 }

@@ -183,6 +183,20 @@ export const inviteCountries = sqliteTable(
   (t) => [primaryKey({ columns: [t.inviteId, t.country] })],
 );
 
+/** Tag scope for an invite (copied to the user on accept; Manager invites only). */
+export const inviteTags = sqliteTable(
+  "invite_tags",
+  {
+    inviteId: text("invite_id")
+      .notNull()
+      .references(() => invites.id, { onDelete: "cascade" }),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.inviteId, t.tagId] })],
+);
+
 /**
  * Dynamic, MANAGED org tags (pm-roles Slice 3) — a SEPARATE dimension that lives
  * ALONGSIDE country (country stays exactly as it is; do NOT fold it into tags).
@@ -242,6 +256,8 @@ export type UserCountry = typeof userCountries.$inferSelect;
 export type NewUserCountry = typeof userCountries.$inferInsert;
 export type InviteCountry = typeof inviteCountries.$inferSelect;
 export type NewInviteCountry = typeof inviteCountries.$inferInsert;
+export type InviteTag = typeof inviteTags.$inferSelect;
+export type NewInviteTag = typeof inviteTags.$inferInsert;
 export type Tag = typeof tags.$inferSelect;
 export type NewTag = typeof tags.$inferInsert;
 export type UserTag = typeof userTags.$inferSelect;

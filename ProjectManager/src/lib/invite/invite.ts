@@ -19,10 +19,12 @@ export type CreateInviteInput = {
   role: Role;
   /** Country scope set; empty = global (all countries). */
   countries: CountryCode[];
+  /** Tag scope (Manager only); empty = no tag reach. */
+  tagIds?: string[];
   invitedBy: string;
 };
 
-/** Create a pending invite (+ its country-scope rows). Returns the invite row. */
+/** Create a pending invite (+ its country/tag-scope rows). Returns the invite row. */
 export async function createInvite(input: CreateInviteInput): Promise<Invite> {
   const db = await getDb();
   const now = Date.now();
@@ -43,7 +45,45 @@ export async function createInvite(input: CreateInviteInput): Promise<Invite> {
       .insert(schema.inviteCountries)
       .values(input.countries.map((country) => ({ inviteId: invite.id, country })));
   }
+  const tagIds = input.tagIds ?? [];
+  if (tagIds.length > 0) {
+    await db
+      .insert(schema.inviteTags)
+      .values(tagIds.map((tagId) => ({ inviteId: invite.id, tagId })));
+  }
   return invite;
+}
+
+/** An invite's tag scope set (Manager invites). Empty array = no tag reach. */
+export async function getInviteTags(inviteId: string): Promise<string[]> {
+  const db = await getDb();
+  const rows = await db
+    .select({ tagId: schema.inviteTags.tagId })
+    .from(schema.inviteTags)
+    .where(eq(schema.inviteTags.inviteId, inviteId));
+  return rows.map((r) => r.tagId);
+}
+
+/** Tag sets for many invites at once, keyed by invite id (for the list). */
+export async function getInviteTagsMap(
+  inviteIds: string[],
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (inviteIds.length === 0) return map;
+  const db = await getDb();
+  const rows = await db
+    .select({
+      inviteId: schema.inviteTags.inviteId,
+      tagId: schema.inviteTags.tagId,
+    })
+    .from(schema.inviteTags)
+    .where(inArray(schema.inviteTags.inviteId, inviteIds));
+  for (const row of rows) {
+    const list = map.get(row.inviteId) ?? [];
+    list.push(row.tagId);
+    map.set(row.inviteId, list);
+  }
+  return map;
 }
 
 /** An invite's country scope set. Empty array = global (all countries). */
@@ -137,6 +177,7 @@ export async function acceptInvite(
   }
 
   const countries = await getInviteCountries(invite.id);
+  const tagIds = await getInviteTags(invite.id);
   const passwordHash = await hashPassword(password);
   let user: User;
   try {
@@ -145,6 +186,7 @@ export async function acceptInvite(
       passwordHash,
       role: invite.role,
       countries,
+      tagIds,
       // Invited users don't get invite rights by default; a SuperAdmin can
       // grant canInvite later when that management UI exists.
       canInvite: false,

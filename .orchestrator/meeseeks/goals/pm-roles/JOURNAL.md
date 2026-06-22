@@ -154,3 +154,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **What I did:** New PM page `app/(app)/users/page.tsx` (server, Admin+ gated, redirects others; passes actor role+scope + managed tags + users list to the client). `users-manager.tsx` (client): users table (email, role, country/tag badges, scope), inline EditRow with role Combobox + country & tag multiselect Comboboxes (option sets limited to the actor's grantable scope, mirroring `authorizeAssign`), wired to `PATCH /api/users/[id]`; Remove behind an in-app `ConfirmRemoveModal` (no window.confirm) wired to `DELETE`. Client tier gate mirrors removal.ts RANK to hide Edit/Remove on equal/higher tiers + the actor's own row (API is still the real gate). Added `/users` NavLink in `app-nav.tsx`, gated Admin+ (new `isAdminPlus`). Extended the `users` i18n namespace (navLink/back/title/subtitle/list/edit/actions/remove) in EN/FI/ET, keeping the existing `users.errors`.
 - **Verified:** tsc 0; npm test 108 pass (no new test — UI slice; tier logic duplicates already-tested removal.ts); `opennextjs-cloudflare build` green with `/users` in the route list. Dev server confirmed NOT running before build.
 - **Files:** ProjectManager/src/app/(app)/users/page.tsx, ProjectManager/src/app/(app)/users/users-manager.tsx, ProjectManager/src/components/nav/app-nav.tsx, ProjectManager/messages/{en,fi,et}.json
+
+## 2026-06-22 13:02 — Slice 6: invite flow → Manager/Editor + tags
+- **Status:** DONE
+- **What I did:** Extended the invite flow to the new role set + tag scope.
+  - schema: new `invite_tags` table (mirrors `invite_countries`, FK→invites+tags,
+    onDelete cascade) + types; migration `0008_ambiguous_carnage.sql` scaffolded by
+    `drizzle-kit generate` (journal/snapshot chain auto-updated — new table = real diff).
+  - `lib/invite/authz.ts`: `INVITABLE_ROLES` now `["Admin","Manager","Editor"]`;
+    `authorizeInvite` takes `inviterTagIds`+`tagIds` and DELEGATES the country+tag
+    subset to `authorizeAssign` (manage-users.ts) — single source of truth shared
+    with PATCH. Tags only granted for `role === "Manager"`. New error key `tagNotAllowed`.
+  - `lib/invite/invite.ts`: `createInvite` stores tag rows; `getInviteTags` +
+    `getInviteTagsMap`; `acceptInvite` reads tags + passes to `createUser`.
+  - `lib/auth/user.ts`: `createUser` accepts `tagIds` (inserts userTags on create).
+  - `app/api/invite/route.ts`: parses `tagIds` (Manager-only), loads inviter
+    countries+tags, calls authorizeInvite with both, forwards tagIds to createInvite.
+  - UI: `invite-form.tsx` shows a tag multiselect ONLY when role=Manager (grantable
+    tags mirror authorizeAssign); `invite/page.tsx` passes inviter tags + managedTags
+    and renders a Tags column in the pending list.
+  - i18n EN/FI/ET: invites.form.{tags,tagsPlaceholder,tagsHint}, pending.tags,
+    errors.tagNotAllowed.
+- **Verified:** `npx tsc --noEmit` clean; `npm test` 112 pass (108→112, +4 new in
+  `lib/invite/authz-slice6.test.ts`); `npx opennextjs-cloudflare build` complete
+  (no dev server running). Subset rule itself already covered by manage-users.test.ts;
+  new test asserts invite-specific wiring via source text (authz.ts can't bare-import @/).
+- **Files:** ProjectManager/src/db/schema.ts, migrations/0008_ambiguous_carnage.sql
+  (+meta journal/snapshot), src/lib/invite/{authz,invite}.ts,
+  src/lib/invite/authz-slice6.test.ts, src/lib/auth/user.ts,
+  src/app/api/invite/route.ts, src/app/(app)/invite/{page,invite-form}.tsx,
+  messages/{en,fi,et}.json.

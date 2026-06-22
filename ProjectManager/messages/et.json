@@ -185,7 +185,10 @@
       "globalCountry": "Globaalne (riigita)",
       "countryHintGlobal": "Vali üks või mitu riiki. Jäta tühjaks kõigi riikide jaoks (globaalne).",
       "countryHintScoped": "Vali üks või mitu oma riikidest.",
-      "submit": "Saada kutse"
+      "submit": "Saada kutse",
+      "tags": "Sildid",
+      "tagsPlaceholder": "Vali sildid…",
+      "tagsHint": "Sildid piiravad Haldurit (lisaks riikidele). Vali hallatavate siltide hulgast."
     },
     "sent": {
       "deliveredTitle": "Kutse saadetud aadressile {email}",
@@ -202,7 +205,8 @@
       "role": "Roll",
       "country": "Riik",
       "expires": "Aegub",
-      "global": "Globaalne"
+      "global": "Globaalne",
+      "tags": "Sildid"
     },
     "email": {
       "subject": "Sind on kutsutud bizbeecms ProjectManagerisse",
@@ -252,7 +256,8 @@
       "countryNotAllowed": "Sa ei saa kutsuda kasutajaid selle riigi jaoks.",
       "emailTaken": "Selle e-posti jaoks on konto juba olemas.",
       "alreadyInvited": "Sellel e-postil on juba ootel kutse.",
-      "unknown": "Midagi läks valesti. Palun proovi uuesti."
+      "unknown": "Midagi läks valesti. Palun proovi uuesti.",
+      "tagNotAllowed": "Sa ei saa anda mõnda neist siltidest."
     }
   },
   "sites": {

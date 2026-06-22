@@ -185,7 +185,10 @@
       "globalCountry": "Global (no country)",
       "countryHintGlobal": "Select one or more countries. Leave empty for all countries (global).",
       "countryHintScoped": "Select one or more of your countries.",
-      "submit": "Send invitation"
+      "submit": "Send invitation",
+      "tags": "Tags",
+      "tagsPlaceholder": "Pick tags…",
+      "tagsHint": "Tags scope a Manager (in addition to countries). Pick from the managed tags."
     },
     "sent": {
       "deliveredTitle": "Invitation sent to {email}",
@@ -202,7 +205,8 @@
       "role": "Role",
       "country": "Country",
       "expires": "Expires",
-      "global": "Global"
+      "global": "Global",
+      "tags": "Tags"
     },
     "email": {
       "subject": "You've been invited to bizbeecms ProjectManager",
@@ -252,7 +256,8 @@
       "countryNotAllowed": "You can't invite users for that country.",
       "emailTaken": "An account for this email already exists.",
       "alreadyInvited": "This email already has a pending invitation.",
-      "unknown": "Something went wrong. Please try again."
+      "unknown": "Something went wrong. Please try again.",
+      "tagNotAllowed": "You can't grant one of those tags."
     }
   },
   "sites": {

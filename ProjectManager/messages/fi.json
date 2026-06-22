@@ -185,7 +185,10 @@
       "globalCountry": "Globaali (ei maata)",
       "countryHintGlobal": "Valitse yksi tai useampi maa. Jätä tyhjäksi kaikkien maiden osalta (globaali).",
       "countryHintScoped": "Valitse yksi tai useampi omista maistasi.",
-      "submit": "Lähetä kutsu"
+      "submit": "Lähetä kutsu",
+      "tags": "Tunnisteet",
+      "tagsPlaceholder": "Valitse tunnisteet…",
+      "tagsHint": "Tunnisteet rajaavat Päällikön (maiden lisäksi). Valitse hallituista tunnisteista."
     },
     "sent": {
       "deliveredTitle": "Kutsu lähetetty osoitteeseen {email}",
@@ -202,7 +205,8 @@
       "role": "Rooli",
       "country": "Maa",
       "expires": "Vanhenee",
-      "global": "Globaali"
+      "global": "Globaali",
+      "tags": "Tunnisteet"
     },
     "email": {
       "subject": "Sinut on kutsuttu bizbeecms ProjectManageriin",
@@ -252,7 +256,8 @@
       "countryNotAllowed": "Et voi kutsua käyttäjiä tuolle maalle.",
       "emailTaken": "Tälle sähköpostille on jo olemassa tili.",
       "alreadyInvited": "Tällä sähköpostilla on jo odottava kutsu.",
-      "unknown": "Jokin meni pieleen. Yritä uudelleen."
+      "unknown": "Jokin meni pieleen. Yritä uudelleen.",
+      "tagNotAllowed": "Et voi myöntää jotakin näistä tunnisteista."
     }
   },
   "sites": {
