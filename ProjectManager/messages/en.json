@@ -282,6 +282,8 @@
       "slug": "Slug",
       "country": "Country",
       "status": "Status",
+      "cmsVersion": "CMS version",
+      "cmsVersionNone": "Not deployed",
       "global": "Global",
       "view": "View",
       "open": "Open"
@@ -310,6 +312,8 @@
       "createdAt": "Created",
       "workerName": "Worker name",
       "workerNamePending": "Not deployed yet",
+      "cmsVersion": "CMS version",
+      "cmsVersionNone": "Not deployed",
       "url": "URL",
       "country": "Country",
       "global": "Global"

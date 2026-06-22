@@ -77,3 +77,19 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `ProjectManager/src/lib/site/site.ts`,
   `ProjectManager/src/app/api/sites/[id]/deploy/route.ts`,
   `deployer/src/index.ts`, goal memory.
+
+## 2026-06-22 13:17 — Slice 4: show deployed CMS version in site list + detail
+- **Status:** DONE
+- **What I did:** Rendered `displayCmsVersion(site.deployedCmsVersion)` in PM site
+  LIST (`app/(app)/sites/page.tsx` — new column between Status and Open) and DETAIL
+  (`sites/[id]/page.tsx` — new `Detail` in the overview grid before "Created by").
+  `cms-v0.6.0`→`0.6.0`, `main` verbatim; null → muted localized "Not deployed".
+  Reused the pure Slice-3 helper `lib/deploy/cms-version.ts` (no re-parse). Added
+  `list.cmsVersion`/`list.cmsVersionNone` + `detail.cmsVersion`/`detail.cmsVersionNone`
+  to EN/FI/ET. The user's ORIGINAL ask ("show the CMS version") now lands.
+- **Verified:** `tsc --noEmit` clean; `npm test` 122/122; `opennextjs-cloudflare
+  build` green (no dev on 3601). Display-only over an already-tested pure helper, so
+  no new test added. NOT live-verified in a browser (no deploy this run).
+- **Files:** ProjectManager/src/app/(app)/sites/page.tsx,
+  ProjectManager/src/app/(app)/sites/[id]/page.tsx,
+  ProjectManager/messages/{en,fi,et}.json

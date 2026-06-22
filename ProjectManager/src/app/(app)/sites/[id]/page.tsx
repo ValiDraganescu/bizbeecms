@@ -15,6 +15,7 @@ import type { SiteStatus } from "@/db/schema";
 import { findUserById, getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canManageSiteByCountry, canUserCreateSite } from "@/lib/site/authz";
 import { cmsWorkerUrl } from "@/lib/deploy/worker-url";
+import { displayCmsVersion } from "@/lib/deploy/cms-version";
 import {
   findSiteById,
   getSiteTagIds,
@@ -133,6 +134,17 @@ export default async function SiteDetailPage({
               ) : (
                 <span className="text-foreground-muted">
                   {t("detail.workerNamePending")}
+                </span>
+              )}
+            </Detail>
+            <Detail label={t("detail.cmsVersion")}>
+              {displayCmsVersion(site.deployedCmsVersion) ? (
+                <span className="font-mono tabular-nums">
+                  {displayCmsVersion(site.deployedCmsVersion)}
+                </span>
+              ) : (
+                <span className="text-foreground-muted">
+                  {t("detail.cmsVersionNone")}
                 </span>
               )}
             </Detail>

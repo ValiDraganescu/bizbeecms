@@ -42,11 +42,14 @@ green; EN/FI/ET for new PM strings).
   site. (If wiring the chosen-version UI isn't done yet, default to recording
   whatever ref was deployed.) Node tests for the callback storing the version. Gate.
 
-- TODO: **Slice 4 — PM: show deployed CMS version in site LIST + DETAIL.** Render
+- DONE: **Slice 4 — PM: show deployed CMS version in site LIST + DETAIL.** Render
   `deployedCmsVersion` in `app/(app)/sites/page.tsx` (a column/badge next to the
   status) and `sites/[id]/page.tsx` (the detail grid, near workerName). Empty/never-
   deployed → a muted "—"/"not deployed". EN/FI/ET for the label. (This is the
   user's ORIGINAL ask — deliverable on its own once Slice 3 records the value.) Gate.
+  (Done 2026-06-22: new `list.cmsVersion`/`list.cmsVersionNone` column + `detail`
+  pair; both UIs call `displayCmsVersion(site.deployedCmsVersion)`; null → muted
+  "Not deployed". tsc 0, 122 tests, opennext build green.)
 
 - TODO: **Slice 5 — PM: CMS version PICKER + release-notes viewer on deploy.** In the
   deploy flow (the deploy button/dialog in site detail): a version `<select>`

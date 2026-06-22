@@ -282,6 +282,8 @@
       "slug": "Tunnus",
       "country": "Riik",
       "status": "Olek",
+      "cmsVersion": "CMS-i versioon",
+      "cmsVersionNone": "Pole avaldatud",
       "global": "Globaalne",
       "view": "Vaata",
       "open": "Ava"
@@ -310,6 +312,8 @@
       "createdAt": "Loodud",
       "workerName": "Workeri nimi",
       "workerNamePending": "Veel avaldamata",
+      "cmsVersion": "CMS-i versioon",
+      "cmsVersionNone": "Pole avaldatud",
       "url": "URL",
       "country": "Riik",
       "global": "Globaalne"

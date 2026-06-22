@@ -282,6 +282,8 @@
       "slug": "Tunnus",
       "country": "Maa",
       "status": "Tila",
+      "cmsVersion": "CMS-versio",
+      "cmsVersionNone": "Ei julkaistu",
       "global": "Globaali",
       "view": "Näytä",
       "open": "Avaa"
@@ -310,6 +312,8 @@
       "createdAt": "Luotu",
       "workerName": "Worker-nimi",
       "workerNamePending": "Ei vielä julkaistu",
+      "cmsVersion": "CMS-versio",
+      "cmsVersionNone": "Ei julkaistu",
       "url": "Osoite",
       "country": "Maa",
       "global": "Globaali"

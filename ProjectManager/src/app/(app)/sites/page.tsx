@@ -20,6 +20,7 @@ import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canUserCreateSite } from "@/lib/site/authz";
 import { listSitesForUser } from "@/lib/site/site";
 import { cmsWorkerUrl } from "@/lib/deploy/worker-url";
+import { displayCmsVersion } from "@/lib/deploy/cms-version";
 import { SiteForm } from "./site-form";
 import { DeployStatusBadge } from "./deploy-status-badge";
 
@@ -110,6 +111,7 @@ export default async function SitesPage() {
                   <TableHead>{t("list.slug")}</TableHead>
                   <TableHead>{t("list.country")}</TableHead>
                   <TableHead>{t("list.status")}</TableHead>
+                  <TableHead>{t("list.cmsVersion")}</TableHead>
                   <TableHead className="text-right">{t("list.open")}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -135,6 +137,17 @@ export default async function SitesPage() {
                         siteId={site.id}
                         initialStatus={site.status}
                       />
+                    </TableCell>
+                    <TableCell>
+                      {displayCmsVersion(site.deployedCmsVersion) ? (
+                        <span className="font-mono text-xs tabular-nums">
+                          {displayCmsVersion(site.deployedCmsVersion)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-foreground-muted">
+                          {t("list.cmsVersionNone")}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       {urls.get(site.id) ? (
