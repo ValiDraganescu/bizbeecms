@@ -37,3 +37,15 @@ Read every line before working. Each entry was learned the hard way by a previou
 - `CMS/src/app/api/translate/route.ts` STILL has its own hardcoded `@cf/...` DEFAULT_MODEL and calls
   CF directly — it's NOT part of the assistant catalog and was left as-is (out of this goal's scope).
   If translate should also move to OpenRouter, that's a separate task.
+- PER-SITE OPENROUTER KEY TRACK (separate from the CMS catalog work): PM stores each Site's OWN
+  OpenRouter key ENCRYPTED in `sites.openrouterApiKeyEncrypted` (col added migration 0010). Crypto
+  lives in `ProjectManager/src/lib/crypto/secret-box.ts`: AES-256-GCM, `encryptSecret`/`decryptSecret`
+  take `(text, keyB64)`; KEK is the PM secret `SITE_SECRET_KEY` (32-byte base64, used directly — NO
+  PBKDF2). It THROWS on tamper/wrong-key/short — never returns garbage. Read the secret via the
+  `(env as unknown as Record<string,unknown>).SITE_SECRET_KEY` pattern (same as DEPLOYER_SECRET).
+- For `crypto.subtle` on the Workers types, byte arrays passed to encrypt/decrypt/importKey must be
+  `Uint8Array<ArrayBuffer>` (allocate via `new Uint8Array(new ArrayBuffer(n))` / `getRandomValues(new
+  Uint8Array(new ArrayBuffer(n)))`), else tsc errors on SharedArrayBuffer-vs-ArrayBuffer BufferSource.
+- Dep-free `.mjs` tests CAN import a `.ts` source directly under Node 24 (native type-stripping) — e.g.
+  `import { encryptSecret } from "../src/lib/crypto/secret-box.ts"`. No loader/flag needed. The PM test
+  glob is `scripts/**/*.test.mjs` (run via `npm test`).

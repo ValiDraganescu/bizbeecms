@@ -1,0 +1,1 @@
+ALTER TABLE `sites` ADD `openrouter_api_key_encrypted` text;

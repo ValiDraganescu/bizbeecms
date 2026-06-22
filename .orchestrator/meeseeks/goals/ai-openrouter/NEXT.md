@@ -1,22 +1,30 @@
 # Note to the next Meeseeks (ai-openrouter)
 
-Slices 1+2+3 DONE. The whole assistant path is now OpenRouter:
-- Adapter `OpenRouterAi` (CMS/src/lib/ports/ai.ts), selected by `getAi()` when
-  `OPENROUTER_API_KEY` is non-empty (else CfAi fallback).
-- Catalog (CMS/src/lib/chat/models.ts + GET /api/chat/models) fetches OpenRouter's
-  `/api/v1/models`, `DEFAULT_MODEL = openai/gpt-4o-mini`, static CHAT_MODELS are
-  4 OpenRouter ids. Untrusted-`model` validation in the chat route already works
-  against the new catalog (resolveModel → DEFAULT_MODEL).
+TWO independent threads live here now — read both.
 
-**Your task — slice 4 (LAST): verify end-to-end.**
-- Stop `npm run dev` FIRST (3601/3602), then run `npx opennextjs-cloudflare build`
-  in CMS/ — must be green. (Parallel CMS worker owned components/** + cms-bundle;
-  check it's done before you build so the bundle is consistent.)
-- Live check (only non-codeable bit): deploy a Site CMS with the deployer holding
-  `OPENROUTER_API_KEY` (wrangler secret put in deployer/), open the assistant,
-  confirm: (1) model picker shows the OpenRouter catalog, (2) chat streams, (3) a
-  tool-call round-trips. Record the manual result in the journal.
-- All node tests green: `node --test scripts/*.test.mjs` (models 12, openrouter-ai
-  + ai-port 11). NOTE pre-existing unrelated failure: `ports-sole-reader.guard`
-  flags content-db.ts:39 — not ours, don't chase.
-- After verification, flip the last BACKLOG task to DONE and the goal is complete.
+## A) NEW TRACK: per-Site OpenRouter key (deserves its own subgoal — flag the curator)
+PM-side: each Site carries its OWN OpenRouter key, encrypted at rest, decrypted at
+deploy time, set as a secret on that Site's CMS Worker. 4 slices total.
+- **Slice 1 DONE** (this run): `ProjectManager/src/lib/crypto/secret-box.ts`
+  exports `encryptSecret(plaintext: string, keyB64: string): Promise<string>` and
+  `decryptSecret(blob: string, keyB64: string): Promise<string>` (AES-256-GCM,
+  base64 iv‖ct+tag, throws on tamper/wrong-key/short). Column
+  `sites.openrouterApiKeyEncrypted` added via migration `0010_bizarre_madrox.sql`.
+  KEK = PM secret `SITE_SECRET_KEY` (HITL P1 item: `wrangler secret put`).
+- **Slice 2 (next):** PM UI on the Site detail/settings page to set/clear the
+  Site's OpenRouter key — a write-only field (POST plaintext → `encryptSecret`
+  with `env.SITE_SECRET_KEY` → store in `openrouterApiKeyEncrypted`; never read
+  the plaintext back; show "set / not set" + a clear button). Admin+ gated, REST
+  route (no server actions — see MEMORY pm-no-server-actions). EN/FI/ET strings.
+- **Slice 3:** thread the decrypted key into the deploy call — PM's deploy route
+  decrypts `openrouterApiKeyEncrypted` and sends it to the deployer over HTTPS.
+- **Slice 4:** deployer sets it as the CMS Worker secret `OPENROUTER_API_KEY`
+  (`wrangler secret put` in the container), so per-Site key beats the deployer's
+  shared --var fallback.
+
+## B) Original CMS catalog work — Slice 4 (LAST) still open
+Slices 1+2+3 DONE; whole CMS assistant path is OpenRouter. Remaining = end-to-end
+verify: stop dev, `npx opennextjs-cloudflare build` in CMS/ green, then live-deploy
+a Site with the deployer holding `OPENROUTER_API_KEY`, confirm picker shows the
+OpenRouter catalog + chat streams + a tool-call round-trips; record in journal and
+flip the last CMS BACKLOG task to DONE.

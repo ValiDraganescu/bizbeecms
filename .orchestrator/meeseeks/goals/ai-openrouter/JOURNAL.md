@@ -62,3 +62,24 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   catalog swap has zero new user strings.
 - **Files:** `CMS/src/lib/chat/models.ts`, `CMS/src/app/api/chat/models/route.ts`,
   `CMS/scripts/models.test.mjs`
+
+## 2026-06-22 15:19 — per-Site OpenRouter key TRACK, Slice 1 (PM crypto helper + schema + migration)
+- **Status:** DONE
+- **What I did:** NEW TRACK (NOT this goal's CMS catalog work — PM-side, each Site stores its OWN
+  OpenRouter key encrypted at rest). Slice 1 of 4: (1) `ProjectManager/src/lib/crypto/secret-box.ts`
+  — AES-256-GCM via Web Crypto `crypto.subtle`; `encryptSecret(plaintext, keyB64)` →
+  base64(iv[12]‖ciphertext+tag), `decryptSecret(blob, keyB64)` → plaintext; random 12-byte IV per
+  call; KEK is the 32-byte base64 `SITE_SECRET_KEY` used DIRECTLY as the AES key (NO PBKDF2 — dodges
+  Workers 100k cap); tamper/short/wrong-key → clean throw, never garbage. (2) Added
+  `openrouterApiKeyEncrypted` (text, nullable) to the `sites` table; generated migration
+  `0010_bizarre_madrox.sql` (single ALTER ADD; re-run shows no drift). (3) Documented `SITE_SECRET_KEY`
+  as a SECRET placeholder/comment in `ProjectManager/wrangler.jsonc` + added a P1 HITL ## Open item
+  (`wrangler secret put SITE_SECRET_KEY`). (4) 5 dep-free tests in `scripts/secret-box.test.mjs`
+  (round-trip, IV-uniqueness, tamper-throws, wrong-key-throws, short-throws) using a fixed test key.
+- **Verified:** Inside ProjectManager/: `npx tsc --noEmit` clean (fixed `Uint8Array<ArrayBuffer>`
+  strictness for `crypto.subtle` BufferSource), `npm test` 135/135 pass (incl. the 5 new),
+  `npx opennextjs-cloudflare build` green (dev confirmed off via lsof 3601/3602). Drizzle re-generate
+  reports "No schema changes" → no drift. Did NOT touch CMS/ or deployer/ (later slices).
+- **Files:** `ProjectManager/src/lib/crypto/secret-box.ts`, `ProjectManager/scripts/secret-box.test.mjs`,
+  `ProjectManager/src/db/schema.ts`, `ProjectManager/migrations/0010_bizarre_madrox.sql`,
+  `ProjectManager/wrangler.jsonc`, `HITL.md`

@@ -25,6 +25,13 @@
     "APP_ORIGIN": "https://manager.bizbeecms.com",
     "DEPLOYER_URL": "https://deployer.bizbeecms.com"
   },
+  // SECRET (not a var — never commit a value): SITE_SECRET_KEY is the 32-byte
+  // base64 KEK that AES-256-GCM-encrypts each Site's OpenRouter API key at rest
+  // (src/lib/crypto/secret-box.ts). Set it once on the PM Worker:
+  //   wrangler secret put SITE_SECRET_KEY   (paste `openssl rand -base64 32`)
+  // Read at runtime via the env-secret pattern, e.g.
+  //   (env as unknown as Record<string, unknown>).SITE_SECRET_KEY
+  // Without it, per-Site key encryption/decryption throws (HITL ## Open item).
   // Trusted public origin used to build invite/email links. MUST be set before
   // deploy — invite-link generation refuses to fall back to the request Host
   // header in production (Host Header Injection guard, see send-invite.ts).

@@ -71,6 +71,13 @@
       "when": 1782123032603,
       "tag": "0009_deployed_cms_version",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1782130681594,
+      "tag": "0010_bizarre_madrox",
+      "breakpoints": true
     }
   ]
 }

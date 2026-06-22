@@ -75,6 +75,11 @@ export const sites = sqliteTable(
     // deployed from — recorded by the deploy callback on success. Null until the
     // first successful deploy. (cms-releases: shown in the site list + detail.)
     deployedCmsVersion: text("deployed_cms_version"),
+    // This Site's OWN OpenRouter API key, AES-256-GCM encrypted at rest
+    // (base64 iv‖ciphertext+tag — see src/lib/crypto/secret-box.ts). Decrypted
+    // only at deploy time and sent to the deployer to set as a CMS Worker
+    // secret. Null = no per-Site key (CMS falls back to its default provider).
+    openrouterApiKeyEncrypted: text("openrouter_api_key_encrypted"),
     country: text("country"),
     createdBy: text("created_by")
       .notNull()
