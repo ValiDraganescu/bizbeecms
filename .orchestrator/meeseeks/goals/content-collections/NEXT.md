@@ -1,45 +1,43 @@
 # Note to the next Meeseeks (content-collections)
 
-BUGS: NONE OPEN. v1 (Slices 0–6) DONE. Phase-2 binding: **Slice A + Slice B DONE**.
+BUGS: NONE OPEN. v1 (Slices 0–6) DONE. Phase-2 binding: **Slices A + B + C DONE**.
 
-WHAT SLICE B ADDED (use it, don't reinvent):
-- `CMS/src/lib/render/tree.ts`: `LIST_COMPONENT="List"` + `BUILTIN_COMPONENTS` +
-  `isBuiltinComponent()`. `Block` grows List-only fields: `listSource`
-  (query: collection+filter[]+sort[]+limit), `listMap` ({templateProp→rowField}),
-  `listRows` (host-hydrated rows — NOT authored), `listRole` ("template"|"empty"
-  on List children). PURE `planList` (dispatched in `planBlock` like `planSection`)
-  partitions children → template vs empty-state, stamps the template per row via
-  `stampRow` (injects mapped row fields into props; downstream `bindTree` gates by
-  the component's propsSchema). Empty/dead/un-hydrated → empty-state slot or nothing.
-- `CMS/src/lib/render/render-page.tsx`: `buildPlanFromPage` fetches List rows in the
-  SAME hydrate-before-walk pass as Slice A (`queryCollection` → `listRows`, graceful);
-  `List` dropped from the component fetch set.
-- `CMS/src/lib/pages/page-blocks.ts`: existence-check drop now loops `isBuiltinComponent`.
-- Tests: `node --test scripts/list-block.test.mjs` (10). Full suite (165):
-  `node --test scripts/{binding,query-compiler,item-write,collection-plan,collection-schema,content-fence,collection-tools,render-tree,list-block,page-blocks}.test.mjs`.
+WHAT SLICE C ADDED (use it, don't reinvent):
+- `lib/pages/page-blocks.ts`: `isList`, `addListBlock`/`addListToSection`,
+  `setBlockField` (set/clear bindings/listSource/listMap/listRole — NON-prop fields,
+  tree-walk, undefined deletes), `setBlockChildren` (List template/empty children).
+- `lib/content/binding.ts`: `validateListBinding` (List analog of `validateBinding`).
+- `page-builder-shell.tsx`: `/api/collections` fetch (graceful); rail List insert
+  button; Block-tab `ListSettings` (List) + `BindingPanel` (single-item, key "item")
+  + a reusable `QueryBuilder` (filter[]/sort[] over a collection's columns). All
+  graceful. EN/FI/ET `pageBuilder.layoutList`/`bind.*`/`list.*` + cms-bundle regen.
+- Tests: `node --test scripts/binding-ui.test.mjs` (11). Full suite (176):
+  `node --test scripts/{binding,query-compiler,item-write,collection-plan,collection-schema,content-fence,collection-tools,render-tree,list-block,page-blocks,binding-ui}.test.mjs`.
 
-PICK NEXT: **P2-bind Slice C — operator UI to author bindings.** Two panels in the
-page-builder: (1) for a NORMAL component block, a "Bind to collection" panel (pick
-collection → first-match query → map fields→declared props) writing the Slice-A
-`bindings` map; (2) for a `List` block, a panel to pick collection + filter/sort/limit
-+ drop the per-item TEMPLATE component + map its declared props (writes `listSource`/
-`listMap`; mark a child `listRole:"empty"` for the empty-state). The page-builder must
-also be able to INSERT a `List` block (today nothing emits one — add it like the
-Section insert in `page-blocks.ts` `addSection`/`addColumn`). Reuse Slice-4's
-query-builder bits + `field-input.tsx`/`confirm-modal.tsx`. Validate via Slice-A
-`validateBinding` (single-item) and a List analog (collection/field/prop exist).
-EN/FI/ET + cms-bundle regen (Slice C ADDS UI strings). Then Slice D (AI tools).
+PICK NEXT: **P2-bind Slice D — AI tools for binding.** Tools so the assistant authors
+the SAME bindings: `bind_component` (set a block's single-item binding: collection +
+first-match query + field→prop map) and `create_list`/`bind_list` (insert/configure a
+`List` block: query + template component + map). REUSE `validateBinding`/
+`validateListBinding` (lib/content/binding.ts) + `declaredPropNames`; reuse the Slice-A/B
+data shapes — NO forked data path. Follow Slice 6's tool wiring EXACTLY (CAVEATS): PURE
+`lib/chat/*-tools.ts` (no @/ imports → node-testable) + register in tool-dispatch.ts
+(TOOL_BY_NAME + HANDLERS) + tool-scopes.ts (KNOWN_TOOL_NAMES + a context's
+TOOLS_BY_CONTEXT) — name in ALL THREE or registry-coverage fails. Tool descriptions are
+MODEL-facing → NO cms-bundle regen, NO EN/FI/ET (like Slice 6). The tools must MUTATE a
+page's blocks — Slice 6 tools hit the collection STORES, but binding tools edit a page's
+draft block tree; check how create_page/page tools persist blocks (likely the draft REST
+/ a page-store mutate) and reuse that. Node tests per tool's validation + the block-edit.
 
-GATE every slice: `node --test scripts/...` + `npx tsc --noEmit` + `npx
-opennextjs-cloudflare build` (dev server DOWN first). cms-bundle regen for Slice C/D
-ONLY if they add CMS *UI* strings (Slice C yes; Slice D AI-tool descs = no, like Slice 6).
+GATE: `node --test scripts/...` + `npx tsc --noEmit` + `npx opennextjs-cloudflare build`
+(dev server DOWN first). Slice D = AI-tool descs only → NO bundle regen, NO EN/FI/ET.
 
-PARALLEL-SAFETY: another CMS worker owns `CMS/src/app/mcp/**` + `CMS/src/app/api/keys/**`
-+ settings UI + the cms-bundle regen — STAY OUT. Slice C is page-builder UI (likely
-`components/` + `lib/pages/`); Slice D touches `lib/chat/**` (coordinate then — that's
-the other worker's turf for MCP, but chat collection-tools wiring was Slice 6's path).
+PARALLEL-SAFETY: another CMS worker owns `CMS/src/app/mcp/**` + `app/api/keys/**` +
+settings UI + the cms-bundle regen. Slice D is `lib/chat/**` — Slice 6 collection-tools
+already live there; the MCP worker also touches lib/chat tool-registry → COORDINATE
+(message them) before editing tool-dispatch.ts/tool-scopes.ts to avoid a clash.
 
-GOTCHAS: renderer is `lib/render/` NOT `lib/content/`. imports inside src/ need `.ts`
-ext. `SYSTEM_COLUMNS` is a string[]. List/binding filter `op` is loose `string` (cast
-to QuerySpec — compiler whitelists at runtime). Keep `planPage`/`planTree` PURE+SYNC —
-hydrate/fetch ALWAYS in the async `buildPlanFromPage` before the walk.
+GOTCHAS: binding/list config lives OUTSIDE props (setBlockField, not mergeBlockProps).
+renderer is lib/render/ NOT lib/content/. imports inside src/ need `.ts` ext.
+List/binding filter `op` is loose `string` (compiler whitelists at runtime). Keep
+planPage/planTree PURE+SYNC — hydrate in the async buildPlanFromPage. Empty-state List
+child (`listRole:"empty"`) has NO operator UI yet (renderer supports it) — add if needed.

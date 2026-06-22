@@ -269,6 +269,31 @@ Read every line before working. Each entry was learned the hard way by a previou
   empty-state) is Slice C and WILL add EN/FI/ET + need the regen. Slice C also wires
   the page-builder to actually EMIT List blocks (today nothing produces one).
 
+- **(Slice C) Binding/List config lives OUTSIDE `props` — use `setBlockField`, NOT
+  `mergeBlockProps`.** `bindings`/`listSource`/`listMap`/`listRole` are top-level
+  `Block` keys the renderer reads SEPARATELY (page-blocks.ts `setBlockField` patches
+  them, tree-walk, undefined deletes). A List's template/empty CHILDREN go through
+  `setBlockChildren` (separate from props/fields) — the shell's `onUpdateList`
+  combines a field patch + a `__child` replacement in ONE setBlocks so a template
+  change + map-reset land atomically. Don't route binding fields through props.
+- **(Slice C) The single-item binding panel authors ONE binding under key `"item"`.**
+  The `bindings` model supports multiple keys but the UI exposes exactly one; clearing
+  the collection sets `bindings` to `undefined` (block reverts to static props). A
+  bound prop OVERWRITES its static value live (Slice A rule).
+- **(Slice C) The List TEMPLATE is set by component NAME via a `<select>`, not DnD.**
+  DnD INTO a List child isn't wired (only Section columns accept drops). The select
+  replaces the List's single `listRole:"template"` child (`${listId}-tpl`) and keeps
+  any `listRole:"empty"` child. Authoring an empty-state child UI was NOT built this
+  slice — the renderer supports it (`listRole:"empty"`), but the operator can't add one
+  yet. ADD that to a follow-up if needed (it's a small ListSettings affordance).
+- **(Slice C) `validateListBinding` is the List analog of `validateBinding`** (both in
+  lib/content/binding.ts) — Slice D's AI `create_list`/`bind_list` tools should reuse
+  it (collection/filter/sort/field exist + mapped prop declared on the template).
+- **(Slice C) The shell reuses `declaredPropNames` from lib/content/binding.ts** (not a
+  new parser) for the prop allowlist in both panels; `FILTER_OPS` in the shell mirrors
+  the Slice-4 query-compiler op whitelist — keep them in step if the compiler's op set
+  changes (the compiler is the runtime authority; the UI list is just for authoring).
+
 - **(Slice 5) Admin UI talks to the Slice 2-4 REST routes only — no new data path.**
   Item create OMITS empty-string field values so column DEFAULTs apply; edit sends
   all keys (PATCH semantics). multiselect round-trips as a JSON-array string (parse on

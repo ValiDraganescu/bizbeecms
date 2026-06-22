@@ -22,7 +22,7 @@
  */
 import type { CollectionField } from "./collection-schema.ts";
 import { SYSTEM_COLUMNS } from "./collection-schema.ts";
-import type { BindingRef } from "../render/tree.ts";
+import type { BindingRef, ListSource } from "../render/tree.ts";
 
 /** The structured-query spec a single-item binding compiles to (first match). */
 export interface BindingQuerySpec {
@@ -98,6 +98,56 @@ export function validateBinding(
   }
   for (const s of binding.source.sort ?? []) {
     if (!cols.has(s.field)) errors.push(`unknown sort field "${s.field}"`);
+  }
+
+  return errors.length === 0 ? { ok: true } : { ok: false, errors };
+}
+
+/**
+ * Validate a List block's query (`listSource`) + row-field→template-prop map
+ * (`listMap`) against the bound collection's registry fields and the per-row
+ * TEMPLATE component's declared props. Returns `ok:true` when the collection
+ * exists, every filter/sort field exists, every mapped field exists (user field
+ * or system column), and every mapped TEMPLATE prop is declared. Otherwise
+ * `ok:false` with reasons (for the authoring UI / AI tools). Same graceful-at-
+ * runtime contract as `validateBinding`: this is for AUTHORING feedback only —
+ * the renderer (`planList`) skips anything it can't resolve, never throws.
+ *
+ * `fields` is the registry schema for the bound collection (or `null` if the
+ * collection doesn't exist). `declared` is the template component's declared
+ * prop names (use `declaredPropNames`); pass an empty set for a List with no
+ * template yet (any non-empty `listMap` then reports undeclared props).
+ */
+export function validateListBinding(
+  listSource: ListSource | undefined,
+  listMap: Record<string, string> | undefined,
+  fields: CollectionField[] | null,
+  declared: Set<string>,
+): { ok: true } | { ok: false; errors: string[] } {
+  const errors: string[] = [];
+
+  if (!listSource || typeof listSource !== "object" || !listSource.collection) {
+    return { ok: false, errors: ["list must have a source collection"] };
+  }
+  if (fields == null) {
+    return { ok: false, errors: [`unknown collection "${listSource.collection}"`] };
+  }
+
+  const cols = columnNames(fields);
+
+  for (const f of listSource.filter ?? []) {
+    if (!cols.has(f.field)) errors.push(`unknown filter field "${f.field}"`);
+  }
+  for (const s of listSource.sort ?? []) {
+    if (!cols.has(s.field)) errors.push(`unknown sort field "${s.field}"`);
+  }
+  for (const [propName, fieldName] of Object.entries(listMap ?? {})) {
+    if (!cols.has(fieldName)) {
+      errors.push(`unknown field "${fieldName}" on "${listSource.collection}"`);
+    }
+    if (!declared.has(propName)) {
+      errors.push(`prop "${propName}" is not declared on the template component`);
+    }
   }
 
   return errors.length === 0 ? { ok: true } : { ok: false, errors };

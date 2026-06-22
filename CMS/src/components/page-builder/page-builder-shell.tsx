@@ -52,6 +52,10 @@ import {
   moveNode,
   findBlock,
   mergeBlockProps,
+  setBlockField,
+  setBlockChildren,
+  isList,
+  addListToSection,
   parsePropsSchema,
   validateBlockProps,
   setLocalizedProp,
@@ -60,12 +64,18 @@ import {
   mergeTranslations,
   type PropField,
 } from "@/lib/pages/page-blocks";
-import type { Block } from "@/lib/render/tree";
+import type { Block, BindingRef, ListSource } from "@/lib/render/tree";
+import { declaredPropNames } from "@/lib/content/binding";
 import { LocalePicker, useLocalePicker } from "./locale-picker";
 
 type Viewport = "desktop" | "tablet" | "mobile";
 type CenterTab = "layers" | "preview";
 type RightTab = "block" | "page" | "seo";
+
+/** A collection field descriptor (registry `CollectionView.fields[]` shape). */
+type CollectionFieldMeta = { name: string; type: string };
+/** A collection registry view as the binding panels need it (`/api/collections`). */
+type CollectionMeta = { name: string; tableName: string; fields: CollectionFieldMeta[] };
 
 // ── Native HTML5 drag-and-drop payload (no dnd dependency) ──────────────────
 // A rail item carries a small JSON payload on a custom MIME type. Slice 1 only
@@ -206,6 +216,9 @@ export function PageBuilderShell({
   const [search, setSearch] = useState("");
   // name → raw propsSchema JSON (Block tab renders a settings form per declared prop).
   const [propsSchemas, setPropsSchemas] = useState<Record<string, string | null>>({});
+  // Phase-2 binding (Slice C): the Site's collections (registry views) for the
+  // "Bind to collection" + List query panels. tableName is the stable handle.
+  const [collections, setCollections] = useState<CollectionMeta[]>([]);
 
   // The selected page's block tree (sections + their dropped components) and the
   // currently-selected node id (drives which section a rail click drops into and,
@@ -314,6 +327,42 @@ export function PageBuilderShell({
   // tab computes the validated props from its schema-driven form and calls this.
   function onUpdateComponentProps(blockId: string, props: Record<string, unknown>) {
     setBlocks((b) => mergeBlockProps(b, blockId, props));
+    setDirty(true);
+  }
+
+  // Slice C: set a block's NON-prop binding fields (single-item `bindings`, or a
+  // List's `listSource`/`listMap`/`listRole`). An undefined value deletes the key.
+  function onUpdateBlockField(
+    blockId: string,
+    patch: Partial<Pick<Block, "bindings" | "listSource" | "listMap" | "listRole">>,
+  ) {
+    setBlocks((b) => setBlockField(b, blockId, patch));
+    setDirty(true);
+  }
+
+  // Slice C: insert a built-in `List` block into the selected (or last) Section.
+  // Returns false when there's no Section yet (caller prompts to add one).
+  function onInsertList(): boolean {
+    const target = targetSectionId(blocks, selectedBlockId);
+    if (!target) return false;
+    setBlocks((b) => addListToSection(b, target));
+    setDirty(true);
+    return true;
+  }
+
+  // Slice C: apply a List settings patch — `listSource`/`listMap` go through
+  // setBlockField; the optional `__child` (template/empty children) through
+  // setBlockChildren. One handler so a template change + map reset land together.
+  function onUpdateList(
+    blockId: string,
+    patch: Partial<Pick<Block, "listSource" | "listMap">> & { __child?: Block[] },
+  ) {
+    const { __child, ...fields } = patch;
+    setBlocks((b) => {
+      let next = setBlockField(b, blockId, fields);
+      if (__child) next = setBlockChildren(next, blockId, __child);
+      return next;
+    });
     setDirty(true);
   }
 
@@ -447,6 +496,15 @@ export function PageBuilderShell({
         setPropsSchemas(
           Object.fromEntries((body.palette ?? []).map((p) => [p.name, p.propsSchema])),
         );
+      }
+    })();
+    void (async () => {
+      // Slice C: collections for the binding panels. 403 (non-admin) / offline →
+      // empty list → panels show "no collections" (graceful, never throws).
+      const res = await fetch("/api/collections");
+      if (live && res.ok) {
+        const body = (await res.json().catch(() => [])) as CollectionMeta[];
+        if (Array.isArray(body)) setCollections(body);
       }
     })();
     return () => {
@@ -597,6 +655,7 @@ export function PageBuilderShell({
             canEdit={!!selected}
             onAddSection={onAddSection}
             onInsertComponent={onInsertComponent}
+            onInsertList={onInsertList}
           />
         </aside>
 
@@ -807,17 +866,38 @@ export function PageBuilderShell({
                     />
                   );
                 }
-                // A component block (not a Section or a column shell): show its
-                // schema-driven settings form.
-                if (sel && !isSectionColumn(sel)) {
+                // A built-in List block: query + per-row template mapping panel.
+                if (sel && isList(sel)) {
                   return (
-                    <ComponentSettings
+                    <ListSettings
                       key={sel.id}
                       block={sel}
-                      schema={parsePropsSchema(propsSchemas[sel.component])}
-                      locales={contentLocales}
-                      onChange={(props) => onUpdateComponentProps(sel.id, props)}
+                      collections={collections}
+                      propsSchemas={propsSchemas}
+                      onChange={(patch) => onUpdateList(sel.id, patch)}
                     />
+                  );
+                }
+                // A component block (not a Section or a column shell): show its
+                // schema-driven settings form + the single-item binding panel.
+                if (sel && !isSectionColumn(sel)) {
+                  return (
+                    <div className="space-y-6">
+                      <ComponentSettings
+                        key={sel.id}
+                        block={sel}
+                        schema={parsePropsSchema(propsSchemas[sel.component])}
+                        locales={contentLocales}
+                        onChange={(props) => onUpdateComponentProps(sel.id, props)}
+                      />
+                      <BindingPanel
+                        key={`bind-${sel.id}`}
+                        block={sel}
+                        collections={collections}
+                        declared={[...declaredPropNames(propsSchemas[sel.component])]}
+                        onChange={(bindings) => onUpdateBlockField(sel.id, { bindings })}
+                      />
+                    </div>
                   );
                 }
                 return <p className="text-sm text-foreground-muted">{t("blockEmpty")}</p>;
@@ -896,12 +976,14 @@ function ComponentsRail({
   canEdit,
   onAddSection,
   onInsertComponent,
+  onInsertList,
 }: {
   groups: ComponentGroup[];
   search: string;
   canEdit: boolean;
   onAddSection: () => void;
   onInsertComponent: (component: string) => boolean;
+  onInsertList: () => boolean;
 }) {
   const t = useTranslations("pageBuilder");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -909,6 +991,10 @@ function ComponentsRail({
 
   function insert(component: string) {
     if (onInsertComponent(component)) setHint(null);
+    else setHint(t("addSectionFirst"));
+  }
+  function insertList() {
+    if (onInsertList()) setHint(null);
     else setHint(t("addSectionFirst"));
   }
 
@@ -946,6 +1032,16 @@ function ComponentsRail({
               className="w-full cursor-grab rounded-md border border-border bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-surface-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t("layoutSection")}
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              disabled={!canEdit}
+              onClick={insertList}
+              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-left text-sm text-foreground hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {t("layoutList")}
             </button>
           </li>
         </ul>
@@ -2359,6 +2455,469 @@ function ComponentSettings({
         );
       })}
     </div>
+  );
+}
+
+// ── Phase-2 binding authoring (Slice C) ──────────────────────────────────────
+//
+// Two operator panels in the Block tab:
+//  - BindingPanel  → a NORMAL component block's single-item `bindings` (pick a
+//    collection → first-match query → map row fields to declared props).
+//  - ListSettings  → a built-in `List` block's `listSource`/`listMap` (collection
+//    + filter/sort/limit + a per-row template component + field→prop map).
+// Both validate client-side via the Slice-A `validateBinding`/`validateListBinding`
+// analogs — but here we keep the authoring inline (the validators live in
+// lib/content/binding.ts and are reused by the AI tools in Slice D). The renderer
+// is graceful, so an in-progress (invalid) binding just renders blank live.
+
+// Filter ops the Slice-4 query compiler whitelists (kept in step with it).
+const FILTER_OPS = ["eq", "ne", "lt", "lte", "gt", "gte", "like", "is_null", "not_null"] as const;
+type FilterClause = { field: string; op: string; value?: unknown };
+type SortClause = { field: string; dir?: "asc" | "desc" };
+
+const ctlLabel = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
+const ctlInput =
+  "w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-foreground-muted";
+
+/** All column names a collection exposes: its user fields + the 6 system columns. */
+function collectionColumns(c: CollectionMeta | undefined): string[] {
+  if (!c) return [];
+  const sys = ["id", "slug", "status", "archived_at", "created_at", "updated_at"];
+  return [...c.fields.map((f) => f.name), ...sys];
+}
+
+/**
+ * A reusable filter[] + sort[] editor over a collection's columns. PURE-ish
+ * (controlled): emits new arrays via `onChange`. `is_null`/`not_null` take no
+ * value. Used by both the single-item BindingPanel and the List query.
+ */
+function QueryBuilder({
+  columns,
+  filters,
+  sort,
+  onFilters,
+  onSort,
+}: {
+  columns: string[];
+  filters: FilterClause[];
+  sort: SortClause[];
+  onFilters: (f: FilterClause[]) => void;
+  onSort: (s: SortClause[]) => void;
+}) {
+  const t = useTranslations("pageBuilder");
+  const firstCol = columns[0] ?? "";
+  return (
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <span className={ctlLabel}>{t("bind.filters")}</span>
+        {filters.map((f, i) => {
+          const noValue = f.op === "is_null" || f.op === "not_null";
+          return (
+            <div key={i} className="flex flex-wrap items-center gap-1.5">
+              <select
+                className={`${ctlInput} flex-1`}
+                value={f.field}
+                aria-label={t("bind.field")}
+                onChange={(e) =>
+                  onFilters(filters.map((x, j) => (j === i ? { ...x, field: e.target.value } : x)))
+                }
+              >
+                {columns.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <select
+                className={`${ctlInput} w-24`}
+                value={f.op}
+                aria-label={t("bind.op")}
+                onChange={(e) =>
+                  onFilters(filters.map((x, j) => (j === i ? { ...x, op: e.target.value } : x)))
+                }
+              >
+                {FILTER_OPS.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+              {!noValue && (
+                <input
+                  type="text"
+                  className={`${ctlInput} flex-1`}
+                  value={f.value == null ? "" : String(f.value)}
+                  placeholder={t("bind.value")}
+                  aria-label={t("bind.value")}
+                  onChange={(e) =>
+                    onFilters(filters.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))
+                  }
+                />
+              )}
+              <button
+                type="button"
+                aria-label={t("bind.removeFilter")}
+                className="rounded-md border border-border px-2 py-1 text-xs text-foreground-muted hover:bg-surface-muted"
+                onClick={() => onFilters(filters.filter((_, j) => j !== i))}
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
+        <button
+          type="button"
+          disabled={columns.length === 0}
+          className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-foreground hover:bg-surface-muted disabled:opacity-50"
+          onClick={() => onFilters([...filters, { field: firstCol, op: "eq", value: "" }])}
+        >
+          + {t("bind.addFilter")}
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        <span className={ctlLabel}>{t("bind.sort")}</span>
+        {sort.map((s, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <select
+              className={`${ctlInput} flex-1`}
+              value={s.field}
+              aria-label={t("bind.field")}
+              onChange={(e) =>
+                onSort(sort.map((x, j) => (j === i ? { ...x, field: e.target.value } : x)))
+              }
+            >
+              {columns.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <select
+              className={`${ctlInput} w-24`}
+              value={s.dir ?? "asc"}
+              aria-label={t("bind.dir")}
+              onChange={(e) =>
+                onSort(sort.map((x, j) => (j === i ? { ...x, dir: e.target.value as "asc" | "desc" } : x)))
+              }
+            >
+              <option value="asc">{t("bind.asc")}</option>
+              <option value="desc">{t("bind.desc")}</option>
+            </select>
+            <button
+              type="button"
+              aria-label={t("bind.removeSort")}
+              className="rounded-md border border-border px-2 py-1 text-xs text-foreground-muted hover:bg-surface-muted"
+              onClick={() => onSort(sort.filter((_, j) => j !== i))}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          disabled={columns.length === 0}
+          className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs text-foreground hover:bg-surface-muted disabled:opacity-50"
+          onClick={() => onSort([...sort, { field: firstCol, dir: "asc" }])}
+        >
+          + {t("bind.addSort")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Single-item binding panel for a NORMAL component block. Authors ONE binding
+ * (key `"item"`): a collection + first-match query (filter/sort) + a map of
+ * `declaredProp → collectionField`. Writing an empty map clears the binding (the
+ * block reverts to its static props). The renderer picks the first matching row
+ * and overwrites the mapped props; unresolved → graceful blank.
+ */
+function BindingPanel({
+  block,
+  collections,
+  declared,
+  onChange,
+}: {
+  block: Block;
+  collections: CollectionMeta[];
+  declared: string[];
+  onChange: (bindings: Record<string, BindingRef> | undefined) => void;
+}) {
+  const t = useTranslations("pageBuilder");
+  const current = block.bindings?.item;
+  const collection = current?.source.collection ?? "";
+  const meta = collections.find((c) => c.tableName === collection);
+  const columns = collectionColumns(meta);
+  const map = current?.map ?? {};
+  const filters = (current?.source.filter ?? []) as FilterClause[];
+  const sort = (current?.source.sort ?? []) as SortClause[];
+
+  // Rebuild the whole binding from parts; an empty collection clears it.
+  function emit(next: Partial<BindingRef["source"]> & { map?: Record<string, string> }) {
+    const src = {
+      collection: next.collection ?? collection,
+      filter: next.filter ?? filters,
+      sort: next.sort ?? sort,
+    };
+    const m = next.map ?? map;
+    if (!src.collection) {
+      onChange(undefined);
+      return;
+    }
+    const binding: BindingRef = {
+      source: {
+        collection: src.collection,
+        ...(src.filter && src.filter.length ? { filter: src.filter } : {}),
+        ...(src.sort && src.sort.length ? { sort: src.sort } : {}),
+      },
+      map: m,
+    };
+    onChange({ item: binding });
+  }
+
+  return (
+    <section className="space-y-3 border-t border-border pt-4">
+      <h3 className="text-sm font-semibold text-foreground">{t("bind.title")}</h3>
+      <p className="text-xs text-foreground-muted">{t("bind.help")}</p>
+
+      <label className="flex flex-col gap-1.5">
+        <span className={ctlLabel}>{t("bind.collection")}</span>
+        <select
+          className={ctlInput}
+          value={collection}
+          aria-label={t("bind.collection")}
+          onChange={(e) => emit({ collection: e.target.value, filter: [], sort: [], map: {} })}
+        >
+          <option value="">{t("bind.none")}</option>
+          {collections.map((c) => (
+            <option key={c.tableName} value={c.tableName}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {collections.length === 0 && (
+        <p className="text-xs text-foreground-muted">{t("bind.noCollections")}</p>
+      )}
+
+      {collection && (
+        <>
+          <QueryBuilder
+            columns={columns}
+            filters={filters}
+            sort={sort}
+            onFilters={(f) => emit({ filter: f })}
+            onSort={(s) => emit({ sort: s })}
+          />
+
+          <div className="space-y-2">
+            <span className={ctlLabel}>{t("bind.map")}</span>
+            {declared.length === 0 ? (
+              <p className="text-xs text-foreground-muted">{t("bind.noProps")}</p>
+            ) : (
+              declared.map((prop) => (
+                <label key={prop} className="flex items-center gap-2">
+                  <span className="w-1/3 truncate font-mono text-xs text-foreground">{prop}</span>
+                  <select
+                    className={`${ctlInput} flex-1`}
+                    value={map[prop] ?? ""}
+                    aria-label={`${t("bind.mapProp")} ${prop}`}
+                    onChange={(e) => {
+                      const next = { ...map };
+                      if (e.target.value) next[prop] = e.target.value;
+                      else delete next[prop];
+                      emit({ map: next });
+                    }}
+                  >
+                    <option value="">{t("bind.unmapped")}</option>
+                    {columns.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * List block settings: pick the source collection + query (filter/sort/limit),
+ * pick the per-row TEMPLATE component (set as the List's single child), and map
+ * each row field → the template's declared props (`listMap`). Empty/dead query →
+ * the renderer shows the empty-state slot (or nothing). The template child is set
+ * by component NAME (DnD into a List isn't wired this slice — a select is enough).
+ */
+function ListSettings({
+  block,
+  collections,
+  propsSchemas,
+  onChange,
+}: {
+  block: Block;
+  collections: CollectionMeta[];
+  propsSchemas: Record<string, string | null>;
+  onChange: (
+    patch: Partial<Pick<Block, "listSource" | "listMap">> & { __child?: Block[] },
+  ) => void;
+}) {
+  const t = useTranslations("pageBuilder");
+  const source = block.listSource;
+  const collection = source?.collection ?? "";
+  const meta = collections.find((c) => c.tableName === collection);
+  const columns = collectionColumns(meta);
+  const filters = (source?.filter ?? []) as FilterClause[];
+  const sort = (source?.sort ?? []) as SortClause[];
+  const limit = source?.limit;
+  const listMap = block.listMap ?? {};
+
+  // The template component is the List's first non-empty-role child.
+  const template = (block.children ?? []).find((c) => c.listRole !== "empty") ?? null;
+  const templateName = template?.component ?? "";
+  const templateProps = template ? [...declaredPropNames(propsSchemas[template.component])] : [];
+  const componentNames = Object.keys(propsSchemas).sort();
+
+  function emitSource(next: Partial<ListSource>) {
+    const src: ListSource = {
+      collection: next.collection ?? collection,
+      ...(() => {
+        const f = next.filter ?? filters;
+        return f.length ? { filter: f } : {};
+      })(),
+      ...(() => {
+        const s = next.sort ?? sort;
+        return s.length ? { sort: s } : {};
+      })(),
+      ...(() => {
+        const l = "limit" in next ? next.limit : limit;
+        return l != null ? { limit: l } : {};
+      })(),
+    };
+    onChange(src.collection ? { listSource: src } : { listSource: undefined });
+  }
+
+  return (
+    <section className="space-y-4">
+      <p className="font-mono text-sm text-foreground">{t("list.title")}</p>
+      <p className="text-xs text-foreground-muted">{t("list.help")}</p>
+
+      <label className="flex flex-col gap-1.5">
+        <span className={ctlLabel}>{t("bind.collection")}</span>
+        <select
+          className={ctlInput}
+          value={collection}
+          aria-label={t("bind.collection")}
+          onChange={(e) => {
+            emitSource({ collection: e.target.value, filter: [], sort: [] });
+            onChange({ listMap: {} });
+          }}
+        >
+          <option value="">{t("bind.none")}</option>
+          {collections.map((c) => (
+            <option key={c.tableName} value={c.tableName}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {collections.length === 0 && (
+        <p className="text-xs text-foreground-muted">{t("bind.noCollections")}</p>
+      )}
+
+      {collection && (
+        <>
+          <QueryBuilder
+            columns={columns}
+            filters={filters}
+            sort={sort}
+            onFilters={(f) => emitSource({ filter: f })}
+            onSort={(s) => emitSource({ sort: s })}
+          />
+
+          <label className="flex flex-col gap-1.5">
+            <span className={ctlLabel}>{t("list.limit")}</span>
+            <input
+              type="number"
+              min={1}
+              className={ctlInput}
+              value={limit ?? ""}
+              placeholder={t("list.limitPlaceholder")}
+              aria-label={t("list.limit")}
+              onChange={(e) =>
+                emitSource({ limit: e.target.value === "" ? undefined : Number(e.target.value) })
+              }
+            />
+          </label>
+
+          <label className="flex flex-col gap-1.5 border-t border-border pt-4">
+            <span className={ctlLabel}>{t("list.template")}</span>
+            <select
+              className={ctlInput}
+              value={templateName}
+              aria-label={t("list.template")}
+              onChange={(e) => {
+                const name = e.target.value;
+                // Keep any empty-state child; replace the single template child.
+                const empties = (block.children ?? []).filter((c) => c.listRole === "empty");
+                const child: Block[] = name
+                  ? [{ id: `${block.id}-tpl`, component: name, listRole: "template" }, ...empties]
+                  : empties;
+                onChange({ __child: child, listMap: {} });
+              }}
+            >
+              <option value="">{t("list.pickTemplate")}</option>
+              {componentNames.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {templateName && (
+            <div className="space-y-2">
+              <span className={ctlLabel}>{t("list.map")}</span>
+              {templateProps.length === 0 ? (
+                <p className="text-xs text-foreground-muted">{t("bind.noProps")}</p>
+              ) : (
+                templateProps.map((prop) => (
+                  <label key={prop} className="flex items-center gap-2">
+                    <span className="w-1/3 truncate font-mono text-xs text-foreground">{prop}</span>
+                    <select
+                      className={`${ctlInput} flex-1`}
+                      value={listMap[prop] ?? ""}
+                      aria-label={`${t("bind.mapProp")} ${prop}`}
+                      onChange={(e) => {
+                        const next = { ...listMap };
+                        if (e.target.value) next[prop] = e.target.value;
+                        else delete next[prop];
+                        onChange({ listMap: next });
+                      }}
+                    >
+                      <option value="">{t("bind.unmapped")}</option>
+                      {columns.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </section>
   );
 }
 

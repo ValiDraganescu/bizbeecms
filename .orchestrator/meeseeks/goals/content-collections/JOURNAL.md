@@ -257,3 +257,31 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   NO cms-bundle regen. Live D1 = HITL.
 - **Files:** CMS/src/lib/render/tree.ts, CMS/src/lib/render/render-page.tsx,
   CMS/src/lib/pages/page-blocks.ts, CMS/scripts/list-block.test.mjs
+
+## 2026-06-22 14:11 — P2-bind Slice C — operator UI to author bindings + List blocks
+- **Status:** DONE
+- **What I did:** Page-builder operator UI for Phase-2 binding (Slices A/B model).
+  PURE helpers (lib/pages/page-blocks.ts): `isList`, `addListBlock`/`addListToSection`
+  (insert a built-in List into a Section column like addComponentToSection),
+  `setBlockField` (set/clear NON-prop block fields bindings/listSource/listMap/listRole,
+  tree-walk, undefined deletes), `setBlockChildren` (replace a List's template/empty
+  children). `lib/content/binding.ts`: `validateListBinding` (analog to validateBinding:
+  collection/filter/sort/mapped-field exist [user OR system col] + mapped prop declared
+  on the template). UI (page-builder-shell.tsx): a `/api/collections` fetch (graceful —
+  403 non-admin / offline → empty list → "no collections"); a rail "List (from
+  collection)" insert button (click-insert into the selected/last Section's first
+  column); the Block tab now branches — a List block → `ListSettings` (collection +
+  filter/sort/limit via a reusable `QueryBuilder` + a template-component `<select>` that
+  sets the List's single template child + field→prop map), a NORMAL block →
+  `ComponentSettings` + a new `BindingPanel` (single-item binding under key "item":
+  collection + first-match query + declaredProp→field map). All authoring is graceful
+  (the renderer skips anything unresolved, never 500). EN/FI/ET: `pageBuilder.layoutList`
+  + `bind.*` + `list.*`; cms-bundle regen (Slice C adds UI strings).
+- **Verified:** `node --test scripts/binding-ui.test.mjs` 11 pass; full content+render
+  suite 176 pass (165 + 11 new). `npx tsc --noEmit` 0. `npx opennextjs-cloudflare build`
+  green (dev server confirmed DOWN first). `npm run bundle:cms` from ProjectManager/ →
+  bundle carries the new strings ("Bind to collection" found in cms-bundle.generated.js).
+  COULD NOT verify the live visual flow / live D1 binding (HITL — no CF binding locally).
+- **Files:** CMS/src/lib/pages/page-blocks.ts, CMS/src/lib/content/binding.ts,
+  CMS/src/components/page-builder/page-builder-shell.tsx, CMS/messages/{en,fi,et}.json,
+  CMS/scripts/binding-ui.test.mjs, ProjectManager/src/lib/deploy/cms-bundle.generated.js

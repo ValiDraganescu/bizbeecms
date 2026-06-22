@@ -656,6 +656,93 @@ export function addComponentToSection(
   return addComponentToColumn(blocks, sectionId, 0, component);
 }
 
+/** True if a block is the built-in `List` block (Phase-2 binding). */
+export function isList(block: Block): boolean {
+  return block.component === LIST_COMPONENT;
+}
+
+/**
+ * Append a built-in `List` block into a Section's column (immutable). A List is
+ * placed like a component (it lives in a column), but it carries a per-row
+ * TEMPLATE child + an empty-state child instead of `props`. We seed it with one
+ * empty template column-less child slot left to the operator to fill: a single
+ * placeholder Section? No — the template is ONE component the operator drops in,
+ * so we seed with NO children and let the List settings panel + DnD add the
+ * template/empty children. The query (`listSource`) starts unset → graceful blank.
+ * No-op for a non-Section id / out-of-range column. PURE.
+ */
+export function addListBlock(
+  blocks: Block[],
+  sectionId: string,
+  colIndex: number,
+): Block[] {
+  const list: Block = {
+    id: uniqueIdAcrossTree(LIST_COMPONENT, blocks),
+    component: LIST_COMPONENT,
+    children: [],
+  };
+  return blocks.map((section) => {
+    if (section.id !== sectionId || !isSection(section)) return section;
+    const cols = sectionColumns(section);
+    if (colIndex < 0 || colIndex >= cols.length) return section;
+    const targetId = cols[colIndex].id;
+    return {
+      ...section,
+      children: (section.children ?? []).map((c) =>
+        c.id === targetId ? { ...c, children: [...(c.children ?? []), list] } : c,
+      ),
+    };
+  });
+}
+
+/** Append a List into a Section's FIRST column (click-insert shim, like addComponentToSection). */
+export function addListToSection(blocks: Block[], sectionId: string): Block[] {
+  return addListBlock(blocks, sectionId, 0);
+}
+
+/**
+ * Replace the `children` of the block `id` wherever it sits in the tree
+ * (immutable). Empty array drops the key. Used to set a List's per-row TEMPLATE
+ * child (+ optional empty-state child). No-op if `id` is absent. PURE.
+ */
+export function setBlockChildren(blocks: Block[], id: string, children: Block[]): Block[] {
+  return blocks.map((b) => {
+    if (b.id === id) {
+      const next: Block = { ...b };
+      if (children.length > 0) next.children = children;
+      else delete next.children;
+      return next;
+    }
+    return b.children ? { ...b, children: setBlockChildren(b.children, id, children) } : b;
+  });
+}
+
+/**
+ * Merge a patch of NON-prop block fields (`bindings`, `listSource`, `listMap`,
+ * `listRole`) into the block `id` wherever it sits in the tree (immutable). A
+ * patch value of `undefined` deletes that key (revert to unbound / no query).
+ * Used by the Slice-C binding panels — `props` go through `mergeBlockProps`;
+ * binding/list config live OUTSIDE props (renderer reads them separately).
+ * No-op if `id` is absent. PURE — never mutates inputs.
+ */
+export function setBlockField(
+  blocks: Block[],
+  id: string,
+  patch: Partial<Pick<Block, "bindings" | "listSource" | "listMap" | "listRole">>,
+): Block[] {
+  return blocks.map((b) => {
+    if (b.id === id) {
+      const next: Block = { ...b };
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined) delete (next as Record<string, unknown>)[k];
+        else (next as Record<string, unknown>)[k] = v;
+      }
+      return next;
+    }
+    return b.children ? { ...b, children: setBlockField(b.children, id, patch) } : b;
+  });
+}
+
 /**
  * Merge a settings patch into a Section's `props` (immutable). The `columns` key
  * is routed through `setSectionColumns` so the column children grow/shrink (and

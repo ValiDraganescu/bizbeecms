@@ -168,12 +168,21 @@ stable id + slug (Slice 3) so this isn't a retrofit.
   `isBuiltinComponent` (Section/column/List). 10 node tests; full suite 165; tsc 0;
   opennext build green. NO user strings → NO cms-bundle regen. Live D1 = HITL.
 
-- TODO: **P2-bind Slice C — UI to author bindings (operator).** In the page-builder:
-  for a normal component block, a "Bind to collection" panel (pick collection →
-  build a first-match query → map fields to the component's declared props). For a
-  `List` block, a panel to pick collection + filter/sort/limit + drop the per-item
-  template component + map its props. Reuse the Slice-4 query-builder UI bits + the
-  design-system. Show the binding state on the block. EN/FI/ET. Gate.
+- DONE (2026-06-22): **P2-bind Slice C — UI to author bindings (operator).** Page-builder
+  operator UI. PURE helpers in `lib/pages/page-blocks.ts`: `isList`, `addListBlock`/
+  `addListToSection` (insert a built-in List into a Section column, like
+  addComponentToSection), `setBlockField` (set/clear NON-prop fields
+  bindings/listSource/listMap/listRole, tree-walk), `setBlockChildren` (set a List's
+  template/empty children). `lib/content/binding.ts`: `validateListBinding`
+  (collection/filter/sort/mapped-field exist + mapped prop declared on the template).
+  `page-builder-shell.tsx`: fetches `/api/collections` (graceful 403/offline→empty);
+  rail "List (from collection)" insert button; Block tab branches List→`ListSettings`
+  (collection + filter/sort/limit via `QueryBuilder` + template component select +
+  field→prop map), normal block→`ComponentSettings` + `BindingPanel` (single-item
+  binding key "item": collection + first-match query + declaredProp→field map). All
+  authoring is graceful (renderer skips unresolved). EN/FI/ET `pageBuilder.layoutList`
+  + `bind.*` + `list.*` + cms-bundle regen. 11 node tests (binding-ui), full suite 176;
+  tsc 0; opennext build green; bundle string verified. Live D1/visual = HITL.
 
 - TODO: **P2-bind Slice D — AI tools for binding.** Tools so the assistant can do
   the same: `bind_component` (set a block's single-item binding: collection,
