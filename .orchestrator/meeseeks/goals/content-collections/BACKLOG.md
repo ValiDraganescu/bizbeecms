@@ -19,15 +19,15 @@ gates on CMS tsc + opennext build green + node tests + EN/FI/ET for new strings.
   the ONLY runtime-SQL site, fences BEFORE every D1 call, MAX_READ_ROWS=1000).
   14 node tests w/ attack corpus, tsc + opennext build green.
 
-- TODO: **Slice 1 — `collection` registry + field-schema → DDL generator.** Built-in
-  `collection` table (Drizzle migration): id, name, tableName (`content_<slug>`),
-  schema JSON (fields: name, type, required, default, ftsIndexed?, etc.), timestamps.
-  Reuse/extend the component `propsSchema` field-type vocabulary
-  (string/text/richtext/number/int/bool/date/datetime/select/multiselect — ref/asset
-  flagged for the binding phase). Pure `buildCreateTableSql(schema)` mapping field
-  types → SQLite affinity + constraints, and `buildItemColumns`. Pure +
-  node-tested (correct DDL string, content_ prefix, column count ≤ D1 limit). NO
-  execution yet — pure generation + validation against the Slice-0 fence.
+- DONE (2026-06-22): **Slice 1 — `collection` registry + field-schema → DDL
+  generator.** Built-in `collection` table (`schema.ts` + migration 0010, unique on
+  table_name) + PURE `CMS/src/lib/content/collection-schema.ts`: field-type vocab
+  (propsSchema set + text/int/bool/datetime/multiselect; ref/asset reserved→TEXT),
+  `affinityFor`, `buildItemColumns` (6 system cols id/slug/status/archived_at/
+  created_at/updated_at), `buildCreateTableSql`, `buildAddColumnSql` (ADD-ONLY),
+  `tableNameForSlug`, MAX_COLUMNS=100. 13 node tests assert generated DDL PASSES the
+  Slice-0 fence + content_ prefix + cap + injection-safe DEFAULTs. NO execution
+  (Slice 2 wires it). tsc + opennext build green.
 
 - TODO: **Slice 2 — create/list/describe collections at runtime (DDL execution).**
   `POST /api/collections` (create): enforce the 100-table cap (registry count),

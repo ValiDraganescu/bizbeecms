@@ -292,6 +292,40 @@ export const session = sqliteTable(
   (t) => [index("session_user_idx").on(t.userId)],
 );
 
+/**
+ * Collection — the canonical registry for a user-defined data collection
+ * (content-collections goal, Slice 1). Each collection is backed by a REAL,
+ * runtime-created D1 table named `content_<slug>` (the `tableName` here). This
+ * registry row is the SOURCE OF TRUTH for the collection's logical schema — the
+ * UI, the AI tools, and the runtime-DDL fence all read this, NOT `sqlite_master`
+ * (CAVEAT: registry is canonical). `schema` is the JSON field list (each field:
+ * `{ name, type, required, default, label, options? }`, type from the
+ * propsSchema-style vocabulary) from which the SYSTEM generates the CREATE TABLE
+ * DDL — nobody authors raw DDL. `collection` is on the fence's BUILTIN_DENYLIST,
+ * so the runtime path can never touch this table. Hard cap of 100 collections
+ * per Site is enforced against the row count here BEFORE any CREATE (Slice 2).
+ */
+export const collection = sqliteTable(
+  "collection",
+  {
+    id: text("id").primaryKey(),
+    // Operator-facing name ("Blog Posts"). Display only.
+    name: text("name").notNull(),
+    // The real D1 table name: always `content_<slug>` (fence-validated). Unique.
+    tableName: text("table_name").notNull(),
+    // JSON array of field descriptors — the canonical logical schema. The DDL
+    // generator (`collection-schema.ts`) maps these to real typed columns.
+    schema: text("schema").notNull().default("[]"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [uniqueIndex("collection_table_name_unique").on(t.tableName)],
+);
+
 export type Component = typeof component.$inferSelect;
 export type NewComponent = typeof component.$inferInsert;
 export type Page = typeof page.$inferSelect;
@@ -309,3 +343,5 @@ export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;
 export type Session = typeof session.$inferSelect;
 export type NewSession = typeof session.$inferInsert;
+export type Collection = typeof collection.$inferSelect;
+export type NewCollection = typeof collection.$inferInsert;

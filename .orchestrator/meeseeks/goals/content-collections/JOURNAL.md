@@ -47,3 +47,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `npm test` (full CMS suite) → **505/505 green** (was 499/500). Test-only change
   (no TS source / runtime code touched) → no tsc/opennext build or i18n needed.
 - **Files:** CMS/scripts/ports-sole-reader.guard.test.mjs
+
+## 2026-06-22 12:52 — Slice 1: collection registry + field-schema → DDL generator
+- **Status:** DONE
+- **What I did:** Added the built-in `collection` registry table + the PURE DDL
+  generator (no execution yet — Slice 2 wires it to the fence).
+  - `CMS/src/db/schema.ts` — new `collection` table (id, name, tableName, schema
+    JSON, created/updated_at) + unique index on table_name + Collection/NewCollection
+    types. `collection` was ALREADY on the fence denylist.
+  - `CMS/migrations/0010_light_emma_frost.sql` (+ meta snapshot/journal) via
+    `npx drizzle-kit generate` — deployer applies per-Site.
+  - `CMS/src/lib/content/collection-schema.ts` — PURE: field-type vocab
+    `CollectionFieldType` (propsSchema set string/richtext/number/select/date +
+    data extensions text/int/bool/boolean/datetime/multiselect; ref/asset RESERVED
+    for binding, stored TEXT); `affinityFor` (→TEXT/INTEGER/REAL); `buildItemColumns`
+    (6 system cols id/slug/status/archived_at/created_at/updated_at first, then user
+    fields); `buildCreateTableSql`; `buildAddColumnSql` (ADD-ONLY v1); `tableNameForSlug`.
+    Strict column-name charset `^[a-z][a-z0-9_]*$`, system-column collision guard,
+    quote-escaped typed DEFAULT literals, MAX_COLUMNS=100 cap.
+- **Verified:** `node --test scripts/collection-schema.test.mjs` 13/13 (both content
+  suites = 27/27). KEY assertion: every generated CREATE/ALTER passes
+  `validateStatement(sql,"write")` AND targets content_*; injection-in-DEFAULT can't
+  break the fence; 100-col cap; bad names/dups/unknown-types rejected. `npx tsc
+  --noEmit` clean; `npx opennextjs-cloudflare build` green (dev was down).
+- **Files:** CMS/src/db/schema.ts, CMS/migrations/0010_light_emma_frost.sql,
+  CMS/migrations/meta/0010_snapshot.json, CMS/migrations/meta/_journal.json,
+  CMS/src/lib/content/collection-schema.ts, CMS/scripts/collection-schema.test.mjs

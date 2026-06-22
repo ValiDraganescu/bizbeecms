@@ -110,3 +110,22 @@ Read every line before working. Each entry was learned the hard way by a previou
   fail this guard until you add its exact path to `ALLOWLIST_FILES` with a
   justification — that's intentional friction; route through the ports/the fence
   first, only widen the allowlist when there's truly no port path.
+
+- **(Slice 1) Imports inside `src/` MUST use the `.ts` extension** (e.g.
+  `import { isContentName } from "./fence.ts"`) — the project sets
+  `allowImportingTsExtensions` and the `node --test` type-stripping loader resolves
+  ONLY the explicit `.ts` path; a bare `./fence` import throws ERR_MODULE_NOT_FOUND
+  in tests. Mirror content-db.ts / fence.ts.
+- **(Slice 1) Generate the migration with `npx drizzle-kit generate`, never hand-write
+  it** — it also writes `migrations/meta/0010_snapshot.json` + bumps
+  `migrations/meta/_journal.json`; commit ALL THREE or the deployer's
+  `wrangler d1 migrations apply` desyncs. New table 0010 = `collection`.
+- **(Slice 1) System columns are RESERVED on every content table** (decided +
+  emitted now): `id`(PK TEXT), `slug`, `status`(default 'draft'), `archived_at`
+  (nullable ms), `created_at`/`updated_at`(ms). User field names can't collide
+  (guarded). Slice 3 (items CRUD) MUST use exactly these names — don't reinvent.
+- **(Slice 1) Generated DDL is fence-safe BY CONSTRUCTION** but DON'T trust that —
+  Slice 2 must still pass each string through `contentDdl`/`validateStatement`
+  before exec. `unixepoch()`/column names are non-keyword bare tokens the fence
+  ALLOWS (they're not builtins); that's why `created_at INTEGER DEFAULT
+  (unixepoch() * 1000)` clears the guard.
