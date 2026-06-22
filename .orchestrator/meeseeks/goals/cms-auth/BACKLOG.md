@@ -22,8 +22,14 @@ green + regen PM cms-bundle + EN/FI/ET for new strings.
   runtime code beyond doc; if a trivial type/const helps, add it. This unblocks all
   other slices.
 
-- TODO: **Slice 1 — CMS user + session schema + password auth (mirror PM, no
-  countries).** Add to `CMS/src/db/schema.ts`: a `users` table (id, email unique,
+- DONE: **Slice 1 — CMS user + session schema + password auth (mirror PM, no
+  countries).** user+session tables (session in D1 — NO KV binding on the CMS
+  Worker), PBKDF2-100k password.ts ported verbatim, pure session-core, user +
+  session stores via the Db port, migration 0009, node tests (526 green), tsc +
+  opennext build green, deployer-applies-migrations confirmed. cms-bundle NOT
+  regenerated (no runtime route added this slice; PM predeploy regens it). See
+  JOURNAL 2026-06-22 12:46. Original spec below.
+  Add to `CMS/src/db/schema.ts`: a `users` table (id, email unique,
   passwordHash nullable for SSO-only users, role, createdAt) and whatever session
   store the model slice picked (KV session like PM, or a sessions table). Port
   `ProjectManager/src/lib/auth/password.ts` (PBKDF2 **100k** — do not exceed) and

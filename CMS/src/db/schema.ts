@@ -234,6 +234,64 @@ export const apiKey = sqliteTable(
   (t) => [uniqueIndex("api_key_hash_unique").on(t.keyHash)],
 );
 
+/**
+ * User — a first-class CMS user (cms-auth Slice 1). Until now the CMS had NO
+ * local users (auth was 100% delegated to PM via cms-validate); this table gives
+ * each per-Site CMS its OWN users so a client's team can log in directly.
+ *
+ * One UNIFIED table (Slice 0 decision): local email/password users, Google
+ * users (Slice 2b), invited users, AND auto-provisioned PM-SSO operators all
+ * live here. `passwordHash` is NULLABLE — SSO-only / Google-only users have no
+ * local credential. `role` mirrors the pm-roles set (SuperAdmin|Admin|Manager|
+ * Editor); country/tag SCOPE is dropped (a CMS = one Site). Default `Editor`
+ * is the least-privilege fallback; auto-provisioned SSO users are set to Admin
+ * explicitly by the SSO callback (Slice 2). The DB IS the Site boundary — no
+ * siteId column.
+ */
+export type CmsRole = "SuperAdmin" | "Admin" | "Manager" | "Editor";
+
+export const user = sqliteTable(
+  "user",
+  {
+    id: text("id").primaryKey(),
+    // Login identity. Lowercased by the store before write; unique per Site.
+    email: text("email").notNull(),
+    // PBKDF2-100k self-describing hash (see lib/auth/password.ts). NULL for
+    // SSO-only / Google-only users with no local password.
+    passwordHash: text("password_hash"),
+    // pm-roles role NAME (no scope). New rows default to least-privilege.
+    role: text("role").notNull().$type<CmsRole>().default("Editor"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [uniqueIndex("user_email_unique").on(t.email)],
+);
+
+/**
+ * Session — a CMS-local session record (cms-auth Slice 1). The CMS Worker has
+ * NO KV binding (unlike PM, which uses KV `SESSIONS`), only D1, so sessions live
+ * here: an opaque random id (the `bizbee_session` cookie value) → a row. The DB
+ * is the source of truth, so logout (delete row) + expiry (`expiresAt` check)
+ * are enforced server-side. The store sweeps expired rows opportunistically;
+ * there's no KV-style auto-TTL on D1, so a row may outlive `expiresAt` until the
+ * sweep (reads still reject it via isSessionValid). `userId` references
+ * `user.id` (no FK so a user delete doesn't cascade silently — the app owns the
+ * lifecycle).
+ */
+export const session = sqliteTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("session_user_idx").on(t.userId)],
+);
+
 export type Component = typeof component.$inferSelect;
 export type NewComponent = typeof component.$inferInsert;
 export type Page = typeof page.$inferSelect;
@@ -247,3 +305,7 @@ export type PageVersion = typeof pageVersion.$inferSelect;
 export type NewPageVersion = typeof pageVersion.$inferInsert;
 export type ApiKey = typeof apiKey.$inferSelect;
 export type NewApiKey = typeof apiKey.$inferInsert;
+export type User = typeof user.$inferSelect;
+export type NewUser = typeof user.$inferInsert;
+export type Session = typeof session.$inferSelect;
+export type NewSession = typeof session.$inferInsert;

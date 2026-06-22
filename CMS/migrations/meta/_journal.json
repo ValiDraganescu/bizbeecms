@@ -64,6 +64,13 @@
       "when": 1782121083692,
       "tag": "0008_famous_vertigo",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1782121511192,
+      "tag": "0009_motionless_night_thrasher",
+      "breakpoints": true
     }
   ]
 }

@@ -101,3 +101,33 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **No native confirm()/alert().** Browser-automation review sessions hang on
   native dialogs (CLAUDE.md). Any "delete user / revoke invite" confirm must be an
   in-app modal/popover, never `window.confirm`.
+
+- **SESSION STORE IS D1, NOT KV (settled Slice 1).** The CMS Worker has NO KV
+  binding (`wrangler.jsonc` has only DB, AI, MEDIA, ASSETS — verified). PM uses
+  KV `SESSIONS`; the CMS does NOT. Sessions live in a D1 `session` table
+  (`schema.ts`), source of truth in D1, no auto-TTL so `getSession()` rejects +
+  opportunistically deletes expired rows. Don't reintroduce a KV session path —
+  use `db/session-store.ts` (`createSession`/`getSession`/`destroySession`).
+
+- **Pure vs CF-coupled split (follow it).** Crypto/logic that must be node-tested
+  lives in `lib/auth/password.ts` + `lib/auth/session-core.ts` (NO `@/` imports,
+  NO CF bindings — only `globalThis.crypto`). The D1/cookie-bound code is in
+  `db/user-store.ts` + `db/session-store.ts`. Stores read D1 ONLY via `getDb()`
+  (the Db port) — NEVER `env.DB` directly, or the sole-reader guard
+  (`scripts/ports-sole-reader.guard.test.mjs`) flips red.
+
+- **password.ts: keep iterations at exactly 100000.** `scripts/password.test.mjs`
+  asserts the stored hash records `100000` — that's a guard against the
+  Workers-only PBKDF2 cap (memory `pm-workers-pbkdf2-100k-cap`). Bumping it fails
+  CI here instead of at runtime on a deployed Worker. Don't "raise it to OWASP".
+
+- **Deployer applies CMS migrations — confirmed.** `deployer/src/index.ts:639`
+  runs `npx wrangler d1 migrations apply DB --remote` over `migrations/` at every
+  Site deploy. New Drizzle migrations (run `npm run db:generate` in CMS/)
+  auto-apply per-Site. No extra wiring needed for new tables.
+
+- **cms-bundle regen is for RUNTIME code only.** `bundle:cms` bundles
+  `CMS/.open-next/worker.js`, NOT migrations. A slice that only adds schema/libs
+  not yet imported by a worker entrypoint doesn't need a manual regen — PM's
+  `predeploy` runs `bundle:cms` automatically. Regen once a slice adds a real
+  route/UI the worker serves (Slice 2 login route).
