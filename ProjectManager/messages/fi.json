@@ -52,6 +52,45 @@
     "manager": "Päällikkö",
     "editor": "Toimittaja"
   },
+  "tags": {
+    "navLink": "Tunnisteet",
+    "back": "Takaisin",
+    "title": "Hallitse tunnisteita",
+    "subtitle": "Ylläpidä organisaation tunnistesanastoa, jolla rajataan päälliköitä ja merkitään sivustoja.",
+    "info": {
+      "title": "Mihin tunnisteita käytetään",
+      "body": "Tunnisteet ovat organisaation merkintöjä (konserni, TO-kanava, …), jotka liitetään sivustoihin ja päälliköihin. Päällikkö tavoittaa sivuston vain, kun sekä maa että tunniste täsmäävät."
+    },
+    "list": {
+      "title": "Tunnisteet",
+      "description": "Lisää, nimeä uudelleen tai poista tunnisteita. Tunnisteen poisto poistaa sen kaikilta sivustoilta ja päälliköiltä.",
+      "label": "Tunniste",
+      "actions": "Toiminnot",
+      "empty": "Ei vielä tunnisteita. Lisää ensimmäinen yllä."
+    },
+    "form": {
+      "label": "Uusi tunniste",
+      "placeholder": "esim. Pohjoismaat-ryhmä",
+      "add": "Lisää tunniste"
+    },
+    "actions": {
+      "rename": "Nimeä uudelleen",
+      "save": "Tallenna",
+      "cancel": "Peruuta",
+      "delete": "Poista"
+    },
+    "delete": {
+      "title": "Poistetaanko tunniste?",
+      "body": "Tunnisteen \"{label}\" poisto poistaa sen kaikilta sitä käyttäviltä sivustoilta ja päälliköiltä. Tätä ei voi kumota."
+    },
+    "errors": {
+      "labelRequired": "Anna tunnisteen nimi.",
+      "labelTooLong": "Tunnisteen nimi on liian pitkä.",
+      "labelTaken": "Samanniminen tunniste on jo olemassa.",
+      "notAllowed": "Sinulla ei ole oikeuksia hallita tunnisteita.",
+      "unknown": "Jokin meni pieleen. Yritä uudelleen."
+    }
+  },
   "auth": {
     "signOut": "Kirjaudu ulos",
     "fields": {

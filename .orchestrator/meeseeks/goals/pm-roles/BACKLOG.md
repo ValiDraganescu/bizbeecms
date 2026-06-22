@@ -39,7 +39,7 @@ tsc + opennext build green + PM node tests + EN/FI/ET for new strings.
   `getUserTagIds`/`getSiteTagIds` DB helpers; `listSitesForUser` Manager branch
   (country ∈ scope AND tag overlap). tsc + 98 node tests + opennext build green.
 
-- TODO: **Slice 3b — tag management (CRUD the dynamic tags).** USER 2026-06-21:
+- DONE (2026-06-22): **Slice 3b — tag management (CRUD the dynamic tags).** USER 2026-06-21:
   "tags can be managed". A small admin surface to create/rename/delete tags in the
   `tags` table (the managed list Slice 3 references), so Admins curate the
   vocabulary (company groups, TO channels, …) before assigning them to Sites/

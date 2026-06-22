@@ -52,6 +52,45 @@
     "manager": "Haldur",
     "editor": "Toimetaja"
   },
+  "tags": {
+    "navLink": "Sildid",
+    "back": "Tagasi",
+    "title": "Halda silte",
+    "subtitle": "Hoia korras organisatsiooni sildisõnastik, millega piiritletakse haldureid ja märgistatakse saite.",
+    "info": {
+      "title": "Milleks silte kasutatakse",
+      "body": "Sildid on organisatsiooni märgised (kontsern, TO-kanal, …), mis seotakse saitide ja halduritega. Haldur jõuab saidini ainult siis, kui nii riik kui silt kattuvad."
+    },
+    "list": {
+      "title": "Sildid",
+      "description": "Lisa, nimeta ümber või kustuta silte. Sildi kustutamine eemaldab selle igalt saidilt ja haldurilt.",
+      "label": "Silt",
+      "actions": "Tegevused",
+      "empty": "Silte pole veel. Lisa esimene ülal."
+    },
+    "form": {
+      "label": "Uus silt",
+      "placeholder": "nt Põhjamaade grupp",
+      "add": "Lisa silt"
+    },
+    "actions": {
+      "rename": "Nimeta ümber",
+      "save": "Salvesta",
+      "cancel": "Tühista",
+      "delete": "Kustuta"
+    },
+    "delete": {
+      "title": "Kas kustutada silt?",
+      "body": "Sildi \"{label}\" kustutamine eemaldab selle kõigilt saitidelt ja halduritelt, kes seda kasutavad. Seda ei saa tagasi võtta."
+    },
+    "errors": {
+      "labelRequired": "Sisesta sildi nimi.",
+      "labelTooLong": "Sildi nimi on liiga pikk.",
+      "labelTaken": "Sama nimega silt on juba olemas.",
+      "notAllowed": "Sul pole õigust silte hallata.",
+      "unknown": "Midagi läks valesti. Palun proovi uuesti."
+    }
+  },
   "auth": {
     "signOut": "Logi välja",
     "fields": {

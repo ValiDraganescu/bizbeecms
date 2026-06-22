@@ -87,3 +87,38 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `ProjectManager/src/lib/site/scope.ts` (new), `ProjectManager/src/lib/site/scope.test.ts` (new),
   `ProjectManager/src/lib/site/authz.ts`, `ProjectManager/src/lib/site/site.ts`,
   `ProjectManager/src/lib/auth/user.ts`.
+
+## 2026-06-22 12:43 — Slice 3b: tag management CRUD (API + UI, Admin+ gated)
+- **Status:** DONE
+- **What I did:** Built the managed-tag admin surface that curates the `tags`
+  vocabulary Slice 3 introduced.
+  - DB helpers `src/lib/tags/tags.ts`: `listTags` (alpha by label), `isLabelTaken`
+    (case-insensitive, optional exclude id), `createTag`/`renameTag`/`deleteTag`.
+    DELETE relies on the schema's onDelete cascade to drop `site_tags`/`user_tags`.
+  - PURE alias-free `src/lib/tags/validate.ts` `parseTagLabel` (trim + collapse inner
+    whitespace, non-empty, <=50 chars) -> node-testable (5 tests, `validate.test.ts`).
+  - REST `app/api/tags/route.ts` (GET list + POST create) and
+    `app/api/tags/[id]/route.ts` (PATCH rename + DELETE). All gated Admin+
+    (`canManageTags` = SuperAdmin|Admin; GET reuses `canUserCreateSite`). Duplicate
+    label -> 409 `labelTaken` (checked before write + caught on the unique-index race).
+    404 on missing id for PATCH/DELETE.
+  - UI `app/(app)/tags/page.tsx` (server, redirects non-Admin+) + client
+    `tags-manager.tsx`: add form, inline rename, delete behind an IN-APP confirm modal
+    (overlay dialog, NEVER window.confirm - CAVEATS). Reuses design-system Card/Table/
+    Button/Field/Alert + purpose tokens. Optimistic local list, re-sorted by label.
+  - Nav: `/tags` link added to `app-nav.tsx`, shown only to Admin+ (`canUserCreateSite`).
+  - i18n EN/FI/ET: new `tags.*` namespace (navLink/back/title/subtitle/info/list/form/
+    actions/delete/errors) in all three message files. FI/ET role-consistent wording.
+- **Verified:** `npx tsc --noEmit` exit 0; `npm test` 103/103 (5 new); `npx
+  opennextjs-cloudflare build` green (port 3601 confirmed free first) with `/tags` in the
+  route list; all three messages JSON parse. NOT verified: live D1 CRUD round-trip (no
+  running dev server this run) and a real browser confirm-modal click.
+- **Files:** `ProjectManager/src/lib/tags/tags.ts` (new),
+  `ProjectManager/src/lib/tags/validate.ts` (new),
+  `ProjectManager/src/lib/tags/validate.test.ts` (new),
+  `ProjectManager/src/app/api/tags/route.ts` (new),
+  `ProjectManager/src/app/api/tags/[id]/route.ts` (new),
+  `ProjectManager/src/app/(app)/tags/page.tsx` (new),
+  `ProjectManager/src/app/(app)/tags/tags-manager.tsx` (new),
+  `ProjectManager/src/components/nav/app-nav.tsx`,
+  `ProjectManager/messages/{en,fi,et}.json`.

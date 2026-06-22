@@ -6,6 +6,7 @@ import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import type { Role, User } from "@/db/schema";
 import { canUserInvite } from "@/lib/invite/authz";
+import { canUserCreateSite } from "@/lib/site/authz";
 
 const roleKey: Record<Role, string> = {
   SuperAdmin: "superAdmin",
@@ -23,6 +24,7 @@ const roleKey: Record<Role, string> = {
 export async function AppNav({ user }: { user: User }) {
   const t = await getTranslations("home");
   const tApp = await getTranslations("app");
+  const tTags = await getTranslations("tags");
   const tRoles = await getTranslations("roles");
 
   return (
@@ -39,6 +41,9 @@ export async function AppNav({ user }: { user: User }) {
           <NavLink href="/sites" label={t("manageSites")} />
           {canUserInvite(user) ? (
             <NavLink href="/invite" label={t("inviteUsers")} />
+          ) : null}
+          {canUserCreateSite(user) ? (
+            <NavLink href="/tags" label={tTags("navLink")} />
           ) : null}
         </div>
 

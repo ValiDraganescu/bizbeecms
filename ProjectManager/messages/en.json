@@ -52,6 +52,45 @@
     "manager": "Manager",
     "editor": "Editor"
   },
+  "tags": {
+    "navLink": "Tags",
+    "back": "Back",
+    "title": "Manage tags",
+    "subtitle": "Curate the org tag vocabulary used to scope Managers and label Sites.",
+    "info": {
+      "title": "What tags do",
+      "body": "Tags are organisation labels (company group, TO channel, …) assigned to Sites and to Managers. A Manager reaches a Site only when their country and tag both match."
+    },
+    "list": {
+      "title": "Tags",
+      "description": "Add, rename, or delete tags. Deleting a tag removes it from every Site and Manager.",
+      "label": "Tag",
+      "actions": "Actions",
+      "empty": "No tags yet. Add your first one above."
+    },
+    "form": {
+      "label": "New tag",
+      "placeholder": "e.g. Nordic Group",
+      "add": "Add tag"
+    },
+    "actions": {
+      "rename": "Rename",
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete"
+    },
+    "delete": {
+      "title": "Delete tag?",
+      "body": "Deleting \"{label}\" removes it from every Site and Manager that uses it. This can't be undone."
+    },
+    "errors": {
+      "labelRequired": "Enter a tag name.",
+      "labelTooLong": "Tag name is too long.",
+      "labelTaken": "A tag with that name already exists.",
+      "notAllowed": "You don't have permission to manage tags.",
+      "unknown": "Something went wrong. Please try again."
+    }
+  },
   "auth": {
     "signOut": "Sign out",
     "fields": {

@@ -104,3 +104,22 @@ Read every line before working. Each entry was learned the hard way by a previou
   hand-authored data-only 0006) because new tables are a real structural diff. The
   meta journal + 0007_snapshot.json were auto-written. Future tag-schema tweaks: just
   re-run `drizzle-kit generate`.
+
+- **Slice 3b done — tag CRUD lives at `lib/tags/` + `app/api/tags/` + `app/(app)/tags/`.**
+  Gate = Admin+ via `canManageTags(role)` (SuperAdmin|Admin) in the routes, mirroring
+  `canUserCreateSite`. The PATCH/DELETE route is `app/api/tags/[id]/route.ts` and uses the
+  Next 15 async-params signature `{ params }: { params: Promise<{ id: string }> }` then
+  `await params` — copy that shape for Slice 4's `app/api/users/[id]`.
+- **Pure tag validation is `lib/tags/validate.ts` (`parseTagLabel`, alias-free, tested).**
+  It only checks SHAPE (non-empty after trim/collapse, <=50). DB uniqueness is a SEPARATE
+  store check (`isLabelTaken`, case-insensitive) + the `tags_label_unique` index as the
+  race backstop -> both surface as 409 `labelTaken`. Don't fold uniqueness into the pure fn.
+- **Button has NO `tone` prop — danger is a `variant`.** `<Button variant="danger">` for a
+  solid danger button; for a ghost-danger (inline destructive action) use
+  `variant="ghost" className="text-danger hover:bg-danger/10"`. Slice 5's remove-user button
+  should follow this.
+- **The delete confirm modal is hand-rolled in `tags-manager.tsx` (`ConfirmDeleteModal`).**
+  There's NO shared Modal/Dialog component in `components/ui` yet. If Slice 5 needs another
+  confirm modal, consider promoting this overlay-dialog pattern (fixed inset bg-black/50,
+  stopPropagation on the panel, role=dialog aria-modal) into `components/ui` instead of
+  copy-pasting a third time.
