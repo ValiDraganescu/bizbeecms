@@ -20,13 +20,11 @@ export-by-tag, then kit import. Each slice gates on CMS tsc + opennext build gre
   on the import trust boundary). Pure tag-normalize helper (trim/dedupe/drop empty)
   + a `distinctTags(components)` helper, node-tested. NO UI yet.
 
-- TODO: **Slice 2 — components admin UI: see/edit tags + filter by tag.** In
-  `components/components/components-manager.tsx` (+ `app/admin/components/page.tsx`):
-  show each component's tags, let the operator add/remove tags (input with
-  autocomplete from `distinctTags`), persist via a small `PATCH /api/components`
-  (name + tags) reusing `upsertComponent` (tags only — never touches artifact). Add
-  a tag FILTER to the list. Reuse design-system + purpose tokens. EN/FI/ET. Pure
-  filter helper tested.
+- DONE (2026-06-22): **Slice 2 — components admin UI: see/edit tags + filter by tag.**
+  `updateComponentTags` (tags-only update, NOT via upsertComponent) + `PATCH
+  /api/components` + `filterByTag` pure helper. UI: tag chips + ×-remove + add-tag
+  input (datalist autocomplete from distinctTags) + tag FILTER select. en/fi/et 6 new
+  keys. tsc + opennext build green; 17/17 tests; cms-bundle regenerated.
 
 - TODO: **Slice 3 — export by tag → one kit bundle.** New `GET
   /api/components/export?tag=<tag>` that returns a single `*.kit.json`:

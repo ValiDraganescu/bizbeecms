@@ -239,7 +239,13 @@
     "installLandingKit": "Asenna laskeutumispaketti",
     "installDocsKit": "Asenna dokumentaatiopaketti",
     "installPortfolioKit": "Asenna portfoliopaketti",
-    "installPricingKit": "Asenna hinnoittelupaketti"
+    "installPricingKit": "Asenna hinnoittelupaketti",
+    "filterByTag": "Suodata tunnisteella",
+    "filterAllTags": "Kaikki tunnisteet",
+    "noneForTag": "Yksikään komponentti ei käytä tätä tunnistetta.",
+    "addTagPlaceholder": "Lisää tunniste…",
+    "addTagFor": "Lisää tunniste komponenttiin {name}",
+    "removeTag": "Poista tunniste {tag}"
   },
   "adminAuth": {
     "forbiddenTitle": "Pääsy estetty",

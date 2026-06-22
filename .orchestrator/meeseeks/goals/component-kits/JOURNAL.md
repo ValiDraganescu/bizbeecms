@@ -37,3 +37,35 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/scripts/component-store.test.mjs, CMS/migrations/0007_tense_lady_vermin.sql,
   CMS/migrations/meta/{0007_snapshot.json,_journal.json},
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-22 12:35 — Slice 2: components admin UI — see/edit tags + filter by tag
+- **Status:** DONE
+- **What I did:**
+  - `component-store.ts`: new `updateComponentTags(name, tags, db?)` — tags-only
+    update (writes ONLY `serializeTags(tags)` to the `tags` column + `updatedAt`,
+    keyed by name; artifact untouched). Returns `{updated, name, tags}`; `updated:false`
+    if no row matches. Mirror of `upsertComponent` (which deliberately skips tags).
+  - `lib/components/tags.ts`: new pure `filterByTag(components, tag)` — case-insensitive,
+    empty/blank tag = no filter. Generic over row shape (works on UI summary rows).
+  - `api/components/route.ts`: GET list now returns `tags: normalizeTags(r.tags)`.
+    New `PATCH { name, tags }` (admin-guarded, trust boundary) → `updateComponentTags`;
+    re-normalizes tags server-side; 400 missing name, 404 not found, 200 `{name, tags}`.
+  - UI `components-manager.tsx`: `ComponentSummary` gained `tags: string[]`. Added a
+    tag FILTER `<select>` (from `distinctTags`), a shared `<datalist id="component-tags">`
+    autocomplete, per-component tag chips with an "×" remove + an add-tag `<input list>`
+    (Enter to add). Optimistic state update synced to the server's canonical tags via
+    `saveTags`. Design-system purpose tokens only.
+  - `app/admin/components/page.tsx`: passes `tags: normalizeTags(r.tags)` to the manager.
+  - i18n: 6 new `components` keys (`filterByTag`, `filterAllTags`, `noneForTag`,
+    `addTagPlaceholder`, `addTagFor`, `removeTag`) in en/fi/et.
+  - Tests: `filterByTag` case in `tags.test.ts`; two `updateComponentTags` cases in
+    `scripts/component-store.test.mjs` (tags-only write + missing-name).
+  - Regenerated PM `cms-bundle.generated.js`.
+- **Verified:** `node --test tags.test.ts component-store.test.mjs` 17/17 green;
+  CMS `tsc --noEmit` clean; `npx opennextjs-cloudflare build` green; cms-bundle regen OK.
+  No native confirm()/alert() (× button removes inline). Did NOT touch other worker's
+  PM files (pm-roles: migrations/schema/scope.*) — staged only my cms-bundle in PM.
+- **Files:** CMS/src/db/component-store.ts, CMS/src/lib/components/{tags.ts,tags.test.ts},
+  CMS/src/app/api/components/route.ts, CMS/src/components/components/components-manager.tsx,
+  CMS/src/app/admin/components/page.tsx, CMS/messages/{en,fi,et}.json,
+  CMS/scripts/component-store.test.mjs, ProjectManager/src/lib/deploy/cms-bundle.generated.js

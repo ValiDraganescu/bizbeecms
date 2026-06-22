@@ -62,3 +62,15 @@ export function serializeTags(tags: unknown): string {
 export function distinctTags(components: { tags?: unknown }[]): string[] {
   return normalizeTags(components.flatMap((c) => normalizeTags(c.tags)));
 }
+
+/**
+ * Filter a component list to those carrying `tag` (case-insensitive). An empty/
+ * falsy `tag` means "no filter" → the list is returned unchanged. PURE — used by
+ * the admin UI's tag filter. Generic over the row shape so it works on the UI's
+ * summary rows too.
+ */
+export function filterByTag<T extends { tags?: unknown }>(components: T[], tag: string): T[] {
+  const t = tag.trim().toLowerCase();
+  if (!t) return components;
+  return components.filter((c) => normalizeTags(c.tags).some((x) => x.toLowerCase() === t));
+}

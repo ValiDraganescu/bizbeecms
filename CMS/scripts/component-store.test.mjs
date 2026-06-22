@@ -28,6 +28,7 @@ import { DatabaseSync } from "node:sqlite";
 import {
   upsertComponent,
   upsertImportedComponent,
+  updateComponentTags,
   missingComponentNames,
 } from "../src/db/component-store.ts";
 import { cfDb } from "../src/lib/ports/db.ts";
@@ -196,6 +197,33 @@ test("a name can be authored by AI then re-imported: upsert keys on name, never 
   const all = rows(d1);
   assert.equal(all.length, 1, "same UNIQUE name → one row, updated");
   assert.equal(all[0].props_schema, '{"x":1}', "import filled in the previously-NULL props_schema");
+});
+
+test("updateComponentTags writes ONLY the tags column (canonical, normalized), artifact untouched", async () => {
+  const d1 = fakeD1();
+  const db = cfDb(d1);
+
+  await upsertComponent(artifact({ name: "Hero", css: "text-lg" }), db);
+
+  const res = await updateComponentTags("Hero", ["  Marketing ", "dark", "MARKETING"], db);
+
+  assert.equal(res.updated, true);
+  assert.equal(res.name, "Hero");
+  const r = rows(d1)[0];
+  // canonical: trimmed, deduped (case-insensitive), sorted JSON
+  assert.equal(r.tags, '["dark","Marketing"]');
+  // artifact columns untouched
+  assert.equal(r.css, "text-lg");
+  assert.deepEqual(JSON.parse(r.tree), { tag: "section", props: {}, children: [] });
+});
+
+test("updateComponentTags returns updated:false for a missing name (no row written)", async () => {
+  const d1 = fakeD1();
+  const db = cfDb(d1);
+
+  const res = await updateComponentTags("Ghost", ["x"], db);
+  assert.equal(res.updated, false);
+  assert.equal(rows(d1).length, 0);
 });
 
 test("missingComponentNames returns the subset absent from the table", async () => {

@@ -19,9 +19,11 @@ import {
   getComponentByName,
   listComponents,
   missingComponentNames,
+  updateComponentTags,
   upsertImportedComponent,
 } from "@/db/component-store";
 import { parsePortableComponent, serializeComponent } from "@/lib/components/portable";
+import { normalizeTags } from "@/lib/components/tags";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -49,11 +51,42 @@ export async function GET(request: Request): Promise<Response> {
         name: r.name,
         hasScript: (r.script ?? "") !== "",
         hasCss: (r.css ?? "") !== "",
+        tags: normalizeTags(r.tags),
       })),
     );
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to read components" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * PATCH { name, tags } → tags-only update of one component (component-kits Slice 2).
+ * Sets ONLY the `tags` column (never the artifact). Tags are re-normalized
+ * server-side (trim/dedupe/cap) so the stored value is canonical regardless of UI.
+ */
+export async function PATCH(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+  const obj = body && typeof body === "object" ? (body as Record<string, unknown>) : null;
+  const name = obj && typeof obj.name === "string" ? obj.name.trim() : "";
+  if (!name) return Response.json({ error: "name is required" }, { status: 400 });
+  const tags = normalizeTags(obj?.tags);
+  try {
+    const res = await updateComponentTags(name, tags);
+    if (!res.updated) return Response.json({ error: "component not found" }, { status: 404 });
+    return Response.json({ name: res.name, tags });
+  } catch (err) {
+    return Response.json(
+      { error: (err as Error).message ?? "failed to update tags" },
       { status: 500 },
     );
   }

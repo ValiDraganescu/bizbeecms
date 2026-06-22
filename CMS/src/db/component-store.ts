@@ -152,6 +152,32 @@ export async function upsertImportedComponent(
 }
 
 /**
+ * Tags-only update by unique `name` (component-kits Slice 2). Writes ONLY the
+ * `tags` column — never the artifact (`upsertComponent` deliberately doesn't
+ * touch tags; this is its mirror). Returns whether a row matched. The tag list
+ * is normalized/serialized canonically via `serializeTags`.
+ */
+export async function updateComponentTags(
+  name: string,
+  tags: unknown,
+  injectedDb?: Db,
+): Promise<{ updated: boolean; name: string; tags: string }> {
+  const db = injectedDb ?? (await getDb());
+  const serialized = serializeTags(tags);
+  const existing = await db
+    .select({ id: schema.component.id })
+    .from(schema.component)
+    .where(eq(schema.component.name, name))
+    .limit(1);
+  if (existing.length === 0) return { updated: false, name, tags: serialized };
+  await db
+    .update(schema.component)
+    .set({ tags: serialized, updatedAt: new Date() })
+    .where(eq(schema.component.name, name));
+  return { updated: true, name, tags: serialized };
+}
+
+/**
  * Insert or update a component by its unique `name`. Returns the action taken so
  * the chat route can tell the model "created" vs "updated".
  */

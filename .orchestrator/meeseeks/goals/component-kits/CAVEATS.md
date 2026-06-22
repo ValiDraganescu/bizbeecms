@@ -72,6 +72,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   (commit ce01b0d, content-collections goal) — NOT this goal. `npm test` = 499/500.
   Don't chase it here.
 
+- **A parallel pm-roles worker leaves PM files dirty in the shared tree.** Slice 2
+  saw uncommitted `ProjectManager/{migrations/0007_tags.sql,migrations/meta/*,src/db/schema.ts,
+  src/lib/site/scope.ts,scope.test.ts}` that are NOT this goal's. Stage ONLY your own
+  paths — your single PM file is `src/lib/deploy/cms-bundle.generated.js`. NEVER `git add -A`.
+
 - **A new column on `component` ripples to all 5 premade kits.** Their `bundle()`
   wrappers build a `PortableComponent` literal; a new REQUIRED envelope field (Slice 1's
   `tags`) breaks `tsc` in blog/docs/landing/pricing/portfolio-kit.ts until each sets it.

@@ -239,7 +239,13 @@
     "installLandingKit": "Install landing kit",
     "installDocsKit": "Install docs kit",
     "installPortfolioKit": "Install portfolio kit",
-    "installPricingKit": "Install pricing kit"
+    "installPricingKit": "Install pricing kit",
+    "filterByTag": "Filter by tag",
+    "filterAllTags": "All tags",
+    "noneForTag": "No components carry this tag.",
+    "addTagPlaceholder": "Add tag…",
+    "addTagFor": "Add a tag to {name}",
+    "removeTag": "Remove tag {tag}"
   },
   "adminAuth": {
     "forbiddenTitle": "Access denied",

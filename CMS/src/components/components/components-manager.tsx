@@ -16,8 +16,14 @@
 
 import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { distinctTags, filterByTag, normalizeTags } from "@/lib/components/tags";
 
-type ComponentSummary = { name: string; hasScript: boolean; hasCss: boolean };
+type ComponentSummary = {
+  name: string;
+  hasScript: boolean;
+  hasCss: boolean;
+  tags: string[];
+};
 
 // Starter kits the UI offers. Keep in sync with the KITS registry in
 // `api/components/kit/route.ts`; `labelKey` is the i18n key for the button.
@@ -53,11 +59,54 @@ export function ComponentsManager({
   const [siteAssetKeys, setSiteAssetKeys] = useState<string[]>([]);
   // Per-dep choice: undefined/"" = keep, "__drop__" = remove, else a /media key.
   const [rebind, setRebind] = useState<Record<string, string>>({});
+  // Slice 2: which tag the list is filtered by ("" = show all), and the per-row
+  // "add tag" input text keyed by component name.
+  const [tagFilter, setTagFilter] = useState("");
+  const [tagDraft, setTagDraft] = useState<Record<string, string>>({});
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const allTags = distinctTags(components);
+  const visible = filterByTag(components, tagFilter);
 
   async function refresh() {
     const res = await fetch("/api/components");
     if (res.ok) setComponents((await res.json()) as ComponentSummary[]);
+  }
+
+  // Persist a component's tags via the tags-only PATCH (never touches the
+  // artifact). Optimistic: update local state, then re-sync from the server's
+  // canonical (normalized) tags.
+  async function saveTags(name: string, tags: string[]) {
+    setError(null);
+    try {
+      const res = await fetch("/api/components", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, tags }),
+      });
+      if (!res.ok) {
+        setError(await errorOf(res));
+        return;
+      }
+      const j = (await res.json()) as { name: string; tags: string[] };
+      setComponents((cs) =>
+        cs.map((c) => (c.name === j.name ? { ...c, tags: j.tags } : c)),
+      );
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  function addTag(c: ComponentSummary) {
+    const draft = (tagDraft[c.name] ?? "").trim();
+    if (!draft) return;
+    const next = normalizeTags([...c.tags, draft]);
+    setTagDraft((d) => ({ ...d, [c.name]: "" }));
+    void saveTags(c.name, next);
+  }
+
+  function removeTag(c: ComponentSummary, tag: string) {
+    void saveTags(c.name, c.tags.filter((x) => x !== tag));
   }
 
   // Load this Site's media keys so a rebind can target a real asset (H3b p1).
@@ -326,34 +375,100 @@ export function ComponentsManager({
         </div>
       </section>
 
-      {/* Component list with per-component export */}
+      {/* Component list with per-component export + tags (Slice 2) */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-foreground">{t("listTitle")}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">{t("listTitle")}</h2>
+          {allTags.length > 0 && (
+            <label className="flex items-center gap-2 text-sm text-foreground-muted">
+              {t("filterByTag")}
+              <select
+                className="rounded-md border border-border bg-surface px-2 py-1 text-sm text-foreground"
+                value={tagFilter}
+                onChange={(e) => setTagFilter(e.target.value)}
+              >
+                <option value="">{t("filterAllTags")}</option>
+                {allTags.map((tg) => (
+                  <option key={tg} value={tg}>
+                    {tg}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        {/* Shared autocomplete source for all per-component add-tag inputs. */}
+        <datalist id="component-tags">
+          {allTags.map((tg) => (
+            <option key={tg} value={tg} />
+          ))}
+        </datalist>
         {components.length === 0 ? (
           <p className="text-foreground-muted">{t("empty")}</p>
+        ) : visible.length === 0 ? (
+          <p className="text-foreground-muted">{t("noneForTag")}</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {components.map((c) => (
+            {visible.map((c) => (
               <li
                 key={c.name}
-                className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-raised px-3 py-2"
+                className="flex flex-col gap-2 rounded-md border border-border bg-surface-raised px-3 py-2"
               >
-                <div className="flex min-w-0 flex-col">
-                  <span className="truncate font-mono text-foreground">{c.name}</span>
-                  <span className="text-sm text-foreground-muted">
-                    {[c.hasScript ? t("flagScript") : null, c.hasCss ? t("flagCss") : null]
-                      .filter(Boolean)
-                      .join(" · ") || t("flagStatic")}
-                  </span>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate font-mono text-foreground">{c.name}</span>
+                    <span className="text-sm text-foreground-muted">
+                      {[c.hasScript ? t("flagScript") : null, c.hasCss ? t("flagCss") : null]
+                        .filter(Boolean)
+                        .join(" · ") || t("flagStatic")}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded border border-border px-3 py-1 text-foreground-muted hover:text-foreground disabled:opacity-40"
+                    disabled={busy}
+                    onClick={() => void exportOne(c.name)}
+                  >
+                    {t("export")}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="shrink-0 rounded border border-border px-3 py-1 text-foreground-muted hover:text-foreground disabled:opacity-40"
-                  disabled={busy}
-                  onClick={() => void exportOne(c.name)}
-                >
-                  {t("export")}
-                </button>
+                {/* Tag chips + remove, and an add-tag input with autocomplete. */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {c.tags.map((tg) => (
+                    <span
+                      key={tg}
+                      className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-xs text-foreground"
+                    >
+                      {tg}
+                      <button
+                        type="button"
+                        className="text-foreground-muted hover:text-danger disabled:opacity-40"
+                        disabled={busy}
+                        aria-label={t("removeTag", { tag: tg })}
+                        onClick={() => removeTag(c, tg)}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    list="component-tags"
+                    className="w-32 rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-foreground"
+                    placeholder={t("addTagPlaceholder")}
+                    aria-label={t("addTagFor", { name: c.name })}
+                    value={tagDraft[c.name] ?? ""}
+                    disabled={busy}
+                    onChange={(e) =>
+                      setTagDraft((d) => ({ ...d, [c.name]: e.target.value }))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addTag(c);
+                      }
+                    }}
+                  />
+                </div>
               </li>
             ))}
           </ul>

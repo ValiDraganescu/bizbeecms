@@ -239,7 +239,13 @@
     "installLandingKit": "Paigalda maandumispakett",
     "installDocsKit": "Paigalda dokumentatsioonipakett",
     "installPortfolioKit": "Paigalda portfooliopakett",
-    "installPricingKit": "Paigalda hinnapakett"
+    "installPricingKit": "Paigalda hinnapakett",
+    "filterByTag": "Filtreeri sildi järgi",
+    "filterAllTags": "Kõik sildid",
+    "noneForTag": "Ükski komponent ei kanna seda silti.",
+    "addTagPlaceholder": "Lisa silt…",
+    "addTagFor": "Lisa silt komponendile {name}",
+    "removeTag": "Eemalda silt {tag}"
   },
   "adminAuth": {
     "forbiddenTitle": "Juurdepääs keelatud",

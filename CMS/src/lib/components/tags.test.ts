@@ -2,7 +2,7 @@
 // node --test does NOT resolve the @/ alias → import via relative .ts path.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeTags, parseTags, serializeTags, distinctTags } from "./tags.ts";
+import { normalizeTags, parseTags, serializeTags, distinctTags, filterByTag } from "./tags.ts";
 
 test("normalizeTags trims, drops empty, dedupes case-insensitively, sorts", () => {
   assert.deepEqual(
@@ -45,4 +45,17 @@ test("distinctTags unions across components, deduped + sorted", () => {
     ]),
     ["blog", "dark", "marketing"],
   );
+});
+
+test("filterByTag matches case-insensitively; empty tag = no filter", () => {
+  const list = [
+    { name: "Hero", tags: ["Marketing", "dark"] },
+    { name: "Post", tags: ["blog"] },
+    { name: "Static", tags: [] },
+  ];
+  assert.deepEqual(filterByTag(list, "marketing").map((c) => c.name), ["Hero"]);
+  assert.deepEqual(filterByTag(list, "BLOG").map((c) => c.name), ["Post"]);
+  assert.deepEqual(filterByTag(list, "").map((c) => c.name), ["Hero", "Post", "Static"]);
+  assert.deepEqual(filterByTag(list, "   ").map((c) => c.name), ["Hero", "Post", "Static"]);
+  assert.deepEqual(filterByTag(list, "nope"), []);
 });

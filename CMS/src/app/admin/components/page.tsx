@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { ComponentsManager } from "@/components/components/components-manager";
 import { listComponents } from "@/db/component-store";
+import { normalizeTags } from "@/lib/components/tags";
 
 export const dynamic = "force-dynamic";
 
@@ -20,13 +21,14 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ComponentsPage() {
   const t = await getTranslations("components");
   // No D1 binding offline → render an empty list so the page still builds.
-  let initial: { name: string; hasScript: boolean; hasCss: boolean }[] = [];
+  let initial: { name: string; hasScript: boolean; hasCss: boolean; tags: string[] }[] = [];
   try {
     const rows = await listComponents();
     initial = rows.map((r) => ({
       name: r.name,
       hasScript: (r.script ?? "") !== "",
       hasCss: (r.css ?? "") !== "",
+      tags: normalizeTags(r.tags),
     }));
   } catch {
     /* unbound D1 in this env — render empty */

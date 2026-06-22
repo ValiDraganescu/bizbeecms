@@ -1,27 +1,26 @@
 # Note to the next Meeseeks (component-kits)
 
-Slice 1 is DONE (2026-06-22): `tags` JSON-array column on `component` + migration
-0007 (deployer auto-applies it), pure `lib/components/tags.ts`
-(`normalizeTags`/`parseTags`/`serializeTags`/`distinctTags`, all tested), tags
-threaded through the `PortableComponent` envelope (round-trips, re-normalized on the
-import trust boundary) and `component-store.ts`. Gate green (tsc + opennext build),
-cms-bundle regenerated. Read CAVEATS.md — several new gotchas landed.
+Slices 1 + 2 are DONE (2026-06-22).
+- Slice 1: `tags` JSON-array column + migration 0007, pure `lib/components/tags.ts`,
+  tags in the `PortableComponent` envelope (round-trips), threaded through `component-store.ts`.
+- Slice 2: components admin UI shows/edits tags (chips + ×-remove + add-tag input with
+  `<datalist>` autocomplete from `distinctTags`) + a tag FILTER select. Persist via
+  `PATCH /api/components {name, tags}` → `updateComponentTags` (tags-only; never
+  `upsertComponent`). Pure `filterByTag` helper, node-tested.
 
-PICK NEXT: **Slice 2 — components admin UI: see/edit tags + filter by tag.**
-- Files: `components/components/components-manager.tsx` + `app/admin/components/page.tsx`.
-- Show each component's tags; add/remove via input with autocomplete from
-  `distinctTags(components)` (already built, import from `lib/components/tags`).
-- Persist via a small `PATCH /api/components` (body: `{ name, tags }`). Do NOT
-  re-route through `upsertComponent` (it deliberately doesn't touch tags) — add a
-  dedicated tags-only update in `component-store.ts` (write `serializeTags(tags)` to
-  the `tags` column, keyed by name; artifact untouched).
-- Add a tag FILTER to the list (pure filter helper, node-tested).
-- The components-manager already lists `ComponentRow[]` from `listComponents` which
-  now SELECTS `tags` — so the rows carry the JSON-string `tags`; `parseTags(row.tags)`
-  to display.
-- Reuse design-system + purpose tokens. EN/FI/ET for all new strings (the `components`
-  i18n namespace already exists in en/fi/et — add keys to ALL THREE or render throws).
-- No native confirm()/alert() — in-app modal for any destructive remove if needed.
+PICK NEXT: **Slice 3 — export by tag → ONE kit bundle.**
+- New `GET /api/components/export?tag=<tag>` returning a single `*.kit.json`:
+  `{ format:"bizbeecms.kit", version:1, name:<tag>, components: PortableComponent[] }`.
+- Build it from every component carrying `<tag>`, REUSING the existing per-component
+  `serializeComponent` + its asset/component-dep collection (so nested deps come along;
+  dedupe shared deps across the bundle). Look at how `serializeComponent` collects deps
+  in `lib/components/portable.ts` and the kit-install route for the multi-component shape.
+- Pure `buildKitBundle(components, tag)` helper, node-tested (shape + dep inclusion + dedupe).
+- UI: an "Export kit" affordance — likely a button next to the tag FILTER select, or a
+  per-tag download. Reuse the existing `<a download>` Blob pattern in `exportOne`.
+- EN/FI/ET for new strings (the `components` namespace; add to ALL THREE).
+- Gate: CMS tsc + opennext build green (NEVER while `npm run dev` up) + regen PM cms-bundle.
 
-THEN Slice 3 (export-by-tag → one `bizbeecms.kit` bundle) and Slice 4 (import a kit
-bundle). USER DECISION: export-by-tag = ONE multi-component kit envelope.
+WATCH OUT: a parallel pm-roles worker is editing ProjectManager/src/** + migrations.
+Stage ONLY your own paths at commit (your only PM file = `cms-bundle.generated.js`).
+THEN Slice 4 (import a kit bundle through the existing trust boundary).
