@@ -288,9 +288,11 @@
       "components": "Ekspordi komponente teisaldatavate pakettidena, impordi neid või paigalda stardikomplekte.",
       "media": "Laadi sellele saidile pilte üles ja viita neile komponentides URL-i kaudu.",
       "settings": "Sisukeeled, teema värvialistamised ning bränd ja tehisintellekti persoon.",
-      "pageBuilder": "Koosta lehti visuaalselt plokkidest ja komponentidest."
+      "pageBuilder": "Koosta lehti visuaalselt plokkidest ja komponentidest.",
+      "collections": "Defineeri tüübitud andmekogumikke, täida need sisuga ja teosta päringuid."
     },
-    "pageBuilder": "Lehe koostaja"
+    "pageBuilder": "Lehe koostaja",
+    "collections": "Kogumikud"
   },
   "pageBuilder": {
     "title": "Lehe koostaja",
@@ -467,5 +469,58 @@
       "busy": "Tõlgin…",
       "empty": "Lähtekeeles pole midagi tõlkida."
     }
+  },
+  "collections": {
+    "title": "Kogumikud",
+    "subtitle": "Defineeri tüübitud andmekogumikke, halda nende välju ja muuda sisu.",
+    "offline": "Ühenda andmebaas selle kogumiku haldamiseks.",
+    "new": "Uus kogumik",
+    "newTitle": "Uus kogumik",
+    "empty": "Kogumikke veel pole. Loo esimene.",
+    "name": "Nimi",
+    "namePlaceholder": "nt Blogipostitused või Meeskonna liikmed",
+    "fields": "Väljad",
+    "fieldCount": "{count, plural, one {# väli} other {# välja}}",
+    "addField": "Lisa väli",
+    "removeField": "Eemalda väli",
+    "fieldName": "Välja nimi",
+    "fieldNamePlaceholder": "nt pealkiri",
+    "fieldType": "Tüüp",
+    "fieldOptions": "Valikud",
+    "fieldOptionsPlaceholder": "komaga,eraldatud,väärtused",
+    "required": "Kohustuslik",
+    "create": "Loo",
+    "manageItems": "Halda sisu",
+    "delete": "Kustuta",
+    "deleteOne": "Kustuta kogumik {name}",
+    "confirmDelete": "Kas kustutada kogumik „{name}“ ja kõik selle andmed? Seda ei saa tagasi võtta.",
+    "newItem": "Uus element",
+    "editItem": "Muuda elementi",
+    "itemSlug": "Tunnus",
+    "itemStatus": "Olek",
+    "status": {
+      "draft": "Mustand",
+      "published": "Avaldatud"
+    },
+    "search": "Otsi",
+    "searchPlaceholder": "Otsi tekstiväljadelt…",
+    "sortBy": "Sordi",
+    "sortDefault": "Vaikejärjestus",
+    "sortNewest": "Uusimad enne",
+    "sortOldest": "Vanimad enne",
+    "show": "Kuva",
+    "showLive": "Aktiivsed",
+    "showArchived": "Arhiveeritud",
+    "showAll": "Kõik",
+    "itemCount": "{count, plural, one {# element} other {# elementi}}",
+    "noItems": "Vasteid pole.",
+    "archivedTag": "Arhiveeritud",
+    "archive": "Arhiveeri",
+    "unarchive": "Taasta",
+    "edit": "Muuda",
+    "save": "Salvesta",
+    "saving": "Salvestan…",
+    "cancel": "Tühista",
+    "confirmDeleteItem": "Kas kustutada see element? Seda ei saa tagasi võtta."
   }
 }

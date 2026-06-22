@@ -146,3 +146,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **What I did:** Built the READ trust boundary. PURE `lib/content/query-compiler.ts` — `compileQuery`/`compileCount` turn a `QuerySpec` (filters[] field:op:value, sort[], search, limit/offset, status, archived) into a SAFE PARAMETERIZED SELECT/COUNT over typed columns. Column NAMES whitelisted against registry fields + SYSTEM_COLUMNS (unknown → 400, never inlined/bound); ops whitelisted (eq/ne/lt/lte/gt/gte/like/in/is_null/not_null); EVERY value coerced via Slice-3 `coerceFieldValue` then `?`-bound; LIKE/search `%`-wrap the BOUND param; text search = LIKE over text-affinity fields (NO FTS5, USER DECISION); limit clamped [1,1000], offset ≥0 inlined as plain ints. Thin live store `db/query-store.ts` (`queryCollection` → `getCollection` + `contentSelect` for items + count → `{items,total,limit,offset}`). Route `app/api/collections/[name]/query/route.ts` (GET, Admin-gated, Next15 async params; parses repeatable ?filter/?sort + ?search/?limit/?offset/?status/?archived). 19 node tests assert fence-pass + placeholders===params + no value inlined + 400s for unknown col/op/dir/value/status.
 - **Verified:** `node --test` 67/67 (48 prior + 19 new); `npx tsc --noEmit` clean; `npx opennextjs-cloudflare build` green; query route present in `.next/server/app/api/collections/[name]/query/route.js`. Live D1 = HITL (compiler is node-tested with fakes). No user strings → no cms-bundle/i18n this slice.
 - **Files:** CMS/src/lib/content/query-compiler.ts, CMS/src/db/query-store.ts, CMS/src/app/api/collections/[name]/query/route.ts, CMS/scripts/query-compiler.test.mjs
+
+## 2026-06-22 13:28 — Slice 5: collections admin UI + rich item editor
+- **Status:** DONE
+- **What I did:** Built the NON-AI admin surface for collections under
+  `CMS/src/app/admin/collections/`. Index page lists collections + a schema editor
+  (create with a field-type picker over the Slice-1 `COLLECTION_FIELD_TYPES` vocab,
+  required toggle, comma-separated options for select/multiselect; delete behind an
+  in-app confirm modal). Detail page (`[name]` = content_<slug> table name) is a
+  per-collection item manager: item table, create/edit forms with the CORRECT input
+  per type, a text-search box + sort picker + live/archived/all filter wired to the
+  Slice-4 `GET .../[name]/query` route, archive/unarchive via `PATCH {_op}`, delete
+  + add-field (ADD-ONLY) via the existing routes. Reusable `field-input.tsx` renders
+  native date/datetime-local/time, number, select, bool checkbox, multiselect
+  checkbox-list, textarea for text/richtext (emits the Slice-3 coercion value
+  shapes; omits "" on create so column DEFAULTs apply). `confirm-modal.tsx` is a
+  plain in-app overlay — NO native confirm()/alert(). Added `collections` to
+  ADMIN_SECTIONS. FIRST slice with user strings → added the full EN/FI/ET
+  `collections` namespace + `adminNav.collections`/`desc.collections`, then regen'd
+  the PM `cms-bundle`.
+- **Verified:** `npx tsc --noEmit` 0 errors; `node --test` 67 content tests pass;
+  `npx opennextjs-cloudflare build` green with both new pages
+  (`/admin/collections`, `/admin/collections/[name]`) in the route manifest;
+  `npm run bundle:cms` regenerated `cms-bundle.generated.js` (7120 KB) and the new
+  strings ("New collection"/"Manage content") are present in it. Could NOT exercise
+  live CRUD — needs a real D1 binding (HITL); pages render an empty list / offline
+  notice without one.
+- **Files:** CMS/src/app/admin/collections/{page.tsx,[name]/page.tsx},
+  CMS/src/components/content/{collections-manager,collection-items,field-input,confirm-modal}.tsx,
+  CMS/src/components/admin-sections.ts, CMS/messages/{en,fi,et}.json,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js.

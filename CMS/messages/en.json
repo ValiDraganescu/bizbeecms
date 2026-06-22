@@ -288,9 +288,11 @@
       "components": "Export components as portable bundles, import them, or install starter kits.",
       "media": "Upload images to this site and reference them in components by URL.",
       "settings": "Content languages, theme color overrides, and brand & AI persona.",
-      "pageBuilder": "Compose pages visually from blocks and components."
+      "pageBuilder": "Compose pages visually from blocks and components.",
+      "collections": "Define typed data collections, fill them with content, and query them."
     },
-    "pageBuilder": "Page Builder"
+    "pageBuilder": "Page Builder",
+    "collections": "Collections"
   },
   "pageBuilder": {
     "title": "Page Builder",
@@ -467,5 +469,58 @@
       "busy": "Translating…",
       "empty": "Nothing to translate in the source language."
     }
+  },
+  "collections": {
+    "title": "Collections",
+    "subtitle": "Define typed data collections, manage their fields, and edit their content.",
+    "offline": "Connect a live database to manage this collection.",
+    "new": "New collection",
+    "newTitle": "New collection",
+    "empty": "No collections yet. Create your first one.",
+    "name": "Name",
+    "namePlaceholder": "e.g. Blog posts or Team members",
+    "fields": "Fields",
+    "fieldCount": "{count, plural, one {# field} other {# fields}}",
+    "addField": "Add field",
+    "removeField": "Remove field",
+    "fieldName": "Field name",
+    "fieldNamePlaceholder": "e.g. title",
+    "fieldType": "Type",
+    "fieldOptions": "Options",
+    "fieldOptionsPlaceholder": "comma,separated,values",
+    "required": "Required",
+    "create": "Create",
+    "manageItems": "Manage content",
+    "delete": "Delete",
+    "deleteOne": "Delete collection {name}",
+    "confirmDelete": "Delete collection “{name}” and all its data? This cannot be undone.",
+    "newItem": "New item",
+    "editItem": "Edit item",
+    "itemSlug": "Slug",
+    "itemStatus": "Status",
+    "status": {
+      "draft": "Draft",
+      "published": "Published"
+    },
+    "search": "Search",
+    "searchPlaceholder": "Search text fields…",
+    "sortBy": "Sort by",
+    "sortDefault": "Default order",
+    "sortNewest": "Newest first",
+    "sortOldest": "Oldest first",
+    "show": "Show",
+    "showLive": "Live",
+    "showArchived": "Archived",
+    "showAll": "All",
+    "itemCount": "{count, plural, one {# item} other {# items}}",
+    "noItems": "No items match.",
+    "archivedTag": "Archived",
+    "archive": "Archive",
+    "unarchive": "Restore",
+    "edit": "Edit",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "confirmDeleteItem": "Delete this item? This cannot be undone."
   }
 }

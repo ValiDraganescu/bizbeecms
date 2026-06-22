@@ -78,13 +78,23 @@ gates on CMS tsc + opennext build green + node tests + EN/FI/ET for new strings.
   route in manifest. Live D1 = HITL. No user strings (Slice 5 UI does cms-bundle +
   EN/FI/ET).
 
-- TODO: **Slice 5 — admin UI: manage collections + rich item editor.** Pages under
-  `app/admin/collections/`: list collections, create/edit schema (add fields with
-  type picker), and a per-collection item table with create/edit forms using the
-  CORRECT input per type (reuse the page-builder type-aware inputs: native
-  date/time, number, select, bool toggle, textarea/richtext). Filter/sort + a simple
-  text-search box (LIKE filter, Slice 4) wired up. Archive/delete behind in-app
-  confirm modal. Design-system + purpose tokens. EN/FI/ET. Gate.
+- DONE (2026-06-22): **Slice 5 — admin UI: manage collections + rich item editor.**
+  Pages `app/admin/collections/page.tsx` (list + schema editor) +
+  `app/admin/collections/[name]/page.tsx` (per-collection item manager; `[name]` =
+  content_<slug> table name). Client components under `components/content/`:
+  `collections-manager.tsx` (create w/ field-type picker over COLLECTION_FIELD_TYPES
+  + required + select/multiselect options; delete behind confirm modal),
+  `collection-items.tsx` (item table; create/edit forms with TYPE-AWARE inputs;
+  search box + sort picker + live/archived/all filter wired to GET .../[name]/query;
+  archive/unarchive via PATCH {_op}; delete + add-field PATCH .../[name]),
+  `field-input.tsx` (native date/datetime-local/time, number, select, bool checkbox,
+  multiselect checkbox list, textarea for text/richtext; emits Slice-3 value shapes),
+  `confirm-modal.tsx` (in-app modal, NO native confirm()). Added `collections` to
+  ADMIN_SECTIONS. FIRST slice with user strings → EN/FI/ET `collections` namespace +
+  `adminNav.collections`/`desc.collections` + `cms-bundle` regen (PM
+  src/lib/deploy/cms-bundle.generated.js). Gate: tsc 0, 67 content node tests,
+  opennext build green (both pages in manifest), bundle strings verified. Live D1 =
+  HITL (pages render empty/offline notice without a binding).
 
 - TODO: **Slice 6 — AI assistant collection tools (structured only).** Register in
   the existing pipeline (KNOWN_TOOL_NAMES + TOOLS_BY_CONTEXT + TOOL_BY_NAME):

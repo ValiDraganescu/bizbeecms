@@ -288,9 +288,11 @@
       "components": "Vie komponentteja siirrettävinä paketteina, tuo niitä tai asenna aloituspaketteja.",
       "media": "Lataa kuvia tälle sivustolle ja viittaa niihin komponenteissa URL-osoitteella.",
       "settings": "Sisältökielet, teeman väriasetukset sekä brändi ja tekoälypersoona.",
-      "pageBuilder": "Koosta sivuja visuaalisesti lohkoista ja komponenteista."
+      "pageBuilder": "Koosta sivuja visuaalisesti lohkoista ja komponenteista.",
+      "collections": "Määritä tyypitettyjä tietokokoelmia, täytä ne sisällöllä ja tee kyselyitä."
     },
-    "pageBuilder": "Sivurakentaja"
+    "pageBuilder": "Sivurakentaja",
+    "collections": "Kokoelmat"
   },
   "pageBuilder": {
     "title": "Sivurakentaja",
@@ -467,5 +469,58 @@
       "busy": "Käännetään…",
       "empty": "Lähdekielessä ei ole käännettävää."
     }
+  },
+  "collections": {
+    "title": "Kokoelmat",
+    "subtitle": "Määritä tyypitettyjä tietokokoelmia, hallitse niiden kenttiä ja muokkaa sisältöä.",
+    "offline": "Yhdistä tietokanta hallitaksesi tätä kokoelmaa.",
+    "new": "Uusi kokoelma",
+    "newTitle": "Uusi kokoelma",
+    "empty": "Ei vielä kokoelmia. Luo ensimmäinen.",
+    "name": "Nimi",
+    "namePlaceholder": "esim. Blogikirjoitukset tai Tiimin jäsenet",
+    "fields": "Kentät",
+    "fieldCount": "{count, plural, one {# kenttä} other {# kenttää}}",
+    "addField": "Lisää kenttä",
+    "removeField": "Poista kenttä",
+    "fieldName": "Kentän nimi",
+    "fieldNamePlaceholder": "esim. otsikko",
+    "fieldType": "Tyyppi",
+    "fieldOptions": "Vaihtoehdot",
+    "fieldOptionsPlaceholder": "pilkulla,erotetut,arvot",
+    "required": "Pakollinen",
+    "create": "Luo",
+    "manageItems": "Hallitse sisältöä",
+    "delete": "Poista",
+    "deleteOne": "Poista kokoelma {name}",
+    "confirmDelete": "Poistetaanko kokoelma ”{name}” ja kaikki sen tiedot? Tätä ei voi kumota.",
+    "newItem": "Uusi kohde",
+    "editItem": "Muokkaa kohdetta",
+    "itemSlug": "Tunnus",
+    "itemStatus": "Tila",
+    "status": {
+      "draft": "Luonnos",
+      "published": "Julkaistu"
+    },
+    "search": "Hae",
+    "searchPlaceholder": "Hae tekstikentistä…",
+    "sortBy": "Lajittele",
+    "sortDefault": "Oletusjärjestys",
+    "sortNewest": "Uusimmat ensin",
+    "sortOldest": "Vanhimmat ensin",
+    "show": "Näytä",
+    "showLive": "Aktiiviset",
+    "showArchived": "Arkistoidut",
+    "showAll": "Kaikki",
+    "itemCount": "{count, plural, one {# kohde} other {# kohdetta}}",
+    "noItems": "Ei osumia.",
+    "archivedTag": "Arkistoitu",
+    "archive": "Arkistoi",
+    "unarchive": "Palauta",
+    "edit": "Muokkaa",
+    "save": "Tallenna",
+    "saving": "Tallennetaan…",
+    "cancel": "Peruuta",
+    "confirmDeleteItem": "Poistetaanko tämä kohde? Tätä ei voi kumota."
   }
 }

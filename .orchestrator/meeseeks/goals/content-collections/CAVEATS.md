@@ -195,3 +195,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   name+type) BEFORE the generator sees it; the generator's strict `COLUMN_NAME_RE`
   + system-column guard are the trust boundary. Don't pass raw body objects into
   the DDL generator.
+
+- **(Slice 5) The CMS i18n catalogs live in `CMS/messages/{en,fi,et}.json`** (NOT in
+  src/), loaded by `src/i18n/request.ts`. The admin-nav label+desc for a new section
+  go under `adminNav.<key>` + `adminNav.desc.<key>`, AND the section must be added to
+  `src/components/admin-sections.ts` ADMIN_SECTIONS (it's a PLAIN module, not a client
+  component — see its header comment). Slice 5 added the whole `collections` namespace.
+- **(Slice 5) This was the FIRST content-collections slice with user strings** — so
+  the `cms-bundle` regen (`npm run bundle:cms` from ProjectManager/) was finally
+  needed here. Slices 2-4 added none. Any future slice that adds CMS UI strings MUST
+  regen the bundle or the deployed CMS ships stale copy.
+- **(Slice 5) Admin UI talks to the Slice 2-4 REST routes only — no new data path.**
+  Item create OMITS empty-string field values so column DEFAULTs apply; edit sends
+  all keys (PATCH semantics). multiselect round-trips as a JSON-array string (parse on
+  read for display + edit). `[name]` in the page route IS the content_<slug> table
+  name, same as the API. Reuse `field-input.tsx`/`confirm-modal.tsx` in Phase-2
+  binding UI (Slice C) rather than rebuilding inputs.
