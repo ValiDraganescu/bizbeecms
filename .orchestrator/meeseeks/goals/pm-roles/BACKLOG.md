@@ -51,7 +51,7 @@ tsc + opennext build green + PM node tests + EN/FI/ET for new strings.
   user-management UI in Slice 5 consumes this list for the Manager tag picker, and
   the Site detail page gets a tag picker too — note that as part of Slice 5/site UI.)
 
-- TODO: **Slice 4 — global User-Management API.** NEW REST under
+- DONE (2026-06-22): **Slice 4 — global User-Management API.** NEW REST under
   `app/api/users/*`: `GET` list all users (with role, countries, tags — scoped to
   what the actor may see), `PATCH /api/users/[id]` to change role + set
   countries + set tags (Admins set a Manager's countries/tags), `DELETE

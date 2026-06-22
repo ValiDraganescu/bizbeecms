@@ -96,3 +96,77 @@ export async function getUserTagIds(userId: string): Promise<string[]> {
     .where(eq(schema.userTags.userId, userId));
   return rows.map((r) => r.tagId);
 }
+
+/** Replace a user's country scope with `countries` (delete-all + insert). */
+export async function setUserCountries(
+  userId: string,
+  countries: CountryCode[],
+): Promise<void> {
+  const db = await getDb();
+  await db.delete(schema.userCountries).where(eq(schema.userCountries.userId, userId));
+  if (countries.length > 0) {
+    await db
+      .insert(schema.userCountries)
+      .values(countries.map((country) => ({ userId, country })));
+  }
+}
+
+/** Replace a user's tag scope with `tagIds` (delete-all + insert). */
+export async function setUserTags(userId: string, tagIds: string[]): Promise<void> {
+  const db = await getDb();
+  await db.delete(schema.userTags).where(eq(schema.userTags.userId, userId));
+  if (tagIds.length > 0) {
+    await db.insert(schema.userTags).values(tagIds.map((tagId) => ({ userId, tagId })));
+  }
+}
+
+/** Change a user's role. Returns the updated row, or null if no such user. */
+export async function setUserRole(userId: string, role: Role): Promise<User | null> {
+  const db = await getDb();
+  const [user] = await db
+    .update(schema.users)
+    .set({ role })
+    .where(eq(schema.users.id, userId))
+    .returning();
+  return user ?? null;
+}
+
+/** Delete a user (cascades countries/tags/site assignments). False if missing. */
+export async function deleteUser(userId: string): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db
+    .delete(schema.users)
+    .where(eq(schema.users.id, userId))
+    .returning({ id: schema.users.id });
+  return rows.length > 0;
+}
+
+export type UserWithScope = {
+  id: string;
+  email: string;
+  role: Role;
+  canInvite: boolean;
+  createdAt: User["createdAt"];
+  countries: CountryCode[];
+  tagIds: string[];
+};
+
+/** All users with their country + tag scope, oldest first. */
+export async function listUsersWithScope(): Promise<UserWithScope[]> {
+  const db = await getDb();
+  const rows = await db.select().from(schema.users);
+  // ponytail: N+1 over users is fine at PM's user counts; batch if it ever grows.
+  return Promise.all(
+    rows
+      .sort((a, b) => Number(a.createdAt) - Number(b.createdAt))
+      .map(async (u) => ({
+        id: u.id,
+        email: u.email,
+        role: u.role,
+        canInvite: u.canInvite,
+        createdAt: u.createdAt,
+        countries: await getUserCountries(u.id),
+        tagIds: await getUserTagIds(u.id),
+      })),
+  );
+}

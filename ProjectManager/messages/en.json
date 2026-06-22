@@ -52,6 +52,16 @@
     "manager": "Manager",
     "editor": "Editor"
   },
+  "users": {
+    "errors": {
+      "notAllowed": "You don't have permission to manage this user.",
+      "notFound": "That user no longer exists.",
+      "roleNotAllowed": "That role can't be assigned.",
+      "countryNotAllowed": "You can only assign countries within your own scope.",
+      "tagNotAllowed": "You can only assign tags within your own scope.",
+      "unknown": "Something went wrong. Please try again."
+    }
+  },
   "tags": {
     "navLink": "Tags",
     "back": "Back",

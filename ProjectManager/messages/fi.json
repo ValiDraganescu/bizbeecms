@@ -52,6 +52,16 @@
     "manager": "Päällikkö",
     "editor": "Toimittaja"
   },
+  "users": {
+    "errors": {
+      "notAllowed": "Sinulla ei ole oikeutta hallita tätä käyttäjää.",
+      "notFound": "Käyttäjää ei enää ole olemassa.",
+      "roleNotAllowed": "Tätä roolia ei voi määrittää.",
+      "countryNotAllowed": "Voit määrittää vain oman laajuutesi maita.",
+      "tagNotAllowed": "Voit määrittää vain oman laajuutesi tunnisteita.",
+      "unknown": "Jotain meni pieleen. Yritä uudelleen."
+    }
+  },
   "tags": {
     "navLink": "Tunnisteet",
     "back": "Takaisin",

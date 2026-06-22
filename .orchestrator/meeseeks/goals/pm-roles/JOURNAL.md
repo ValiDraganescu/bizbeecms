@@ -122,3 +122,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `ProjectManager/src/app/(app)/tags/tags-manager.tsx` (new),
   `ProjectManager/src/components/nav/app-nav.tsx`,
   `ProjectManager/messages/{en,fi,et}.json`.
+
+## 2026-06-22 12:49 — Slice 4: global User-Management API
+- **Status:** DONE
+- **What I did:** NEW REST `app/api/users/*` (Admin+ gated). `GET /api/users`
+  lists every user with role+countries+tags (`listUsersWithScope`). `PATCH
+  /api/users/[id]` changes role + sets countries + tags, enforcing BOTH gates:
+  tier (`canChangeRole` from removal.ts — blocks self-edit, peer/superior re-role,
+  elevation to/above own tier) AND the NEW subset rule (`authorizeAssign` in
+  pure alias-free `lib/auth/manage-users.ts` — a scoped actor may grant only
+  countries/tags within its own scope; global actors grant anything). `DELETE
+  /api/users/[id]` enforces `canRemoveUser` (tier only). Next15 async-params
+  shape copied from `app/api/tags/[id]`. Added DB helpers to `lib/auth/user.ts`:
+  `setUserCountries`, `setUserTags`, `setUserRole`, `deleteUser`,
+  `listUsersWithScope`. Added `users.errors` namespace EN/FI/ET (Slice 5 UI will
+  consume). Pure subset rule node-tested (`manage-users.test.ts`, 5 tests).
+- **Verified:** PM `npm test` 108 pass (was 103, +5), `tsc --noEmit` exit 0,
+  `npx opennextjs-cloudflare build` green with `/api/users` + `/api/users/[id]`
+  in the route tree (dev confirmed off on 3601 before build). Did NOT exercise
+  routes against a live D1 (no running PM) — authz wiring is the node-tested part;
+  the route handler glue is type-checked + build-verified only.
+- **Files:** `ProjectManager/src/lib/auth/manage-users.ts` (new),
+  `ProjectManager/src/lib/auth/manage-users.test.ts` (new),
+  `ProjectManager/src/lib/auth/user.ts`,
+  `ProjectManager/src/app/api/users/route.ts` (new),
+  `ProjectManager/src/app/api/users/[id]/route.ts` (new),
+  `ProjectManager/messages/{en,fi,et}.json`.

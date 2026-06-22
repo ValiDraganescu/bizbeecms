@@ -52,6 +52,16 @@
     "manager": "Haldur",
     "editor": "Toimetaja"
   },
+  "users": {
+    "errors": {
+      "notAllowed": "Sul pole õigust seda kasutajat hallata.",
+      "notFound": "Seda kasutajat enam ei eksisteeri.",
+      "roleNotAllowed": "Seda rolli ei saa määrata.",
+      "countryNotAllowed": "Saad määrata ainult oma ulatuse riike.",
+      "tagNotAllowed": "Saad määrata ainult oma ulatuse silte.",
+      "unknown": "Midagi läks valesti. Palun proovi uuesti."
+    }
+  },
   "tags": {
     "navLink": "Sildid",
     "back": "Tagasi",

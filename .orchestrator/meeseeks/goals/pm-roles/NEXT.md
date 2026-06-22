@@ -1,32 +1,35 @@
 # Note to the next Meeseeks (pm-roles)
 
-Slices 1 (role enum + migration), 2 (removal hierarchy), 3 (tags data model +
-Manager country-AND-tag reach), and 3b (tag CRUD API+UI) are all DONE.
+Slices 1 (role enum + migration), 2 (removal hierarchy), 3 (tags model +
+Manager country-AND-tag reach), 3b (tag CRUD API+UI), and 4 (user-management
+API) are all DONE.
 
-Slice 3b delivered: `lib/tags/tags.ts` (DB CRUD), `lib/tags/validate.ts`
-(pure `parseTagLabel`, alias-free, tested), REST `app/api/tags/route.ts`
-(GET+POST) + `app/api/tags/[id]/route.ts` (PATCH+DELETE) all Admin+ gated
-(`canManageTags` = SuperAdmin|Admin), and UI `app/(app)/tags/` (page +
-`tags-manager.tsx` with inline rename + an in-app delete confirm modal). Nav
-`/tags` link shown only to Admin+. EN/FI/ET `tags.*` namespace. tsc + 103 tests
-+ opennext build green; `/tags` in the route list. The managed vocabulary is
-now CRUD-able, which unblocks the tag pickers in Slice 4/5.
+Slice 4 delivered:
+- `GET /api/users` — list every user w/ role+countries+tags (`listUsersWithScope`),
+  Admin+ gated.
+- `PATCH /api/users/[id]` — change role + set countries + set tags. Enforces BOTH
+  `canChangeRole` (tier, removal.ts) AND `authorizeAssign` (subset rule, NEW pure
+  `lib/auth/manage-users.ts`). Role omitted = keep current (still needs to outrank).
+- `DELETE /api/users/[id]` — `canRemoveUser` (tier). Cascades scope rows.
+- New DB helpers in `lib/auth/user.ts`: setUserCountries/setUserTags/setUserRole/
+  deleteUser/listUsersWithScope.
+- `users.errors` namespace EN/FI/ET (for the Slice 5 UI to surface 403/400 keys).
+- Gate: tsc 0, npm test 108 (was 103), opennext build green w/ both routes.
 
-PICK NEXT: **Slice 4 — global User-Management API** under `app/api/users/*`:
-- `GET` list users (role, countries, tags — scoped to what the actor may see).
-- `PATCH /api/users/[id]` to change role + set countries + set tags. MUST call
-  BOTH `canChangeRole` (lib/auth/removal.ts) AND scope — and a Manager may only
-  assign countries/tags within its OWN scope (mirror `authorizeInvite`'s subset rule).
-- `DELETE /api/users/[id]` to remove a user — MUST call `canRemoveUser`
-  (lib/auth/removal.ts) AND scope.
-- Pass REAL tag ids: `getUserTagIds` (lib/auth/user.ts) for the actor + the
-  target; use scope.ts `canManageSite` with the real ids when reach matters.
-- Use the Next 15 async-params route shape (see `app/api/tags/[id]/route.ts`):
-  `{ params }: { params: Promise<{ id: string }> }` then `await params`.
-- Node tests for each route's authz (forbidden + allowed). EN/FI/ET. Gate
-  (tsc + npm test + opennext build, NOT while dev on 3601 is up).
+PICK NEXT: **Slice 5 — global User-Management UI** at `app/(app)/users/`:
+- Users table (email, role, countries, tags) from `GET /api/users`.
+- Inline role change (select over the 4 roles), a countries picker (reuse the
+  invite/site country picker) + a TAG multiselect from the managed `tags` list
+  (`GET /api/tags`), wired to `PATCH /api/users/[id]`.
+- Remove action behind an IN-APP confirm modal (NEVER window.confirm) — consider
+  promoting `tags-manager.tsx`'s `ConfirmDeleteModal` into `components/ui` rather
+  than copy-pasting a third time (see CAVEATS).
+- HIDE/disable actions the API would 403 (you can compute tier client-side from
+  removal.ts's rank, but the server is the real gate). Show `/users` nav link to
+  Admin+ only (mirror the `/tags` link gating in `components/nav/app-nav.tsx`).
+- Reuse design-system + purpose tokens. EN/FI/ET for all chrome (extend the
+  `users` namespace — only `users.errors` exists so far). Gate (tsc + npm test +
+  opennext build, NOT while dev on 3601 is up).
 
-After 4: Slice 5 (global User-Management UI — reuse the tags page's confirm-modal
-+ design tokens; add a tag multiselect from the managed list), then Slice 6 (extend
-invite to Manager/Editor + tags). PARALLEL-SAFETY: stay OUT of CMS/ and don't run
-bundle:cms — another worker owns it.
+After 5: Slice 6 (extend invite to Manager/Editor + tags). PARALLEL-SAFETY:
+stay OUT of CMS/ and don't run bundle:cms — another worker owns it.

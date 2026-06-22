@@ -118,6 +118,25 @@ Read every line before working. Each entry was learned the hard way by a previou
   solid danger button; for a ghost-danger (inline destructive action) use
   `variant="ghost" className="text-danger hover:bg-danger/10"`. Slice 5's remove-user button
   should follow this.
+- **Slice 4 done — user-mgmt API at `app/api/users/*` + the SUBSET rule in
+  `lib/auth/manage-users.ts` (pure, alias-free, tested).** `authorizeAssign(actor,
+  countries, tagIds)` is the single source of truth for "may the actor GRANT these
+  countries/tags?" — global actors (SuperAdmin or country-empty Admin) grant
+  anything; a scoped actor must grant a non-empty subset of its OWN countries AND
+  only tags it itself holds. PATCH calls BOTH `authorizeAssign` (subset) AND
+  `canChangeRole` (tier) — they're orthogonal, don't fold them. DELETE calls only
+  `canRemoveUser` (tier). Slice 5's UI must hide actions the API would 403.
+- **PATCH role defaults to the target's CURRENT role when `body.role` is omitted**
+  so a countries/tags-only edit still passes through `canChangeRole` (which requires
+  the actor to outrank the target even for a no-op role) — that's intentional: you
+  must outrank someone to touch their scope at all. If Slice 5 wants "edit my own
+  tags", that's a DIFFERENT path (self-edit is blocked here by the id check).
+- **`setUserCountries`/`setUserTags`/`setUserRole`/`deleteUser`/`listUsersWithScope`
+  are the new DB helpers in `lib/auth/user.ts`.** set* are delete-all+insert (full
+  replace, not merge). `listUsersWithScope` is N+1 over users (ponytail-marked) —
+  fine at PM scale; batch if user counts ever explode. These import `@/db` so they
+  are NOT bare-node-testable — that's why the subset RULE lives in the alias-free
+  `manage-users.ts` and the routes are gated by tsc+build only, not a route test.
 - **The delete confirm modal is hand-rolled in `tags-manager.tsx` (`ConfirmDeleteModal`).**
   There's NO shared Modal/Dialog component in `components/ui` yet. If Slice 5 needs another
   confirm modal, consider promoting this overlay-dialog pattern (fixed inset bg-black/50,
