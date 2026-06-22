@@ -4,6 +4,7 @@ import {
   Alert,
   AlertBody,
   AlertTitle,
+  Badge,
   Card,
   CardContent,
   CardDescription,
@@ -21,6 +22,8 @@ import { canUserCreateSite } from "@/lib/site/authz";
 import { listSitesForUser } from "@/lib/site/site";
 import { cmsWorkerUrl } from "@/lib/deploy/worker-url";
 import { displayCmsVersion } from "@/lib/deploy/cms-version";
+import { isUpdateAvailable } from "@/lib/deploy/cms-releases";
+import { fetchCmsReleases } from "@/lib/deploy/cms-releases-server";
 import { SiteForm } from "./site-form";
 import { DeployStatusBadge } from "./deploy-status-badge";
 
@@ -37,6 +40,11 @@ export default async function SitesPage() {
   const canCreate = canUserCreateSite(user);
   const actorCountries = canCreate ? await getUserCountries(user.id) : [];
   const sites = await listSitesForUser(user);
+
+  // Slice 6: fetch the release list ONCE (no N+1) so we can flag sites running
+  // an older CMS than the latest tag. Empty/unreachable → no badges anywhere.
+  const releases = await fetchCmsReleases();
+  const latestVersion = releases[0]?.version ?? null;
 
   // Public CMS URL per deployed Site (derived from APP_ORIGIN), for the Open link.
   const urls = new Map<string, string>();
@@ -140,8 +148,15 @@ export default async function SitesPage() {
                     </TableCell>
                     <TableCell>
                       {displayCmsVersion(site.deployedCmsVersion) ? (
-                        <span className="font-mono text-xs tabular-nums">
-                          {displayCmsVersion(site.deployedCmsVersion)}
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="font-mono text-xs tabular-nums">
+                            {displayCmsVersion(site.deployedCmsVersion)}
+                          </span>
+                          {isUpdateAvailable(site.deployedCmsVersion, latestVersion) ? (
+                            <Badge tone="warning" dot title={t("list.cmsUpdateAvailable")}>
+                              {t("list.cmsUpdateAvailable")}
+                            </Badge>
+                          ) : null}
                         </span>
                       ) : (
                         <span className="text-xs text-foreground-muted">

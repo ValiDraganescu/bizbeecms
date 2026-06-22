@@ -117,3 +117,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** ProjectManager/src/lib/deploy/cms-releases.ts(+test),
   src/app/api/cms-releases/{tags,release-notes}/route.ts,
   src/app/(app)/sites/deploy-form.tsx, messages/{en,fi,et}.json
+
+## 2026-06-22 — Slice 6: "update available" indicator in the site list
+- **Status:** DONE
+- **What I did:** Flag sites running an older CMS than the latest release.
+  - Pure helper `isUpdateAvailable(stored, latestVersion)` in
+    `lib/deploy/cms-releases.ts` — reuses `parseCmsTag`; true ONLY when both known
+    AND `stored` is a `cms-v<x.y.z>` strictly older than `latestVersion` (semver
+    cmp, not lexical). Degrades to false (no badge) for null/never-deployed, `main`
+    /non-tag refs, and empty tag list. +3 node tests (older→true, up-to-date/newer
+    →false, all graceful cases →false).
+  - New server helper `lib/deploy/cms-releases-server.ts` `fetchCmsReleases()` —
+    fetches deployer `/tags` ONCE (Bearer DEPLOYER_SECRET server-side), normalises;
+    `[]` on any failure/missing config. Site list page calls it once →
+    `latestVersion = releases[0]?.version ?? null` (NO N+1, NO self-HTTP).
+  - `sites/page.tsx` CMS-version cell now renders a `<Badge tone="warning" dot>` with
+    `list.cmsUpdateAvailable` next to the version when `isUpdateAvailable`. Dot = not
+    color-only. EN/FI/ET `sites.list.cmsUpdateAvailable`.
+- **Verified:** `npm test` 130 (was 127, +3); `npx tsc --noEmit` 0; `npx
+  opennextjs-cloudflare build` green (3601 free). NOT live-verified — `/tags` reads
+  the REMOTE and `cms-v0.6.0` is still LOCAL-only, so the badge won't appear until a
+  tag is pushed AND a site is deployed from an older one.
+- **Files:** ProjectManager/src/lib/deploy/cms-releases.ts(+test),
+  src/lib/deploy/cms-releases-server.ts, src/app/(app)/sites/page.tsx,
+  messages/{en,fi,et}.json

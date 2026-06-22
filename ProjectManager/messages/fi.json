@@ -284,6 +284,7 @@
       "status": "Tila",
       "cmsVersion": "CMS-versio",
       "cmsVersionNone": "Ei julkaistu",
+      "cmsUpdateAvailable": "Päivitys saatavilla",
       "global": "Globaali",
       "view": "Näytä",
       "open": "Avaa"

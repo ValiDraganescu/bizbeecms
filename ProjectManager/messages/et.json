@@ -284,6 +284,7 @@
       "status": "Olek",
       "cmsVersion": "CMS-i versioon",
       "cmsVersionNone": "Pole avaldatud",
+      "cmsUpdateAvailable": "Uuendus saadaval",
       "global": "Globaalne",
       "view": "Vaata",
       "open": "Ava"

@@ -117,3 +117,20 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **Release-notes modal renders RAW markdown in a `<pre>`** (no md lib — ponytail).
   If rich rendering is ever wanted, add react-markdown in `ReleaseNotesModal` in
   deploy-form.tsx; the route already serves the markdown string.
+
+- **Cross-module imports in `src/lib/**` need the `.ts` extension** (Slice 6 pain).
+  `npm test` is `node --test 'src/lib/**/*.test.ts'` — Node's native TS resolver does
+  NOT add `.ts` for relative imports. When a `lib/` source file imports a sibling lib
+  module that a test then loads (e.g. `cms-releases.ts` → `import {parseCmsTag} from
+  "./cms-version.ts"`), the extension is REQUIRED or the whole test file ERR_MODULE_
+  NOT_FOUNDs. tsconfig has `allowImportingTsExtensions:true` + `bundler` resolution so
+  tsc + opennext build are happy with `.ts`. (App-tree files like route.ts use the
+  `@/` alias and don't hit this.)
+- **Slice 6 DONE — "update available" badge in the site list.** Pure
+  `isUpdateAvailable(stored, latestVersion)` (`lib/deploy/cms-releases.ts`): true ONLY
+  when `stored` parses to a `cms-v<x.y.z>` strictly OLDER than `latestVersion`
+  (semver). Null/`main`/empty-tags → false (graceful no-badge). `fetchCmsReleases()`
+  (`lib/deploy/cms-releases-server.ts`) is the server-only single-fetch of deployer
+  `/tags` — REUSE it instead of self-HTTPing the proxy route; list page passes
+  `releases[0]?.version` as latest (no N+1). Badge is `<Badge tone="warning" dot>` so
+  meaning isn't color-only. STILL won't show live until a tag is PUSHED.

@@ -284,6 +284,7 @@
       "status": "Status",
       "cmsVersion": "CMS version",
       "cmsVersionNone": "Not deployed",
+      "cmsUpdateAvailable": "Update available",
       "global": "Global",
       "view": "View",
       "open": "Open"

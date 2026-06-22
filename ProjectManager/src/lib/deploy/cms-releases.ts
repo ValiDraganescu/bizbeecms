@@ -7,6 +7,8 @@
  * never renders junk refs. No Cloudflare/db deps → node-testable.
  */
 
+import { parseCmsTag } from "./cms-version.ts";
+
 export type CmsRelease = { version: string; tag: string };
 
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
@@ -59,4 +61,29 @@ export function normalizeReleases(payload: unknown): CmsRelease[] {
 /** The `cms-v<x.y.z>` ref to deploy for a chosen bare version. */
 export function refForVersion(version: string): string {
   return `cms-v${version}`;
+}
+
+/**
+ * Slice 6 — is a newer CMS release available than what a site runs?
+ *
+ * `stored` is the site's `deployedCmsVersion` (e.g. `cms-v0.6.0`, `main`, or
+ * null/undefined). `latestVersion` is the bare semver of the newest release
+ * (`releases[0].version` from `normalizeReleases`, or null when none exist).
+ *
+ * Returns true only when both are known AND `stored` parses to a `cms-v<x.y.z>`
+ * tag strictly OLDER than `latestVersion`. Degrades to false (no badge) for:
+ * never-deployed sites (null), non-tag refs like `main` (can't compare), and an
+ * empty tag list (latestVersion null) — exactly the graceful cases the task asks
+ * for.
+ */
+export function isUpdateAvailable(
+  stored: string | null | undefined,
+  latestVersion: string | null | undefined,
+): boolean {
+  if (!stored || !latestVersion) return false;
+  if (!SEMVER_RE.test(latestVersion)) return false;
+  const current = parseCmsTag(stored);
+  if (!current) return false; // `main` / junk → not comparable
+  // cmpSemverDesc < 0 means `current` is newer than `latest`; > 0 means older.
+  return cmpSemverDesc(current, latestVersion) > 0;
 }

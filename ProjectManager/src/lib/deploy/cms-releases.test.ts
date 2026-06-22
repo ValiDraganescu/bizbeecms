@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeReleases, refForVersion } from "./cms-releases.ts";
+import { normalizeReleases, refForVersion, isUpdateAvailable } from "./cms-releases.ts";
 
 test("normalizeReleases keeps valid cms-v releases", () => {
   assert.deepEqual(
@@ -58,4 +58,23 @@ test("normalizeReleases is empty for malformed payloads", () => {
 test("refForVersion builds the cms-v tag", () => {
   assert.equal(refForVersion("0.6.0"), "cms-v0.6.0");
   assert.equal(refForVersion("12.3.45"), "cms-v12.3.45");
+});
+
+test("isUpdateAvailable flags an older deployed tag", () => {
+  assert.equal(isUpdateAvailable("cms-v0.6.0", "1.2.3"), true);
+  assert.equal(isUpdateAvailable("cms-v0.9.0", "0.10.0"), true); // semver, not lexical
+});
+
+test("isUpdateAvailable is false when up-to-date or newer", () => {
+  assert.equal(isUpdateAvailable("cms-v1.2.3", "1.2.3"), false);
+  assert.equal(isUpdateAvailable("cms-v2.0.0", "1.2.3"), false); // somehow newer → no badge
+});
+
+test("isUpdateAvailable degrades gracefully to false", () => {
+  assert.equal(isUpdateAvailable(null, "1.2.3"), false); // never deployed
+  assert.equal(isUpdateAvailable(undefined, "1.2.3"), false);
+  assert.equal(isUpdateAvailable("main", "1.2.3"), false); // non-tag ref, not comparable
+  assert.equal(isUpdateAvailable("cms-v0.6.0", null), false); // empty tag list
+  assert.equal(isUpdateAvailable("cms-v0.6.0", undefined), false);
+  assert.equal(isUpdateAvailable("cms-v0.6.0", "main"), false); // junk latest
 });

@@ -64,6 +64,11 @@ green; EN/FI/ET for new PM strings).
   modal (Escape/backdrop close, raw md in `<pre>`); POSTs `{ref:"cms-v<ver>"}`. tsc 0,
   127 tests, opennext build green. Live-verify waits on `cms-v0.6.0` being PUSHED.)
 
-- TODO (optional, later) — **upgrade indicator.** In the site list, flag sites whose
-  `deployedCmsVersion` < the latest `cms-v*` tag ("update available"). Small,
-  additive; only if useful after 1-5.
+- DONE: **Slice 6 — "update available" indicator.** Site list flags sites whose
+  `deployedCmsVersion` < the latest `cms-v*` tag. Pure
+  `isUpdateAvailable(stored, latest)` in `lib/deploy/cms-releases.ts` (semver cmp;
+  graceful null/`main`/empty-tags → false; +3 node tests); `fetchCmsReleases()` in
+  `lib/deploy/cms-releases-server.ts` fetches `/tags` ONCE (no N+1, secret
+  server-side); `sites/page.tsx` renders a `<Badge tone="warning" dot>`
+  `list.cmsUpdateAvailable` (EN/FI/ET). 130 tests, tsc 0, opennext build green.
+  Live-verify waits on a pushed tag + a site deployed from an older version.
