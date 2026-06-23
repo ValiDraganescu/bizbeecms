@@ -166,6 +166,12 @@
       "invalidCredentials": "Väärä sähköposti tai salasana.",
       "registrationClosed": "Rekisteröityminen on suljettu — ylläpitäjä on jo olemassa.",
       "unknown": "Jokin meni pieleen. Yritä uudelleen."
+    },
+    "forgot": {
+      "email": {
+        "subject": "Nollaa bizbeecms ProjectManager -salasanasi",
+        "body": "Saimme pyynnön nollata bizbeecms ProjectManager -salasanasi. Aseta uusi salasana täällä:\n\n{url}\n\nTämä linkki vanhenee 7 päivässä. Jos et tehnyt tätä pyyntöä, voit jättää tämän sähköpostin huomiotta."
+      }
     }
   },
   "invites": {

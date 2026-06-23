@@ -166,6 +166,12 @@
       "invalidCredentials": "Vale e-post või parool.",
       "registrationClosed": "Registreerimine on suletud — administraator on juba olemas.",
       "unknown": "Midagi läks valesti. Palun proovi uuesti."
+    },
+    "forgot": {
+      "email": {
+        "subject": "Lähtesta oma bizbeecms ProjectManageri parool",
+        "body": "Saime taotluse lähtestada sinu bizbeecms ProjectManageri parool. Määra uus parool siin:\n\n{url}\n\nSee link aegub 7 päevaga. Kui sa seda ei taotlenud, võid selle e-kirja eirata."
+      }
     }
   },
   "invites": {

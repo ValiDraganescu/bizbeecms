@@ -166,6 +166,12 @@
       "invalidCredentials": "Incorrect email or password.",
       "registrationClosed": "Registration is closed — an administrator already exists.",
       "unknown": "Something went wrong. Please try again."
+    },
+    "forgot": {
+      "email": {
+        "subject": "Reset your bizbeecms ProjectManager password",
+        "body": "We received a request to reset your bizbeecms ProjectManager password. Set a new password here:\n\n{url}\n\nThis link expires in 7 days. If you didn't request this, you can ignore this email."
+      }
     }
   },
   "invites": {

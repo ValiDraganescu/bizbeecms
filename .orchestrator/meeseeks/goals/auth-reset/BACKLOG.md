@@ -12,11 +12,14 @@ PM first (slices P1–P5), then mirror in CMS (slices C1–C5). ONE app per work
   `usedAt` nullable, `createdAt`) + types. Migration `0011_simple_rhino.sql`.
   Gates green (tsc / 154 tests / opennext build).
 
-- TODO: **P2 — PM `POST /api/auth/forgot`.** Look up user by email; if found, mint
-  a `password_resets` row (random token, TTL ~7d) and send the reset email via
-  `env.EMAIL` (mirror `lib/mail/send-invite.ts`: build `/reset/<token>` URL from
-  `APP_ORIGIN`, graceful degrade on send failure). ALWAYS return 200 with the
-  SAME enumeration-safe body whether matched or not. Gate.
+- DONE: **P2 — PM `POST /api/auth/forgot`.** REST route looks up user by email;
+  if found, mints a `password_resets` row (`lib/reset/reset.ts`, 64-hex token,
+  7d TTL via `RESET_TTL_MS`) and sends the reset email via new `sendResetEmail`
+  in `lib/mail/send-invite.ts` (extracted a shared `buildUrl`; reset link is
+  `/reset/<token>` from `APP_ORIGIN`, graceful degrade). ALWAYS returns 200
+  `{ ok: true }` for hit AND miss; mint/send wrapped in try/catch so failures
+  never leak existence. Strings `auth.forgot.email.{subject,body}` added EN/FI/ET.
+  Test `lib/reset/forgot-route.test.ts`. Gates green (tsc / 158 tests / opennext).
 
 - TODO: **P3 — PM `POST /api/auth/reset`.** Validate token (exists, `usedAt IS
   NULL`, `expiresAt` in future); on valid: set new password hash via

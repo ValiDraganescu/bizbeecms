@@ -1,18 +1,24 @@
 # Note to the next Meeseeks (auth-reset)
 
-P1 is DONE: PM `password_resets` table + migration `0011_simple_rhino.sql` are
-in. Schema exports `passwordResets` table + `PasswordReset`/`NewPasswordReset`
-types (mirrors `invites`). Migration NOT yet applied to D1 (apply happens at
-deploy via `db:migrate` / on next deploy — not our job here).
+P1 + P2 DONE. PM has the `password_resets` table (migration `0011`) and a working
+enumeration-safe `POST /api/auth/forgot` that mints a token (`lib/reset/reset.ts`,
+64-hex, 7d `RESET_TTL_MS`) and emails a `/reset/<token>` link via `sendResetEmail`
+(`lib/mail/send-invite.ts`). Always returns 200 `{ ok: true }`, hit or miss.
 
-**Take P2 — PM `POST /api/auth/forgot`.** Look up user by email; if found, mint a
-`password_resets` row (random token, TTL ~7d) and send the reset email via
-`env.EMAIL` (mirror `ProjectManager/src/lib/mail/send-invite.ts`: build
-`/reset/<token>` URL from `APP_ORIGIN`, graceful degrade on send failure). ALWAYS
-return 200 with the SAME enumeration-safe body whether matched or not.
+**Take P3 — PM `POST /api/auth/reset`.** Validate the token: exists, `usedAt IS
+NULL`, `expiresAt` in the future. On valid: set the new password hash via
+`lib/auth/password.ts` (`hashPassword`; PBKDF2 100k — do NOT bump), enforce
+min-length = `MIN_PASSWORD_LENGTH` (10, from `lib/auth/validation.ts`), set
+`usedAt = now`, and INVALIDATE the user's sessions in KV (`lib/auth/session.ts` —
+read how sessions key off userId first; may need a session index or delete-all).
+Reject invalid/expired/used with a single generic error (no detail leak). Add a
+token-classify helper to `lib/reset/reset.ts` (mirror invite's `checkInvite`).
+Any new strings (e.g. reset-success/invalid-token messages) need EN/FI/ET.
 
-Reminders: PM only this run (ProjectManager/, never CMS/, never bundle:cms). Use
-`lib/auth/password.ts` + `lib/auth/session.ts` shapes. REST route handler, no
-server action. Any new strings need EN/FI/ET (P4 has the pages, but if forgot
-returns a message key add all 3 locales). Gate: tsc + node tests + opennext
-build; never while dev (3601) is up — `lsof -ti:3601,3602` first.
+Reminders: PM only this run (`ProjectManager/`, never `CMS/`, never `bundle:cms`).
+REST route handler, no server action. Gate: tsc + `npm test` + opennext build;
+NEVER while dev is up — `lsof -ti:3601,3602` first.
+
+Pattern notes for P3: the forgot route + `lib/reset/reset.ts` are the templates.
+Tests use source-text assertions because the `@/` alias isn't resolvable under
+`node --test` (see `lib/reset/forgot-route.test.ts`).

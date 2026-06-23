@@ -45,13 +45,13 @@ export type SendInviteResult = {
  * Cloudflare var/secret. Only in local development do we fall back to the
  * request host (there it isn't a trust boundary, and it keeps dev frictionless).
  */
-async function buildAcceptUrl(
+async function buildUrl(
   env: Record<string, unknown>,
-  token: string,
+  path: string,
 ): Promise<string> {
   const configured = typeof env.APP_ORIGIN === "string" ? env.APP_ORIGIN : "";
   if (configured) {
-    return `${configured.replace(/\/+$/, "")}/invite/accept/${token}`;
+    return `${configured.replace(/\/+$/, "")}${path}`;
   }
 
   // No trusted origin configured. Allow the request host ONLY in development.
@@ -59,13 +59,20 @@ async function buildAcceptUrl(
     const h = await headers();
     const host = h.get("host") ?? "localhost:3601";
     const proto = h.get("x-forwarded-proto") ?? "http";
-    return `${proto}://${host}/invite/accept/${token}`;
+    return `${proto}://${host}${path}`;
   }
 
   // In production we refuse to guess the origin from headers.
   throw new Error(
-    "APP_ORIGIN is not configured; cannot build a trusted invite link.",
+    "APP_ORIGIN is not configured; cannot build a trusted link.",
   );
+}
+
+async function buildAcceptUrl(
+  env: Record<string, unknown>,
+  token: string,
+): Promise<string> {
+  return buildUrl(env, `/invite/accept/${token}`);
 }
 
 export async function sendInviteEmail(params: {
@@ -100,5 +107,44 @@ export async function sendInviteEmail(params: {
     // UI can show it. Surface the failure in logs.
     console.error(`[invite] EMAIL.send failed for ${params.to}:`, err);
     return { acceptUrl, delivered: false };
+  }
+}
+
+/**
+ * Send a password-reset email with a tokenized `/reset/<token>` link.
+ *
+ * Mirrors sendInviteEmail's graceful degrade: if the binding is missing or
+ * send() throws we log and return `delivered:false` — the caller MUST NOT let
+ * that change the user-facing response (enumeration-safe: always the same body).
+ */
+export async function sendResetEmail(params: {
+  to: string;
+  token: string;
+  subject: string;
+  body: (resetUrl: string) => string;
+}): Promise<{ resetUrl: string; delivered: boolean }> {
+  const { env } = await getCloudflareContext({ async: true });
+  const resetUrl = await buildUrl(
+    env as unknown as Record<string, unknown>,
+    `/reset/${params.token}`,
+  );
+  const email = (env as unknown as { EMAIL?: EmailBinding }).EMAIL;
+
+  if (!email) {
+    console.log(`[reset] no EMAIL binding; reset link for ${params.to}: ${resetUrl}`);
+    return { resetUrl, delivered: false };
+  }
+
+  try {
+    await email.send({
+      from: FROM_ADDRESS,
+      to: params.to,
+      subject: params.subject,
+      text: params.body(resetUrl),
+    });
+    return { resetUrl, delivered: true };
+  } catch (err) {
+    console.error(`[reset] EMAIL.send failed for ${params.to}:`, err);
+    return { resetUrl, delivered: false };
   }
 }
