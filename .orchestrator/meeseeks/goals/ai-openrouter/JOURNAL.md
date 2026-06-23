@@ -212,3 +212,9 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   is read from PM secret `OPENROUTER_PROVISIONING_KEY`.
 - **Files:** `ProjectManager/src/lib/openrouter/provision.ts`,
   `ProjectManager/scripts/openrouter-provision.test.mjs`, `ProjectManager/wrangler.jsonc`
+
+## 2026-06-23 16:49 — KEY-MINTING Slice 2: PM schema (minting state on the Site)
+- **Status:** DONE
+- **What I did:** Added three columns to the `sites` table in `ProjectManager/src/db/schema.ts`: `openrouterMintingEnabled` (`integer` boolean, NOT NULL default false), `openrouterKeyHash` (`text`, null), `openrouterMonthlyLimitUsd` (`integer`, null). Reuses existing `openrouterApiKeyEncrypted` to hold the minted `sk-or-...` (no new crypto). Generated forward migration `migrations/0012_far_johnny_blaze.sql` (3 `ALTER TABLE sites ADD`). The `Site`/`NewSite` inferred types pick up the new fields automatically. No behavior wired in yet.
+- **Verified:** `npx drizzle-kit generate` produced 0012; re-running it = "No schema changes, nothing to migrate" (no drift). `tsc --noEmit` exit 0. `npm test` 182/182. `npx opennextjs-cloudflare build` green (dev OFF — 3601/3602 free). Migration applies to D1 = HITL (not run here).
+- **Files:** ProjectManager/src/db/schema.ts, ProjectManager/migrations/0012_far_johnny_blaze.sql, ProjectManager/migrations/meta/_journal.json, ProjectManager/migrations/meta/0012_snapshot.json

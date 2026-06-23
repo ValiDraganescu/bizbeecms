@@ -103,7 +103,24 @@ export const sites = sqliteTable(
     // (base64 iv‖ciphertext+tag — see src/lib/crypto/secret-box.ts). Decrypted
     // only at deploy time and sent to the deployer to set as a CMS Worker
     // secret. Null = no per-Site key (CMS falls back to its default provider).
+    // Under the KEY-MINTING track this also holds the PM-MINTED `sk-or-...` key
+    // (same AES-GCM box, no new crypto), replacing the old manual paste flow.
     openrouterApiKeyEncrypted: text("openrouter_api_key_encrypted"),
+    // KEY-MINTING track: when true, PM auto-mints an OpenRouter key for this
+    // Site at deploy time via the Provisioning API (idempotent — only when no
+    // key exists yet). Default false = no minting (deployer global fallback).
+    openrouterMintingEnabled: integer("openrouter_minting_enabled", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(false),
+    // The minted key's hash returned by OpenRouter (`mintKey` → `{ key, hash }`).
+    // Stored to target the key for DELETE and to detect "already minted" (skip
+    // re-minting). Null = no minted key yet.
+    openrouterKeyHash: text("openrouter_key_hash"),
+    // Per-Site monthly spend cap (USD) for the minted key; maps to `mintKey`'s
+    // `limit`. Null = no cap.
+    openrouterMonthlyLimitUsd: integer("openrouter_monthly_limit_usd"),
     country: text("country"),
     createdBy: text("created_by")
       .notNull()

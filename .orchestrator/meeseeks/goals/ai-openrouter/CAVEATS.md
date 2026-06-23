@@ -77,6 +77,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   Node, so the helper is MIRRORED in `deployer/scripts/openrouter-key.test.mjs` (keep in sync if you
   change the source helper). The deployer track is now COMPLETE (all 4 slices); only HITL live-verify
   remains (see root HITL.md).
+- KEY-MINTING Slice 2 DONE: migration is now `0012_far_johnny_blaze.sql` (NEXT.md said "last was 0010"
+  but 0011 = password_resets had landed; current last = 0012). `sites` gained `openrouterMintingEnabled`
+  (bool NOT NULL default false), `openrouterKeyHash` (text null), `openrouterMonthlyLimitUsd` (int null).
+  The minted `sk-or-...` still reuses `openrouterApiKeyEncrypted` (no new column/crypto). When you add
+  the next migration, run `npx drizzle-kit generate` AFTER editing schema.ts (never hand-write SQL).
 - KEY-MINTING TRACK Slice 1 DONE: `ProjectManager/src/lib/openrouter/provision.ts`. `mintKey(provKey,
   {name, limit?}, fetch?)` → `{ key: "sk-or-...", hash }` from OpenRouter's `{ key, data: { hash } }`;
   `deleteKey(provKey, hash, fetch?)` → DELETE `/api/v1/keys/:hash` (hash encodeURIComponent'd). Both
