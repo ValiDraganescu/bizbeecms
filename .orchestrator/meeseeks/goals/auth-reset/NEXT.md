@@ -1,30 +1,38 @@
 # Note to the next Meeseeks (auth-reset)
 
-**PM half P1–P5 COMPLETE. CMS half started: C1 DONE.**
-- C1: `passwordReset` table (SINGULAR `password_reset`) + FK→`user.id` cascade +
-  `token` unique + `usedAt` nullable + types in `CMS/src/db/schema.ts`. Migration
-  `0012_supreme_shriek.sql` (meta chain auto-updated). Gates green (tsc / 733 / opennext).
+**PM half P1–P5 COMPLETE. CMS half: C1 + C2 DONE.**
+- C1: `passwordReset` table (SINGULAR `password_reset`) + migration 0012.
+- C2: CMS `POST /api/auth/forgot` (enumeration-safe). New `CMS/src/lib/reset/reset.ts`
+  (`newResetToken`/`RESET_TTL_MS` 7d/`createPasswordReset` → `schema.passwordReset`),
+  `sendResetEmail` in CMS `lib/mail/send-invite.ts` (shared `buildUrl` extracted),
+  route at `CMS/src/app/api/auth/forgot/route.ts`, `resetEmail` strings EN/FI/ET.
+  Gates green (tsc / 737 / opennext). NO bundle:cms.
 
-**Next: take C2 — CMS `POST /api/auth/forgot`** (mirror PM P2), under `CMS/src/`.
-Look up user by email; if found, mint a `password_reset` row + send reset email via
-CMS `env.EMAIL`. ALWAYS 200 `{ ok: true }` (enumeration-safe), mint/send in try/catch.
-Then C3→C4→C5 in order.
+**Next: take C3 — CMS `POST /api/auth/reset`** (mirror PM P3), under `CMS/src/`.
+Validate token (exists, `usedAt IS NULL`, not expired) → set new password hash via
+CMS `lib/auth/password.ts` → mark `usedAt` (single-use, guarded `where isNull(usedAt)`
+returning) → invalidate the user's sessions. ALL invalid/expired/used collapse to ONE
+generic error key (no reason leak). Then C4 → C5.
 
-CMS-half reminders (read CAVEATS in full first):
+C3 reminders (read CAVEATS in full first):
 - ONE app per run — C-slices touch ONLY `CMS/`, never `ProjectManager/`.
-- CMS schema uses SINGULAR table names (`user`, `session`, `invite`, now
-  `password_reset`) and the Drizzle export is `passwordReset` (PM uses plural
-  `passwordResets`). Don't copy PM's names verbatim into CMS code.
-- CMS has its OWN users + `lib/auth/password.ts` + session store
-  (`db/session-store.ts` / `lib/auth/session-core.ts`). Sessions are in D1 (NO KV —
-  CMS Worker has no KV binding). For C3 session-invalidation: `session` table has a
-  `session_user_idx` index on `userId`, so killing a user's sessions IS a simple
-  indexed `delete where userId=…` (unlike PM's KV prefix-scan — easier here).
-- CMS `env.EMAIL` binding is live; reuse CMS `lib/mail/send-invite.ts` graceful degrade.
-- Mirror PM's token mint shape: `lib/reset/reset.ts` (64-hex token, 7d TTL) — but
-  check if CMS already has a `lib/reset/` or mints invite tokens elsewhere first.
-- **C5 (LAST CMS slice) must run `bundle:cms`** to ship CMS changes into the PM
-  `cms-bundle.generated.js`. P*/C1–C4 slices NEVER run it. Only one worker at a time.
-- P5 pattern for C5: extract pure decision logic into an alias-free `*-logic.ts`
-  (structural types, no `@/db` import) and import+execute it — node can't resolve `@/`.
-- Always `lsof -ti:3601,3602` before any opennext build (corrupts .next if dev is up).
+- Add `checkReset`/`applyReset` to `CMS/src/lib/reset/reset.ts` (C2 created this file
+  with only the mint helpers). Mirror PM `lib/reset/reset.ts`: `schema.passwordReset`
+  SINGULAR, `schema.user` SINGULAR (not PM's plurals). Single-use = guarded
+  `update … where isNull(usedAt) … returning`; 0 rows ⇒ already used ⇒ reject.
+- SESSION INVALIDATION is the EASY case in CMS: sessions live in D1 `session` table
+  with `session_user_idx` on `userId`, so kill them with a plain indexed
+  `delete from session where userId = ?` (PM needed a KV prefix-scan; CMS doesn't).
+  Look at `CMS/src/db/session-store.ts` for the existing delete shape.
+- CMS routes return `Response.json(...)` (web Response), NOT PM's `NextResponse`.
+- CMS password min-length: check the register/accept-invite flow before guessing
+  (PM is 10). Use CMS `lib/auth/password.ts` `hashPassword` (PBKDF2 100k — don't bump).
+- New error string → top-level CMS message convention (NOT `auth.errors.*`); add EN/FI/ET.
+- C4: forgot/reset PAGES + login-form "forgot password?" link. CMS login form is
+  `src/components/login-form.tsx` using `useTranslations("login")`. Pages mirror PM's
+  `(auth)/forgot` + `(auth)/reset/[token]` but in CMS's app structure (check where
+  CMS login page lives) — REST+fetch, no server actions.
+- **C5 (LAST CMS slice) runs `bundle:cms`** to ship CMS into PM `cms-bundle.generated.js`.
+  P*/C1–C4 NEVER run it. Only one worker at a time. Also extract pure decision logic
+  into an alias-free `*-logic.ts` for genuine behavioral tests (node can't resolve `@/`).
+- Always `lsof -ti:3601,3602` before any opennext build (corrupts .next if dev up).

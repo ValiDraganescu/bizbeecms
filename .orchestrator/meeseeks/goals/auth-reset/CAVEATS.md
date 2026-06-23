@@ -70,6 +70,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   `userId`, so C3 can kill a user's sessions with a plain indexed
   `delete from session where userId = ?` — no prefix-scan needed (PM's KV had no
   user index and needed a scan; CMS is the easy case).
+- C2 CMS MESSAGE STRUCTURE (learned): CMS `messages/*.json` has NO `auth`
+  namespace (PM does). CMS invite/reset email strings live at the TOP LEVEL —
+  invite is `inviteEmail`, C2 added `resetEmail` (NOT `auth.forgot.email` like PM).
+  Login-form strings are top-level `login.*`. When C4 adds the forgot/reset PAGE
+  strings, follow CMS's own top-level convention (e.g. a `forgotPassword`/`reset`
+  top-level key), do NOT copy PM's `auth.forgot.*`/`auth.reset.*` nesting. Also
+  CMS has NO `validateEmail` helper (PM's `lib/auth/validation.ts` doesn't exist
+  in CMS) — only `normalizeEmail` in `db/user-store`. C2's forgot route did the
+  format check with an inline regex; reuse that or extract if C3/C4 also need it.
+- C2 CMS ROUTES use `Response.json(...)` (web Response), NOT PM's
+  `NextResponse.json(...)` — CMS auth routes (login) return `Response`. Mirror
+  that in C3 (`/api/auth/reset`); the forgot-route test greps for `Response.json`,
+  so a reset-route test should too.
 - P5 NON-DUPLICATION: the enumeration-safe hit===miss invariant is already locked
   STRUCTURALLY by `forgot-route.test.ts` (exactly one `{ok:true}` returned AFTER
   the `if(user)` block). Don't add a runtime deep-equal of `{ok:true}` vs

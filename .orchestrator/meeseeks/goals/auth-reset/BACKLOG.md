@@ -66,7 +66,18 @@ PM first (slices P1–P5), then mirror in CMS (slices C1–C5). ONE app per work
   spec asked for a cascade FK — done). Migration `0012_supreme_shriek.sql`
   (drizzle-kit generate auto-updated meta journal+snapshot). No route this run.
   Gates green (tsc / 733 tests / opennext build). NO bundle:cms (that's C5).
-- TODO: **C2 — CMS `POST /api/auth/forgot`** (mirror P2; CMS `env.EMAIL`).
+- DONE: **C2 — CMS `POST /api/auth/forgot`.** REST route (`CMS/src/app/api/auth/
+  forgot/route.ts`) looks up user by email via CMS `findUserByEmail`; if found,
+  mints a `password_reset` row (new `CMS/src/lib/reset/reset.ts`: `newResetToken`
+  64-hex, `RESET_TTL_MS` 7d, `createPasswordReset` → `schema.passwordReset`
+  SINGULAR) and sends the reset email via new `sendResetEmail` in CMS
+  `lib/mail/send-invite.ts` (extracted shared `buildUrl`; `/reset/<token>` from
+  `APP_ORIGIN`, graceful degrade). ALWAYS returns 200 `{ ok: true }` for hit AND
+  miss; malformed email → 400 (inline regex, CMS has no `validateEmail`);
+  mint/send in try/catch so failures never leak existence. New top-level
+  `resetEmail.{subject,body}` strings EN/FI/ET (mirrors `inviteEmail`). Test
+  `lib/reset/forgot-route.test.ts`. Gates green (tsc / 737 tests / opennext build;
+  route in manifest). NO bundle:cms (that's C5).
 - TODO: **C3 — CMS `POST /api/auth/reset`** (mirror P3; CMS session store).
 - TODO: **C4 — CMS forgot/reset pages + login-form link** (mirror P4; EN/FI/ET).
 - TODO: **C5 — CMS reset pure-logic tests + regen PM `cms-bundle`** (mirror P5;

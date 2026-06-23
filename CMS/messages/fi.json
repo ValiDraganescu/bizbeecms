@@ -596,6 +596,10 @@
     "subject": "Sinut on kutsuttu BizbeeCMS:ään",
     "body": "Sinut on kutsuttu hallinnoimaan tätä sivustoa. Hyväksy kutsu ja aseta salasana täällä:\n\n{url}\n\nLinkki vanhenee 7 päivässä."
   },
+  "resetEmail": {
+    "subject": "Palauta BizbeeCMS-salasanasi",
+    "body": "Saimme pyynnön palauttaa BizbeeCMS-salasanasi. Aseta uusi salasana täällä:\n\n{url}\n\nLinkki vanhenee 7 päivässä. Jos et pyytänyt tätä, voit jättää tämän viestin huomiotta."
+  },
   "acceptInvite": {
     "title": "Hyväksy kutsusi",
     "subtitle": "Aseta salasana osoitteelle {email} viimeistelläksesi tilisi luonnin.",

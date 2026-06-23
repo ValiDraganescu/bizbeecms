@@ -104,3 +104,35 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   clean CREATE TABLE + unique index, FK cascade, matches PM 0011 shape.
 - **Files:** CMS/src/db/schema.ts, CMS/migrations/0012_supreme_shriek.sql,
   CMS/migrations/meta/ (snapshot + journal).
+
+## 2026-06-23 — C2: CMS POST /api/auth/forgot (enumeration-safe, mirror PM P2)
+- **Status:** DONE
+- **What I did:** Added the CMS forgot-password request endpoint, mirroring PM P2
+  but using CMS shapes. New `CMS/src/lib/reset/reset.ts` (`newResetToken` 64-hex,
+  `RESET_TTL_MS` 7d, `createPasswordReset(userId)` → insert into SINGULAR
+  `schema.passwordReset` → returning). Refactored CMS `lib/mail/send-invite.ts`:
+  extracted a shared `buildUrl(env, path)` from `buildAcceptUrl` and added
+  `sendResetEmail({to,token,subject,body})` mirroring `sendInviteEmail`'s graceful
+  degrade (no EMAIL binding or send throw → log + `delivered:false`), building
+  `/reset/<token>` from `APP_ORIGIN`. New route
+  `CMS/src/app/api/auth/forgot/route.ts`: parses JSON, normalizes email via CMS
+  `normalizeEmail` (from `db/user-store`), validates format with an inline regex
+  (CMS has no `validateEmail` like PM) → 400 on malformed only; looks up user via
+  `findUserByEmail`; if matched, mints token + sends email inside a try/catch that
+  swallows failures; ALWAYS returns 200 `{ ok: true }` for hit AND miss. Strings:
+  CMS messages have NO `auth` namespace — invite uses a TOP-LEVEL `inviteEmail`
+  key, so I added a top-level `resetEmail.{subject,body}` to EN/FI/ET (inserted
+  right after `inviteEmail` for parity ordering), `getTranslations("resetEmail")`.
+- **Verified:** ports 3601/3602 clear (lsof); `npx tsc --noEmit` exit 0; `npm test`
+  737/737 pass (was 733, +4 new in `lib/reset/forgot-route.test.ts`: single
+  success body after the user block, mint/send swallowed, token shape/TTL +
+  SINGULAR `schema.passwordReset`, i18n parity). Fail-before PROVEN: rewrote the
+  source to plural `schema.passwordResets` ⇒ the token test fails, restored.
+  `npx opennextjs-cloudflare build` green, `.next/server/app/api/auth/forgot/route.js`
+  exists + `/api/auth/forgot` in app-paths-manifest. Did NOT run bundle:cms (C5),
+  did NOT exercise live email/runtime, did NOT apply migration.
+- **Files:** CMS/src/lib/reset/reset.ts (new),
+  CMS/src/app/api/auth/forgot/route.ts (new),
+  CMS/src/lib/reset/forgot-route.test.ts (new),
+  CMS/src/lib/mail/send-invite.ts (buildUrl extract + sendResetEmail),
+  CMS/messages/{en,fi,et}.json (resetEmail)

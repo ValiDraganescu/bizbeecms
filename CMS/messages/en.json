@@ -596,6 +596,10 @@
     "subject": "You're invited to BizbeeCMS",
     "body": "You've been invited to manage this site. Accept your invitation and set a password here:\n\n{url}\n\nThis link expires in 7 days."
   },
+  "resetEmail": {
+    "subject": "Reset your BizbeeCMS password",
+    "body": "We received a request to reset your BizbeeCMS password. Set a new password here:\n\n{url}\n\nThis link expires in 7 days. If you didn't request this, you can ignore this email."
+  },
   "acceptInvite": {
     "title": "Accept your invitation",
     "subtitle": "Set a password for {email} to finish creating your account.",

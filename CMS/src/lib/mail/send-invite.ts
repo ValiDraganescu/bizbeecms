@@ -47,25 +47,32 @@ export type SendInviteResult = {
  * the `APP_ORIGIN` Worker var. Only in local dev do we fall back to the request
  * host (there it isn't a trust boundary, and it keeps dev frictionless).
  */
-async function buildAcceptUrl(
+async function buildUrl(
   env: Record<string, unknown>,
-  token: string,
+  path: string,
 ): Promise<string> {
   const configured = typeof env.APP_ORIGIN === "string" ? env.APP_ORIGIN : "";
   if (configured) {
-    return `${configured.replace(/\/+$/, "")}/invite/accept/${token}`;
+    return `${configured.replace(/\/+$/, "")}${path}`;
   }
 
   if (process.env.NODE_ENV !== "production") {
     const h = await headers();
     const host = h.get("host") ?? "localhost:3601";
     const proto = h.get("x-forwarded-proto") ?? "http";
-    return `${proto}://${host}/invite/accept/${token}`;
+    return `${proto}://${host}${path}`;
   }
 
   throw new Error(
-    "APP_ORIGIN is not configured; cannot build a trusted invite link.",
+    "APP_ORIGIN is not configured; cannot build a trusted link.",
   );
+}
+
+async function buildAcceptUrl(
+  env: Record<string, unknown>,
+  token: string,
+): Promise<string> {
+  return buildUrl(env, `/invite/accept/${token}`);
 }
 
 export async function sendInviteEmail(params: {
@@ -100,5 +107,51 @@ export async function sendInviteEmail(params: {
     // can show it. Surface the failure in logs.
     console.error(`[invite] EMAIL.send failed for ${params.to}:`, err);
     return { acceptUrl, delivered: false };
+  }
+}
+
+export type SendResetResult = {
+  /** Absolute URL the user opens to set a new password. */
+  resetUrl: string;
+  /** Whether a real email was dispatched (vs. logged for manual sharing). */
+  delivered: boolean;
+};
+
+/**
+ * Send a password-reset email (auth-reset C2). Mirrors `sendInviteEmail`:
+ * builds the `/reset/<token>` link from the trusted `APP_ORIGIN` var and sends
+ * via the `EMAIL` binding, degrading gracefully (log + `delivered:false`) when
+ * the binding is absent or `send()` throws. The caller (the forgot route) is
+ * enumeration-safe and never surfaces `delivered` to the requester.
+ */
+export async function sendResetEmail(params: {
+  to: string;
+  token: string;
+  subject: string;
+  body: (resetUrl: string) => string;
+}): Promise<SendResetResult> {
+  const { env } = await getCloudflareContext({ async: true });
+  const resetUrl = await buildUrl(
+    env as unknown as Record<string, unknown>,
+    `/reset/${params.token}`,
+  );
+  const email = (env as { EMAIL?: EmailBinding }).EMAIL;
+
+  if (!email) {
+    console.log(`[reset] no EMAIL binding; reset link for ${params.to}: ${resetUrl}`);
+    return { resetUrl, delivered: false };
+  }
+
+  try {
+    await email.send({
+      to: params.to,
+      from: { email: FROM_ADDRESS, name: FROM_NAME },
+      subject: params.subject,
+      text: params.body(resetUrl),
+    });
+    return { resetUrl, delivered: true };
+  } catch (err) {
+    console.error(`[reset] EMAIL.send failed for ${params.to}:`, err);
+    return { resetUrl, delivered: false };
   }
 }

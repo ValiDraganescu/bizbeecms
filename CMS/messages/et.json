@@ -596,6 +596,10 @@
     "subject": "Sind on kutsutud BizbeeCMS-i",
     "body": "Sind on kutsutud seda saiti haldama. Võta kutse vastu ja määra parool siin:\n\n{url}\n\nLink aegub 7 päeva pärast."
   },
+  "resetEmail": {
+    "subject": "Lähtesta oma BizbeeCMS parool",
+    "body": "Saime taotluse sinu BizbeeCMS parooli lähtestamiseks. Määra uus parool siin:\n\n{url}\n\nLink aegub 7 päeva pärast. Kui sa seda ei taotlenud, võid selle kirja eirata."
+  },
   "acceptInvite": {
     "title": "Võta kutse vastu",
     "subtitle": "Määra parool aadressile {email}, et oma konto loomine lõpetada.",
