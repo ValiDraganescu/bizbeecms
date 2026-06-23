@@ -55,3 +55,32 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **What I did:** Added `checkReset` (classify notFound/used/expired/valid, mirror invite's `checkInvite`) and `applyReset` to `lib/reset/reset.ts`. `applyReset` re-validates, marks `usedAt` via an `update … where isNull(usedAt)` guard (single-use + concurrency-safe: 0 rows updated ⇒ rejected as `used`), then `hashPassword(newPassword)` onto `users.passwordHash`, then `invalidateUserSessions(reset.userId)`. Added `invalidateUserSessions(userId)` to `lib/auth/session.ts` — KV sessions have NO userId index, so it pages `kv.list({ prefix: "session:" })`, reads each record, deletes those whose `userId` matches (ponytail-commented O(all-sessions) ceiling; eventual-consistency is safe because the hash already changed). New route `src/app/api/auth/reset/route.ts`: validates token presence, password via `validatePassword` (register min-length 10), confirm match; every applyReset failure (notFound/expired/used) collapses to ONE generic `auth.errors.resetTokenInvalid` (no detail leak; route never reads `result.reason`). Added `resetTokenInvalid` to EN/FI/ET.
 - **Verified:** ports 3601/3602 clear; `npx tsc --noEmit` exit 0; `npm test` 166/166 pass (8 new in `lib/reset/reset-route.test.ts`: classify, `<=` expiry boundary, isNull single-use guard, hash+session-invalidate ordering, generic-error/no-reason-leak, min-length, i18n parity); `npx opennextjs-cloudflare build` green, `.next/server/app/api/auth/reset/route.js` exists + `/api/auth/reset` in app-paths-manifest. Did NOT exercise live KV/runtime (build-only) or apply the migration.
 - **Files:** ProjectManager/src/app/api/auth/reset/route.ts (new), ProjectManager/src/lib/reset/reset.ts (checkReset/applyReset), ProjectManager/src/lib/auth/session.ts (invalidateUserSessions), ProjectManager/src/lib/reset/reset-route.test.ts (new), ProjectManager/messages/{en,fi,et}.json (auth.errors.resetTokenInvalid)
+
+## 2026-06-23 12:45 — P5: PM reset pure-logic tests (PM half complete)
+- **Status:** DONE
+- **What I did:** Read the two existing reset test files first (per the hint).
+  Found they are SOURCE-TEXT assertions (grep the .ts for patterns) — they don't
+  EXECUTE the logic, because `reset.ts`/the route import the `@/` alias which
+  `node --test` can't resolve. To get genuine fail-before/pass-after BEHAVIORAL
+  coverage I extracted the pure classification decision out of `checkReset` into a
+  new alias-free `lib/reset/reset-logic.ts` (`classifyReset(reset, now)`, with a
+  structural `ResetRow` type so it imports nothing from `@/db`); `checkReset` now
+  calls it. New `reset-logic.test.ts` imports and RUNS it: token validity, expiry
+  BOUNDARY (just-valid at now+1; expired AT now and now-1 — proving `<=` not `<`),
+  single-use (a row with `usedAt` set => "used", and used wins over expired),
+  notFound, and default-now-from-Date.now. Updated the now-stale source-text check
+  in `reset-route.test.ts` (the old inline `if (!reset) return...` strings moved)
+  to assert `checkReset` delegates to `classifyReset`. Did NOT add a deep-equal
+  "hit body === miss body" test: that invariant is already locked structurally by
+  `forgot-route.test.ts` (exactly one `{ok:true}` returned AFTER the `if(user)`
+  block), and a runtime deep-equal of the literal `{ok:true}` vs `{ok:true}` would
+  be tautological — noted rather than faked.
+- **Verified:** ports 3601/3602 clear (lsof exit 1); `npx tsc --noEmit` exit 0;
+  `npm test` 170/170 pass (was 166 => +4 new behavioral + 1 rewired source-text);
+  fail-before PROVEN: sed `<=`->`<` in reset-logic.ts => the boundary test fails,
+  restored; `npx opennextjs-cloudflare build` green (worker saved). PM only — did
+  NOT touch CMS/ or run bundle:cms.
+- **Files:** ProjectManager/src/lib/reset/reset-logic.ts (new),
+  ProjectManager/src/lib/reset/reset-logic.test.ts (new),
+  ProjectManager/src/lib/reset/reset.ts (delegate checkReset to classifyReset),
+  ProjectManager/src/lib/reset/reset-route.test.ts (rewire classify source-text check)

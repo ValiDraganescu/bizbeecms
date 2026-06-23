@@ -21,6 +21,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..", "..");
 
 const resetSrc = readFileSync(join(here, "reset.ts"), "utf8");
+const logicSrc = readFileSync(join(here, "reset-logic.ts"), "utf8");
 const routeSrc = readFileSync(
   join(root, "src/app/api/auth/reset/route.ts"),
   "utf8",
@@ -30,23 +31,11 @@ const sessionSrc = readFileSync(
   "utf8",
 );
 
-test("checkReset classifies notFound, used, expired, valid", () => {
-  assert.match(resetSrc, /if \(!reset\) return \{ status: "notFound"/);
-  assert.match(resetSrc, /if \(reset\.usedAt\) return \{ status: "used"/);
-  assert.match(
-    resetSrc,
-    /reset\.expiresAt\.getTime\(\) <= Date\.now\(\)[\s\S]*status: "expired"/,
-  );
-  assert.match(resetSrc, /return \{ status: "valid", reset \}/);
-});
-
-test("expiry boundary is <= now (an exactly-expired token is rejected)", () => {
-  // Strictly-less would let a token live one tick past expiry; we want <=.
-  assert.match(resetSrc, /expiresAt\.getTime\(\) <= Date\.now\(\)/);
-  assert.ok(
-    !/expiresAt\.getTime\(\) < Date\.now\(\)/.test(resetSrc),
-    "must use <= so the expiry instant itself is rejected",
-  );
+test("checkReset delegates classification to classifyReset", () => {
+  // The DB lookup stays in reset.ts; the decision lives in the pure module so
+  // it's behaviorally testable (see reset-logic.test.ts).
+  assert.match(resetSrc, /classifyReset\(reset\)/);
+  assert.match(logicSrc, /export function classifyReset/);
 });
 
 test("applyReset enforces single-use via an isNull(usedAt) guarded update", () => {

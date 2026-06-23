@@ -52,3 +52,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   rows: 0 rows updated ⇒ token already used ⇒ reject. Don't replace with a
   read-then-write (TOCTOU). Mark used BEFORE hashing/session-kill (test locks the
   order).
+- P5 TESTABILITY (learned): `node --test` CANNOT resolve the `@/` alias, so logic
+  that imports `@/db`/`@/lib/...` can only be tested by SOURCE-TEXT matching (grep
+  the .ts). For GENUINE behavioral fail-before/pass-after tests, extract the pure
+  decision (no DB, no `@/`) into an alias-free `*-logic.ts` with STRUCTURAL types
+  (e.g. `ResetRow = {usedAt, expiresAt}`), have the real fn delegate to it, and
+  import+execute it from the test. PM did this: `checkReset` → `classifyReset` in
+  `lib/reset/reset-logic.ts` + `reset-logic.test.ts`. Mirror this for CMS C5.
+- P5 NON-DUPLICATION: the enumeration-safe hit===miss invariant is already locked
+  STRUCTURALLY by `forgot-route.test.ts` (exactly one `{ok:true}` returned AFTER
+  the `if(user)` block). Don't add a runtime deep-equal of `{ok:true}` vs
+  `{ok:true}` — it's tautological. Trust the structural lock.

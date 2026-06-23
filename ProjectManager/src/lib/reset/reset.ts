@@ -3,6 +3,7 @@ import { getDb, schema } from "@/db";
 import type { PasswordReset } from "@/db/schema";
 import { hashPassword } from "@/lib/auth/password";
 import { invalidateUserSessions } from "@/lib/auth/session";
+import { classifyReset, type ResetStatus } from "./reset-logic";
 
 /** Reset-token lifetime: 7 days (mirrors the invite TTL). */
 export const RESET_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -39,18 +40,14 @@ async function findResetByToken(token: string): Promise<PasswordReset | null> {
   return row ?? null;
 }
 
-export type ResetStatus = "valid" | "notFound" | "expired" | "used";
+export type { ResetStatus };
 
 /** Classify a reset token (mirror invite's `checkInvite`). */
 export async function checkReset(
   token: string,
 ): Promise<{ status: ResetStatus; reset: PasswordReset | null }> {
   const reset = await findResetByToken(token);
-  if (!reset) return { status: "notFound", reset: null };
-  if (reset.usedAt) return { status: "used", reset };
-  if (reset.expiresAt.getTime() <= Date.now())
-    return { status: "expired", reset };
-  return { status: "valid", reset };
+  return { status: classifyReset(reset), reset };
 }
 
 export type ApplyResetResult = { ok: true } | { ok: false; reason: ResetStatus };

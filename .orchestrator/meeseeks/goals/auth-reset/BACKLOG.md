@@ -44,10 +44,18 @@ PM first (slices P1–P5), then mirror in CMS (slices C1–C5). ONE app per work
   subtitle,submit} in EN/FI/ET. Gates green (tsc / 166 tests / opennext build;
   both pages in .next/server output).
 
-- TODO: **P5 — PM reset pure-logic tests.** Dependency-free node tests
-  (fail-before/pass-after): token validity, expiry boundary, single-use (2nd use
-  rejected), enumeration-safe response (hit body === miss body). Mirror the style
-  of existing PM `lib/**/*.test.ts`. Gate.
+- DONE: **P5 — PM reset pure-logic tests.** Extracted token classification out of
+  `checkReset` into a pure `lib/reset/reset-logic.ts` (`classifyReset(row, now)`,
+  no DB/`@/` deps) so it's BEHAVIORALLY testable; `checkReset` now delegates to it.
+  New `reset-logic.test.ts` EXECUTES the real logic: validity, expiry BOUNDARY
+  (just-valid @ now+1, expired @ now and now-1 — `<=` not `<`), single-use
+  (`usedAt` set ⇒ used; used wins over expired), notFound, default-now.
+  Fail-before verified (flip `<=`→`<` ⇒ boundary test fails). Rewired the
+  source-text check in `reset-route.test.ts` to assert the delegation.
+  Enumeration-safe hit===miss is already structurally locked by
+  `forgot-route.test.ts` (single `{ok:true}` after the user block) — NOT
+  re-added as a tautological deep-equal of a literal. Gates green
+  (tsc / 170 tests / opennext build). **PM half P1–P5 COMPLETE.**
 
 - TODO: **C1 — CMS `password_resets` table + migration** (mirror P1 in `CMS/src/`).
 - TODO: **C2 — CMS `POST /api/auth/forgot`** (mirror P2; CMS `env.EMAIL`).
