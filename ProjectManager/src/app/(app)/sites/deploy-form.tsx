@@ -34,6 +34,7 @@ export function DeployForm({
   const router = useRouter();
   const [error, setError] = useState<DeployError | null>(null);
   const [started, setStarted] = useState(false);
+  const [mintWarning, setMintWarning] = useState(false);
   const [pending, setPending] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -87,6 +88,7 @@ export function DeployForm({
     e.preventDefault();
     setError(null);
     setStarted(false);
+    setMintWarning(false);
     setPending(true);
     try {
       const res = await fetch(`/api/sites/${siteId}/deploy`, {
@@ -97,9 +99,11 @@ export function DeployForm({
       const data = (await res.json().catch(() => ({}))) as {
         error?: DeployError;
         accepted?: boolean;
+        mintWarning?: boolean;
       };
       if (res.ok && data.accepted) {
         setStarted(true);
+        setMintWarning(data.mintWarning === true);
         router.refresh();
         return;
       }
@@ -177,6 +181,12 @@ export function DeployForm({
         {status === "failed" && started ? (
           <Alert tone="danger">
             <AlertBody>{t("errors.uploadFailed")}</AlertBody>
+          </Alert>
+        ) : null}
+
+        {mintWarning ? (
+          <Alert tone="warning">
+            <AlertBody>{t("mintWarning")}</AlertBody>
           </Alert>
         ) : null}
 

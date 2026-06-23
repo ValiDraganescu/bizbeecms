@@ -88,6 +88,9 @@ export async function POST(
   // never re-minted. Minting MUST NOT crash the deploy: any failure (no
   // provisioning key, OpenRouter error, encrypt error) is caught and logged,
   // and the deploy proceeds with the deployer's global fallback key.
+  // Set when minting was attempted but failed — surfaced to the operator in the
+  // deploy response so the silent "fell back to the global key" isn't invisible.
+  let mintFailed = false;
   if (shouldMintOnDeploy(site.openrouterMintingEnabled, site.openrouterKeyHash)) {
     const provKey =
       typeof bag.OPENROUTER_PROVISIONING_KEY === "string"
@@ -104,6 +107,7 @@ export async function POST(
       site.openrouterApiKeyEncrypted = ciphertext;
       site.openrouterKeyHash = minted.hash;
     } catch (e) {
+      mintFailed = true;
       console.warn(
         `[deploy] Site ${siteId}: OpenRouter key mint failed; proceeding with ` +
           `the deployer's global key. ${e instanceof Error ? e.message : ""}`,
@@ -170,6 +174,10 @@ export async function POST(
   }
 
   // Accepted — the deploy is running in the container; status finalizes via the
-  // callback. Client shows "deploying" and polls.
-  return NextResponse.json({ accepted: true });
+  // callback. Client shows "deploying" and polls. `mintWarning` is non-blocking:
+  // the deploy proceeded with the deployer's global key because minting failed.
+  return NextResponse.json({
+    accepted: true,
+    ...(mintFailed ? { mintWarning: true } : {}),
+  });
 }

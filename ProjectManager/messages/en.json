@@ -398,6 +398,7 @@
       "redeploy": "Redeploy",
       "deployed": "Deploy succeeded.",
       "deployedWorker": "Deployed as {worker}.",
+      "mintWarning": "Couldn't mint this Site's OpenRouter key — the deploy is using the shared fallback key instead. Check the provisioning key and redeploy to retry.",
       "errors": {
         "notAllowed": "You're not allowed to deploy this Site.",
         "notFound": "Site not found.",

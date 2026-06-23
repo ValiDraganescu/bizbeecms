@@ -289,6 +289,25 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Verified:** `cd ProjectManager && npm test` → 187/187. `cd CMS && node --test scripts/*.test.mjs 'src/**/*.test.ts'` → 776/776. `cd ProjectManager && npx opennextjs-cloudflare build` → "OpenNext build complete". `cd CMS && npx opennextjs-cloudflare build` → "OpenNext build complete". Could NOT verify: live PM mint-on-deploy (idempotent), DELETE revoke, and CMS-local-key-overrides-minted-key at request time — these need a real `OPENROUTER_PROVISIONING_KEY` secret on the PM Worker + a real key in CMS settings (HITL, recorded in root HITL.md).
 - **Files:** no code changes; goal-memory only (BACKLOG/JOURNAL/NEXT) + HITL.md.
 
+## 2026-06-23 18:38 — Surface mint failures to the PM operator (no more silent fallback)
+- **Status:** DONE
+- **What I did:** Took the NEXT.md "surface mint failures" slice. The deploy route silently
+  `console.warn`ed on a mint failure and returned a bare `{ accepted: true }`, so the operator never
+  knew the Site fell back to the deployer's shared global key. Now the mint catch sets `mintFailed`
+  and the success response carries `mintWarning: true` ONLY when minting was attempted and failed
+  (`...(mintFailed ? { mintWarning: true } : {})`). Minting still never crashes the deploy. The
+  deploy form (`deploy-form.tsx`) reads `data.mintWarning === true` on the accepted path, stores it
+  in a `mintWarning` state, and renders a non-blocking `tone="warning"` Alert (`t("mintWarning")`)
+  above the error alert. Added `sites.deploy.mintWarning` in EN/FI/ET.
+- **Verified:** new `scripts/deploy-mint-warning.test.mjs` (5 tests: route sets mintFailed + conditional
+  response, form reads+renders, EN/FI/ET have a non-empty string) → 5/5. `npx tsc --noEmit` clean;
+  `npm test` 192/192 (was 187, +5); `npx opennextjs-cloudflare build` GREEN (dev off — 3601/3602 clear).
+  Could NOT verify: the warning firing against a real failed mint (HITL — needs OPENROUTER_PROVISIONING_KEY
+  configured-but-failing on PM).
+- **Files:** `ProjectManager/src/app/api/sites/[id]/deploy/route.ts`,
+  `ProjectManager/src/app/(app)/sites/deploy-form.tsx`,
+  `ProjectManager/scripts/deploy-mint-warning.test.mjs`, `ProjectManager/messages/{en,fi,et}.json`
+
 ## 2026-06-23 18:32 — Translate route unified onto OpenRouter (drop hardcoded @cf id)
 - **Status:** DONE
 - **What I did:** Fixed the last CF-coupling in the AI provider story. `CMS/src/app/api/translate/route.ts` already called `getAi()` (the port → OpenRouter when keyed) but kept its OWN `const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct"`, an invalid model id for the OpenRouter adapter → translate would 502 on every keyed Site. Replaced the local const with `import { DEFAULT_MODEL } from "@/lib/chat/models"` (already `openai/gpt-4o-mini`), same pattern the chat route uses, so translate runs on whatever provider `getAi()` selected. No other behavior changed.

@@ -19,6 +19,13 @@ Ordered tracer-first: prove the adapter + test in isolation, then wire selection
 ## Unify translate route onto OpenRouter
 - DONE (2026-06-23): **Translate route no longer hardcodes a `@cf/...` DEFAULT_MODEL.** `CMS/src/app/api/translate/route.ts` already called `getAi()` (port → OpenRouter when keyed) but kept its own `@cf/meta/llama-3.1-8b-instruct` const → 502 against the OpenRouter adapter on every keyed Site. Replaced with `import { DEFAULT_MODEL } from "@/lib/chat/models"` (= `openai/gpt-4o-mini`), same as the chat route. Regression in `scripts/translate-request.test.mjs` asserts the import + no `@cf/` id in the route source. Gate: translate tests 13/13, full CMS suite 777/777, tsc 0 in my files, `npx opennextjs-cloudflare build` GREEN.
 
+## Operator visibility
+- DONE (2026-06-23): **Surface mint failures to the PM operator.** Deploy route now returns
+  `mintWarning: true` (alongside `accepted: true`) when mint-on-deploy was attempted and failed; the
+  deploy form shows a non-blocking `tone="warning"` Alert (`sites.deploy.mintWarning`, EN/FI/ET).
+  Minting still never crashes the deploy (graceful fallback to the deployer global key unchanged).
+  Regression `scripts/deploy-mint-warning.test.mjs` (5). Gate: tsc 0, `npm test` 192/192, build GREEN.
+
 ## KEY-MINTING TRACK (auto-provision per-Site OpenRouter keys)
 Replace the PM manual-paste field with PM-side auto-minting via OpenRouter's Provisioning API, plus a CMS-local user override. Final precedence at request time in the CMS: **CMS-local user key → PM minted key → deployer global fallback**. USER DECISIONS (2026-06-23): minting REPLACES the manual paste field in PM (no more pasting); CMS stores its own key locally in CMS D1 and prefers it at request time; PM gets a per-site spend-limit field for the minted key. Provisioning auth = a single OpenRouter Management/Provisioning key held by PM (NOT per-site), used only to mint/delete site keys. Docs: https://openrouter.ai/docs/features/provisioning-api-keys (POST/DELETE `/api/v1/keys`).
 

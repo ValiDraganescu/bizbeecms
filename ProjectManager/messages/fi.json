@@ -398,6 +398,7 @@
       "redeploy": "Julkaise uudelleen",
       "deployed": "Julkaisu onnistui.",
       "deployedWorker": "Julkaistu nimellä {worker}.",
+      "mintWarning": "Tämän Siten OpenRouter-avainta ei voitu luoda — julkaisu käyttää jaettua vara-avainta. Tarkista provisiointiavain ja julkaise uudelleen yrittääksesi uudelleen.",
       "errors": {
         "notAllowed": "Sinulla ei ole oikeutta julkaista tätä sivustoa.",
         "notFound": "Sivustoa ei löytynyt.",
