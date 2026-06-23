@@ -28,7 +28,7 @@ type EmailMessage = {
 };
 type EmailBinding = { send: (message: EmailMessage) => Promise<unknown> };
 
-const FROM_ADDRESS = "noreply@bizbeecms.example";
+const FROM_ADDRESS = "noreply@bizbeecms.com";
 const FROM_NAME = "BizbeeCMS";
 
 export type SendInviteResult = {

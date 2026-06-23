@@ -78,7 +78,7 @@
   // degrades to logging the accept link (see lib/mail/send-invite.ts). When
   // enabling: uncomment, set a real `destination_address`/sender domain, and
   // rerun typegen so `env.EMAIL` is typed.
-  // "send_email": [{ "name": "EMAIL" }],
+  "send_email": [{ "name": "EMAIL" }],
   "observability": {
     "enabled": true
   }

@@ -16,6 +16,41 @@ Task states: TODO | DOING | DONE | BLOCKED.
   Gate: tsc 0, 150 node tests, opennext build green.
 
 ## Tasks
+- DONE (2026-06-23): **Enable live invite email delivery (DNS is done; code-only now).**
+  PM `wrangler.jsonc`: added `"send_email": [{ "name": "EMAIL" }]` (Mode B, no
+  destination_address) as a sibling key after `kv_namespaces`. CMS `wrangler.jsonc`:
+  uncommented `"send_email": [{ "name": "EMAIL" }],`. Both `send-invite.ts`
+  FROM_ADDRESS `noreply@bizbeecms.example` → `noreply@bizbeecms.com`. Regenerated
+  `worker-configuration.d.ts` for both apps (now types `env.EMAIL`). Gates: PM tsc 0,
+  CMS tsc 0, PM 154 tests, CMS 733 tests, PM + CMS opennext build green, deployer
+  `wrangler deploy --dry-run` builds. USER must redeploy PM + redeploy a site to ship
+  the EMAIL binding, then test an invite expecting `delivered: true`.
+
+- (superseded entry below — original TODO kept for trail)
+- TODO-ARCHIVED: **Enable live invite email delivery (DNS is done; code-only now).** The
+  sender domain `bizbeecms.com` is FULLY set up on Cloudflare as of 2026-06-23 —
+  Email Routing Enabled + SPF + DKIM (`cf2024-1._domainkey`) + DMARC
+  (`_dmarc` = `v=DMARC1; p=none; rua=mailto:dmarc@bizbeecms.com`) + MX all resolve
+  (verified via dig). Mode B (`send_email` with NO `destination_address`) → sends
+  to any invitee, no per-address verification. Remaining work is code in BOTH apps:
+  1. **PM** `ProjectManager/wrangler.jsonc` ~line 71-73: replace the commented
+     block with `"send_email": [{ "name": "EMAIL" }]` (NO `destination_address`).
+  2. **CMS** `CMS/wrangler.jsonc` ~line 81: uncomment `"send_email": [{ "name":
+     "EMAIL" }]` (already the right shape, just commented). The CMS deployer carries
+     this binding into each per-Site Worker.
+  3. **PM** `ProjectManager/src/lib/mail/send-invite.ts:29` `FROM_ADDRESS`:
+     `noreply@bizbeecms.example` → `noreply@bizbeecms.com` (from-domain MUST match
+     the verified sender domain or CF rejects).
+  4. **CMS** `CMS/src/lib/mail/send-invite.ts:31` same FROM change.
+  5. Regen types if needed (`npx wrangler types`) so `env.EMAIL` is typed (code
+     already casts, so optional). `APP_ORIGIN` is already set for PM and injected
+     per-Site by the deployer — leave it.
+  Gate: PM + CMS tsc + opennext build green; deployer dry-run still builds. After
+  merge the USER redeploys PM + redeploys a site to ship the CMS binding, then
+  tests an invite expecting `delivered: true`. Setup steps are in
+  `docs/email-sender-setup.md`. (No new strings → no i18n/bundle churn beyond
+  what the redeploy regenerates.)
+
 - DONE (2026-06-23): **Editor invite→assignment follow-up — harden + test assign-list
   candidacy.** Verified Editor accept path (role Editor, no country/tag scope) and
   `listSitesForUser` Editor-reaches-assigned-only branch are correct in source.

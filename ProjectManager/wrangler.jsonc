@@ -63,12 +63,10 @@
       "binding": "HOST_MAP",
       "id": "1c276b01cd5a41f0b8c98ace07b4c064"
     }
-  ]
-  // Email: invite delivery via Cloudflare Email Sending (Beta, Workers Paid).
-  // Uncomment + set a verified `destination_address` to enable env.EMAIL.send()
-  // in src/lib/mail/send-invite.ts. Without this binding the invite flow
-  // degrades to showing the accept link in-app (see send-invite.ts).
-  // "send_email": [
-  //   { "name": "EMAIL", "destination_address": "verified@yourdomain.com" }
-  // ]
+  ],
+  // Email: invite delivery via Cloudflare Email Sending. Mode B (no
+  // `destination_address`) sends to any invitee — sender domain bizbeecms.com
+  // is verified (SPF/DKIM/DMARC/MX). Enables env.EMAIL.send() in
+  // src/lib/mail/send-invite.ts.
+  "send_email": [{ "name": "EMAIL" }]
 }

@@ -26,7 +26,7 @@ type EmailMessage = {
 };
 type EmailBinding = { send: (message: EmailMessage) => Promise<void> };
 
-const FROM_ADDRESS = "noreply@bizbeecms.example";
+const FROM_ADDRESS = "noreply@bizbeecms.com";
 
 export type SendInviteResult = {
   /** Absolute URL the invitee opens to accept. Always returned. */
