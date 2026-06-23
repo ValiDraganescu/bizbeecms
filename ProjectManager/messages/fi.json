@@ -399,6 +399,7 @@
       "deployed": "Julkaisu onnistui.",
       "deployedWorker": "Julkaistu nimellä {worker}.",
       "mintWarning": "Tämän Siten OpenRouter-avainta ei voitu luoda — julkaisu käyttää jaettua vara-avainta. Tarkista provisiointiavain ja julkaise uudelleen yrittääksesi uudelleen.",
+      "keyWarning": "Tämän Siten tallennettua OpenRouter-avainta ei voitu purkaa — julkaisu käyttää jaettua vara-avainta. Tallenna avain uudelleen Siten muokkauksessa ja julkaise uudelleen.",
       "errors": {
         "notAllowed": "Sinulla ei ole oikeutta julkaista tätä sivustoa.",
         "notFound": "Sivustoa ei löytynyt.",

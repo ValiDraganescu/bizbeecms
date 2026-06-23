@@ -174,10 +174,13 @@ export async function POST(
   }
 
   // Accepted — the deploy is running in the container; status finalizes via the
-  // callback. Client shows "deploying" and polls. `mintWarning` is non-blocking:
-  // the deploy proceeded with the deployer's global key because minting failed.
+  // callback. Client shows "deploying" and polls. Both warnings are non-blocking:
+  // `mintWarning` — minting failed, deploy used the deployer's global key.
+  // `keyWarning` — a stored per-Site key couldn't be decrypted (bad/rotated
+  // SITE_SECRET_KEY or a corrupt blob), so the deploy fell back to the global key.
   return NextResponse.json({
     accepted: true,
     ...(mintFailed ? { mintWarning: true } : {}),
+    ...(degraded ? { keyWarning: true } : {}),
   });
 }

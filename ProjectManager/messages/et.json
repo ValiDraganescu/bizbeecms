@@ -399,6 +399,7 @@
       "deployed": "Juurutamine õnnestus.",
       "deployedWorker": "Juurutatud nimega {worker}.",
       "mintWarning": "Selle Site'i OpenRouteri võtit ei õnnestunud luua — juurutus kasutab jagatud varuvõtit. Kontrolli provisioneerimisvõtit ja juuruta uuesti, et proovida uuesti.",
+      "keyWarning": "Selle Site'i salvestatud OpenRouteri võtit ei õnnestunud dekrüpteerida — juurutus kasutab jagatud varuvõtit. Salvesta võti uuesti Site'i muutmisel ja juuruta uuesti.",
       "errors": {
         "notAllowed": "Sul pole õigust seda saiti juurutada.",
         "notFound": "Saiti ei leitud.",

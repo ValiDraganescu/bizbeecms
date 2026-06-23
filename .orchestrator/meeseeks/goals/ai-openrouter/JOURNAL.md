@@ -313,3 +313,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **What I did:** Fixed the last CF-coupling in the AI provider story. `CMS/src/app/api/translate/route.ts` already called `getAi()` (the port → OpenRouter when keyed) but kept its OWN `const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct"`, an invalid model id for the OpenRouter adapter → translate would 502 on every keyed Site. Replaced the local const with `import { DEFAULT_MODEL } from "@/lib/chat/models"` (already `openai/gpt-4o-mini`), same pattern the chat route uses, so translate runs on whatever provider `getAi()` selected. No other behavior changed.
 - **Verified:** Added a regression test in `scripts/translate-request.test.mjs` that reads the route source and asserts (a) it imports DEFAULT_MODEL from the catalog, (b) it carries no `@cf/` id, (c) the catalog default isn't a CF id. `node --test scripts/translate-request.test.mjs` 13/13. Full CMS suite `node --test scripts/*.test.mjs 'src/**/*.test.ts'` 777/777 (+1). `npx tsc --noEmit` 0 errors in my files. `npx opennextjs-cloudflare build` (dev off) → "OpenNext build complete". Could NOT verify: a live translate call against OpenRouter (HITL — needs a real key on the deployed CMS).
 - **Files:** CMS/src/app/api/translate/route.ts, CMS/scripts/translate-request.test.mjs
+
+## 2026-06-23 — Surface per-Site DECRYPT failure to the PM operator (keyWarning)
+- **Status:** DONE
+- **What I did:** Symmetric follow-up to the mintWarning slice. The deploy route already computed
+  `degraded` when a stored per-Site `openrouterApiKeyEncrypted` failed to decrypt (bad/rotated
+  `SITE_SECRET_KEY` or corrupt blob) and `console.warn`ed it — but the operator never saw it; the
+  deploy silently fell back to the deployer's shared global key. Now the accepted response carries
+  `keyWarning: true` ONLY when `degraded` (`...(degraded ? { keyWarning: true } : {})`), alongside the
+  existing `mintWarning`. Graceful degrade is UNCHANGED — the key warning is purely a response flag.
+  `deploy-form.tsx` reads `data.keyWarning === true`, stores `keyWarning` state, and renders a
+  non-blocking `tone="warning"` Alert (`t("keyWarning")`) right below the mintWarning alert. Added
+  `sites.deploy.keyWarning` in EN/FI/ET.
+- **Verified:** extended `scripts/deploy-mint-warning.test.mjs` with 5 keyWarning assertions (route
+  conditional response, form reads+renders, EN/FI/ET non-empty) → 10/10. `npx tsc --noEmit` clean;
+  `npm test` 197/197 (was 192, +5); `npx opennextjs-cloudflare build` GREEN (dev off, 3601 clear).
+  Could NOT verify: the warning firing against a real corrupt/rotated-key decrypt failure on a
+  deployed PM (HITL — needs a real Site with an undecryptable stored key).
+- **Files:** `ProjectManager/src/app/api/sites/[id]/deploy/route.ts`,
+  `ProjectManager/src/app/(app)/sites/deploy-form.tsx`,
+  `ProjectManager/scripts/deploy-mint-warning.test.mjs`, `ProjectManager/messages/{en,fi,et}.json`

@@ -35,6 +35,7 @@ export function DeployForm({
   const [error, setError] = useState<DeployError | null>(null);
   const [started, setStarted] = useState(false);
   const [mintWarning, setMintWarning] = useState(false);
+  const [keyWarning, setKeyWarning] = useState(false);
   const [pending, setPending] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -89,6 +90,7 @@ export function DeployForm({
     setError(null);
     setStarted(false);
     setMintWarning(false);
+    setKeyWarning(false);
     setPending(true);
     try {
       const res = await fetch(`/api/sites/${siteId}/deploy`, {
@@ -100,10 +102,12 @@ export function DeployForm({
         error?: DeployError;
         accepted?: boolean;
         mintWarning?: boolean;
+        keyWarning?: boolean;
       };
       if (res.ok && data.accepted) {
         setStarted(true);
         setMintWarning(data.mintWarning === true);
+        setKeyWarning(data.keyWarning === true);
         router.refresh();
         return;
       }
@@ -187,6 +191,12 @@ export function DeployForm({
         {mintWarning ? (
           <Alert tone="warning">
             <AlertBody>{t("mintWarning")}</AlertBody>
+          </Alert>
+        ) : null}
+
+        {keyWarning ? (
+          <Alert tone="warning">
+            <AlertBody>{t("keyWarning")}</AlertBody>
           </Alert>
         ) : null}
 

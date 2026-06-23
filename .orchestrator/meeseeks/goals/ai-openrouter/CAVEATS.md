@@ -149,3 +149,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   no cache). If chat latency ever matters, cache per-isolate — but YAGNI for now.
 - CMS settings tab + page live at `/admin/settings/openrouter-key`; route `/api/settings/openrouter-key`.
   i18n block `openrouterKey` + `settingsNav.openrouterKey` in all three `CMS/messages/{en,fi,et}.json`.
+- DEPLOY-FALLBACK WARNINGS (PM deploy route → form): the accepted deploy response can carry TWO
+  non-blocking warning flags, both pure response flags that DON'T change the graceful-degrade behavior:
+  `mintWarning` (mint-on-deploy failed → global key) and `keyWarning` (stored per-Site key failed to
+  decrypt → global key, from the existing `degraded` value). Form (`deploy-form.tsx`) renders each as a
+  `tone="warning"` Alert: `t("mintWarning")` then `t("keyWarning")`. i18n keys `sites.deploy.mintWarning`
+  + `sites.deploy.keyWarning` in PM `messages/{en,fi,et}.json`. Regression: `scripts/deploy-mint-warning.test.mjs`
+  (10 tests) source-greps the route's conditional `...(degraded ? { keyWarning: true } : {})` + form
+  reads + i18n parity — the route can't be imported under Node (pulls the CF context).
