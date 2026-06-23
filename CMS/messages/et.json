@@ -674,7 +674,8 @@
     "success": "Kui selle e-posti aadressiga konto on olemas, saatsime sulle parooli lähtestuslingi.",
     "backToSignIn": "Tagasi sisselogimisse",
     "errorGeneric": "Lähtestuslinki ei õnnestunud saata. Proovi uuesti.",
-    "errorNetwork": "Serveriga ei õnnestunud ühendust luua. Proovi uuesti."
+    "errorNetwork": "Serveriga ei õnnestunud ühendust luua. Proovi uuesti.",
+    "errorTooMany": "Liiga palju lähtestamistaotlusi sellele e-postile. Palun oota mõni minut ja proovi uuesti."
   },
   "resetPassword": {
     "title": "Sea uus parool",

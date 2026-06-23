@@ -5,6 +5,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-23): **Throttle `/api/auth/forgot` (rate-limit reset-email
+  requests).** See JOURNAL. Added a `kind` column to `login_attempt` (migration
+  0014, default `'login'`; index now `(email, kind)`) so forgot + login have
+  SEPARATE sliding-window namespaces — forgot-spam can't lock out login. Threaded
+  `kind: AttemptKind` through `db/login-attempt-store.ts` (signature change:
+  `injectedDb` moved to position 4, `kind` at 3, both defaulted). Forgot route
+  throttles (`kind:"forgot"`) BEFORE the user lookup → **429 + Retry-After** when
+  locked, records every request (no success to clear on), still enumeration-safe.
+  Form shows `forgotPassword.errorTooMany` (EN/FI/ET). 2 new tests (788 total),
+  tsc + opennext build green, cms-bundle regen.
+
 - DONE (2026-06-23 18:55): **Brute-force protection on `/api/auth/login`.** See
   JOURNAL. Pure `lib/auth/throttle-core.ts` (`decideThrottle` sliding window,
   MAX_ATTEMPTS=5 / WINDOW_MS=15min, node-tested) + D1 `login_attempt` table

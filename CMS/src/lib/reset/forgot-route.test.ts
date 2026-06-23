@@ -109,6 +109,22 @@ test("forgot route returns the SAME success body whether or not email matched (e
   );
 });
 
+test("forgot route is rate-limited in the 'forgot' namespace BEFORE the user lookup", () => {
+  // 429 + Retry-After when locked, and the throttle uses the SEPARATE 'forgot'
+  // namespace so it can't lock out login.
+  assert.match(routeSrc, /status:\s*429/, "must 429 when rate-limited");
+  assert.match(routeSrc, /"Retry-After"/, "429 must carry Retry-After");
+  assert.match(routeSrc, /recentFailureTimestamps\(\s*email,\s*now,\s*"forgot"/);
+  assert.match(routeSrc, /recordFailure\(\s*email,\s*now,\s*"forgot"/);
+  // The throttle check comes before the user lookup (no email send / DB read on lock).
+  const throttleIdx = routeSrc.indexOf("decideThrottle");
+  const lookupIdx = routeSrc.indexOf("await findUserByEmail");
+  assert.ok(
+    throttleIdx > -1 && throttleIdx < lookupIdx,
+    "throttle must run before findUserByEmail",
+  );
+});
+
 test("reset email strings exist in all three locales and interpolate {url} (i18n parity)", () => {
   // CMS keeps email strings at the TOP LEVEL (`resetEmail`), not PM's `auth.forgot.email`.
   for (const loc of ["en", "fi", "et"]) {

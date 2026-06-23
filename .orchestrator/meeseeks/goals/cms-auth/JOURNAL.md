@@ -443,3 +443,35 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (+meta), CMS/src/app/api/auth/login/route.ts, CMS/src/components/login-form.tsx,
   CMS/messages/{en,fi,et}.json (+login.errorTooMany), CMS/scripts/login-throttle.test.mjs
   (new), ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-23 19:05 — Rate-limit /api/auth/forgot (reset-email throttle)
+- **Status:** DONE
+- **What I did:** Extended the cms-auth brute-force throttle to the
+  forgot-password endpoint. Added a `kind` column to `login_attempt` (migration
+  0014, NOT NULL default `'login'`; replaced the email-only index with
+  `login_attempt_email_kind_idx (email, kind)`) so login and forgot share the
+  table but have SEPARATE sliding-window namespaces — spamming forgot can't lock
+  out login. Threaded `kind: AttemptKind ('login'|'forgot')` through
+  `db/login-attempt-store.ts` (recentFailureTimestamps/recordFailure/clearFailures
+  now take `kind` at arg 3, `injectedDb` moved to arg 4; both defaulted to keep the
+  login route's call sites unchanged). `/api/auth/forgot` now: decideThrottle over
+  the `forgot` namespace BEFORE the user lookup → 429 + `Retry-After` when locked;
+  records EVERY request (no success signal to clear on — forgot always 200s) so
+  the window fills; still enumeration-safe (records misses too, 429 before
+  findUserByEmail). Form surfaces 429 as `forgotPassword.errorTooMany` (EN/FI/ET).
+- **Verified:** `npm test` 788 pass / 0 fail (2 new: forgot-namespace isolation in
+  login-throttle.test.mjs + structural forgot-route check that it 429s before the
+  lookup in the 'forgot' namespace). `npx tsc --noEmit` clean. `npx
+  opennextjs-cloudflare build` green (dev server confirmed down first). PM
+  `bundle:cms` regenerated (tree had NO parallel CMS/PM WIP — only goal-memory +
+  two untracked `.impeccable/` archive dirs, which I left alone). Could NOT verify
+  a live 429 round-trip on a deployed CMS (no live Site this run) — logic is
+  node-tested + structurally locked.
+- **Files:** CMS/src/db/schema.ts (loginAttempt +kind col, email+kind index),
+  CMS/migrations/0014_high_texas_twister.sql (+meta snapshot/_journal),
+  CMS/src/db/login-attempt-store.ts (kind param), CMS/src/app/api/auth/forgot/route.ts
+  (throttle), CMS/src/components/forgot-password-form.tsx (429 branch),
+  CMS/messages/{en,fi,et}.json (+forgotPassword.errorTooMany),
+  CMS/scripts/login-throttle.test.mjs (kind sig + isolation test),
+  CMS/src/lib/reset/forgot-route.test.ts (+throttle structural test),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).

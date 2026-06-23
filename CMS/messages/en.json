@@ -674,7 +674,8 @@
     "success": "If an account exists for that email, we've sent a link to reset your password.",
     "backToSignIn": "Back to sign in",
     "errorGeneric": "Couldn't send the reset link. Try again.",
-    "errorNetwork": "Couldn't reach the server. Try again."
+    "errorNetwork": "Couldn't reach the server. Try again.",
+    "errorTooMany": "Too many reset requests for this email. Please wait a few minutes and try again."
   },
   "resetPassword": {
     "title": "Set a new password",

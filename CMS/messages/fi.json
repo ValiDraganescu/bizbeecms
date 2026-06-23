@@ -674,7 +674,8 @@
     "success": "Jos kyseiselle sähköpostiosoitteelle on tili, olemme lähettäneet linkin salasanan nollaamiseen.",
     "backToSignIn": "Takaisin kirjautumiseen",
     "errorGeneric": "Nollauslinkkiä ei voitu lähettää. Yritä uudelleen.",
-    "errorNetwork": "Palvelimeen ei saatu yhteyttä. Yritä uudelleen."
+    "errorNetwork": "Palvelimeen ei saatu yhteyttä. Yritä uudelleen.",
+    "errorTooMany": "Liian monta nollauspyyntöä tälle sähköpostille. Odota muutama minuutti ja yritä uudelleen."
   },
   "resetPassword": {
     "title": "Aseta uusi salasana",

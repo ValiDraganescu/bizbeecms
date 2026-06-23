@@ -39,6 +39,11 @@ export function ForgotPasswordForm() {
         setSent(true);
         return;
       }
+      // Rate-limited: too many reset requests for this email in the window.
+      if (res.status === 429) {
+        setError(t("errorTooMany"));
+        return;
+      }
       setError(t("errorGeneric"));
     } catch {
       setError(t("errorNetwork"));

@@ -58,9 +58,10 @@ const DDL = `
 CREATE TABLE login_attempt (
   id text PRIMARY KEY NOT NULL,
   email text NOT NULL,
+  kind text DEFAULT 'login' NOT NULL,
   created_at integer DEFAULT (unixepoch() * 1000) NOT NULL
 );
-CREATE INDEX login_attempt_email_idx ON login_attempt (email);
+CREATE INDEX login_attempt_email_kind_idx ON login_attempt (email, kind);
 `;
 
 /** D1Database-shaped binding over in-memory node:sqlite. */
@@ -94,16 +95,16 @@ test("record → count → throttle → clear lifecycle", async () => {
   const now = 50_000_000;
 
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    await recordFailure(email, now - i * 1000, db);
+    await recordFailure(email, now - i * 1000, "login", db);
   }
 
-  const ts = await recentFailureTimestamps(email, now, db);
+  const ts = await recentFailureTimestamps(email, now, "login", db);
   assert.equal(ts.length, MAX_ATTEMPTS);
   assert.equal(decideThrottle(ts, now).locked, true);
 
   // A successful login clears the email's attempts → no longer locked.
-  await clearFailures(email, db);
-  const after = await recentFailureTimestamps(email, now, db);
+  await clearFailures(email, "login", db);
+  const after = await recentFailureTimestamps(email, now, "login", db);
   assert.equal(after.length, 0);
   assert.equal(decideThrottle(after, now).locked, false);
 });
@@ -112,18 +113,40 @@ test("recentFailureTimestamps only returns in-window rows", async () => {
   const db = cfDb(fakeD1());
   const email = "user@example.com";
   const now = 50_000_000;
-  await recordFailure(email, now - 1000, db); // in window
-  await recordFailure(email, now - WINDOW_MS - 5000, db); // aged out
-  const ts = await recentFailureTimestamps(email, now, db);
+  await recordFailure(email, now - 1000, "login", db); // in window
+  await recordFailure(email, now - WINDOW_MS - 5000, "login", db); // aged out
+  const ts = await recentFailureTimestamps(email, now, "login", db);
   assert.equal(ts.length, 1);
 });
 
 test("attempts are per-email isolated", async () => {
   const db = cfDb(fakeD1());
   const now = 50_000_000;
-  await recordFailure("a@example.com", now, db);
-  await recordFailure("a@example.com", now, db);
-  await recordFailure("b@example.com", now, db);
-  assert.equal((await recentFailureTimestamps("a@example.com", now, db)).length, 2);
-  assert.equal((await recentFailureTimestamps("b@example.com", now, db)).length, 1);
+  await recordFailure("a@example.com", now, "login", db);
+  await recordFailure("a@example.com", now, "login", db);
+  await recordFailure("b@example.com", now, "login", db);
+  assert.equal((await recentFailureTimestamps("a@example.com", now, "login", db)).length, 2);
+  assert.equal((await recentFailureTimestamps("b@example.com", now, "login", db)).length, 1);
+});
+
+test("login and forgot namespaces are isolated (forgot-spam can't lock login)", async () => {
+  const db = cfDb(fakeD1());
+  const email = "victim@example.com";
+  const now = 50_000_000;
+
+  // Hammer the forgot endpoint up to (and past) the limit.
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    await recordFailure(email, now - i * 1000, "forgot", db);
+  }
+  // forgot is now locked…
+  const forgot = await recentFailureTimestamps(email, now, "forgot", db);
+  assert.equal(decideThrottle(forgot, now).locked, true);
+  // …but login for the same email is untouched.
+  const login = await recentFailureTimestamps(email, now, "login", db);
+  assert.equal(login.length, 0);
+  assert.equal(decideThrottle(login, now).locked, false);
+
+  // Clearing one namespace leaves the other intact.
+  await clearFailures(email, "forgot", db);
+  assert.equal((await recentFailureTimestamps(email, now, "forgot", db)).length, 0);
 });

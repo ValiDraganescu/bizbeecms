@@ -404,13 +404,17 @@ export const loginAttempt = sqliteTable(
   "login_attempt",
   {
     id: text("id").primaryKey(),
-    // Lowercased login email the failed attempt targeted.
+    // Lowercased email the failed/limited attempt targeted.
     email: text("email").notNull(),
+    // Which surface the attempt is for, so login and forgot-password share the
+    // table but have SEPARATE sliding-window namespaces (forgot-spam must not
+    // lock out login, and vice versa). 'login' default keeps existing rows.
+    kind: text("kind").notNull().default("login"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
   },
-  (t) => [index("login_attempt_email_idx").on(t.email)],
+  (t) => [index("login_attempt_email_kind_idx").on(t.email, t.kind)],
 );
 
 export type Component = typeof component.$inferSelect;

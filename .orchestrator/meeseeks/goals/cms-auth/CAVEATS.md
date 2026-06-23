@@ -328,6 +328,22 @@ Read every line before working. Each entry was learned the hard way by a previou
   remaining `env.GOOGLE_CLIENT_*` references live ONLY in deployer/wrangler shared
   injection — REWORK #4 rips those out.
 
+- **FORGOT-PASSWORD THROTTLE LANDED (2026-06-23) + `login_attempt` IS NOW
+  `kind`-NAMESPACED.** `login_attempt` gained a `kind` column (`'login' | 'forgot'`,
+  NOT NULL default `'login'`, migration 0014; index is now `(email, kind)`). The
+  store fns in `db/login-attempt-store.ts` changed signature:
+  `recentFailureTimestamps(email, now, kind='login', injectedDb?)`,
+  `recordFailure(email, now, kind='login', injectedDb?)`,
+  `clearFailures(email, kind='login', injectedDb?)` — **`kind` is arg 3, `injectedDb`
+  moved to arg 4.** Both default, so the login route's call sites (which omit them)
+  are unchanged. If you add a THIRD throttled surface, extend the `AttemptKind`
+  union + pass the new kind; do NOT reuse `'login'`/`'forgot'` (you'd cross-lock
+  surfaces). `/api/auth/forgot` records EVERY request (it always 200s — no success
+  to clear on) and 429s + `Retry-After` BEFORE `findUserByEmail`. Still
+  enumeration-safe. `/api/auth/reset` is NOT throttled — it's token-gated (the token
+  IS the credential, single-use, TOCTOU-safe) so it's not an enumeration/guess
+  surface; don't add a throttle there without a reason.
+
 - **LOGIN BRUTE-FORCE THROTTLE LANDED (2026-06-23).** Pure
   `lib/auth/throttle-core.ts` (`decideThrottle`, MAX_ATTEMPTS=5/WINDOW_MS=15min) +
   D1 `login_attempt` table (migration 0013) + `db/login-attempt-store.ts`
