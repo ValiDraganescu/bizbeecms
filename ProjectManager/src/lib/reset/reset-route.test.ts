@@ -3,90 +3,195 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { drizzle } from "drizzle-orm/d1";
+import * as schema from "../../db/schema.ts";
+import { fakeD1Returning } from "../test/fake-d1.ts";
+import { checkReset, applyReset } from "./reset.ts";
 
 /**
- * auth-reset P3 regression: PM `POST /api/auth/reset`.
+ * auth-reset P3 — BEHAVIORAL test of the PM reset flow.
  *
- * Like the P2 test, the route + lib import the `@/` alias which Node's native TS
- * stripping doesn't resolve under a bare `node --test`, so we assert against
- * source TEXT (the established repo pattern). The contract we lock:
- *  - the reset classifier gates on existence, single-use (usedAt), and expiry;
- *  - applyReset re-validates, marks the token used under an isNull guard, sets a
- *    fresh hash, and invalidates the user's sessions;
- *  - invalid/expired/used all return the SAME generic error (no detail leak);
- *  - new password obeys the register min-length; i18n parity for the error key.
+ * Drives the REAL `checkReset`/`applyReset` over the real drizzle-D1 client on a
+ * fake D1 (real schema → real SQL → real bindings), with a stub session
+ * invalidator injected so the KV-backed `invalidateUserSessions` (which needs the
+ * CF context) doesn't have to load. We assert the actual contract:
+ *  - single-use: a second applyReset with the same token is rejected;
+ *  - expired/used/notFound all collapse to a non-ok result the route maps to ONE
+ *    generic error;
+ *  - usedAt is set (the guarded update fires) and a fresh user hash is written;
+ *  - the route never exposes the failure reason.
+ *
+ * `reset-logic.test.ts` covers the pure classifier boundaries; this file proves
+ * the DB-driven wiring around it.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..", "..");
 
-const resetSrc = readFileSync(join(here, "reset.ts"), "utf8");
-const logicSrc = readFileSync(join(here, "reset-logic.ts"), "utf8");
-const routeSrc = readFileSync(
-  join(root, "src/app/api/auth/reset/route.ts"),
-  "utf8",
-);
-const sessionSrc = readFileSync(
-  join(root, "src/lib/auth/session.ts"),
-  "utf8",
-);
+const cfDb = (d1: unknown) => drizzle(d1 as D1Database, { schema });
 
-test("checkReset delegates classification to classifyReset", () => {
-  // The DB lookup stays in reset.ts; the decision lives in the pure module so
-  // it's behaviorally testable (see reset-logic.test.ts).
-  assert.match(resetSrc, /classifyReset\(reset\)/);
-  assert.match(logicSrc, /export function classifyReset/);
+/** A password_resets D1 row as drizzle reads it back (snake_case, epoch ints). */
+const resetRow = (o: {
+  id?: string;
+  user_id?: string;
+  token?: string;
+  expires_at?: number;
+  used_at?: number | null;
+}) => ({
+  id: o.id ?? "reset-1",
+  user_id: o.user_id ?? "user-1",
+  token: o.token ?? "tok-abc",
+  expires_at: o.expires_at ?? Date.now() + 60_000,
+  used_at: o.used_at ?? null,
+  created_at: Date.now(),
 });
 
-test("applyReset enforces single-use via an isNull(usedAt) guarded update", () => {
-  // The usedAt update is conditioned on usedAt still being NULL, so a concurrent
-  // double-submit can't reuse the token; zero rows updated => rejected as used.
-  assert.match(
-    resetSrc,
-    /\.update\(schema\.passwordResets\)[\s\S]*isNull\(schema\.passwordResets\.usedAt\)/,
-  );
-  assert.match(resetSrc, /if \(marked\.length === 0\) return \{ ok: false, reason: "used" \}/);
+test("checkReset reads a real select on password_resets keyed by token", async () => {
+  const d1 = fakeD1Returning([
+    { match: 'from "password_resets"', rows: [resetRow({ token: "tok-xyz" })] },
+  ]);
+  const { status, reset } = await checkReset("tok-xyz", cfDb(d1));
+
+  // The real query hit the real table, bound by token.
+  const sel = d1.calls.find((c) => /from "password_resets"/i.test(c.sql));
+  assert.ok(sel, "expected a select on password_resets");
+  assert.match(sel!.sql, /"token" = \?/i);
+  assert.ok(sel!.params.includes("tok-xyz"));
+  // A fresh, unused row classifies valid and maps the columns back through schema.
+  assert.equal(status, "valid");
+  assert.equal(reset?.userId, "user-1");
 });
 
-test("applyReset sets a fresh hash and invalidates the user's sessions", () => {
-  assert.match(resetSrc, /hashPassword\(newPassword\)/);
-  assert.match(resetSrc, /\.update\(schema\.users\)[\s\S]*passwordHash/);
-  assert.match(resetSrc, /invalidateUserSessions\(reset\.userId\)/);
-  // Order: hash + user update must happen only after the token is marked used.
-  const markIdx = resetSrc.indexOf("marked.length === 0");
-  const hashIdx = resetSrc.indexOf("hashPassword(newPassword)");
-  assert.ok(markIdx > 0 && hashIdx > markIdx, "mark-used must precede hashing");
+test("checkReset reports notFound when no row matches the token", async () => {
+  const d1 = fakeD1Returning([]); // every read returns []
+  const { status, reset } = await checkReset("missing", cfDb(d1));
+  assert.equal(status, "notFound");
+  assert.equal(reset, null);
 });
 
-test("invalidateUserSessions scans the session prefix and deletes by userId", () => {
-  assert.match(sessionSrc, /export async function invalidateUserSessions/);
-  assert.match(sessionSrc, /kv\.list\(\{ prefix: KV_PREFIX/);
-  assert.match(sessionSrc, /record\.userId === userId.*kv\.delete/s);
+test("checkReset reports expired for a row whose expiresAt is past", async () => {
+  const d1 = fakeD1Returning([
+    { match: 'from "password_resets"', rows: [resetRow({ expires_at: Date.now() - 1000 })] },
+  ]);
+  const { status } = await checkReset("tok-abc", cfDb(d1));
+  assert.equal(status, "expired");
 });
 
-test("reset route returns ONE generic error for invalid/expired/used", () => {
-  // All non-ok applyReset outcomes collapse to the same resetTokenInvalid body.
-  assert.match(
-    routeSrc,
-    /if \(!result\.ok\)[\s\S]*error: "resetTokenInvalid"/,
-  );
-  // The route never branches its error message on the failure reason.
+test("checkReset reports used for a row whose usedAt is set", async () => {
+  const d1 = fakeD1Returning([
+    { match: 'from "password_resets"', rows: [resetRow({ used_at: Date.now() - 1000 })] },
+  ]);
+  const { status } = await checkReset("tok-abc", cfDb(d1));
+  assert.equal(status, "used");
+});
+
+test("applyReset on a valid token marks it used, writes a fresh hash, kills sessions", async () => {
+  // select → returns the valid row; the guarded update → returns the marked row
+  // (1 row ⇒ single-use claim succeeded).
+  const d1 = fakeD1Returning([
+    { match: 'from "password_resets"', rows: [resetRow({})] },
+    { match: 'update "password_resets"', rows: [resetRow({ used_at: Date.now() })] },
+  ]);
+  const killed: string[] = [];
+  const result = await applyReset("tok-abc", "a-new-password-123", {
+    db: cfDb(d1),
+    invalidateSessions: async (uid) => {
+      killed.push(uid);
+    },
+  });
+
+  assert.deepEqual(result, { ok: true });
+
+  // The single-use claim was a guarded update on password_resets setting used_at.
+  const upd = d1.calls.find((c) => /update "password_resets"/i.test(c.sql));
+  assert.ok(upd, "expected a guarded update on password_resets");
+  assert.match(upd!.sql, /"used_at" = \?/i);
+  assert.match(upd!.sql, /"used_at" is null/i); // isNull guard ⇒ single-use
+
+  // A fresh hash was written to the user row (PBKDF2 self-describing string).
+  const userUpd = d1.calls.find((c) => /update "users"/i.test(c.sql));
+  assert.ok(userUpd, "expected an update on users with the new hash");
   assert.ok(
-    !/result\.reason/.test(routeSrc),
-    "route must not expose the failure reason (no detail leak)",
+    userUpd!.params.some((p) => typeof p === "string" && p.startsWith("pbkdf2$")),
+    "a real PBKDF2 hash must be bound to the user update",
   );
+
+  // Sessions were invalidated for exactly the reset's user.
+  assert.deepEqual(killed, ["user-1"]);
 });
 
-test("reset route enforces register min-length on the new password", () => {
-  assert.match(routeSrc, /validatePassword\(password\)/);
-  assert.match(routeSrc, /password !== confirm[\s\S]*passwordMismatch/);
+test("applyReset is single-use: a guarded update returning 0 rows rejects as used", async () => {
+  // The token still selects as valid, but the guarded update claims 0 rows
+  // (concurrent double-submit already spent it) ⇒ rejected, no hash written.
+  const d1 = fakeD1Returning([
+    { match: 'from "password_resets"', rows: [resetRow({})] },
+    { match: 'update "password_resets"', rows: [] }, // 0 rows updated
+  ]);
+  let killed = false;
+  const result = await applyReset("tok-abc", "a-new-password-123", {
+    db: cfDb(d1),
+    invalidateSessions: async () => {
+      killed = true;
+    },
+  });
+
+  assert.deepEqual(result, { ok: false, reason: "used" });
+  // No user hash update and no session kill once the token claim failed.
+  assert.ok(!d1.calls.some((c) => /update "users"/i.test(c.sql)), "must not rehash");
+  assert.equal(killed, false);
+});
+
+test("applyReset rejects expired/used/notFound BEFORE any write (generic non-ok)", async () => {
+  // Expired token: classified before the update, so nothing is mutated.
+  const expired = fakeD1Returning([
+    { match: 'from "password_resets"', rows: [resetRow({ expires_at: Date.now() - 1 })] },
+  ]);
+  const r1 = await applyReset("tok-abc", "a-new-password-123", {
+    db: cfDb(expired),
+    invalidateSessions: async () => {},
+  });
+  assert.deepEqual(r1, { ok: false, reason: "expired" });
+  assert.ok(!expired.calls.some((c) => /update "/i.test(c.sql)), "expired ⇒ no writes");
+
+  // notFound: empty read.
+  const missing = fakeD1Returning([]);
+  const r2 = await applyReset("nope", "a-new-password-123", {
+    db: cfDb(missing),
+    invalidateSessions: async () => {},
+  });
+  assert.deepEqual(r2, { ok: false, reason: "notFound" });
+
+  // used: a row already spent.
+  const used = fakeD1Returning([
+    { match: 'from "password_resets"', rows: [resetRow({ used_at: Date.now() - 1 })] },
+  ]);
+  const r3 = await applyReset("tok-abc", "a-new-password-123", {
+    db: cfDb(used),
+    invalidateSessions: async () => {},
+  });
+  assert.deepEqual(r3, { ok: false, reason: "used" });
+
+  // All three are non-ok; the route maps every non-ok to ONE generic error, so
+  // no caller can tell expired/used/notFound apart.
+  for (const r of [r1, r2, r3]) assert.equal(r.ok, false);
+});
+
+test("reset route maps every non-ok applyReset to ONE generic error, never the reason", () => {
+  // The route is a thin Next handler that can't load under node --test (next/server
+  // + `@/`), so we lock its branchless error mapping at the source. The BEHAVIOR
+  // (which reasons exist, single-use, write ordering) is proven above against the
+  // real fns; here we only assert the route can't leak which reason fired.
+  const routeSrc = readFileSync(
+    join(root, "src/app/api/auth/reset/route.ts"),
+    "utf8",
+  );
+  assert.match(routeSrc, /if \(!result\.ok\)[\s\S]*error: "resetTokenInvalid"/);
+  assert.ok(!/result\.reason/.test(routeSrc), "route must not expose the failure reason");
 });
 
 test("resetTokenInvalid error string exists in all three locales (i18n parity)", () => {
   for (const loc of ["en", "fi", "et"]) {
-    const msgs = JSON.parse(
-      readFileSync(join(root, `messages/${loc}.json`), "utf8"),
-    );
+    const msgs = JSON.parse(readFileSync(join(root, `messages/${loc}.json`), "utf8"));
     assert.ok(
       msgs?.auth?.errors?.resetTokenInvalid,
       `auth.errors.resetTokenInvalid missing in ${loc}`,

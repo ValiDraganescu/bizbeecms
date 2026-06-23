@@ -26,52 +26,10 @@ import {
   type TimelineRow,
 } from "./deploy-events.ts";
 import * as schema from "../../db/schema.ts";
+import { fakeD1, fakeD1Rows } from "../test/fake-d1.ts";
 
 /** Build the real schema-bound drizzle-D1 client over a fake D1, like prod's getDb. */
 const cfDb = (d1: D1Database) => drizzle(d1, { schema });
-
-/** In-memory fake D1Database: records every prepared SQL + bound params. */
-function fakeD1() {
-  const calls: { sql: string; params: unknown[] }[] = [];
-  return {
-    calls,
-    prepare(sql: string) {
-      const stmt: {
-        sql: string;
-        params: unknown[];
-        bind: (...p: unknown[]) => unknown;
-        all: () => Promise<unknown>;
-        run: () => Promise<unknown>;
-        first: () => Promise<unknown>;
-        raw: () => Promise<unknown>;
-      } = {
-        sql,
-        params: [],
-        bind(...p: unknown[]) {
-          stmt.params = p;
-          return stmt;
-        },
-        async all() {
-          calls.push({ sql: stmt.sql, params: stmt.params });
-          return { results: [] };
-        },
-        async run() {
-          calls.push({ sql: stmt.sql, params: stmt.params });
-          return { results: [], meta: {} };
-        },
-        async first() {
-          calls.push({ sql: stmt.sql, params: stmt.params });
-          return null;
-        },
-        async raw() {
-          calls.push({ sql: stmt.sql, params: stmt.params });
-          return [];
-        },
-      };
-      return stmt;
-    },
-  };
-}
 
 test("insertDeployEvent compiles a real insert into deploy_events with bound values", async () => {
   const d1 = fakeD1();
@@ -128,39 +86,6 @@ test("insertDeployEvent persists nullable fields as null, not undefined", async 
   assert.ok(params.includes(null));
   assert.ok(!params.includes(undefined));
 });
-
-/** Fake D1 whose `all()` returns seeded rows, so the read query's mapping is testable. */
-function fakeD1Rows(rows: Record<string, unknown>[]) {
-  const calls: { sql: string; params: unknown[] }[] = [];
-  return {
-    calls,
-    prepare(sql: string) {
-      const stmt: {
-        sql: string;
-        params: unknown[];
-        bind: (...p: unknown[]) => unknown;
-        all: () => Promise<unknown>;
-        raw: () => Promise<unknown>;
-      } = {
-        sql,
-        params: [],
-        bind(...p: unknown[]) {
-          stmt.params = p;
-          return stmt;
-        },
-        async all() {
-          calls.push({ sql: stmt.sql, params: stmt.params });
-          return { results: rows };
-        },
-        async raw() {
-          calls.push({ sql: stmt.sql, params: stmt.params });
-          return rows.map((r) => Object.values(r));
-        },
-      };
-      return stmt;
-    },
-  };
-}
 
 test("listDeployEventsForSite filters by site and orders by started_at then created_at", async () => {
   const d1 = fakeD1Rows([]);

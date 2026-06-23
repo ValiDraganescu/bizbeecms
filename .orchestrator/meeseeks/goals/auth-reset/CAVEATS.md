@@ -107,6 +107,23 @@ Read every line before working. Each entry was learned the hard way by a previou
   FORM maps the C3 route's BARE error keys to `resetPassword.error*`
   (passwordRequired+passwordTooShort→errorTooShort, passwordMismatch→errorMismatch,
   resetTokenInvalid→errorTokenInvalid, default→errorGeneric). C5 needs NO new strings.
+- TEST-HARNESS (learned): the way to BEHAVIORALLY test PM lib code that imports
+  `@/` under `node --test` (which can't resolve the alias) is the deploy-events
+  INJECTED-DB SEAM, now generalised: (1) import `schema`/`Db`/pure helpers via
+  RELATIVE paths (`../../db/schema.ts`, `../auth/password.ts`), never `@/`; (2) make
+  the CF-context deps (`getDb`, KV `session.ts`) LAZY — `injected ?? (await
+  import("../../db/index.ts")).getDb()` — so the module LOADS without ever pulling
+  `@opennextjs/cloudflare` at import time; (3) give each fn an optional injected
+  `Db` (+ stub for the session invalidator) defaulting to the real one. Tests then
+  build `drizzle(fakeD1, { schema })` and drive the REAL fn → REAL SQL → REAL
+  bindings. Shared fakes live in `ProjectManager/src/lib/test/fake-d1.ts`:
+  `fakeD1()` (records SQL+params, reads empty), `fakeD1Rows(rows)` (reads return
+  rows), `fakeD1Returning(matchers)` (per-statement rows matched by SQL substring,
+  with `once:true` to model a single-use `update … returning` that yields rows
+  then empty). `password.ts` is pure Web Crypto (no imports) ⇒ safe to import
+  relatively and assert the real `pbkdf2$…` hash flows to the bound params.
+  CMS half (TEST-HARNESS-CMS) mirrors this but ports the util fresh (CMS has no
+  deploy-events precedent) and asserts the indexed `delete from session` fires.
 - P5 NON-DUPLICATION: the enumeration-safe hit===miss invariant is already locked
   STRUCTURALLY by `forgot-route.test.ts` (exactly one `{ok:true}` returned AFTER
   the `if(user)` block). Don't add a runtime deep-equal of `{ok:true}` vs

@@ -1,22 +1,32 @@
 # Note to the next Meeseeks (auth-reset)
 
-**auth-reset FULL SCOPE COMPLETE — PM P1–P5 + CMS C1–C5 all DONE.**
-- PM half: password_resets table, /api/auth/forgot, /api/auth/reset, pages+login link,
-  pure-logic tests.
-- CMS half: password_reset table+migration 0012, /api/auth/forgot, /api/auth/reset,
-  forgot/reset pages+login link, and C5 = reset-logic.test.ts + `bundle:cms` regen.
-- C5 (final) shipped all CMS reset changes into the PM-deployable
-  `ProjectManager/src/lib/deploy/cms-bundle.generated.js` via `npm run bundle:cms`.
-- Gates all green both apps (tsc / node tests / opennext build).
+**Feature scope COMPLETE (PM P1–P5 + CMS C1–C5). Now hardening the tests.**
 
-**There is no queued next task — the whole password-reset feature (both apps) is delivered.**
-If summoned again on this goal:
-1. Re-read main/GOAL.md + this goal's GOAL.md and verify against the live app — the
-   only meaningful work left would be an E2E browser smoke (request reset on
-   bizbee.localhost / a deployed Site, click the emailed link, set a new password,
-   confirm old session is killed) or a deploy of the regenerated CMS bundle.
-2. If nothing reset-specific remains, flag in `result` that auth-reset looks fully
-   delivered so the curator can archive this subgoal — don't invent busywork.
+DONE this run: **TEST-HARNESS-PM** — the PM reset ROUTE tests are now BEHAVIORAL,
+not source-grep. Shared `ProjectManager/src/lib/test/fake-d1.ts` holds
+`fakeD1`/`fakeD1Rows`/`fakeD1Returning`; `reset.ts` got the injected-Db seam so it
+loads under `node --test`; `forgot-route.test.ts` + `reset-route.test.ts` drive the
+real `createPasswordReset`/`checkReset`/`applyReset` over a fake D1. See the
+TEST-HARNESS caveat for the exact seam recipe (relative imports + lazy CF deps +
+optional injected Db/invalidator).
 
-Reminders that still hold: ONE app per run; only ONE worker runs `bundle:cms`;
-`lsof -ti:3601,3602` must be empty before any opennext build or bundle:cms.
+**NEXT TASK: TEST-HARNESS-CMS** (the remaining open TODO in BACKLOG.md). Mirror the
+PM work on the CMS side — CMS ONLY (`CMS/`), never PM:
+1. Port the util to `CMS/src/lib/test/fake-d1.ts` (CMS has no deploy-events to
+   extract from — copy PM's `fake-d1.ts`).
+2. Apply the SAME injected-Db seam to CMS `lib/reset/reset.ts` (CMS table is
+   SINGULAR `passwordReset`/`user`/`session`; CMS session kill is an INDEXED
+   `delete from session where userId = ?`, NOT KV scan — assert it fires for the
+   right userId via the delete SQL+param or an injected stub).
+3. Rewrite CMS `lib/reset/forgot-route.test.ts` + `reset-route.test.ts` to drive
+   the real fns over the fake D1 (same behavioral assertions). DELETE the
+   source-grep asserts; keep i18n bodies.
+4. CMS auth routes use web `Response.json` and bare error keys (see CMS caveats).
+5. LAST STEP: run `bundle:cms` (from PM dir) to keep the committed CMS bundle in
+   sync, then PM tsc + opennext build after the regen.
+
+Gate: CMS tsc + node tests + opennext build, NOT while dev (3602) up — `lsof` first.
+Watch the parallel-safety caveat: ONE app per run, only one worker runs `bundle:cms`.
+
+After TEST-HARNESS-CMS lands, the whole auth-reset goal (feature + genuine tests,
+both apps) is delivered — flag for archival, don't invent busywork.

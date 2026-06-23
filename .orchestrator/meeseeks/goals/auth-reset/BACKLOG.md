@@ -7,6 +7,49 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 PM first (slices P1–P5), then mirror in CMS (slices C1–C5). ONE app per worker run.
 
+USER 2026-06-23: the reset ROUTE tests (PM+CMS forgot/reset) are tautological
+source-text asserts (`readFileSync` + `assert.match` regex on the route/lib
+source) — they verify code EXISTS, not that it WORKS. Replace them with real
+behavioral tests over a fake-D1 harness. NOTE: a proven harness already exists,
+trapped inside `ProjectManager/src/lib/deploy/deploy-events.test.ts` (`fakeD1()`
+drives the REAL drizzle-D1 client over an in-memory fake D1 — records prepared
+SQL + bound params, can seed rows for reads). Promote it to a shared test util,
+then convert the reset route tests to drive the real `createPasswordReset` /
+`checkReset` / `applyReset` over it. The pure `reset-logic.test.ts` files are
+already genuine — leave them.
+
+- DONE: **TEST-HARNESS-PM — shared fake-D1 test util + PM reset route tests now
+  behavioral.** Extracted `fakeD1()`/`fakeD1Rows()` (+ added `fakeD1Returning()`
+  for multi-statement flows) into shared `ProjectManager/src/lib/test/fake-d1.ts`;
+  `deploy-events.test.ts` imports it (its tests stay green). Refactored `reset.ts`
+  to the deploy-events INJECTED-DB SEAM: `@/` imports → relative
+  (`../../db/schema.ts`, `../auth/password.ts`), `getDb`/`session` pulled in
+  LAZILY via dynamic import only when no dep is injected, and
+  `createPasswordReset`/`checkReset`/`applyReset` take an optional injected
+  `Db`/session-invalidator (defaults = real). Now `reset.ts` LOADS under
+  `node --test` and the tests DRIVE the real fns over the real drizzle-D1 client
+  on a fake D1: `createPasswordReset` writes a 64-hex token + 7d-TTL row;
+  `applyReset` marks usedAt under the isNull guard, writes a fresh `pbkdf2$…`
+  hash, kills the right userId's sessions; single-use (guarded update → 0 rows ⇒
+  rejected, no rehash); expired/used/notFound all collapse to non-ok before any
+  write. DELETED the source-grep asserts; KEPT the structural enumeration-safe
+  route lock (single `{ok:true}` after the user block — runtime deep-equal would
+  be tautological) + i18n bodies (executed on real data). Fail-before verified
+  (drop the `marked.length===0` guard ⇒ single-use test fails; reverted). Gates
+  green: tsc 0 / 173 node tests / opennext build. PM only; no bundle:cms.
+
+- TODO: **TEST-HARNESS-CMS — convert CMS reset route tests to behavior (mirror
+  PM).** After the PM harness lands, do the CMS side: add a CMS
+  `CMS/src/lib/test/fake-d1.ts` (mirror PM's; CMS has no deploy-events precedent
+  to extract from, so port the shared util) and rewrite CMS
+  `lib/reset/forgot-route.test.ts` + `lib/reset/reset-route.test.ts` to drive the
+  real CMS `createPasswordReset`/`checkReset`/`applyReset` over it (same
+  behavioral assertions; CMS session kill is an indexed delete — assert it fires
+  for the right userId). DELETE the source-grep asserts. CMS only. LAST step: run
+  `bundle:cms` (test-only changes, but keep the bundle in sync). Gate: CMS tsc +
+  node tests + opennext build, not while dev (3602) up.
+
+
 - DONE: **P1 — PM `password_resets` table + migration.** Added `passwordResets`
   to schema (`id`, `userId` FK→users cascade, `token` unique, `expiresAt`,
   `usedAt` nullable, `createdAt`) + types. Migration `0011_simple_rhino.sql`.
