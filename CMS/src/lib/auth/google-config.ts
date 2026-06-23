@@ -86,3 +86,33 @@ export function toGoogleClientStatus(config: GoogleClientConfig): GoogleClientSt
     configured: isGoogleConfigured(config),
   };
 }
+
+/**
+ * The OAuth routes' runtime decision: given the stored per-Site config (id +
+ * encrypted secret presence) and the deployer-injected `appOrigin`, is Google
+ * sign-in usable, and what redirect_uri do start/callback share?
+ *
+ * `usable` requires a configured client (id + secret) AND an `appOrigin` — the
+ * redirect_uri is always `<appOrigin>/api/auth/google/callback` (the customer
+ * registers exactly that URI). Not usable → the route no-ops (start redirects to
+ * /admin, no consent). The actual secret is decrypted at request time by the
+ * store (`getDecryptedClientSecret`); this helper only needs to know it EXISTS.
+ */
+export interface GoogleRouteDecision {
+  usable: boolean;
+  clientId: string;
+  redirectUri: string;
+}
+
+export function decideGoogleRoute(
+  config: GoogleClientConfig,
+  appOrigin: string,
+): GoogleRouteDecision {
+  const origin = typeof appOrigin === "string" ? appOrigin.replace(/\/+$/, "") : "";
+  const usable = isGoogleConfigured(config) && origin.length > 0;
+  return {
+    usable,
+    clientId: config.clientId,
+    redirectUri: origin ? `${origin}/api/auth/google/callback` : "",
+  };
+}

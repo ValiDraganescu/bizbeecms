@@ -295,3 +295,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/settings/settings-nav.tsx, CMS/messages/{en,fi,et}.json,
   CMS/scripts/google-client.test.mjs (new),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js.
+
+## 2026-06-23 16:52 — GOOGLE-CLIENT REWORK #2: OAuth routes source per-Site creds (not env)
+- **Status:** DONE
+- **What I did:** Rewrote `app/api/auth/google/{start,callback}/route.ts` to read the
+  Google client id from the per-Site CMS-D1 config (`getGoogleClientConfig`) and the
+  client secret via `getDecryptedClientSecret(CMS_AUTH_SECRET)` at request time —
+  instead of `env.GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET`. Added a pure decision helper
+  `decideGoogleRoute(config, appOrigin)` in `lib/auth/google-config.ts` that returns
+  `{ usable, clientId, redirectUri }` (usable = configured client + non-empty appOrigin;
+  redirect_uri = `<appOrigin>/api/auth/google/callback`, trailing slash stripped).
+  `start` no-ops to `/admin` (no consent) when not usable; `callback` redirects
+  `/admin?error=google` when not usable OR the secret decrypt returns null (NEVER 500).
+  `google-core.ts` UNCHANGED (already param-driven). CMS_AUTH_SECRET still read from env
+  (KEK + HMAC state key only — not a Google cred).
+- **Verified:** 757 node tests pass (+1 new `decideGoogleRoute` case covering usable/
+  no-origin/half-config/empty/trailing-slash); `npx tsc --noEmit` clean (fixed a
+  `decision` name collision → renamed mine to `route`); `npx opennextjs-cloudflare build`
+  green (dev server confirmed not running first); regen'd PM cms-bundle (both routes are
+  runtime). Could not do a live Google round-trip (needs a real per-Site client — HITL).
+- **Files:** CMS/src/app/api/auth/google/start/route.ts,
+  CMS/src/app/api/auth/google/callback/route.ts, CMS/src/lib/auth/google-config.ts,
+  CMS/scripts/google-client.test.mjs,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js

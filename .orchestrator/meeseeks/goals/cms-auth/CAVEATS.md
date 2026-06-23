@@ -270,8 +270,20 @@ Read every line before working. Each entry was learned the hard way by a previou
   validation/`isGoogleConfigured`/`toGoogleClientStatus` (never leaks the secret) in
   `lib/auth/google-config.ts`. `isGoogleConfigured` needs BOTH id AND secret. Route
   `GET/PATCH/DELETE /api/settings/google` is `requireUserManager` (Manager+); page
-  `/admin/settings/google`. **The OAuth routes STILL read `env.GOOGLE_CLIENT_*` —
-  this slice only added storage+UI; the env→config swap + ripping out the shared
-  client are the remaining 3 REWORK TODOs (don't assume the routes use the D1 creds
-  yet).** When that swap lands, update the "GOOGLE SIGN-IN LANDED" caveat's last
-  bullet (shared deployer-injected client) to reflect the per-Site model.
+  `/admin/settings/google`.
+
+- **OAUTH ROUTES NOW USE PER-SITE D1 CREDS (REWORK #2 landed 2026-06-23).**
+  `app/api/auth/google/{start,callback}` read the clientId from
+  `getGoogleClientConfig()` and decrypt the secret via
+  `getDecryptedClientSecret(CMS_AUTH_SECRET)` at request time — they NO LONGER read
+  `env.GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET`. The pure decision is
+  `decideGoogleRoute(config, appOrigin)` in `lib/auth/google-config.ts`
+  (`{ usable, clientId, redirectUri }`; usable = configured + appOrigin; redirect_uri
+  = `<appOrigin>/api/auth/google/callback`). `start` no-ops to `/admin` when not
+  usable; `callback` → `?error=google` when not usable OR decrypt returns null (decrypt
+  failure NEVER 500s). `CMS_AUTH_SECRET` is STILL read from env — it's the KEK + the
+  state-HMAC key, NOT a Google credential; don't remove it. **REMAINING REWORK TODOs:**
+  #3 hide the login button unless THIS Site has a client (switch the visibility signal
+  from env to per-Site config — the page still reads `GOOGLE_CLIENT_ID` env), and #4 rip
+  the shared `GOOGLE_CLIENT_ID/SECRET` out of deployer + wrangler + the "GOOGLE SIGN-IN
+  LANDED" caveat's last bullet (still describes the shared-client model — update it then).

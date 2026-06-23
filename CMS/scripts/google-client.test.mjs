@@ -20,6 +20,7 @@ import {
   normalizeGoogleClientConfig,
   toGoogleClientStatus,
   emptyGoogleClientConfig,
+  decideGoogleRoute,
 } from "../src/lib/auth/google-config.ts";
 import { encryptSecret, decryptSecret } from "../src/lib/crypto/secret-box.ts";
 import {
@@ -32,6 +33,38 @@ import { cfDb } from "../src/lib/ports/db.ts";
 
 // A valid 32-byte base64 KEK (matches CMS_AUTH_SECRET in prod).
 const KEK = Buffer.alloc(32, 7).toString("base64");
+
+// ---- PURE decideGoogleRoute (route credential-sourcing) ----------------------
+
+test("decideGoogleRoute: usable only with configured client AND appOrigin", () => {
+  const configured = { clientId: "x.apps.googleusercontent.com", clientSecretEnc: "blob" };
+
+  // Fully usable.
+  const ok = decideGoogleRoute(configured, "https://site.workers.dev");
+  assert.equal(ok.usable, true);
+  assert.equal(ok.clientId, "x.apps.googleusercontent.com");
+  assert.equal(ok.redirectUri, "https://site.workers.dev/api/auth/google/callback");
+
+  // Trailing slash on origin is stripped before building the redirect_uri.
+  assert.equal(
+    decideGoogleRoute(configured, "https://site.workers.dev/").redirectUri,
+    "https://site.workers.dev/api/auth/google/callback",
+  );
+
+  // No appOrigin → not usable, empty redirect_uri.
+  const noOrigin = decideGoogleRoute(configured, "");
+  assert.equal(noOrigin.usable, false);
+  assert.equal(noOrigin.redirectUri, "");
+
+  // Half-config (id but no secret) → not usable even with an origin.
+  assert.equal(
+    decideGoogleRoute({ clientId: "x", clientSecretEnc: "" }, "https://site.workers.dev").usable,
+    false,
+  );
+
+  // Empty config → not usable.
+  assert.equal(decideGoogleRoute(emptyGoogleClientConfig(), "https://site.workers.dev").usable, false);
+});
 
 // ---- PURE google-config ------------------------------------------------------
 

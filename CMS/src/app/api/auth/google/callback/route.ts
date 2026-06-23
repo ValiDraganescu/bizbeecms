@@ -8,6 +8,11 @@ import {
 import { createSession } from "@/db/session-store";
 import { findUserByEmail } from "@/db/user-store";
 import { hasPendingInvite } from "@/db/invite-store";
+import { decideGoogleRoute } from "@/lib/auth/google-config";
+import {
+  getGoogleClientConfig,
+  getDecryptedClientSecret,
+} from "@/db/google-client-store";
 
 /**
  * Google sign-in CALLBACK (cms-auth Slice 2b). Google redirects the browser here
@@ -45,12 +50,18 @@ export async function GET(request: Request): Promise<Response> {
 
   const { env } = await getCloudflareContext({ async: true });
   const e = env as unknown as Record<string, unknown>;
-  const clientId = typeof e.GOOGLE_CLIENT_ID === "string" ? e.GOOGLE_CLIENT_ID : "";
-  const clientSecret = typeof e.GOOGLE_CLIENT_SECRET === "string" ? e.GOOGLE_CLIENT_SECRET : "";
   const cmsSecret = typeof e.CMS_AUTH_SECRET === "string" ? e.CMS_AUTH_SECRET : "";
   const appOrigin = typeof e.APP_ORIGIN === "string" ? e.APP_ORIGIN : "";
 
-  if (!code || !state || !clientId || !clientSecret || !cmsSecret || !appOrigin) {
+  // Per-Site Google client creds from the CMS's own D1 (NOT shared env vars).
+  // clientId is plaintext; the secret is decrypted at request time with the KEK.
+  // A decrypt failure returns null → treated as not-configured, NEVER a 500.
+  const config = await getGoogleClientConfig();
+  const route = decideGoogleRoute(config, appOrigin);
+  const clientId = route.clientId;
+  const clientSecret = cmsSecret ? await getDecryptedClientSecret(cmsSecret) : null;
+
+  if (!code || !state || !route.usable || !clientSecret || !cmsSecret) {
     return redirect("/admin?error=google");
   }
 
@@ -61,7 +72,7 @@ export async function GET(request: Request): Promise<Response> {
 
   // 2. Exchange the code for tokens (server-to-server; client_secret never leaves
   //    the Worker). redirect_uri MUST equal the one start sent.
-  const redirectUri = `${appOrigin.replace(/\/+$/, "")}/api/auth/google/callback`;
+  const redirectUri = route.redirectUri;
   let idToken = "";
   try {
     const res = await fetch(GOOGLE_TOKEN_ENDPOINT, {
