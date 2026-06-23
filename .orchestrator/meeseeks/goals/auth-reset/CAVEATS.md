@@ -79,6 +79,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   CMS has NO `validateEmail` helper (PM's `lib/auth/validation.ts` doesn't exist
   in CMS) — only `normalizeEmail` in `db/user-store`. C2's forgot route did the
   format check with an inline regex; reuse that or extract if C3/C4 also need it.
+- C3 ROUTE ERROR KEYS ARE BARE / NO STRINGS (learned): CMS auth routes return raw
+  error KEYS (`Response.json({error:"passwordTooShort"})`), NOT translated text — the
+  PAGE maps the key to a message (see invite-accept route + its page). So C3's reset
+  route reuses `passwordRequired`/`passwordTooShort`/`passwordMismatch`/`resetTokenInvalid`
+  and added ZERO message strings → i18n parity untouched. C4 is the slice that adds the
+  `resetTokenInvalid` etc. mappings to its reset page (+ EN/FI/ET) — do it there, not C3.
+  (PM differs: PM's reset route returns keys under `auth.errors.*` that already existed.)
+- C3 used `isPasswordLongEnough(password)` from CMS `lib/auth/password.ts` (NOT PM's
+  `validatePassword` — CMS has no `lib/auth/validation.ts`). `MIN_PASSWORD_LENGTH=10`,
+  same as invite-accept. The reset-route test greps `isPasswordLongEnough`, not
+  `validatePassword`.
 - C2 CMS ROUTES use `Response.json(...)` (web Response), NOT PM's
   `NextResponse.json(...)` — CMS auth routes (login) return `Response`. Mirror
   that in C3 (`/api/auth/reset`); the forgot-route test greps for `Response.json`,

@@ -78,7 +78,21 @@ PM first (slices P1–P5), then mirror in CMS (slices C1–C5). ONE app per work
   `resetEmail.{subject,body}` strings EN/FI/ET (mirrors `inviteEmail`). Test
   `lib/reset/forgot-route.test.ts`. Gates green (tsc / 737 tests / opennext build;
   route in manifest). NO bundle:cms (that's C5).
-- TODO: **C3 — CMS `POST /api/auth/reset`** (mirror P3; CMS session store).
+- DONE: **C3 — CMS `POST /api/auth/reset`.** Added `checkReset`/`applyReset` to
+  `CMS/src/lib/reset/reset.ts` + pure `reset-logic.ts` (`classifyReset`, alias-free).
+  `applyReset` re-validates via `checkReset`→`classifyReset`, marks `usedAt` under a
+  guarded `update … where isNull(usedAt) … returning` (0 rows ⇒ used ⇒ reject) BEFORE
+  hashing (TOCTOU-safe), sets a fresh `hashPassword` on `schema.user`, then kills the
+  user's sessions with a PLAIN INDEXED `delete from session where userId = ?` (CMS
+  sessions are D1 w/ `session_user_idx` — no KV prefix-scan like PM). Route
+  `CMS/src/app/api/auth/reset/route.ts` returns web `Response.json`; min-length via
+  `isPasswordLongEnough` (MIN_PASSWORD_LENGTH=10, same as invite-accept); ALL
+  invalid/expired/used collapse to ONE generic `resetTokenInvalid` (never reads
+  `reason`). Error keys are bare (`passwordRequired`/`passwordTooShort`/
+  `passwordMismatch`/`resetTokenInvalid`) — translated by the C4 page, mirroring how
+  invite-accept route works, so C3 adds NO message strings (i18n parity untouched).
+  Test `lib/reset/reset-route.test.ts` (source-text, +6). Gates green (tsc / 743 tests
+  / opennext build; route in manifest). NO bundle:cms (that's C5).
 - TODO: **C4 — CMS forgot/reset pages + login-form link** (mirror P4; EN/FI/ET).
 - TODO: **C5 — CMS reset pure-logic tests + regen PM `cms-bundle`** (mirror P5;
   LAST CMS slice runs `bundle:cms` to ship the CMS changes into the PM bundle).

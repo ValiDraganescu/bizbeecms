@@ -136,3 +136,34 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/reset/forgot-route.test.ts (new),
   CMS/src/lib/mail/send-invite.ts (buildUrl extract + sendResetEmail),
   CMS/messages/{en,fi,et}.json (resetEmail)
+
+## 2026-06-23 — C3: CMS `POST /api/auth/reset` (mirror PM P3)
+- **Task:** CMS set-new-password-from-token endpoint. Validate token (exists,
+  `usedAt IS NULL`, not expired) → mark used single-use → set fresh hash → kill
+  the user's sessions. ONE generic error for all token failures. CMS-only.
+- **Did:** Added `checkReset`/`applyReset` to `CMS/src/lib/reset/reset.ts` and a
+  pure alias-free `reset-logic.ts` (`classifyReset`, structural `ResetRow`) so the
+  decision is node-testable (C5 will execute it). `applyReset` re-validates via
+  `checkReset`→`classifyReset`, marks `usedAt` under a guarded
+  `update(schema.passwordReset)…where isNull(usedAt)…returning` (0 rows ⇒ used ⇒
+  reject) BEFORE hashing (TOCTOU-safe order), sets `hashPassword` on
+  `schema.user`, then kills sessions with a PLAIN INDEXED
+  `delete(schema.session).where(eq(userId))` — CMS sessions are D1 with
+  `session_user_idx` (no KV prefix-scan like PM; the easy case). Route
+  `CMS/src/app/api/auth/reset/route.ts` returns web `Response.json` (not
+  NextResponse), checks min-length via `isPasswordLongEnough` (MIN_PASSWORD_LENGTH
+  =10, same as invite-accept), and collapses notFound/expired/used into ONE
+  generic `resetTokenInvalid` (never reads `result.reason`).
+- **No new strings:** CMS auth routes return BARE error keys (like invite-accept);
+  the C4 page maps `resetTokenInvalid`/`passwordTooShort`/etc. to messages. So C3
+  added ZERO message strings — i18n parity untouched.
+- **Gates:** `tsc --noEmit` clean. `npm test` 743/743 (was 737, +6 in
+  `lib/reset/reset-route.test.ts`: classifier delegation, isNull-guarded single-use,
+  hash+indexed-session-delete + mark-before-hash order, ONE generic error / no
+  reason leak, isPasswordLongEnough min-length, web Response.json not NextResponse).
+  `npx opennextjs-cloudflare build` green; `.next/server/app/api/auth/reset/route.js`
+  exists. Dev confirmed down (`lsof -ti:3601,3602` empty) before build. Did NOT run
+  bundle:cms (C5), did NOT exercise live runtime/email, did NOT apply migration.
+- **Files:** CMS/src/lib/reset/reset.ts (checkReset/applyReset),
+  CMS/src/lib/reset/reset-logic.ts (new), CMS/src/app/api/auth/reset/route.ts (new),
+  CMS/src/lib/reset/reset-route.test.ts (new).
