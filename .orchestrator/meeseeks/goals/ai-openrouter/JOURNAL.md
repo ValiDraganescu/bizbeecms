@@ -282,3 +282,9 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Verified:** new test 9/9; `npx tsc --noEmit` clean; full CMS `npm test` 776/776 (was 748);
   `npx opennextjs-cloudflare build` GREEN (dev off). Live request-time precedence on a deployed CMS
   is the only non-codeable bit (HITL — needs a real key set in CMS settings).
+
+## 2026-06-23 18:28 — Verify minting end-to-end (codeable gates) — KEY-MINTING TRACK done
+- **Status:** DONE (offline-complete; live mint/delete/precedence = HITL)
+- **What I did:** Ran all four codeable gates for the full ai-openrouter + key-minting feature, no code changes needed (everything was already built across the prior slices). PM build green, CMS build green (dev off, ports 3601/3602 clear), CMS suite 776/776, PM suite 187/187. The KEY-MINTING TRACK and the CMS-local override are complete and fully unit-covered; the only remaining work is live OpenRouter calls that can't run offline.
+- **Verified:** `cd ProjectManager && npm test` → 187/187. `cd CMS && node --test scripts/*.test.mjs 'src/**/*.test.ts'` → 776/776. `cd ProjectManager && npx opennextjs-cloudflare build` → "OpenNext build complete". `cd CMS && npx opennextjs-cloudflare build` → "OpenNext build complete". Could NOT verify: live PM mint-on-deploy (idempotent), DELETE revoke, and CMS-local-key-overrides-minted-key at request time — these need a real `OPENROUTER_PROVISIONING_KEY` secret on the PM Worker + a real key in CMS settings (HITL, recorded in root HITL.md).
+- **Files:** no code changes; goal-memory only (BACKLOG/JOURNAL/NEXT) + HITL.md.
