@@ -1,0 +1,114 @@
+name: Deploy
+
+# Deploy the bizbeecms Workers on push to main, only for the services whose
+# files changed. Or run manually (Actions → Deploy → Run workflow) and tick the
+# services to force-deploy.
+#
+# Secrets required (repo Settings → Secrets and variables → Actions):
+#   CLOUDFLARE_API_TOKEN   — token with Workers Scripts:Edit + D1:Edit + Workers KV + Cloudflare Pages (for assets)
+#   CLOUDFLARE_ACCOUNT_ID  — your account id
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pm:       { description: "Deploy ProjectManager", type: boolean, default: false }
+      deployer: { description: "Deploy deployer",        type: boolean, default: false }
+      router:   { description: "Deploy router",          type: boolean, default: false }
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Decide which services to deploy: path filter on push, checkbox inputs on dispatch.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      pm: ${{ steps.decide.outputs.pm }}
+      deployer: ${{ steps.decide.outputs.deployer }}
+      router: ${{ steps.decide.outputs.router }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            pm:
+              - 'ProjectManager/**'
+              - 'CMS/**'
+            deployer:
+              - 'deployer/**'
+            router:
+              - 'router/**'
+      - id: decide
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "pm=${{ inputs.pm }}"             >> "$GITHUB_OUTPUT"
+            echo "deployer=${{ inputs.deployer }}" >> "$GITHUB_OUTPUT"
+            echo "router=${{ inputs.router }}"     >> "$GITHUB_OUTPUT"
+          else
+            echo "pm=${{ steps.filter.outputs.pm }}"             >> "$GITHUB_OUTPUT"
+            echo "deployer=${{ steps.filter.outputs.deployer }}" >> "$GITHUB_OUTPUT"
+            echo "router=${{ steps.filter.outputs.router }}"     >> "$GITHUB_OUTPUT"
+          fi
+
+  # PM: apply D1 migrations FIRST (so new code never queries missing columns),
+  # then bundle:cms (builds CMS via opennext) + preflight + opennext deploy.
+  pm:
+    needs: changes
+    if: needs.changes.outputs.pm == 'true'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: "**/package-lock.json" }
+      - name: Install CMS deps (bundle:cms builds CMS)
+        run: npm ci
+        working-directory: CMS
+      - name: Install ProjectManager deps
+        run: npm ci
+        working-directory: ProjectManager
+      - name: Apply D1 migrations (remote)
+        run: npx wrangler d1 migrations apply bizbeecms --remote
+        working-directory: ProjectManager
+      - name: Deploy ProjectManager
+        run: npm run deploy
+        working-directory: ProjectManager
+
+  deployer:
+    needs: changes
+    if: needs.changes.outputs.deployer == 'true'
+    runs-on: ubuntu-latest  # has Docker — the deployer ships a Cloudflare Container
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: deployer/package-lock.json }
+      - run: npm ci
+        working-directory: deployer
+      - run: npm run deploy
+        working-directory: deployer
+
+  router:
+    needs: changes
+    if: needs.changes.outputs.router == 'true'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: router/package-lock.json }
+      - run: npm ci
+        working-directory: router
+      - run: npm run deploy
+        working-directory: router
