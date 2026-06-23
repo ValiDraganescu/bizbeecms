@@ -96,3 +96,10 @@ tsc + opennext build green + PM node tests + EN/FI/ET for new strings.
   invite-accept path stores the role + countries + tags on the new user. Node
   tests for the subset/authz rules. EN/FI/ET. Gate. (Keep in sync with cms-auth's
   invite flow — same shape, CMS-local.)
+
+- DONE (2026-06-23): **Polish — promote the confirm/overlay-dialog to components/ui.**
+  Was copy-pasted in 3 call sites (tags-manager, users-manager, invite/pending-invites).
+  Extracted ONE shared `<ConfirmDialog>` (`components/ui/confirm-dialog.tsx`, barrel-
+  exported), migrated all three callers, deleted the two helper fns + the inline block.
+  Updated the revoke regression test to assert `<ConfirmDialog` in the page + aria-modal
+  in the shared component. Gate: tsc 0, 150 tests, opennext build green.

@@ -193,3 +193,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   create tags in Tag management (`/tags`) when `listTags()` is empty — a Site can't be
   tagged before the vocabulary exists. The picker hides the form (not an error) in that
   case, matching `assign-form`'s `noneAssignable` empty-state.
+
+- **The confirm/overlay-dialog IS NOW a shared `<ConfirmDialog>` in `components/ui`
+  (`confirm-dialog.tsx`, barrel-exported).** All three old copies (tags-manager,
+  users-manager, invite/pending-invites) were migrated to it; the per-file
+  `ConfirmDeleteModal`/`ConfirmRemoveModal` helpers are GONE — do NOT re-copy the
+  overlay pattern, use `<ConfirmDialog title body confirmLabel cancelLabel loading
+  onCancel onConfirm />` (i18n stays at the call site; confirm defaults to `danger`
+  variant, override via `confirmVariant`). The revoke regression test now asserts on
+  `<ConfirmDialog` in the page + `aria-modal` in `confirm-dialog.tsx` (the markup moved
+  out of the page) — inlining a modal again breaks it, which is the point. The test's
+  `window.confirm` guard on the dialog matches `window\.confirm\(` (the CALL), because
+  the file's doc comment literally contains "NEVER window.confirm".

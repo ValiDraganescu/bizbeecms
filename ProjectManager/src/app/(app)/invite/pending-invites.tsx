@@ -8,6 +8,7 @@ import {
   AlertBody,
   Badge,
   Button,
+  ConfirmDialog,
   Table,
   TableBody,
   TableCell,
@@ -127,42 +128,15 @@ export function PendingInvites({ invites }: { invites: PendingInvite[] }) {
       </Table>
 
       {confirming ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => !revoking && setConfirming(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-semibold tracking-tight">
-              {t("revoke.title")}
-            </h2>
-            <Alert tone="danger" className="my-4">
-              <AlertBody>
-                {t("revoke.body", { email: confirming.email })}
-              </AlertBody>
-            </Alert>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => setConfirming(null)}
-                disabled={revoking}
-              >
-                {t("revoke.cancel")}
-              </Button>
-              <Button
-                variant="danger"
-                onClick={() => revoke(confirming.id)}
-                loading={revoking}
-              >
-                {t("revoke.confirm")}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={t("revoke.title")}
+          body={t("revoke.body", { email: confirming.email })}
+          confirmLabel={t("revoke.confirm")}
+          cancelLabel={t("revoke.cancel")}
+          loading={revoking}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => revoke(confirming.id)}
+        />
       ) : null}
     </>
   );

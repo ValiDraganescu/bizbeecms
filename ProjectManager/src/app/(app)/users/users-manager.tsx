@@ -3,11 +3,10 @@
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
-  Alert,
-  AlertBody,
   Badge,
   Button,
   Combobox,
+  ConfirmDialog,
   Field,
   FieldError,
   FieldLabel,
@@ -210,9 +209,12 @@ export function UsersManager({
       </Table>
 
       {confirmUser ? (
-        <ConfirmRemoveModal
-          email={confirmUser.email}
-          deleting={deleting}
+        <ConfirmDialog
+          title={t("remove.title")}
+          body={t("remove.body", { email: confirmUser.email })}
+          confirmLabel={t("actions.remove")}
+          cancelLabel={t("actions.cancel")}
+          loading={deleting}
           onCancel={() => setConfirmUser(null)}
           onConfirm={confirmDelete}
         />
@@ -363,48 +365,5 @@ function EditRow({
         </div>
       </TableCell>
     </TableRow>
-  );
-}
-
-/** In-app remove confirm — never window.confirm (CAVEATS). */
-function ConfirmRemoveModal({
-  email,
-  deleting,
-  onCancel,
-  onConfirm,
-}: {
-  email: string;
-  deleting: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const t = useTranslations("users");
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onCancel}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t("remove.title")}
-        </h2>
-        <Alert tone="danger" className="my-4">
-          <AlertBody>{t("remove.body", { email })}</AlertBody>
-        </Alert>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onCancel} disabled={deleting}>
-            {t("actions.cancel")}
-          </Button>
-          <Button variant="danger" onClick={onConfirm} loading={deleting}>
-            {t("actions.remove")}
-          </Button>
-        </div>
-      </div>
-    </div>
   );
 }

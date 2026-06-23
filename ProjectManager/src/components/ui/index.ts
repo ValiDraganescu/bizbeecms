@@ -39,3 +39,4 @@ export {
   type AlertProps,
   type AlertTone,
 } from "./alert";
+export { ConfirmDialog } from "./confirm-dialog";

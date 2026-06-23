@@ -236,3 +236,25 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   ProjectManager/src/app/(app)/invite/page.tsx,
   ProjectManager/src/lib/invite/revoke-bug-2026-06-23.test.ts,
   ProjectManager/messages/{en,fi,et}.json
+
+## 2026-06-23 11:32 — Promote confirm/overlay-dialog to components/ui (ConfirmDialog)
+- **Status:** DONE
+- **What I did:** The destructive-confirm overlay-dialog was copy-pasted in THREE
+  call sites (tags-manager `ConfirmDeleteModal`, users-manager `ConfirmRemoveModal`,
+  invite/pending-invites inline modal). Extracted ONE shared `<ConfirmDialog>`
+  (`components/ui/confirm-dialog.tsx`, exported from the barrel): role=dialog
+  aria-modal overlay (bg-black/50, click-overlay-cancels, panel stopPropagation),
+  danger Alert body, ghost Cancel + danger Confirm with `loading`. Props are
+  text/labels + onCancel/onConfirm so i18n stays at each call site. Migrated all
+  three callers to it and deleted the two helper fns + the inline block; dropped now-
+  unused `Alert`/`AlertBody` imports from tags-manager and users-manager (invite keeps
+  them for its error banner). Updated the revoke regression test: it now asserts the
+  page renders `<ConfirmDialog` and that the shared component carries aria-modal (the
+  aria-modal text moved out of the page into the shared component).
+- **Verified:** PM `tsc --noEmit` clean; `npm test` 150/150 pass; `npx
+  opennextjs-cloudflare build` complete (dev 3601 confirmed down first). No leftover
+  `ConfirmDeleteModal`/`ConfirmRemoveModal` refs. Pure UI refactor — no behavior/string
+  change; NOT smoke-tested in a live browser.
+- **Files:** components/ui/confirm-dialog.tsx (new), components/ui/index.ts,
+  app/(app)/tags/tags-manager.tsx, app/(app)/users/users-manager.tsx,
+  app/(app)/invite/pending-invites.tsx, lib/invite/revoke-bug-2026-06-23.test.ts

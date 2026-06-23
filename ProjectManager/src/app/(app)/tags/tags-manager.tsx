@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
-  Alert,
-  AlertBody,
   Button,
+  ConfirmDialog,
   Field,
   FieldError,
   FieldLabel,
@@ -223,56 +222,16 @@ export function TagsManager({ initialTags }: { initialTags: TagRow[] }) {
       )}
 
       {confirmTag ? (
-        <ConfirmDeleteModal
-          tag={confirmTag}
-          deleting={deleting}
+        <ConfirmDialog
+          title={t("delete.title")}
+          body={t("delete.body", { label: confirmTag.label })}
+          confirmLabel={t("actions.delete")}
+          cancelLabel={t("actions.cancel")}
+          loading={deleting}
           onCancel={() => setConfirmTag(null)}
           onConfirm={confirmDelete}
         />
       ) : null}
-    </div>
-  );
-}
-
-/** In-app confirm modal for delete — never window.confirm (CAVEATS). */
-function ConfirmDeleteModal({
-  tag,
-  deleting,
-  onCancel,
-  onConfirm,
-}: {
-  tag: { label: string };
-  deleting: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  const t = useTranslations("tags");
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onCancel}
-    >
-      <div
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t("delete.title")}
-        </h2>
-        <Alert tone="danger" className="my-4">
-          <AlertBody>{t("delete.body", { label: tag.label })}</AlertBody>
-        </Alert>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onCancel} disabled={deleting}>
-            {t("actions.cancel")}
-          </Button>
-          <Button variant="danger" onClick={onConfirm} loading={deleting}>
-            {t("actions.delete")}
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

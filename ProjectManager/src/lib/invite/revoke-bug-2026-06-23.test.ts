@@ -32,12 +32,17 @@ test("deleteInvite store fn only removes PENDING invites", () => {
   assert.match(store, /isNull\(schema\.invites\.acceptedAt\)/);
 });
 
-test("pending table has a revoke control using the in-app modal (no window.confirm)", () => {
+test("pending table has a revoke control using the shared ConfirmDialog (no window.confirm)", () => {
   const ui = read("src/app/(app)/invite/pending-invites.tsx");
   assert.match(ui, /DELETE/);
   assert.match(ui, /\/api\/invite\//);
-  assert.match(ui, /aria-modal="true"/);
+  // Confirm is the shared in-app dialog (promoted to components/ui), not a copy.
+  assert.match(ui, /<ConfirmDialog/);
   assert.doesNotMatch(ui, /window\.confirm/);
+  // The shared dialog carries the modal a11y + dims the page; never a native confirm() call.
+  const dialog = read("src/components/ui/confirm-dialog.tsx");
+  assert.match(dialog, /aria-modal="true"/);
+  assert.doesNotMatch(dialog, /window\.confirm\(/);
 });
 
 test("revoke strings exist in EN/FI/ET", () => {
