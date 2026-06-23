@@ -195,3 +195,20 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/app/forgot/page.tsx, CMS/src/app/reset/[token]/page.tsx,
   CMS/src/components/forgot-password-form.tsx, CMS/src/components/reset-password-form.tsx,
   CMS/src/components/login-form.tsx, CMS/messages/{en,fi,et}.json.
+
+## 2026-06-23 15:51 — C5: CMS reset pure-logic test + regen PM cms-bundle (FINAL slice)
+- **Status:** DONE
+- **What I did:** Added `CMS/src/lib/reset/reset-logic.test.ts` (5 tests) executing
+  the real `classifyReset` — mirrors PM's reset-logic.test.ts; covers validity,
+  expiry boundary (`<=` so AT-expiry is rejected), single-use (used>expired),
+  notFound, default-now. Then ran `npm run bundle:cms` (from ProjectManager) as the
+  LAST step, regenerating the committed `ProjectManager/src/lib/deploy/cms-bundle.generated.js`
+  (7853 KB) — this ships all CMS C1–C5 reset changes into the PM-deployable bundle.
+- **Verified:** Fail-before/pass-after on the boundary test (flipped `<=`→`<` in
+  reset-logic.ts ⇒ the boundary test failed; reverted ⇒ all 5 pass, git diff clean).
+  CMS gates: tsc clean, `npm test` 748 pass / 0 fail (was 743 + 5 new), opennext build
+  green. After bundle regen, confirmed PM tsc clean + PM opennext build green.
+  `lsof -ti:3601,3602` empty before every build. No other worker active for bundle:cms.
+- **Files:** CMS/src/lib/reset/reset-logic.test.ts (new),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regenerated).
+- **auth-reset full scope COMPLETE:** PM P1–P5 + CMS C1–C5 all DONE; CMS changes shipped into PM bundle.

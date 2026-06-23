@@ -109,8 +109,16 @@ PM first (slices P1–P5), then mirror in CMS (slices C1–C5). ONE app per work
   extra). Gates green (tsc / 743 tests / opennext build; both pages in route
   table). NO bundle:cms (that's C5). UI-only slice — no new behavioral test (pages
   are thin wiring over the already-tested forgot/reset routes).
-- TODO: **C5 — CMS reset pure-logic tests + regen PM `cms-bundle`** (mirror P5;
-  LAST CMS slice runs `bundle:cms` to ship the CMS changes into the PM bundle).
+- DONE: **C5 — CMS reset pure-logic tests + regen PM `cms-bundle`.** New
+  `CMS/src/lib/reset/reset-logic.test.ts` EXECUTES the real `classifyReset`
+  (mirrors PM's): validity, expiry BOUNDARY (just-valid @ now+1, expired @ now
+  and now-1, `<=` not `<`), single-use (`usedAt` ⇒ used; used wins over expired),
+  notFound, default-now. Fail-before verified (flip `<=`→`<` ⇒ boundary test
+  fails, reverted). Then ran `bundle:cms` (from PM) as LAST step → regenerated
+  `ProjectManager/src/lib/deploy/cms-bundle.generated.js` (7853 KB) shipping all
+  CMS C1–C5 changes into the PM-deployable bundle. Gates green: CMS tsc / 748
+  tests / opennext build; PM tsc + opennext build confirmed after bundle regen.
+  **CMS half C1–C5 COMPLETE → auth-reset full PM+CMS scope done.**
 
 Build order rationale: schema→API(forgot)→API(reset)→UI→tests per app. PM proves
 the shape; CMS mirrors it. The forgot endpoint can land before reset (it just
