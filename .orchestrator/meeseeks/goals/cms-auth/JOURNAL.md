@@ -503,3 +503,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/db/login-attempt-store.ts (import `lt`; prune in recordFailure),
   CMS/scripts/login-throttle.test.mjs (+prune test),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-23 19:16 — Opportunistic prune of expired `session` rows
+- **Status:** DONE
+- **What I did:** The `session` D1 table only self-swept the ONE expired row that
+  `getSession()` happened to read; a user whose 7-day session expires and never
+  returns leaves a dead row forever → unbounded growth (same class as the solved
+  `login_attempt` prune). Added `db/session-prune.ts` exporting
+  `pruneExpiredSessions(now=Date.now(), injectedDb?)` = `DELETE FROM session WHERE
+  expires_at <= now`, reading D1 only via the `getDb()` Db port (sole-reader guard
+  stays green). It's a SEPARATE module (not added to `session-store.ts`) because
+  `session-store.ts` statically imports `cookies` from `next/headers`, so it can't
+  be loaded under `node --test`; the new module imports only the Db port, so it's
+  node-testable (mirrors the pure/CF split + the login-attempt prune). Wired into
+  `createSession`: after the INSERT + cookie set, it calls `pruneExpiredSessions`
+  best-effort in a try/catch (prune is housekeeping — a failed sweep must never
+  break a fresh login). No cron — the CMS Worker has no scheduled handler, so the
+  prune piggybacks the low-volume session-write path; ponytail comment names the
+  cron upgrade path.
+- **Verified:** `node --test scripts/session-prune.test.mjs` 2 pass (long-expired
+  + exactly-now rows pruned via `<=`, live row kept; no-op when nothing expired —
+  fails-before: without the DELETE the row count would stay at 3/2). Full `npm
+  test` 789 pass / 0 fail (was 787). `npx tsc --noEmit` clean. `npx
+  opennextjs-cloudflare build` green (dev server confirmed down first). PM
+  `bundle:cms` regenerated (`createSession` is imported by the login/invite/
+  sso-callback worker routes, so the sweep ships in the bundle). Could NOT verify a
+  live prune on a deployed CMS (no live Site this run) — node-tested only.
+- **Files:** CMS/src/db/session-prune.ts (new), CMS/src/db/session-store.ts
+  (import + best-effort call in createSession),
+  CMS/scripts/session-prune.test.mjs (new),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).

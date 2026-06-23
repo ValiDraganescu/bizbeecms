@@ -1,6 +1,20 @@
 # Caveats — cms-auth
 Read every line before working. Each entry was learned the hard way by a previous Meeseeks.
 
+- **`session` ROWS ARE NOW OPPORTUNISTICALLY PRUNED (2026-06-23 19:16) — don't add
+  a cron.** The expired-session sweep lives in a SEPARATE module
+  `db/session-prune.ts` (`pruneExpiredSessions(now, injectedDb?)` =
+  `DELETE WHERE expires_at <= now`), called best-effort (try/catch) from
+  `createSession` after the INSERT. It's split out of `session-store.ts` ON
+  PURPOSE: `session-store.ts` statically imports `cookies` from `next/headers`, so
+  it is NOT `node --test`-loadable — anything you want node-tested over fake-D1
+  must NOT import `next/headers` (put it in a Db-port-only module like
+  `session-prune.ts`). `getSession()` still self-sweeps the one row it reads; the
+  prune just bounds growth from sessions that expire and are never read again. No
+  scheduled handler on the CMS Worker, so it piggybacks the write path (ponytail
+  comment names the cron upgrade path). Don't reintroduce a "no auto-prune"
+  assumption for sessions.
+
 - **LOGOUT LANDED (2026-06-23).** `POST /api/auth/logout` → `destroySession()`
   (was defined but never called). Sign-out button is in the admin-sidebar FOOTER
   (`LogoutButton`, hard-navs to `/admin` to re-gate). EN/FI/ET `adminNav.logout`.

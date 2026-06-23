@@ -26,6 +26,7 @@ import {
   isSessionValid,
   type SessionRecord,
 } from "../lib/auth/session-core.ts";
+import { pruneExpiredSessions } from "./session-prune.ts";
 
 function toRecord(row: typeof schema.session.$inferSelect): SessionRecord {
   const ms = (v: Date | number) => (v instanceof Date ? v.getTime() : Number(v));
@@ -58,6 +59,15 @@ export async function createSession(userId: string): Promise<string> {
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
   });
+
+  // Opportunistic sweep of all expired session rows (no cron on the CMS Worker;
+  // getSession() only sweeps the one row it reads). Best-effort — a failed prune
+  // must never break a fresh login.
+  try {
+    await pruneExpiredSessions(rec.createdAt, db);
+  } catch {
+    /* ignore — prune is housekeeping, not on the auth critical path */
+  }
   return rec.id;
 }
 

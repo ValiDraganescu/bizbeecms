@@ -1,15 +1,16 @@
 # Note to the next Meeseeks (cms-auth)
 
-NO open bugs. `login_attempt` PRUNE LANDED this run (opportunistic
-`DELETE WHERE created_at < windowStart(now)` inside `recordFailure`, wipes ALL
-out-of-window rows any email/kind — the never-`clearFailures`-d `forgot` rows now
-age out). Backlog has NO queued TODO — invent the next slice (skill rule 3).
+NO open bugs. EXPIRED-SESSION PRUNE LANDED this run (new `db/session-prune.ts`
+`pruneExpiredSessions`, called best-effort from `createSession`; bounds `session`
+table growth — same class as the login_attempt prune). Backlog has NO queued
+TODO — invent the next slice (skill rule 3).
 
 ## CHECK `git status` FIRST
-This run the tree was clean of parallel CMS/PM WIP (only goal-memory + two
-untracked `.impeccable/` archive dirs, left untouched). If a parallel worker has
-uncommitted edits in `CMS/src` or `ProjectManager/src`, stage ONLY your own files
-(no `git add -A`) and DON'T regen cms-bundle (it'd bundle their WIP).
+This run another worker (ai-openrouter / curator) had UNCOMMITTED edits in
+`DEPLOY-ARCHITECTURE.md` + `.orchestrator/meeseeks/goals/main/SUBGOALS.md` and
+untracked `.impeccable/` archive dirs — I left ALL of them unstaged (not mine).
+If you see foreign WIP in `CMS/src` or `ProjectManager/src`, stage ONLY your own
+files (no `git add -A`) and DON'T regen cms-bundle (it'd bundle their WIP).
 
 ## PICK NEXT — strongest candidates (in order):
 1. **Slice-2 `@pm.sso` synthetic-email FOLLOW-UP.** ⚠️ TOUCHES PM
@@ -22,20 +23,20 @@ uncommitted edits in `CMS/src` or `ProjectManager/src`, stage ONLY your own file
 3. **CSP / per-site isolation hardening** for AI-authored `script` artifacts (main
    GOAL.md notes "(later) CSP"). Cross-cutting — if it doesn't clearly belong to
    cms-auth's session/cookie boundary, flag the curator to carve its own track.
+4. **Session-id rotation on privilege change** — `applyReset` already kills the
+   user's sessions; consider rotating the session id on role change too (fixation
+   defense). Small, CMS-only, node-testable.
 
 ## Gotchas (still true)
+- **node-test loadability:** a module that imports `next/headers` (e.g.
+  `session-store.ts`) CANNOT be loaded under `node --test`. Put node-tested D1
+  logic in a Db-port-only module (no `next/headers`) — that's why the session
+  prune is in `db/session-prune.ts`, not `session-store.ts`.
+- `session` prune = `DELETE WHERE expires_at <= now` from `createSession`
+  (try/catch, best-effort). `login_attempt` prune = inside `recordFailure`. Both
+  piggyback the write path; the CMS Worker has NO cron handler — don't add one.
 - `login_attempt` is `kind`-namespaced (`'login'|'forgot'`). Store fns:
   `(email, now, kind='login', injectedDb?)` — kind arg 3, injectedDb arg 4.
-  Don't cross-lock surfaces by reusing a kind. `/api/auth/reset` token-gated, NOT
-  throttled.
-- PRUNE lives in `recordFailure` (post-INSERT, deletes ALL aged rows). DON'T add a
-  cron — the CMS Worker has no scheduled handler; the write-path piggyback is
-  deliberate (ponytail comment names the cron upgrade path).
-- Throttle keyed by lowercased email ONLY (no IP). MAX_ATTEMPTS=5 / WINDOW=15min.
-  Non-enumerating: failures/requests recorded for unknown emails too.
-- Login route order: throttle-check -> password verify -> recordFailure(bad) /
-  clearFailures(ok) -> createSession. Forgot: throttle-check -> recordFailure(always)
-  -> findUser -> mint/send. Both 429 with `Retry-After` (seconds).
 - Guard resolves sessions LOCALLY (no PM forward); local users have no PM row.
 - Google id_token JWK-RS256-verified; OAuth routes + login button read per-Site D1
   creds via `decideGoogleRoute(getGoogleClientConfig(), APP_ORIGIN).usable`.

@@ -5,6 +5,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-23 19:16): **Opportunistic prune of expired `session` rows.** See
+  JOURNAL. New node-loadable `db/session-prune.ts` (`pruneExpiredSessions(now,
+  injectedDb?)` = `DELETE WHERE expires_at <= now`, Db-port only, NO `next/headers`
+  so it's node-testable — `session-store.ts` couldn't be imported in node because
+  of its `cookies()` import). `createSession` calls it best-effort (try/catch) on
+  the low-volume session-write path; no cron (CMS has no scheduled handler).
+  2 new tests (789 total), tsc + opennext build green, cms-bundle regen.
+
 - DONE (2026-06-23 19:09): **Periodic prune of aged-out `login_attempt` rows.** See
   JOURNAL. Opportunistic sweep inside `recordFailure` (`db/login-attempt-store.ts`):
   after the INSERT, `DELETE … WHERE created_at < windowStart(now)` wipes ALL
