@@ -73,7 +73,8 @@
     "theme": "Teema",
     "brand": "Brändi ja tekoäly",
     "apiKeys": "API-avaimet",
-    "users": "Käyttäjät"
+    "users": "Käyttäjät",
+    "google": "Google-kirjautuminen"
   },
   "theme": {
     "title": "Teema",
@@ -686,5 +687,26 @@
     "errorTokenInvalid": "Tämä nollauslinkki on virheellinen tai vanhentunut. Pyydä uusi.",
     "errorGeneric": "Salasanaa ei voitu nollata. Yritä uudelleen.",
     "errorNetwork": "Palvelimeen ei saatu yhteyttä. Yritä uudelleen."
+  },
+  "googleClient": {
+    "title": "Google-kirjautuminen",
+    "subtitle": "Anna tiimisi kirjautua organisaatiosi Google-tilillä.",
+    "forbidden": "Sinulla ei ole oikeutta hallita Google-kirjautumista.",
+    "loading": "Ladataan…",
+    "help": "Rekisteröi oma Google OAuth 2.0 -asiakas ja liitä sen tunnistetiedot tähän. Käytä valtuutettuna uudelleenohjaus-URI:na \"<APP_ORIGIN>/api/auth/google/callback\". Salaisuus tallennetaan salattuna eikä sitä näytetä enää uudelleen.",
+    "statusLabel": "Tila",
+    "configured": "Määritetty",
+    "notConfigured": "Ei määritetty",
+    "clientIdLabel": "Asiakastunnus",
+    "clientIdPlaceholder": "1234567890-abc.apps.googleusercontent.com",
+    "clientSecretLabel": "Asiakassalaisuus",
+    "clientSecretPlaceholder": "Liitä asiakassalaisuus",
+    "clientSecretSetPlaceholder": "Jätä tyhjäksi säilyttääksesi nykyisen salaisuuden",
+    "save": "Tallenna",
+    "saving": "Tallennetaan…",
+    "saved": "Tallennettu",
+    "clear": "Tyhjennä",
+    "clearConfirm": "Poistetaanko tallennetut Google-asiakkaan tunnistetiedot? Google-kirjautuminen poistetaan käytöstä, kunnes lisäät ne uudelleen.",
+    "cancel": "Peruuta"
   }
 }

@@ -73,7 +73,8 @@
     "theme": "Teema",
     "brand": "Bränd ja AI",
     "apiKeys": "API-võtmed",
-    "users": "Kasutajad"
+    "users": "Kasutajad",
+    "google": "Google'i sisselogimine"
   },
   "theme": {
     "title": "Teema",
@@ -686,5 +687,26 @@
     "errorTokenInvalid": "See lähtestuslink on vigane või aegunud. Küsi uus.",
     "errorGeneric": "Parooli ei õnnestunud lähtestada. Proovi uuesti.",
     "errorNetwork": "Serveriga ei õnnestunud ühendust luua. Proovi uuesti."
+  },
+  "googleClient": {
+    "title": "Google'i sisselogimine",
+    "subtitle": "Lubage oma meeskonnal sisse logida teie organisatsiooni Google'i kontoga.",
+    "forbidden": "Teil pole õigust Google'i sisselogimist hallata.",
+    "loading": "Laadimine…",
+    "help": "Registreerige oma Google OAuth 2.0 klient ja kleepige selle mandaadid siia. Kasutage volitatud ümbersuunamise URI-na \"<APP_ORIGIN>/api/auth/google/callback\". Saladus salvestatakse krüpteeritult ega kuvata enam uuesti.",
+    "statusLabel": "Olek",
+    "configured": "Seadistatud",
+    "notConfigured": "Seadistamata",
+    "clientIdLabel": "Kliendi ID",
+    "clientIdPlaceholder": "1234567890-abc.apps.googleusercontent.com",
+    "clientSecretLabel": "Kliendi saladus",
+    "clientSecretPlaceholder": "Kleepige kliendi saladus",
+    "clientSecretSetPlaceholder": "Jätke tühjaks, et säilitada praegune saladus",
+    "save": "Salvesta",
+    "saving": "Salvestamine…",
+    "saved": "Salvestatud",
+    "clear": "Tühjenda",
+    "clearConfirm": "Eemaldada salvestatud Google'i kliendi mandaadid? Google'i sisselogimine keelatakse, kuni need uuesti lisate.",
+    "cancel": "Tühista"
   }
 }

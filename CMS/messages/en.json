@@ -73,7 +73,8 @@
     "theme": "Theme",
     "brand": "Brand & AI",
     "apiKeys": "API keys",
-    "users": "Users"
+    "users": "Users",
+    "google": "Google sign-in"
   },
   "theme": {
     "title": "Theme",
@@ -686,5 +687,26 @@
     "errorTokenInvalid": "This reset link is invalid or has expired. Request a new one.",
     "errorGeneric": "Couldn't reset your password. Try again.",
     "errorNetwork": "Couldn't reach the server. Try again."
+  },
+  "googleClient": {
+    "title": "Google sign-in",
+    "subtitle": "Let your team sign in with your organization's Google account.",
+    "forbidden": "You don't have permission to manage Google sign-in.",
+    "loading": "Loading…",
+    "help": "Register your own Google OAuth 2.0 client and paste its credentials here. Use \"<APP_ORIGIN>/api/auth/google/callback\" as the authorized redirect URI. The secret is stored encrypted and never shown again.",
+    "statusLabel": "Status",
+    "configured": "Configured",
+    "notConfigured": "Not configured",
+    "clientIdLabel": "Client ID",
+    "clientIdPlaceholder": "1234567890-abc.apps.googleusercontent.com",
+    "clientSecretLabel": "Client secret",
+    "clientSecretPlaceholder": "Paste the client secret",
+    "clientSecretSetPlaceholder": "Leave blank to keep the current secret",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "clear": "Clear",
+    "clearConfirm": "Remove the stored Google client credentials? Google sign-in will be disabled until you add them again.",
+    "cancel": "Cancel"
   }
 }

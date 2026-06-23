@@ -35,11 +35,10 @@ Read every line before working. Each entry was learned the hard way by a previou
 
 - **Invite email = Cloudflare Email Service `send_email` binding** (the user's
   link: https://developers.cloudflare.com/email-service/). PM's `send-invite.ts`
-  already calls `env.EMAIL.send` but PM's `wrangler.jsonc` has the `send_email`
-  binding COMMENTED OUT (needs a verified sender on a paid plan). The CMS Worker
-  must get the binding + a verified sender provisioned by the deployer — treat
-  missing-binding as a deploy-wiring sub-task, and degrade to logging the link in
-  dev (as PM does) so tests/dev don't hard-fail.
+  already calls `env.EMAIL.send`. UPDATE 2026-06-23 (USER): the `send_email`
+  binding + verified sender are now LIVE — invite emails actually deliver. The code
+  still degrades to logging the link (`delivered:false`) when the binding is absent
+  (dev/unconfigured), so tests/dev don't hard-fail; that fallback stays.
 
 - **Cookie-name collision risk.** PM's session cookie is `bizbee_session` on the PM
   host; the CMS guard already FORWARDS that cookie to PM. If the CMS now mints its
@@ -196,11 +195,11 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **CF Email binding shape is the WORKERS shape, not PM's old one.** CMS
   `send-invite.ts` calls `env.EMAIL.send({ to, from: { email, name }, subject,
   text })` — the `send_email` Workers binding (per cloudflare-email-service skill).
-  PM's older code used `{ from: string, ... }`; don't copy PM's `from` shape. The
-  binding is COMMENTED in CMS/wrangler.jsonc until a verified sender DOMAIN is
-  onboarded (`wrangler email sending enable <domain>`, Paid plan) — until then the
-  flow degrades to logging the accept link (`delivered:false`). Enabling it +
-  rerunning typegen is a deploy-ops task, not codeable here.
+  PM's older code used `{ from: string, ... }`; don't copy PM's `from` shape.
+  UPDATE 2026-06-23 (USER): the binding + verified sender are LIVE — invite emails
+  deliver for real. The code still degrades to logging the accept link
+  (`delivered:false`) when the binding is absent (dev/unconfigured); keep that
+  fallback for tests/dev.
 
 - **APP_ORIGIN is deployer-injected (Slice 4).** The CMS's own public origin for
   building trusted invite-accept links comes from the `APP_ORIGIN` Worker var. The
@@ -257,3 +256,22 @@ Read every line before working. Each entry was learned the hard way by a previou
     GOOGLE_CLIENT_SECRET (Env type + container env + `--var` in deployer/src/index.ts;
     wrangler.jsonc placeholders). Empty => button hidden + routes no-op. Live
     provisioning + round-trip is in HITL.md ## Open (P1).
+
+- **PER-SITE GOOGLE CREDS NOW STORED IN CMS D1 (REWORK storage slice landed
+  2026-06-23).** A customer's OWN Google client id/secret live in ONE generic
+  `site_settings` row keyed `google_client` = `{clientId, clientSecretEnc}` (NO new
+  table/column — reused the JSON settings store). The secret is AES-256-GCM
+  encrypted via the NEW CMS-local `lib/crypto/secret-box.ts` (mirror of PM's), KEK =
+  the existing `CMS_AUTH_SECRET` Worker var (NOT a new secret — reuse it; it's
+  deployer-injected + already the google-core HMAC key). Access only via
+  `db/google-client-store.ts` (getGoogleClientConfig / setGoogleClientConfig /
+  clearGoogleClientConfig / **getDecryptedClientSecret** — the last is for the NEXT
+  slice's route rewrite; it returns null on decrypt-fail, NEVER 500). Pure
+  validation/`isGoogleConfigured`/`toGoogleClientStatus` (never leaks the secret) in
+  `lib/auth/google-config.ts`. `isGoogleConfigured` needs BOTH id AND secret. Route
+  `GET/PATCH/DELETE /api/settings/google` is `requireUserManager` (Manager+); page
+  `/admin/settings/google`. **The OAuth routes STILL read `env.GOOGLE_CLIENT_*` —
+  this slice only added storage+UI; the env→config swap + ripping out the shared
+  client are the remaining 3 REWORK TODOs (don't assume the routes use the D1 creds
+  yet).** When that swap lands, update the "GOOGLE SIGN-IN LANDED" caveat's last
+  bullet (shared deployer-injected client) to reflect the per-Site model.

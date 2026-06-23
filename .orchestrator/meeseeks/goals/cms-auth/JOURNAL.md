@@ -264,3 +264,34 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/messages/{en,fi,et}.json, CMS/wrangler.jsonc,
   CMS/scripts/google-auth.test.mjs (new), deployer/src/index.ts,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js, HITL.md.
+
+## 2026-06-23 16:46 — GOOGLE-CLIENT REWORK (storage slice): per-Site Google client creds in CMS settings (encrypted D1)
+- **Status:** DONE
+- **What I did:** First of the 4 rework TODOs — STORAGE + UI only, NO OAuth wiring
+  yet (routes still read env this slice; the env→config swap is the NEXT TODO).
+  Built the CMS-local secret-box (mirror of PM's `lib/crypto/secret-box.ts`, AES-256-GCM
+  Web Crypto, pure/node-testable), a pure `lib/auth/google-config.ts` (validation +
+  `isGoogleConfigured` [needs BOTH id AND secret] + normalize + `toGoogleClientStatus`
+  which NEVER echoes the secret), and `db/google-client-store.ts` (stores one
+  `site_settings` row `google_client` = `{clientId, clientSecretEnc}`; id plaintext,
+  secret AES-encrypted with the KEK; injectedDb-testable, reads D1 only via the Db
+  port). KEK = the existing `CMS_AUTH_SECRET` Worker var (no new secret to provision).
+  REST route `GET/PATCH/DELETE /api/settings/google` gated by `requireUserManager`
+  (Manager+); GET returns the safe status only. Settings page `/admin/settings/google`
+  + client `google-client-manager.tsx` (write-only fields, configured/not-configured
+  badge, clear via in-app ConfirmModal — no native confirm). SettingsNav `google` tab.
+  EN/FI/ET `googleClient` namespace + `settingsNav.google`. `getDecryptedClientSecret`
+  added for the NEXT slice (route rewrite) — decrypt failure returns null, never 500.
+- **Verified:** new `scripts/google-client.test.mjs` (8 tests: config validation,
+  is-configured, normalize, status-never-leaks-secret, secret-box round-trip +
+  wrong-key/tamper reject, store set→status→decrypt→clear, wrong-KEK→null). Full
+  suite 756 green, `tsc --noEmit` clean, `opennextjs-cloudflare build` complete,
+  i18n EN==FI==ET key parity, cms-bundle regenerated (route is runtime-served).
+- **Files:** CMS/src/lib/crypto/secret-box.ts (new),
+  CMS/src/lib/auth/google-config.ts (new), CMS/src/db/google-client-store.ts (new),
+  CMS/src/app/api/settings/google/route.ts (new),
+  CMS/src/app/admin/settings/google/page.tsx (new),
+  CMS/src/components/settings/google-client-manager.tsx (new),
+  CMS/src/components/settings/settings-nav.tsx, CMS/messages/{en,fi,et}.json,
+  CMS/scripts/google-client.test.mjs (new),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js.
