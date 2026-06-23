@@ -206,7 +206,16 @@
       "country": "Maa",
       "expires": "Vanhenee",
       "global": "Globaali",
-      "tags": "Tunnisteet"
+      "tags": "Tunnisteet",
+      "actions": "Toiminnot"
+    },
+    "revoke": {
+      "action": "Peru",
+      "title": "Peru kutsu",
+      "body": "Perutaanko kutsu osoitteelle {email}? Hyväksymislinkki lakkaa toimimasta heti. Tätä ei voi kumota.",
+      "confirm": "Peru",
+      "cancel": "Peruuta",
+      "error": "Kutsun peruminen epäonnistui. Se on ehkä jo hyväksytty tai peruttu."
     },
     "email": {
       "subject": "Sinut on kutsuttu bizbeecms ProjectManageriin",

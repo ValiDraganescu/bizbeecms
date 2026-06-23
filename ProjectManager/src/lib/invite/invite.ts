@@ -206,6 +206,23 @@ export async function acceptInvite(
   return { ok: true, user };
 }
 
+/**
+ * Revoke a PENDING invite by id (delete the row → its accept link dies).
+ * Scope-row cleanup is handled by the FK cascade on `invite_countries`/
+ * `invite_tags`. Returns true if a pending invite was deleted, false if none
+ * matched (unknown id or already accepted/revoked) → 404.
+ */
+export async function deleteInvite(id: string): Promise<boolean> {
+  const db = await getDb();
+  const deleted = await db
+    .delete(schema.invites)
+    .where(
+      and(eq(schema.invites.id, id), isNull(schema.invites.acceptedAt)),
+    )
+    .returning({ id: schema.invites.id });
+  return deleted.length > 0;
+}
+
 /** True if a pending invite already exists for this email. */
 export async function hasPendingInvite(email: string): Promise<boolean> {
   const db = await getDb();

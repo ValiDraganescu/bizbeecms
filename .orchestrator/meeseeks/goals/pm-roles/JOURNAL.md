@@ -207,3 +207,32 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   ProjectManager/src/app/(app)/sites/[id]/page.tsx,
   ProjectManager/src/lib/site/site-tags-slice7.test.ts,
   ProjectManager/messages/{en,fi,et}.json
+
+## 2026-06-23 08:35 — BUG [P2]: revoke a pending invitation (PM had no cancel)
+- **Status:** DONE
+- **What I did:**
+  - `lib/invite/invite.ts` `deleteInvite(id)`: `DELETE ... WHERE id=? AND acceptedAt
+    IS NULL` `.returning()` → bool. Scope rows (`invite_countries`/`invite_tags`)
+    drop via their FK cascade — no manual cleanup. Re-checks pending so an accepted
+    invite 404s.
+  - `app/api/invite/[id]/route.ts` `DELETE` (Next 15 async-params shape): gated by
+    `canUserInvite(user)` — the SAME authz as POST — 403 otherwise; 404 when
+    `deleteInvite` returns false. REST-only (server actions 500 on OpenNext).
+  - Extracted the formerly-inline pending table from `invite/page.tsx` into a client
+    `invite/pending-invites.tsx`. The server page now pre-resolves each row to plain
+    strings (`PendingInvite[]`: roleLabel/countryText/tagLabels/expires) so the client
+    stays a thin shell. Per-row "Revoke" ghost-danger button → in-app confirm modal
+    (copy of the users-manager dialog pattern, role=dialog aria-modal, NO native
+    confirm) → `fetch(DELETE)` then `router.refresh()`; error Alert on failure.
+  - EN/FI/ET: added `invites.revoke.{action,title,body,confirm,cancel,error}` +
+    `invites.pending.actions`. FI/ET hand-translated.
+  - Regression test `lib/invite/revoke-bug-2026-06-23.test.ts` (source-text + i18n;
+    route imports `@/` so not bare-node-importable — same strategy as Slices 1/4/5).
+- **Gate:** tsc 0, 150 node tests pass, `npx opennextjs-cloudflare build` green
+  (dev not on 3601). No live-D1 runtime exercise this run.
+- **Files:** ProjectManager/src/lib/invite/invite.ts,
+  ProjectManager/src/app/api/invite/[id]/route.ts,
+  ProjectManager/src/app/(app)/invite/pending-invites.tsx,
+  ProjectManager/src/app/(app)/invite/page.tsx,
+  ProjectManager/src/lib/invite/revoke-bug-2026-06-23.test.ts,
+  ProjectManager/messages/{en,fi,et}.json

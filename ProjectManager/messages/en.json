@@ -206,7 +206,16 @@
       "country": "Country",
       "expires": "Expires",
       "global": "Global",
-      "tags": "Tags"
+      "tags": "Tags",
+      "actions": "Actions"
+    },
+    "revoke": {
+      "action": "Revoke",
+      "title": "Revoke invitation",
+      "body": "Revoke the invitation for {email}? The accept link will stop working immediately. This can't be undone.",
+      "confirm": "Revoke",
+      "cancel": "Cancel",
+      "error": "Couldn't revoke the invitation. It may have already been accepted or revoked."
     },
     "email": {
       "subject": "You've been invited to bizbeecms ProjectManager",

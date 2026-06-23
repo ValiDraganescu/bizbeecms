@@ -4,6 +4,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
 
+- DONE (2026-06-23): **BUG [P2] — PM has no way to cancel a pending invitation.**
+  FIXED: added `deleteInvite(id)` store fn (`lib/invite/invite.ts`, deletes only
+  while `acceptedAt IS NULL`; scope rows go via FK cascade) + `DELETE
+  /api/invite/[id]/route.ts` gated by `canUserInvite` (same authz as POST), 404
+  on missing/already-accepted. Extracted the pending table into a client
+  `pending-invites.tsx` with a per-row "Revoke" ghost-danger button + in-app
+  confirm modal (no native confirm) that calls the DELETE then `router.refresh()`.
+  EN/FI/ET `invites.revoke.*` + `invites.pending.actions`. Regression test
+  `lib/invite/revoke-bug-2026-06-23.test.ts` (source-text + i18n, fails-before).
+  Gate: tsc 0, 150 node tests, opennext build green.
+
 ## Tasks
 Build order: role enum + migration FIRST (everything keys off the names), then the
 removal hierarchy, then tags, then the management UI/API. Each slice gates on PM

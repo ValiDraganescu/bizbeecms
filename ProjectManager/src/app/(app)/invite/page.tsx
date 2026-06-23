@@ -4,18 +4,11 @@ import {
   Alert,
   AlertBody,
   AlertTitle,
-  Badge,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
 } from "@/components/ui";
 import type { Role } from "@/db/schema";
 import {
@@ -31,6 +24,7 @@ import {
   getInviteTagsMap,
 } from "@/lib/invite/invite";
 import { InviteForm } from "./invite-form";
+import { PendingInvites, type PendingInvite } from "./pending-invites";
 
 const roleKey: Record<Role, string> = {
   SuperAdmin: "superAdmin",
@@ -60,6 +54,20 @@ export default async function InvitePage() {
   const tagsByInvite = await getInviteTagsMap(inviteIds);
   const tagLabel = (id: string) =>
     managedTags.find((tg) => tg.id === id)?.label ?? id;
+
+  // Pre-resolve invite rows to plain strings so the client table stays thin.
+  const pendingRows: PendingInvite[] = pending.map((inv) => {
+    const countries = countriesByInvite.get(inv.id) ?? [];
+    return {
+      id: inv.id,
+      email: inv.email,
+      roleLabel: tRoles(roleKey[inv.role]),
+      countryText:
+        countries.length > 0 ? countries.join(", ") : t("pending.global"),
+      tagLabels: (tagsByInvite.get(inv.id) ?? []).map(tagLabel),
+      expires: inv.expiresAt.toISOString().slice(0, 10),
+    };
+  });
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-10">
@@ -120,56 +128,7 @@ export default async function InvitePage() {
               <CardDescription>{t("pending.description")}</CardDescription>
             </CardHeader>
             <CardContent>
-              {pending.length === 0 ? (
-                <p className="text-sm text-foreground-muted">
-                  {t("pending.empty")}
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("pending.email")}</TableHead>
-                      <TableHead>{t("pending.role")}</TableHead>
-                      <TableHead>{t("pending.country")}</TableHead>
-                      <TableHead>{t("pending.tags")}</TableHead>
-                      <TableHead>{t("pending.expires")}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pending.map((inv) => (
-                      <TableRow key={inv.id}>
-                        <TableCell>{inv.email}</TableCell>
-                        <TableCell>
-                          <Badge tone="neutral">
-                            {tRoles(roleKey[inv.role])}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {(countriesByInvite.get(inv.id) ?? []).length > 0
-                            ? countriesByInvite.get(inv.id)!.join(", ")
-                            : t("pending.global")}
-                        </TableCell>
-                        <TableCell>
-                          {(tagsByInvite.get(inv.id) ?? []).length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {tagsByInvite.get(inv.id)!.map((id) => (
-                                <Badge key={id} tone="primary">
-                                  {tagLabel(id)}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-foreground-muted">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="tabular-nums text-foreground-muted">
-                          {inv.expiresAt.toISOString().slice(0, 10)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+              <PendingInvites invites={pendingRows} />
             </CardContent>
           </Card>
         </>

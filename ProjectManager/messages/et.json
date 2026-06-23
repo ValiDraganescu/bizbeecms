@@ -206,7 +206,16 @@
       "country": "Riik",
       "expires": "Aegub",
       "global": "Globaalne",
-      "tags": "Sildid"
+      "tags": "Sildid",
+      "actions": "Toimingud"
+    },
+    "revoke": {
+      "action": "Tühista",
+      "title": "Tühista kutse",
+      "body": "Kas tühistada kutse aadressile {email}? Vastuvõtmise link lakkab kohe töötamast. Seda ei saa tagasi võtta.",
+      "confirm": "Tühista",
+      "cancel": "Loobu",
+      "error": "Kutse tühistamine ebaõnnestus. See võis olla juba vastu võetud või tühistatud."
     },
     "email": {
       "subject": "Sind on kutsutud bizbeecms ProjectManagerisse",

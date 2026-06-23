@@ -178,6 +178,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   inside the `canManage` block but with its OWN `canUserCreateSite(user)` gate — a
   scoped Admin who reaches the site by country still sees it; a Manager/Editor never
   does. No new migration (site_tags already existed since Slice 3).
+- **BUG 2026-06-23 fixed — invite revoke = `DELETE /api/invite/[id]`.** `deleteInvite`
+  (`lib/invite/invite.ts`) deletes the invite row ONLY while `acceptedAt IS NULL` and
+  relies on the FK cascade on `invite_countries`/`invite_tags` to drop scope rows — do
+  NOT hand-delete those (and don't drop the cascade from the schema). Route gated by
+  `canUserInvite` (SAME authz as creating one — no separate revoke tier). The pending
+  table is now a CLIENT component `invite/pending-invites.tsx`; the server `page.tsx`
+  pre-resolves each row to strings (`PendingInvite[]`) — if you add a column, resolve it
+  server-side, don't push Maps/Dates into the client. Confirm modal is a 3rd copy of the
+  overlay-dialog pattern (after tags-manager + users-manager) — promoting it to
+  components/ui is now justified (see NEXT). NO live-D1 runtime test was run.
+
 - **Site tag picker needs tags to EXIST first.** `sites.tags.none` tells the admin to
   create tags in Tag management (`/tags`) when `listTags()` is empty — a Site can't be
   tagged before the vocabulary exists. The picker hides the form (not an error) in that
