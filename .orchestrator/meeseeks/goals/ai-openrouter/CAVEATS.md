@@ -108,3 +108,22 @@ Read every line before working. Each entry was learned the hard way by a previou
 - PM test glob is BOTH `src/lib/**/*.test.ts` AND `scripts/**/*.test.mjs` (see package.json `test`).
   A `.test.ts` next to its source under `src/lib/` IS run by `npm test` — the earlier caveat that said
   "PM test glob is scripts/**/*.test.mjs" is INCOMPLETE; co-located `.test.ts` works too.
+- KEY-MINTING Slice 5 DONE: mint-on-deploy lives in the deploy route, gated on pure
+  `shouldMintOnDeploy(enabled, keyHash)` (`src/lib/site/mint-on-deploy.ts` — `=== true` toggle,
+  hash null/"" → mint). Persistence is `setSiteMintedOpenrouterKey(id, ciphertext, hash)` /
+  `clearSiteMintedOpenrouterKey(id)` in site.ts (write BOTH cols together). `setSiteOpenrouterKey`
+  (encrypted-only setter) is now truly unused — leave it or it can be deleted in a cleanup pass.
+- The mint block MUTATES the in-memory `site` (`site.openrouterApiKeyEncrypted`/`openrouterKeyHash`)
+  after persisting, so the existing Slice-3 `decideDeployOpenrouterField` decrypt-and-thread block
+  below it picks up the freshly minted key in the SAME request. Don't reorder them — mint must run first.
+- DELETE endpoint = `/api/sites/[id]/openrouter-key` (route.ts, DELETE handler). Authz mirrors the
+  deploy route (country-reach OR `site_users` assignment), NOT the PATCH route's `canUserCreateSite`.
+  It is PROCEED-AND-CLEAR: remote `deleteKey` failure (incl. 404 already-gone) is caught+warned and
+  local state is cleared anyway; a no-hash Site returns `{ok:true}` without calling OpenRouter.
+- `OPENROUTER_PROVISIONING_KEY` is read in BOTH the deploy route and the DELETE route via the
+  `(env as Record<string,unknown>).OPENROUTER_PROVISIONING_KEY` boundary (same pattern as SITE_SECRET_KEY).
+  It's still only a COMMENT in PM wrangler.jsonc — a live mint/delete needs `wrangler secret put
+  OPENROUTER_PROVISIONING_KEY` on PM (HITL). Without it, `mintKey` throws → caught → global fallback.
+- The form delete button now uses local `hasKey` state (seeded from `hasMintedOpenrouterKey`) + a
+  `deleting` loading flag; on 2xx it flips `hasKey=false` and `router.refresh()`. The old DISABLED-stub
+  caveat is now stale.

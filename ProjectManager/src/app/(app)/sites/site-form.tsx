@@ -104,6 +104,25 @@ export function SiteForm({
   const [monthlyLimit, setMonthlyLimit] = useState(
     initialMonthlyLimitUsd == null ? "" : String(initialMonthlyLimitUsd),
   );
+  // Locally track whether a minted key exists so the delete button hides after
+  // a successful revoke without a full page reload.
+  const [hasKey, setHasKey] = useState(hasMintedOpenrouterKey);
+  const [deleting, setDeleting] = useState(false);
+
+  async function onDeleteKey() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/sites/${siteId}/openrouter-key`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setHasKey(false);
+        router.refresh();
+      }
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   // Auto-derive slug from name until the user takes over the slug field.
   useEffect(() => {
@@ -287,9 +306,14 @@ export function SiteForm({
             </div>
           ) : null}
 
-          {hasMintedOpenrouterKey ? (
+          {hasKey ? (
             <div className="mt-2 flex items-center gap-2">
-              <Button type="button" variant="ghost" disabled title="—">
+              <Button
+                type="button"
+                variant="ghost"
+                loading={deleting}
+                onClick={onDeleteKey}
+              >
                 {t("form.openrouterKeyDelete")}
               </Button>
               <FieldHint>{t("form.openrouterKeyMinted")}</FieldHint>

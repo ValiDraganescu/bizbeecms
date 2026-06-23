@@ -8,8 +8,11 @@ import {
   setSiteDeployStatus,
 } from "@/lib/site/site";
 import { canStartDeploy } from "@/lib/deploy";
-import { decryptSecret } from "@/lib/crypto/secret-box";
+import { decryptSecret, encryptSecret } from "@/lib/crypto/secret-box";
 import { decideDeployOpenrouterField } from "@/lib/site/deploy-openrouter-key";
+import { shouldMintOnDeploy } from "@/lib/site/mint-on-deploy";
+import { mintKey } from "@/lib/openrouter/provision";
+import { setSiteMintedOpenrouterKey } from "@/lib/site/site";
 
 export type DeployError =
   | "notAllowed"
@@ -76,13 +79,43 @@ export async function POST(
     return NextResponse.json({ error: "notConfigured" }, { status: 500 });
   }
 
+  const kek =
+    typeof bag.SITE_SECRET_KEY === "string" ? bag.SITE_SECRET_KEY : "";
+
+  // Mint-on-deploy (KEY-MINTING Slice 5): if the Site has minting enabled and
+  // no minted key yet, mint one now via the Provisioning API, encrypt it, and
+  // persist (ciphertext + hash). Idempotent — a Site that already has a key is
+  // never re-minted. Minting MUST NOT crash the deploy: any failure (no
+  // provisioning key, OpenRouter error, encrypt error) is caught and logged,
+  // and the deploy proceeds with the deployer's global fallback key.
+  if (shouldMintOnDeploy(site.openrouterMintingEnabled, site.openrouterKeyHash)) {
+    const provKey =
+      typeof bag.OPENROUTER_PROVISIONING_KEY === "string"
+        ? bag.OPENROUTER_PROVISIONING_KEY
+        : "";
+    try {
+      const minted = await mintKey(provKey, {
+        name: site.slug,
+        limit: site.openrouterMonthlyLimitUsd ?? undefined,
+      });
+      const ciphertext = await encryptSecret(minted.key, kek);
+      await setSiteMintedOpenrouterKey(siteId, ciphertext, minted.hash);
+      // Reflect the new key locally so the decrypt-and-thread path below sends it.
+      site.openrouterApiKeyEncrypted = ciphertext;
+      site.openrouterKeyHash = minted.hash;
+    } catch (e) {
+      console.warn(
+        `[deploy] Site ${siteId}: OpenRouter key mint failed; proceeding with ` +
+          `the deployer's global key. ${e instanceof Error ? e.message : ""}`,
+      );
+    }
+  }
+
   // Per-Site OpenRouter key (Slice 3): if the Site has one stored encrypted,
   // decrypt it and pass the PLAINTEXT to the deployer over the existing HTTPS
   // call. A decrypt failure (bad/rotated/unset SITE_SECRET_KEY, corrupt blob)
   // MUST NOT fail the deploy — we omit the field and let the deployer fall back
   // to its global OPENROUTER_API_KEY. Decrypt up-front so the helper stays pure.
-  const kek =
-    typeof bag.SITE_SECRET_KEY === "string" ? bag.SITE_SECRET_KEY : "";
   let decrypted: string | null = null;
   if (site.openrouterApiKeyEncrypted) {
     try {

@@ -115,6 +115,32 @@ export async function setSiteOpenrouterKey(
 }
 
 /**
+ * Store a freshly-minted OpenRouter key (KEY-MINTING Slice 5): the encrypted
+ * `sk-or-...` ciphertext AND its OpenRouter `hash`, in one update. The hash is
+ * the idempotency signal (`shouldMintOnDeploy`) and the DELETE handle.
+ */
+export async function setSiteMintedOpenrouterKey(
+  id: string,
+  ciphertext: string,
+  hash: string,
+): Promise<void> {
+  const db = await getDb();
+  await db
+    .update(schema.sites)
+    .set({ openrouterApiKeyEncrypted: ciphertext, openrouterKeyHash: hash })
+    .where(eq(schema.sites.id, id));
+}
+
+/** Clear a Site's minted OpenRouter key — both the ciphertext and the hash. */
+export async function clearSiteMintedOpenrouterKey(id: string): Promise<void> {
+  const db = await getDb();
+  await db
+    .update(schema.sites)
+    .set({ openrouterApiKeyEncrypted: null, openrouterKeyHash: null })
+    .where(eq(schema.sites.id, id));
+}
+
+/**
  * Sites visible to `user`, newest first.
  *  - SuperAdmin / global Admin: every Site.
  *  - Country-scoped Admin: Sites whose country is in their scope.
