@@ -77,3 +77,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   Node, so the helper is MIRRORED in `deployer/scripts/openrouter-key.test.mjs` (keep in sync if you
   change the source helper). The deployer track is now COMPLETE (all 4 slices); only HITL live-verify
   remains (see root HITL.md).
+- KEY-MINTING TRACK Slice 1 DONE: `ProjectManager/src/lib/openrouter/provision.ts`. `mintKey(provKey,
+  {name, limit?}, fetch?)` → `{ key: "sk-or-...", hash }` from OpenRouter's `{ key, data: { hash } }`;
+  `deleteKey(provKey, hash, fetch?)` → DELETE `/api/v1/keys/:hash` (hash encodeURIComponent'd). Both
+  throw on non-2xx + missing creds (guarded before fetch). `limit` is OMITTED from the body when
+  null/undefined (= no cap) — don't send `limit: null`. The provisioning key is the SINGLE PM secret
+  `OPENROUTER_PROVISIONING_KEY` (NOT per-site); declared as a comment in PM wrangler.jsonc. Reuse the
+  EXISTING `sites.openrouterApiKeyEncrypted` (secret-box.ts) to store the minted `key`; the `hash` needs
+  a NEW column (Slice 2). PM test glob `scripts/**/*.test.mjs` — node imports `.ts` directly (no loader).

@@ -181,3 +181,34 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   showing the live catalog on a deployed CMS — these need the deployer's `OPENROUTER_API_KEY` secret
   and a live deploy; tracked in root HITL.md.
 - **Files:** `.orchestrator/meeseeks/goals/ai-openrouter/{BACKLOG,JOURNAL,CAVEATS,NEXT}.md` only
+
+## 2026-06-23 16:45 — KEY-MINTING TRACK Slice 1: pure OpenRouter provisioning client (mint + delete)
+- **Status:** DONE
+- **What I did:** Tracer slice for the auto-provision track (PM-side, NOT yet wired into deploy).
+  New `ProjectManager/src/lib/openrouter/provision.ts`:
+  - `mintKey(provisioningKey, { name, limit? }, fetchImpl = fetch)` → `POST
+    https://openrouter.ai/api/v1/keys` with `Authorization: Bearer <provisioningKey>` +
+    `Content-Type: application/json`, body `{ name, limit? }` (limit OMITTED when null/undefined →
+    no monthly cap). Parses OpenRouter's `{ key: "sk-or-...", data: { hash } }` → returns
+    `{ key, hash }` (key = the one-time runtime secret; hash = the stable delete handle).
+  - `deleteKey(provisioningKey, hash, fetchImpl = fetch)` → `DELETE /api/v1/keys/:hash` (hash
+    `encodeURIComponent`-d), Bearer auth.
+  - Both THROW on non-2xx (`safeText`-ed body in the message), on missing creds (guarded BEFORE any
+    fetch call), and mintKey throws when the response lacks `key`/`hash`. `fetch` injected so it's
+    fake-testable. Exported `OPENROUTER_KEYS_URL`.
+  - `scripts/openrouter-provision.test.mjs` — 9 dep-free tests over a fake fetch: mint request shape
+    (POST/url/Bearer/Content-Type/body), limit-omitted (null + undefined), mint non-2xx throws,
+    mint missing-key/hash throws, mint no-key guard (no fetch call), delete request shape, delete
+    hash URL-encoding, delete non-2xx throws, delete missing-cred guards (no fetch call).
+  - Declared `OPENROUTER_PROVISIONING_KEY` as a SECRET comment in `ProjectManager/wrangler.jsonc`
+    (single PM-held provisioning key, NOT per-site; read via the `(env as Record<...>)` pattern).
+- **Verified:** Inside ProjectManager/: `node --test scripts/openrouter-provision.test.mjs` → 9/9;
+  `npx tsc --noEmit` clean; `npm test` (full PM suite) → **182/182 pass, 0 fail**. Did NOT run
+  `opennextjs-cloudflare build` (pure helper + config only, no route/runtime change; dev may be up —
+  build gate is the deploy slices). Did NOT touch CMS/ or deployer/. NOT wired into deploy (next slice).
+- **CONTRACT for next slices:** `mintKey` → `{ key, hash }`; persist `key` encrypted into the EXISTING
+  `sites.openrouterApiKeyEncrypted` (reuse `secret-box.ts`, no new crypto) and `hash` into a new
+  `openrouterKeyHash` column (Slice 2 migration). `deleteKey(provKey, hash)` revokes. Provisioning key
+  is read from PM secret `OPENROUTER_PROVISIONING_KEY`.
+- **Files:** `ProjectManager/src/lib/openrouter/provision.ts`,
+  `ProjectManager/scripts/openrouter-provision.test.mjs`, `ProjectManager/wrangler.jsonc`

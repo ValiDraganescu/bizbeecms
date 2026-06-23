@@ -32,6 +32,13 @@
   // Read at runtime via the env-secret pattern, e.g.
   //   (env as unknown as Record<string, unknown>).SITE_SECRET_KEY
   // Without it, per-Site key encryption/decryption throws (HITL ## Open item).
+  // SECRET (not a var): OPENROUTER_PROVISIONING_KEY is the SINGLE PM-held OpenRouter
+  // management/provisioning key used to mint/delete a per-Site runtime key via the
+  // Provisioning API (src/lib/openrouter/provision.ts). NOT per-site. Set it once:
+  //   wrangler secret put OPENROUTER_PROVISIONING_KEY
+  // Read at runtime via the env-secret pattern:
+  //   (env as unknown as Record<string, unknown>).OPENROUTER_PROVISIONING_KEY
+  // Without it, mint-on-deploy degrades gracefully to the deployer's global key.
   // Trusted public origin used to build invite/email links. MUST be set before
   // deploy — invite-link generation refuses to fall back to the request Host
   // header in production (Host Header Injection guard, see send-invite.ts).
