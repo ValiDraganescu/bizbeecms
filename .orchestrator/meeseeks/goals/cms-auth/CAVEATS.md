@@ -355,8 +355,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   unknown/SSO-only emails too, so a 429 never reveals an email exists. If you wire
   the SAME throttle into `/api/auth/forgot` or `/api/auth/reset`, REUSE
   throttle-core + the store (don't fork); a separate D1 key namespace would need a
-  `kind` column (currently email-only). The `login_attempt` table has NO auto-prune
-  job — rows age out of the WINDOW logically but only `clearFailures` (on success)
-  deletes them; a periodic sweep is a future nicety, not needed yet (low volume,
-  per-Site D1). UI surfaces 429 as `login.errorTooMany` (EN/FI/ET); 401 stays
-  `errorInvalid`.
+  `kind` column (currently email-only). UI surfaces 429 as `login.errorTooMany`
+  (EN/FI/ET); 401 stays `errorInvalid`.
+
+- **`login_attempt` IS NOW OPPORTUNISTICALLY PRUNED (2026-06-23 19:09) — don't add a
+  cron.** `recordFailure` (`db/login-attempt-store.ts`), after its INSERT, runs
+  `DELETE FROM login_attempt WHERE created_at < windowStart(now)` — sweeping ALL
+  out-of-window rows regardless of email/kind (they count toward no throttle, so
+  deleting is safe). This bounds table growth and clears the never-`clearFailures`-d
+  `forgot` rows. The CMS Worker has NO scheduled (cron) handler, so the prune
+  piggybacks the low-volume write path on purpose; the ponytail comment names the
+  cron upgrade path IF a Site's failure volume ever makes the DELETE measurably hurt
+  login latency. Don't reintroduce a "no auto-prune" assumption.

@@ -475,3 +475,31 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/scripts/login-throttle.test.mjs (kind sig + isolation test),
   CMS/src/lib/reset/forgot-route.test.ts (+throttle structural test),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-23 19:09 — Opportunistic prune of aged-out `login_attempt` rows
+- **Status:** DONE
+- **What I did:** Closed the "`login_attempt` rows never get deleted" tidiness
+  gap (NEXT.md candidate 2). `forgot`-kind rows are never `clearFailures`-d (no
+  success signal), so they accumulated forever; `login` rows only age out of the
+  window logically. Added an opportunistic sweep inside `recordFailure`
+  (`db/login-attempt-store.ts`): after the INSERT, `DELETE FROM login_attempt
+  WHERE created_at < windowStart(now)` — wipes ALL aged-out rows regardless of
+  email/kind (out-of-window rows count toward no throttle, so deleting them is
+  safe and correct). recordFailure is the right host: it's the only write that's
+  both low-volume AND covers every throttled surface. No cron/Worker needed
+  (the CMS has no scheduled handler wired; piggybacking the write path is the
+  lazy correct fix). ponytail comment names the upgrade path (cron) if volume
+  ever makes the DELETE hurt.
+- **Verified:** `node --test scripts/login-throttle.test.mjs` 9 pass (1 new:
+  "recordFailure opportunistically prunes aged-out rows (any email/kind)" — seeds
+  2 aged login+forgot rows, one fresh failure, asserts only the fresh row
+  survives; fails-before since without the sweep count would be 3). Full `npm
+  test` 787 pass / 0 fail. `npx tsc --noEmit` clean. `npx opennextjs-cloudflare
+  build` green (dev server down first). PM `bundle:cms` regenerated (recordFailure
+  is imported by the login+forgot worker routes, so the behavior ships in the
+  bundle). Tree had NO parallel CMS/PM WIP this run (clean except goal-memory +
+  two untracked `.impeccable/` archive dirs, left untouched). Could NOT verify a
+  live prune on a deployed CMS (no live Site this run) — node-tested only.
+- **Files:** CMS/src/db/login-attempt-store.ts (import `lt`; prune in recordFailure),
+  CMS/scripts/login-throttle.test.mjs (+prune test),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).

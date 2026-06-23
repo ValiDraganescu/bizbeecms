@@ -11,7 +11,7 @@
  * `injectedDb` is for tests only (prod resolves via the Db port; never reads
  * `env.DB` directly, so the sole-reader guard stays green).
  */
-import { eq, gt, and } from "drizzle-orm";
+import { eq, gt, lt, and } from "drizzle-orm";
 import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import { windowStart } from "../lib/auth/throttle-core.ts";
 
@@ -56,6 +56,15 @@ export async function recordFailure(
     kind,
     createdAt: new Date(now),
   });
+  // Opportunistic prune: rows older than the window count toward no throttle and
+  // (for 'forgot') are never cleared on success, so they'd accumulate forever.
+  // Sweep all aged-out rows (any email/kind) here — recordFailure is the only
+  // write that's low-volume yet covers every surface. ponytail: piggybacked on
+  // the write path; promote to a cron only if a Site's failure volume ever makes
+  // this DELETE measurably hurt the login path.
+  await db
+    .delete(schema.loginAttempt)
+    .where(lt(schema.loginAttempt.createdAt, new Date(windowStart(now))));
 }
 
 /** Clear an email's attempts for `kind` (call on a successful login). */

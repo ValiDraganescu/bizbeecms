@@ -129,6 +129,24 @@ test("attempts are per-email isolated", async () => {
   assert.equal((await recentFailureTimestamps("b@example.com", now, "login", db)).length, 1);
 });
 
+test("recordFailure opportunistically prunes aged-out rows (any email/kind)", async () => {
+  const fake = fakeD1();
+  const db = cfDb(fake);
+  const now = 50_000_000;
+  const countAll = () => fake.sqlite.prepare("SELECT count(*) AS c FROM login_attempt").get().c;
+
+  // Seed rows well past the window, across emails AND kinds.
+  await recordFailure("old-a@example.com", now - WINDOW_MS - 10_000, "login", db);
+  await recordFailure("old-b@example.com", now - WINDOW_MS - 10_000, "forgot", db);
+
+  // A fresh in-window failure triggers the prune and itself survives.
+  await recordFailure("fresh@example.com", now, "login", db);
+
+  // Only the fresh row remains; both aged-out rows were swept.
+  assert.equal(countAll(), 1);
+  assert.equal((await recentFailureTimestamps("fresh@example.com", now, "login", db)).length, 1);
+});
+
 test("login and forgot namespaces are isolated (forgot-spam can't lock login)", async () => {
   const db = cfDb(fakeD1());
   const email = "victim@example.com";

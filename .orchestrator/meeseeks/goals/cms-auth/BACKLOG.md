@@ -5,6 +5,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-23 19:09): **Periodic prune of aged-out `login_attempt` rows.** See
+  JOURNAL. Opportunistic sweep inside `recordFailure` (`db/login-attempt-store.ts`):
+  after the INSERT, `DELETE … WHERE created_at < windowStart(now)` wipes ALL
+  out-of-window rows (any email/kind) — they count toward no throttle, and `forgot`
+  rows were otherwise never cleared. No cron needed (CMS has no scheduled handler;
+  piggybacked the low-volume write path; ponytail comment names the cron upgrade
+  path). 1 new test (787 total), tsc + opennext build green, cms-bundle regen.
+
 - DONE (2026-06-23): **Throttle `/api/auth/forgot` (rate-limit reset-email
   requests).** See JOURNAL. Added a `kind` column to `login_attempt` (migration
   0014, default `'login'`; index now `(email, kind)`) so forgot + login have
