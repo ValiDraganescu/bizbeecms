@@ -154,7 +154,8 @@
       "title": "Sign in",
       "subtitle": "Sign in to the ProjectManager.",
       "submit": "Sign in",
-      "firstRun": "No account yet?"
+      "firstRun": "No account yet?",
+      "forgotPassword": "Forgot password?"
     },
     "errors": {
       "emailRequired": "Enter your email address.",
@@ -172,7 +173,17 @@
       "email": {
         "subject": "Reset your bizbeecms ProjectManager password",
         "body": "We received a request to reset your bizbeecms ProjectManager password. Set a new password here:\n\n{url}\n\nThis link expires in 7 days. If you didn't request this, you can ignore this email."
-      }
+      },
+      "title": "Reset your password",
+      "subtitle": "Enter your email and we'll send you a link to set a new password.",
+      "submit": "Send reset link",
+      "success": "If an account exists for that email, we've sent a link to reset your password.",
+      "backToSignIn": "Back to sign in"
+    },
+    "reset": {
+      "title": "Set a new password",
+      "subtitle": "Choose a new password for your account.",
+      "submit": "Set new password"
     }
   },
   "invites": {

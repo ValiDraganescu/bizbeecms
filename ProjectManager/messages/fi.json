@@ -154,7 +154,8 @@
       "title": "Kirjaudu sisään",
       "subtitle": "Kirjaudu ProjectManageriin.",
       "submit": "Kirjaudu sisään",
-      "firstRun": "Eikö sinulla ole vielä tiliä?"
+      "firstRun": "Eikö sinulla ole vielä tiliä?",
+      "forgotPassword": "Unohditko salasanasi?"
     },
     "errors": {
       "emailRequired": "Anna sähköpostiosoitteesi.",
@@ -172,7 +173,17 @@
       "email": {
         "subject": "Nollaa bizbeecms ProjectManager -salasanasi",
         "body": "Saimme pyynnön nollata bizbeecms ProjectManager -salasanasi. Aseta uusi salasana täällä:\n\n{url}\n\nTämä linkki vanhenee 7 päivässä. Jos et tehnyt tätä pyyntöä, voit jättää tämän sähköpostin huomiotta."
-      }
+      },
+      "title": "Nollaa salasanasi",
+      "subtitle": "Anna sähköpostiosoitteesi, niin lähetämme sinulle linkin uuden salasanan asettamiseen.",
+      "submit": "Lähetä nollauslinkki",
+      "success": "Jos kyseiselle sähköpostille on tili, olemme lähettäneet linkin salasanan nollaamiseen.",
+      "backToSignIn": "Takaisin kirjautumiseen"
+    },
+    "reset": {
+      "title": "Aseta uusi salasana",
+      "subtitle": "Valitse tilillesi uusi salasana.",
+      "submit": "Aseta uusi salasana"
     }
   },
   "invites": {

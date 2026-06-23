@@ -34,10 +34,15 @@ PM first (slices P1–P5), then mirror in CMS (slices C1–C5). ONE app per work
   leak). String added EN/FI/ET. Test `lib/reset/reset-route.test.ts`. Gates green
   (tsc / 166 tests / opennext build; route in manifest).
 
-- TODO: **P4 — PM forgot/reset pages + login link.** `(auth)/forgot` (email form
-  → POST /api/auth/forgot, shows the enumeration-safe message) + `(auth)/reset/
-  [token]` (new-password form → POST /api/auth/reset, success → login). Add a
-  "Forgot password?" link to the login page. EN/FI/ET for all new strings. Gate.
+- DONE: **P4 — PM forgot/reset pages + login link.** `(auth)/forgot` page+form
+  (email → POST /api/auth/forgot; on any 2xx shows the enumeration-safe success +
+  back-to-sign-in, no body branching) + `(auth)/reset/[token]` page+form
+  (password+confirm → POST /api/auth/reset, min-length 10 via MIN_PASSWORD_LENGTH,
+  generic resetTokenInvalid for all token failures, success → /login). Added a
+  "Forgot password?" link to `login-form.tsx`. New strings auth.login.forgotPassword
+  + auth.forgot.{title,subtitle,submit,success,backToSignIn} + auth.reset.{title,
+  subtitle,submit} in EN/FI/ET. Gates green (tsc / 166 tests / opennext build;
+  both pages in .next/server output).
 
 - TODO: **P5 — PM reset pure-logic tests.** Dependency-free node tests
   (fail-before/pass-after): token validity, expiry boundary, single-use (2nd use

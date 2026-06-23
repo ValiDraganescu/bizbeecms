@@ -120,6 +120,15 @@ export function LoginForm({
         ) : null}
       </Field>
 
+      <div className="-mt-1 text-right text-sm">
+        <Link
+          href="/forgot"
+          className="font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+        >
+          {t("login.forgotPassword")}
+        </Link>
+      </div>
+
       <Button type="submit" loading={pending} className="w-full">
         {t("login.submit")}
       </Button>

@@ -154,7 +154,8 @@
       "title": "Logi sisse",
       "subtitle": "Logi sisse ProjectManagerisse.",
       "submit": "Logi sisse",
-      "firstRun": "Pole veel kontot?"
+      "firstRun": "Pole veel kontot?",
+      "forgotPassword": "Unustasid parooli?"
     },
     "errors": {
       "emailRequired": "Sisesta oma e-posti aadress.",
@@ -172,7 +173,17 @@
       "email": {
         "subject": "Lähtesta oma bizbeecms ProjectManageri parool",
         "body": "Saime taotluse lähtestada sinu bizbeecms ProjectManageri parool. Määra uus parool siin:\n\n{url}\n\nSee link aegub 7 päevaga. Kui sa seda ei taotlenud, võid selle e-kirja eirata."
-      }
+      },
+      "title": "Lähtesta oma parool",
+      "subtitle": "Sisesta oma e-posti aadress ja me saadame sulle lingi uue parooli määramiseks.",
+      "submit": "Saada lähtestamislink",
+      "success": "Kui selle e-posti aadressiga konto on olemas, oleme saatnud lingi parooli lähtestamiseks.",
+      "backToSignIn": "Tagasi sisselogimisse"
+    },
+    "reset": {
+      "title": "Määra uus parool",
+      "subtitle": "Vali oma kontole uus parool.",
+      "submit": "Määra uus parool"
     }
   },
   "invites": {
