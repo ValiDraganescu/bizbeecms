@@ -79,7 +79,7 @@ export async function sendInviteEmail(params: {
     env as unknown as Record<string, unknown>,
     params.token,
   );
-  const email = (env as { EMAIL?: EmailBinding }).EMAIL;
+  const email = (env as unknown as { EMAIL?: EmailBinding }).EMAIL;
 
   if (!email) {
     // No binding (dev / not yet provisioned): degrade to log + show in-app.
