@@ -74,7 +74,8 @@
     "brand": "Brändi ja tekoäly",
     "apiKeys": "API-avaimet",
     "users": "Käyttäjät",
-    "google": "Google-kirjautuminen"
+    "google": "Google-kirjautuminen",
+    "openrouterKey": "OpenRouter-avain"
   },
   "theme": {
     "title": "Teema",
@@ -281,6 +282,7 @@
     "expand": "Laajenna sivupalkki",
     "collapse": "Tiivistä sivupalkki",
     "viewSite": "Näytä sivusto",
+    "logout": "Kirjaudu ulos",
     "theme": {
       "label": "Teema",
       "light": "Vaalea",
@@ -707,6 +709,25 @@
     "saved": "Tallennettu",
     "clear": "Tyhjennä",
     "clearConfirm": "Poistetaanko tallennetut Google-asiakkaan tunnistetiedot? Google-kirjautuminen poistetaan käytöstä, kunnes lisäät ne uudelleen.",
+    "cancel": "Peruuta"
+  },
+  "openrouterKey": {
+    "title": "OpenRouter-avain",
+    "subtitle": "Käytä omaa OpenRouter-avaintasi tämän sivuston AI-avustajalle.",
+    "forbidden": "Sinulla ei ole oikeutta hallita OpenRouter-avainta.",
+    "loading": "Ladataan…",
+    "help": "Liitä oma OpenRouter API -avaimesi (alkaa \"sk-or-\"). Se tallennetaan salattuna ja sitä käytetään ensisijaisesti sisäänrakennetun avaimen sijaan. Jätä tyhjäksi käyttääksesi käyttöönoton avainta.",
+    "statusLabel": "Tila",
+    "keySet": "Avain asetettu",
+    "noKey": "Ei avainta",
+    "keyLabel": "OpenRouter API -avain",
+    "keyPlaceholder": "sk-or-…",
+    "keySetPlaceholder": "Avain on tallennettu — liitä uusi korvataksesi sen",
+    "save": "Tallenna",
+    "saving": "Tallennetaan…",
+    "saved": "Tallennettu",
+    "clear": "Tyhjennä",
+    "clearConfirm": "Poistetaanko tallennettu OpenRouter-avain? AI-avustaja käyttää käyttöönoton avainta.",
     "cancel": "Peruuta"
   }
 }

@@ -1,6 +1,22 @@
 # Caveats — cms-auth
 Read every line before working. Each entry was learned the hard way by a previous Meeseeks.
 
+- **LOGOUT LANDED (2026-06-23).** `POST /api/auth/logout` → `destroySession()`
+  (was defined but never called). Sign-out button is in the admin-sidebar FOOTER
+  (`LogoutButton`, hard-navs to `/admin` to re-gate). EN/FI/ET `adminNav.logout`.
+  Works for every session notion (one `bizbee_session` cookie). Don't re-add it.
+
+- **PARALLEL-WORKER WIP IN THE TREE (2026-06-23) — STAGE ONLY YOUR OWN FILES.**
+  The ai-openrouter Meeseeks left UNCOMMITTED work in this shared working tree:
+  modified `CMS/src/lib/ports/ai.ts` + `CMS/src/components/settings/settings-nav.tsx`
+  and untracked `openrouter-key` files (route/page/store/lib/test). Their `ai.ts`
+  edit has a broken `@/db` import, so `npm test` shows 3 FAILURES
+  (`ai-port`/`openrouter-ai`/`ports-factory`) that are NOT yours — verify any test
+  failure isn't theirs before chasing it (HEAD's `ai.ts` has no `@/db`). NEVER
+  `git add -A`/`git commit -a` while another worker is mid-edit — you'd swallow
+  their half-finished WIP. `git add` your explicit file list only. Likewise don't
+  regen cms-bundle (it'd bundle their WIP into your commit).
+
 - **The CMS today has NO local users.** `CMS/src/db/schema.ts` has only `component`,
   `page`, `siteSettings`, `asset` — auth is 100% delegated to PM via
   `lib/auth/guard.ts` → PM `/api/auth/cms-validate`. This goal ADDS the user layer;

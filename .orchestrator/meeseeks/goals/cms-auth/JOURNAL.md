@@ -382,3 +382,38 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   PM `npm run bundle:cms` regenerated (callback route is runtime worker code).
 - **Files:** CMS/src/lib/auth/google-core.ts, CMS/src/app/api/auth/google/callback/route.ts,
   CMS/scripts/google-auth.test.mjs, ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-23 (Slice: logout) — Sign out (route + admin UI button)
+- **Status:** DONE
+- **What I did:** Closed the missing sign-out gap. `destroySession()` existed
+  (db/session-store.ts) but was NEVER called from anywhere — users had no way to
+  log out. CMS-only slice (the hint + NEXT.md #1 `@pm.sso` follow-up TOUCHES PM,
+  and a PARALLEL ai-openrouter worker has uncommitted WIP in this tree — see
+  CAVEAT below — so I avoided PM entirely).
+  - `CMS/src/app/api/auth/logout/route.ts` — `POST /api/auth/logout` → calls
+    `destroySession()` (deletes the D1 session row + clears `bizbee_session`),
+    returns `{ok:true}`. POST-only (CSRF), idempotent (no session → still 200),
+    no auth gate (worst case = clearing your own absent cookie). Works for ALL
+    session notions (local/Google/SSO all mint the same cookie).
+  - `CMS/src/components/admin-sidebar.tsx` — `LogoutButton` (client) in the
+    footer next to ThemeToggle/LocaleSwitcher: POST logout → `window.location.href
+    = "/admin"` (hard nav so the layout re-gates and shows the login page; drops
+    client cache). `LogoutIcon` added. The footer's "no user menu" comment is now
+    partly obsolete (it still has no user identity display — only a sign-out).
+  - EN/FI/ET `adminNav.logout` ("Sign out" / "Kirjaudu ulos" / "Logi välja").
+- **Verified:** `npx tsc --noEmit` GREEN across the whole tree. `npm test` =
+  761/764; the **3 failures are NOT mine** — `ai-port`/`openrouter-ai`/
+  `ports-factory` fail on `Cannot find package '@/db'` from a MODIFIED
+  `src/lib/ports/ai.ts` that is the parallel ai-openrouter worker's uncommitted
+  WIP (HEAD's ai.ts has no `@/db` import; my slice doesn't import ports/ai at
+  all). Did NOT run `opennextjs-cloudflare build` — it would compile the other
+  worker's broken in-flight `ai.ts`, giving a false signal, and the gate explicitly
+  warns against building a tree another worker is editing. tsc + the additive
+  nature of the change (1 new route, 1 button, 3 strings) cover it.
+- **Bundle:** did NOT regen cms-bundle — would have swept the parallel worker's
+  uncommitted openrouter WIP into MY commit. Staged ONLY my 5 files. PM's
+  predeploy `bundle:cms` regenerates the worker bundle anyway; the next clean-tree
+  Meeseeks (or the openrouter worker on its own commit) should regen once the
+  tree is theirs-committed.
+- **Files:** CMS/src/app/api/auth/logout/route.ts,
+  CMS/src/components/admin-sidebar.tsx, CMS/messages/{en,et,fi}.json

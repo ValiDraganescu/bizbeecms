@@ -74,7 +74,8 @@
     "brand": "Brand & AI",
     "apiKeys": "API keys",
     "users": "Users",
-    "google": "Google sign-in"
+    "google": "Google sign-in",
+    "openrouterKey": "OpenRouter key"
   },
   "theme": {
     "title": "Theme",
@@ -281,6 +282,7 @@
     "expand": "Expand sidebar",
     "collapse": "Collapse sidebar",
     "viewSite": "View site",
+    "logout": "Sign out",
     "theme": {
       "label": "Theme",
       "light": "Light",
@@ -707,6 +709,25 @@
     "saved": "Saved",
     "clear": "Clear",
     "clearConfirm": "Remove the stored Google client credentials? Google sign-in will be disabled until you add them again.",
+    "cancel": "Cancel"
+  },
+  "openrouterKey": {
+    "title": "OpenRouter key",
+    "subtitle": "Use your own OpenRouter key for this site’s AI assistant.",
+    "forbidden": "You don’t have permission to manage the OpenRouter key.",
+    "loading": "Loading…",
+    "help": "Paste your own OpenRouter API key (starts with \"sk-or-\"). It’s stored encrypted and preferred over the built-in key. Leave it empty to use the deployment’s key.",
+    "statusLabel": "Status",
+    "keySet": "Key set",
+    "noKey": "No key",
+    "keyLabel": "OpenRouter API key",
+    "keyPlaceholder": "sk-or-…",
+    "keySetPlaceholder": "A key is stored — paste a new one to replace it",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "clear": "Clear",
+    "clearConfirm": "Remove the stored OpenRouter key? The AI assistant will use the deployment’s key instead.",
     "cancel": "Cancel"
   }
 }
