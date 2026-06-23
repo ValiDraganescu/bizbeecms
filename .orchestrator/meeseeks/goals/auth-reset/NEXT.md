@@ -1,24 +1,28 @@
 # Note to the next Meeseeks (auth-reset)
 
-P1 + P2 DONE. PM has the `password_resets` table (migration `0011`) and a working
-enumeration-safe `POST /api/auth/forgot` that mints a token (`lib/reset/reset.ts`,
-64-hex, 7d `RESET_TTL_MS`) and emails a `/reset/<token>` link via `sendResetEmail`
-(`lib/mail/send-invite.ts`). Always returns 200 `{ ok: true }`, hit or miss.
+P1 + P2 + P3 DONE. PM now has the full reset BACKEND:
+- `password_resets` table (migration `0011`).
+- `POST /api/auth/forgot` — enumeration-safe, mints token + emails `/reset/<token>`.
+- `POST /api/auth/reset` — `checkReset`/`applyReset` in `lib/reset/reset.ts`:
+  validates token, marks `usedAt` (single-use, `isNull` guarded), sets fresh hash,
+  `invalidateUserSessions(userId)` (new in `lib/auth/session.ts`). One generic
+  `auth.errors.resetTokenInvalid` for all failures.
 
-**Take P3 — PM `POST /api/auth/reset`.** Validate the token: exists, `usedAt IS
-NULL`, `expiresAt` in the future. On valid: set the new password hash via
-`lib/auth/password.ts` (`hashPassword`; PBKDF2 100k — do NOT bump), enforce
-min-length = `MIN_PASSWORD_LENGTH` (10, from `lib/auth/validation.ts`), set
-`usedAt = now`, and INVALIDATE the user's sessions in KV (`lib/auth/session.ts` —
-read how sessions key off userId first; may need a session index or delete-all).
-Reject invalid/expired/used with a single generic error (no detail leak). Add a
-token-classify helper to `lib/reset/reset.ts` (mirror invite's `checkInvite`).
-Any new strings (e.g. reset-success/invalid-token messages) need EN/FI/ET.
+**Take P4 — PM forgot/reset PAGES + login link.** Mirror the invite accept page +
+the login/register pages (REST + fetch, NO server action — they 500 on OpenNext):
+- `app/(auth)/forgot/page.tsx` — email form → `POST /api/auth/forgot`; on any
+  response show the enumeration-safe "if an account exists, we sent a link" copy
+  (success body is identical hit/miss, so don't branch on it).
+- `app/(auth)/reset/[token]/page.tsx` — new-password + confirm form →
+  `POST /api/auth/reset` with `{ token, password, confirmPassword }`; min-length 10
+  (matches register); on `{ ok: true }` redirect to login. Resolve `error` keys
+  against `auth.errors.*` — `resetTokenInvalid` already exists EN/FI/ET.
+- Add a "Forgot password?" link on the login page → `/forgot`.
+- New page chrome strings (titles, labels, submit, success copy) need EN/FI/ET.
+
+Look at `app/(auth)/login` + the invite accept page for the form/fetch/redirect
+shape and the existing `auth.*` message namespace. Then P5 = pure-logic tests.
 
 Reminders: PM only this run (`ProjectManager/`, never `CMS/`, never `bundle:cms`).
-REST route handler, no server action. Gate: tsc + `npm test` + opennext build;
-NEVER while dev is up — `lsof -ti:3601,3602` first.
-
-Pattern notes for P3: the forgot route + `lib/reset/reset.ts` are the templates.
-Tests use source-text assertions because the `@/` alias isn't resolvable under
-`node --test` (see `lib/reset/forgot-route.test.ts`).
+Gate: tsc + `npm test` + opennext build; NEVER while dev is up — `lsof -ti:3601,3602`
+first. Tests use source-text assertions (the `@/` alias isn't node-resolvable).

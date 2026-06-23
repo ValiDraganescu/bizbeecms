@@ -165,7 +165,8 @@
       "emailTaken": "Tämä sähköposti on jo rekisteröity.",
       "invalidCredentials": "Väärä sähköposti tai salasana.",
       "registrationClosed": "Rekisteröityminen on suljettu — ylläpitäjä on jo olemassa.",
-      "unknown": "Jokin meni pieleen. Yritä uudelleen."
+      "unknown": "Jokin meni pieleen. Yritä uudelleen.",
+      "resetTokenInvalid": "Tämä salasanan palautuslinkki on virheellinen tai vanhentunut. Pyydä uusi."
     },
     "forgot": {
       "email": {

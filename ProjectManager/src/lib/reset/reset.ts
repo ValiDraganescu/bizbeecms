@@ -1,5 +1,8 @@
+import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { PasswordReset } from "@/db/schema";
+import { hashPassword } from "@/lib/auth/password";
+import { invalidateUserSessions } from "@/lib/auth/session";
 
 /** Reset-token lifetime: 7 days (mirrors the invite TTL). */
 export const RESET_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -23,4 +26,68 @@ export async function createPasswordReset(userId: string): Promise<PasswordReset
     })
     .returning();
   return row;
+}
+
+/** Look up a reset row by its token. */
+async function findResetByToken(token: string): Promise<PasswordReset | null> {
+  const db = await getDb();
+  const [row] = await db
+    .select()
+    .from(schema.passwordResets)
+    .where(eq(schema.passwordResets.token, token))
+    .limit(1);
+  return row ?? null;
+}
+
+export type ResetStatus = "valid" | "notFound" | "expired" | "used";
+
+/** Classify a reset token (mirror invite's `checkInvite`). */
+export async function checkReset(
+  token: string,
+): Promise<{ status: ResetStatus; reset: PasswordReset | null }> {
+  const reset = await findResetByToken(token);
+  if (!reset) return { status: "notFound", reset: null };
+  if (reset.usedAt) return { status: "used", reset };
+  if (reset.expiresAt.getTime() <= Date.now())
+    return { status: "expired", reset };
+  return { status: "valid", reset };
+}
+
+export type ApplyResetResult = { ok: true } | { ok: false; reason: ResetStatus };
+
+/**
+ * Apply a password reset: re-validate the token, set a fresh hash on the user,
+ * mark the token used (single-use), and invalidate the user's sessions so a
+ * leaked/old session can't survive the reset. The `usedAt` update is guarded by
+ * `isNull(usedAt)` so a concurrent double-submit can't reuse the token.
+ */
+export async function applyReset(
+  token: string,
+  newPassword: string,
+): Promise<ApplyResetResult> {
+  const { status, reset } = await checkReset(token);
+  if (status !== "valid" || !reset) return { ok: false, reason: status };
+
+  const db = await getDb();
+  // Single-use gate: only succeeds while usedAt is still NULL.
+  const marked = await db
+    .update(schema.passwordResets)
+    .set({ usedAt: new Date() })
+    .where(
+      and(
+        eq(schema.passwordResets.id, reset.id),
+        isNull(schema.passwordResets.usedAt),
+      ),
+    )
+    .returning();
+  if (marked.length === 0) return { ok: false, reason: "used" };
+
+  const passwordHash = await hashPassword(newPassword);
+  await db
+    .update(schema.users)
+    .set({ passwordHash })
+    .where(eq(schema.users.id, reset.userId));
+
+  await invalidateUserSessions(reset.userId);
+  return { ok: true };
 }

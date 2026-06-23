@@ -89,6 +89,40 @@ export async function getSession(): Promise<SessionRecord | null> {
   return record;
 }
 
+/**
+ * Invalidate ALL of a user's sessions (used on password reset so a leaked or
+ * old session can't outlive the credential change). Sessions are keyed by an
+ * opaque random id with no userId index, so we scan the `session:` prefix and
+ * delete the records whose `userId` matches.
+ *
+ * ponytail: O(total sessions) KV scan, no userId→session index. Fine for a
+ * small-team PM app; add a `user:<id>:sessions` set index if session volume
+ * ever makes the scan slow. KV list is eventually-consistent, but a reset
+ * already changed the password hash, so any session the scan misses can't be
+ * used to set a password and login still requires the new hash.
+ */
+export async function invalidateUserSessions(userId: string): Promise<void> {
+  const kv = await sessionsKv();
+  let cursor: string | undefined;
+  do {
+    const page = await kv.list({ prefix: KV_PREFIX, cursor });
+    await Promise.all(
+      page.keys.map(async ({ name }) => {
+        const raw = await kv.get(name);
+        if (!raw) return;
+        try {
+          const record = JSON.parse(raw) as SessionRecord;
+          if (record.userId === userId) await kv.delete(name);
+        } catch {
+          // Unparseable record — drop it.
+          await kv.delete(name);
+        }
+      }),
+    );
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+}
+
 /** Destroy the current session: delete the KV record and clear the cookie. */
 export async function destroySession(): Promise<void> {
   const jar = await cookies();

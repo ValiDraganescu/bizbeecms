@@ -165,7 +165,8 @@
       "emailTaken": "That email is already registered.",
       "invalidCredentials": "Incorrect email or password.",
       "registrationClosed": "Registration is closed — an administrator already exists.",
-      "unknown": "Something went wrong. Please try again."
+      "unknown": "Something went wrong. Please try again.",
+      "resetTokenInvalid": "This password reset link is invalid or has expired. Request a new one."
     },
     "forgot": {
       "email": {

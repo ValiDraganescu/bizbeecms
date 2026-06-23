@@ -21,11 +21,18 @@ PM first (slices P1–P5), then mirror in CMS (slices C1–C5). ONE app per work
   never leak existence. Strings `auth.forgot.email.{subject,body}` added EN/FI/ET.
   Test `lib/reset/forgot-route.test.ts`. Gates green (tsc / 158 tests / opennext).
 
-- TODO: **P3 — PM `POST /api/auth/reset`.** Validate token (exists, `usedAt IS
-  NULL`, `expiresAt` in future); on valid: set new password hash via
-  `lib/auth/password.ts` (min-length per register route), set `usedAt`, invalidate
-  the user's KV sessions (`lib/auth/session.ts`). Reject invalid/expired/used with
-  a generic error (no detail leak). Gate.
+- DONE: **P3 — PM `POST /api/auth/reset`.** Added `checkReset`/`applyReset` to
+  `lib/reset/reset.ts` (mirror invite's `checkInvite`): classify notFound/used/
+  expired/valid; `applyReset` marks `usedAt` under an `isNull(usedAt)` guarded
+  update (single-use, concurrency-safe), sets a fresh `hashPassword` on the user,
+  then `invalidateUserSessions(userId)`. New `invalidateUserSessions` in
+  `lib/auth/session.ts` (KV `list({prefix})` scan → delete records matching
+  userId; ponytail: O(all sessions), add a userId→session index if volume grows).
+  Route `src/app/api/auth/reset/route.ts`: validates token presence + password
+  (register min-length via `validatePassword`) + confirm match; ALL invalid/
+  expired/used collapse to one generic `auth.errors.resetTokenInvalid` (no detail
+  leak). String added EN/FI/ET. Test `lib/reset/reset-route.test.ts`. Gates green
+  (tsc / 166 tests / opennext build; route in manifest).
 
 - TODO: **P4 — PM forgot/reset pages + login link.** `(auth)/forgot` (email form
   → POST /api/auth/forgot, shows the enumeration-safe message) + `(auth)/reset/

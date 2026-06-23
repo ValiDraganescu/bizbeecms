@@ -36,3 +36,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   pages POST to api route handlers via fetch, never a server action. Same for CMS.
 - i18n parity is TEST-LOCKED: any new string needs EN + FI + ET or the i18n parity
   test fails. Add all three locales in the same slice that adds the string.
+- PM SESSION INVALIDATION (P3, learned): KV sessions are keyed by an opaque random
+  id with NO userId index, so "kill all of a user's sessions" can't be a single
+  delete. P3 added `invalidateUserSessions(userId)` to `lib/auth/session.ts` that
+  pages `kv.list({ prefix: "session:" })` and deletes records whose `userId`
+  matches — O(all sessions), fine for a small team (ponytail comment names the
+  upgrade path: a `user:<id>:sessions` set index). CMS C3 will hit the same wall:
+  check the CMS session store keying before assuming a delete-all. Reuse this
+  scan-by-prefix shape if CMS sessions are likewise un-indexed by user.
+- P3 GENERIC ERROR: invalid/expired/used reset tokens ALL return the single
+  `auth.errors.resetTokenInvalid` key — the route never reads `applyReset`'s
+  `reason` (a test asserts `result.reason` never appears in the route). Keep that
+  property when mirroring in CMS: no detail leak about why a token failed.
+- P3 SINGLE-USE is concurrency-safe via `update … where isNull(usedAt)` returning
+  rows: 0 rows updated ⇒ token already used ⇒ reject. Don't replace with a
+  read-then-write (TOCTOU). Mark used BEFORE hashing/session-kill (test locks the
+  order).

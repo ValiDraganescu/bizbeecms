@@ -165,7 +165,8 @@
       "emailTaken": "See e-post on juba registreeritud.",
       "invalidCredentials": "Vale e-post või parool.",
       "registrationClosed": "Registreerimine on suletud — administraator on juba olemas.",
-      "unknown": "Midagi läks valesti. Palun proovi uuesti."
+      "unknown": "Midagi läks valesti. Palun proovi uuesti.",
+      "resetTokenInvalid": "See parooli lähtestamise link on kehtetu või aegunud. Taotle uut."
     },
     "forgot": {
       "email": {
