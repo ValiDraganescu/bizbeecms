@@ -318,3 +318,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/auth/google/callback/route.ts, CMS/src/lib/auth/google-config.ts,
   CMS/scripts/google-client.test.mjs,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-23 16:57 — GOOGLE-CLIENT REWORK #3: login Google button gated on per-Site config
+- **Status:** DONE
+- **What I did:** Switched the login-page Google-button visibility from the shared
+  env `GOOGLE_CLIENT_ID` to THIS Site's own D1 client config. `admin/layout.tsx`
+  now computes `showGoogle = decideGoogleRoute(await getGoogleClientConfig(),
+  APP_ORIGIN).usable` — the same single signal the OAuth routes use (REWORK #2), so
+  button + routes can never disagree. Dropped `GOOGLE_CLIENT_ID` from the layout's
+  `env` cast (no longer read there). No config / half-config (id but no secret) /
+  missing APP_ORIGIN → button hidden; email/password + PM-SSO still work. No new
+  i18n strings (button keys exist from Slice 2b).
+- **Verified:** `decideGoogleRoute` usable-matrix already fully covered in
+  `scripts/google-client.test.mjs` (configured→usable, half/empty/no-origin→not
+  usable) — the visibility signal IS that helper, so NO duplicate test added
+  (YAGNI). `npm test` 760/760 green; `npx tsc --noEmit` clean; `npx
+  opennextjs-cloudflare build` green (dev confirmed not running first); regen'd PM
+  cms-bundle (layout is a runtime page). Could not live-verify the button
+  appears/hides on a deployed Worker (needs a real per-Site client → HITL).
+- **Files:** CMS/src/app/admin/layout.tsx,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js.

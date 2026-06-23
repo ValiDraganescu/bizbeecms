@@ -4,6 +4,8 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getTranslations } from "next-intl/server";
 import { checkAdminFromHeaders } from "@/lib/auth/guard";
 import { shouldShowSsoButton } from "@/lib/auth/guard-core";
+import { decideGoogleRoute } from "@/lib/auth/google-config";
+import { getGoogleClientConfig } from "@/db/google-client-store";
 import { verifyForwardedHost } from "@/lib/auth/forwarded-host";
 import { SidebarShell } from "@/components/admin-sidebar";
 import { LoginForm } from "@/components/login-form";
@@ -46,14 +48,18 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const e = env as unknown as {
     PM_ORIGIN?: string;
     CMS_AUTH_SECRET?: string;
-    GOOGLE_CLIENT_ID?: string;
     APP_ORIGIN?: string;
   };
   const pmOrigin = e.PM_ORIGIN;
-  // Google button shows only when the OAuth client is configured (id + the
-  // APP_ORIGIN the redirect_uri is built from). The button just links to
-  // /api/auth/google/start — no secret reaches the client.
-  const showGoogle = Boolean(e.GOOGLE_CLIENT_ID && e.APP_ORIGIN);
+  // Google button shows only when THIS Site has its OWN Google client configured
+  // in CMS D1 (REWORK #3 — no shared env client). `decideGoogleRoute().usable`
+  // is the single signal: configured client (id + secret) AND an APP_ORIGIN to
+  // build the redirect_uri. The button just links to /api/auth/google/start —
+  // no secret reaches the client.
+  const showGoogle = decideGoogleRoute(
+    await getGoogleClientConfig(),
+    e.APP_ORIGIN ?? "",
+  ).usable;
 
   const h = await headers();
 

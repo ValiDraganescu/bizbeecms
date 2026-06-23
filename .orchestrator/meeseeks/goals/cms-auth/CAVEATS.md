@@ -282,8 +282,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   = `<appOrigin>/api/auth/google/callback`). `start` no-ops to `/admin` when not
   usable; `callback` → `?error=google` when not usable OR decrypt returns null (decrypt
   failure NEVER 500s). `CMS_AUTH_SECRET` is STILL read from env — it's the KEK + the
-  state-HMAC key, NOT a Google credential; don't remove it. **REMAINING REWORK TODOs:**
-  #3 hide the login button unless THIS Site has a client (switch the visibility signal
-  from env to per-Site config — the page still reads `GOOGLE_CLIENT_ID` env), and #4 rip
-  the shared `GOOGLE_CLIENT_ID/SECRET` out of deployer + wrangler + the "GOOGLE SIGN-IN
-  LANDED" caveat's last bullet (still describes the shared-client model — update it then).
+  state-HMAC key, NOT a Google credential; don't remove it. **REMAINING REWORK TODO:**
+  #4 rip the shared `GOOGLE_CLIENT_ID/SECRET` out of deployer + wrangler + the "GOOGLE
+  SIGN-IN LANDED" caveat's last bullet (still describes the shared-client model — update
+  it then).
+
+- **LOGIN GOOGLE BUTTON IS GATED ON PER-SITE CONFIG (REWORK #3 landed 2026-06-23).**
+  `admin/layout.tsx` computes `showGoogle = decideGoogleRoute(await
+  getGoogleClientConfig(), APP_ORIGIN).usable` — NOT `env.GOOGLE_CLIENT_ID` anymore
+  (that read is gone from the layout's env cast). Button + OAuth routes (REWORK #2)
+  now share ONE signal (`decideGoogleRoute(...).usable`) so they can't disagree. No
+  config / half-config (id-no-secret) / missing APP_ORIGIN → button hidden. The
+  remaining `env.GOOGLE_CLIENT_*` references live ONLY in deployer/wrangler shared
+  injection — REWORK #4 rips those out.
