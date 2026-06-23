@@ -5,6 +5,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-23 16:22): **Opportunistic prune of spent `password_reset` rows.**
+  See JOURNAL. New `pruneSpentResets(now, injectedDb?)` in `lib/reset/reset.ts`
+  (`DELETE WHERE used_at IS NOT NULL OR expires_at <= now`), called best-effort
+  (try/catch) from `createPasswordReset` on the forgot-password write path — closes
+  the last unbounded-growth gap (mirrors the session + login_attempt prunes). No
+  cron (CMS has no scheduled handler). 2 new tests (791 total), tsc + opennext build
+  green, cms-bundle regen.
+
 - DONE (2026-06-23 19:16): **Opportunistic prune of expired `session` rows.** See
   JOURNAL. New node-loadable `db/session-prune.ts` (`pruneExpiredSessions(now,
   injectedDb?)` = `DELETE WHERE expires_at <= now`, Db-port only, NO `next/headers`

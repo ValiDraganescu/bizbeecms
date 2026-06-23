@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, isNotNull, lte, or } from "drizzle-orm";
 // Relative imports (not `@/`) so this module LOADS under `node --test` native TS
 // stripping. `getDb` pulls in `@opennextjs/cloudflare` (via the ports module's
 // top-level `getCloudflareContext` import), so it's imported LAZILY (dynamic
@@ -25,6 +25,29 @@ export function newResetToken(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * Delete every spent `password_reset` row — used (`usedAt IS NOT NULL`) or
+ * expired (`expiresAt <= now`). Both are dead: `classifyReset` already rejects
+ * them, so removing them changes no auth decision; it only bounds table growth.
+ * Mirrors the `session`/`login_attempt` prunes. `injectedDb` is for tests.
+ * ponytail: piggybacked on the (low-volume) reset-request write path; promote to
+ * a cron only if a Site's reset volume ever makes this DELETE measurably hurt.
+ */
+export async function pruneSpentResets(
+  now: number = Date.now(),
+  injectedDb?: Db,
+): Promise<void> {
+  const db = await resolveDb(injectedDb);
+  await db
+    .delete(schema.passwordReset)
+    .where(
+      or(
+        isNotNull(schema.passwordReset.usedAt),
+        lte(schema.passwordReset.expiresAt, new Date(now)),
+      ),
+    );
+}
+
 /** Mint a single-use, time-boxed password-reset row for a user. */
 export async function createPasswordReset(
   userId: string,
@@ -40,6 +63,12 @@ export async function createPasswordReset(
       expiresAt: new Date(Date.now() + RESET_TTL_MS),
     })
     .returning();
+  // Best-effort housekeeping — a failed prune must never break a reset request.
+  try {
+    await pruneSpentResets(Date.now(), db);
+  } catch {
+    /* ignore — prune is housekeeping, not on the auth critical path */
+  }
   return row;
 }
 

@@ -1,6 +1,18 @@
 # Caveats — cms-auth
 Read every line before working. Each entry was learned the hard way by a previous Meeseeks.
 
+- **`password_reset` ROWS ARE NOW OPPORTUNISTICALLY PRUNED (2026-06-23 16:22) —
+  don't add a cron.** `pruneSpentResets(now, injectedDb?)` in `lib/reset/reset.ts`
+  = `DELETE FROM password_reset WHERE used_at IS NOT NULL OR expires_at <= now`,
+  called best-effort (try/catch) from `createPasswordReset` AFTER the INSERT. Lives
+  in `reset.ts` (not a new module) because that file is ALREADY node-loadable
+  (relative imports + lazy `getDb` + injectedDb seam) — no `next/headers`. Used
+  AND expired rows are dead (`classifyReset` rejects both), so deleting them changes
+  no auth decision. Same prune family as the `session`/`login_attempt` sweeps; CMS
+  Worker has NO cron, so it piggybacks the low-volume forgot-password write path
+  (ponytail comment names the cron upgrade path). All THREE auth-token tables now
+  self-prune — don't reintroduce a "no auto-prune" assumption for any of them.
+
 - **`session` ROWS ARE NOW OPPORTUNISTICALLY PRUNED (2026-06-23 19:16) — don't add
   a cron.** The expired-session sweep lives in a SEPARATE module
   `db/session-prune.ts` (`pruneExpiredSessions(now, injectedDb?)` =

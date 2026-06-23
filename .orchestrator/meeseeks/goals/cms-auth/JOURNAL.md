@@ -533,3 +533,30 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (import + best-effort call in createSession),
   CMS/scripts/session-prune.test.mjs (new),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-23 16:22 — Opportunistic prune of spent `password_reset` rows
+- **Status:** DONE
+- **What I did:** Closed the last unbounded-growth gap in the auth tables. The
+  `password_reset` table was NEVER pruned: used tokens (`usedAt` set) and expired
+  tokens just accumulate forever (same class as the already-solved `session` and
+  `login_attempt` prunes). The guard already rejects them (`classifyReset`), so
+  deleting them changes no auth decision — pure housekeeping. Added
+  `pruneSpentResets(now=Date.now(), injectedDb?)` to `lib/reset/reset.ts` (already
+  node-loadable: relative imports + lazy `getDb`, injectedDb seam) =
+  `DELETE FROM password_reset WHERE used_at IS NOT NULL OR expires_at <= now`.
+  Wired best-effort (try/catch) into `createPasswordReset` after the INSERT — it
+  piggybacks the low-volume forgot-password write path; no cron (CMS Worker has no
+  scheduled handler; ponytail comment names the cron upgrade path). A failed prune
+  must never break a reset request, hence the try/catch.
+- **Verified:** `node --test scripts/reset-prune.test.mjs` 2 pass (used + expired +
+  exactly-now rows pruned via `OR`/`lte`, live-unused kept; no-op when all live —
+  fails-before: without the DELETE the count would stay 4 not 1). Full `npm test`
+  791 pass / 0 fail (was 789). `npx tsc --noEmit` clean. `npx
+  opennextjs-cloudflare build` green (dev server confirmed down first). PM
+  `bundle:cms` regenerated (`createPasswordReset` is imported by the forgot route
+  worker entrypoint, so the prune ships in the bundle). Node-tested only — no live
+  Site this run to verify a real prune.
+- **Files:** CMS/src/lib/reset/reset.ts (pruneSpentResets + best-effort call in
+  createPasswordReset; +imports isNotNull/lte/or),
+  CMS/scripts/reset-prune.test.mjs (new),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
