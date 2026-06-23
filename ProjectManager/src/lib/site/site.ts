@@ -72,6 +72,10 @@ export type UpdateSiteInput = {
   name: string;
   slug: string;
   country: CountryCode | null;
+  /** Whether PM auto-mints a per-Site OpenRouter key. */
+  openrouterMintingEnabled: boolean;
+  /** Monthly spend cap in whole USD for the minted key, or null for no cap. */
+  openrouterMonthlyLimitUsd: number | null;
 };
 
 /** Update a Site's editable fields. Status/workerName are managed elsewhere. */
@@ -82,7 +86,13 @@ export async function updateSite(
   const db = await getDb();
   const [site] = await db
     .update(schema.sites)
-    .set({ name: input.name, slug: input.slug, country: input.country })
+    .set({
+      name: input.name,
+      slug: input.slug,
+      country: input.country,
+      openrouterMintingEnabled: input.openrouterMintingEnabled,
+      openrouterMonthlyLimitUsd: input.openrouterMonthlyLimitUsd,
+    })
     .where(eq(schema.sites.id, id))
     .returning();
   return site ?? null;

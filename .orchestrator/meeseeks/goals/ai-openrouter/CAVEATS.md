@@ -90,3 +90,21 @@ Read every line before working. Each entry was learned the hard way by a previou
   `OPENROUTER_PROVISIONING_KEY` (NOT per-site); declared as a comment in PM wrangler.jsonc. Reuse the
   EXISTING `sites.openrouterApiKeyEncrypted` (secret-box.ts) to store the minted `key`; the `hash` needs
   a NEW column (Slice 2). PM test glob `scripts/**/*.test.mjs` — node imports `.ts` directly (no loader).
+- KEY-MINTING Slice 3 DONE: the manual paste field is GONE. The Edit Site form (`site-form.tsx`) now
+  sends `openrouterMintingEnabled` (bool) + `openrouterMonthlyLimitUsd` (number|null), NEVER a key.
+  Pure parse = `src/lib/site/openrouter-minting.ts#parseOpenrouterMinting` (toggle `=== true`-only;
+  limit floored non-negative int, trims string input so whitespace/""/invalid/negative → null = no cap).
+  `parseSiteBody`'s `SiteBody`/`ParsedSite` swapped key fields for these two. PATCH route persists them
+  via `updateSite` (`UpdateSiteInput` gained both cols). The OLD `openrouter-key.ts` (paste parser) +
+  its test were DELETED — don't resurrect them. PM Site pages are server-rendered; client signal is
+  `hasMintedOpenrouterKey` (from `site.openrouterKeyHash != null`), NOT `hasOpenrouterKey` (removed).
+- `setSiteOpenrouterKey` (site.ts) is now unused by any route but KEPT on purpose — Slice 5
+  (mint-on-deploy) encrypts the minted `sk-or-...` through it into `openrouterApiKeyEncrypted`.
+- PM has NO Switch/Toggle UI component (only Button/Card/Table/Field/Input/Badge/Combobox/Alert/
+  ConfirmDialog). For toggles use a styled native `<input type="checkbox" className="... accent-primary
+  focus-visible:ring-2 focus-visible:ring-ring">` — no new component needed.
+- The "Delete current key" button in the Edit form is a DISABLED STUB (no onClick endpoint yet). Slice 5
+  must add `DELETE /api/sites/[id]/openrouter-key` (deleteKey + null out hash+encrypted) and wire it.
+- PM test glob is BOTH `src/lib/**/*.test.ts` AND `scripts/**/*.test.mjs` (see package.json `test`).
+  A `.test.ts` next to its source under `src/lib/` IS run by `npm test` — the earlier caveat that said
+  "PM test glob is scripts/**/*.test.mjs" is INCOMPLETE; co-located `.test.ts` works too.

@@ -3,7 +3,7 @@ import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { authorizeSiteCountry, canUserCreateSite } from "@/lib/site/authz";
 import { createSite, isSlugTaken, isValidSlug } from "@/lib/site/site";
-import { parseOpenrouterKey } from "@/lib/site/openrouter-key";
+import { parseOpenrouterMinting } from "@/lib/site/openrouter-minting";
 
 export type SiteErrorKey =
   | "nameRequired"
@@ -20,10 +20,10 @@ export type SiteBody = {
   name?: unknown;
   slug?: unknown;
   country?: unknown;
-  /** Plaintext OpenRouter key to set/replace (write-only; blank ≠ clear). */
-  openrouterApiKey?: unknown;
-  /** Explicit clear — only this wipes an existing key. */
-  clearOpenrouterKey?: unknown;
+  /** Whether PM auto-mints a per-Site OpenRouter key (replaces the paste field). */
+  openrouterMintingEnabled?: unknown;
+  /** Monthly spend cap in whole USD for the minted key, or null for no cap. */
+  openrouterMonthlyLimitUsd?: unknown;
 };
 
 /** Parse the country field: empty / "GLOBAL" → null; else a validated code. */
@@ -36,10 +36,10 @@ export type ParsedSite = {
   name: string;
   slug: string;
   country: CountryCode | null;
-  /** Trimmed plaintext to set, or undefined if not provided / blank. */
-  openrouterApiKey?: string;
-  /** True only when the caller explicitly asked to clear the key. */
-  clearOpenrouterKey: boolean;
+  /** Whether PM auto-mints a per-Site OpenRouter key. */
+  openrouterMintingEnabled: boolean;
+  /** Monthly spend cap in whole USD for the minted key, or null for no cap. */
+  openrouterMonthlyLimitUsd: number | null;
 };
 
 /** Shared field parse + validation for create/update. Returns an error key or the value. */
@@ -59,13 +59,20 @@ export function parseSiteBody(
   const country = parseCountry(countryRaw);
   if (country === "invalid") return { ok: false, error: "countryInvalid" };
 
-  // Write-only OpenRouter key: a blank field is "no change", NOT a clear. Only
-  // the explicit clearOpenrouterKey flag wipes an existing key.
-  const { openrouterApiKey, clearOpenrouterKey } = parseOpenrouterKey(body);
+  // Key-minting controls (the manual paste field is gone — key is never
+  // user-entered). Toggle + monthly USD spend cap.
+  const { openrouterMintingEnabled, openrouterMonthlyLimitUsd } =
+    parseOpenrouterMinting(body);
 
   return {
     ok: true,
-    value: { name, slug, country, openrouterApiKey, clearOpenrouterKey },
+    value: {
+      name,
+      slug,
+      country,
+      openrouterMintingEnabled,
+      openrouterMonthlyLimitUsd,
+    },
   };
 }
 

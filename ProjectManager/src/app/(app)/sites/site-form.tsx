@@ -49,15 +49,21 @@ export function SiteForm({
   actor,
   mode,
   initial,
-  hasOpenrouterKey = false,
+  hasMintedOpenrouterKey = false,
+  initialMintingEnabled = false,
+  initialMonthlyLimitUsd = null,
 }: {
   /** Required in edit mode — the Site being updated. */
   siteId?: string;
   actor: ActorCtx;
   mode: "create" | "edit";
   initial?: SiteFormValues;
-  /** Edit mode only: whether a key is already stored (never the key itself). */
-  hasOpenrouterKey?: boolean;
+  /** Edit mode only: whether a key has already been minted (never the key itself). */
+  hasMintedOpenrouterKey?: boolean;
+  /** Edit mode only: initial state of the minting toggle. */
+  initialMintingEnabled?: boolean;
+  /** Edit mode only: initial monthly spend cap (whole USD), or null for no cap. */
+  initialMonthlyLimitUsd?: number | null;
 }) {
   const t = useTranslations("sites");
   const router = useRouter();
@@ -92,10 +98,12 @@ export function SiteForm({
   const [country, setCountry] = useState<DefaultOption | null>(
     initialCountryOption,
   );
-  // Write-only OpenRouter key (edit mode). `keyCleared` arms the explicit clear;
-  // a blank `openrouterKey` is "no change". Either field resets on a fresh edit.
-  const [openrouterKey, setOpenrouterKey] = useState("");
-  const [keyCleared, setKeyCleared] = useState(false);
+  // OpenRouter key-minting controls (edit mode). The key value is never
+  // user-entered now — PM mints it on deploy. Here we only set the toggle + cap.
+  const [mintingEnabled, setMintingEnabled] = useState(initialMintingEnabled);
+  const [monthlyLimit, setMonthlyLimit] = useState(
+    initialMonthlyLimitUsd == null ? "" : String(initialMonthlyLimitUsd),
+  );
 
   // Auto-derive slug from name until the user takes over the slug field.
   useEffect(() => {
@@ -123,8 +131,10 @@ export function SiteForm({
       country: countryValue,
     };
     if (mode === "edit") {
-      if (keyCleared) payload.clearOpenrouterKey = true;
-      else if (openrouterKey.trim()) payload.openrouterApiKey = openrouterKey;
+      payload.openrouterMintingEnabled = mintingEnabled;
+      const trimmed = monthlyLimit.trim();
+      payload.openrouterMonthlyLimitUsd =
+        trimmed === "" ? null : Number(trimmed);
     }
     try {
       const res =
@@ -243,49 +253,48 @@ export function SiteForm({
 
       {mode === "edit" ? (
         <Field>
-          <FieldLabel htmlFor="site-openrouter-key">
-            {t("form.openrouterKey")}
-          </FieldLabel>
-          <div className="flex items-center gap-2">
-            <Input
-              id="site-openrouter-key"
-              name="openrouterApiKey"
-              type="password"
-              autoComplete="off"
-              value={openrouterKey}
-              disabled={keyCleared}
-              onChange={(e) => setOpenrouterKey(e.target.value)}
-              placeholder={t("form.openrouterKeyPlaceholder")}
+          <FieldLabel>{t("form.openrouterMinting")}</FieldLabel>
+          <label className="flex items-start gap-2.5 text-sm text-foreground">
+            <input
+              id="site-openrouter-minting"
+              type="checkbox"
+              checked={mintingEnabled}
+              onChange={(e) => setMintingEnabled(e.target.checked)}
+              className="mt-0.5 size-4 shrink-0 rounded border-border accent-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
-            {hasOpenrouterKey && !keyCleared ? (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setKeyCleared(true);
-                  setOpenrouterKey("");
-                }}
-              >
-                {t("form.openrouterKeyClear")}
+            <span>{t("form.openrouterMintingToggle")}</span>
+          </label>
+          <FieldHint>{t("form.openrouterMintingHint")}</FieldHint>
+
+          {mintingEnabled ? (
+            <div className="mt-2 flex flex-col gap-1.5">
+              <FieldLabel htmlFor="site-openrouter-limit">
+                {t("form.openrouterMonthlyLimit")}
+              </FieldLabel>
+              <Input
+                id="site-openrouter-limit"
+                name="openrouterMonthlyLimitUsd"
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                value={monthlyLimit}
+                onChange={(e) => setMonthlyLimit(e.target.value)}
+                placeholder={t("form.openrouterMonthlyLimitPlaceholder")}
+                className="font-mono text-sm"
+              />
+              <FieldHint>{t("form.openrouterMonthlyLimitHint")}</FieldHint>
+            </div>
+          ) : null}
+
+          {hasMintedOpenrouterKey ? (
+            <div className="mt-2 flex items-center gap-2">
+              <Button type="button" variant="ghost" disabled title="—">
+                {t("form.openrouterKeyDelete")}
               </Button>
-            ) : null}
-            {keyCleared ? (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setKeyCleared(false)}
-              >
-                {t("form.cancel")}
-              </Button>
-            ) : null}
-          </div>
-          <FieldHint>
-            {keyCleared
-              ? t("form.openrouterKeyWillClear")
-              : hasOpenrouterKey
-                ? t("form.openrouterKeySet")
-                : t("form.openrouterKeyNone")}
-          </FieldHint>
+              <FieldHint>{t("form.openrouterKeyMinted")}</FieldHint>
+            </div>
+          ) : null}
         </Field>
       ) : null}
 

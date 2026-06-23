@@ -218,3 +218,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **What I did:** Added three columns to the `sites` table in `ProjectManager/src/db/schema.ts`: `openrouterMintingEnabled` (`integer` boolean, NOT NULL default false), `openrouterKeyHash` (`text`, null), `openrouterMonthlyLimitUsd` (`integer`, null). Reuses existing `openrouterApiKeyEncrypted` to hold the minted `sk-or-...` (no new crypto). Generated forward migration `migrations/0012_far_johnny_blaze.sql` (3 `ALTER TABLE sites ADD`). The `Site`/`NewSite` inferred types pick up the new fields automatically. No behavior wired in yet.
 - **Verified:** `npx drizzle-kit generate` produced 0012; re-running it = "No schema changes, nothing to migrate" (no drift). `tsc --noEmit` exit 0. `npm test` 182/182. `npx opennextjs-cloudflare build` green (dev OFF — 3601/3602 free). Migration applies to D1 = HITL (not run here).
 - **Files:** ProjectManager/src/db/schema.ts, ProjectManager/migrations/0012_far_johnny_blaze.sql, ProjectManager/migrations/meta/_journal.json, ProjectManager/migrations/meta/0012_snapshot.json
+
+## 2026-06-23 16:58 — KEY-MINTING Slice 3: PM Edit Site UI — paste field → minting controls
+- **Status:** DONE
+- **What I did:** Replaced the manual `sk-or-...` paste input in the Edit Site form with
+  minting controls. `site-form.tsx`: removed the password key field + clear button; added (1) a
+  native-checkbox toggle bound to `openrouterMintingEnabled` (no Switch component exists in PM —
+  styled `<input type=checkbox>` with `accent-primary`), (2) a monthly USD spend-limit `<Input
+  type=number>` (shown only when minting is enabled) bound to `openrouterMonthlyLimitUsd`, (3) a
+  DISABLED "Delete current key" button + "key minted" hint shown only when `hasMintedOpenrouterKey`
+  (the live DELETE endpoint is Slice 5 — button is a present-but-stubbed placeholder per NEXT.md).
+  New prop names: `hasMintedOpenrouterKey` (derived from `site.openrouterKeyHash != null`),
+  `initialMintingEnabled`, `initialMonthlyLimitUsd` — replacing `hasOpenrouterKey`. PATCH payload now
+  sends `openrouterMintingEnabled` (bool) + `openrouterMonthlyLimitUsd` (number|null), NOT a key.
+  New pure parser `src/lib/site/openrouter-minting.ts#parseOpenrouterMinting` (toggle is `=== true`-only;
+  limit = floored non-negative int or null; trims string input so whitespace → null not 0). Wired into
+  `parseSiteBody` (route.ts) — `SiteBody`/`ParsedSite` swapped key fields for minting fields. PATCH
+  route (`[id]/route.ts`) dropped all key-encryption logic; now just persists toggle+limit via
+  `updateSite`. `updateSite`/`UpdateSiteInput` (site.ts) gained the two columns in the `.set()`.
+  Deleted obsolete `src/lib/site/openrouter-key.ts` + `.test.ts` (paste-field parser, now dead).
+  i18n: replaced 6 `openrouterKey*` keys with 8 `openrouterMinting*`/`openrouterKey{Delete,Minted}`
+  keys in EN/FI/ET. New `openrouter-minting.test.ts` (6 tests: parse + i18n-presence + stale-key-gone).
+- **Verified:** `npx tsc --noEmit` clean; `npm test` 183/183 (was 182; -3 old key tests, +6 minting);
+  `npx opennextjs-cloudflare build` GREEN (dev confirmed off first). `setSiteOpenrouterKey` (site.ts)
+  is now unused by routes but KEPT — Slice 5 (mint-on-deploy) encrypts the minted key through it.
+  Deploy route's existing decrypt-and-thread path is untouched (still reads `openrouterApiKeyEncrypted`).
+- **Files:** `ProjectManager/src/app/(app)/sites/site-form.tsx`, `.../sites/[id]/page.tsx`,
+  `ProjectManager/src/app/api/sites/route.ts`, `.../sites/[id]/route.ts`,
+  `ProjectManager/src/lib/site/site.ts`, `ProjectManager/src/lib/site/openrouter-minting.ts` (+test),
+  removed `ProjectManager/src/lib/site/openrouter-key.ts` (+test),
+  `ProjectManager/messages/{en,fi,et}.json`

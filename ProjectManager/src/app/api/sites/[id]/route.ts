@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { authorizeSiteCountry, canManageSiteByCountry, canUserCreateSite } from "@/lib/site/authz";
-import {
-  findSiteById,
-  isSlugTaken,
-  setSiteOpenrouterKey,
-  updateSite,
-} from "@/lib/site/site";
-import { encryptSecret } from "@/lib/crypto/secret-box";
+import { findSiteById, isSlugTaken, updateSite } from "@/lib/site/site";
 import { parseSiteBody, type SiteBody } from "../route";
 
 /**
@@ -46,8 +39,13 @@ export async function PATCH(
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  const { name, slug, country, openrouterApiKey, clearOpenrouterKey } =
-    parsed.value;
+  const {
+    name,
+    slug,
+    country,
+    openrouterMintingEnabled,
+    openrouterMonthlyLimitUsd,
+  } = parsed.value;
 
   const authzError = authorizeSiteCountry(user, actorCountries, country);
   if (authzError) {
@@ -59,20 +57,15 @@ export async function PATCH(
   }
 
   try {
-    await updateSite(siteId, { name, slug, country });
-
-    // Write-only OpenRouter key. Clear wins; a blank field is left untouched.
-    if (clearOpenrouterKey) {
-      await setSiteOpenrouterKey(siteId, null);
-    } else if (openrouterApiKey) {
-      const { env } = await getCloudflareContext({ async: true });
-      const kek = (env as unknown as Record<string, unknown>).SITE_SECRET_KEY;
-      if (typeof kek !== "string" || kek === "") {
-        return NextResponse.json({ error: "unknown" }, { status: 500 });
-      }
-      const ciphertext = await encryptSecret(openrouterApiKey, kek);
-      await setSiteOpenrouterKey(siteId, ciphertext);
-    }
+    // Key value is never user-entered now — minting (toggle + spend limit) is
+    // persisted here; the key itself is minted/deleted in later slices.
+    await updateSite(siteId, {
+      name,
+      slug,
+      country,
+      openrouterMintingEnabled,
+      openrouterMonthlyLimitUsd,
+    });
 
     return NextResponse.json({ savedId: siteId });
   } catch {

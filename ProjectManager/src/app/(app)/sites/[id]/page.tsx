@@ -215,7 +215,9 @@ export default async function SiteDetailPage({
                   slug: site.slug,
                   country: (site.country as CountryCode | null) ?? null,
                 }}
-                hasOpenrouterKey={site.openrouterApiKeyEncrypted != null}
+                hasMintedOpenrouterKey={site.openrouterKeyHash != null}
+                initialMintingEnabled={site.openrouterMintingEnabled}
+                initialMonthlyLimitUsd={site.openrouterMonthlyLimitUsd}
               />
             </CardContent>
           </Card>
