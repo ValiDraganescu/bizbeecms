@@ -164,3 +164,20 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **HITL:** appended a P1 item to root `HITL.md` to live-verify a per-Site key reaches a deployed CMS
   (the `wrangler secret put` + live OpenRouter call are HITL).
 - **Files:** `deployer/src/index.ts`, `deployer/scripts/openrouter-key.test.mjs`
+
+## 2026-06-23 16:40 — CMS catalog Slice 4: end-to-end verify (offline gate)
+- **Status:** DONE (codeable part; live deploy/chat-stream is HITL)
+- **What I did:** Verification-only run, no source changes. Confirmed the full OpenRouter swap
+  (adapter + getAi selection + catalog) holds at the deploy gate. Ran the offline verification the
+  BACKLOG "Verify end-to-end" task asks for: OpenRouter unit tests, the whole CMS suite, and the
+  `npx opennextjs-cloudflare build` deploy gate. Flipped that BACKLOG TODO → DONE.
+- **Verified:** dev OFF (lsof 3601/3602 clear) before building. `node --test
+  scripts/openrouter-ai.test.mjs scripts/ai-port.test.mjs scripts/models.test.mjs` → 23/23 pass.
+  `npm test` (full CMS suite) → **748/748 pass, 0 fail**. NOTE: the long-standing pre-existing
+  failure flagged in CAVEATS — `ports-sole-reader.guard` on `content-db.ts:39` — now PASSES (4/4);
+  another track fixed `content-db.ts` to read `env.DB` via the port boundary. `npx
+  opennextjs-cloudflare build` → green ("OpenNext build complete", worker.js saved). NOT verifiable
+  offline (HITL): live chat stream from OpenRouter + a real tool-call round-trip + the picker
+  showing the live catalog on a deployed CMS — these need the deployer's `OPENROUTER_API_KEY` secret
+  and a live deploy; tracked in root HITL.md.
+- **Files:** `.orchestrator/meeseeks/goals/ai-openrouter/{BACKLOG,JOURNAL,CAVEATS,NEXT}.md` only

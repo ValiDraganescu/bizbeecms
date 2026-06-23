@@ -17,8 +17,9 @@ Read every line before working. Each entry was learned the hard way by a previou
   can drive a fake — DON'T hardcode global `fetch` if you refactor; the test depends on injection.
 - It returns `response.body` (the SSE stream) directly. OpenRouter is OpenAI-compatible so this is the
   same delta+tool-call SSE shape the route's reframer already handles — no extra translation needed.
-- Pre-existing, NOT ours: `scripts/ports-sole-reader.guard.test.mjs` FAILS on `content-db.ts:39`
-  reading `env.DB`. Unrelated to the AI port; don't chase it as part of this goal.
+- ~~Pre-existing: `ports-sole-reader.guard.test.mjs` FAILS on `content-db.ts:39`.~~ RESOLVED — as of
+  2026-06-23 that guard PASSES (4/4); another track fixed `content-db.ts`. Full CMS `npm test` is now
+  748/748 with ZERO failures. If you see a fail, it's a real regression — don't dismiss it as "pre-existing".
 - The model id for OpenRouter is provider-prefixed (e.g. `openai/gpt-4o-mini`), NOT the `@cf/...` form.
   Remember when setting `DEFAULT_MODEL` in the catalog slice.
 - Provider selection is by KEY PRESENCE (`pickSelection` in `ai.ts`): a non-empty `OPENROUTER_API_KEY`
