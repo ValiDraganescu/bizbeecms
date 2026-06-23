@@ -290,6 +290,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   SIGN-IN LANDED" caveat's last bullet (still describes the shared-client model — update
   it then).
 
+- **GOOGLE id_token IS NOW JWK-RS256-VERIFIED (hardening landed 2026-06-23 17:07).**
+  The callback route verifies the id_token signature against Google's JWKS BEFORE
+  reading any claim. Pure `verifyIdTokenSignature(idToken, jwks)` in `google-core.ts`
+  is fail-closed (alg must be RS256; JWK picked by `kid`; any mismatch/missing-key/
+  malformed → false). The JWKS fetcher `fetchGoogleJwks()` (module-level 1h cache,
+  `GOOGLE_JWKS_URI`) lives IN the callback route to keep google-core pure — don't move
+  it into google-core (it does a network fetch). If JWKS can't be fetched OR the sig
+  doesn't match → `?error=google` (never 500). GOTCHA: WebCrypto `verify` needs
+  ArrayBuffer-backed BufferSource — the sig/data are copied via `.slice().buffer`
+  before the call (else tsc flags `Uint8Array<ArrayBufferLike>`). The earlier "Full
+  JWK verification is a hardening follow-up" note in google-core's header comment is
+  now SUPERSEDED by this function.
+
 - **LOGIN GOOGLE BUTTON IS GATED ON PER-SITE CONFIG (REWORK #3 landed 2026-06-23).**
   `admin/layout.tsx` computes `showGoogle = decideGoogleRoute(await
   getGoogleClientConfig(), APP_ORIGIN).usable` — NOT `env.GOOGLE_CLIENT_ID` anymore

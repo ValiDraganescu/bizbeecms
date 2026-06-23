@@ -25,6 +25,8 @@
 
 export const GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 export const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+/** Google's RS256 signing keys (JWKS). Public; safe to fetch + cache. */
+export const GOOGLE_JWKS_URI = "https://www.googleapis.com/oauth2/v3/certs";
 const GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"];
 
 /** State lifetime: 10 minutes is plenty for a consent round-trip. */
@@ -153,6 +155,86 @@ export function verifiedEmailFromIdToken(
   if (!verified) return null;
   if (typeof c.email !== "string" || c.email.trim() === "") return null;
   return c.email.trim().toLowerCase();
+}
+
+// ---- 3b. JWK RS256 signature verification (hardening) ------------------------
+
+/** A single RSA JWK from Google's JWKS (only the fields we use). */
+export type GoogleJwk = { kid?: string; kty?: string; alg?: string; n?: string; e?: string };
+
+/** base64url → Uint8Array (for the JWT signature bytes). */
+function b64urlToBytes(b64url: string): Uint8Array {
+  let b64 = b64url.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4) b64 += "=";
+  const bin = typeof atob === "function" ? atob(b64) : Buffer.from(b64, "base64").toString("binary");
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function decodeJwtHeader(idToken: string): { alg?: unknown; kid?: unknown } | null {
+  const parts = idToken.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    let b64 = parts[0].replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    const json = typeof atob === "function" ? atob(b64) : Buffer.from(b64, "base64").toString("utf8");
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Verify a Google id_token's RS256 signature against the JWKS — defense in depth
+ * on top of the TLS-authenticated direct token exchange. Picks the JWK whose
+ * `kid` matches the token header, imports it, and verifies `header.payload` against
+ * the signature. Returns false for any mismatch, a missing/wrong key, a non-RS256
+ * token, or a malformed token. PURE: takes the JWKS as a param (the route fetches
+ * + caches it), so it's node-testable with a generated keypair fixture.
+ */
+export async function verifyIdTokenSignature(
+  idToken: string,
+  jwks: { keys: GoogleJwk[] },
+): Promise<boolean> {
+  const header = decodeJwtHeader(idToken);
+  if (!header || header.alg !== "RS256") return false;
+  const parts = idToken.split(".");
+  if (parts.length !== 3) return false;
+
+  const kid = typeof header.kid === "string" ? header.kid : null;
+  const candidates = jwks.keys.filter(
+    (k) => k.kty === "RSA" && k.n && k.e && (kid ? k.kid === kid : true),
+  );
+  if (candidates.length === 0) return false;
+
+  const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
+  let sig: Uint8Array;
+  try {
+    sig = b64urlToBytes(parts[2]);
+  } catch {
+    return false;
+  }
+  // Copy into fresh ArrayBuffer-backed views so the WebCrypto BufferSource type
+  // is satisfied (a Uint8Array can be backed by SharedArrayBuffer otherwise).
+  const sigBuf = sig.slice().buffer;
+  const dataBuf = data.slice().buffer;
+
+  for (const jwk of candidates) {
+    try {
+      const key = await crypto.subtle.importKey(
+        "jwk",
+        { kty: "RSA", n: jwk.n, e: jwk.e, alg: "RS256", ext: true },
+        { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+        false,
+        ["verify"],
+      );
+      if (await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, sigBuf, dataBuf)) return true;
+    } catch {
+      // try the next candidate
+    }
+  }
+  return false;
 }
 
 export type GoogleSignInDecision =

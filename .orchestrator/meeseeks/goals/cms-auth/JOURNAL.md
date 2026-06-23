@@ -356,3 +356,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   Deployer has no local TypeScript (only wrangler) so used a ts transpile syntax check
   → "syntax OK". No dev server was running during the build.
 - **Files:** deployer/src/index.ts, CMS/wrangler.jsonc, ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-23 17:07 — Hardening: JWK RS256 signature verification of the Google id_token
+- **Status:** DONE
+- **What I did:** Backlog had NO queued TODO (GOOGLE-CLIENT REWORK fully closed) — invented
+  the next valuable slice per skill rule 3, picking NEXT.md candidate #2 (hardening) over
+  candidate #1 (the `@pm.sso` PM follow-up) because a PARALLEL ai-openrouter Meeseeks is
+  actively editing ProjectManager/src (site-form/deploy/site.ts) — touching PM would collide.
+  This slice is fully self-contained in CMS. Added defense-in-depth: the Google id_token's
+  RS256 signature is now verified against Google's JWKS, on top of the existing
+  TLS-direct-exchange provenance. Pure `verifyIdTokenSignature(idToken, jwks)` in
+  `google-core.ts` (decodes the JWT header, requires alg=RS256, filters JWKS by `kid`,
+  imports each RSA JWK via `crypto.subtle.importKey("jwk", …, RSASSA-PKCS1-v1_5/SHA-256)`
+  and verifies — fail-closed on any mismatch/missing key/non-RS256/malformed). Exported
+  `GOOGLE_JWKS_URI` + `GoogleJwk` type. The CF-bound `fetchGoogleJwks()` (module-level 1h
+  cache) lives in the callback route (keeps google-core pure); the callback now verifies the
+  signature BEFORE `verifiedEmailFromIdToken`, redirecting to `?error=google` if JWKS can't
+  be fetched OR the signature doesn't match.
+- **Verified:** 8 new node tests (real generated RSA keypair → sign → export public JWK →
+  verify; covers happy path, kid-selection among multiple keys, wrong key, tampered payload,
+  no-kid-match, alg=none, malformed/empty-JWKS). `npm test` 767 pass (was 760, +7 net — one
+  pre-existing 0-count quirk). `npx tsc --noEmit` clean (fixed a `Uint8Array<ArrayBufferLike>`
+  → `BufferSource` typing by copying into fresh `.slice().buffer` ArrayBuffers before
+  `crypto.subtle.verify`). `npx opennextjs-cloudflare build` green (no dev server running).
+  PM `npm run bundle:cms` regenerated (callback route is runtime worker code).
+- **Files:** CMS/src/lib/auth/google-core.ts, CMS/src/app/api/auth/google/callback/route.ts,
+  CMS/scripts/google-auth.test.mjs, ProjectManager/src/lib/deploy/cms-bundle.generated.js

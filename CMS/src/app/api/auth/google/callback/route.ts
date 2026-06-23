@@ -1,9 +1,12 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import {
+  GOOGLE_JWKS_URI,
   GOOGLE_TOKEN_ENDPOINT,
   decideGoogleSignIn,
   verifiedEmailFromIdToken,
+  verifyIdTokenSignature,
   verifyState,
+  type GoogleJwk,
 } from "@/lib/auth/google-core";
 import { createSession } from "@/db/session-store";
 import { findUserByEmail } from "@/db/user-store";
@@ -41,6 +44,28 @@ import {
  */
 function redirect(to: string): Response {
   return new Response(null, { status: 302, headers: { location: to } });
+}
+
+// Google's JWKS rotates infrequently; cache it in-Worker so we don't refetch on
+// every sign-in. ponytail: module-level cache, fine for a single key set per
+// Worker instance; add an ETag/max-age refresh only if rotation ever bites.
+let jwksCache: { keys: GoogleJwk[]; fetchedAt: number } | null = null;
+const JWKS_TTL_MS = 1000 * 60 * 60; // 1h
+
+async function fetchGoogleJwks(): Promise<{ keys: GoogleJwk[] } | null> {
+  if (jwksCache && Date.now() - jwksCache.fetchedAt < JWKS_TTL_MS) {
+    return { keys: jwksCache.keys };
+  }
+  try {
+    const res = await fetch(GOOGLE_JWKS_URI);
+    if (res.status !== 200) return null;
+    const body = (await res.json()) as { keys?: GoogleJwk[] };
+    if (!body || !Array.isArray(body.keys)) return null;
+    jwksCache = { keys: body.keys, fetchedAt: Date.now() };
+    return { keys: body.keys };
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -95,10 +120,18 @@ export async function GET(request: Request): Promise<Response> {
   }
   if (!idToken) return redirect("/admin?error=google");
 
-  // 3. Verified email from the id_token.
+  // 3. Verify the id_token's RS256 signature against Google's JWKS (defense in
+  //    depth on top of the TLS-authenticated direct exchange). Fail-closed: a
+  //    JWKS we can't fetch, or a signature that doesn't match, rejects sign-in.
+  const jwks = await fetchGoogleJwks();
+  if (!jwks || !(await verifyIdTokenSignature(idToken, jwks))) {
+    return redirect("/admin?error=google");
+  }
+
+  // 4. Verified email from the id_token (claims: aud/iss/email_verified/exp).
   const email = verifiedEmailFromIdToken(idToken, clientId);
 
-  // 4. Resolve existence (user / pending invite) and apply the no-self-signup rule.
+  // 5. Resolve existence (user / pending invite) and apply the no-self-signup rule.
   const user = email ? await findUserByEmail(email) : null;
   const pendingInvite = email && !user ? await hasPendingInvite(email) : false;
   const decision = decideGoogleSignIn(email, { user: user != null, pendingInvite });
@@ -113,7 +146,7 @@ export async function GET(request: Request): Promise<Response> {
     return redirect("/admin?error=googleInvitePending");
   }
 
-  // 5. Mint the CMS-local session (sets the bizbee_session cookie).
+  // 6. Mint the CMS-local session (sets the bizbee_session cookie).
   await createSession(user.id);
   return redirect("/admin");
 }

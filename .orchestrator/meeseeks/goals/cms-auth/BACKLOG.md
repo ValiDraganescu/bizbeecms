@@ -5,6 +5,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-23 17:07): **Hardening — JWK RS256 signature verification of the
+  Google id_token.** See JOURNAL. Pure `verifyIdTokenSignature(idToken, jwks)` in
+  `google-core.ts` (RS256, kid-filtered JWK import + verify, fail-closed) + exported
+  `GOOGLE_JWKS_URI`/`GoogleJwk`; CF-bound cached `fetchGoogleJwks()` in the callback
+  route, which verifies the signature BEFORE `verifiedEmailFromIdToken` (→`?error=google`
+  on JWKS-fetch-fail or bad sig). 8 new tests (767 total), tsc + opennext build green,
+  cms-bundle regen.
+
 Build order is deliberate: settle the identity model (Slice 0) BEFORE building
 schema/login/invites on top of it. Each slice gates on CMS tsc + opennext build
 green + regen PM cms-bundle + EN/FI/ET for new strings.

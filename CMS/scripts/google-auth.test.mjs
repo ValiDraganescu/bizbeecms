@@ -20,6 +20,7 @@ import {
   signState,
   verifyState,
   verifiedEmailFromIdToken,
+  verifyIdTokenSignature,
   decideGoogleSignIn,
 } from "../src/lib/auth/google-core.ts";
 
@@ -125,6 +126,76 @@ test("verifiedEmailFromIdToken rejects an expired token", () => {
 test("verifiedEmailFromIdToken rejects a malformed token", () => {
   assert.equal(verifiedEmailFromIdToken("not-a-jwt", CLIENT), null);
   assert.equal(verifiedEmailFromIdToken("a.b.c", CLIENT), null);
+});
+
+// ---- verifyIdTokenSignature (JWK RS256 hardening) ----------------------------
+
+const b64u = (obj) =>
+  Buffer.from(JSON.stringify(obj))
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+// Generate an RSA keypair, sign `header.payload` (RS256), return the full JWT +
+// the PUBLIC key as a JWK (what the JWKS endpoint serves).
+async function signedIdToken(claims, { kid = "kid-1", header } = {}) {
+  const { publicKey, privateKey } = await crypto.subtle.generateKey(
+    { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+    true,
+    ["sign", "verify"],
+  );
+  const head = header ?? { alg: "RS256", kid };
+  const signingInput = `${b64u(head)}.${b64u(claims)}`;
+  const sig = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    privateKey,
+    new TextEncoder().encode(signingInput),
+  );
+  const sigB64u = Buffer.from(sig).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const jwk = await crypto.subtle.exportKey("jwk", publicKey);
+  return { token: `${signingInput}.${sigB64u}`, jwk: { ...jwk, kid } };
+}
+
+test("verifyIdTokenSignature accepts a token signed by the matching JWK", async () => {
+  const { token, jwk } = await signedIdToken(validClaims);
+  assert.equal(await verifyIdTokenSignature(token, { keys: [jwk] }), true);
+});
+
+test("verifyIdTokenSignature picks the JWK by kid among several keys", async () => {
+  const { token, jwk } = await signedIdToken(validClaims, { kid: "real" });
+  const other = await signedIdToken(validClaims, { kid: "decoy" });
+  assert.equal(await verifyIdTokenSignature(token, { keys: [other.jwk, jwk] }), true);
+});
+
+test("verifyIdTokenSignature rejects a token signed by a different key", async () => {
+  const { token } = await signedIdToken(validClaims);
+  const other = await signedIdToken(validClaims); // unrelated keypair, same kid
+  assert.equal(await verifyIdTokenSignature(token, { keys: [other.jwk] }), false);
+});
+
+test("verifyIdTokenSignature rejects a tampered payload", async () => {
+  const { token, jwk } = await signedIdToken(validClaims);
+  const [h, , s] = token.split(".");
+  const forged = `${h}.${b64u({ ...validClaims, email: "attacker@evil.com" })}.${s}`;
+  assert.equal(await verifyIdTokenSignature(forged, { keys: [jwk] }), false);
+});
+
+test("verifyIdTokenSignature rejects when no JWK matches the kid", async () => {
+  const { token, jwk } = await signedIdToken(validClaims, { kid: "missing" });
+  assert.equal(await verifyIdTokenSignature(token, { keys: [{ ...jwk, kid: "other" }] }), false);
+});
+
+test("verifyIdTokenSignature rejects a non-RS256 (alg=none) token", async () => {
+  const { jwk } = await signedIdToken(validClaims);
+  const none = `${b64u({ alg: "none" })}.${b64u(validClaims)}.`;
+  assert.equal(await verifyIdTokenSignature(none, { keys: [jwk] }), false);
+});
+
+test("verifyIdTokenSignature rejects a malformed token + empty JWKS", async () => {
+  assert.equal(await verifyIdTokenSignature("not-a-jwt", { keys: [] }), false);
+  const { token } = await signedIdToken(validClaims);
+  assert.equal(await verifyIdTokenSignature(token, { keys: [] }), false);
 });
 
 // ---- decideGoogleSignIn (the no-self-signup rule) ----------------------------
