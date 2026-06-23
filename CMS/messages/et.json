@@ -271,7 +271,8 @@
     "googleButton": "Logi sisse Google'iga",
     "googleDenied": "Sellel Google'i kontol pole õigust siia sisse logida. Küsi saidi administraatorilt kutset.",
     "googleInvitePending": "Sul on ootel kutse — konto seadistuse lõpetamiseks ava oma e-kirjas olev kutselink.",
-    "googleError": "Google'iga sisselogimine ebaõnnestus. Proovi uuesti."
+    "googleError": "Google'iga sisselogimine ebaõnnestus. Proovi uuesti.",
+    "forgotPassword": "Unustasid parooli?"
   },
   "adminNav": {
     "brand": "CMS-i haldus",
@@ -659,5 +660,31 @@
       "alreadyInvited": "Sellel inimesel on juba ootel kutse.",
       "unknown": "Midagi läks valesti. Proovi uuesti."
     }
+  },
+  "forgotPassword": {
+    "title": "Lähtesta oma parool",
+    "subtitle": "Sisesta oma e-posti aadress ja saadame sulle lingi uue parooli seadmiseks.",
+    "emailLabel": "E-post",
+    "submit": "Saada lähtestuslink",
+    "submitting": "Saatmine…",
+    "success": "Kui selle e-posti aadressiga konto on olemas, saatsime sulle parooli lähtestuslingi.",
+    "backToSignIn": "Tagasi sisselogimisse",
+    "errorGeneric": "Lähtestuslinki ei õnnestunud saata. Proovi uuesti.",
+    "errorNetwork": "Serveriga ei õnnestunud ühendust luua. Proovi uuesti."
+  },
+  "resetPassword": {
+    "title": "Sea uus parool",
+    "subtitle": "Vali oma kontole uus parool.",
+    "passwordLabel": "Uus parool",
+    "confirmLabel": "Kinnita parool",
+    "passwordHint": "Vähemalt 10 tähemärki.",
+    "submit": "Sea uus parool",
+    "submitting": "Salvestamine…",
+    "requestNew": "Küsi uus lähtestuslink",
+    "errorTooShort": "Parool peab olema vähemalt 10 tähemärki.",
+    "errorMismatch": "Paroolid ei ühti.",
+    "errorTokenInvalid": "See lähtestuslink on vigane või aegunud. Küsi uus.",
+    "errorGeneric": "Parooli ei õnnestunud lähtestada. Proovi uuesti.",
+    "errorNetwork": "Serveriga ei õnnestunud ühendust luua. Proovi uuesti."
   }
 }

@@ -271,7 +271,8 @@
     "googleButton": "Kirjaudu Google-tilillä",
     "googleDenied": "Tällä Google-tilillä ei ole oikeutta kirjautua tänne. Pyydä kutsua sivuston ylläpitäjältä.",
     "googleInvitePending": "Sinulla on odottava kutsu — viimeistele tilisi avaamalla sähköpostissasi oleva kutsulinkki.",
-    "googleError": "Google-kirjautuminen epäonnistui. Yritä uudelleen."
+    "googleError": "Google-kirjautuminen epäonnistui. Yritä uudelleen.",
+    "forgotPassword": "Unohditko salasanasi?"
   },
   "adminNav": {
     "brand": "CMS-hallinta",
@@ -659,5 +660,31 @@
       "alreadyInvited": "Tällä henkilöllä on jo odottava kutsu.",
       "unknown": "Jotain meni pieleen. Yritä uudelleen."
     }
+  },
+  "forgotPassword": {
+    "title": "Nollaa salasanasi",
+    "subtitle": "Syötä sähköpostiosoitteesi, niin lähetämme linkin uuden salasanan asettamiseen.",
+    "emailLabel": "Sähköposti",
+    "submit": "Lähetä nollauslinkki",
+    "submitting": "Lähetetään…",
+    "success": "Jos kyseiselle sähköpostiosoitteelle on tili, olemme lähettäneet linkin salasanan nollaamiseen.",
+    "backToSignIn": "Takaisin kirjautumiseen",
+    "errorGeneric": "Nollauslinkkiä ei voitu lähettää. Yritä uudelleen.",
+    "errorNetwork": "Palvelimeen ei saatu yhteyttä. Yritä uudelleen."
+  },
+  "resetPassword": {
+    "title": "Aseta uusi salasana",
+    "subtitle": "Valitse tilillesi uusi salasana.",
+    "passwordLabel": "Uusi salasana",
+    "confirmLabel": "Vahvista salasana",
+    "passwordHint": "Vähintään 10 merkkiä.",
+    "submit": "Aseta uusi salasana",
+    "submitting": "Tallennetaan…",
+    "requestNew": "Pyydä uusi nollauslinkki",
+    "errorTooShort": "Salasanan on oltava vähintään 10 merkkiä.",
+    "errorMismatch": "Salasanat eivät täsmää.",
+    "errorTokenInvalid": "Tämä nollauslinkki on virheellinen tai vanhentunut. Pyydä uusi.",
+    "errorGeneric": "Salasanaa ei voitu nollata. Yritä uudelleen.",
+    "errorNetwork": "Palvelimeen ei saatu yhteyttä. Yritä uudelleen."
   }
 }

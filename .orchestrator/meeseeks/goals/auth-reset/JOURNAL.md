@@ -167,3 +167,31 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/reset/reset.ts (checkReset/applyReset),
   CMS/src/lib/reset/reset-logic.ts (new), CMS/src/app/api/auth/reset/route.ts (new),
   CMS/src/lib/reset/reset-route.test.ts (new).
+
+## 2026-06-23 — C4: CMS forgot/reset pages + login-form "Forgot password?" link
+- **Status:** DONE
+- **What I did:** Mirrored PM P4 in CMS (CMS/src only). New public pages:
+  `app/forgot/page.tsx` → `components/forgot-password-form.tsx` (email → POST
+  /api/auth/forgot; on ANY 2xx shows the enumeration-safe success notice +
+  back-to-sign-in, NO body branching) and `app/reset/[token]/page.tsx` →
+  `components/reset-password-form.tsx`. The reset PAGE gates on `checkReset` status
+  server-side exactly like invite-accept's page: notFound/expired/used all render
+  ONE generic notice (+ "request a new link"); only `valid` renders the form. The
+  FORM POSTs to /api/auth/reset (minLength 10), maps the C3 route's BARE error keys
+  (resetTokenInvalid/passwordTooShort/passwordRequired/passwordMismatch) to messages
+  — all token failures → one `errorTokenInvalid` (no leak) — and on success hard-navs
+  to /admin (where the now-session-killed user sees the login page; CMS has no
+  standalone /login route, login is rendered by admin/layout when unauthenticated).
+  Added a "Forgot password?" link (`href="/forgot"`) under the sign-in button in
+  `login-form.tsx`. REST+fetch, NO server actions (Workers/OpenNext).
+- **i18n:** new TOP-LEVEL keys `forgotPassword.*` + `resetPassword.*` +
+  `login.forgotPassword` in EN/FI/ET (CMS convention — NOT PM's `auth.forgot/reset.*`
+  nesting). Parity verified: fi/et 0 missing / 0 extra vs en.
+- **Verified:** ports clear (lsof 3601,3602) → `npx tsc --noEmit` exit 0; `npm test`
+  743 pass/0 fail; `opennextjs-cloudflare build` complete (worker saved; /forgot and
+  /reset/[token] both in the route table). UI-only slice — pages are thin wiring over
+  the already-tested forgot/reset routes, so no new behavioral test (C5 adds the
+  reset-logic.test.ts). NO bundle:cms (that's C5).
+- **Files:** CMS/src/app/forgot/page.tsx, CMS/src/app/reset/[token]/page.tsx,
+  CMS/src/components/forgot-password-form.tsx, CMS/src/components/reset-password-form.tsx,
+  CMS/src/components/login-form.tsx, CMS/messages/{en,fi,et}.json.

@@ -271,7 +271,8 @@
     "googleButton": "Sign in with Google",
     "googleDenied": "That Google account isn't allowed to sign in here. Ask a site administrator for an invitation.",
     "googleInvitePending": "You have a pending invitation — open the invite link in your email to finish setting up your account.",
-    "googleError": "Google sign-in failed. Try again."
+    "googleError": "Google sign-in failed. Try again.",
+    "forgotPassword": "Forgot password?"
   },
   "adminNav": {
     "brand": "CMS admin",
@@ -659,5 +660,31 @@
       "alreadyInvited": "That person already has a pending invite.",
       "unknown": "Something went wrong. Try again."
     }
+  },
+  "forgotPassword": {
+    "title": "Reset your password",
+    "subtitle": "Enter your email and we'll send you a link to set a new password.",
+    "emailLabel": "Email",
+    "submit": "Send reset link",
+    "submitting": "Sending…",
+    "success": "If an account exists for that email, we've sent a link to reset your password.",
+    "backToSignIn": "Back to sign in",
+    "errorGeneric": "Couldn't send the reset link. Try again.",
+    "errorNetwork": "Couldn't reach the server. Try again."
+  },
+  "resetPassword": {
+    "title": "Set a new password",
+    "subtitle": "Choose a new password for your account.",
+    "passwordLabel": "New password",
+    "confirmLabel": "Confirm password",
+    "passwordHint": "At least 10 characters.",
+    "submit": "Set new password",
+    "submitting": "Saving…",
+    "requestNew": "Request a new reset link",
+    "errorTooShort": "Password must be at least 10 characters.",
+    "errorMismatch": "The passwords don't match.",
+    "errorTokenInvalid": "This reset link is invalid or has expired. Request a new one.",
+    "errorGeneric": "Couldn't reset your password. Try again.",
+    "errorNetwork": "Couldn't reach the server. Try again."
   }
 }

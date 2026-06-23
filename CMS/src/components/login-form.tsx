@@ -128,6 +128,13 @@ export function LoginForm({
         >
           {busy ? t("signingIn") : t("signIn")}
         </button>
+
+        <a
+          href="/forgot"
+          className="text-center text-sm text-foreground-muted hover:text-foreground hover:underline"
+        >
+          {t("forgotPassword")}
+        </a>
       </form>
 
       {(showGoogle || showSso) && (

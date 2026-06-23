@@ -93,7 +93,22 @@ PM first (slices P1–P5), then mirror in CMS (slices C1–C5). ONE app per work
   invite-accept route works, so C3 adds NO message strings (i18n parity untouched).
   Test `lib/reset/reset-route.test.ts` (source-text, +6). Gates green (tsc / 743 tests
   / opennext build; route in manifest). NO bundle:cms (that's C5).
-- TODO: **C4 — CMS forgot/reset pages + login-form link** (mirror P4; EN/FI/ET).
+- DONE: **C4 — CMS forgot/reset pages + login-form link.** Public `/forgot` page
+  (`app/forgot/page.tsx` → `ForgotPasswordForm`: email → POST /api/auth/forgot;
+  on ANY 2xx shows the enumeration-safe success + back-to-sign-in, NO body
+  branching) + `/reset/[token]` page (`app/reset/[token]/page.tsx` server-gates on
+  `checkReset` status like invite-accept — notFound/expired/used all collapse to
+  ONE generic notice; valid → `ResetPasswordForm`: password+confirm → POST
+  /api/auth/reset, minLength 10, maps bare error keys
+  resetTokenInvalid/passwordTooShort/passwordRequired/passwordMismatch to messages,
+  success → hard-nav /admin which shows login since sessions were killed). Added a
+  "Forgot password?" link (`href="/forgot"`) under the login button in
+  `login-form.tsx`. REST+fetch, NO server actions. New strings: top-level
+  `forgotPassword.*` + `resetPassword.*` + `login.forgotPassword` (CMS top-level
+  convention, NOT PM's `auth.*` nesting) in EN/FI/ET (parity verified 0 missing/
+  extra). Gates green (tsc / 743 tests / opennext build; both pages in route
+  table). NO bundle:cms (that's C5). UI-only slice — no new behavioral test (pages
+  are thin wiring over the already-tested forgot/reset routes).
 - TODO: **C5 — CMS reset pure-logic tests + regen PM `cms-bundle`** (mirror P5;
   LAST CMS slice runs `bundle:cms` to ship the CMS changes into the PM bundle).
 

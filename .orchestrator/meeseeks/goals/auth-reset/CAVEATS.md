@@ -94,6 +94,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   `NextResponse.json(...)` — CMS auth routes (login) return `Response`. Mirror
   that in C3 (`/api/auth/reset`); the forgot-route test greps for `Response.json`,
   so a reset-route test should too.
+- C4 CMS HAS NO STANDALONE `/login` ROUTE (learned): unlike PM (which has
+  `(auth)/login`), the CMS login form is rendered by `app/admin/layout.tsx` when the
+  visitor is signed OUT — there is no `/login` page. So "success → login" / "back to
+  sign in" must hard-navigate to `/admin` (NOT `/login`), where admin/layout shows the
+  login page. C4's forms + notices all link to `/admin` for sign-in and `/forgot` for
+  the reset-request. The reset PAGE gates on `checkReset` status server-side exactly
+  like `invite/accept/[token]/page.tsx` (a server component using `getTranslations` +
+  the store fn) — mirror that pattern, not a client-only page.
+- C4 MESSAGE KEYS landed as TOP-LEVEL `forgotPassword.*` and `resetPassword.*` (+
+  `login.forgotPassword` for the link) — per CMS convention (see C2 caveat). The reset
+  FORM maps the C3 route's BARE error keys to `resetPassword.error*`
+  (passwordRequired+passwordTooShort→errorTooShort, passwordMismatch→errorMismatch,
+  resetTokenInvalid→errorTokenInvalid, default→errorGeneric). C5 needs NO new strings.
 - P5 NON-DUPLICATION: the enumeration-safe hit===miss invariant is already locked
   STRUCTURALLY by `forgot-route.test.ts` (exactly one `{ok:true}` returned AFTER
   the `if(user)` block). Don't add a runtime deep-equal of `{ok:true}` vs
