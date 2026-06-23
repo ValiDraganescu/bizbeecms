@@ -78,6 +78,13 @@
       "when": 1782130681594,
       "tag": "0010_bizarre_madrox",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1782216204290,
+      "tag": "0011_simple_rhino",
+      "breakpoints": true
     }
   ]
 }

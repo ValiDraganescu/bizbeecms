@@ -11,6 +11,7 @@ Status: ACTIVE (being worked / available to drive) | PAUSED (set aside by the us
 - cms-mcp — expose the CMS AI tools over a REMOTE MCP server on each per-Site CMS Worker (`/mcp`), per-site API-key auth minted in the CMS admin UI, so local Claude Code can manage a site (brings its own model = cheaper); reuses the existing tool handlers via a shared dispatch — ACTIVE
 - cms-releases — CMS release system: repo `release` skill (draft notes from commits → edit → semver tag `cms-v*`), deployer tag-list + release-notes endpoints, PM version PICKER (tagged releases only) + notes viewer on deploy, and deployed CMS version shown in site list + detail — ACTIVE
 - external-data-sources — define external APIs (e.g. weather) as bindable DATA SOURCES w/ configurable auth (header/query/basic/none) + write-only encrypted secret; server-side cached fetch at render; binding seam generalized to collection|api; UI + AI tools (sample+map) — ACTIVE
+- auth-reset — self-serve "forgot password" reset for BOTH PM and CMS users: token+email+set-new-password mirroring the invite flow; enumeration-safe; reset always sets a password (Google-SSO accounts too); reuses lib/auth/password.ts (PBKDF2) + live Cloudflare Email Sending — ACTIVE
 
 ## Archived (delivered; moved to goals/archive/<slug>/ — 2026-06-21)
 - binding-adapters → `archive/binding-adapters/` — ports-and-adapters seam over CMS env.DB/MEDIA/AI + CF adapter (CF-native, no Vercel adapter). Db/Storage/Ai interfaces + CF adapters + mocked-port test shipped; the AI-over-REST path was delivered by ai-assistant.

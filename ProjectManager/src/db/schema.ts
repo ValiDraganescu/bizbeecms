@@ -58,6 +58,30 @@ export const invites = sqliteTable(
   (t) => [uniqueIndex("invites_token_unique").on(t.token)],
 );
 
+/**
+ * Self-serve password-reset tokens (auth-reset subgoal). Mirrors the `invites`
+ * token pattern: a single-use, time-boxed token emailed to a user who clicks
+ * "Forgot password?". Single-use = `usedAt IS NULL` gate; expiry = `expiresAt`.
+ * On a valid reset we set a fresh PBKDF2 hash, set `usedAt`, and invalidate the
+ * user's sessions. Token lookup keys off the unique `token` index.
+ */
+export const passwordResets = sqliteTable(
+  "password_resets",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    usedAt: integer("used_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [uniqueIndex("password_resets_token_unique").on(t.token)],
+);
+
 export const sites = sqliteTable(
   "sites",
   {
@@ -257,6 +281,8 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Invite = typeof invites.$inferSelect;
 export type NewInvite = typeof invites.$inferInsert;
+export type PasswordReset = typeof passwordResets.$inferSelect;
+export type NewPasswordReset = typeof passwordResets.$inferInsert;
 export type Site = typeof sites.$inferSelect;
 export type NewSite = typeof sites.$inferInsert;
 export type SiteUser = typeof siteUsers.$inferSelect;
