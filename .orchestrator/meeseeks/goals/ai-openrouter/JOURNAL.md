@@ -254,3 +254,31 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **What I did:** Deploy route (`api/sites/[id]/deploy/route.ts`) now mints a per-Site OpenRouter key BEFORE the existing Slice-3 decrypt-and-thread block, gated on pure `shouldMintOnDeploy(enabled, keyHash)` (new `src/lib/site/mint-on-deploy.ts`): mint only when minting enabled AND `openrouterKeyHash` null/empty (idempotent — a re-deploy reuses the key). On mint: `mintKey(env.OPENROUTER_PROVISIONING_KEY, {name: slug, limit: monthlyLimitUsd ?? undefined})` → `encryptSecret(key, SITE_SECRET_KEY)` → `setSiteMintedOpenrouterKey(siteId, ciphertext, hash)` (new site.ts helper writes both cols), then mutate local `site` so the decrypt path threads the minted key into the deploy POST. ANY mint failure caught + `console.warn` + deploy proceeds (graceful degrade to deployer global key — never 500). Added `DELETE /api/sites/[id]/openrouter-key` (new route): authz mirrors deploy (country-reach OR assignment), `deleteKey(provKey, hash)` then `clearSiteMintedOpenrouterKey` — proceed-and-clear even if remote revoke 404s; no-op `{ok:true}` if already clear. Wired the form's previously-DISABLED "Delete current key" button to it (loading state + local `hasKey` so it hides after revoke without reload).
 - **Verified:** `node --test scripts/mint-on-deploy.test.mjs` 4/4; `npx tsc --noEmit` 0 errors; `npm test` 187/187 (was 183, +4); `npx opennextjs-cloudflare build` GREEN (dev off, 3601/3602 clear). Live mint/delete against OpenRouter = HITL (needs `OPENROUTER_PROVISIONING_KEY` secret on PM).
 - **Files:** src/lib/site/mint-on-deploy.ts (new), scripts/mint-on-deploy.test.mjs (new), src/lib/site/site.ts, src/app/api/sites/[id]/deploy/route.ts, src/app/api/sites/[id]/openrouter-key/route.ts (new), src/app/(app)/sites/site-form.tsx.
+
+## 2026-06-23 — KEY-MINTING: CMS-local user-key override
+- **Status:** DONE
+- **What I did:** Added a CMS-local OpenRouter user key (operator pastes their OWN `sk-or-...`),
+  stored encrypted in the CMS's own D1 and PREFERRED at AI request time over the deployer-injected
+  `OPENROUTER_API_KEY`. Files:
+  - `CMS/src/lib/settings/openrouter-key.ts` (PURE): `isValidUserKey` (sk-or- prefix + bounds),
+    `normalizeOpenrouterUserKey`, `toOpenrouterUserKeyStatus` ({hasKey}), and the request-time
+    `effectiveOpenrouterKey(userKey, envKey)` — user key wins when non-empty, else env, else "".
+  - `CMS/src/db/openrouter-key-store.ts`: mirrors `google-client-store.ts` — `site_settings` row
+    `openrouter_user_key` = `{ keyEnc }`, AES-GCM via secret-box (KEK = `CMS_AUTH_SECRET`), `injectedDb`
+    seam. `getDecryptedOpenrouterUserKey(kek)` returns null on missing/bad decrypt (never throws).
+  - `CMS/src/lib/ports/ai.ts#getAi()`: reads the CMS-local key (try/catch → null) and threads
+    `effectiveOpenrouterKey(userKey, env.OPENROUTER_API_KEY)` into `pickSelection`. Precedence now:
+    CMS-local user key → env OPENROUTER_API_KEY (minted/global) → CfAi → null/503. `pickSelection`
+    stays env-shaped & pure (unchanged).
+  - `CMS/src/app/api/settings/openrouter-key/route.ts`: GET {hasKey} / PATCH {key} / DELETE — all
+    `requireUserManager`-gated, mirrors the Google route. Key NEVER echoed.
+  - UI: `openrouter-key-manager.tsx` (write-only field + key-set/no-key badge + clear via in-app
+    ConfirmModal) + `app/admin/settings/openrouter-key/page.tsx` + a `settings-nav` tab. i18n EN/FI/ET.
+  - Test: `CMS/scripts/openrouter-user-key.test.mjs` (9): pure helpers + store round-trip (encrypt at
+    rest, plaintext never in D1, key-keyed upsert, clear, null-on-wrong-KEK).
+- **Gotcha:** `ai.ts` imports its new deps RELATIVELY (`../../db/...`, `../settings/...`), NOT `@/`,
+  because the dep-free `.mjs` tests import `ai.ts` directly under Node type-stripping and `@/` doesn't
+  resolve there. First attempt with `@/db/...` broke ai-port/openrouter-ai/ports-factory tests.
+- **Verified:** new test 9/9; `npx tsc --noEmit` clean; full CMS `npm test` 776/776 (was 748);
+  `npx opennextjs-cloudflare build` GREEN (dev off). Live request-time precedence on a deployed CMS
+  is the only non-codeable bit (HITL — needs a real key set in CMS settings).

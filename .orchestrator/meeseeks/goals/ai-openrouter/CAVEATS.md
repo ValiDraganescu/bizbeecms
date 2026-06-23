@@ -127,3 +127,20 @@ Read every line before working. Each entry was learned the hard way by a previou
 - The form delete button now uses local `hasKey` state (seeded from `hasMintedOpenrouterKey`) + a
   `deleting` loading flag; on 2xx it flips `hasKey=false` and `router.refresh()`. The old DISABLED-stub
   caveat is now stale.
+- CMS-LOCAL USER-KEY OVERRIDE DONE (2026-06-23): the CMS now has its OWN OpenRouter key (operator-pasted),
+  stored encrypted in CMS D1 (`site_settings` row `openrouter_user_key` = `{keyEnc}`, secret-box AES-GCM,
+  KEK = CMS Worker var `CMS_AUTH_SECRET` — same KEK google-client-store uses). `getAi()` PREFERS it over
+  `env.OPENROUTER_API_KEY`. Pure precedence = `lib/settings/openrouter-key.ts#effectiveOpenrouterKey`;
+  store = `db/openrouter-key-store.ts` (mirror of google-client-store, `injectedDb` seam, node-testable).
+- CRITICAL: `CMS/src/lib/ports/ai.ts` is imported DIRECTLY by dep-free `.mjs` tests (ai-port,
+  openrouter-ai, ports-factory) under Node type-stripping — so ANY import added to `ai.ts` MUST be a
+  RELATIVE `.ts` path (`../../db/...`, `../settings/...`), NEVER a `@/` alias (Node can't resolve `@/`,
+  every importing test ERR_MODULE_NOT_FOUNDs). Learned the hard way this run.
+- `getAi()` reads the CMS-local key inside a try/catch → null on any failure; `effectiveOpenrouterKey`
+  then falls through to the env key. The chat route must NEVER 500 because of a settings read — keep that
+  guard if you touch `getAi()`. `pickSelection` stays PURE & env-shaped (`{OPENROUTER_API_KEY, AI}`) —
+  the override is applied BEFORE calling it, not inside it.
+- The request-time D1 read in `getAi()` is one indexed `site_settings` lookup per chat request (cheap,
+  no cache). If chat latency ever matters, cache per-isolate — but YAGNI for now.
+- CMS settings tab + page live at `/admin/settings/openrouter-key`; route `/api/settings/openrouter-key`.
+  i18n block `openrouterKey` + `settingsNav.openrouterKey` in all three `CMS/messages/{en,fi,et}.json`.

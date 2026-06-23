@@ -19,6 +19,8 @@
  * fake binding (see `scripts/ai-port.test.mjs`).
  */
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { getDecryptedOpenrouterUserKey } from "../../db/openrouter-key-store.ts";
+import { effectiveOpenrouterKey } from "../settings/openrouter-key.ts";
 
 /** A chat message in the OpenAI-compatible shape Workers AI accepts. */
 export interface ChatMessage {
@@ -153,11 +155,33 @@ export class OpenRouterAi implements Ai {
  *
  * ponytail: key-presence is the switch — no extra provider flag. Add an explicit
  * `AI_PROVIDER` var only if a Site ever needs CfAi despite having an OpenRouter key.
+ *
+ * CMS-local user key override (ai-openrouter): before selecting, the CMS-local
+ * user key (encrypted in this Site's D1, KEK = `CMS_AUTH_SECRET`) is read and
+ * PREFERRED over the deployer-injected `OPENROUTER_API_KEY`. So precedence is
+ * CMS-local user key → env OPENROUTER_API_KEY (minted/global) → CfAi → null/503.
+ * A missing/failed decrypt falls through to the env key — NEVER throws here.
  */
 export async function getAi(): Promise<Ai | null> {
   const { env } = await getCloudflareContext({ async: true });
-  const e = env as unknown as { OPENROUTER_API_KEY?: string; AI?: AiBinding };
-  const key = pickSelection(e);
+  const e = env as unknown as {
+    OPENROUTER_API_KEY?: string;
+    AI?: AiBinding;
+    CMS_AUTH_SECRET?: string;
+  };
+
+  // CMS-local user key wins over the deployer-injected env key.
+  let userKey: string | null = null;
+  if (typeof e.CMS_AUTH_SECRET === "string" && e.CMS_AUTH_SECRET) {
+    try {
+      userKey = await getDecryptedOpenrouterUserKey(e.CMS_AUTH_SECRET);
+    } catch {
+      userKey = null; // never let a settings read break the chat route
+    }
+  }
+  const orKey = effectiveOpenrouterKey(userKey, e.OPENROUTER_API_KEY);
+
+  const key = pickSelection({ OPENROUTER_API_KEY: orKey, AI: e.AI });
   if (key.provider === "openrouter") return new OpenRouterAi(key.apiKey);
   if (key.provider === "cf") return new CfAi(e.AI as AiBinding);
   return null;
