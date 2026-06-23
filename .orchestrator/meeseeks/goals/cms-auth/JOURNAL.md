@@ -338,3 +338,21 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   appears/hides on a deployed Worker (needs a real per-Site client → HITL).
 - **Files:** CMS/src/app/admin/layout.tsx,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js.
+
+## 2026-06-23 17:01 — REWORK #4: rip out shared deployer-injected Google client
+- **Status:** DONE
+- **What I did:** Final GOOGLE-CLIENT REWORK slice. Deleted the shared
+  `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` everywhere: `deployer/src/index.ts` (the
+  `Env` type fields + their comment block, the container-env block `GOOGLE_CLIENT_ID:
+  env...` / `GOOGLE_CLIENT_SECRET: env...`, and the two `--var "GOOGLE_CLIENT_*"` lines
+  in the wrangler-deploy command — also fixed the trailing `\` so `--var APP_ORIGIN`
+  is now the last arg). `CMS/wrangler.jsonc`: removed the two empty placeholders and
+  rewrote the comment to document the per-Site customer-client model. Nothing in the
+  app layer ever read these post-REWORK-#2/#3 (routes use D1, layout uses D1), so this
+  was pure dead-code removal.
+- **Verified:** `grep GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET` across deployer/src +
+  CMS/src + CMS/wrangler.jsonc → ZERO hits. CMS `npm test` 760 pass, `npx tsc --noEmit`
+  clean, `npx opennextjs-cloudflare build` green, PM `npm run bundle:cms` regen OK.
+  Deployer has no local TypeScript (only wrangler) so used a ts transpile syntax check
+  → "syntax OK". No dev server was running during the build.
+- **Files:** deployer/src/index.ts, CMS/wrangler.jsonc, ProjectManager/src/lib/deploy/cms-bundle.generated.js

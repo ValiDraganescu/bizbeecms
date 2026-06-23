@@ -252,10 +252,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   • id_token is decoded, NOT JWK-signature-verified — provenance is the TLS direct
     server-to-server token exchange (we hold client_secret). Full JWK verify is a
     hardening follow-up, not required for the direct-exchange threat model.
-  • Google client id/secret are deployer-injected vars GOOGLE_CLIENT_ID/
-    GOOGLE_CLIENT_SECRET (Env type + container env + `--var` in deployer/src/index.ts;
-    wrangler.jsonc placeholders). Empty => button hidden + routes no-op. Live
-    provisioning + round-trip is in HITL.md ## Open (P1).
+  • Google client id/secret are PER-SITE, configured in the CMS settings UI and
+    stored ENCRYPTED in the CMS's own D1 (see the "PER-SITE GOOGLE CREDS" caveat).
+    There is NO shared deployer-injected client — the old `GOOGLE_CLIENT_ID`/
+    `GOOGLE_CLIENT_SECRET` deployer vars + wrangler.jsonc placeholders were RIPPED OUT
+    (REWORK #4, 2026-06-23 17:01); don't reintroduce them. A Site with no client
+    configured simply hides the button + the routes no-op. Live provisioning +
+    round-trip is in HITL.md ## Open (P1).
 
 - **PER-SITE GOOGLE CREDS NOW STORED IN CMS D1 (REWORK storage slice landed
   2026-06-23).** A customer's OWN Google client id/secret live in ONE generic

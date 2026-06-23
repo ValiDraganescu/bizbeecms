@@ -21,13 +21,6 @@ type Env = {
   // getAi() selects OpenRouter. Empty/absent => CMS falls back to the CF `AI`
   // binding. Set as a deployer secret (`wrangler secret put OPENROUTER_API_KEY`).
   OPENROUTER_API_KEY?: string;
-  // CMS "Sign in with Google" (cms-auth Slice 2b): the OWN Google OAuth 2.0
-  // client, injected into each CMS Worker as vars. Empty/absent => the Google
-  // button is hidden + start/callback no-op. Set as deployer secrets
-  // (`wrangler secret put GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`). The
-  // client's authorized redirect URI must be `<APP_ORIGIN>/api/auth/google/callback`.
-  GOOGLE_CLIENT_ID?: string;
-  GOOGLE_CLIENT_SECRET?: string;
   // Custom-domain attach (Cloudflare for SaaS): the zone whose custom_hostnames
   // API we register against, and the Host->slug map the router reads. CF_API_TOKEN
   // must additionally hold "SSL and Certificates: Edit" for the custom_hostnames call.
@@ -513,9 +506,6 @@ async function startDeploy(
       ).setSecret
         ? "1"
         : "",
-      // CMS "Sign in with Google" OAuth client (cms-auth Slice 2b).
-      GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID ?? "",
-      GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET ?? "",
     },
   });
 }
@@ -726,9 +716,7 @@ npx wrangler deploy --name "$WORKER_NAME" --compatibility-date 2025-09-01 \
   --var "SITE_ID:$SITE_ID" \
   --var "PM_ORIGIN:$PM_ORIGIN" \
   --var "CMS_AUTH_SECRET:$CMS_AUTH_SECRET" \
-  --var "APP_ORIGIN:$APP_ORIGIN" \
-  --var "GOOGLE_CLIENT_ID:$GOOGLE_CLIENT_ID" \
-  --var "GOOGLE_CLIENT_SECRET:$GOOGLE_CLIENT_SECRET"
+  --var "APP_ORIGIN:$APP_ORIGIN"
 if [ $? -ne 0 ]; then step_fail "wrangler deploy failed"; report failed "wrangler deploy failed"; exit 1; fi
 step_ok
 
