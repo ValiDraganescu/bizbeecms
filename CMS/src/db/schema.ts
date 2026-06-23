@@ -361,6 +361,34 @@ export const collection = sqliteTable(
   (t) => [uniqueIndex("collection_table_name_unique").on(t.tableName)],
 );
 
+/**
+ * Password reset token (auth-reset subgoal — CMS mirror of PM `password_resets`).
+ * Mirrors the `invite` token pattern: a single-use, time-boxed token emailed to a
+ * user who clicks "Forgot password?". Single-use = `usedAt IS NULL` gate; expiry =
+ * `expiresAt`. On a valid reset we set a fresh PBKDF2 hash on the user, set
+ * `usedAt`, and invalidate the user's sessions. Token lookup keys off the unique
+ * `token` index. `userId` references `user.id` with an ON DELETE cascade FK (per
+ * the auth-reset task spec) — a reset row has no meaning once its user is gone.
+ */
+export const passwordReset = sqliteTable(
+  "password_reset",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Opaque 64-hex token (32 random bytes). Unique so a lookup is unambiguous.
+    token: text("token").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    // Set when consumed; single-use gate is `usedAt IS NULL`.
+    usedAt: integer("used_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [uniqueIndex("password_reset_token_unique").on(t.token)],
+);
+
 export type Component = typeof component.$inferSelect;
 export type NewComponent = typeof component.$inferInsert;
 export type Page = typeof page.$inferSelect;
@@ -382,3 +410,5 @@ export type Invite = typeof invite.$inferSelect;
 export type NewInvite = typeof invite.$inferInsert;
 export type Collection = typeof collection.$inferSelect;
 export type NewCollection = typeof collection.$inferInsert;
+export type PasswordReset = typeof passwordReset.$inferSelect;
+export type NewPasswordReset = typeof passwordReset.$inferInsert;

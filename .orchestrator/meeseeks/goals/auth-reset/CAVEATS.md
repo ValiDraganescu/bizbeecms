@@ -59,6 +59,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   (e.g. `ResetRow = {usedAt, expiresAt}`), have the real fn delegate to it, and
   import+execute it from the test. PM did this: `checkReset` → `classifyReset` in
   `lib/reset/reset-logic.ts` + `reset-logic.test.ts`. Mirror this for CMS C5.
+- C1 CMS NAMING (learned): CMS schema uses SINGULAR table names + the Drizzle
+  export matches (`user`/`session`/`invite`, and now `password_reset` exported as
+  `passwordReset`) — PM uses PLURALS (`users`/`passwordResets`). When mirroring PM
+  reset code into CMS, rename: PM `passwordResets` ⇒ CMS `passwordReset`, PM `users`
+  ⇒ CMS `user`. C1 followed the task spec and kept a real FK→`user.id` cascade even
+  though CMS `session`/`invite` deliberately drop FKs — the spec asked for it.
+- C1/C3 SESSION INVALIDATION: CMS sessions live in D1 (`session` table) NOT KV (the
+  CMS Worker has no KV binding). The `session` table has `session_user_idx` on
+  `userId`, so C3 can kill a user's sessions with a plain indexed
+  `delete from session where userId = ?` — no prefix-scan needed (PM's KV had no
+  user index and needed a scan; CMS is the easy case).
 - P5 NON-DUPLICATION: the enumeration-safe hit===miss invariant is already locked
   STRUCTURALLY by `forgot-route.test.ts` (exactly one `{ok:true}` returned AFTER
   the `if(user)` block). Don't add a runtime deep-equal of `{ok:true}` vs

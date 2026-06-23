@@ -84,3 +84,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   ProjectManager/src/lib/reset/reset-logic.test.ts (new),
   ProjectManager/src/lib/reset/reset.ts (delegate checkReset to classifyReset),
   ProjectManager/src/lib/reset/reset-route.test.ts (rewire classify source-text check)
+
+## 2026-06-23 — C1: CMS `password_reset` table + migration (mirror PM P1)
+- **Status:** DONE
+- **What I did:** Added `passwordReset` table to `CMS/src/db/schema.ts` mirroring
+  PM's `passwordResets` + the CMS `invite` token pattern: `id` PK, `userId` FK→
+  `user.id` ON DELETE cascade, `token` (unique index `password_reset_token_unique`),
+  `expiresAt` timestamp_ms, `usedAt` timestamp_ms nullable (single-use gate),
+  `createdAt`. Added `PasswordReset`/`NewPasswordReset` types. Table is SINGULAR
+  `password_reset` (CMS uses `user`/`session`/`invite`, NOT PM's plural names).
+  Generated migration `0012_supreme_shriek.sql` via `npm run db:generate`
+  (drizzle-kit auto-updated migrations/meta journal+snapshot chain). No route.
+- **Decision:** CMS `session`/`invite` deliberately drop FKs (schema comments:
+  "no FK so a user delete doesn't cascade silently"), but the C1 task spec asked
+  for `userId FK→users cascade`. Followed the explicit spec → real FK cascade.
+- **Verified:** `npx tsc --noEmit` exit 0; `npm test` 733 pass/0 fail;
+  `opennextjs-cloudflare build` complete (worker saved). Ports 3601/3602 clear
+  before build. Did NOT run bundle:cms (reserved for C5). Migration SQL reviewed:
+  clean CREATE TABLE + unique index, FK cascade, matches PM 0011 shape.
+- **Files:** CMS/src/db/schema.ts, CMS/migrations/0012_supreme_shriek.sql,
+  CMS/migrations/meta/ (snapshot + journal).

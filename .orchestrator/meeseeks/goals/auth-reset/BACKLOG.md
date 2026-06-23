@@ -57,7 +57,15 @@ PM first (slices P1–P5), then mirror in CMS (slices C1–C5). ONE app per work
   re-added as a tautological deep-equal of a literal. Gates green
   (tsc / 170 tests / opennext build). **PM half P1–P5 COMPLETE.**
 
-- TODO: **C1 — CMS `password_resets` table + migration** (mirror P1 in `CMS/src/`).
+- DONE: **C1 — CMS `password_reset` table + migration.** Added `passwordReset`
+  to `CMS/src/db/schema.ts` (`id`, `userId` FK→`user.id` ON DELETE cascade,
+  `token` unique, `expiresAt`, `usedAt` nullable, `createdAt`) +
+  `PasswordReset`/`NewPasswordReset` types. Table is SINGULAR `password_reset`
+  (CMS naming convention: `user`/`session`/`invite`, not PM's plurals). FK kept
+  per the C1 task spec (CMS's session/invite drop FKs by convention, but the
+  spec asked for a cascade FK — done). Migration `0012_supreme_shriek.sql`
+  (drizzle-kit generate auto-updated meta journal+snapshot). No route this run.
+  Gates green (tsc / 733 tests / opennext build). NO bundle:cms (that's C5).
 - TODO: **C2 — CMS `POST /api/auth/forgot`** (mirror P2; CMS `env.EMAIL`).
 - TODO: **C3 — CMS `POST /api/auth/reset`** (mirror P3; CMS session store).
 - TODO: **C4 — CMS forgot/reset pages + login-form link** (mirror P4; EN/FI/ET).
