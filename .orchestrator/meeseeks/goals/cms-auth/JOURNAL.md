@@ -417,3 +417,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   tree is theirs-committed.
 - **Files:** CMS/src/app/api/auth/logout/route.ts,
   CMS/src/components/admin-sidebar.tsx, CMS/messages/{en,et,fi}.json
+
+## 2026-06-23 18:55 — Brute-force protection on /api/auth/login
+- **Status:** DONE
+- **What I did:** Login had ZERO rate limiting — an attacker could try unlimited
+  passwords against a known email. Added a CMS-only sliding-window throttle (no PM
+  touched). Pure `lib/auth/throttle-core.ts` `decideThrottle(failureTimestamps,
+  now)` → `{locked:false}` or `{locked:true,retryAfterMs}` (MAX_ATTEMPTS=5,
+  WINDOW_MS=15min; retry-after = until the oldest in-window failure ages out).
+  D1 `login_attempt` table (migration 0013, keyed by lowercased email only — IP is
+  unreliable on OpenNext; per-email lock protects the targeted account) + store
+  `db/login-attempt-store.ts` (recentFailureTimestamps / recordFailure /
+  clearFailures, injectedDb-testable, reads D1 only via the Db port). Login route
+  now: throttle-check BEFORE the password verify → 429 + `Retry-After` header when
+  locked; recordFailure on bad creds (unknown email / SSO-only / wrong pw all
+  count, so still non-enumerating); clearFailures on success. UI: 429 → new
+  `login.errorTooMany` (EN/FI/ET) instead of the generic invalid-credentials msg.
+- **Verified:** 791 tests green (7 new: 4 pure decision, 3 store-lifecycle over the
+  fake-D1 node:sqlite shim); `npx tsc --noEmit` clean; `npx opennextjs-cloudflare
+  build` green; regenerated `ProjectManager/.../cms-bundle.generated.js`. Could NOT
+  do a live deployed brute-force round-trip (no live Site this run) — logic is
+  node-tested and the route wiring is type-checked + bundled.
+- **Files:** CMS/src/lib/auth/throttle-core.ts (new), CMS/src/db/login-attempt-store.ts
+  (new), CMS/src/db/schema.ts (+loginAttempt table/types), CMS/migrations/0013_*.sql
+  (+meta), CMS/src/app/api/auth/login/route.ts, CMS/src/components/login-form.tsx,
+  CMS/messages/{en,fi,et}.json (+login.errorTooMany), CMS/scripts/login-throttle.test.mjs
+  (new), ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).

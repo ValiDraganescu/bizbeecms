@@ -327,3 +327,20 @@ Read every line before working. Each entry was learned the hard way by a previou
   config / half-config (id-no-secret) / missing APP_ORIGIN → button hidden. The
   remaining `env.GOOGLE_CLIENT_*` references live ONLY in deployer/wrangler shared
   injection — REWORK #4 rips those out.
+
+- **LOGIN BRUTE-FORCE THROTTLE LANDED (2026-06-23).** Pure
+  `lib/auth/throttle-core.ts` (`decideThrottle`, MAX_ATTEMPTS=5/WINDOW_MS=15min) +
+  D1 `login_attempt` table (migration 0013) + `db/login-attempt-store.ts`
+  (recentFailureTimestamps/recordFailure/clearFailures, injectedDb-testable). The
+  login route throttles BEFORE the password check → **429 + `Retry-After`** when
+  locked, records a failure on bad creds, clears on success. KEY RULES: keyed by
+  **lowercased email ONLY** (no IP — unreliable on OpenNext; per-email lock guards
+  the targeted account). It's **non-enumerating** — attempts are recorded for
+  unknown/SSO-only emails too, so a 429 never reveals an email exists. If you wire
+  the SAME throttle into `/api/auth/forgot` or `/api/auth/reset`, REUSE
+  throttle-core + the store (don't fork); a separate D1 key namespace would need a
+  `kind` column (currently email-only). The `login_attempt` table has NO auto-prune
+  job — rows age out of the WINDOW logically but only `clearFailures` (on success)
+  deletes them; a periodic sweep is a future nicety, not needed yet (low volume,
+  per-Site D1). UI surfaces 429 as `login.errorTooMany` (EN/FI/ET); 401 stays
+  `errorInvalid`.

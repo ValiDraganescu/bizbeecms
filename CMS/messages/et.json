@@ -274,7 +274,8 @@
     "googleDenied": "Sellel Google'i kontol pole õigust siia sisse logida. Küsi saidi administraatorilt kutset.",
     "googleInvitePending": "Sul on ootel kutse — konto seadistuse lõpetamiseks ava oma e-kirjas olev kutselink.",
     "googleError": "Google'iga sisselogimine ebaõnnestus. Proovi uuesti.",
-    "forgotPassword": "Unustasid parooli?"
+    "forgotPassword": "Unustasid parooli?",
+    "errorTooMany": "Liiga palju sisselogimiskatseid. Palun oota mõni minut ja proovi uuesti."
   },
   "adminNav": {
     "brand": "CMS-i haldus",

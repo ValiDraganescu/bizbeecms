@@ -5,6 +5,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-23 18:55): **Brute-force protection on `/api/auth/login`.** See
+  JOURNAL. Pure `lib/auth/throttle-core.ts` (`decideThrottle` sliding window,
+  MAX_ATTEMPTS=5 / WINDOW_MS=15min, node-tested) + D1 `login_attempt` table
+  (migration 0013, keyed by lowercased email, injectedDb-testable store
+  `db/login-attempt-store.ts`: recentFailureTimestamps/recordFailure/clearFailures).
+  Login route now checks the throttle BEFORE the password check → 429 +
+  `Retry-After` when locked; records a failure on bad creds; clears on success.
+  Non-enumerating (attempts recorded for unknown emails too). `errorTooMany`
+  EN/FI/ET + 429-branch in login-form. 791 tests (7 new), tsc + opennext build
+  green, cms-bundle regen.
+
 - DONE (2026-06-23 17:07): **Hardening — JWK RS256 signature verification of the
   Google id_token.** See JOURNAL. Pure `verifyIdTokenSignature(idToken, jwks)` in
   `google-core.ts` (RS256, kid-filtered JWK import + verify, fail-closed) + exported

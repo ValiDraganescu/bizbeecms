@@ -92,6 +92,13 @@
       "when": 1782217640739,
       "tag": "0012_supreme_shriek",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1782230055619,
+      "tag": "0013_dapper_gunslinger",
+      "breakpoints": true
     }
   ]
 }

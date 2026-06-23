@@ -65,7 +65,7 @@ export function LoginForm({
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
-        setError(t("errorInvalid"));
+        setError(t(res.status === 429 ? "errorTooMany" : "errorInvalid"));
         return;
       }
       // Hard navigation so the server layout re-runs with the new cookie.

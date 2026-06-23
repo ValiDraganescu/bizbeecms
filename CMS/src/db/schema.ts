@@ -389,6 +389,30 @@ export const passwordReset = sqliteTable(
   (t) => [uniqueIndex("password_reset_token_unique").on(t.token)],
 );
 
+/**
+ * Login attempt — a record of a FAILED CMS-local email/password login, for
+ * brute-force throttling (cms-auth). Login had no rate limiting; without KV on
+ * the CMS Worker, failures are counted in D1 over a sliding window (see
+ * lib/auth/throttle-core.ts). Keyed by lowercased `email` only (IP is
+ * unreliable on OpenNext). A successful login deletes the email's rows; the
+ * store opportunistically prunes rows older than the window so this never grows
+ * unbounded. No FK to `user` — we record attempts for unknown emails too (the
+ * login API is non-enumerating, so the throttle can't reveal whether an email
+ * exists). The DB IS the Site boundary — no siteId column.
+ */
+export const loginAttempt = sqliteTable(
+  "login_attempt",
+  {
+    id: text("id").primaryKey(),
+    // Lowercased login email the failed attempt targeted.
+    email: text("email").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [index("login_attempt_email_idx").on(t.email)],
+);
+
 export type Component = typeof component.$inferSelect;
 export type NewComponent = typeof component.$inferInsert;
 export type Page = typeof page.$inferSelect;
@@ -412,3 +436,5 @@ export type Collection = typeof collection.$inferSelect;
 export type NewCollection = typeof collection.$inferInsert;
 export type PasswordReset = typeof passwordReset.$inferSelect;
 export type NewPasswordReset = typeof passwordReset.$inferInsert;
+export type LoginAttempt = typeof loginAttempt.$inferSelect;
+export type NewLoginAttempt = typeof loginAttempt.$inferInsert;
