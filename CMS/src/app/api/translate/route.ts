@@ -17,6 +17,7 @@
  * unit-tested (`scripts/translate-request.test.mjs`).
  */
 import { getAi, getGatewayId } from "@/lib/ports/ai";
+import { DEFAULT_MODEL } from "@/lib/chat/models";
 import {
   buildTranslateMessages,
   collectStreamText,
@@ -31,8 +32,10 @@ import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
-// Same default Workers AI model as the chat route (swappable via AI Gateway).
-const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+// Uses the SAME catalog DEFAULT_MODEL as the chat route (an OpenRouter id since
+// the ai-openrouter migration). `getAi()` picks the provider; this id must match
+// it — translate runs on whatever the assistant runs on. (Was a hardcoded
+// Workers-AI id, which 502'd against the OpenRouter adapter on every keyed Site.)
 
 export async function POST(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);

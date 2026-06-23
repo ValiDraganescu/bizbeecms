@@ -125,3 +125,24 @@ test("parseTranslateResponse: unparseable text → source-only, all missing", ()
   assert.deepEqual(fields.a, { en: "Y" });
   assert.deepEqual(missing, ["a[fi]"]);
 });
+
+// ── regression: translate route must use the catalog (OpenRouter) DEFAULT_MODEL ──
+// The route once hardcoded `@cf/meta/llama-3.1-8b-instruct`, which 502s against
+// the OpenRouter adapter `getAi()` returns on every keyed Site. Guard that it now
+// imports the catalog DEFAULT_MODEL and carries no `@cf/...` id.
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { DEFAULT_MODEL } from "../src/lib/chat/models.ts";
+
+test("translate route uses the catalog DEFAULT_MODEL, not a hardcoded @cf/ id", () => {
+  const routePath = fileURLToPath(
+    new URL("../src/app/api/translate/route.ts", import.meta.url),
+  );
+  const src = readFileSync(routePath, "utf8");
+  assert.ok(
+    /import\s*\{\s*DEFAULT_MODEL\s*\}\s*from\s*["']@\/lib\/chat\/models["']/.test(src),
+    "translate route must import DEFAULT_MODEL from the model catalog",
+  );
+  assert.ok(!src.includes("@cf/"), "translate route must not hardcode a @cf/ model id");
+  assert.ok(!DEFAULT_MODEL.startsWith("@cf/"), "catalog DEFAULT_MODEL is an OpenRouter id");
+});

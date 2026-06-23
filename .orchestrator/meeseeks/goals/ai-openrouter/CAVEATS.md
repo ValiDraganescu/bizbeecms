@@ -35,9 +35,14 @@ Read every line before working. Each entry was learned the hard way by a previou
 - `GET /api/chat/models` hits OpenRouter's PUBLIC `/api/v1/models` (no key strictly required) — it
   works un-keyed in local dev. The key is sent only for attribution. So the picker shows the live
   OpenRouter list even before the deployer secret is set; only actual chat completions need the key.
-- `CMS/src/app/api/translate/route.ts` STILL has its own hardcoded `@cf/...` DEFAULT_MODEL and calls
-  CF directly — it's NOT part of the assistant catalog and was left as-is (out of this goal's scope).
-  If translate should also move to OpenRouter, that's a separate task.
+- ~~`CMS/src/app/api/translate/route.ts` STILL has its own hardcoded `@cf/...` DEFAULT_MODEL.~~
+  RESOLVED 2026-06-23: translate now imports `DEFAULT_MODEL` from `lib/chat/models.ts` (the OpenRouter
+  id), so it runs on whatever provider `getAi()` selects — unified with the chat route. The whole AI
+  provider story is now OpenRouter-first end to end. NOTE: un-keyed Sites fall back to `CfAi`, which
+  would receive the OpenRouter id (CF would reject `openai/gpt-4o-mini`). This is the SAME pre-existing
+  behavior the chat route already had (it also sends the catalog default to CfAi) — the settled design
+  is OpenRouter-first; un-keyed CF chat/translate was never the supported path. Don't "fix" it by
+  re-adding a `@cf/` id — that re-breaks the keyed path the regression test guards.
 - PER-SITE OPENROUTER KEY TRACK (separate from the CMS catalog work): PM stores each Site's OWN
   OpenRouter key ENCRYPTED in `sites.openrouterApiKeyEncrypted` (col added migration 0010). Crypto
   lives in `ProjectManager/src/lib/crypto/secret-box.ts`: AES-256-GCM, `encryptSecret`/`decryptSecret`
