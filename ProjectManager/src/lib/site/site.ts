@@ -4,6 +4,7 @@ import type { Site, SiteStatus, User } from "@/db/schema";
 import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
 import { getUserCountries, getUserTagIds } from "@/lib/auth/user";
 import { hasGlobalScope } from "./authz";
+import { isAssignableToSite } from "./assignable";
 
 // Pure slug helpers live in ./slug (client-safe). Re-export for existing callers.
 export { slugify, isValidSlug } from "./slug";
@@ -294,12 +295,9 @@ export async function listAssignableUsers(
     scopeByUser.set(row.userId, list);
   }
 
-  return users.filter((u) => {
-    const scope = scopeByUser.get(u.id) ?? [];
-    if (scope.length === 0) return true; // global user fits any Site
-    if (siteCountry === null) return false; // global Site needs a global user
-    return scope.includes(siteCountry);
-  });
+  return users.filter((u) =>
+    isAssignableToSite(scopeByUser.get(u.id) ?? [], siteCountry),
+  );
 }
 
 /**

@@ -16,6 +16,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   Gate: tsc 0, 150 node tests, opennext build green.
 
 ## Tasks
+- DONE (2026-06-23): **Editor invite→assignment follow-up — harden + test assign-list
+  candidacy.** Verified Editor accept path (role Editor, no country/tag scope) and
+  `listSitesForUser` Editor-reaches-assigned-only branch are correct in source.
+  Extracted the per-Site assign-list filter to PURE alias-free `lib/site/assignable.ts`
+  (`isAssignableToSite`) + `assignable.test.ts` (4 tests, fails-before verified by
+  mutation); `site.ts listAssignableUsers` now delegates. Locks that Editors appear for
+  every Site (incl. global). tsc 0, 154 tests, opennext build green. Live-D1 smoke still
+  pending (no live env here).
+
 Build order: role enum + migration FIRST (everything keys off the names), then the
 removal hierarchy, then tags, then the management UI/API. Each slice gates on PM
 tsc + opennext build green + PM node tests + EN/FI/ET for new strings.

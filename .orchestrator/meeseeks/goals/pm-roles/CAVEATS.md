@@ -205,3 +205,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   out of the page) — inlining a modal again breaks it, which is the point. The test's
   `window.confirm` guard on the dialog matches `window\.confirm\(` (the CALL), because
   the file's doc comment literally contains "NEVER window.confirm".
+
+- **Assign-list candidacy is COUNTRY-only and lives in `lib/site/assignable.ts`
+  (`isAssignableToSite`, pure/alias-free, tested).** `site.ts listAssignableUsers`
+  delegates to it. Contract: a user with NO country rows (SuperAdmin, global Admin,
+  AND every Editor — Editors carry no scope by construction) is assignable to ANY
+  Site incl. a global one; a country-scoped user only within its countries and NEVER
+  to a global Site. Tags do NOT gate assignment candidacy (Manager tag reach is
+  automatic in `listSitesForUser`; assignment is the manual country-only grant). Do
+  NOT add a tag filter here. This was incidental behavior before — now it's a locked,
+  tested contract; if you change candidacy, change the predicate + its test together.

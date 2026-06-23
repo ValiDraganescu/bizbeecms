@@ -258,3 +258,9 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** components/ui/confirm-dialog.tsx (new), components/ui/index.ts,
   app/(app)/tags/tags-manager.tsx, app/(app)/users/users-manager.tsx,
   app/(app)/invite/pending-invites.tsx, lib/invite/revoke-bug-2026-06-23.test.ts
+
+## 2026-06-23 11:37 — Editor invite→assignment follow-up: harden + test the per-Site assign-list candidacy
+- **Status:** DONE
+- **What I did:** Verified the Editor path end-to-end in source (accept → role Editor, NO countries/tags; `listSitesForUser` Editor branch reaches assigned-only; `INVITABLE_ROLES` includes Editor). Found the assign-list candidacy filter in `listAssignableUsers` was an untested inline predicate. Extracted it to a PURE alias-free `lib/site/assignable.ts` `isAssignableToSite(userCountries, siteCountry)` (mirrors scope.ts/removal.ts pattern) and made `site.ts` delegate to it — behavior unchanged, now locked by a test. The contract: a global/no-country user (incl. every Editor) is assignable to ANY Site incl. global; a country-scoped user only within its countries and never to a global Site.
+- **Verified:** tsc 0; `npm test` 154 pass (was 150, +4 new in `assignable.test.ts`); opennext build complete. Confirmed fails-before by mutating the predicate (`length===0 → false`): 2 of 4 tests fail, then restored. Did NOT run live D1 (no live env here) — Editor smoke at https://bizbee.localhost still pending.
+- **Files:** `src/lib/site/assignable.ts` (new), `src/lib/site/assignable.test.ts` (new), `src/lib/site/site.ts` (delegate `listAssignableUsers`).
