@@ -124,6 +124,23 @@ Read every line before working. Each entry was learned the hard way by a previou
   relatively and assert the real `pbkdf2$…` hash flows to the bound params.
   CMS half (TEST-HARNESS-CMS) mirrors this but ports the util fresh (CMS has no
   deploy-events precedent) and asserts the indexed `delete from session` fires.
+- TEST-HARNESS-CMS (learned): the CMS `@/db` re-export CHAINS through the
+  `@/`-aliased ports module (`db/index.ts` → `@/lib/ports/db`), whose TOP-LEVEL
+  `import { getCloudflareContext }` pulls `@opennextjs/cloudflare` at load. So in the
+  reset.ts seam you CANNOT lazily `import("../../db/index.ts")` (it'd re-hit the `@/`
+  alias node can't resolve) — import the `Db` TYPE and lazily the `getDb` VALUE from
+  the RELATIVE ports path `../ports/db.ts` directly. CMS `applyReset` needs NO
+  session-invalidator stub (unlike PM's KV path): sessions are a D1 `delete from
+  session where userId=?`, so just inject the fake `Db` and assert the delete SQL +
+  param (`del.params === ["user-1"]`). CMS table is SINGULAR — fakeD1 matchers/asserts
+  use `"password_reset"`/`"user"`/`"session"` (col `"user_id"`), NOT PM's plurals.
+- BUNDLE:CMS CONCURRENCY (learned, TEST-HARNESS-CMS): when other workers have
+  UNCOMMITTED in-flight CMS/PM source in the tree, do NOT run `bundle:cms` — it
+  regenerates the committed PM `cms-bundle.generated.js` from the WHOLE current CMS
+  tree and would bake their unfinished work into your commit. Check `git status`
+  first; if dirty with others' files AND your change is test-only / behavior-neutral
+  (e.g. a backward-compatible seam refactor), DEFER the bundle and say so — a later
+  worker regenerates it cleanly. tsc/build still run fine (read-only of source).
 - P5 NON-DUPLICATION: the enumeration-safe hit===miss invariant is already locked
   STRUCTURALLY by `forgot-route.test.ts` (exactly one `{ok:true}` returned AFTER
   the `if(user)` block). Don't add a runtime deep-equal of `{ok:true}` vs

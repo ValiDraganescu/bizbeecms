@@ -3,62 +3,114 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { drizzle } from "drizzle-orm/d1";
+import * as schema from "../../db/schema.ts";
+import { fakeD1Returning } from "../test/fake-d1.ts";
+import { createPasswordReset, newResetToken, RESET_TTL_MS } from "./reset.ts";
 
 /**
- * auth-reset C2 regression: CMS `POST /api/auth/forgot` is ENUMERATION-SAFE.
+ * auth-reset C2 — BEHAVIORAL test of the CMS forgot flow (mirrors PM P2).
  *
- * The route imports the `@/` alias (db, mail, reset libs) which Node's native
- * TS stripping doesn't resolve under a bare `node --test`, so we assert against
- * source TEXT — the established pattern in this repo. The contract we lock: a
- * matched email and a missing email produce the SAME 200 `{ ok: true }` body,
- * any mint/send failure is swallowed (never leaks account existence or 500s),
- * plus the reset token shape/TTL and i18n parity.
+ * The mint half (`createPasswordReset`) is driven over the REAL drizzle-D1 client
+ * on a fake D1 (real schema → real insert → real bindings), so we assert the row
+ * it actually writes — 64-hex token, 7-day TTL, bound userId — not the source.
+ *
+ * The enumeration-safe property (hit and miss return the SAME body) lives in the
+ * route, which can't load under node --test (next + `@/`); it's locked
+ * STRUCTURALLY at the route source (exactly one `Response.json({ ok: true })`,
+ * returned after the user block) — a runtime deep-equal of `{ok:true}` vs
+ * `{ok:true}` would be tautological. The reset-email i18n bodies are executed
+ * against real data.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..", "..", "..");
 
+const cfDb = (d1: unknown) => drizzle(d1 as D1Database, { schema });
+
 const routeSrc = readFileSync(
   join(root, "src/app/api/auth/forgot/route.ts"),
   "utf8",
 );
-const resetSrc = readFileSync(join(here, "reset.ts"), "utf8");
 
-test("forgot route returns the SAME success body whether or not email matched", () => {
-  // Exactly one success response, returned unconditionally after the lookup.
+test("newResetToken is 64 hex chars (32 random bytes)", () => {
+  const tok = newResetToken();
+  assert.match(tok, /^[0-9a-f]{64}$/);
+  // Two mints don't collide (random source actually used).
+  assert.notEqual(tok, newResetToken());
+});
+
+test("RESET_TTL_MS is exactly 7 days", () => {
+  assert.equal(RESET_TTL_MS, 1000 * 60 * 60 * 24 * 7);
+});
+
+test("createPasswordReset inserts a real password_reset row with a 64-hex token + 7d TTL", async () => {
+  const before = Date.now();
+  // The insert ... returning reads back the row drizzle just bound; echo a row so
+  // the fn has something to return (its values come from the bound params anyway).
+  const d1 = fakeD1Returning([
+    {
+      match: 'insert into "password_reset"',
+      rows: [
+        {
+          id: "r1",
+          user_id: "user-9",
+          token: "x".repeat(64),
+          expires_at: before + RESET_TTL_MS,
+          used_at: null,
+          created_at: before,
+        },
+      ],
+    },
+  ]);
+
+  await createPasswordReset("user-9", cfDb(d1));
+
+  // CMS uses the SINGULAR table name (password_reset), not PM's plural.
+  const ins = d1.calls.find((c) => /insert into "password_reset"/i.test(c.sql));
+  assert.ok(ins, "expected an insert into the real password_reset table");
+  // userId flows through to the bound params.
+  assert.ok(ins!.params.includes("user-9"));
+  // A 64-hex token was minted and bound.
+  assert.ok(
+    ins!.params.some((p) => typeof p === "string" && /^[0-9a-f]{64}$/.test(p)),
+    "a 64-hex reset token must be bound",
+  );
+  // expiresAt is ~7 days out (bound as ms epoch; drizzle timestamp_ms).
+  const expiry = ins!.params.find(
+    (p) => typeof p === "number" && p >= before + RESET_TTL_MS - 5000,
+  );
+  assert.ok(
+    typeof expiry === "number" && expiry <= Date.now() + RESET_TTL_MS + 5000,
+    "expiresAt must be ~7 days from now",
+  );
+});
+
+test("forgot route returns the SAME success body whether or not email matched (enumeration-safe)", () => {
+  // Structural lock: a single Response.json({ ok: true }), returned unconditionally
+  // AFTER the `if (user)` block — so hit and miss share the same response. CMS auth
+  // routes use the web `Response.json`, not PM's NextResponse.
   const successCount = (
     routeSrc.match(/Response\.json\(\{\s*ok:\s*true\s*\}\)/g) ?? []
   ).length;
   assert.equal(successCount, 1, "expected a single { ok: true } success body");
-
-  // The success return must run for both hit and miss — it appears AFTER the
-  // `if (user)` block, at the route's end.
   const successIdx = routeSrc.indexOf("return Response.json({ ok: true })");
   const userBlockIdx = routeSrc.indexOf("if (user) {");
   assert.ok(successIdx > userBlockIdx, "success must come after the user block");
-});
 
-test("forgot route swallows mint/send failures (no enumeration via errors)", () => {
+  // The mint+send is wrapped in try/catch so a failure can't change the response.
   assert.match(
     routeSrc,
     /try\s*\{[\s\S]*createPasswordReset[\s\S]*sendResetEmail[\s\S]*\}\s*catch/,
   );
-  // No 5xx is returned from the matched branch.
   assert.ok(
     !/if \(user\)[\s\S]*status:\s*5\d\d/.test(routeSrc),
     "matched branch must not 500",
   );
 });
 
-test("reset token is 64 hex chars (32 random bytes) and TTL is 7 days", () => {
-  assert.match(resetSrc, /new Uint8Array\(32\)/);
-  assert.match(resetSrc, /padStart\(2, "0"\)/);
-  assert.match(resetSrc, /RESET_TTL_MS\s*=\s*1000 \* 60 \* 60 \* 24 \* 7/);
-  // CMS uses the SINGULAR Drizzle export (passwordReset), not PM's plural.
-  assert.match(resetSrc, /schema\.passwordReset\b/);
-});
-
-test("reset email strings exist in all three locales (i18n parity)", () => {
+test("reset email strings exist in all three locales and interpolate {url} (i18n parity)", () => {
+  // CMS keeps email strings at the TOP LEVEL (`resetEmail`), not PM's `auth.forgot.email`.
   for (const loc of ["en", "fi", "et"]) {
     const msgs = JSON.parse(
       readFileSync(join(root, `messages/${loc}.json`), "utf8"),

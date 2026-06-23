@@ -38,16 +38,22 @@ already genuine — leave them.
   (drop the `marked.length===0` guard ⇒ single-use test fails; reverted). Gates
   green: tsc 0 / 173 node tests / opennext build. PM only; no bundle:cms.
 
-- TODO: **TEST-HARNESS-CMS — convert CMS reset route tests to behavior (mirror
-  PM).** After the PM harness lands, do the CMS side: add a CMS
-  `CMS/src/lib/test/fake-d1.ts` (mirror PM's; CMS has no deploy-events precedent
-  to extract from, so port the shared util) and rewrite CMS
-  `lib/reset/forgot-route.test.ts` + `lib/reset/reset-route.test.ts` to drive the
-  real CMS `createPasswordReset`/`checkReset`/`applyReset` over it (same
-  behavioral assertions; CMS session kill is an indexed delete — assert it fires
-  for the right userId). DELETE the source-grep asserts. CMS only. LAST step: run
-  `bundle:cms` (test-only changes, but keep the bundle in sync). Gate: CMS tsc +
-  node tests + opennext build, not while dev (3602) up.
+- DONE: **TEST-HARNESS-CMS — CMS reset route tests now behavioral (mirror PM).**
+  Ported the shared util to `CMS/src/lib/test/fake-d1.ts`; refactored
+  `CMS/src/lib/reset/reset.ts` to the injected-Db seam (relative `../../db/schema.ts`,
+  `Db` type from RELATIVE `../ports/db.ts`, lazy `(await import("../ports/db.ts"))
+  .getDb()`, optional injected `Db` defaulting real) so it LOADS under node --test;
+  rewrote `forgot-route.test.ts` + `reset-route.test.ts` to drive the real
+  createPasswordReset/checkReset/applyReset over the fake D1 — 64-hex+7d-TTL insert
+  into SINGULAR `password_reset`; guarded isNull single-use; fresh `pbkdf2$` hash on
+  `user`; CMS session kill asserted as INDEXED `delete from "session" where
+  "user_id"=?` for the right userId. DELETED source-grep asserts; KEPT enumeration-safe
+  structural lock + i18n bodies. Fail-before verified. Gates GREEN (tsc 0 / 760 node
+  tests / opennext build). **`bundle:cms` DEFERRED** — other workers had uncommitted
+  in-flight CMS/PM changes; regen would bake their unfinished work into the committed
+  bundle. My change is test-only + a backward-compatible reset.ts seam (no runtime
+  behavior change), so the bundle needs no regen for correctness — a later worker
+  regenerates cleanly.
 
 
 - DONE: **P1 — PM `password_resets` table + migration.** Added `passwordResets`

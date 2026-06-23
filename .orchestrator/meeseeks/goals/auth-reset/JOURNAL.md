@@ -212,3 +212,43 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/reset/reset-logic.test.ts (new),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regenerated).
 - **auth-reset full scope COMPLETE:** PM P1–P5 + CMS C1–C5 all DONE; CMS changes shipped into PM bundle.
+
+## 2026-06-23 16:56 — TEST-HARNESS-CMS: CMS reset route tests now behavioral (mirror PM)
+- **Status:** DONE
+- **What I did:** Mirrored PM's TEST-HARNESS work on the CMS side. (1) Ported the
+  shared fake-D1 util to `CMS/src/lib/test/fake-d1.ts` (copy of PM's:
+  `fakeD1`/`fakeD1Rows`/`fakeD1Returning` — dep-free, node --test friendly; CMS had
+  no deploy-events precedent to extract from). (2) Refactored `CMS/src/lib/reset/
+  reset.ts` to the injected-Db seam: `@/db` → relative `../../db/schema.ts`, `Db`
+  type from relative `../ports/db.ts` (the CMS `@/db` re-export chains through the
+  `@/`-aliased ports module — must import the RELATIVE ports path), `getDb` pulled
+  LAZILY via `(await import("../ports/db.ts")).getDb()` so the module LOADS under
+  node --test without dragging `@opennextjs/cloudflare`; `createPasswordReset`/
+  `checkReset`/`applyReset` take an optional injected `Db` (defaults real). CMS kills
+  sessions with a plain INDEXED `delete from session where userId = ?` (D1, not KV)
+  so NO session-invalidator stub is needed — it's asserted off the emitted SQL+param.
+  (3) Rewrote `forgot-route.test.ts` + `reset-route.test.ts` to DRIVE the real CMS
+  fns over the fake D1: createPasswordReset writes a 64-hex token + 7d-TTL row into
+  the SINGULAR `password_reset` table; applyReset marks usedAt under the isNull
+  guard, writes a fresh `pbkdf2$…` hash to `user`, fires the indexed
+  `delete from "session" where "user_id" = ?` for the RIGHT userId (`["user-1"]`);
+  single-use (guarded update → 0 rows ⇒ rejected, no rehash, no session kill);
+  expired/used/notFound collapse to non-ok BEFORE any write. DELETED the source-grep
+  asserts; KEPT the structural enumeration-safe route lock (single
+  `Response.json({ok:true})` after the user block) + i18n bodies (top-level
+  `resetEmail.*`, executed on real data).
+- **Verified:** Fail-before confirmed (drop the `marked.length===0` guard ⇒ single-use
+  test fails; reverted). Gates GREEN against the current tree: `npx tsc --noEmit`
+  exit 0 / `npm test` 760 pass 0 fail (was 748 — the 11 old source-grep asserts
+  replaced by real behavioral tests) / `opennextjs-cloudflare build` complete.
+  Dev ports 3601/3602 confirmed down before the build.
+- **DEFERRED:** `bundle:cms` — per the concurrency warning, other workers (cms-auth,
+  ai-openrouter) have UNCOMMITTED in-flight changes in the CMS tree
+  (`CMS/src/app/admin/layout.tsx`) + PM. Regenerating the PM `cms-bundle.generated.js`
+  now would bake their unfinished work into the committed bundle. My change is
+  TEST-ONLY + a backward-compatible `reset.ts` seam (prod call sites unchanged, no
+  runtime behavior change) so the deployed bundle needs no regen for correctness.
+  A later worker regenerates it cleanly. **auth-reset behavioral-test hardening
+  COMPLETE (PM + CMS); bundle regen is the only loose end.**
+- **Files:** CMS/src/lib/test/fake-d1.ts (new), CMS/src/lib/reset/reset.ts,
+  CMS/src/lib/reset/forgot-route.test.ts, CMS/src/lib/reset/reset-route.test.ts

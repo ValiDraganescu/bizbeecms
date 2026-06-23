@@ -1,32 +1,29 @@
 # Note to the next Meeseeks (auth-reset)
 
-**Feature scope COMPLETE (PM P1–P5 + CMS C1–C5). Now hardening the tests.**
+**FEATURE + BEHAVIORAL-TEST HARDENING COMPLETE for BOTH apps (PM P1–P5, CMS C1–C5,
+TEST-HARNESS-PM, TEST-HARNESS-CMS).** The whole auth-reset goal is delivered.
 
-DONE this run: **TEST-HARNESS-PM** — the PM reset ROUTE tests are now BEHAVIORAL,
-not source-grep. Shared `ProjectManager/src/lib/test/fake-d1.ts` holds
-`fakeD1`/`fakeD1Rows`/`fakeD1Returning`; `reset.ts` got the injected-Db seam so it
-loads under `node --test`; `forgot-route.test.ts` + `reset-route.test.ts` drive the
-real `createPasswordReset`/`checkReset`/`applyReset` over a fake D1. See the
-TEST-HARNESS caveat for the exact seam recipe (relative imports + lazy CF deps +
-optional injected Db/invalidator).
+DONE this run: **TEST-HARNESS-CMS** — CMS reset route tests are now BEHAVIORAL (not
+source-grep), mirroring PM. Ported `CMS/src/lib/test/fake-d1.ts`; gave `CMS/src/lib/
+reset/reset.ts` the injected-Db seam (RELATIVE imports + lazy `getDb` from
+`../ports/db.ts` + optional injected `Db`); `forgot-route.test.ts` +
+`reset-route.test.ts` drive the real fns over a fake D1. Gates green: tsc 0 / 760
+node tests / opennext build.
 
-**NEXT TASK: TEST-HARNESS-CMS** (the remaining open TODO in BACKLOG.md). Mirror the
-PM work on the CMS side — CMS ONLY (`CMS/`), never PM:
-1. Port the util to `CMS/src/lib/test/fake-d1.ts` (CMS has no deploy-events to
-   extract from — copy PM's `fake-d1.ts`).
-2. Apply the SAME injected-Db seam to CMS `lib/reset/reset.ts` (CMS table is
-   SINGULAR `passwordReset`/`user`/`session`; CMS session kill is an INDEXED
-   `delete from session where userId = ?`, NOT KV scan — assert it fires for the
-   right userId via the delete SQL+param or an injected stub).
-3. Rewrite CMS `lib/reset/forgot-route.test.ts` + `reset-route.test.ts` to drive
-   the real fns over the fake D1 (same behavioral assertions). DELETE the
-   source-grep asserts; keep i18n bodies.
-4. CMS auth routes use web `Response.json` and bare error keys (see CMS caveats).
-5. LAST STEP: run `bundle:cms` (from PM dir) to keep the committed CMS bundle in
-   sync, then PM tsc + opennext build after the regen.
+**ONE LOOSE END — `bundle:cms` was DEFERRED** (see JOURNAL + the BUNDLE:CMS
+CONCURRENCY caveat). At my run-time, cms-auth + ai-openrouter had UNCOMMITTED
+in-flight CMS/PM source (`CMS/src/app/admin/layout.tsx`, PM site files), so
+regenerating the committed PM `cms-bundle.generated.js` would have baked their
+unfinished work into my commit. My change was test-only + a behavior-neutral seam,
+so the bundle didn't NEED regen for correctness.
 
-Gate: CMS tsc + node tests + opennext build, NOT while dev (3602) up — `lsof` first.
-Watch the parallel-safety caveat: ONE app per run, only one worker runs `bundle:cms`.
+**NEXT TASK (only if a real source/behavior change shipped since the last bundle):**
+once the CMS tree is CLEAN of other workers' in-flight changes (`git status`),
+run `bundle:cms` (from the ProjectManager dir) to resync the committed CMS bundle,
+then PM tsc + opennext build after the regen. If nothing functional changed in CMS
+since the last good bundle, this is unnecessary — don't regen busywork.
 
-After TEST-HARNESS-CMS lands, the whole auth-reset goal (feature + genuine tests,
-both apps) is delivered — flag for archival, don't invent busywork.
+After the bundle is confirmed in sync, **flag auth-reset for archival** (it's done) —
+do NOT invent new auth-reset work. Gate any run: CMS tsc + node tests + opennext
+build, NOT while dev (3601/3602) up — `lsof` first. ONE app per run.
+</content>
