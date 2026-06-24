@@ -26,6 +26,14 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **i18n files are shared across concurrent goals.** `CMS/messages/{en,fi,et}.json` gets edited by
   ai-openrouter too. Stage ONLY your own keys: drop the other goal's keys, `git add` the file (now
   showing just yours), then restore theirs unstaged. Never `git add -A`.
+- **`CMS/src/lib/chat/models.ts` is ai-openrouter's territory** and is often modified-uncommitted in
+  the shared tree. `npx tsc --noEmit` / the opennext build can transiently FAIL on it mid-their-edit
+  (missing field on `CatalogModel`, etc.). Don't touch it; just re-run the gate — it goes green once
+  their edit settles. Never stage `models.ts`.
+- **Staging shared i18n: rebase your keys onto HEAD, don't `git add` the working file.** The working
+  `messages/{en,fi,et}.json` may already carry ai-openrouter's uncommitted keys (e.g. `widget.modality*`).
+  A plain `git add` would sweep those in. Instead rebuild the file from `git show HEAD:CMS/messages/<loc>.json`
+  + ONLY your keys, write that, then `git add` — the diff is then yours alone.
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.

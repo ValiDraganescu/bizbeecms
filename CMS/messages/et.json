@@ -56,6 +56,11 @@
       "prompt": "Süsteemiviip",
       "loading": "Laadimine…",
       "error": "Viga: {message}"
+    },
+    "enterMode": {
+      "send": "↵ Saada",
+      "newline": "↵ Reavahetus",
+      "aria": "Lülita Enter-klahvi käitumist: saada sõnum või lisa reavahetus"
     }
   },
   "contentLocales": {

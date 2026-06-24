@@ -15,9 +15,15 @@
  * the pure unit-tested `lib/chat/client-sse.ts`.
  */
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { ChatEventParser, type ToolResult } from "@/lib/chat/client-sse";
+import {
+  decideSendOnEnter,
+  loadEnterMode,
+  saveEnterMode,
+  type EnterMode,
+} from "@/lib/chat/enter-mode";
 
 export type ChatMsg =
   | { role: "user"; content: string }
@@ -167,8 +173,22 @@ export function ChatConversation({
 }) {
   const t = useTranslations("chat");
   const [input, setInput] = useState("");
+  const [enterMode, setEnterMode] = useState<EnterMode>("send");
   const scrollRef = useRef<HTMLDivElement>(null);
   const { messages, busy, error, send } = chat;
+
+  // Restore the Enter-behaviour pref on mount (client-only; localStorage).
+  useEffect(() => {
+    setEnterMode(loadEnterMode());
+  }, []);
+
+  const toggleEnterMode = () => {
+    setEnterMode((m) => {
+      const next: EnterMode = m === "send" ? "newline" : "send";
+      saveEnterMode(next);
+      return next;
+    });
+  };
 
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
@@ -227,27 +247,46 @@ export function ChatConversation({
       {footer}
 
       <form
-        className="flex gap-2"
+        className="flex flex-col gap-2"
         onSubmit={(e) => {
           e.preventDefault();
           void onSend();
         }}
       >
-        <input
-          className="flex-1 rounded-md border border-border bg-surface px-3 py-2 text-foreground"
+        <textarea
+          className="min-h-[5.5rem] max-h-64 w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-foreground"
+          rows={3}
           placeholder={t("placeholder")}
           value={input}
           disabled={busy}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            if (decideSendOnEnter(enterMode, { shift: e.shiftKey, meta: e.metaKey, ctrl: e.ctrlKey })) {
+              e.preventDefault();
+              void onSend();
+            }
+          }}
           aria-label={t("placeholder")}
         />
-        <button
-          type="submit"
-          className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-          disabled={busy || input.trim() === ""}
-        >
-          {busy ? t("sending") : t("send")}
-        </button>
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={toggleEnterMode}
+            className="rounded-md border border-border px-2 py-1 text-foreground-muted hover:text-foreground"
+            aria-label={t("enterMode.aria")}
+            title={t("enterMode.aria")}
+          >
+            {enterMode === "send" ? t("enterMode.send") : t("enterMode.newline")}
+          </button>
+          <button
+            type="submit"
+            className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+            disabled={busy || input.trim() === ""}
+          >
+            {busy ? t("sending") : t("send")}
+          </button>
+        </div>
       </form>
     </div>
   );

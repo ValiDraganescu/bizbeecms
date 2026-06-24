@@ -56,6 +56,11 @@
       "prompt": "System prompt",
       "loading": "Loading…",
       "error": "Error: {message}"
+    },
+    "enterMode": {
+      "send": "↵ Send",
+      "newline": "↵ Newline",
+      "aria": "Toggle Enter key behaviour: send message or insert newline"
     }
   },
   "contentLocales": {

@@ -56,6 +56,11 @@
       "prompt": "Järjestelmäkehote",
       "loading": "Ladataan…",
       "error": "Virhe: {message}"
+    },
+    "enterMode": {
+      "send": "↵ Lähetä",
+      "newline": "↵ Rivinvaihto",
+      "aria": "Vaihda Enter-näppäimen toiminto: lähetä viesti tai lisää rivinvaihto"
     }
   },
   "contentLocales": {

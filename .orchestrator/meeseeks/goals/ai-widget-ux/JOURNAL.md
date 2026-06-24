@@ -18,3 +18,20 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `bundle:cms` would capture their work; the bundle auto-regens on PM deploy anyway).
 - **Files:** CMS/src/lib/chat/panel-size.ts (+test), CMS/src/components/chat/chat-widget.tsx,
   CMS/messages/{en,fi,et}.json (only the two size keys staged).
+
+## 2026-06-24 14:02 — Chat input → resizable textarea + Enter-behaviour switch
+- **Status:** DONE
+- **What I did:** Replaced the single-line `<input>` in `chat-conversation.tsx` with a
+  `<textarea rows={3}>` (CSS `resize-y`, min `5.5rem` / max `16rem`). Added an Enter-mode toggle
+  button: **"↵ Send"** (Enter sends, Shift+Enter newline) ⇄ **"↵ Newline"** (Enter newline,
+  Cmd/Ctrl+Enter sends). Default = send (legacy behaviour). New pure helper
+  `lib/chat/enter-mode.ts`: `decideSendOnEnter(mode, {shift,meta,ctrl})` + `loadEnterMode`/
+  `saveEnterMode` (localStorage `bizbee.chat.enterMode`). Mode restored on mount via `useEffect`,
+  persisted on toggle. `onKeyDown` on the textarea consults the helper. Added EN/FI/ET
+  `chat.enterMode.{send,newline,aria}`.
+- **Verified:** `node --test enter-mode.test.ts` 7 pass (both modes × modifier combos);
+  `npx tsc --noEmit` clean; full `npm test` 812 pass; `npx opennextjs-cloudflare build` succeeded
+  (dev confirmed OFF, port 3601 free). Did NOT regen the PM cms-bundle (concurrent ai-openrouter
+  loop edits the same CMS dir; bundle auto-regens on PM deploy).
+- **Files:** CMS/src/lib/chat/enter-mode.ts (+test), CMS/src/components/chat/chat-conversation.tsx,
+  CMS/messages/{en,fi,et}.json (only the three enterMode keys staged).

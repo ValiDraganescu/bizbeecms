@@ -1,17 +1,21 @@
 # Note to the next Meeseeks (ai-widget-ux)
 
-Resizable panel + preset sizes is DONE (2026-06-24): `lib/chat/panel-size.ts` (+test) +
-native CSS `resize` + a default⇄half header toggle in `chat-widget.tsx`, size persisted in
-localStorage `bizbee.chat.panelSize`, re-clamped to the viewport on mount/resize.
+Textarea + Enter-behaviour switch is DONE (2026-06-24): `lib/chat/enter-mode.ts` (+test) +
+`<textarea rows={3}>` with `resize-y` + an "↵ Send"⇄"↵ Newline" toggle in `chat-conversation.tsx`,
+mode persisted in localStorage `bizbee.chat.enterMode`.
 
-Pick the top remaining TODO in BACKLOG.md. The most self-contained next one is
-**"Chat input → resizable 3-row textarea + Enter-behavior switch"** (`chat-conversation.tsx:236`):
-swap the `<input>` for a `<textarea rows={3}>` with CSS `resize: vertical`, add an Enter-mode toggle,
-pure `decideSendOnEnter(mode,{shift,meta,ctrl})` + node test, persist the mode in localStorage.
+Pick the top remaining TODO in BACKLOG.md. Good self-contained next ones:
+- **"Persist the selected model across reloads"** — smallest. `chat-widget.tsx:38` `useState(DEFAULT_MODEL)`
+  → init from localStorage, validate against catalog ids, fall back to default. Pure
+  `resolveInitialModel(stored, catalogIds, default)` + node test. (Coordinate with ai-openrouter,
+  which owns the catalog/model type.)
+- **"Tool-call cards: stop repeating the name + accordion"** — bigger; touches SSE `tool` event +
+  `ToolResult` to carry args/result. Coordinate with the tool-persistence task.
 
-Gotchas this run hit (now in CAVEATS):
-- `CMS/messages/{en,fi,et}.json` is SHARED with the concurrent ai-openrouter loop — stage ONLY your
-  keys (drop theirs, add the file, restore theirs unstaged). Never `git add -A`.
-- Do NOT run `bundle:cms` — it captures other loops' uncommitted CMS edits; the bundle auto-regens on
-  PM deploy.
+Gotchas (all in CAVEATS):
+- `CMS/messages/{en,fi,et}.json` is SHARED with ai-openrouter — stage ONLY your keys (use a node
+  script to add yours, then `git add` just those files). Never `git add -A`.
+- Do NOT run `bundle:cms` — auto-regens on PM deploy; would capture other loops' uncommitted edits.
+- `CMS/src/lib/chat/models.ts` shows as modified in the tree — that's ai-openrouter's in-flight work.
+  Don't touch it. tsc/build may transiently fail mid-their-edit; re-run, it goes green.
 - Gate: CMS `npx tsc --noEmit` + `npm test` + `npx opennextjs-cloudflare build` (dev OFF on :3601).
