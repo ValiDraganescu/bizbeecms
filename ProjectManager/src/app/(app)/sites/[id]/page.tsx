@@ -68,14 +68,15 @@ export default async function SiteDetailPage({
   const creator = await findUserById(site.createdBy);
   const domains = await listSiteDomains(site.id);
 
-  // Public URL of the deployed CMS Worker, if deployed. A Site with a custom
-  // domain attached is served on it (CF-for-SaaS), so prefer that over the raw
-  // workers.dev URL. ponytail: first domain wins; multi-domain Sites are rare and
-  // any attached domain routes to the same Worker.
+  // Public URL of the deployed CMS Worker, if deployed. Prefer a custom domain
+  // that SERVES the Site (CF-for-SaaS) over the raw workers.dev URL — but never a
+  // redirect-only host (e.g. an apex that 301s to www), since that's not where the
+  // Site is served. listSiteDomains is newest-first; take the first serving one.
+  const servingDomain = domains.find((d) => !d.redirectTo);
   const workerUrl =
     site.status === "deployed" && site.workerName
-      ? domains.length > 0
-        ? `https://${domains[0].hostname}`
+      ? servingDomain
+        ? `https://${servingDomain.hostname}`
         : await cmsWorkerUrl(site.workerName)
       : null;
 
