@@ -6,9 +6,11 @@
  *
  * Uses Web Crypto `crypto.subtle`, available on Cloudflare Workers — NO Node
  * crypto, NO PBKDF2 (avoids the Workers 100k-iteration cap; see MEMORY). The KEK
- * is a 32-byte random key supplied as base64 and used directly as the AES-256 key.
- * The CMS reuses its existing `CMS_AUTH_SECRET` Worker var as the KEK (it's
- * already deployer-injected; no new secret to provision) — see google-client-store.
+ * is ANY non-empty string; we SHA-256-derive it to the exact 32 bytes AES-256
+ * needs (see `deriveKey`). The CMS reuses its existing `CMS_AUTH_SECRET` Worker
+ * var as the KEK (already deployer-injected; no new secret to provision) — and
+ * that var is a 48-byte base64 bearer/HMAC secret, NOT 32 bytes, which is why we
+ * derive rather than use it raw — see google-client-store.
  *
  * Wire format of an encrypted blob: base64( iv[12] ‖ ciphertext+tag ). GCM's
  * 16-byte auth tag is appended to the ciphertext by `subtle.encrypt`, so a
@@ -34,11 +36,30 @@ function b64decode(b64: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-async function importKey(keyB64: string): Promise<CryptoKey> {
-  const raw = b64decode(keyB64);
-  if (raw.length !== 32) {
-    throw new Error(`secret-box KEK must be 32 bytes (base64), got ${raw.length}`);
-  }
+/**
+ * Derive a fixed 32-byte AES-256 key from ANY non-empty KEK string via SHA-256.
+ * The KEK is `CMS_AUTH_SECRET`, which is minted/injected as a 48-byte base64
+ * bearer/HMAC secret (length is flexible there) — NOT the exact 32 bytes AES-256
+ * needs. SHA-256 deterministically normalises any length to 32 bytes, so the same
+ * KEK always yields the same AES key and existing deploys work without re-minting
+ * the secret. We hash the RAW UTF-8 KEK string (not its base64-decode) so the
+ * derivation is independent of whether the KEK happens to be valid base64.
+ */
+async function deriveKey(kek: string): Promise<Uint8Array<ArrayBuffer>> {
+  if (!kek) throw new Error("secret-box KEK is empty");
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(kek),
+  );
+  // Copy into a fresh ArrayBuffer-backed view so importKey's BufferSource type
+  // is satisfied (subtle.digest returns ArrayBufferLike). Always 32 bytes.
+  const out = new Uint8Array(new ArrayBuffer(digest.byteLength));
+  out.set(new Uint8Array(digest));
+  return out;
+}
+
+async function importKey(kek: string): Promise<CryptoKey> {
+  const raw = await deriveKey(kek);
   return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, [
     "encrypt",
     "decrypt",

@@ -560,3 +560,43 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   createPasswordReset; +imports isNotNull/lte/or),
   CMS/scripts/reset-prune.test.mjs (new),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regen).
+
+## 2026-06-24 14:37 — BUG [P1] fix: secret-box KEK rejected 48-byte CMS_AUTH_SECRET
+- **Status:** DONE
+- **What I did:** Human-reported P1 bug — saving the per-Site Google client secret
+  (CMS → Settings → Google) and ANY CMS-local secret-box write (incl. the
+  OpenRouter user key) failed with "secret-box KEK must be 32 bytes (base64), got
+  48". ROOT CAUSE: `lib/crypto/secret-box.ts` `importKey` base64-decoded the KEK
+  and required EXACTLY 32 bytes (used raw as the AES-256 key), but the KEK is
+  `CMS_AUTH_SECRET` — minted/deployer-injected as a 48-byte base64 bearer/HMAC
+  secret (length flexible for that original use). So every secret-box encrypt threw
+  before writing. NOT Google-specific: both `api/settings/google/route.ts` and
+  `api/settings/openrouter-key/route.ts` use CMS_AUTH_SECRET as the KEK, so both
+  were broken on any site whose secret ≠ 32 bytes.
+  FIX (option (a) from the backlog — recommended): replaced the length check with a
+  SHA-256 key derivation. New `deriveKey(kek)` hashes the raw UTF-8 KEK string →
+  always 32 bytes → imported as the AES-256 key. `importKey` now calls it. This is
+  the SINGLE shared path (both routes go encrypt/decryptSecret → importKey →
+  deriveKey), deterministic, needs NO env change, and works on existing deploys
+  (no successfully-encrypted blobs exist yet — every write was failing — so no
+  migration concern). Empty KEK still rejected (no silent all-zero key). Hashing
+  the raw string (not its base64-decode) makes it independent of whether the KEK
+  is valid base64. Updated the module header comment.
+- **Verified:** new regression test in `scripts/google-client.test.mjs` ("KEK of
+  any length (48-byte base64 CMS_AUTH_SECRET) round-trips") — encrypts+decrypts
+  with a 48-byte base64 KEK (the prod shape; FAILS-BEFORE: old code threw "must be
+  32 bytes"), a non-base64 KEK, and asserts empty-KEK still rejects. `node --test
+  scripts/google-client.test.mjs` 10/10. Full `npm test` 857 pass / 0 fail.
+  `npx tsc --noEmit` clean (fixed the digest's `ArrayBufferLike` → fresh
+  ArrayBuffer-backed Uint8Array, same gotcha as the JWK-verify caveat). `npx
+  opennextjs-cloudflare build` green (dev server confirmed not running). Could NOT
+  live-verify the save in a deployed CMS (no live Site this run) — node-tested +
+  type-checked + bundled.
+- **cms-bundle NOT regenerated (deliberate):** foreign UNCOMMITTED WIP is in the
+  tree (ai-widget-ux worker's `CMS/src/components/chat/{chat-widget,chat-conversation,
+  chat-debug-panel}.tsx`). `bundle:cms` bundles `CMS/.open-next/worker.js`, which my
+  build compiled WITH their chat WIP — regenerating would sweep their half-finished
+  work into MY commit. PM's `predeploy` runs `bundle:cms` automatically before any
+  real deploy, so the secret-box fix ships then (same call as the 2026-06-23 logout
+  slice). Staged ONLY my own files.
+- **Files:** CMS/src/lib/crypto/secret-box.ts, CMS/scripts/google-client.test.mjs.

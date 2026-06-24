@@ -4,6 +4,10 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
 
+- BUG [P1] (DONE 2026-06-24 14:37): secret-box encryption failed with "secret-box KEK must be 32 bytes (base64), got 48" — saving the Google client secret (and any CMS-local secret-box write, e.g. the OpenRouter user key) was broken. — repro: CMS → Settings → Google sign-in → paste Client ID + secret → Save → red error. — reported 2026-06-24.
+  ROOT CAUSE: `secret-box.ts` `importKey` required the KEK to base64-decode to EXACTLY 32 bytes (used directly as the AES-256 key). The KEK is `CMS_AUTH_SECRET` (both google + openrouter-key routes use it), minted as a 48-byte base64 bearer/HMAC secret — so secret-box rejected it. NOT Google-specific — every secret-box write failed on any site whose `CMS_AUTH_SECRET` ≠ 32 bytes.
+  FIX: chose option (a) — `secret-box.ts` now SHA-256-derives a fixed 32-byte AES key from ANY non-empty KEK string (`deriveKey`). Deterministic, no env change, works on existing deploys; same single path serves BOTH google + openrouter routes (they both go through encrypt/decryptSecret → importKey → deriveKey). Empty KEK still rejected. Regression test: 48-byte base64 KEK round-trips (fails-before with the 32-byte throw), plus a non-base64 KEK + empty-KEK reject. CMS tsc + `npm test` (857) + opennext build green. cms-bundle NOT regen'd this run — foreign uncommitted chat WIP (ai-widget-ux) is in the tree; PM predeploy regens it. See JOURNAL.
+
 ## Tasks
 - DONE (2026-06-23 16:22): **Opportunistic prune of spent `password_reset` rows.**
   See JOURNAL. New `pruneSpentResets(now, injectedDb?)` in `lib/reset/reset.ts`

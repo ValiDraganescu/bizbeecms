@@ -1,6 +1,19 @@
 # Caveats — cms-auth
 Read every line before working. Each entry was learned the hard way by a previous Meeseeks.
 
+- **secret-box KEK is SHA-256-DERIVED now (BUG [P1] fix 2026-06-24) — don't
+  re-add the 32-byte length check.** `lib/crypto/secret-box.ts importKey` used to
+  require the KEK to base64-decode to EXACTLY 32 bytes. But the KEK is
+  `CMS_AUTH_SECRET`, a 48-byte base64 bearer/HMAC secret — so every secret-box
+  write (Google client secret AND OpenRouter user key) threw "must be 32 bytes,
+  got 48". `deriveKey(kek)` now SHA-256-hashes the raw UTF-8 KEK string → 32 bytes,
+  so ANY non-empty KEK works (empty still rejected). It hashes the STRING, not the
+  base64-decode — don't "fix" that. This is the single shared path for both
+  settings routes; don't fork it. NOTE: if a customer ever rotates `CMS_AUTH_SECRET`
+  the derived key changes → existing encrypted blobs become undecryptable (return
+  null, never 500) and must be re-entered — that's inherent to deriving from the
+  secret, acceptable since the secret is stable per deploy.
+
 - **`password_reset` ROWS ARE NOW OPPORTUNISTICALLY PRUNED (2026-06-23 16:22) —
   don't add a cron.** `pruneSpentResets(now, injectedDb?)` in `lib/reset/reset.ts`
   = `DELETE FROM password_reset WHERE used_at IS NOT NULL OR expires_at <= now`,

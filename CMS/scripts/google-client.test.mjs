@@ -120,6 +120,25 @@ test("secret-box: wrong key + tampered blob throw, never leak", async () => {
   await assert.rejects(() => decryptSecret("AA==", KEK)); // too short
 });
 
+// Regression for BUG [P1] 2026-06-24: CMS_AUTH_SECRET is minted as a 48-byte
+// base64 value, NOT 32 bytes — the KEK is now SHA-256-derived so ANY non-empty
+// string works. Before the fix encryptSecret threw "KEK must be 32 bytes".
+test("secret-box: KEK of any length (48-byte base64 CMS_AUTH_SECRET) round-trips", async () => {
+  const realWorldKek = Buffer.alloc(48, 3).toString("base64"); // 48 bytes, like prod
+  const blob = await encryptSecret("GOCSPX-real", realWorldKek);
+  assert.equal(await decryptSecret(blob, realWorldKek), "GOCSPX-real");
+
+  // A short / non-base64 KEK works too (derivation is over the raw string).
+  const plainKek = "not-base64-but-still-fine";
+  assert.equal(
+    await decryptSecret(await encryptSecret("x", plainKek), plainKek),
+    "x",
+  );
+
+  // Empty KEK is still rejected (no silent all-zero key).
+  await assert.rejects(() => encryptSecret("x", ""));
+});
+
 // ---- STORE over fake D1 ------------------------------------------------------
 
 const DDL = `
