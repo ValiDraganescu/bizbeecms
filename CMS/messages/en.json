@@ -33,6 +33,7 @@
       "open": "Open AI assistant",
       "close": "Close AI assistant",
       "minimize": "Minimize",
+      "unread": "New reply",
       "debug": "Debug",
       "model": "Model",
       "new": "New conversation",
@@ -46,6 +47,9 @@
       "modelPriceOut": "out",
       "modelPricePerMillion": "/1M",
       "modelPriceTitle": "Price per 1M tokens (input / output)",
+      "creditOf": "${remaining} of ${limit} left",
+      "creditUsage": "${usage} used",
+      "creditTitle": "Remaining credit on the in-use OpenRouter key",
       "sizeHalf": "Expand to half screen",
       "sizeCompact": "Shrink to compact"
     },

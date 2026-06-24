@@ -33,6 +33,7 @@
       "open": "Avaa tekoälyavustaja",
       "close": "Sulje tekoälyavustaja",
       "minimize": "Pienennä",
+      "unread": "Uusi vastaus",
       "debug": "Virheenkorjaus",
       "model": "Malli",
       "new": "Uusi keskustelu",
@@ -46,6 +47,9 @@
       "modelPriceOut": "ulos",
       "modelPricePerMillion": "/1 M",
       "modelPriceTitle": "Hinta / 1 M tokenia (syöte / tuotos)",
+      "creditOf": "${remaining} / ${limit} jäljellä",
+      "creditUsage": "${usage} käytetty",
+      "creditTitle": "Käytössä olevan OpenRouter-avaimen jäljellä oleva saldo",
       "sizeHalf": "Laajenna puoleen näyttöön",
       "sizeCompact": "Pienennä kompaktiksi"
     },

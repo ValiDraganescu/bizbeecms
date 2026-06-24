@@ -33,6 +33,7 @@
       "open": "Ava tehisintellekti assistent",
       "close": "Sulge tehisintellekti assistent",
       "minimize": "Minimeeri",
+      "unread": "Uus vastus",
       "debug": "Silumine",
       "model": "Mudel",
       "new": "Uus vestlus",
@@ -46,6 +47,9 @@
       "modelPriceOut": "välja",
       "modelPricePerMillion": "/1 M",
       "modelPriceTitle": "Hind / 1 M tokenit (sisend / väljund)",
+      "creditOf": "${remaining} / ${limit} alles",
+      "creditUsage": "${usage} kasutatud",
+      "creditTitle": "Kasutusel oleva OpenRouter-võtme järelejäänud krediit",
       "sizeHalf": "Laienda pool ekraani",
       "sizeCompact": "Vähenda kompaktseks"
     },

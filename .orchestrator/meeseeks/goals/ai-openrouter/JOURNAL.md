@@ -374,6 +374,30 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** `CMS/src/lib/chat/models.ts`, `CMS/src/components/chat/model-picker.tsx`,
   `CMS/scripts/models.test.mjs`, `CMS/messages/{en,fi,et}.json`
 
+## 2026-06-24 14:09 — Chat widget: show remaining credit/spend for the in-use minted/env key
+- **Status:** DONE (codeable; live `/api/v1/key` call = HITL)
+- **What I did:** The LAST open BACKLOG TODO — surface the in-use OpenRouter key's spend-vs-limit
+  in the chat widget. (1) Pure `CMS/src/lib/chat/credit.ts`: `parseKeyCredit(json)` reads
+  OpenRouter's per-KEY `{data:{usage,limit}}` → `{usage, limit, remaining}` (uncapped/absent limit →
+  remaining null; clamps remaining at 0 when usage>limit; coerces numeric strings; null on no-usage/
+  garbage, never throws); `formatUsd(n)` = `.toFixed(2)`; `OPENROUTER_KEY_URL`. (2) New
+  `GET /api/chat/credit` route (requireAdmin, force-dynamic): mirrors `getAi()` precedence —
+  decrypts the CMS-local user key (try/catch→null), `effectiveOpenrouterKey(userKey, envKey)`; if a
+  CMS-local USER key is in use OR no key → `{credit:null}` (user keys = customer's own balance, out of
+  scope); else fetches `/api/v1/key` with the env/minted key as Bearer → `parseKeyCredit` → `{credit}`.
+  Never 500s (degrades to `{credit:null}`); key never logged/echoed. (3) `chat-widget.tsx`: `credit`
+  state, fetch-on-open effect, footer line under the model picker — "$X of $Y left" (capped) /
+  "$X used" (uncapped), hidden when null. i18n `credit{Of,Usage,Title}` EN/FI/ET.
+- **Verified:** `node --test scripts/credit.test.mjs` 8/8; CMS `tsc --noEmit` 0 errors; i18n
+  parity (chat.widget) 23/23/23; full CMS suite `node --test scripts/*.test.mjs 'src/**/*.test.ts'`
+  → **831/831**; `npx opennextjs-cloudflare build` GREEN (dev OFF — 3601/3602 clear). Used the
+  per-KEY `/api/v1/key` endpoint (no mgmt key), NOT account-wide `/api/v1/credits`. Catalog/widget are
+  bundled modules → no cms-bundle regen. Could NOT verify: a live `/api/v1/key` call returning real
+  usage on a deployed CMS with a minted key (HITL).
+- **Files:** `CMS/src/lib/chat/credit.ts` (new), `CMS/src/app/api/chat/credit/route.ts` (new),
+  `CMS/src/components/chat/chat-widget.tsx`, `CMS/scripts/credit.test.mjs` (new),
+  `CMS/messages/{en,fi,et}.json`
+
 ## 2026-06-24 13:55 — Model picker: show input/output price per 1M tokens (not raw $/token)
 - **Status:** DONE
 - **What I did:** The picker printed `${m.price}` = raw USD/token (e.g. "$0.00000015"),

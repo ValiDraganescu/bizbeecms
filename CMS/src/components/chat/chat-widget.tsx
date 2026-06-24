@@ -22,6 +22,8 @@ import { detectAdminContext } from "@/lib/chat/tool-scopes";
 import { DEFAULT_MODEL, type CatalogModel } from "@/lib/chat/models";
 import { ModelPicker } from "@/components/chat/model-picker";
 import { resolveInitialModel, loadModel, saveModel } from "@/lib/chat/selected-model";
+import { formatUsd } from "@/lib/chat/credit";
+import { nextUnread } from "@/lib/chat/unread-badge";
 import {
   type PanelPreset,
   type PanelSize,
@@ -41,6 +43,9 @@ const THREAD_KEY = "bizbee.chat.threadId";
 export function ChatWidget() {
   const t = useTranslations("chat.widget");
   const [open, setOpen] = useState(false);
+  // Unread badge (ai-widget-ux): set when a reply finishes while the panel is
+  // closed; cleared when the panel opens. See `lib/chat/unread-badge.ts`.
+  const [unread, setUnread] = useState(false);
   const [debug, setDebug] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
@@ -58,6 +63,13 @@ export function ChatWidget() {
   // viewport so a panel sized big on one screen is clamped, never lost.
   const [panel, setPanel] = useState<PanelSize | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  // In-use OpenRouter key credit (ai-openrouter): only set when the env/minted
+  // key is in use; null (and the line is hidden) for CMS-local user keys or no key.
+  const [credit, setCredit] = useState<{
+    usage: number;
+    limit: number | null;
+    remaining: number | null;
+  } | null>(null);
   const pathname = usePathname();
   // The conversation lives at the widget level so it SURVIVES minimize (closing
   // the panel just hides it; the transcript is intact when reopened).
@@ -128,6 +140,8 @@ export function ChatWidget() {
     busyRef.current = busy;
     if (!(wasBusy && !busy)) return; // only on the finish edge
     if (messages.length === 0) return;
+    // A reply just landed; flag it unread if the panel is closed.
+    setUnread((cur) => nextUnread(cur, { open, replyFinished: true }));
     const payload = {
       id: threadId.current,
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
@@ -154,7 +168,7 @@ export function ChatWidget() {
         /* best-effort persistence */
       }
     })();
-  }, [busy, messages, historyOpen]);
+  }, [busy, messages, historyOpen, open]);
 
   async function openThread(id: string) {
     try {
@@ -228,6 +242,33 @@ export function ChatWidget() {
       cancelled = true;
     };
   }, []);
+
+  // Clear the unread badge whenever the panel is open.
+  useEffect(() => {
+    if (open) setUnread(false);
+  }, [open]);
+
+  // Load the in-use key's remaining credit when the panel opens (ai-openrouter).
+  // Only the env/minted key reports credit; the route returns null otherwise.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/chat/credit");
+        if (!res.ok) return;
+        const j = (await res.json()) as {
+          credit?: { usage: number; limit: number | null; remaining: number | null } | null;
+        };
+        if (!cancelled) setCredit(j.credit ?? null);
+      } catch {
+        /* offline / no binding — leave credit hidden */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   // Resolve the stored size preference against the current viewport. Runs on
   // mount and whenever the window resizes so a clamped panel re-fits.
@@ -406,9 +447,21 @@ export function ChatWidget() {
                 chat={chat}
                 transcriptClassName="flex-1"
                 footer={
-                  <div className="flex items-center gap-2 text-xs text-foreground-muted">
-                    <span className="shrink-0">{t("model")}</span>
-                    <ModelPicker value={model} onChange={setModel} />
+                  <div className="flex flex-col gap-1 text-xs text-foreground-muted">
+                    <div className="flex items-center gap-2">
+                      <span className="shrink-0">{t("model")}</span>
+                      <ModelPicker value={model} onChange={setModel} />
+                    </div>
+                    {credit && (
+                      <span className="shrink-0 tabular-nums" title={t("creditTitle")}>
+                        {credit.limit != null && credit.remaining != null
+                          ? t("creditOf", {
+                              remaining: formatUsd(credit.remaining),
+                              limit: formatUsd(credit.limit),
+                            })
+                          : t("creditUsage", { usage: formatUsd(credit.usage) })}
+                      </span>
+                    )}
                   </div>
                 }
               />
@@ -425,6 +478,14 @@ export function ChatWidget() {
         title={open ? t("close") : t("open")}
         className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
       >
+        {unread && !open && (
+          <span
+            role="status"
+            aria-label={t("unread")}
+            title={t("unread")}
+            className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-surface bg-danger"
+          />
+        )}
         {open ? (
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <line x1="6" y1="6" x2="18" y2="18" />

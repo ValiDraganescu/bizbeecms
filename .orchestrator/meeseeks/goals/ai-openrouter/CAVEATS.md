@@ -171,6 +171,15 @@ Read every line before working. Each entry was learned the hard way by a previou
 - There is NO `bundle:cms` npm script — the "cms-bundle regen" some NEXT/BACKLOG notes mention is
   ONLY for runtime-shipped UI artifacts (components/css), NOT for `.ts` modules like `models.ts`,
   which `next build` bundles normally. A pure catalog/helper change needs no bundle regen.
+- KEY CREDIT (2026-06-24): the in-use key's spend is surfaced via per-KEY OpenRouter
+  `GET /api/v1/key` (Bearer = the in-use key) — NOT `/api/v1/credits` (account-wide, needs the mgmt
+  key). New route `GET /api/chat/credit` returns `{credit:null}` whenever a CMS-local USER key is in
+  use (customer's own balance, out of scope) or no key — it determines the in-use key with the SAME
+  `effectiveOpenrouterKey(userKey, envKey)` precedence as `getAi()`. Pure parse/format =
+  `CMS/src/lib/chat/credit.ts` (`parseKeyCredit`/`formatUsd`); test `scripts/credit.test.mjs`. The
+  widget fetches it on open and shows a footer line under the picker. NEVER log the key.
+- `formatUsd`/`.toFixed(2)` is binary-float: `7.555 → "7.55"` (not "7.56"). Don't assert exact
+  half-up rounding in tests; pick non-pathological values.
 - CONCURRENT ai-widget-ux Meeseeks shares `CMS/messages/{en,fi,et}.json` + `chat-widget.tsx`.
   As of this run those files also carry their `sizeHalf`/`sizeCompact` keys and a `panel-size.*`
   feature. If `npm test` shows a `panel-size.test.ts` fail ("nextPreset toggles default<->half"),
