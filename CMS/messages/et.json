@@ -52,7 +52,11 @@
       "creditUsage": "${usage} kasutatud",
       "creditTitle": "Kasutusel oleva OpenRouter-võtme järelejäänud krediit",
       "sizeHalf": "Laienda pool ekraani",
-      "sizeCompact": "Vähenda kompaktseks"
+      "sizeCompact": "Vähenda kompaktseks",
+      "overrideActive": "Kohandatud viip: {label}",
+      "overrideActiveUnnamed": "Kohandatud viip aktiivne",
+      "overrideTitle": "Salvestatud süsteemiviipa versioon on aktiivne ainult sinu seansis.",
+      "overrideClear": "Kasuta vaikimisi"
     },
     "debug": {
       "context": "Lehe kontekst",

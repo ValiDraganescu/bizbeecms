@@ -52,7 +52,11 @@
       "creditUsage": "${usage} käytetty",
       "creditTitle": "Käytössä olevan OpenRouter-avaimen jäljellä oleva saldo",
       "sizeHalf": "Laajenna puoleen näyttöön",
-      "sizeCompact": "Pienennä kompaktiksi"
+      "sizeCompact": "Pienennä kompaktiksi",
+      "overrideActive": "Mukautettu kehote: {label}",
+      "overrideActiveUnnamed": "Mukautettu kehote käytössä",
+      "overrideTitle": "Tallennettu järjestelmäkehotteen versio on käytössä vain istunnossasi.",
+      "overrideClear": "Käytä oletusta"
     },
     "debug": {
       "context": "Sivun konteksti",

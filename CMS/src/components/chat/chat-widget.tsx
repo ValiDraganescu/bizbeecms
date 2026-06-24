@@ -63,6 +63,13 @@ export function ChatWidget() {
   // (session-only — never a site default; the route ignores it for non-SSO).
   // null = no override (assembled default). Set/cleared from the debug panel.
   const [promptOverride, setPromptOverride] = useState<string | null>(null);
+  // The active version's label, shown inline near the input so the operator
+  // always knows they're off the assembled default (not just in the debug panel).
+  const [overrideLabel, setOverrideLabel] = useState<string | null>(null);
+  function applyOverride(prompt: string | null, label: string | null) {
+    setPromptOverride(prompt);
+    setOverrideLabel(label);
+  }
   // Resizable panel (ai-widget-ux): preset toggle (default ⇄ half-screen) plus
   // free-drag via native CSS `resize`. Size is resolved against the live
   // viewport so a panel sized big on one screen is clamped, never lost.
@@ -457,7 +464,7 @@ export function ChatWidget() {
                 messages={messages}
                 model={model}
                 override={promptOverride}
-                onOverrideChange={setPromptOverride}
+                onOverrideChange={applyOverride}
               />
             ) : (
               <ChatConversation
@@ -465,6 +472,22 @@ export function ChatWidget() {
                 transcriptClassName="flex-1"
                 footer={
                   <div className="flex flex-col gap-1 text-xs text-foreground-muted">
+                    {promptOverride !== null && (
+                      <div className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning-subtle px-2 py-1 text-warning">
+                        <span className="min-w-0 flex-1 truncate" title={t("overrideTitle")}>
+                          {overrideLabel
+                            ? t("overrideActive", { label: overrideLabel })
+                            : t("overrideActiveUnnamed")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => applyOverride(null, null)}
+                          className="shrink-0 rounded font-medium underline hover:no-underline"
+                        >
+                          {t("overrideClear")}
+                        </button>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2">
                       <span className="shrink-0">{t("model")}</span>
                       <ModelPicker value={model} onChange={setModel} />

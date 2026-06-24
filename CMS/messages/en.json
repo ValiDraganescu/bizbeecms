@@ -52,7 +52,11 @@
       "creditUsage": "${usage} used",
       "creditTitle": "Remaining credit on the in-use OpenRouter key",
       "sizeHalf": "Expand to half screen",
-      "sizeCompact": "Shrink to compact"
+      "sizeCompact": "Shrink to compact",
+      "overrideActive": "Custom prompt: {label}",
+      "overrideActiveUnnamed": "Custom prompt active",
+      "overrideTitle": "A saved system-prompt version is active for your session only.",
+      "overrideClear": "Use default"
     },
     "debug": {
       "context": "Page context",

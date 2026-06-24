@@ -5,6 +5,8 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-24): **Active-override clarity — inline label near the chat input (PM-SSO).** When a saved system-prompt version is active, the widget shows a `warning-subtle` banner above the model row ("Custom prompt: <label>" / "…active" if unnamed) + a "Use default" clear button. `ChatDebugPanel.onOverrideChange` is now `(prompt, label)`; widget owns `overrideLabel` via `applyOverride`. Panel effect resyncs its `<select>` to Default when `override` is cleared externally. EN/FI/ET `chat.widget.override*`. Gates green (tsc, 856 tests, opennext build).
+
 Pure CMS chat-widget UX. Widget shell = `chat-widget.tsx`; transcript/input/tool-cards = `chat-conversation.tsx`. Each gates on CMS tsc + `npm test` + `npx opennextjs-cloudflare build` (dev OFF) + cms-bundle regen + EN/FI/ET for new strings.
 
 - DONE (2026-06-24): **System-prompt versions — UI slice (PM-SSO only).** `useChat` gained an optional 3rd getter `getOverride` → adds `systemPromptOverride` to the chat POST when set. `chat-widget.tsx` holds `promptOverride` state and threads it to `useChat` + down to `ChatDebugPanel` (`override`/`onOverrideChange`). `ChatDebugPanel` (PM-SSO-gated) gained a versions section: select (Default ⇄ saved, fetched from `GET /api/chat/prompts`), New (seeds label-input + textarea from the assembled default), Save (`POST {label,prompt}`, auto-activates), Cancel, Delete (`DELETE ?id=`). Selecting a version sets the per-request override; Default clears it. Session-only, never a site default. EN/FI/ET `chat.debug.prompts.*`. Gates green (tsc, 856 tests, opennext build). Original TODO text below for reference.

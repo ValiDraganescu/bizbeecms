@@ -181,3 +181,19 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/components/chat/chat-conversation.tsx (useChat getOverride),
   CMS/src/components/chat/chat-widget.tsx (promptOverride state + props),
   CMS/src/components/chat/chat-debug-panel.tsx (versions UI), CMS/messages/{en,fi,et}.json
+
+## 2026-06-24 14:45 — Active-override label near the chat input (PM-SSO)
+- **Status:** DONE
+- **What I did:** When a saved system-prompt version is active, the widget now shows an inline
+  warning banner above the model row near the chat input ("Custom prompt: <label>" / "Custom prompt
+  active" when unnamed) with a "Use default" clear button — so the operator always knows they're
+  off-default, not just inside the debug panel. `ChatDebugPanel.onOverrideChange` is now
+  `(prompt, label)`; widget holds `overrideLabel` + `applyOverride(prompt,label)`. Clearing from the
+  banner clears the override (and a new effect in the panel resyncs its `<select>` to "Default" when
+  `override` goes null externally). Banner uses `bg-warning-subtle`/`text-warning` tokens. New i18n
+  `chat.widget.{overrideActive,overrideActiveUnnamed,overrideTitle,overrideClear}` EN/FI/ET.
+- **Verified:** CMS `npx tsc --noEmit` clean; `npm test` 856 pass; `npx opennextjs-cloudflare build`
+  OK (dev off, 3601 free); all 3 message JSONs parse. Did not exercise live (HITL — needs a PM-SSO
+  session + saved version).
+- **Files:** CMS/src/components/chat/chat-widget.tsx, CMS/src/components/chat/chat-debug-panel.tsx,
+  CMS/messages/{en,fi,et}.json

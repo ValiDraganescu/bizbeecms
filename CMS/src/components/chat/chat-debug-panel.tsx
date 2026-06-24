@@ -26,8 +26,12 @@ type ChatDebugPanelProps = {
   model?: string;
   /** Active per-request system-prompt override (PM-SSO editor), or null. */
   override?: string | null;
-  /** Set/clear the override that the widget threads into the chat POST. */
-  onOverrideChange?: (prompt: string | null) => void;
+  /**
+   * Set/clear the override that the widget threads into the chat POST. `label`
+   * is the selected version's label (for the inline "off-default" banner near
+   * the input), null when clearing back to the assembled default.
+   */
+  onOverrideChange?: (prompt: string | null, label: string | null) => void;
 };
 
 export function ChatDebugPanel({
@@ -104,17 +108,23 @@ export function ChatDebugPanel({
     if (isPmSso) void loadVersions();
   }, [isPmSso]);
 
+  // Keep the select in sync if the override is cleared elsewhere (e.g. the
+  // inline "use default" banner near the chat input).
+  useEffect(() => {
+    if (override === null && selectedId !== "") setSelectedId("");
+  }, [override, selectedId]);
+
   // Apply a selected version's prompt as the override (or clear it).
   function selectVersion(id: string) {
     setSelectedId(id);
     setDraft(null);
     setPvError(null);
     if (!id) {
-      onOverrideChange?.(null);
+      onOverrideChange?.(null, null);
       return;
     }
     const v = versions.find((x) => x.id === id);
-    onOverrideChange?.(v ? v.prompt : null);
+    onOverrideChange?.(v ? v.prompt : null, v ? v.label : null);
   }
 
   // Open the editor seeded from the assembled default; the operator edits freely.
@@ -144,7 +154,7 @@ export function ChatDebugPanel({
       setLabel("");
       // Auto-select the just-saved version so it's active immediately.
       setSelectedId(j.version.id);
-      onOverrideChange?.(j.version.prompt);
+      onOverrideChange?.(j.version.prompt, j.version.label);
     } catch (err) {
       setPvError((err as Error).message);
     } finally {

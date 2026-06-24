@@ -89,6 +89,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   IN `ChatDebugPanel` (already PM-SSO-gated). To add any new per-request chat-body field, follow this
   same getter pattern — don't bypass `useChat`. The route gates the override to PM-SSO; the override
   is session-only, NEVER persisted as a site default.
+- **`onOverrideChange` is `(prompt, label)` since 2026-06-24.** The PM-SSO prompt-version override
+  now threads the version LABEL up too (for the inline "off-default" banner near the chat input).
+  Widget owns `promptOverride` + `overrideLabel`, both set via `applyOverride(prompt,label)` (clear =
+  `applyOverride(null,null)`). The debug panel has an effect that resyncs its `<select>` to "Default"
+  when `override` becomes null externally (the banner's "Use default" button). The inline banner uses
+  `bg-warning-subtle` + `text-warning` (NOT `text-warning-foreground` — that's near-white, only legible
+  ON `bg-warning`). Keep both override setters together; don't set one without the other.
+
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.
