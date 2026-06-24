@@ -129,14 +129,31 @@ export default async function SiteDetailPage({
             </Detail>
             <Detail label={t("detail.url")}>
               {workerUrl ? (
-                <a
-                  href={workerUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-sm text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
-                >
-                  {workerUrl}
-                </a>
+                <div className="flex flex-col gap-2">
+                  <span className="font-mono text-sm text-foreground-muted break-all">
+                    {workerUrl}
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={workerUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium bg-surface-muted text-foreground border border-border hover:bg-surface-raised outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {t("detail.openSite")}
+                    </a>
+                    {/* ?from=pm so the CMS shows the SSO button even when the admin
+                        is opened directly (not via a PM referer). */}
+                    <a
+                      href={`${workerUrl}/admin?from=pm`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {t("detail.openAdmin")}
+                    </a>
+                  </div>
+                </div>
               ) : (
                 <span className="text-foreground-muted">
                   {t("detail.workerNamePending")}

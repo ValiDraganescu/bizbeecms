@@ -352,7 +352,9 @@
       "cmsVersionNone": "Ei julkaistu",
       "url": "Osoite",
       "country": "Maa",
-      "global": "Globaali"
+      "global": "Globaali",
+      "openSite": "Avaa sivusto",
+      "openAdmin": "Avaa hallinta"
     },
     "timeline": {
       "title": "Julkaisun aikajana",

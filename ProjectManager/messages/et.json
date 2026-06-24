@@ -352,7 +352,9 @@
       "cmsVersionNone": "Pole avaldatud",
       "url": "URL",
       "country": "Riik",
-      "global": "Globaalne"
+      "global": "Globaalne",
+      "openSite": "Ava sait",
+      "openAdmin": "Ava administraator"
     },
     "timeline": {
       "title": "Avaldamise ajajoon",

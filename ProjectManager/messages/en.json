@@ -352,7 +352,9 @@
       "cmsVersionNone": "Not deployed",
       "url": "URL",
       "country": "Country",
-      "global": "Global"
+      "global": "Global",
+      "openSite": "Open site",
+      "openAdmin": "Open admin"
     },
     "timeline": {
       "title": "Deploy timeline",
