@@ -51,10 +51,12 @@
     //  - CMS_AUTH_SECRET: shared bearer PM checks (peer of DEPLOYER_SECRET). It's
     //    a secret in practice — the deployer injects the real value; never commit
     //    a real one here.
-    //  - OPENROUTER_API_KEY: the AI provider key (ai-openrouter). Empty here =>
-    //    getAi() falls back to the CF `AI` binding; the deployer injects the real
-    //    key per-Site so OpenRouter becomes the active provider. Secret in
-    //    practice — never commit a real one.
+    //  - OPENROUTER_API_KEY: the AI provider key (ai-openrouter). It is a Worker
+    //    SECRET, NOT a var — the deployer sets it via `wrangler secret put` AFTER
+    //    deploy. It must NOT be declared here: a var binding of the same name is
+    //    created at deploy time and then `secret put` fails `10053: Binding name
+    //    'OPENROUTER_API_KEY' already in use`. getAi() reads it via env regardless
+    //    (secret and var are both env.OPENROUTER_API_KEY); unset => CF `AI` fallback.
     //  - APP_ORIGIN: this CMS's own public origin, used to build trusted
     //    invite-accept links (cms-auth Slice 4). The deployer injects the
     //    per-Site worker URL. Empty here => dev falls back to the request host;
@@ -66,7 +68,6 @@
     "SITE_ID": "",
     "PM_ORIGIN": "",
     "CMS_AUTH_SECRET": "",
-    "OPENROUTER_API_KEY": "",
     "APP_ORIGIN": ""
   },
   // Cloudflare Email Sending binding for transactional invite emails (cms-auth
