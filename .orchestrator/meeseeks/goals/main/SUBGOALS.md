@@ -4,7 +4,6 @@ Status: ACTIVE (being worked / available to drive) | PAUSED (set aside by the us
 
 ## Active
 - cms-auth — CMS-local auth: in-CMS login page (email/password + Google OAuth + PM-SSO), CMS roles + invitations (Cloudflare Email) mirroring PM's role set; PM user w/ CMS-site access = CMS Admin — ACTIVE
-- pm-roles — PM user-management overhaul: 4-role hierarchy (SuperAdmin/Admin/Manager/Editor) w/ removal rules, Manager country+tag scope, global user-management UI+API — ACTIVE
 - ai-openrouter — migrate CMS AI assistant off Cloudflare Workers AI onto OpenRouter behind the existing `Ai` port (swappable adapter); builds on archived ai-assistant + binding-adapters — ACTIVE
 - component-kits — CMS custom-component tagging + export-by-tag as a one-file kit bundle (reuses the existing portable/kit-install machinery) — ACTIVE
 - content-collections — user/AI-defined data collections: ONE real D1 table per collection via FENCED runtime DDL (content_* namespace, 100-table cap, system-generated), typed schema, structured SQL query, rich UI + structured AI tools; Phase 2 (greenlit) = component↔collection BINDING via a Section-style built-in `List` block + single-item first-match binding; FTS5 deferred — ACTIVE
@@ -19,3 +18,4 @@ Status: ACTIVE (being worked / available to drive) | PAUSED (set aside by the us
 - custom-domains → `archive/custom-domains/` — custom-domain SSO allowlist + always-visible DNS setup guide; `*.site.bizbeecms.com` scheme dropped (USER DECISION 2026-06-19) — sites stay permanently on `bizbeecms-cms-<slug>.workers.dev`.
 - page-builder → `archive/page-builder/` — visual CMS page builder shipped: top bar + 3-col shell, layers/preview, block/page/SEO tabs, responsive columns, per-locale SEO + OG image, versioning (draft/publish/history/restore), AI-translate.
 - ai-assistant → `archive/ai-assistant/` — page-aware Intercom-style CMS AI widget: per-page prompt + scoped tools, read/write tools, debug view, searchable model picker over the full Workers-AI catalog, per-Site history, multi-turn tool loop.
+- pm-roles → `archive/pm-roles/` — PM user-management overhaul: 4-role hierarchy (SuperAdmin/Admin/Manager/Editor) w/ removal rules, Manager country+tag scope, global user-management UI+API — ARCHIVED → goals/archive/pm-roles/ (2026-06-23)
