@@ -1,25 +1,21 @@
 # Note to the next Meeseeks (ai-widget-ux)
 
-**BUG [P1] (model-picker `undefined.map` crash) is FIXED** (2026-06-24). New pure
-`lib/chat/catalog-coerce.ts` (`coerceCatalog`) heals stale-cache/older-bundle catalog rows;
-`model-picker.tsx` coerces `j.models` on load + guards the `.map`. 7 regression tests in
-`scripts/catalog-coerce.test.mjs`. See CAVEATS for the "always coerce, never trust /api/chat/models"
-rule. **HITL TODO for the user:** redeploy test-1 — the live worker still serves the stale D1 cache
-row + old bundle; the code fix only protects new loads, the deployed crash clears after a redeploy.
+**BUG [P2] (expand/shrink toggle one-way) is FIXED** (2026-06-24). `nextPreset(current, isLarge?)` +
+new pure `isLarge(size,vw,vh)` in `panel-size.ts` make the toggle key off actual size, not the volatile
+`preset` (which `captureDrag`'s `onMouseUp` flips to `"custom"` after an expand). `chat-widget.tsx` uses
+a render-level `panelLarge` const for the button icon/label/pressed. Regression in `panel-size.test.ts`
+(+4 cases, 11 pass). See CAVEATS "Expand/shrink toggle keys off SIZE".
 
-**Check BUGS first (BACKLOG `## Bugs`).** Still OPEN:
-- **BUG [P2]: expand/shrink toggle is one-way.** Root cause noted in the bug: free-drag `onMouseUp`
-  capture (~line 349 of `chat-widget.tsx`) sets `preset:"custom"`, and `nextPreset("custom")`→`"half"`
-  so the toggle never returns to default. NOTE: there's now a TODO ("LEFT-edge drag rail") that REMOVES
-  the native CSS `resize` + that custom-capture — doing that TODO likely SUBSUMES this P2 bug. Decide:
-  fix P2 directly (smallest: make `nextPreset("custom")` → `"default"` + update `panel-size.test.ts`),
-  OR do the rail TODO and close P2 as part of it. Bugs outrank the TODO, so if you fix P2 standalone do
-  that first.
+**Check BUGS first (BACKLOG `## Bugs`).** As of this run, NO open bugs — both P1 (model-picker crash)
+and P2 (toggle) are DONE. The P1 still has a HITL TODO for the user: redeploy test-1 to clear the stale
+D1 catalog cache (code fix only protects new loads).
 
 After bugs: top `## Tasks` TODO is the **left-edge resize rail** (native bottom-right grip is unusable
-under the launcher) — see its full spec in BACKLOG. Or a pure-client polish (copy-message-to-clipboard).
+under the launcher). It REMOVES the native CSS `resize` + the `onMouseUp` `captureDrag` (~line 349 of
+`chat-widget.tsx`). NOTE: my `isLarge` toggle fix stays correct even after that removal — but re-confirm
+the toggle cycles once the native resize is gone. Or do a pure-client polish (copy-message-to-clipboard).
 
-GATES (all green this run): CMS `npx tsc --noEmit` + `npm test` (884 pass) +
+GATES (all green this run): CMS `npx tsc --noEmit` + `npm test` (887 pass) +
 `npx opennextjs-cloudflare build` (dev OFF — port 3601 must be free; NEVER build while dev is up).
 Do NOT run `bundle:cms` (auto-regens on PM deploy). `lib/chat/models.ts` is ai-openrouter's — don't
 touch/stage it; tsc/build may transiently fail mid-their-edit, just re-run.

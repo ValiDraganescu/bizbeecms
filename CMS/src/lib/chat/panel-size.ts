@@ -56,11 +56,26 @@ export function resolveSize(
   return { preset, width: c.width, height: c.height };
 }
 
-/** The toggle cycles default ⇄ half. A custom (dragged) size toggles to half. */
-export function nextPreset(current: PanelPreset | "custom"): PanelPreset {
-  // From the compact default → half; from half → back to compact. A custom
-  // (free-dragged) size has no obvious "other" preset, so jump to half.
-  return current === "half" ? "default" : "half";
+/**
+ * The expand/shrink toggle. It must be a true 2-state cycle so clicking the
+ * button always reverses the last toggle. We key off whether the panel is
+ * currently enlarged (`isLarge`) rather than the raw preset, because expanding
+ * can re-capture as "custom" (native resize fires onMouseUp on the expand
+ * click) — and a "custom" state must shrink back, not jump to half again
+ * (that one-way bug is why this takes `isLarge`, not just `current`).
+ */
+export function nextPreset(current: PanelPreset | "custom", isLarge = current === "half"): PanelPreset {
+  return isLarge ? "default" : "half";
+}
+
+/**
+ * Is the panel currently enlarged (vs. the compact default)? Used by the
+ * expand toggle + button state so a free-dragged "custom" size that's bigger
+ * than default still reads as "large" and shrinks back on click. Compares
+ * against the default width with a small tolerance for rounding.
+ */
+export function isLarge(size: { width: number }, vw: number, vh: number, tol = 8): boolean {
+  return size.width > defaultSize(vw, vh).width + tol;
 }
 
 const KEY = "bizbee.chat.panelSize";

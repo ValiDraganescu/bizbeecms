@@ -132,6 +132,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   stale cache row will crash again. Don't "fix" this by editing `models.ts` (ai-openrouter's). The stale
   cache also means: after a catalog-shape change, the deployed site needs a REDEPLOY (clears/rewrites the
   D1 cache) — a code fix alone won't heal already-cached rows on the live worker until then (HITL).
+- **Expand/shrink toggle keys off SIZE, not `preset` (BUG [P2] DONE 2026-06-24).** Expanding fires the
+  native CSS `resize` `onMouseUp` (`captureDrag`) which sets `preset:"custom"`, so `preset` is unreliable
+  for "is the panel big?". `nextPreset(current, isLarge?)` now takes an `isLarge` flag and toggles
+  `isLarge ? "default" : "half"`; new pure `isLarge(size, vw, vh, tol=8)` = width > defaultSize+tol. In
+  `chat-widget.tsx` a render-level `panelLarge` const (SSR-safe `typeof window` guard) drives the button
+  icon/label/`aria-pressed`/active-bg — DON'T revert those to `preset==="half"` (that's the one-way bug).
+  The native-resize `onMouseUp` capture is STILL there; the LEFT-edge-rail TODO is meant to remove it —
+  when it does, re-confirm the toggle still cycles (the `isLarge` logic stays correct regardless).
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.

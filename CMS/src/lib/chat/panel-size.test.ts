@@ -13,6 +13,7 @@ import {
   clamp,
   resolveSize,
   nextPreset,
+  isLarge,
 } from "./panel-size.ts";
 
 const VW = 1440;
@@ -66,8 +67,44 @@ test("resolveSize: default when no stored / unknown", () => {
   assert.equal(r.height, 560);
 });
 
-test("nextPreset toggles default<->half; custom -> half", () => {
+test("nextPreset toggles default<->half by raw preset (no isLarge given)", () => {
   assert.equal(nextPreset("default"), "half");
   assert.equal(nextPreset("half"), "default");
+  // legacy bug: bare custom defaulted to "half" (never shrank) — kept for the
+  // no-isLarge call path, but the widget always passes isLarge now.
   assert.equal(nextPreset("custom"), "half");
+});
+
+test("nextPreset honours isLarge so the expand toggle is a true 2-state cycle", () => {
+  // A custom (free-dragged) size that's currently LARGE must shrink to default.
+  assert.equal(nextPreset("custom", true), "default");
+  // A custom size that's small must enlarge to half.
+  assert.equal(nextPreset("custom", false), "half");
+  // Even a "half" preset reads enlarged → shrinks; a small preset enlarges.
+  assert.equal(nextPreset("half", true), "default");
+  assert.equal(nextPreset("default", false), "half");
+});
+
+test("isLarge: default size reads small, half/dragged reads large", () => {
+  // The compact default is NOT large (within tolerance).
+  assert.equal(isLarge(defaultSize(VW, VH), VW, VH), false);
+  // Half preset is clearly larger than default.
+  assert.equal(isLarge(halfSize(VW, VH), VW, VH), true);
+  // A custom drag a touch above default+tol reads large (drives the toggle back).
+  assert.equal(isLarge({ width: 380 + 9 }, VW, VH), true);
+  // Within tolerance still reads small.
+  assert.equal(isLarge({ width: 380 + 4 }, VW, VH), false);
+});
+
+// Regression for the one-way toggle bug: expand → (mouseup captures custom) →
+// click again must SHRINK, not re-expand. Simulate the captured custom state.
+test("expand toggle cycle survives a custom re-capture (one-way bug regression)", () => {
+  // Start compact.
+  let preset = nextPreset("default", isLarge(defaultSize(VW, VH), VW, VH));
+  assert.equal(preset, "half"); // grew
+  const grown = halfSize(VW, VH);
+  // Native resize fires onMouseUp → state becomes "custom" at the grown size.
+  // Next click must shrink because the panel is currently large.
+  preset = nextPreset("custom", isLarge(grown, VW, VH));
+  assert.equal(preset, "default"); // shrank — bug would have returned "half"
 });

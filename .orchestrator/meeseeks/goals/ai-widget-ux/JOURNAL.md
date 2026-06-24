@@ -249,3 +249,21 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (dev off, port 3601 free) complete. Could NOT verify live in a browser (no live session); the deployed
   test-1 still needs a redeploy to clear the stale D1 cache / ship the new bundle (HITL — Meeseeks don't deploy).
 - **Files:** CMS/src/lib/chat/catalog-coerce.ts, CMS/scripts/catalog-coerce.test.mjs, CMS/src/components/chat/model-picker.tsx
+
+## 2026-06-24 — BUG [P2] expand/shrink toggle one-way → FIXED
+- **Task:** the human-reported P2 bug (bugs outrank features): the expand (↗) button grew the panel to
+  half but a second click never shrank it back.
+- **Root cause (confirmed):** expanding changes panel size → native CSS `resize` fires `onMouseUp` →
+  `captureDrag` sets `preset:"custom"`; `togglePreset` then ran `nextPreset("custom")` which returned
+  `"half"` (not `"default"`), so it re-expanded instead of shrinking. The button's icon/label/`aria-pressed`
+  also keyed off `preset==="half"` → showed the wrong (expand) affordance while preset was `"custom"`.
+- **Fix (smallest robust):** `nextPreset(current, isLarge?)` now toggles on ACTUAL size, not the volatile
+  preset: `isLarge ? "default" : "half"`. New pure `isLarge(size, vw, vh, tol=8)` (= width > defaultSize+tol).
+  `chat-widget.tsx`: `togglePreset` computes `isLarge(cur, vw, vh)` and passes it; a render-level `panelLarge`
+  const (size-keyed, SSR-safe `typeof window` guard) replaces all four `preset==="half"` reads driving the
+  button icon/label/pressed/active-bg. Free-drag still persists a custom px size — it just no longer breaks
+  the toggle. Left the `onMouseUp`/native-resize capture in place (the LEFT-edge-rail TODO will remove it).
+- **Verified:** `panel-size.test.ts` +4 cases (incl. an explicit expand→custom-recapture→shrink regression),
+  11 pass; `npx tsc --noEmit` clean; full `npm test` 887 pass; `npx opennextjs-cloudflare build` (dev off,
+  port 3601 free) complete. Browser repro not done (no live session) — covered by the regression test instead.
+- **Files:** CMS/src/lib/chat/panel-size.ts, CMS/src/lib/chat/panel-size.test.ts, CMS/src/components/chat/chat-widget.tsx

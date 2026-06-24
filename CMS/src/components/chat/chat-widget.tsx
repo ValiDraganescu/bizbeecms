@@ -30,6 +30,7 @@ import {
   type PanelSize,
   resolveSize,
   nextPreset,
+  isLarge,
   loadPref,
   savePref,
 } from "@/lib/chat/panel-size";
@@ -333,8 +334,11 @@ export function ChatWidget() {
 
   function togglePreset() {
     setPanel((cur) => {
-      const preset: PanelPreset = nextPreset(cur?.preset ?? "default");
-      const next = resolveSize(preset, null, window.innerWidth, window.innerHeight);
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const large = cur ? isLarge(cur, vw, vh) : false;
+      const preset: PanelPreset = nextPreset(cur?.preset ?? "default", large);
+      const next = resolveSize(preset, null, vw, vh);
       savePref({ preset, width: next.width, height: next.height });
       return next;
     });
@@ -357,6 +361,15 @@ export function ChatWidget() {
       return next;
     });
   }
+
+  // Is the panel currently enlarged? Drives the expand/shrink button's icon +
+  // pressed state. Keyed off actual size (not `preset`) so a free-dragged
+  // "custom" size that's bigger than default still shows "shrink" — and the
+  // toggle reliably returns to compact (fixes the one-way toggle bug).
+  const panelLarge =
+    panel != null && typeof window !== "undefined"
+      ? isLarge(panel, window.innerWidth, window.innerHeight)
+      : false;
 
   return (
     <>
@@ -444,15 +457,15 @@ export function ChatWidget() {
               <button
                 type="button"
                 onClick={togglePreset}
-                aria-label={panel?.preset === "half" ? t("sizeCompact") : t("sizeHalf")}
-                aria-pressed={panel?.preset === "half"}
-                title={panel?.preset === "half" ? t("sizeCompact") : t("sizeHalf")}
+                aria-label={panelLarge ? t("sizeCompact") : t("sizeHalf")}
+                aria-pressed={panelLarge}
+                title={panelLarge ? t("sizeCompact") : t("sizeHalf")}
                 className={
                   "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
-                  (panel?.preset === "half" ? "bg-surface-muted text-foreground" : "text-foreground-muted")
+                  (panelLarge ? "bg-surface-muted text-foreground" : "text-foreground-muted")
                 }
               >
-                {panel?.preset === "half" ? (
+                {panelLarge ? (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
                     <path d="M14 10 21 3M21 3h-5M21 3v5M10 14l-7 7M3 21h5M3 21v-5" />
                   </svg>
