@@ -344,3 +344,9 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   and a parallel CMS worker owns the build + bundle regen (no user strings here).
 - **Files:** CMS/src/lib/content/schema-rebuild.ts (new),
   CMS/scripts/schema-rebuild.test.mjs (new).
+
+## 2026-06-24 14:48 — BUG [P1] fix: collection create failed (D1 exec newline-split)
+- **Status:** DONE
+- **What I did:** Fixed the P1 "Creating a collection fails — CREATE TABLE content_authors (: incomplete input" bug. ROOT CAUSE was the D1 exec boundary, not the pure DDL builders (those were correct and always emit the 6 system columns). `contentDdl` ran `d1.exec(sql)`; D1's `exec()` splits its input on newlines and runs each line as its own statement, so the multi-line generated `CREATE TABLE content_x (\n  col,\n ...\n)` got chopped — line 1 `CREATE TABLE content_x (` ran alone → "incomplete input". Changed `contentDdl` to run the single fenced statement via `d1.prepare(sql).run()` instead. Added a regression test that models exec()'s newline-splitting and feeds the EXACT reported repro DDL (collection Authors: name string req + bio richtext req) — fails-before (exec path throws), passes-after.
+- **Verified:** `node --test scripts/content-fence.test.mjs` 15/15; reverted the fix → 2 contentDdl tests FAIL (confirmed regression catches it), restored. Full `npm test` 857/857 green. `npx tsc --noEmit` clean. `npx opennextjs-cloudflare build` green (dev was OFF). No new UI strings → no cms-bundle regen (per CAVEATS: only CMS UI copy triggers regen).
+- **Files:** CMS/src/lib/content/content-db.ts, CMS/scripts/content-fence.test.mjs.

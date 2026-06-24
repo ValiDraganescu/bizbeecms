@@ -82,5 +82,11 @@ export async function contentWrite(
 export async function contentDdl(sql: string, db?: D1Like): Promise<void> {
   assertStatement(sql, "write");
   const d1 = db ?? (await liveDb());
-  await d1.exec(sql);
+  // D1's `exec()` SPLITS its input on newlines and runs each line as a separate
+  // statement — so a multi-line `CREATE TABLE content_x (\n  col,\n  ...\n)`
+  // gets chopped (line 1 `CREATE TABLE content_x (` runs alone → "incomplete
+  // input"). Our system-generated DDL is always exactly ONE statement (the fence
+  // rejects multi-statement), so run it via the prepared-statement path, which
+  // executes the single statement intact regardless of newlines.
+  await d1.prepare(sql).run();
 }

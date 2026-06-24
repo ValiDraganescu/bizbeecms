@@ -19,6 +19,7 @@ import {
   assertStatement,
 } from "../src/lib/content/fence.ts";
 import { contentSelect, contentWrite, contentDdl, MAX_READ_ROWS } from "../src/lib/content/content-db.ts";
+import { buildCreateTableSql } from "../src/lib/content/collection-schema.ts";
 
 const ok = (sql, mode) => assert.equal(validateStatement(sql, mode).ok, true, `should ACCEPT: ${sql}`);
 const bad = (sql, mode) => assert.equal(validateStatement(sql, mode).ok, false, `should REJECT: ${sql}`);
@@ -155,12 +156,51 @@ test("contentWrite runs only fenced DML and returns change count", async () => {
   await assert.rejects(() => contentWrite("DROP TABLE page", [], d1), /content fence rejected/);
 });
 
-test("contentDdl runs only fenced DDL via exec", async () => {
+test("contentDdl runs only fenced DDL via a single prepared statement", async () => {
   const d1 = fakeD1();
   await contentDdl("CREATE TABLE content_x (id INTEGER PRIMARY KEY)", d1);
-  assert.equal(d1.calls[0].kind, "exec");
+  // Must use prepare().run() (NOT exec) — see regression test below for why.
+  assert.equal(d1.calls[0].kind, "run");
   await assert.rejects(() => contentDdl("ATTACH DATABASE 'e' AS e", d1), /content fence rejected/);
   await assert.rejects(() => contentDdl("DROP TABLE collection", d1), /content fence rejected/);
+});
+
+// Regression — BUG [P1] 2026-06-24: creating a collection failed with
+// `CREATE TABLE content_authors (: incomplete input`. Root cause: D1's exec()
+// SPLITS on newlines and runs each line as its own statement, so the multi-line
+// CREATE TABLE got chopped at the first `(`. The real generated DDL is multi-line
+// (one column per line). This fake models exec()'s newline-splitting so the bug
+// reproduces; the fix routes contentDdl through prepare().run() instead.
+test("contentDdl handles multi-line generated DDL (D1 exec newline-split regression)", async () => {
+  // The exact DDL the create flow generates for the reported repro:
+  // collection "Authors", fields name(string,req) + bio(richtext,req).
+  const createSql = buildCreateTableSql("content_authors", [
+    { name: "name", type: "string", required: true },
+    { name: "bio", type: "richtext", required: true },
+  ]);
+  assert.ok(createSql.includes("\n"), "generated CREATE TABLE is multi-line");
+  assert.match(createSql, /name TEXT NOT NULL/);
+  assert.match(createSql, /bio TEXT NOT NULL/);
+
+  // A fake that faithfully models D1's exec() (newline-split → run each line) and
+  // a sane prepare().run() (whole statement). exec() on the multi-line DDL would
+  // throw on the first chopped line — exactly the production failure.
+  let execFragments = null;
+  const d1 = {
+    prepare: (sql) => ({ run: async () => ({ meta: { changes: 0 } }) }),
+    exec: async (sql) => {
+      execFragments = sql.split("\n").map((l) => l.trim()).filter(Boolean);
+      // first fragment is `CREATE TABLE content_authors (` → incomplete input
+      if (!/\)\s*$/.test(execFragments[0])) {
+        throw new Error("D1_EXEC_ERROR: incomplete input: SQLITE_ERROR");
+      }
+      return {};
+    },
+  };
+
+  // Must NOT throw — the fix avoids exec() for multi-line DDL.
+  await contentDdl(createSql, d1);
+  assert.equal(execFragments, null, "contentDdl must not call the newline-splitting exec()");
 });
 
 test("MAX_READ_ROWS is a sane backstop", () => {

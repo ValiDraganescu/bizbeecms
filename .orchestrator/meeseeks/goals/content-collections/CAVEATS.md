@@ -353,3 +353,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   read for display + edit). `[name]` in the page route IS the content_<slug> table
   name, same as the API. Reuse `field-input.tsx`/`confirm-modal.tsx` in Phase-2
   binding UI (Slice C) rather than rebuilding inputs.
+
+- **(BUG fix 2026-06-24) D1's `exec()` SPLITS its input on NEWLINES and runs each
+  line as a SEPARATE statement.** A multi-line single statement (e.g. our generated
+  `CREATE TABLE content_x (\n  col,\n ...\n)`) gets chopped → "incomplete input:
+  SQLITE_ERROR" on the first line. NEVER run generated DDL via `d1.exec()`. Use
+  `d1.prepare(sql).run()` — it executes ONE whole statement intact regardless of
+  newlines. `contentDdl` now does this. (The fence already guarantees single-statement,
+  so prepare().run() is safe.) This was the real root cause of the P1 "collection
+  create broken" bug — NOT the pure builders (they were fine).
