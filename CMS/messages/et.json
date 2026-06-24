@@ -27,7 +27,9 @@
     "tool": {
       "failBadge": "ebaõnnestus",
       "input": "Sisend",
-      "output": "Väljund"
+      "output": "Väljund",
+      "showMore": "Näita {count} märki rohkem",
+      "showLess": "Näita vähem"
     },
     "widget": {
       "title": "Tehisintellekti assistent",

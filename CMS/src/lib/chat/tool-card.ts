@@ -32,15 +32,40 @@ export function toolSummary(tool: Pick<ToolResult, "name" | "action" | "componen
   return [action, subject].filter(Boolean).join(" ");
 }
 
+/** Pretty-print a tool input/output blob to a string (no truncation). */
+function stringifyBlob(value: unknown): string {
+  if (value === undefined) return "";
+  try {
+    return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
 /** Pretty-print a tool input/output blob for the accordion, truncated for huge values. */
 export function formatBlob(value: unknown, max = 4000): string {
-  if (value === undefined) return "";
-  let text: string;
-  try {
-    text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
-  } catch {
-    text = String(value);
-  }
+  const text = stringifyBlob(value);
   if (text.length > max) return `${text.slice(0, max)}\n… (${text.length - max} more chars)`;
   return text;
+}
+
+/**
+ * A blob view for the accordion's "show more" toggle: the full pretty-printed
+ * text, a truncated preview, the hidden-char count, and whether truncation happened.
+ * The component shows `preview` collapsed and `full` when expanded.
+ */
+export function blobView(value: unknown, max = 4000): {
+  full: string;
+  preview: string;
+  hidden: number;
+  truncated: boolean;
+} {
+  const full = stringifyBlob(value);
+  if (full.length <= max) return { full, preview: full, hidden: 0, truncated: false };
+  return {
+    full,
+    preview: `${full.slice(0, max)}\n… (${full.length - max} more chars)`,
+    hidden: full.length - max,
+    truncated: true,
+  };
 }

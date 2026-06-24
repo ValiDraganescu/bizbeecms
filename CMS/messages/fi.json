@@ -27,7 +27,9 @@
     "tool": {
       "failBadge": "epäonnistui",
       "input": "Syöte",
-      "output": "Tulos"
+      "output": "Tulos",
+      "showMore": "Näytä {count} merkkiä lisää",
+      "showLess": "Näytä vähemmän"
     },
     "widget": {
       "title": "Tekoälyavustaja",

@@ -18,7 +18,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { ChatEventParser, type ToolResult } from "@/lib/chat/client-sse";
-import { toolSummary, formatBlob } from "@/lib/chat/tool-card";
+import { toolSummary, blobView } from "@/lib/chat/tool-card";
 import { isAtBottom } from "@/lib/chat/scroll-anchor";
 import {
   decideSendOnEnter,
@@ -378,8 +378,8 @@ function ToolCard({
   const cls = tool.ok
     ? "border-success bg-success-subtle text-foreground"
     : "border-danger bg-danger-subtle text-foreground";
-  const inputText = formatBlob(tool.input);
-  const outputText = formatBlob(tool.output);
+  const inputBlob = blobView(tool.input);
+  const outputBlob = blobView(tool.output);
   // ponytail: native <details> is the accordion — collapsed by default, no JS state.
   return (
     <details className={`group mt-2 rounded-md border px-3 py-2 ${cls}`}>
@@ -398,19 +398,38 @@ function ToolCard({
           ))}
         </ul>
       )}
-      {inputText && <ToolBlob label={t("tool.input")} text={inputText} />}
-      {outputText && <ToolBlob label={t("tool.output")} text={outputText} />}
+      {inputBlob.full && <ToolBlob label={t("tool.input")} blob={inputBlob} t={t} />}
+      {outputBlob.full && <ToolBlob label={t("tool.output")} blob={outputBlob} t={t} />}
     </details>
   );
 }
 
-function ToolBlob({ label, text }: { label: string; text: string }) {
+function ToolBlob({
+  label,
+  blob,
+  t,
+}: {
+  label: string;
+  blob: ReturnType<typeof blobView>;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const text = expanded ? blob.full : blob.preview;
   return (
     <div className="mt-2">
       <p className="mb-1 text-foreground-muted">{label}</p>
       <pre className="overflow-x-auto rounded-md bg-surface px-2 py-1 text-foreground">
         {text}
       </pre>
+      {blob.truncated && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 rounded-sm text-foreground-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {expanded ? t("tool.showLess") : t("tool.showMore", { count: blob.hidden })}
+        </button>
+      )}
     </div>
   );
 }

@@ -27,7 +27,9 @@
     "tool": {
       "failBadge": "failed",
       "input": "Input",
-      "output": "Output"
+      "output": "Output",
+      "showMore": "Show {count} more chars",
+      "showLess": "Show less"
     },
     "widget": {
       "title": "AI Assistant",
