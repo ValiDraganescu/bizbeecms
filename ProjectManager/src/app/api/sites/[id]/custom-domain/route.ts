@@ -21,6 +21,7 @@ export type DnsRecord = { name: string; value: string };
 export type CustomDomainResult = {
   ok: true;
   hostname: string;
+  redirectTo?: string | null;
   status: string;
   ssl: string;
   dns: {
@@ -74,12 +75,29 @@ export async function POST(
 
   const body = (await request.json().catch(() => ({}))) as {
     hostname?: unknown;
+    redirectTo?: unknown;
   };
   const hostname = String(body.hostname ?? "")
     .trim()
     .toLowerCase();
   if (!HOSTNAME_RE.test(hostname)) {
     return NextResponse.json({ error: "badRequest" }, { status: 400 });
+  }
+
+  // Optional: redirect this hostname to another host (e.g. apex → www) instead of
+  // serving the Site. Accept a bare hostname or a URL; normalise to an https URL.
+  // The deployer re-validates; this is the early fail-fast shape check.
+  let redirectTo: string | null = null;
+  if (body.redirectTo != null && String(body.redirectTo).trim() !== "") {
+    const targetHost = String(body.redirectTo)
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .replace(/\/.*$/, "");
+    if (!HOSTNAME_RE.test(targetHost) || targetHost === hostname) {
+      return NextResponse.json({ error: "badRequest" }, { status: 400 });
+    }
+    redirectTo = `https://${targetHost}`;
   }
 
   const { env } = await getCloudflareContext({ async: true });
@@ -101,7 +119,7 @@ export async function POST(
           "content-type": "application/json",
           authorization: `Bearer ${deployerSecret}`,
         },
-        body: JSON.stringify({ slug: site.slug, hostname }),
+        body: JSON.stringify({ slug: site.slug, hostname, redirectTo }),
       },
     );
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -113,7 +131,7 @@ export async function POST(
     }
     // Persist so the Site page can list this domain (and its DNS records) across
     // reloads — the deployer only wrote CF + HOST_MAP, which PM can't query by Site.
-    await addSiteDomain(site.id, hostname);
+    await addSiteDomain(site.id, hostname, redirectTo);
     return NextResponse.json(data as CustomDomainResult);
   } catch {
     return NextResponse.json({ error: "deployerUnreachable" }, { status: 502 });

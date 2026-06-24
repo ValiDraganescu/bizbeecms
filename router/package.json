@@ -6,7 +6,8 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "test": "node --test 'src/**/*.test.ts'"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260617.1",

@@ -37,7 +37,15 @@ type DeployBody = {
   // Worker SECRET OPENROUTER_API_KEY; absent → fall back to the deployer global.
   openrouterApiKey?: string;
 };
-type AttachBody = { slug?: string; hostname?: string };
+type AttachBody = {
+  slug?: string;
+  hostname?: string;
+  // Optional: make this hostname a REDIRECT (301) to an absolute https URL
+  // instead of serving the Site. Used for apex→www. Still registers a CF custom
+  // hostname (cert) so the redirect host reaches our edge; only the HOST_MAP
+  // value differs (">"+url instead of the slug).
+  redirectTo?: string;
+};
 
 // --- Cloudflare config constants (deployer's source of truth) ---
 // PM has its own copy in ProjectManager/src/lib/config/hosts.ts (separate package,
@@ -189,6 +197,22 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
     return Response.json({ error: "badRequest" }, { status: 400 });
   }
 
+  // Optional redirect: validate it's an https URL whose host is a clean hostname
+  // (the router 301s to it verbatim, so reject anything that isn't a plain
+  // https origin — no open-redirect surface from a malformed value).
+  let redirectTo: string | null = null;
+  if (body.redirectTo != null && String(body.redirectTo).trim() !== "") {
+    try {
+      const u = new URL(String(body.redirectTo).trim());
+      if (u.protocol !== "https:" || !HOSTNAME_RE.test(u.hostname)) {
+        return Response.json({ error: "badRequest" }, { status: 400 });
+      }
+      redirectTo = `https://${u.hostname}`;
+    } catch {
+      return Response.json({ error: "badRequest" }, { status: 400 });
+    }
+  }
+
   const api = `https://api.cloudflare.com/client/v4/zones/${env.CF_ZONE_ID}/custom_hostnames`;
   const cfHeaders = {
     Authorization: `Bearer ${env.CF_API_TOKEN}`,
@@ -232,8 +256,9 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
     }
   }
 
-  // Record the route mapping so the router can resolve this Host to the Site.
-  await env.HOST_MAP.put(hostname, slug);
+  // Record the route mapping so the router can resolve this Host. A redirect host
+  // stores "><target>" (router 301s it); a serving host stores the bare slug.
+  await env.HOST_MAP.put(hostname, redirectTo ? `>${redirectTo}` : slug);
 
   // CF returns DV records under ssl.validation_records[] (and a one-CNAME DCV
   // delegation under ssl.dcv_delegation_records[]); some responses also carry the
@@ -255,6 +280,7 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
     ok: true,
     hostname,
     slug,
+    redirectTo,
     status: record?.status ?? "pending",
     ssl: ssl?.status ?? "pending",
     // Every record the customer might add at their registrar:

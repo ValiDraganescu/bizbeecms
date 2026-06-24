@@ -465,7 +465,7 @@
         "intro": "The customer adds a DNS record at their registrar that points their domain at us. Pick the path that matches the domain they want to use.",
         "cnameTitle": "Subdomain via CNAME (recommended)",
         "cnameBody": "For a subdomain such as www, add a CNAME pointing it at our router:",
-        "apexRedirect": "An apex (bare) domain can't be a CNAME, so redirect the apex (e.g. example.com → www.example.com) with a 301 at the registrar or a Cloudflare redirect rule.",
+        "apexRedirect": "An apex (bare) domain can't be a CNAME. You can either serve it directly with the A records below, or attach it here as a redirect to your www subdomain — PM sets the 301 up for you.",
         "apexTitle": "Apex domain via A records",
         "apexBody": "To serve the bare apex directly (no redirect), add both A records to Cloudflare's anycast IPs:",
         "moreTitle": "Other options",
@@ -473,6 +473,17 @@
         "moreAAAA": "AAAA records: optional IPv6 addresses alongside the A records; Cloudflare's anycast already answers over IPv6, so they are not required.",
         "moreDcv": "Certificate validation (DCV): after the domain is added we show a one-time TXT record to prove control. Providers that support DCV delegation can instead delegate via a _acme-challenge CNAME so renewals are automatic.",
         "certNote": "Once the record resolves to us, Cloudflare issues and renews the HTTPS certificate automatically."
+      },
+      "redirectsTo": "Redirects to {target}",
+      "apexOrCname": "…or, if your registrar supports a CNAME on the apex (CNAME flattening / ALIAS), use this instead of the A records:",
+      "mode": {
+        "legend": "What should this domain do?",
+        "serveLabel": "Serve this Site",
+        "serveHint": "Visitors to this domain see this Site.",
+        "redirectLabel": "Redirect to another domain",
+        "redirectHint": "Send visitors to another domain with a 301 — e.g. redirect the apex example.com to www.example.com.",
+        "targetLabel": "Redirect to",
+        "targetHint": "The domain to send visitors to, e.g. www.example.com. Defaults to www. for an apex."
       }
     }
   },

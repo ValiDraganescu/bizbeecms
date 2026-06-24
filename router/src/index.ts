@@ -34,6 +34,24 @@ async function hmacHex(secret: string, msg: string): Promise<string> {
  * redeploying this Worker on every new Site. Switch to service bindings only if
  * that hop's latency ever measurably matters.
  */
+/**
+ * Redirect target for a HOST_MAP value, or null if the host SERVES (no redirect).
+ * A redirect entry is "><absolute https target>" (e.g. apex example.com →
+ * ">https://www.example.com"). Returns the target with the REQUEST's path + query
+ * grafted on, so `example.com/foo?x=1` → `https://www.example.com/foo?x=1`.
+ */
+export function redirectTargetFor(
+  mapped: string,
+  requestUrl: string,
+): string | null {
+  if (!mapped.startsWith(">")) return null;
+  const to = new URL(mapped.slice(1));
+  const reqUrl = new URL(requestUrl);
+  to.pathname = reqUrl.pathname;
+  to.search = reqUrl.search;
+  return to.toString();
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const host = request.headers.get("host")?.toLowerCase() ?? "";
@@ -43,10 +61,17 @@ export default {
     // /attach-domain). Per-Site CMS deployments are reached directly on their
     // own bizbeecms-cms-<slug>.workers.dev URL, NOT through this router (the
     // `<slug>.site.bizbeecms.com` scheme was ruled out — needed a paid ACM cert).
-    const slug = await env.HOST_MAP.get(host);
-    if (!slug) {
+    const mapped = await env.HOST_MAP.get(host);
+    if (!mapped) {
       return new Response("Unknown domain", { status: 404 });
     }
+
+    // A HOST_MAP value prefixed ">" is a REDIRECT entry (see redirectTargetFor).
+    // 301 to the computed absolute URL; the target is OUR value (written by the
+    // deployer on attach), never request-supplied, so it's a safe redirect.
+    const redirect = redirectTargetFor(mapped, request.url);
+    if (redirect) return Response.redirect(redirect, 301);
+    const slug = mapped;
 
     // Rebuild the URL against the Site's worker, preserving path + query.
     const target = new URL(request.url);

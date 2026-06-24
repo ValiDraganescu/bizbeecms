@@ -68,10 +68,15 @@ export default async function SiteDetailPage({
   const creator = await findUserById(site.createdBy);
   const domains = await listSiteDomains(site.id);
 
-  // Public URL of the deployed CMS Worker (derived from APP_ORIGIN), if deployed.
+  // Public URL of the deployed CMS Worker, if deployed. A Site with a custom
+  // domain attached is served on it (CF-for-SaaS), so prefer that over the raw
+  // workers.dev URL. ponytail: first domain wins; multi-domain Sites are rare and
+  // any attached domain routes to the same Worker.
   const workerUrl =
     site.status === "deployed" && site.workerName
-      ? await cmsWorkerUrl(site.workerName)
+      ? domains.length > 0
+        ? `https://${domains[0].hostname}`
+        : await cmsWorkerUrl(site.workerName)
       : null;
 
   return (
@@ -195,7 +200,10 @@ export default async function SiteDetailPage({
               <CustomDomainForm
                 siteId={site.id}
                 deployed={site.status === "deployed"}
-                domains={domains.map((d) => d.hostname)}
+                domains={domains.map((d) => ({
+                  hostname: d.hostname,
+                  redirectTo: d.redirectTo,
+                }))}
               />
             </CardContent>
           </Card>

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canUserCreateSite } from "@/lib/site/authz";
-import { listSitesForUser } from "@/lib/site/site";
+import { listSitesForUser, primaryDomainBySite } from "@/lib/site/site";
 import { cmsWorkerUrl } from "@/lib/deploy/worker-url";
 import { displayCmsVersion } from "@/lib/deploy/cms-version";
 import { isUpdateAvailable } from "@/lib/deploy/cms-releases";
@@ -46,11 +46,18 @@ export default async function SitesPage() {
   const releases = await fetchCmsReleases();
   const latestVersion = releases[0]?.version ?? null;
 
-  // Public CMS URL per deployed Site (derived from APP_ORIGIN), for the Open link.
+  // Public CMS URL per deployed Site, for the Open link. A custom domain (CF-for-
+  // SaaS) is preferred over the raw workers.dev URL; batch-load them (no N+1).
+  const customDomains = await primaryDomainBySite(
+    sites.filter((s) => s.status === "deployed").map((s) => s.id),
+  );
   const urls = new Map<string, string>();
   for (const site of sites) {
     if (site.status === "deployed" && site.workerName) {
-      const url = await cmsWorkerUrl(site.workerName);
+      const domain = customDomains.get(site.id);
+      const url = domain
+        ? `https://${domain}`
+        : await cmsWorkerUrl(site.workerName);
       if (url) urls.set(site.id, url);
     }
   }

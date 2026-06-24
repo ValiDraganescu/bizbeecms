@@ -40,6 +40,11 @@ export const CUSTOM_DOMAIN_FALLBACK_ORIGIN = "cf.bizbeecms.com";
 /** CF anycast IPs for apex domains that can't CNAME — used as A records. */
 export const CUSTOM_DOMAIN_APEX_IPS = ["104.21.34.242", "172.67.210.25"];
 
+/** A bare apex domain is exactly two labels (`example.com`); more = a subdomain. */
+export function isApex(hostname: string): boolean {
+  return hostname.trim().toLowerCase().split(".").length === 2;
+}
+
 /**
  * The DNS records a customer adds to point `hostname` at us. Deterministic from
  * the hostname (NOT the volatile cert-validation TXT, which CF issues per attach):
@@ -51,11 +56,16 @@ export function routingRecordsForHost(hostname: string): {
   isApex: boolean;
   cname: { name: string; value: string };
   apexA: { name: string; values: string[] };
+  // Apex via CNAME flattening — for registrars that support a CNAME on the root
+  // (e.g. Cloudflare Registrar, Namecheap, many others). Same target as a
+  // subdomain CNAME; the operator picks A OR CNAME-flatten by what their registrar
+  // allows. Subdomains use `cname` directly and ignore this.
+  apexCname: { name: string; value: string };
 } {
-  const isApex = hostname.split(".").length === 2;
   return {
-    isApex,
+    isApex: isApex(hostname),
     cname: { name: hostname, value: CUSTOM_DOMAIN_FALLBACK_ORIGIN },
     apexA: { name: hostname, values: CUSTOM_DOMAIN_APEX_IPS },
+    apexCname: { name: hostname, value: CUSTOM_DOMAIN_FALLBACK_ORIGIN },
   };
 }

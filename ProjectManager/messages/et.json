@@ -465,7 +465,7 @@
         "intro": "Klient lisab oma registripidaja juures DNS-kirje, mis suunab tema domeeni meile. Vali tee selle järgi, millist domeeni ta soovib kasutada.",
         "cnameTitle": "Alamdomeen CNAME-iga (soovitatav)",
         "cnameBody": "Alamdomeeni jaoks, näiteks www, lisa CNAME, mis osutab meie ruuterile:",
-        "apexRedirect": "Juurdomeen (ilma alamdomeenita) ei saa olla CNAME, seega suuna juur (nt example.com → www.example.com) 301-ümbersuunamisega registripidaja juures või Cloudflare'i ümbersuunamisreegliga.",
+        "apexRedirect": "Juurdomeen ei saa olla CNAME. Võid kas teenindada seda otse allolevate A-kirjetega või lisada selle siia ümbersuunamisena oma www-alamdomeenile — PM seadistab 301-suunamise sinu eest.",
         "apexTitle": "Juurdomeen A-kirjetega",
         "apexBody": "Et teenindada juurdomeeni otse (ilma ümbersuunamiseta), lisa mõlemad A-kirjed Cloudflare'i anycast-IP-aadressidele:",
         "moreTitle": "Muud valikud",
@@ -473,6 +473,17 @@
         "moreAAAA": "AAAA-kirjed: valikulised IPv6-aadressid A-kirjete kõrval; Cloudflare'i anycast vastab juba IPv6 kaudu, seega need pole nõutavad.",
         "moreDcv": "Sertifikaadi kinnitamine (DCV): pärast domeeni lisamist näitame ühekordset TXT-kirjet kontrolli tõestamiseks. DCV-delegeerimist toetavad teenusepakkujad saavad delegeerida _acme-challenge CNAME-iga, nii et uuendamine on automaatne.",
         "certNote": "Kui kirje osutab meile, väljastab ja uuendab Cloudflare HTTPS-sertifikaadi automaatselt."
+      },
+      "redirectsTo": "Suunatakse ümber aadressile {target}",
+      "apexOrCname": "…või kui sinu registripidaja toetab CNAME-kirjet juurdomeenil (CNAME-lamendamine / ALIAS), kasuta seda A-kirjete asemel:",
+      "mode": {
+        "legend": "Mida see domeen tegema peaks?",
+        "serveLabel": "Teeninda seda saiti",
+        "serveHint": "Sellele domeenile tulevad külastajad näevad seda saiti.",
+        "redirectLabel": "Suuna ümber teisele domeenile",
+        "redirectHint": "Saada külastajad teisele domeenile 301-ümbersuunamisega — nt suuna juurdomeen example.com aadressile www.example.com.",
+        "targetLabel": "Suuna ümber aadressile",
+        "targetHint": "Domeen, kuhu külastajad suunatakse, nt www.example.com. Vaikimisi www. juurdomeeni puhul."
       }
     }
   },

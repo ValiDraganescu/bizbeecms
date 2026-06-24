@@ -15,6 +15,7 @@ import {
 } from "@/components/ui";
 import {
   routingRecordsForHost,
+  isApex,
   CUSTOM_DOMAIN_FALLBACK_ORIGIN,
   CUSTOM_DOMAIN_APEX_IPS,
 } from "@/lib/config/hosts";
@@ -40,11 +41,13 @@ export function CustomDomainForm({
 }: {
   siteId: string;
   deployed: boolean;
-  domains: string[];
+  domains: { hostname: string; redirectTo: string | null }[];
 }) {
   const t = useTranslations("sites.customDomain");
   const router = useRouter();
   const [hostname, setHostname] = useState("");
+  const [mode, setMode] = useState<"serve" | "redirect">("serve");
+  const [redirectTo, setRedirectTo] = useState("");
   const [error, setError] = useState<CustomDomainError | null>(null);
   const [pending, setPending] = useState(false);
   // The cert-validation records CF returned for the most recent attach, keyed by
@@ -53,21 +56,27 @@ export function CustomDomainForm({
     Record<string, CustomDomainResult["dns"]>
   >({});
 
-  async function attach(host: string) {
+  // Default redirect target = www.<apex> when the entered host is a bare apex,
+  // so the common apex→www case is one click. The operator can override it.
+  const apexDefault = isApex(hostname) ? `www.${hostname.trim()}` : "";
+
+  async function attach(host: string, redirect?: string | null) {
     setError(null);
     setPending(true);
     try {
       const res = await fetch(`/api/sites/${siteId}/custom-domain`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ hostname: host }),
+        body: JSON.stringify({ hostname: host, redirectTo: redirect ?? null }),
       });
       const data = (await res.json().catch(() => ({}))) as
         | CustomDomainResult
         | { error?: CustomDomainError };
       if (res.ok && "ok" in data && data.ok) {
-        setValidation((v) => ({ ...v, [data.hostname]: data.dns }));
+        if (data.dns) setValidation((v) => ({ ...v, [data.hostname]: data.dns }));
         setHostname("");
+        setRedirectTo("");
+        setMode("serve");
         router.refresh(); // reload the persisted domain list
         return;
       }
@@ -97,12 +106,13 @@ export function CustomDomainForm({
       {domains.length > 0 ? (
         <div className="flex flex-col gap-4">
           <h3 className="text-sm font-semibold">{t("attachedHeading")}</h3>
-          {domains.map((host) => (
+          {domains.map((d) => (
             <DomainCard
-              key={host}
-              host={host}
-              validation={validation[host] ?? null}
-              onShowValidation={() => attach(host)}
+              key={d.hostname}
+              host={d.hostname}
+              redirectTo={d.redirectTo}
+              validation={validation[d.hostname] ?? null}
+              onShowValidation={() => attach(d.hostname, d.redirectTo)}
               busy={pending}
               t={t}
             />
@@ -114,7 +124,13 @@ export function CustomDomainForm({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (hostname.trim()) attach(hostname.trim().toLowerCase());
+          const host = hostname.trim().toLowerCase();
+          if (!host) return;
+          const target =
+            mode === "redirect"
+              ? (redirectTo.trim() || apexDefault).toLowerCase()
+              : null;
+          attach(host, target);
         }}
         className="flex flex-col gap-3"
         noValidate
@@ -133,8 +149,64 @@ export function CustomDomainForm({
             disabled={!deployed || pending}
           />
           <FieldHint>{t("hint")}</FieldHint>
-          {error ? <FieldError>{t(`errors.${error}`)}</FieldError> : null}
         </Field>
+
+        {/* Serve vs redirect. Default serve; redirect powers apex→www. */}
+        <fieldset className="flex flex-col gap-2" disabled={!deployed || pending}>
+          <legend className="text-sm font-medium">{t("mode.legend")}</legend>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="mode"
+              value="serve"
+              checked={mode === "serve"}
+              onChange={() => setMode("serve")}
+              className="mt-1"
+            />
+            <span>
+              <span className="font-medium">{t("mode.serveLabel")}</span>
+              <span className="block text-xs text-foreground-muted">
+                {t("mode.serveHint")}
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="mode"
+              value="redirect"
+              checked={mode === "redirect"}
+              onChange={() => setMode("redirect")}
+              className="mt-1"
+            />
+            <span>
+              <span className="font-medium">{t("mode.redirectLabel")}</span>
+              <span className="block text-xs text-foreground-muted">
+                {t("mode.redirectHint")}
+              </span>
+            </span>
+          </label>
+        </fieldset>
+
+        {mode === "redirect" ? (
+          <Field>
+            <FieldLabel htmlFor="redirectTo">{t("mode.targetLabel")}</FieldLabel>
+            <Input
+              id="redirectTo"
+              name="redirectTo"
+              placeholder={apexDefault || "www.example.com"}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              value={redirectTo}
+              onChange={(e) => setRedirectTo(e.target.value)}
+              disabled={!deployed || pending}
+            />
+            <FieldHint>{t("mode.targetHint")}</FieldHint>
+          </Field>
+        ) : null}
+
+        {error ? <FieldError>{t(`errors.${error}`)}</FieldError> : null}
         <Button
           type="submit"
           loading={pending}
@@ -201,31 +273,49 @@ function SetupGuide({ t }: { t: ReturnType<typeof useTranslations> }) {
 
 function DomainCard({
   host,
+  redirectTo,
   validation,
   onShowValidation,
   busy,
   t,
 }: {
   host: string;
+  redirectTo: string | null;
   validation: CustomDomainResult["dns"] | null;
   onShowValidation: () => void;
   busy: boolean;
   t: ReturnType<typeof useTranslations>;
 }) {
   const routing = routingRecordsForHost(host);
+  const redirectHost = redirectTo?.replace(/^https?:\/\//, "") ?? null;
   return (
     <div className="rounded-lg border border-border p-4">
       <p className="font-medium">{host}</p>
+      {redirectHost ? (
+        <p className="mt-0.5 text-xs text-foreground-muted">
+          {t("redirectsTo", { target: redirectHost })}
+        </p>
+      ) : null}
 
-      {/* Routing records — always shown, derived from the hostname. */}
+      {/* Routing records — always shown, derived from the hostname. The host still
+          needs to reach our edge (and get a cert) even when it only redirects, so
+          these apply to serve AND redirect entries. */}
       <p className="mt-3 text-sm font-medium">{t("step1Routing")}</p>
       <dl className="mt-1 flex flex-col gap-2">
         {routing.isApex ? (
           <>
+            {/* Apex: A records OR a flattened CNAME — pick what the registrar
+                supports. Both are valid; show both. */}
             <p className="text-xs text-foreground-muted">{t("apexUseA")}</p>
             {routing.apexA.values.map((ip) => (
               <DnsRow key={ip} type="A" name={routing.apexA.name} value={ip} />
             ))}
+            <p className="text-xs text-foreground-muted">{t("apexOrCname")}</p>
+            <DnsRow
+              type="CNAME"
+              name={routing.apexCname.name}
+              value={routing.apexCname.value}
+            />
           </>
         ) : (
           <DnsRow

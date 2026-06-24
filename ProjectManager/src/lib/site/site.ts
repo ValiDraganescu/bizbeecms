@@ -389,6 +389,30 @@ export async function listSiteDomains(siteId: string) {
 }
 
 /**
+ * For a set of Sites, the newest custom hostname of each (no N+1 on the list
+ * page). Sites with no custom domain are absent from the map.
+ */
+export async function primaryDomainBySite(
+  siteIds: string[],
+): Promise<Map<string, string>> {
+  const byId = new Map<string, string>();
+  if (siteIds.length === 0) return byId;
+  const db = await getDb();
+  const rows = await db
+    .select()
+    .from(schema.siteDomains)
+    .where(inArray(schema.siteDomains.siteId, siteIds))
+    .orderBy(desc(schema.siteDomains.createdAt));
+  // Newest-first: the first SERVE row per siteId is its primary public URL.
+  // Redirect hosts (redirectTo set) aren't where the Site is served, so skip them.
+  for (const r of rows) {
+    if (r.redirectTo) continue;
+    if (!byId.has(r.siteId)) byId.set(r.siteId, r.hostname);
+  }
+  return byId;
+}
+
+/**
  * Record a custom domain on a Site (idempotent on hostname — re-attaching an
  * existing one is a no-op, so the deployer's idempotent /attach-domain stays
  * idempotent end to end). The hostname is globally unique across Sites.
@@ -396,12 +420,23 @@ export async function listSiteDomains(siteId: string) {
 export async function addSiteDomain(
   siteId: string,
   hostname: string,
+  redirectTo?: string | null,
 ): Promise<void> {
   const db = await getDb();
   await db
     .insert(schema.siteDomains)
-    .values({ id: crypto.randomUUID(), siteId, hostname })
-    .onConflictDoNothing({ target: schema.siteDomains.hostname });
+    .values({
+      id: crypto.randomUUID(),
+      siteId,
+      hostname,
+      redirectTo: redirectTo ?? null,
+    })
+    .onConflictDoUpdate({
+      // Re-attaching is idempotent on the hostname, but a flip between serve and
+      // redirect (or a changed redirect target) must take — update redirectTo.
+      target: schema.siteDomains.hostname,
+      set: { redirectTo: redirectTo ?? null },
+    });
 }
 
 /** Remove a custom domain from a Site (HOST_MAP cleanup is the deployer's job). */

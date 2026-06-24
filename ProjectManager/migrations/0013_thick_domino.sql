@@ -1,0 +1,1 @@
+ALTER TABLE `site_domains` ADD `redirect_to` text;

@@ -148,6 +148,11 @@ export const siteDomains = sqliteTable(
       .notNull()
       .references(() => sites.id, { onDelete: "cascade" }),
     hostname: text("hostname").notNull(),
+    // NULL → this hostname SERVES the Site (proxied by the router). Set → this
+    // hostname is a REDIRECT: the router 301s it to `redirectTo` (e.g. an apex
+    // `example.com` redirecting to `www.example.com`). Either way the hostname is
+    // still a CF-for-SaaS custom hostname (it needs a cert to reach our edge).
+    redirectTo: text("redirect_to"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
