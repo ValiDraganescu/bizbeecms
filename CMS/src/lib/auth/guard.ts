@@ -18,6 +18,7 @@ import { findUserById } from "@/db/user-store";
 import type { CmsRole } from "@/db/schema";
 import { SESSION_COOKIE, readSessionCookie, type GuardDecision } from "./guard-core";
 import { canManageUsers, canManageApiKeys } from "./roles";
+import { isPmSsoUser } from "./pm-sso";
 
 /**
  * Resolve the current session cookie (read via `next/headers`, so it works for
@@ -88,6 +89,35 @@ export async function requireRole(
   }
   if (!decision.role || !allowed(decision.role)) {
     return Response.json({ error: "forbidden", reason: "forbidden" }, { status: 403 });
+  }
+  return null;
+}
+
+/**
+ * Is the CURRENT request's signed-in user a PM-SSO operator? Resolves the session
+ * → user row and applies the pure `isPmSsoUser` predicate. Returns false for
+ * not-signed-in / local / Google users (fail-closed). Used by debug-only surfaces
+ * (chat export, system-prompt editor) to decide whether to even show the control.
+ */
+export async function currentUserIsPmSso(): Promise<boolean> {
+  const session = await getSession();
+  if (!session) return false;
+  const user = await findUserById(session.userId);
+  return isPmSsoUser(user);
+}
+
+/**
+ * Guard a PM-SSO-only /api/* route. First requires a signed-in admin (401 like
+ * `requireAdmin`), then requires the user to be a PM-SSO operator — 403 otherwise.
+ * Server-side enforcement for the debug-only PM-SSO tools; the UI also hides the
+ * control, but THIS is the real gate (a non-SSO caller hitting the route is denied
+ * regardless of any field they send).
+ */
+export async function requirePmSso(request: Request): Promise<Response | null> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+  if (!(await currentUserIsPmSso())) {
+    return Response.json({ error: "forbidden", reason: "notPmSso" }, { status: 403 });
   }
   return null;
 }

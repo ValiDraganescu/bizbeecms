@@ -60,7 +60,10 @@
       "noTools": "Täällä ei ole työkaluja.",
       "prompt": "Järjestelmäkehote",
       "loading": "Ladataan…",
-      "error": "Virhe: {message}"
+      "error": "Virhe: {message}",
+      "export": "Vie keskustelu",
+      "exporting": "Viedään…",
+      "exportError": "Vienti epäonnistui: {message}"
     },
     "enterMode": {
       "send": "↵ Lähetä",

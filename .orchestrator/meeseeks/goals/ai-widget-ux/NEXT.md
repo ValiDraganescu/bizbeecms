@@ -1,26 +1,28 @@
 # Note to the next Meeseeks (ai-widget-ux)
 
-Tool-call PERSISTENCE is DONE (2026-06-24): tool cards round-trip through history, stored inside
-the existing `chat_thread.messages` JSON (NO migration). `lib/chat/history.ts` `ThreadMessage` has
-`tools?: StoredTool[]` + exported `sanitizeTools` (assistant-only, plain-objects, cap 50). `seed()`
-restores them. Reloaded cards expand (input/output) just like live ones. See CAVEATS.
+Chat EXPORT is DONE (2026-06-24). The shared `isPmSsoUser` predicate +
+`requirePmSso`/`currentUserIsPmSso` server gate are BUILT (`CMS/src/lib/auth/pm-sso.ts`
++ `guard.ts`) — REUSE them, don't rebuild. See CAVEATS for the known `@pm.sso` backfill leak.
 
-**Remaining open TODOs — both are PM-SSO debug tasks (the LAST two in BACKLOG):**
-1. **Export chat as full model-payload JSON — PM-SSO only.** Gated `GET /api/chat/export` mirroring
-   the existing `GET /api/chat/debug` route; widget downloads the JSON. Build the pure
-   `isPmSsoUser(user)` predicate ONCE here (sso→true, google/local→false) + node test — the
-   system-prompt task reuses it. Server-gate (403 non-SSO), AND hide the button for non-SSO.
-2. **In-chat system-prompt editor + versions — PM-SSO only.** New D1 table + migration + gated
-   `/api/chat/prompts` CRUD; a NEW version seeds from the assembled default (`assembleSystemPrompt`,
-   reuse the debug builder); selecting a version applies to the TESTER's SESSION ONLY via a
-   per-request `systemPromptOverride` on the chat POST (route uses it only when present AND caller is
-   PM-SSO; IGNORED for non-SSO). Never changes the site default. Do the export task first (or build
-   `isPmSsoUser` here) — they share it. Read the CAVEATS block on these two before starting.
+**The ONE remaining open TODO (last in BACKLOG):**
+**In-chat system-prompt editor + versions — PM-SSO only.**
+- New per-Site D1 table (id, name/label, prompt text, createdAt) + migration + gated
+  `/api/chat/prompts` CRUD route. Gate with `requirePmSso` (already built).
+- A NEW version SEEDS from the assembled default (`assembleSystemPrompt`; reuse the
+  `GET /api/chat/debug` builder which already returns `systemPrompt`). The edited text IS
+  the version (full prompt, not a layer).
+- Selecting a version applies to the TESTER's SESSION ONLY: the widget sends a per-request
+  `systemPromptOverride` on the chat POST; `POST /api/chat/route.ts` uses it INSTEAD of
+  `assembleSystemPrompt` ONLY when present AND caller is PM-SSO (reuse `currentUserIsPmSso`);
+  IGNORED for non-SSO. NEVER changes the site default real end-users get.
+- Pure helpers (node-tested): validate-prompt-input + "effective prompt = override-if-present-
+  and-sso else assembled" decision.
+- UI: versions dropdown + edit/save/new/delete near the debug panel; PM-SSO only (the debug
+  route already returns `isPmSso`).
+- EN/FI/ET for all new strings. Read the CAVEATS block on this task before starting.
 
-Gotchas (all in CAVEATS):
-- `CMS/messages/{en,fi,et}.json` SHARED with ai-openrouter — rebuild from `git show HEAD:...` + only
-  your keys if a plain `git add` would sweep their uncommitted keys. Never `-A`.
-- Do NOT run `bundle:cms` — auto-regens on PM deploy; captures other loops' uncommitted edits.
-- `CMS/src/lib/chat/models.ts` is ai-openrouter's; don't touch it; tsc/build may transiently fail
-  mid-their-edit — re-run.
-- Gate: CMS `npx tsc --noEmit` + `npm test` + `npx opennextjs-cloudflare build` (dev OFF on :3601).
+Gate (all green this run): CMS `npx tsc --noEmit` + `npm test` (848 pass) +
+`npx opennextjs-cloudflare build` (dev OFF on :3601). Do NOT run `bundle:cms` — auto-regens on
+PM deploy. `CMS/src/lib/chat/models.ts` is ai-openrouter's; tsc/build may transiently fail
+mid-their-edit — re-run. `messages/{en,fi,et}.json` SHARED — stage only your keys (rebuild from
+`git show HEAD:...` if a plain add would sweep their uncommitted keys).

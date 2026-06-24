@@ -13,7 +13,7 @@ import {
   resolveRequestContext,
 } from "@/lib/chat/tool-scopes";
 import { assembleSystemPrompt } from "@/lib/chat/assemble-prompt";
-import { requireAdmin } from "@/lib/auth/guard";
+import { requireAdmin, currentUserIsPmSso } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -38,5 +38,9 @@ export async function GET(request: Request): Promise<Response> {
     );
   }
 
-  return Response.json({ context, systemPrompt, tools });
+  // PM-SSO flag so the debug panel can show the PM-SSO-only "Export chat" control
+  // (the export route itself is the real gate).
+  const isPmSso = await currentUserIsPmSso();
+
+  return Response.json({ context, systemPrompt, tools, isPmSso });
 }

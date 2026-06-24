@@ -54,6 +54,22 @@ Read every line before working. Each entry was learned the hard way by a previou
   (it's opaque) — but `seed()` casts `m.tools as ToolResult[]`, so a card field the renderer now
   requires that an OLD stored thread lacks must be optional/defensive in the render layer (it already
   is: `toolSummary`/`formatBlob` tolerate missing fields). Don't add a tools column/migration — wasteful.
+- **`isPmSsoUser` is BUILT (DONE 2026-06-24) — reuse it, don't rebuild.** Pure
+  `CMS/src/lib/auth/pm-sso.ts`: `isPmSsoUser({email})` / `isPmSsoEmail(email)` match the synthetic
+  `@pm.sso` suffix (case-insensitive, fail-closed). Server gate = `requirePmSso(request)` +
+  `currentUserIsPmSso()` in `guard.ts` (401 not-signed-in → 403 non-SSO). The system-prompt task
+  MUST reuse these, not duplicate. **Known leak (note for that task):** the user table has NO
+  origin column; `upsertSsoUser` BACKFILLS a synthetic `@pm.sso` row to the operator's REAL email
+  once PM returns it — so a long-lived SSO operator can stop matching `@pm.sso` and lose access to
+  the debug tools. Acceptable for now (debug-only); the proper fix is an explicit `origin` column
+  on `user`. Don't widen the predicate to "passwordHash IS NULL" — that'd also let Google users in,
+  which the spec forbids.
+- **Export route is `POST /api/chat/export`, NOT GET (DONE 2026-06-24).** The spec said GET mirroring
+  debug, but the EXACT payload needs the transcript MESSAGES which are client-side — a GET can't see
+  them. So it's a POST taking the chat-POST body shape (`{messages, context, model}`), re-assembling
+  system prompt + messages + tool schemas + resolved model and returning JSON (no model call). The
+  debug panel filters empty-content turns before sending (an in-progress assistant turn would 400).
+  `GET /api/chat/debug` now also returns `isPmSso` so the panel shows the export button only for SSO.
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.

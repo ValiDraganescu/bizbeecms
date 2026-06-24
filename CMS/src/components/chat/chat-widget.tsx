@@ -447,7 +447,7 @@ export function ChatWidget() {
                 )}
               </div>
             ) : debug ? (
-              <ChatDebugPanel />
+              <ChatDebugPanel messages={messages} model={model} />
             ) : (
               <ChatConversation
                 chat={chat}

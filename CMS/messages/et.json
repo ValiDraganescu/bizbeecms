@@ -60,7 +60,10 @@
       "noTools": "Siin pole tööriistu.",
       "prompt": "Süsteemiviip",
       "loading": "Laadimine…",
-      "error": "Viga: {message}"
+      "error": "Viga: {message}",
+      "export": "Ekspordi vestlus",
+      "exporting": "Ekspordin…",
+      "exportError": "Eksport ebaõnnestus: {message}"
     },
     "enterMode": {
       "send": "↵ Saada",

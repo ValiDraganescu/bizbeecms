@@ -60,7 +60,10 @@
       "noTools": "No tools available here.",
       "prompt": "System prompt",
       "loading": "Loading…",
-      "error": "Error: {message}"
+      "error": "Error: {message}",
+      "export": "Export chat",
+      "exporting": "Exporting…",
+      "exportError": "Export failed: {message}"
     },
     "enterMode": {
       "send": "↵ Send",

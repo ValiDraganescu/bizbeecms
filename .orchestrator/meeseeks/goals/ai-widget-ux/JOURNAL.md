@@ -110,3 +110,28 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   auto-regens on PM deploy). No new i18n strings (no visible label changed).
 - **Files:** CMS/src/lib/chat/history.ts (+new history.test.ts),
   CMS/src/components/chat/chat-widget.tsx, CMS/src/components/chat/chat-conversation.tsx.
+
+## 2026-06-24 14:26 — Export chat as full model-payload JSON (PM-SSO only)
+- **Status:** DONE
+- **What I did:** Built the PM-SSO debug export. (1) Pure `CMS/src/lib/auth/pm-sso.ts`:
+  `isPmSsoEmail`/`isPmSsoUser` — matches the synthetic `@pm.sso` email (the documented SSO
+  signal; case-insensitive/trimmed, fail-closed on null/empty). +`pm-sso.test.ts` (3 cases:
+  sso→true, gmail/acme/local→false, null/empty→false). (2) `guard.ts`: `currentUserIsPmSso()`
+  (resolves session→user→predicate) + `requirePmSso(request)` (401 not-signed-in, else 403 if
+  not PM-SSO) — the REAL server gate, built ONCE for the system-prompt task to reuse. (3) New
+  `POST /api/chat/export` route: chose POST over the spec's GET because the EXACT payload needs
+  the transcript MESSAGES which are client-side — it re-assembles system prompt
+  (`assembleSystemPrompt`, same as `withSystemPrompt`) + messages + `toolSchemasForContext` +
+  `resolveModel` (validated against catalog cache), NO model call; returns JSON. (4) `GET
+  /api/chat/debug` now also returns `isPmSso` so the panel shows the button only for SSO. (5)
+  `ChatDebugPanel` gained `messages`/`model` props + an "Export chat" button (download
+  `chat-payload-<context>.json` via Blob; drops empty-content turns so the route won't 400 on an
+  in-progress assistant turn); wired from `chat-widget.tsx`. EN/FI/ET `chat.debug.{export,
+  exporting,exportError}`.
+- **Verified:** `node --test pm-sso.test.ts` 3 pass; `npx tsc --noEmit` clean; full `npm test`
+  848 pass; `npx opennextjs-cloudflare build` succeeded (dev confirmed OFF, :3601 free). Did NOT
+  regen the PM cms-bundle (concurrent loops share the CMS dir; auto-regens on PM deploy).
+- **Files:** CMS/src/lib/auth/pm-sso.ts (+pm-sso.test.ts), CMS/src/lib/auth/guard.ts,
+  CMS/src/app/api/chat/export/route.ts (new), CMS/src/app/api/chat/debug/route.ts,
+  CMS/src/components/chat/chat-debug-panel.tsx, CMS/src/components/chat/chat-widget.tsx,
+  CMS/messages/{en,fi,et}.json (only the three chat.debug keys staged).
