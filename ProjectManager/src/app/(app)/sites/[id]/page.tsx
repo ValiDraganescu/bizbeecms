@@ -142,10 +142,8 @@ export default async function SiteDetailPage({
                     >
                       {t("detail.openSite")}
                     </a>
-                    {/* ?from=pm so the CMS shows the SSO button even when the admin
-                        is opened directly (not via a PM referer). */}
                     <a
-                      href={`${workerUrl}/admin?from=pm`}
+                      href={`${workerUrl}/admin`}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-ring"

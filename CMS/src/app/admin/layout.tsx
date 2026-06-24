@@ -72,17 +72,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     loginError = null;
   }
 
-  // Show the SSO button ONLY when the visitor came from PM — matched against the
-  // configured PM_ORIGIN (never a hardcoded domain). `?from=pm` is the explicit
-  // hint; Referer origin is the fallback.
-  const reqUrl = h.get("x-forwarded-url") ?? h.get("referer"); // best-effort current URL
-  let fromParam: string | null = null;
-  try {
-    if (reqUrl) fromParam = new URL(reqUrl).searchParams.get("from");
-  } catch {
-    fromParam = null;
-  }
-  const showSso = shouldShowSsoButton(h.get("referer"), fromParam, pmOrigin);
+  // Show the SSO button whenever this CMS can honor the SSO handoff (PM_ORIGIN
+  // set). Not gated on a PM referer/?from=pm — that was unreliable (a Next layout
+  // doesn't get the query string, and an apex→www 301 strips the Referer).
+  const showSso = shouldShowSsoButton(pmOrigin);
 
   // Build the SSO handoff URL behind the button (unchanged handoff, just gated).
   // The public host the BROWSER is on, for the SSO return URL. The router proxies

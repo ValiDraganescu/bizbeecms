@@ -71,26 +71,13 @@ test("login namespace exists with identical non-empty keys in EN/FI/ET", () => {
 // ── SSO button visibility (origin match from config, never hardcoded) ────────
 const PM = "https://manager.bizbeecms.com";
 
-test("shouldShowSsoButton: ?from=pm hint → show (any referer)", () => {
-  assert.equal(shouldShowSsoButton(null, "pm", PM), true);
-  assert.equal(shouldShowSsoButton("https://evil.example.com/x", "pm", PM), true);
-});
-
-test("shouldShowSsoButton: referer origin === PM_ORIGIN → show", () => {
-  assert.equal(shouldShowSsoButton(`${PM}/sites/abc`, null, PM), true);
-  // trailing slash / path on the configured origin don't matter (origin compared)
-  assert.equal(shouldShowSsoButton(`${PM}/`, null, `${PM}/`), true);
-});
-
-test("shouldShowSsoButton: foreign / absent referer → hide", () => {
-  assert.equal(shouldShowSsoButton("https://other.example.com/x", null, PM), false);
-  assert.equal(shouldShowSsoButton(null, null, PM), false);
-  assert.equal(shouldShowSsoButton("not-a-url", null, PM), false);
+test("shouldShowSsoButton: PM_ORIGIN configured → show", () => {
+  assert.equal(shouldShowSsoButton(PM), true);
 });
 
 test("shouldShowSsoButton: missing pmOrigin → never show (fail-closed)", () => {
-  assert.equal(shouldShowSsoButton(`${PM}/x`, "pm", undefined), false);
-  assert.equal(shouldShowSsoButton(`${PM}/x`, "pm", ""), false);
+  assert.equal(shouldShowSsoButton(undefined), false);
+  assert.equal(shouldShowSsoButton(""), false);
 });
 
 // ── config gate (fail-closed when unconfigured) ─────────────────────────────

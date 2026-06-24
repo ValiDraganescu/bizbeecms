@@ -53,30 +53,22 @@ export function readSessionCookie(cookieHeader: string | null): string {
 }
 
 /**
- * Should the login page show the "Sign in with BizbeeCMS" SSO button? Only when
- * the visitor arrived from PM. We detect that from an explicit `?from=pm` query
- * hint OR a `Referer` whose origin matches the configured `PM_ORIGIN` (NEVER a
- * hardcoded domain — same config-driven host handling as `forwarded-host`). The
- * SSO handoff itself stays gated behind this button so operators keep their flow
- * while a client's own team just sees email/password.
+ * Should the login page show the "Sign in with BizbeeCMS" SSO button? Whenever a
+ * `PM_ORIGIN` is configured — i.e. whenever this CMS CAN honor the SSO handoff.
  *
- * Pure + node-testable: takes the raw `Referer` header, the `from` param, and the
- * configured origin; no fetch/env. Missing `pmOrigin` ⇒ never show (fail-closed:
- * an unconfigured CMS can't honor the SSO handoff anyway).
+ * We previously gated this on the visitor arriving from PM (a `?from=pm` hint or a
+ * matching `Referer`), but that detection was fragile: a Next layout doesn't
+ * reliably receive the query string, and an apex→www 301 (or any cross-host hop)
+ * strips the Referer — so a PM admin opening /admin would lose the button. Showing
+ * it whenever PM_ORIGIN is set is simpler and safe: the button only LINKS to PM's
+ * cms-sso, which is itself access-gated, so a client's own team clicking it is just
+ * bounced by PM's auth. Email/password stays the primary path for non-PM users.
+ *
+ * Pure + node-testable: just the configured origin, no fetch/env. Missing
+ * `pmOrigin` ⇒ never show (fail-closed: an unconfigured CMS can't honor SSO).
  */
-export function shouldShowSsoButton(
-  referer: string | null,
-  fromParam: string | null,
-  pmOrigin: string | undefined,
-): boolean {
-  if (!pmOrigin) return false;
-  if (fromParam === "pm") return true;
-  if (!referer) return false;
-  try {
-    return new URL(referer).origin === new URL(pmOrigin).origin;
-  } catch {
-    return false;
-  }
+export function shouldShowSsoButton(pmOrigin: string | undefined): boolean {
+  return Boolean(pmOrigin);
 }
 
 export type ValidateResponse = { ok?: unknown; userId?: unknown };
