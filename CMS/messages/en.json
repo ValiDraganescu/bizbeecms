@@ -20,6 +20,7 @@
     "send": "Send",
     "sending": "Sending…",
     "thinking": "Thinking…",
+    "scrollToLatest": "Jump to latest",
     "you": "You",
     "assistant": "Assistant",
     "error": "Error: {message}",

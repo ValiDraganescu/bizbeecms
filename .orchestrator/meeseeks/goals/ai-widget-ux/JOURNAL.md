@@ -197,3 +197,20 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   session + saved version).
 - **Files:** CMS/src/components/chat/chat-widget.tsx, CMS/src/components/chat/chat-debug-panel.tsx,
   CMS/messages/{en,fi,et}.json
+
+## 2026-06-24 — Scroll-to-bottom affordance in the transcript
+- **Status:** DONE
+- **What I did:** The transcript used to scroll-to-bottom on every send; now it auto-follows new
+  content ONLY while the reader is parked at the bottom (a `useEffect([messages])` gated by the new
+  pure `isAtBottom` helper). When scrolled up (and there are messages), a centered "Jump to latest ↓"
+  pill (`bg-surface-raised` + `shadow-md`, design tokens) appears over the transcript and scrolls to
+  bottom on click. Tracking via an `onScroll` handler → `atBottom` state. Wrapped the scroll div in a
+  `relative flex min-h-0 flex-1 flex-col` parent for the absolute pill; kept the `flex-1`/`min-h-0`
+  chain so both callers (`admin-chat.tsx` h-[60vh], widget panel) keep their layout.
+- **Helper:** pure `lib/chat/scroll-anchor.ts` `isAtBottom({scrollTop,scrollHeight,clientHeight},
+  tol=24)` — 24px tolerance so streaming sub-pixel drift doesn't flap the pill. 5-case node test.
+- **Verified:** CMS `npx tsc --noEmit` clean; `npm test` 862 pass; `npx opennextjs-cloudflare build`
+  OK (dev off, 3601 free); all 3 message JSONs parse. messages/ was clean vs HEAD so a plain edit was
+  safe (no concurrent ai-openrouter keys to preserve this run).
+- **Files:** CMS/src/lib/chat/scroll-anchor.ts (+.test.ts),
+  CMS/src/components/chat/chat-conversation.tsx, CMS/messages/{en,fi,et}.json

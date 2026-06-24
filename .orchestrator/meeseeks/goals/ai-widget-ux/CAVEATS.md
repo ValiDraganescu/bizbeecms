@@ -97,6 +97,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   `bg-warning-subtle` + `text-warning` (NOT `text-warning-foreground` — that's near-white, only legible
   ON `bg-warning`). Keep both override setters together; don't set one without the other.
 
+- **Transcript follows-bottom only when parked there (scroll-anchor DONE 2026-06-24).** The transcript
+  scroll div is now wrapped in a `relative flex min-h-0 flex-1 flex-col` parent (for the absolutely-
+  positioned "Jump to latest" pill). The flex chain is: outer `flex min-h-0 flex-1 flex-col gap-3` →
+  this new wrapper → scroll div (`flex-1 min-h-0 overflow-y-auto`). BOTH callers pass
+  `transcriptClassName="flex-1"` and live inside a bounded-height `flex flex-col` (`h-[60vh]` page /
+  widget panel). Don't remove the `min-h-0`s or the inner `flex-1` — overflow scrolling breaks if the
+  chain collapses. Auto-scroll lives in a `useEffect([messages])` gated by `isAtBottom`
+  (`lib/chat/scroll-anchor.ts`, 24px tolerance so streaming sub-pixel drift doesn't flap the pill);
+  don't re-add an unconditional scroll-to-bottom or you'll yank a scrolled-up reader back down.
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.

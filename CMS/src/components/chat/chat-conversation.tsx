@@ -19,6 +19,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { ChatEventParser, type ToolResult } from "@/lib/chat/client-sse";
 import { toolSummary, formatBlob } from "@/lib/chat/tool-card";
+import { isAtBottom } from "@/lib/chat/scroll-anchor";
 import {
   decideSendOnEnter,
   loadEnterMode,
@@ -188,6 +189,7 @@ export function ChatConversation({
   const t = useTranslations("chat");
   const [input, setInput] = useState("");
   const [enterMode, setEnterMode] = useState<EnterMode>("send");
+  const [atBottom, setAtBottom] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { messages, busy, error, send } = chat;
 
@@ -195,6 +197,13 @@ export function ChatConversation({
   useEffect(() => {
     setEnterMode(loadEnterMode());
   }, []);
+
+  // Follow new content only while the reader is parked at the bottom; if they've
+  // scrolled up to re-read, leave them be and surface the "jump to latest" pill.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && isAtBottom(el)) el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
   const toggleEnterMode = () => {
     setEnterMode((m) => {
@@ -207,7 +216,10 @@ export function ChatConversation({
   const scrollToBottom = () => {
     requestAnimationFrame(() => {
       const el = scrollRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+        setAtBottom(true);
+      }
     });
   };
 
@@ -222,30 +234,42 @@ export function ChatConversation({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div
-        ref={scrollRef}
-        className={
-          "flex flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-surface-raised p-4 " +
-          (transcriptClassName ?? "")
-        }
-        aria-live="polite"
-      >
-        {messages.length === 0 && (
-          <p className="text-foreground-muted">{t("empty")}</p>
-        )}
-        {messages.map((m, i) =>
-          m.role === "user" ? (
-            <UserBubble key={i} content={m.content} label={t("you")} />
-          ) : (
-            <AssistantBubble
-              key={i}
-              content={m.content}
-              tools={m.tools}
-              label={t("assistant")}
-              thinking={busy && i === messages.length - 1 && m.content === ""}
-              t={t}
-            />
-          ),
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div
+          ref={scrollRef}
+          onScroll={(e) => setAtBottom(isAtBottom(e.currentTarget))}
+          className={
+            "flex min-h-0 flex-col gap-4 overflow-y-auto rounded-lg border border-border bg-surface-raised p-4 " +
+            (transcriptClassName ?? "")
+          }
+          aria-live="polite"
+        >
+          {messages.length === 0 && (
+            <p className="text-foreground-muted">{t("empty")}</p>
+          )}
+          {messages.map((m, i) =>
+            m.role === "user" ? (
+              <UserBubble key={i} content={m.content} label={t("you")} />
+            ) : (
+              <AssistantBubble
+                key={i}
+                content={m.content}
+                tools={m.tools}
+                label={t("assistant")}
+                thinking={busy && i === messages.length - 1 && m.content === ""}
+                t={t}
+              />
+            ),
+          )}
+        </div>
+        {!atBottom && messages.length > 0 && (
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border bg-surface-raised px-3 py-1 text-foreground shadow-md hover:bg-surface-muted"
+          >
+            {t("scrollToLatest")} ↓
+          </button>
         )}
       </div>
 
