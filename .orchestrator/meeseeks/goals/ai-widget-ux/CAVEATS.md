@@ -81,6 +81,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   trust gate (override wins only when PM-SSO + non-empty string); the route ignores it for non-SSO.
 - **`withSystemPrompt` is now 4-arg** (`messages, context, override?, isPmSso?`) in `route.ts`. If you
   touch the chat POST, keep passing the override through; default both new args so old callers are safe.
+- **System-prompt override is wired via a 3rd `useChat` getter (UI slice DONE 2026-06-24).**
+  `useChat(getContext?, getModel?, getOverride?)` — `getOverride` returns the selected version's
+  prompt text (or undefined); `send` adds `systemPromptOverride` to the chat POST only when set.
+  `chat-widget.tsx` owns `promptOverride` state, passes `() => promptOverride ?? undefined` to
+  `useChat`, and threads `override`/`onOverrideChange` to `ChatDebugPanel`. The versions editor lives
+  IN `ChatDebugPanel` (already PM-SSO-gated). To add any new per-request chat-body field, follow this
+  same getter pattern — don't bypass `useChat`. The route gates the override to PM-SSO; the override
+  is session-only, NEVER persisted as a site default.
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.

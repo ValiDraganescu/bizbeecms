@@ -42,10 +42,16 @@ export type ChatMsg =
  * `getModel` (optional, Slice 4) lets a surface tell the route which allowlisted
  * model to use (the picker). Read fresh per `send`. Omit it → route uses its
  * default. The id is validated server-side, so an unknown value is harmless.
+ *
+ * `getOverride` (optional, ai-widget-ux PM-SSO prompt editor) lets a surface send
+ * a per-request `systemPromptOverride` (a selected prompt-version's text). Read
+ * fresh per `send`. The route ignores it unless the caller is PM-SSO, so a
+ * non-SSO surface sending it is harmless. Omit / return undefined → no override.
  */
 export function useChat(
   getContext?: () => string | undefined,
   getModel?: () => string | undefined,
+  getOverride?: () => string | undefined,
 ) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [busy, setBusy] = useState(false);
@@ -89,9 +95,11 @@ export function useChat(
     try {
       const context = getContext?.();
       const model = getModel?.();
+      const override = getOverride?.();
       const payload: Record<string, unknown> = { messages: history };
       if (context) payload.context = context;
       if (model) payload.model = model;
+      if (override) payload.systemPromptOverride = override;
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

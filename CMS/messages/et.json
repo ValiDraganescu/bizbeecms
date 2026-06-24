@@ -63,7 +63,23 @@
       "error": "Viga: {message}",
       "export": "Ekspordi vestlus",
       "exporting": "Ekspordin…",
-      "exportError": "Eksport ebaõnnestus: {message}"
+      "exportError": "Eksport ebaõnnestus: {message}",
+      "prompts": {
+        "title": "Süsteemiviiba versioonid",
+        "help": "Salvesta ja vaheta täielikke süsteemiviiba versioone ainult oma seansi jaoks. Lõppkasutajad saavad vaikeväärtuse.",
+        "select": "Valitud viiba versioon",
+        "default": "Vaikimisi (koostatud)",
+        "new": "Uus",
+        "delete": "Kustuta",
+        "active": "Selles seansis on aktiivne salvestatud versioon.",
+        "label": "Versiooni silt",
+        "labelPlaceholder": "Versiooni silt",
+        "editor": "Süsteemiviiba tekst",
+        "save": "Salvesta",
+        "saving": "Salvestan…",
+        "cancel": "Tühista",
+        "error": "Ebaõnnestus: {message}"
+      }
     },
     "enterMode": {
       "send": "↵ Saada",

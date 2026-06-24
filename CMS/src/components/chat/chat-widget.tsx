@@ -58,6 +58,11 @@ export function ChatWidget() {
     setModelState(id);
     saveModel(id);
   }
+  // PM-SSO system-prompt editor (ai-widget-ux): the selected version's prompt
+  // text, threaded into the chat POST as a per-request `systemPromptOverride`
+  // (session-only — never a site default; the route ignores it for non-SSO).
+  // null = no override (assembled default). Set/cleared from the debug panel.
+  const [promptOverride, setPromptOverride] = useState<string | null>(null);
   // Resizable panel (ai-widget-ux): preset toggle (default ⇄ half-screen) plus
   // free-drag via native CSS `resize`. Size is resolved against the live
   // viewport so a panel sized big on one screen is clamped, never lost.
@@ -79,6 +84,7 @@ export function ChatWidget() {
   const chat = useChat(
     () => detectAdminContext(pathname),
     () => model,
+    () => promptOverride ?? undefined,
   );
 
   // History (Slice 4 sub-slice 3): the current thread's server id (null = a new,
@@ -447,7 +453,12 @@ export function ChatWidget() {
                 )}
               </div>
             ) : debug ? (
-              <ChatDebugPanel messages={messages} model={model} />
+              <ChatDebugPanel
+                messages={messages}
+                model={model}
+                override={promptOverride}
+                onOverrideChange={setPromptOverride}
+              />
             ) : (
               <ChatConversation
                 chat={chat}

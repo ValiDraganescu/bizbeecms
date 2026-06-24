@@ -63,7 +63,23 @@
       "error": "Error: {message}",
       "export": "Export chat",
       "exporting": "Exporting…",
-      "exportError": "Export failed: {message}"
+      "exportError": "Export failed: {message}",
+      "prompts": {
+        "title": "System prompt versions",
+        "help": "Save and switch full system-prompt versions for your session only. End users keep the default.",
+        "select": "Selected prompt version",
+        "default": "Default (assembled)",
+        "new": "New",
+        "delete": "Delete",
+        "active": "A saved version is active for this session.",
+        "label": "Version label",
+        "labelPlaceholder": "Version label",
+        "editor": "System prompt text",
+        "save": "Save",
+        "saving": "Saving…",
+        "cancel": "Cancel",
+        "error": "Failed: {message}"
+      }
     },
     "enterMode": {
       "send": "↵ Send",

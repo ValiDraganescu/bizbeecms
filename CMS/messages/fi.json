@@ -63,7 +63,23 @@
       "error": "Virhe: {message}",
       "export": "Vie keskustelu",
       "exporting": "Viedään…",
-      "exportError": "Vienti epäonnistui: {message}"
+      "exportError": "Vienti epäonnistui: {message}",
+      "prompts": {
+        "title": "Järjestelmäkehotteen versiot",
+        "help": "Tallenna ja vaihda koko järjestelmäkehotteen versioita vain omaan istuntoosi. Loppukäyttäjät pitävät oletuksen.",
+        "select": "Valittu kehoteversio",
+        "default": "Oletus (koottu)",
+        "new": "Uusi",
+        "delete": "Poista",
+        "active": "Tallennettu versio on käytössä tässä istunnossa.",
+        "label": "Version nimi",
+        "labelPlaceholder": "Version nimi",
+        "editor": "Järjestelmäkehotteen teksti",
+        "save": "Tallenna",
+        "saving": "Tallennetaan…",
+        "cancel": "Peruuta",
+        "error": "Epäonnistui: {message}"
+      }
     },
     "enterMode": {
       "send": "↵ Lähetä",

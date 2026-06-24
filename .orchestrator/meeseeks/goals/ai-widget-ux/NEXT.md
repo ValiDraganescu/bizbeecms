@@ -1,28 +1,29 @@
 # Note to the next Meeseeks (ai-widget-ux)
 
-The system-prompt versions **SERVER slice is DONE** (2026-06-24). Don't rebuild it.
-Built this run:
-- D1 table `prompt_version` + migration `CMS/migrations/0015_sleepy_mephisto.sql`.
-- Store `CMS/src/db/prompt-version-store.ts` (`listPromptVersions`/`createPromptVersion`/`deletePromptVersion`).
-- Pure `CMS/src/lib/chat/prompt-version.ts`: `validatePromptInput` (label ≤80, prompt ≤20000),
-  `effectiveSystemPrompt({override,isPmSso,assembled})` — override wins ONLY when PM-SSO + non-empty.
-- Gated CRUD `GET/POST/DELETE /api/chat/prompts` (`requirePmSso` on every verb).
-- Chat route (`POST /api/chat/route.ts`) already reads `systemPromptOverride` from the body and applies
-  it via the now-4-arg `withSystemPrompt` ONLY when `currentUserIsPmSso()`.
+The system-prompt versions **UI slice is DONE** (2026-06-24) — the whole versions feature
+(server + UI) and every bullet in this goal's GOAL.md "what good looks like" list is now shipped:
+resizable panel + presets, textarea + Enter-mode switch, tool-card accordion, full transcript
+(incl. tool calls) survives refresh, minimized unread badge, persisted model, PM-SSO export +
+prompt-versions editor.
 
-**THE ONE REMAINING TODO: the WIDGET UI slice (PM-SSO only).**
-In/near `ChatDebugPanel` (already PM-SSO-gated; `GET /api/chat/debug` returns `isPmSso` AND
-`systemPrompt`), add:
-- A versions dropdown — fetch `GET /api/chat/prompts` → `{versions:[{id,label,prompt,createdAt}]}`.
-- An edit textarea + save / new / delete buttons. **New** seeds the textarea from the assembled
-  default (`systemPrompt` from `GET /api/chat/debug`); the operator edits, then POST `{label,prompt}`.
-- Selecting a version must thread its `prompt` up to `chat-widget.tsx` so the chat POST sends
-  `systemPromptOverride: <selected prompt>` (per-request, session-only). Clearing selection = no
-  override (back to assembled default). Delete via `DELETE /api/chat/prompts?id=<id>`.
-- EN/FI/ET for all new strings. No native confirm/dialog.
+**The backlog has no queued TODO left — pick the next valuable widget-UX slice (never idle).**
+Candidates, smallest-first, all client/UX-only (honour the client-only rule + CAVEATS):
+- **Active-override clarity:** when a saved prompt version is active, show its label inline near the
+  chat input (not just in the debug panel) so the operator always knows they're off-default. Small.
+- **Versions UX polish:** the version select shows only labels; consider a tiny "applied" indicator
+  + relative createdAt; allow renaming a version (currently only create/delete). Adds a PATCH route
+  though → server work, exception to client-only like the rest of the prompt feature.
+- **Keyboard a11y pass** on the widget header buttons + the versions section (focus ring, Esc to
+  minimize, focus trap when open).
+- **Scroll-to-bottom affordance** when the transcript is scrolled up and a new reply lands.
 
-Gate (all green this run): CMS `npx tsc --noEmit` + `npm test` (855 pass) +
-`npx opennextjs-cloudflare build` (dev OFF on :3601). Do NOT run `bundle:cms` — auto-regens on PM
-deploy. `CMS/src/lib/chat/models.ts` is ai-openrouter's — tsc/build may transiently fail mid-their-
-edit; re-run. `messages/{en,fi,et}.json` SHARED — stage ONLY your keys (rebuild from
-`git show HEAD:...` if a plain add would sweep their uncommitted keys).
+How to wire an override into the chat POST (already built this run, reuse it): `useChat` takes a 3rd
+getter `getOverride`; the widget owns `promptOverride` state and the debug panel sets it via
+`onOverrideChange`. The route gates it to PM-SSO server-side.
+
+GATES (all green this run): CMS `npx tsc --noEmit` + `npm test` (856 pass) +
+`npx opennextjs-cloudflare build` (dev OFF — port 3601 must be free; NEVER build while dev is up).
+Do NOT run `bundle:cms` (auto-regens on PM deploy). `messages/{en,fi,et}.json` SHARED with
+ai-openrouter — stage ONLY your keys (rebuild from `git show HEAD:...` if a plain add would sweep
+their uncommitted keys). `lib/chat/models.ts` is ai-openrouter's — tsc/build may transiently fail
+mid-their-edit; just re-run.

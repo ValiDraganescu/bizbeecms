@@ -160,3 +160,24 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/db/schema.ts, CMS/migrations/0015_sleepy_mephisto.sql (+ meta/_journal.json),
   CMS/src/db/prompt-version-store.ts (new), CMS/src/lib/chat/prompt-version.ts (+test, new),
   CMS/src/app/api/chat/prompts/route.ts (new), CMS/src/app/api/chat/route.ts.
+
+## 2026-06-24 14:37 — System-prompt versions — UI slice (PM-SSO only)
+- **Status:** DONE
+- **What I did:** Wired the widget UI to the already-built prompt-versions server slice.
+  `useChat` gained an optional 3rd getter `getOverride?: () => string | undefined`; when it
+  returns a value, the chat POST body now carries `systemPromptOverride` (route already gates it to
+  PM-SSO). `chat-widget.tsx` holds `promptOverride` state, passes `() => promptOverride ?? undefined`
+  to `useChat`, and passes `override`+`onOverrideChange` down to `ChatDebugPanel`. The debug panel
+  (already PM-SSO-gated via `GET /api/chat/debug`'s `isPmSso`) gained a versions section: a select
+  (Default ⇄ saved versions; fetched from `GET /api/chat/prompts` once PM-SSO is known), a "New"
+  button that seeds an inline label-input + textarea from the assembled default prompt
+  (`systemPrompt` from the debug fetch), Save (`POST {label,prompt}`, auto-selects + activates the
+  new version), Cancel, and Delete (`DELETE ?id=`). Selecting a version sets the override; selecting
+  "Default" clears it (back to assembled). Override is session-only/per-request — never persisted as
+  a site default. EN/FI/ET `chat.debug.prompts.*` (14 keys each). No native dialogs.
+- **Verified:** CMS `npx tsc --noEmit` clean; `npm test` 856 pass; `npx opennextjs-cloudflare build`
+  (dev OFF, port 3601 free) succeeded — worker saved. Could not exercise live CRUD (needs real D1
+  binding = HITL) but the route + store + pure helper were build-verified in the prior server slice.
+- **Files:** CMS/src/components/chat/chat-conversation.tsx (useChat getOverride),
+  CMS/src/components/chat/chat-widget.tsx (promptOverride state + props),
+  CMS/src/components/chat/chat-debug-panel.tsx (versions UI), CMS/messages/{en,fi,et}.json
