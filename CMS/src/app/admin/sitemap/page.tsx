@@ -28,8 +28,6 @@ const PUBLIC_ROUTES: { path: string; href?: string; note?: string }[] = [
 const ADMIN_PAGES: { path: string; href: string }[] = [
   { path: "/admin", href: "/admin" },
   { path: "/admin/sitemap", href: "/admin/sitemap" },
-  { path: "/admin/chat", href: "/admin/chat" },
-  { path: "/admin/pages", href: "/admin/pages" },
   { path: "/admin/components", href: "/admin/components" },
   { path: "/admin/media", href: "/admin/media" },
   { path: "/admin/settings/content-locales", href: "/admin/settings/content-locales" },
@@ -41,7 +39,6 @@ const ADMIN_API: { path: string; methods: string }[] = [
   { path: "/api/health", methods: "GET" },
   { path: "/api/chat", methods: "POST (SSE)" },
   { path: "/api/pages", methods: "GET · POST · PUT · DELETE" },
-  { path: "/api/pages/[id]/blocks", methods: "GET · PUT" },
   { path: "/api/components", methods: "GET · POST (import)" },
   { path: "/api/components/kit", methods: "POST (install)" },
   { path: "/api/assets", methods: "GET · POST · DELETE" },
@@ -103,7 +100,7 @@ export default async function DevSitemapPage() {
         </h2>
         {pages.length === 0 ? (
           <p className="text-sm text-foreground-muted">
-            {pagesError ? "Could not read the database." : "No pages yet — create one in /admin/pages."}
+            {pagesError ? "Could not read the database." : "No pages yet — create one in the Page Builder."}
           </p>
         ) : (
           <ul className="flex flex-col gap-1">

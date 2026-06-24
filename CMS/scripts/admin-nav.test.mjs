@@ -26,8 +26,8 @@ function keys(obj, prefix = "") {
   return out;
 }
 
-// Mirror of ADMIN_SECTIONS in src/components/admin-nav.tsx (kept in lockstep).
-const SECTIONS = ["chat", "pages", "components", "media", "settings"];
+// Mirror of ADMIN_SECTIONS in src/components/admin-sections.ts (kept in lockstep).
+const SECTIONS = ["pageBuilder", "components", "collections", "media", "settings"];
 
 test("adminNav namespace exists with identical keys in EN/FI/ET", () => {
   const cats = { en: load("en"), fi: load("fi"), et: load("et") };

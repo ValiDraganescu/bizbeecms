@@ -299,8 +299,10 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
   });
 }
 
-// cms-v<x.y.z> — the only tag scheme PM can deploy (CMS-scoped; monorepo).
-const CMS_TAG_RE = /^cms-v(\d+\.\d+\.\d+)$/;
+// r-<x.y.z> is the current CMS release tag scheme (`r` = release); legacy
+// `cms-v<x.y.z>` tags are retired but still listed so already-deployed sites
+// resolve. Both map to a bare x.y.z (CMS-scoped; monorepo).
+const CMS_TAG_RE = /^(?:r-|cms-v)(\d+\.\d+\.\d+)$/;
 // A bare semver, used to validate the ?version= query before building a git ref.
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 
@@ -394,11 +396,15 @@ async function releaseNotes(version: string, env: Env): Promise<Response> {
   // ponytail: a fresh shallow clone per request is the lazy correct path —
   // ls-remote can't stream file contents, and a full clone is wasteful. Notes are
   // small + requested rarely (deploy dialog), so the clone cost is fine.
+  // Try the current r-<ver> tag first, fall back to the retired cms-v<ver> so
+  // notes for already-deployed legacy versions still resolve.
   const script = `
 set -uo pipefail
 DIR="/workspace/notes-$VER"
 rm -rf "$DIR"
-git clone --depth 1 --branch "cms-v$VER" "$REPO_URL" "$DIR" >/dev/null 2>&1 || exit 21
+git clone --depth 1 --branch "r-$VER" "$REPO_URL" "$DIR" >/dev/null 2>&1 \
+  || git clone --depth 1 --branch "cms-v$VER" "$REPO_URL" "$DIR" >/dev/null 2>&1 \
+  || exit 21
 cat "$DIR/release-notes/$VER.md" 2>/dev/null || exit 22
 `;
   let out: { stdout: string; exitCode: number };

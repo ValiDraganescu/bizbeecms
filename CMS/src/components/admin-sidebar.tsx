@@ -380,19 +380,23 @@ export function SidebarShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Footer — theme toggle + locale (view site moved to top of nav) */}
+        {/* Footer — theme toggle + locale + release version (view site moved to top of nav) */}
         <div className="space-y-2 border-t border-border p-3">
           <ThemeToggle collapsed={collapsed} />
           {!collapsed && <LocaleSwitcher />}
           <LogoutButton collapsed={collapsed} />
+          {!collapsed && process.env.NEXT_PUBLIC_CMS_VERSION && (
+            <p className="px-3 pt-1 text-[11px] text-foreground-muted">
+              {t("version", { version: process.env.NEXT_PUBLIC_CMS_VERSION })}
+            </p>
+          )}
         </div>
       </aside>
 
       <main className="flex-1 overflow-y-auto">{children}</main>
 
-      {/* Intercom-style floating assistant on every admin page EXCEPT the
-          full-page /admin/chat (which already renders the same conversation). */}
-      {!pathname.startsWith("/admin/chat") && <ChatWidget />}
+      {/* Intercom-style floating assistant on every admin page. */}
+      <ChatWidget />
     </div>
   );
 }

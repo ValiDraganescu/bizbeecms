@@ -12,7 +12,9 @@ import { parseCmsTag } from "./cms-version.ts";
 export type CmsRelease = { version: string; tag: string };
 
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
-const TAG_RE = /^cms-v\d+\.\d+\.\d+$/;
+// Current scheme is `r-<x.y.z>` (`r` = release); legacy `cms-v<x.y.z>` tags are
+// retired but still accepted so already-deployed sites resolve.
+const TAG_RE = /^(?:r-|cms-v)\d+\.\d+\.\d+$/;
 
 /** `[1,2,3]` from `"1.2.3"`. */
 function semverParts(v: string): [number, number, number] {
@@ -32,8 +34,8 @@ function cmpSemverDesc(a: string, b: string): number {
 
 /**
  * Normalise the deployer's `/tags` payload into a clean, newest-first list of
- * valid `cms-v<x.y.z>` releases. Drops anything whose `version` isn't a bare
- * semver or whose `tag` isn't a `cms-v*` tag, de-dupes by version, and re-sorts
+ * valid releases. Drops anything whose `version` isn't a bare semver or whose
+ * `tag` isn't an `r-*` (or retired `cms-v*`) tag, de-dupes by version, and re-sorts
  * (don't trust the upstream order). `main` is never a release here — TAGGED
  * RELEASES ONLY (USER DECISION).
  */
@@ -58,9 +60,9 @@ export function normalizeReleases(payload: unknown): CmsRelease[] {
   return out;
 }
 
-/** The `cms-v<x.y.z>` ref to deploy for a chosen bare version. */
+/** The `r-<x.y.z>` ref to deploy for a chosen bare version (current scheme). */
 export function refForVersion(version: string): string {
-  return `cms-v${version}`;
+  return `r-${version}`;
 }
 
 /**

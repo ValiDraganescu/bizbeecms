@@ -1,5 +1,5 @@
 ---
-description: Repo-specific CMS release tooling for bizbeecms. `commit` ships ordinary changes (delegates to /orc-commit). `release` cuts a CMS release — drafts release-notes/<x.y.z>.md from commits since the last cms-v* tag, STOPS for human edit, then bumps CMS/package.json, commits, annotated-tags cms-v<x.y.z>, and pushes the tag + branch.
+description: Repo-specific CMS release tooling for bizbeecms. `commit` ships ordinary changes (delegates to /orc-commit). `release` cuts a CMS release — drafts release-notes/<x.y.z>.md from commits since the last r-* tag, STOPS for human edit, then bumps CMS/package.json, commits, annotated-tags r-<x.y.z>, and pushes the tag + branch.
 argument-hint: "[commit | release [major|minor|patch]] — default: release"
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 ---
@@ -7,8 +7,10 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 # bizbeecms CMS release tool
 
 This is the **repo-specific** release skill. The CMS is deployed per-Site from a
-**git tag** (`cms-v<x.y.z>`), so cutting a tagged release with editable notes is the
-source of truth for "what PM can deploy". Two commands:
+**git tag** (`r-<x.y.z>`, `r` = release), so cutting a tagged release with editable notes
+is the source of truth for "what PM can deploy". The `r-` prefix is deliberate: the old
+`cms-v*` series had historical collisions (a version number recut onto a different
+commit), so the `r-` scheme starts clean and the deployer keys off `r-*`. Two commands:
 
 - `commit` — ship ordinary working-tree changes. **Delegate to `/orc-commit`** (it
   bumps the right version file, commits, pushes). No tagging. Use this for normal work.
@@ -30,8 +32,10 @@ pushes the current branch.) Nothing CMS-release-specific happens here — no tag
 
 ## `release` — cut a tagged CMS release
 
-The tag scheme is **`cms-v<x.y.z>`** (CMS-scoped; this is a monorepo and PM versions
-separately). The canonical version file is **`CMS/package.json`** (`"version"`).
+The tag scheme is **`r-<x.y.z>`** (`r` = release; CMS-scoped — this is a monorepo and PM
+versions separately). The canonical version file is **`CMS/package.json`** (`"version"`).
+Legacy `cms-v*` tags exist but are retired (historical collisions); always cut and look
+up `r-*` now.
 
 ### Step 0 — Pre-flight
 Run in parallel:
@@ -42,13 +46,13 @@ Run in parallel:
 - `git fetch --tags` (so the "last tag" check sees remote tags)
 - `git rev-parse --abbrev-ref HEAD` (the branch you'll push)
 
-### Step 1 — Find the last cms-v* tag and the commit range
+### Step 1 — Find the last r-* tag and the commit range
 ```bash
-LAST=$(git tag -l 'cms-v*' --sort=-v:refname | head -1)
+LAST=$(git tag -l 'r-*' --sort=-v:refname | head -1)
 ```
-- If `LAST` is empty → this is the **first** release. The range is "all history"
+- If `LAST` is empty → this is the **first** `r-` release. The range is "all history"
   (`git log --oneline`); seed the new version from `CMS/package.json` (don't go
-  backwards).
+  backwards). Ignore the retired `cms-v*` tags for the range.
 - Else the range is `"$LAST"..HEAD`:
   ```bash
   git log --oneline "$LAST"..HEAD
@@ -123,25 +127,25 @@ Only run this once the notes are edited and the user confirms.
    ```
 4. Annotated tag on that commit, message = the notes title:
    ```bash
-   git tag -a "cms-v<NEW>" -m "CMS v<NEW>"
+   git tag -a "r-<NEW>" -m "CMS v<NEW>"
    ```
 5. Push the branch **and** the tag:
    ```bash
    git push origin "$(git rev-parse --abbrev-ref HEAD)"
-   git push origin "cms-v<NEW>"
+   git push origin "r-<NEW>"
    ```
    Do not force-push. If on `main` and the repo's flow requires a PR, push the tag only
    and tell the user the branch needs its normal review.
 
 ### Step 5 — Report
-One or two lines: `cms-v<NEW>` tagged + pushed, notes at `release-notes/<NEW>.md`, the
+One or two lines: `r-<NEW>` tagged + pushed, notes at `release-notes/<NEW>.md`, the
 chosen level and old→new. PM's deployer `GET /tags` will now list it.
 
 ---
 
 ## Notes
 - The deployer clones `--branch "$REF"` where `REF` can be a tag, so PM deploying
-  `cms-v<NEW>` works once the tag is pushed. This skill only produces tags + notes; the
+  `r-<NEW>` works once the tag is pushed. This skill only produces tags + notes; the
   deployer/PM wiring is separate slices.
 - `cms-v*` is CMS-only. If you ever need to version PM, that's a separate scheme — do
   not reuse `cms-v*` for PM.

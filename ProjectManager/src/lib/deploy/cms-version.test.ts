@@ -6,7 +6,9 @@ import {
   displayCmsVersion,
 } from "./cms-version.ts";
 
-test("parseCmsTag extracts x.y.z from a cms-v tag", () => {
+test("parseCmsTag extracts x.y.z from an r- or legacy cms-v tag", () => {
+  assert.equal(parseCmsTag("r-1.0.0"), "1.0.0");
+  assert.equal(parseCmsTag("r-12.3.45"), "12.3.45");
   assert.equal(parseCmsTag("cms-v0.6.0"), "0.6.0");
   assert.equal(parseCmsTag("cms-v12.3.45"), "12.3.45");
   assert.equal(parseCmsTag("  cms-v1.0.0  "), "1.0.0");

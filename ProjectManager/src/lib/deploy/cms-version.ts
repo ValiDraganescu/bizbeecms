@@ -7,9 +7,9 @@
  * Cloudflare/db deps so they're node-testable.
  */
 
-/** A `cms-v<x.y.z>` tag → its bare `x.y.z`, else null. */
+/** An `r-<x.y.z>` (or retired `cms-v<x.y.z>`) tag → its bare `x.y.z`, else null. */
 export function parseCmsTag(ref: string): string | null {
-  const m = /^cms-v(\d+\.\d+\.\d+)$/.exec(ref.trim());
+  const m = /^(?:r-|cms-v)(\d+\.\d+\.\d+)$/.exec(ref.trim());
   return m ? m[1] : null;
 }
 

@@ -55,9 +55,9 @@ test("normalizeReleases is empty for malformed payloads", () => {
   assert.deepEqual(normalizeReleases([]), []);
 });
 
-test("refForVersion builds the cms-v tag", () => {
-  assert.equal(refForVersion("0.6.0"), "cms-v0.6.0");
-  assert.equal(refForVersion("12.3.45"), "cms-v12.3.45");
+test("refForVersion builds the r- tag", () => {
+  assert.equal(refForVersion("0.6.0"), "r-0.6.0");
+  assert.equal(refForVersion("12.3.45"), "r-12.3.45");
 });
 
 test("isUpdateAvailable flags an older deployed tag", () => {

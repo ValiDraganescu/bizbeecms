@@ -11,8 +11,6 @@
  * sub-pages are grouped under one "Settings" link → content-locales.
  */
 export const ADMIN_SECTIONS = [
-  { key: "chat", href: "/admin/chat" },
-  { key: "pages", href: "/admin/pages" },
   { key: "pageBuilder", href: "/admin/page-builder" },
   { key: "components", href: "/admin/components" },
   { key: "collections", href: "/admin/collections" },

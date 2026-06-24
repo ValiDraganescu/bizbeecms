@@ -226,25 +226,6 @@ test("setLocalizedProp output round-trips through validateBlockProps + resolves"
   assert.deepEqual(emptied, {}, "emptied prop dropped");
 });
 
-test("pageBlocks namespace + pages.editBlocks parity across EN/FI/ET", () => {
-  const cats = { en: load("en"), fi: load("fi"), et: load("et") };
-  for (const [l, cat] of Object.entries(cats)) {
-    assert.ok(cat.pageBlocks, `${l}.json missing pageBlocks namespace`);
-    assert.ok(cat.pages?.editBlocks, `${l}.json missing pages.editBlocks`);
-  }
-  const en = keys(cats.en.pageBlocks).sort();
-  assert.ok(en.length > 0);
-  for (const l of ["fi", "et"]) {
-    assert.deepEqual(keys(cats[l].pageBlocks).sort(), en, `${l} pageBlocks keys differ`);
-  }
-  for (const [l, cat] of Object.entries(cats)) {
-    for (const path of keys(cat.pageBlocks)) {
-      const v = path.split(".").reduce((o, k) => o[k], cat.pageBlocks);
-      assert.ok(typeof v === "string" && v.trim() !== "", `${l}: ${path} empty`);
-    }
-  }
-});
-
 test("sectionGridCols mirrors the render: N equal tracks (Layers row, not stacked)", () => {
   // A 2-column Section must produce a 2-track grid so the Layers tree lays its
   // columns side-by-side as a ROW (regression: was stacked vertically).
