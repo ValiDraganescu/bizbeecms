@@ -105,6 +105,14 @@ interface RawModel {
   id?: unknown;
   name?: unknown;
   pricing?: { prompt?: unknown; completion?: unknown } | null;
+  /** OpenRouter exposes supported request params; includes "tools" when the model can tool-call. */
+  supported_parameters?: unknown;
+}
+
+/** True when the model advertises tool/function-calling support (`supported_parameters` includes "tools"). */
+function supportsTools(m: RawModel): boolean {
+  const p = m.supported_parameters;
+  return Array.isArray(p) && p.includes("tools");
 }
 
 /** Coerce a USD-per-token pricing field (string|number) to a finite number, else null. */
@@ -136,7 +144,9 @@ export function pricePerMillion(usdPerToken: number | null): string | null {
 /**
  * Parse the OpenRouter list-models JSON (`{ data: RawModel[] }` or a bare
  * `RawModel[]`) into the clean `CatalogModel[]`. Resilient to a missing `data`
- * wrapper and junk entries (anything without a string `id` is dropped).
+ * wrapper and junk entries (anything without a string `id` is dropped). Models
+ * that don't advertise tool-calling (`supported_parameters` lacking "tools")
+ * are also dropped — the assistant is tool-driven, so they're unusable here.
  */
 export function parseModelCatalog(apiJson: unknown): CatalogModel[] {
   const raw: unknown =
@@ -147,6 +157,8 @@ export function parseModelCatalog(apiJson: unknown): CatalogModel[] {
   const out: CatalogModel[] = [];
   for (const m of list) {
     if (!m || typeof m.id !== "string" || m.id.length === 0) continue;
+    // The assistant is tool-driven; models without tool-calling are useless in the picker.
+    if (!supportsTools(m)) continue;
     const input = priceOf(m);
     out.push({
       id: m.id,

@@ -162,6 +162,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   (USD/token, null when absent). Format with the pure `pricePerMillion()` (× 1e6, `.toFixed(2)`),
   never print raw `$/token`. Static `CHAT_MODELS` have all three null (no live price) — the picker
   shows nothing for them, by design; keep new static models null unless you have a real price.
+- CATALOG FILTER (2026-06-24): `parseModelCatalog` now DROPS any model whose
+  `supported_parameters` doesn't include `"tools"` (pure `supportsTools()`). The picker shows only
+  tool-capable models — the assistant is tool-driven. Tests must give SAMPLE entries
+  `supported_parameters: ["tools"]` or they vanish from the parsed catalog. The `/api/chat/models`
+  route passes RAW OpenRouter JSON to the parser, so new fields (`supported_parameters`,
+  `architecture.*`) are visible there with NO route change — parse them in `models.ts`.
+- There is NO `bundle:cms` npm script — the "cms-bundle regen" some NEXT/BACKLOG notes mention is
+  ONLY for runtime-shipped UI artifacts (components/css), NOT for `.ts` modules like `models.ts`,
+  which `next build` bundles normally. A pure catalog/helper change needs no bundle regen.
 - CONCURRENT ai-widget-ux Meeseeks shares `CMS/messages/{en,fi,et}.json` + `chat-widget.tsx`.
   As of this run those files also carry their `sizeHalf`/`sizeCompact` keys and a `panel-size.*`
   feature. If `npm test` shows a `panel-size.test.ts` fail ("nextPreset toggles default<->half"),

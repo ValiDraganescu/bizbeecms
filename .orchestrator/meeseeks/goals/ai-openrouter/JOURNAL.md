@@ -334,6 +334,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `ProjectManager/src/app/(app)/sites/deploy-form.tsx`,
   `ProjectManager/scripts/deploy-mint-warning.test.mjs`, `ProjectManager/messages/{en,fi,et}.json`
 
+## 2026-06-24 13:59 — Filter the model catalog to tool-call-capable models only
+- **Status:** DONE
+- **What I did:** The assistant is tool-driven, so models without tool/function-calling are
+  useless in the picker. `CMS/src/lib/chat/models.ts`: `RawModel` gained
+  `supported_parameters?: unknown`; new pure `supportsTools(m)` = `Array.isArray(p) &&
+  p.includes("tools")`; `parseModelCatalog` now skips (`continue`) any model that fails it, right
+  after the id check. Static `CHAT_MODELS` + `DEFAULT_MODEL` (gpt-4o-mini) are already tool-capable.
+  The route (`api/chat/models/route.ts`) passes the raw OpenRouter JSON straight to
+  `parseModelCatalog`, so `supported_parameters` is preserved — no route change. Updated the
+  parser doc comment to record the new filter.
+- **Verified:** `models.test.mjs` 14/14 (SAMPLE entries now carry `supported_parameters`; added a
+  `meta/no-tools-model` filtered-out assert + a dedicated test that missing/empty/non-array params
+  are all dropped, and a tool-capable one is kept). CMS `tsc --noEmit` 0 errors. Full CMS suite
+  `node --test scripts/*.test.mjs 'src/**/*.test.ts'` → **805/805** (the prior concurrent
+  `panel-size.test.ts` fail is gone — the ai-widget-ux track fixed it). `npx opennextjs-cloudflare
+  build` GREEN (dev off — 3601/3602 clear). No new visible strings → no i18n; the catalog is a
+  bundled module (not a runtime-shipped artifact) → no cms-bundle regen. Could NOT verify: the
+  live picker showing only tool-capable models on a deployed CMS (HITL).
+- **Files:** `CMS/src/lib/chat/models.ts`, `CMS/scripts/models.test.mjs`
+
 ## 2026-06-24 13:55 — Model picker: show input/output price per 1M tokens (not raw $/token)
 - **Status:** DONE
 - **What I did:** The picker printed `${m.price}` = raw USD/token (e.g. "$0.00000015"),

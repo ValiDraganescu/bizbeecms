@@ -87,21 +87,32 @@ const SAMPLE = {
       id: "anthropic/claude-3.5-sonnet",
       name: "Anthropic: Claude 3.5 Sonnet",
       pricing: { prompt: "0.000003", completion: "0.000015" },
+      supported_parameters: ["tools", "temperature"],
     },
     {
       id: "openai/gpt-4o-mini",
       name: "OpenAI: GPT-4o-mini",
       pricing: { prompt: "0.00000015", completion: "0.0000006" },
+      supported_parameters: ["tools"],
     },
     {
       id: "google/gemini-flash-1.5",
       name: "Google: Gemini Flash 1.5",
       pricing: {}, // no prompt price → sorts last
+      supported_parameters: ["tools"],
+    },
+    {
+      // not tool-capable → filtered out of the catalog
+      id: "meta/no-tools-model",
+      name: "No Tools Model",
+      pricing: { prompt: "0.0000001" },
+      supported_parameters: ["temperature"],
     },
     {
       // junk entry: no id → dropped
       name: "Mystery model",
       pricing: { prompt: "0.001" },
+      supported_parameters: ["tools"],
     },
   ],
 };
@@ -112,7 +123,8 @@ test("parseModelCatalog extracts id/name/provider/price from the OpenRouter shap
   assert.ok(ids.includes("anthropic/claude-3.5-sonnet"));
   assert.ok(ids.includes("openai/gpt-4o-mini"));
   assert.ok(ids.includes("google/gemini-flash-1.5"));
-  assert.equal(cat.length, 3); // junk (no id) dropped
+  assert.equal(cat.length, 3); // junk (no id) + no-tools model dropped
+  assert.ok(!ids.includes("meta/no-tools-model")); // filtered: no "tools" support
   const small = cat.find((m) => m.id === "openai/gpt-4o-mini");
   assert.equal(small.provider, "openai");
   assert.equal(small.label, "OpenAI: GPT-4o-mini");
@@ -137,9 +149,23 @@ test("parseModelCatalog tolerates a bare array (no data wrapper) + junk", () => 
   assert.deepEqual(parseModelCatalog(null), []);
   assert.deepEqual(parseModelCatalog({}), []);
   assert.deepEqual(parseModelCatalog([{ name: "no id" }]), []); // no id
-  const bare = parseModelCatalog([{ id: "x/y" }]);
+  const bare = parseModelCatalog([{ id: "x/y", supported_parameters: ["tools"] }]);
   assert.equal(bare.length, 1);
   assert.equal(bare[0].label, "y"); // no name → tail of id
+});
+
+test("parseModelCatalog keeps only tool-call-capable models", () => {
+  const cat = parseModelCatalog([
+    { id: "a/with-tools", supported_parameters: ["tools", "temperature"] },
+    { id: "b/no-tools", supported_parameters: ["temperature"] },
+    { id: "c/missing-params" }, // no supported_parameters → dropped
+    { id: "d/empty-params", supported_parameters: [] }, // dropped
+    { id: "e/junk-params", supported_parameters: "tools" }, // string, not array → dropped
+  ]);
+  assert.deepEqual(
+    cat.map((m) => m.id),
+    ["a/with-tools"],
+  );
 });
 
 test("sortByPrice orders LOW→HIGH; null price last", () => {
