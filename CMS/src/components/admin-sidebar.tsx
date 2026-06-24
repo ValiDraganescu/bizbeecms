@@ -26,6 +26,7 @@ type IconKey =
   | "pages"
   | "pageBuilder"
   | "components"
+  | "collections"
   | "media"
   | "settings";
 
@@ -78,6 +79,14 @@ function NavIcon({ name }: { name: IconKey }) {
           <path d="m14 17 2-2-2-2" />
           <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
           <polyline points="14 2 14 8 20 8" />
+        </svg>
+      );
+    case "collections":
+      return (
+        <svg {...common}>
+          <ellipse cx="12" cy="5" rx="9" ry="3" />
+          <path d="M3 5v6c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+          <path d="M3 11v6c0 1.66 4 3 9 3s9-1.34 9-3v-6" />
         </svg>
       );
     case "media":
