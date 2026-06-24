@@ -14,6 +14,7 @@ import {
   resolveSize,
   nextPreset,
   isLarge,
+  sizeFromDrag,
 } from "./panel-size.ts";
 
 const VW = 1440;
@@ -94,6 +95,35 @@ test("isLarge: default size reads small, half/dragged reads large", () => {
   assert.equal(isLarge({ width: 380 + 9 }, VW, VH), true);
   // Within tolerance still reads small.
   assert.equal(isLarge({ width: 380 + 4 }, VW, VH), false);
+});
+
+test("sizeFromDrag: drag left/up grows (panel anchored bottom-right)", () => {
+  const start = { width: 400, height: 500 };
+  // cursor moves 100px left + 80px up → width +100, height +80
+  const r = sizeFromDrag(start, -100, -80, VW, VH);
+  assert.equal(r.width, 500);
+  assert.equal(r.height, 580);
+});
+
+test("sizeFromDrag: drag right/down shrinks, clamped to minimums", () => {
+  const start = { width: 320, height: 340 };
+  const r = sizeFromDrag(start, 200, 200, VW, VH);
+  assert.equal(r.width, PANEL_MIN_W); // 320-200=120 → min 300
+  assert.equal(r.height, PANEL_MIN_H); // 340-200=140 → min 320
+});
+
+test("sizeFromDrag: single-axis (edge handle passes 0 on the other axis)", () => {
+  const start = { width: 400, height: 500 };
+  const r = sizeFromDrag(start, -50, 0, VW, VH);
+  assert.equal(r.width, 450);
+  assert.equal(r.height, 500);
+});
+
+test("sizeFromDrag: clamped to viewport so a huge drag can't overflow", () => {
+  const start = { width: 400, height: 500 };
+  const r = sizeFromDrag(start, -99999, -99999, 1000, 800);
+  assert.equal(r.width, 1000 - 32);
+  assert.equal(r.height, 800 - 32);
 });
 
 // Regression for the one-way toggle bug: expand → (mouseup captures custom) →

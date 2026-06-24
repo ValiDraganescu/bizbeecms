@@ -78,6 +78,24 @@ export function isLarge(size: { width: number }, vw: number, vh: number, tol = 8
   return size.width > defaultSize(vw, vh).width + tol;
 }
 
+/**
+ * New size while dragging the top-left resize handle. The panel is anchored
+ * `fixed bottom-right`, so it grows UP and LEFT: moving the cursor left (smaller
+ * x) widens it, moving up (smaller y) heightens it. `dx`/`dy` are the cursor
+ * delta from where the drag started (current - start). Result is clamped to the
+ * viewport + minimums (a partial axis is allowed — corner handle drives both,
+ * an edge handle passes 0 on the axis it doesn't touch).
+ */
+export function sizeFromDrag(
+  start: { width: number; height: number },
+  dx: number,
+  dy: number,
+  vw: number,
+  vh: number,
+): { width: number; height: number } {
+  return clamp(start.width - dx, start.height - dy, vw, vh);
+}
+
 const KEY = "bizbee.chat.panelSize";
 
 export function loadPref(): { preset: PanelPreset | "custom"; width: number; height: number } | null {

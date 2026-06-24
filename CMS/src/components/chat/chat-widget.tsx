@@ -31,6 +31,7 @@ import {
   resolveSize,
   nextPreset,
   isLarge,
+  sizeFromDrag,
   loadPref,
   savePref,
 } from "@/lib/chat/panel-size";
@@ -344,14 +345,29 @@ export function ChatWidget() {
     });
   }
 
-  // Capture a free-drag (native CSS resize) as a "custom" px size to persist.
-  function captureDrag() {
-    const el = panelRef.current;
-    if (!el) return;
-    const width = el.offsetWidth;
-    const height = el.offsetHeight;
-    setPanel({ preset: "custom", width, height });
-    savePref({ preset: "custom", width, height });
+  // Custom resize handle (ai-widget-ux): the native CSS `resize` grip sat at the
+  // panel's BOTTOM-RIGHT, pinned to the viewport edge under the launcher — there
+  // was no room to grab it. Since the panel is anchored bottom-right and grows
+  // up/left, we put the handle at the TOP-LEFT corner and resize via pointer
+  // events: drag left = wider, drag up = taller. Persisted as a "custom" size.
+  function startResize(e: React.PointerEvent) {
+    e.preventDefault();
+    const cur = panel ?? resolveSize("default", null, window.innerWidth, window.innerHeight);
+    const start = { width: cur.width, height: cur.height };
+    const startX = e.clientX;
+    const startY = e.clientY;
+    function onMove(ev: PointerEvent) {
+      const next = sizeFromDrag(start, ev.clientX - startX, ev.clientY - startY, window.innerWidth, window.innerHeight);
+      setPanel({ preset: "custom", width: next.width, height: next.height });
+    }
+    function onUp(ev: PointerEvent) {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      const next = sizeFromDrag(start, ev.clientX - startX, ev.clientY - startY, window.innerWidth, window.innerHeight);
+      savePref({ preset: "custom", width: next.width, height: next.height });
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   }
 
   function toggleHistory() {
@@ -376,9 +392,8 @@ export function ChatWidget() {
       {open && (
         <div
           ref={panelRef}
-          className="fixed bottom-24 right-6 z-50 flex resize flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
+          className="fixed bottom-24 right-6 z-50 flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
           style={panel ? { width: panel.width, height: panel.height } : undefined}
-          onMouseUp={captureDrag}
           // Esc minimizes the panel — keyboard parity with the close button. Bound
           // on the dialog (focus lives inside it); ignore Esc while a textarea/input
           // is mid-composition so it doesn't fight IME/typing escape.
@@ -404,6 +419,19 @@ export function ChatWidget() {
           tabIndex={-1}
           aria-label={t("title")}
         >
+          {/* Top-left resize handle (ai-widget-ux): drag to resize up/left.
+              `touch-none` so a touch-drag resizes instead of scrolling. */}
+          <div
+            role="separator"
+            aria-label={t("resize")}
+            title={t("resize")}
+            onPointerDown={startResize}
+            className="absolute left-0 top-0 z-10 flex h-5 w-5 cursor-nwse-resize touch-none items-start justify-start p-1 text-foreground-muted hover:text-foreground"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={1.4}>
+              <path d="M9 1 1 9M5 1 1 5M9 5 5 9" />
+            </svg>
+          </div>
           <header className="flex items-center justify-between gap-2 border-b border-border bg-surface-raised px-4 py-3">
             <div className="min-w-0">
               <p className="truncate font-semibold text-foreground">{t("title")}</p>

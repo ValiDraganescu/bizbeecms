@@ -20,12 +20,19 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **Coordinate with `ai-openrouter` on the model type.** Tasks there add `inputModalities`,
   `inputPrice/outputPrice`, tool-capability filtering to the model objects. If a widget task reads
   model fields, expect the type to be evolving — don't fight it, align.
-- **Panel sizing is now inline-px, not Tailwind classes.** `chat-widget.tsx` panel `<div>` carries
-  `resize` (native CSS) + a `style={{width,height}}` from `panel` state (resolved via
+- **Panel sizing is inline-px, resized via a TOP-LEFT pointer-drag handle (native CSS `resize` is GONE,
+  done 2026-06-24).** The panel `<div>` carries `style={{width,height}}` from `panel` state (resolved via
   `lib/chat/panel-size.ts`, persisted under localStorage `bizbee.chat.panelSize`). It's still
-  `fixed bottom-24 right-6`, so it grows up/left from the bottom-right anchor; the native resize grip
-  sits at the panel's bottom-right (above the launcher). Don't re-add `w-[...]/h-[...]` classes — they'd
-  fight the inline style. Min size 300×320 so it can't vanish.
+  `fixed bottom-24 right-6`, so it grows up/LEFT from the bottom-right anchor — that's why the handle is
+  at the TOP-LEFT corner (the old native bottom-right grip was pinned under the launcher, ungrabbable).
+  The handle is an `absolute left-0 top-0` div with `onPointerDown={startResize}`; `startResize` attaches
+  window pointermove/up listeners and calls pure `sizeFromDrag(start, dx, dy, vw, vh)` = `clamp(width-dx,
+  height-dy)` (drag left/up grows, since anchored bottom-right). `touch-none` on the handle so touch-drag
+  resizes instead of scrolling. Don't re-add `w-[...]/h-[...]` classes or the `resize` CSS class — they'd
+  fight the inline style. Min size 300×320 so it can't vanish. The old `captureDrag`/`onMouseUp` (the P2
+  toggle bug's root cause) is REMOVED — the expand toggle no longer gets a stray "custom" re-capture.
+- **`chat.widget.resize` i18n key already exists in HEAD** (EN/FI/ET) — reuse it, don't re-add (a
+  duplicate JSON key is harmless but messy). It labels the resize handle.
 - **Do NOT run `bundle:cms` while another loop has uncommitted CMS edits.** The PM cms-bundle
   (`ProjectManager/src/lib/deploy/cms-bundle.generated.js`) auto-regens on PM deploy (`predeploy`), and
   regenerating it captures EVERY uncommitted CMS file in the tree — including a concurrent Meeseeks's.

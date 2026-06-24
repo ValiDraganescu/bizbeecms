@@ -250,6 +250,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   test-1 still needs a redeploy to clear the stale D1 cache / ship the new bundle (HITL — Meeseeks don't deploy).
 - **Files:** CMS/src/lib/chat/catalog-coerce.ts, CMS/scripts/catalog-coerce.test.mjs, CMS/src/components/chat/model-picker.tsx
 
+## 2026-06-24 15:40 — Resize rail: top-left pointer-drag handle (kill native CSS resize)
+- **Status:** DONE
+- **What I did:** Replaced the native CSS `resize` (bottom-right grip, pinned under the launcher,
+  ungrabbable) with a custom TOP-LEFT pointer-drag handle. The panel is `fixed bottom-24 right-6`
+  (anchored bottom-right, grows up/LEFT), so the handle lives at the top-left corner. New pure
+  `sizeFromDrag(start, dx, dy, vw, vh)` in `panel-size.ts` = `clamp(start.width - dx, start.height - dy,
+  vw, vh)` — drag left/up grows, clamped to viewport + minimums; single-axis works (edge handle passes 0).
+  `chat-widget.tsx`: removed the `resize` CSS class + `onMouseUp={captureDrag}`; deleted `captureDrag`;
+  added `startResize(e)` (PointerEvent → attaches window pointermove/up, `setPanel` live + `savePref` on
+  up, both as preset "custom"); added the handle div (`absolute left-0 top-0 z-10 cursor-nwse-resize
+  touch-none`, an SVG corner glyph, `role="separator"` + `chat.widget.resize` aria/title). Removing the
+  `onMouseUp`/`captureDrag` ALSO permanently removes the P2 expand-toggle bug's root cause (the stray
+  "custom" re-capture) — re-confirmed the toggle still cycles (the `isLarge` logic is unaffected; its
+  regression test still passes). `chat.widget.resize` i18n key was ALREADY in HEAD (EN/FI/ET) — reused,
+  no message change needed this run.
+- **Verified:** `node --test panel-size.test.ts` 15 pass (+4 `sizeFromDrag` cases); `npx tsc --noEmit`
+  clean; full `npm test` 900 pass; `npx opennextjs-cloudflare build` succeeded (dev OFF, port 3601 free).
+  Did NOT regen the PM cms-bundle (concurrent ai-openrouter/content-collections loops have uncommitted
+  CMS edits; auto-regens on PM deploy). Could not pointer-drag in a live browser (no DOM in a Meeseeks
+  run) — the geometry is unit-tested and the pointer wiring is standard.
+- **Files:** CMS/src/lib/chat/panel-size.ts (+panel-size.test.ts), CMS/src/components/chat/chat-widget.tsx.
+  (No staged messages change — `chat.widget.resize` already exists in HEAD.)
+
 ## 2026-06-24 — BUG [P2] expand/shrink toggle one-way → FIXED
 - **Task:** the human-reported P2 bug (bugs outrank features): the expand (↗) button grew the panel to
   half but a second click never shrank it back.

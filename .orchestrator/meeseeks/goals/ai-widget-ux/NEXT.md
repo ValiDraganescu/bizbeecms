@@ -1,21 +1,23 @@
 # Note to the next Meeseeks (ai-widget-ux)
 
-**BUG [P2] (expand/shrink toggle one-way) is FIXED** (2026-06-24). `nextPreset(current, isLarge?)` +
-new pure `isLarge(size,vw,vh)` in `panel-size.ts` make the toggle key off actual size, not the volatile
-`preset` (which `captureDrag`'s `onMouseUp` flips to `"custom"` after an expand). `chat-widget.tsx` uses
-a render-level `panelLarge` const for the button icon/label/pressed. Regression in `panel-size.test.ts`
-(+4 cases, 11 pass). See CAVEATS "Expand/shrink toggle keys off SIZE".
+**Resize rail is DONE** (2026-06-24). The native CSS `resize` + `onMouseUp`/`captureDrag` are GONE —
+replaced by a TOP-LEFT pointer-drag handle (panel anchored bottom-right grows up/left). Pure
+`sizeFromDrag(start,dx,dy,vw,vh)` in `panel-size.ts` (+4 tests, 15 pass). `startResize` in
+`chat-widget.tsx` attaches window pointermove/up + persists as "custom". `chat.widget.resize` i18n
+key was ALREADY in HEAD (reused, not re-added). See CAVEATS "Panel sizing is inline-px, resized via
+a TOP-LEFT pointer-drag handle". Removing the custom-capture also permanently kills the P2 toggle
+bug's root cause (the `isLarge` toggle logic was already correct; re-confirmed it still cycles).
 
-**Check BUGS first (BACKLOG `## Bugs`).** As of this run, NO open bugs — both P1 (model-picker crash)
-and P2 (toggle) are DONE. The P1 still has a HITL TODO for the user: redeploy test-1 to clear the stale
-D1 catalog cache (code fix only protects new loads).
+**Check BUGS first (BACKLOG `## Bugs`).** As of this run, NO open bugs (P1 model-picker + P2 toggle
+both DONE). The P1 still has a HITL TODO for the user: redeploy test-1 to clear the stale D1 catalog
+cache (code fix only protects new loads).
 
-After bugs: top `## Tasks` TODO is the **left-edge resize rail** (native bottom-right grip is unusable
-under the launcher). It REMOVES the native CSS `resize` + the `onMouseUp` `captureDrag` (~line 349 of
-`chat-widget.tsx`). NOTE: my `isLarge` toggle fix stays correct even after that removal — but re-confirm
-the toggle cycles once the native resize is gone. Or do a pure-client polish (copy-message-to-clipboard).
+**No open `## Tasks` TODO left** — the resize rail was the last queued one. Next run: invent a pure-
+client widget polish toward GOAL.md, e.g. **copy-message-to-clipboard button** on transcript bubbles,
+or a per-message timestamp, or the resize handle could also get a bottom-LEFT corner for height-only.
 
-GATES (all green this run): CMS `npx tsc --noEmit` + `npm test` (887 pass) +
+GATES (all green this run): CMS `npx tsc --noEmit` + `npm test` (900 pass) +
 `npx opennextjs-cloudflare build` (dev OFF — port 3601 must be free; NEVER build while dev is up).
 Do NOT run `bundle:cms` (auto-regens on PM deploy). `lib/chat/models.ts` is ai-openrouter's — don't
-touch/stage it; tsc/build may transiently fail mid-their-edit, just re-run.
+touch/stage it. i18n files carry ai-openrouter's uncommitted content-collections import/export keys —
+DON'T `git add -A` them; this run needed NO message change (resize key already in HEAD).
