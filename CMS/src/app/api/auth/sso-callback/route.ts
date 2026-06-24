@@ -1,7 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { cmsValidateUrl, SESSION_COOKIE } from "@/lib/auth/guard-core";
 import { createSession } from "@/db/session-store";
-import { createUser, findUserByEmail } from "@/db/user-store";
+import { upsertSsoUser } from "@/db/user-store";
 
 /**
  * CMS SSO callback (cross-host auth bridge) — cms-auth Slice 2 rewrite.
@@ -18,12 +18,11 @@ import { createUser, findUserByEmail } from "@/db/user-store";
  * From then on the guard resolves the cookie LOCALLY (D1 session → user) — it no
  * longer forwards every request to PM. cms-validate is only this handshake now.
  *
- * EMAIL NOTE: cms-validate returns the PM userId but NOT the email, and we can't
- * touch PM this slice. So the SSO operator's CMS row is keyed by a stable
- * synthetic email derived from the PM userId (`<userId>@pm.sso`). It's unique +
- * idempotent (same operator → same row) and they never log in by email anyway
- * (passwordHash is NULL). Backfill to the real email once PM returns it. See
- * CAVEATS.
+ * EMAIL: cms-validate now returns the operator's real verified PM email alongside
+ * the userId. `upsertSsoUser` keys the CMS row on that real email AND backfills any
+ * earlier synthetic `<userId>@pm.sso` row (Slice-2 stopgap) to it — so operators
+ * show under their real address in the user list. If an older PM deploy omits the
+ * email, the upsert falls back to the synthetic email (unchanged behaviour).
  *
  * Fail-closed: a missing/expired/used nonce, a denied cms-validate, missing
  * config, or any error → back to /admin with no cookie (which re-initiates SSO;
@@ -68,8 +67,9 @@ export async function GET(request: Request): Promise<Response> {
   }
   if (!sid) return redirectToAdmin();
 
-  // 2. cms-validate handshake → confirm Site reach + get the PM userId.
+  // 2. cms-validate handshake → confirm Site reach + get the PM userId + email.
   let pmUserId = "";
+  let pmEmail: string | null = null;
   try {
     const res = await fetch(cmsValidateUrl(pmOrigin), {
       method: "POST",
@@ -81,24 +81,22 @@ export async function GET(request: Request): Promise<Response> {
       body: JSON.stringify({ siteId }),
     });
     const body = (await res.json().catch(() => null)) as
-      | { ok?: unknown; userId?: unknown }
+      | { ok?: unknown; userId?: unknown; email?: unknown }
       | null;
     if (res.status === 200 && body && body.ok === true && typeof body.userId === "string") {
       pmUserId = body.userId;
+      pmEmail = typeof body.email === "string" ? body.email : null;
     }
   } catch {
     pmUserId = "";
   }
   if (!pmUserId) return redirectToAdmin();
 
-  // 3. UPSERT the CMS-local user (Admin, SSO-only). Synthetic email keyed on the
-  //    PM userId so the upsert is idempotent. See header note + CAVEATS.
-  const ssoEmail = `${pmUserId}@pm.sso`;
+  // 3. UPSERT the CMS-local user (Admin, SSO-only). Keyed on the real PM email when
+  //    available (backfilling any earlier synthetic row); falls back to the
+  //    synthetic email otherwise. See header note + CAVEATS.
   try {
-    let user = await findUserByEmail(ssoEmail);
-    if (!user) {
-      user = await createUser({ email: ssoEmail, passwordHash: null, role: "Admin" });
-    }
+    const user = await upsertSsoUser(pmUserId, pmEmail);
     // 4. Mint a CMS-local session (sets the bizbee_session cookie).
     await createSession(user.id);
   } catch {

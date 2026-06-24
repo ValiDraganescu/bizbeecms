@@ -15,9 +15,12 @@ import { findSiteById, isUserAssignedToSite } from "@/lib/site/site";
  * forwarded `bizbee_session` cookie — `getCurrentUser()` reads it via
  * `cookies()`, so a forwarded cookie resolves exactly like a direct PM request.
  *
- * Body: `{ siteId }`. Returns `{ ok: true, userId }` when the resolved PM user
- * reaches that Site (country-reach OR site_users assignment — the same reach the
- * PM site detail/deploy routes enforce), else `{ ok: false }`.
+ * Body: `{ siteId }`. Returns `{ ok: true, userId, email }` when the resolved PM
+ * user reaches that Site (country-reach OR site_users assignment — the same reach
+ * the PM site detail/deploy routes enforce), else `{ ok: false }`. `email` is the
+ * operator's real verified PM email — the CMS keys its SSO user row on it (and
+ * backfills any earlier synthetic `<userId>@pm.sso` row) so operators show up
+ * under their real address in the CMS user list.
  *
  * REST route handler, not a server action (server actions 500 on OpenNext).
  */
@@ -66,7 +69,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     (await isUserAssignedToSite(user.id, siteId));
 
   return NextResponse.json(
-    reaches ? { ok: true, userId: user.id } : { ok: false },
+    reaches ? { ok: true, userId: user.id, email: user.email } : { ok: false },
     { status: 200 },
   );
 }

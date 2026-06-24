@@ -62,6 +62,50 @@ export async function createUser(
   return stored;
 }
 
+/** Synthetic email a pre-email-handshake SSO row was keyed on (cms-auth Slice 2). */
+export function ssoSyntheticEmail(pmUserId: string): string {
+  return `${pmUserId}@pm.sso`;
+}
+
+/**
+ * Upsert the CMS-local user for a PM operator arriving via SSO, returning the row
+ * (role=Admin, passwordHash=NULL — SSO-only). Idempotent on repeat logins.
+ *
+ * `realEmail` is the operator's verified PM email (now returned by cms-validate).
+ * When present we key on it AND backfill any earlier synthetic `<pmUserId>@pm.sso`
+ * row to the real address — so operators show under their real email in the user
+ * list. When absent (older PM that doesn't return email yet) we fall back to the
+ * synthetic email, preserving the Slice-2 behaviour. `injectedDb` is tests only.
+ */
+export async function upsertSsoUser(
+  pmUserId: string,
+  realEmail: string | null | undefined,
+  injectedDb?: Db,
+): Promise<User> {
+  const synthetic = ssoSyntheticEmail(pmUserId);
+  const email = realEmail && realEmail.trim() ? normalizeEmail(realEmail) : "";
+
+  if (!email) {
+    // No real email available — synthetic-keyed upsert (Slice-2 fallback).
+    return (await findUserByEmail(synthetic, injectedDb)) ??
+      (await createUser({ email: synthetic, passwordHash: null, role: "Admin" }, injectedDb));
+  }
+
+  // Real email present. Prefer an existing real-email row.
+  const existing = await findUserByEmail(email, injectedDb);
+  if (existing) return existing;
+
+  // Backfill an earlier synthetic row to the real email (one-time migration).
+  const legacy = await findUserByEmail(synthetic, injectedDb);
+  if (legacy) {
+    const db = injectedDb ?? (await getDb());
+    await db.update(schema.user).set({ email }).where(eq(schema.user.id, legacy.id));
+    return { ...legacy, email };
+  }
+
+  return createUser({ email, passwordHash: null, role: "Admin" }, injectedDb);
+}
+
 /** All CMS users, newest first — for the user-management list (Slice 5). */
 export async function listUsers(injectedDb?: Db): Promise<User[]> {
   const db = injectedDb ?? (await getDb());
