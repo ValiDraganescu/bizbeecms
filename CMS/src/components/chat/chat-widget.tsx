@@ -19,8 +19,9 @@ import { useTranslations } from "next-intl";
 import { ChatConversation, useChat } from "@/components/chat/chat-conversation";
 import { ChatDebugPanel } from "@/components/chat/chat-debug-panel";
 import { detectAdminContext } from "@/lib/chat/tool-scopes";
-import { DEFAULT_MODEL } from "@/lib/chat/models";
+import { DEFAULT_MODEL, type CatalogModel } from "@/lib/chat/models";
 import { ModelPicker } from "@/components/chat/model-picker";
+import { resolveInitialModel, loadModel, saveModel } from "@/lib/chat/selected-model";
 import {
   type PanelPreset,
   type PanelSize,
@@ -43,7 +44,15 @@ export function ChatWidget() {
   const [debug, setDebug] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
-  const [model, setModel] = useState(DEFAULT_MODEL);
+  // Persisted across reloads (ai-widget-ux): restored on mount from localStorage,
+  // validated against the live catalog (a removed model can't stick), written
+  // through on change. Until the catalog loads we trust a stored id (the chat
+  // route validates the model server-side regardless).
+  const [model, setModelState] = useState(DEFAULT_MODEL);
+  function setModel(id: string) {
+    setModelState(id);
+    saveModel(id);
+  }
   // Resizable panel (ai-widget-ux): preset toggle (default ⇄ half-screen) plus
   // free-drag via native CSS `resize`. Size is resolved against the live
   // viewport so a panel sized big on one screen is clamped, never lost.
@@ -194,6 +203,31 @@ export function ChatWidget() {
     chat.reset();
     setHistoryOpen(false);
   }
+
+  // Restore the persisted model once on mount, validated against the live
+  // catalog so a model that's no longer offered falls back to the default.
+  useEffect(() => {
+    const stored = loadModel();
+    if (!stored) return;
+    let cancelled = false;
+    void (async () => {
+      let ids: string[] = [];
+      try {
+        const res = await fetch("/api/chat/models");
+        if (res.ok) {
+          const j = (await res.json()) as { models?: CatalogModel[] };
+          ids = (j.models ?? []).map((m) => m.id);
+        }
+      } catch {
+        /* offline / no binding — empty ids → trust the stored id */
+      }
+      if (cancelled) return;
+      setModelState(resolveInitialModel(stored, ids, DEFAULT_MODEL));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Resolve the stored size preference against the current viewport. Runs on
   // mount and whenever the window resizes so a clamped panel re-fits.

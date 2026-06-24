@@ -35,3 +35,17 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   loop edits the same CMS dir; bundle auto-regens on PM deploy).
 - **Files:** CMS/src/lib/chat/enter-mode.ts (+test), CMS/src/components/chat/chat-conversation.tsx,
   CMS/messages/{en,fi,et}.json (only the three enterMode keys staged).
+
+## 2026-06-24 14:06 — Persist the selected model across reloads
+- **Status:** DONE
+- **What I did:** New pure helper `CMS/src/lib/chat/selected-model.ts`:
+  `resolveInitialModel(stored, catalogIds, fallback)` (stored-id kept only if still in the catalog;
+  empty catalog → trust a non-empty stored id since the chat route validates server-side; absent →
+  fallback) + `loadModel`/`saveModel` (localStorage `bizbee.chat.model`, guarded). In
+  `chat-widget.tsx`: model `useState` now wrapped by a `setModel(id)` that writes through to storage;
+  a mount `useEffect` restores the stored id, fetching `/api/chat/models` to validate against live
+  catalog ids before applying `resolveInitialModel`. No new i18n strings (no visible label changed).
+- **Verified:** `node --test selected-model.test.ts` 5 pass; `npx tsc --noEmit` clean; full `npm test`
+  818 pass; `npx opennextjs-cloudflare build` succeeded (dev confirmed OFF, port 3601 free). Did NOT
+  regen the PM cms-bundle (concurrent ai-openrouter loop edits the same CMS dir; auto-regens on PM deploy).
+- **Files:** CMS/src/lib/chat/selected-model.ts (+test), CMS/src/components/chat/chat-widget.tsx.
