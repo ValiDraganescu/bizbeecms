@@ -44,6 +44,10 @@ export interface ToolResult {
   assets?: unknown[];
   /** On failure: validation / D1 error messages. */
   errors?: string[];
+  /** Accordion (ai-widget-ux): the tool-call arguments the model sent. */
+  input?: unknown;
+  /** Accordion (ai-widget-ux): the full raw tool result the handler returned. */
+  output?: unknown;
 }
 
 /**
@@ -145,5 +149,16 @@ function toToolResult(data: Record<string, unknown>): ToolResult {
     fields: data.fields,
     assets: Array.isArray(data.assets) ? data.assets : undefined,
     errors,
+    input: data.input,
+    // The whole frame IS the tool output (name/ok/action/... + per-tool payload).
+    // Expose it for the accordion minus the input we threaded onto the frame.
+    output: stripInput(data),
   };
+}
+
+/** A shallow copy of the tool frame without the threaded `input` key (that's the args, not the output). */
+function stripInput(data: Record<string, unknown>): Record<string, unknown> {
+  const { input: _input, ...rest } = data;
+  void _input;
+  return rest;
 }

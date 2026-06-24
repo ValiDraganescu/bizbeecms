@@ -24,8 +24,9 @@
     "assistant": "Assistant",
     "error": "Error: {message}",
     "tool": {
-      "ok": "{name}: {action} {subject}",
-      "fail": "{name} failed"
+      "failBadge": "failed",
+      "input": "Input",
+      "output": "Output"
     },
     "widget": {
       "title": "AI Assistant",

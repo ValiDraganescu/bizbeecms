@@ -65,3 +65,24 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   regen the PM cms-bundle (concurrent ai-openrouter loop edits the same CMS dir; auto-regens on PM deploy).
 - **Files:** CMS/src/lib/chat/unread-badge.ts (+test), CMS/src/components/chat/chat-widget.tsx,
   CMS/messages/{en,fi,et}.json (only the `chat.widget.unread` key staged).
+
+## 2026-06-24 14:16 — Tool-call cards: name once + input/output accordion
+- **Status:** DONE
+- **What I did:** Fixed the duplicate-name label and made each tool card a collapsible
+  accordion. New pure helper `CMS/src/lib/chat/tool-card.ts`: `toolSubject` (component/page/
+  target, but NEVER the name → kills the dup), `toolSummary` (action + subject suffix, name
+  rendered separately), `formatBlob` (pretty-print + truncate input/output). Threaded the call
+  args + raw result to the client: extended `ToolResult` (`client-sse.ts`) with `input?`/`output?`
+  (`output` = the whole tool frame minus the threaded `input`); `route.ts` `runToolsRound` now
+  frames `{ ...data, input: call.args }`. `ToolCard` in `chat-conversation.tsx` is now a native
+  `<details>`/`<summary>` accordion (collapsed by default): summary shows `name` + summary text +
+  fail badge; expands to show errors + Input/Output `<pre>` blobs. Removed the now-unused
+  `chat.tool.ok`/`chat.tool.fail` join strings; added `chat.tool.{failBadge,input,output}` in
+  EN/FI/ET.
+- **Verified:** `node --test tool-card.test.ts` 8 pass (subject dedup, summary, blob truncate);
+  `npx tsc --noEmit` clean; full `npm test` 839 pass; all three messages JSON parse; `npx
+  opennextjs-cloudflare build` succeeded (dev confirmed OFF, port 3601 free). Did NOT regen the PM
+  cms-bundle (concurrent ai-openrouter loop edits the same CMS dir; auto-regens on PM deploy).
+- **Files:** CMS/src/lib/chat/tool-card.ts (+test), CMS/src/lib/chat/client-sse.ts,
+  CMS/src/app/api/chat/route.ts, CMS/src/components/chat/chat-conversation.tsx,
+  CMS/messages/{en,fi,et}.json (only the three chat.tool keys staged).

@@ -24,8 +24,9 @@
     "assistant": "Assistent",
     "error": "Viga: {message}",
     "tool": {
-      "ok": "{name}: {action} {subject}",
-      "fail": "{name} ebaõnnestus"
+      "failBadge": "ebaõnnestus",
+      "input": "Sisend",
+      "output": "Väljund"
     },
     "widget": {
       "title": "Tehisintellekti assistent",

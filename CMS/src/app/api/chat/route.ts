@@ -176,7 +176,9 @@ async function runToolsRound(
   const results: ToolResult[] = [];
   for (const call of calls) {
     const data = await runTool(call.name, call.args);
-    controller.enqueue(encoder.encode(frameEvent("tool", data)));
+    // Thread the call args onto the frame so the client's tool-card accordion can
+    // show input(args) alongside output(result). ai-widget-ux.
+    controller.enqueue(encoder.encode(frameEvent("tool", { ...data, input: call.args })));
     results.push({ name: data.name, data });
   }
   return results;

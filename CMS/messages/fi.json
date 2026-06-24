@@ -24,8 +24,9 @@
     "assistant": "Avustaja",
     "error": "Virhe: {message}",
     "tool": {
-      "ok": "{name}: {action} {subject}",
-      "fail": "{name} epäonnistui"
+      "failBadge": "epäonnistui",
+      "input": "Syöte",
+      "output": "Tulos"
     },
     "widget": {
       "title": "Tekoälyavustaja",

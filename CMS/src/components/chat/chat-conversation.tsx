@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { ChatEventParser, type ToolResult } from "@/lib/chat/client-sse";
+import { toolSummary, formatBlob } from "@/lib/chat/tool-card";
 import {
   decideSendOnEnter,
   loadEnterMode,
@@ -336,24 +337,43 @@ function ToolCard({
   tool: ToolResult;
   t: ReturnType<typeof useTranslations>;
 }) {
-  const subject = tool.component ?? tool.page ?? tool.target ?? tool.name;
+  const summary = toolSummary(tool);
   const cls = tool.ok
     ? "border-success bg-success-subtle text-foreground"
     : "border-danger bg-danger-subtle text-foreground";
+  const inputText = formatBlob(tool.input);
+  const outputText = formatBlob(tool.output);
+  // ponytail: native <details> is the accordion — collapsed by default, no JS state.
   return (
-    <div className={`mt-2 rounded-md border px-3 py-2 ${cls}`}>
-      <p className="font-medium">
-        {tool.ok
-          ? t("tool.ok", { name: tool.name, action: tool.action ?? "", subject })
-          : t("tool.fail", { name: tool.name })}
-      </p>
+    <details className={`group mt-2 rounded-md border px-3 py-2 ${cls}`}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 font-medium">
+        <span aria-hidden className="text-foreground-muted transition-transform group-open:rotate-90">
+          ›
+        </span>
+        <span className="font-mono">{tool.name}</span>
+        {summary && <span className="text-foreground-muted">{summary}</span>}
+        {!tool.ok && <span className="text-danger">{t("tool.failBadge")}</span>}
+      </summary>
       {!tool.ok && tool.errors && tool.errors.length > 0 && (
-        <ul className="mt-1 list-disc pl-5 text-danger">
+        <ul className="mt-2 list-disc pl-5 text-danger">
           {tool.errors.map((e, i) => (
             <li key={i}>{e}</li>
           ))}
         </ul>
       )}
+      {inputText && <ToolBlob label={t("tool.input")} text={inputText} />}
+      {outputText && <ToolBlob label={t("tool.output")} text={outputText} />}
+    </details>
+  );
+}
+
+function ToolBlob({ label, text }: { label: string; text: string }) {
+  return (
+    <div className="mt-2">
+      <p className="mb-1 text-foreground-muted">{label}</p>
+      <pre className="overflow-x-auto rounded-md bg-surface px-2 py-1 text-foreground">
+        {text}
+      </pre>
     </div>
   );
 }

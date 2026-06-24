@@ -4,6 +4,13 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **This goal is CLIENT/UX only.** Don't touch the OpenRouter adapter, key handling, or model
   catalog DATA (prices/modalities/tool-capability filter/credit) — those live in `ai-openrouter`.
   You work on the widget components + UI-pref persistence + chat-history round-trip.
+- **TWO PM-SSO DEBUG TASKS break the client-only rule (on purpose).** "Export chat JSON" and
+  "system-prompt editor + versions" DO add server routes (+ a D1 table/migration for prompt versions).
+  They share a `isPmSsoUser(user)` predicate — BUILD IT ONCE, reuse. PM-SSO = SSO-provisioned row
+  (synthetic `@pm.sso` email via `ssoSyntheticEmail`, `db/user-store.ts:66`), NOT Google, NOT local.
+  Gate on the SERVER (403 + IGNORE any override field for non-SSO callers), never just by hiding UI.
+  The system-prompt override applies to the requesting operator's SESSION ONLY (per-request field) —
+  it must NEVER change the site default real end-users get.
 - **Widget files:** shell = `CMS/src/components/chat/chat-widget.tsx` (open/minimize, model state at
   line ~38, layout). Transcript/input/tool-cards = `CMS/src/components/chat/chat-conversation.tsx`
   (input `<input>` ~236, tool render `ToolCard` ~294, `ToolResult` type ~24, history `seed()` ~134).
@@ -34,6 +41,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   `messages/{en,fi,et}.json` may already carry ai-openrouter's uncommitted keys (e.g. `widget.modality*`).
   A plain `git add` would sweep those in. Instead rebuild the file from `git show HEAD:CMS/messages/<loc>.json`
   + ONLY your keys, write that, then `git add` — the diff is then yours alone.
+- **`ToolResult` now carries `input`/`output` (accordion DONE 2026-06-24).** `client-sse.ts`
+  `ToolResult` gained `input?: unknown` (the call args) + `output?: unknown` (the full raw tool
+  frame minus the threaded `input`). The chat route frames `{ ...data, input: call.args }`. The
+  PERSISTENCE task MUST store this enriched shape (input+output) so reloaded cards expand too — not
+  just name/ok/action. `seed()` (~line 141 now) still sets `tools: []`.
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.
