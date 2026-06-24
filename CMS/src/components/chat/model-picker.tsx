@@ -21,6 +21,62 @@ import {
   type CatalogModel,
 } from "@/lib/chat/models";
 
+/** Minimal inline glyph per input modality (design-system stroke icons). */
+function ModalityIcon({ modality, label }: { modality: string; label: string }) {
+  const common = {
+    width: 12,
+    height: 12,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-label": label,
+    role: "img" as const,
+    className: "shrink-0",
+  };
+  switch (modality) {
+    case "image":
+      return (
+        <svg {...common}>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <path d="M21 15l-5-5L5 21" />
+        </svg>
+      );
+    case "file":
+      return (
+        <svg {...common}>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <path d="M14 2v6h6" />
+        </svg>
+      );
+    case "audio":
+      return (
+        <svg {...common}>
+          <path d="M3 10v4h4l5 5V5L7 10z" />
+          <path d="M16 8a5 5 0 0 1 0 8" />
+        </svg>
+      );
+    case "video":
+      return (
+        <svg {...common}>
+          <rect x="2" y="5" width="14" height="14" rx="2" />
+          <path d="M22 8l-6 4 6 4z" />
+        </svg>
+      );
+    default: // text
+      return (
+        <svg {...common}>
+          <path d="M4 7V5h16v2" />
+          <path d="M12 5v14" />
+          <path d="M9 19h6" />
+        </svg>
+      );
+  }
+}
+
 export function ModelPicker({
   value,
   onChange,
@@ -167,7 +223,18 @@ export function ModelPicker({
                               idx === active ? "bg-primary/10" : ""
                             } ${m.id === value ? "font-semibold text-primary" : "text-foreground"}`}
                           >
-                            <span className="truncate">{m.label}</span>
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <span className="truncate">{m.label}</span>
+                              <span className="flex shrink-0 items-center gap-0.5 text-foreground-muted">
+                                {m.inputModalities.map((mod) => (
+                                  <ModalityIcon
+                                    key={mod}
+                                    modality={mod}
+                                    label={t(`modality${mod.charAt(0).toUpperCase()}${mod.slice(1)}`)}
+                                  />
+                                ))}
+                              </span>
+                            </span>
                             {(() => {
                               const inP = pricePerMillion(m.inputPrice);
                               const outP = pricePerMillion(m.outputPrice);

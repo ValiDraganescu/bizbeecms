@@ -354,6 +354,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   live picker showing only tool-capable models on a deployed CMS (HITL).
 - **Files:** `CMS/src/lib/chat/models.ts`, `CMS/scripts/models.test.mjs`
 
+## 2026-06-24 — Model picker: show input-modality icons per model
+- **Status:** DONE
+- **What I did:** OpenRouter's `/api/v1/models` returns `architecture.input_modalities`
+  (snake_case), previously DISCARDED. `models.ts`: `RawModel` gained `architecture?.input_modalities`;
+  new pure `parseInputModalities(raw)` (exported) keeps only known modalities
+  (text/image/file/audio/video) and defaults to `["text"]` for absent/empty/non-array/all-junk;
+  `CatalogModel` gained `inputModalities: string[]`; the parser sets it via the helper; static
+  `CHAT_MODELS` all get `["text"]`. `model-picker.tsx`: added an inline `<ModalityIcon>` (small
+  design-system stroke glyphs, `role="img"` + per-modality `aria-label`), rendered as a row of icons
+  beside each model's label (selected model uses the same component since it's just a row). i18n
+  `modality{Text,Image,File,Audio,Video}` in EN/FI/ET.
+- **Verified:** `models.test.mjs` 15/15 (added `parseInputModalities` direct test + SAMPLE
+  `architecture` assert: claude → ["text","image"], gpt-4o-mini no-arch → ["text"]). CMS `tsc --noEmit`
+  0 errors. Full CMS suite `node --test scripts/*.test.mjs 'src/**/*.test.ts'` → **813/813**. i18n
+  parity script clean. `npx opennextjs-cloudflare build` GREEN (dev off — 3601/3602 free). Catalog is
+  a bundled `.ts` module → no cms-bundle regen. Output modalities OUT OF SCOPE (widget is text I/O +
+  tools). Could NOT verify: live picker rendering modalities on a deployed CMS (HITL).
+- **Files:** `CMS/src/lib/chat/models.ts`, `CMS/src/components/chat/model-picker.tsx`,
+  `CMS/scripts/models.test.mjs`, `CMS/messages/{en,fi,et}.json`
+
 ## 2026-06-24 13:55 — Model picker: show input/output price per 1M tokens (not raw $/token)
 - **Status:** DONE
 - **What I did:** The picker printed `${m.price}` = raw USD/token (e.g. "$0.00000015"),

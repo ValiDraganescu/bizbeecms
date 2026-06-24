@@ -39,6 +39,8 @@ export interface CatalogModel {
   inputPrice: number | null;
   /** Per-output-token USD price (`pricing.completion`); null when none. */
   outputPrice: number | null;
+  /** Accepted input modalities (`architecture.input_modalities`); defaults to `["text"]`. */
+  inputModalities: string[];
 }
 
 /**
@@ -54,6 +56,7 @@ export const CHAT_MODELS: ReadonlyArray<CatalogModel> = [
     price: null,
     inputPrice: null,
     outputPrice: null,
+    inputModalities: ["text"],
   },
   {
     id: "openai/gpt-4o",
@@ -62,6 +65,7 @@ export const CHAT_MODELS: ReadonlyArray<CatalogModel> = [
     price: null,
     inputPrice: null,
     outputPrice: null,
+    inputModalities: ["text"],
   },
   {
     id: "anthropic/claude-3.5-sonnet",
@@ -70,6 +74,7 @@ export const CHAT_MODELS: ReadonlyArray<CatalogModel> = [
     price: null,
     inputPrice: null,
     outputPrice: null,
+    inputModalities: ["text"],
   },
   {
     id: "google/gemini-flash-1.5",
@@ -78,6 +83,7 @@ export const CHAT_MODELS: ReadonlyArray<CatalogModel> = [
     price: null,
     inputPrice: null,
     outputPrice: null,
+    inputModalities: ["text"],
   },
 ];
 
@@ -107,6 +113,24 @@ interface RawModel {
   pricing?: { prompt?: unknown; completion?: unknown } | null;
   /** OpenRouter exposes supported request params; includes "tools" when the model can tool-call. */
   supported_parameters?: unknown;
+  /** OpenRouter's modality metadata; `input_modalities` lists accepted inputs (text/image/file/…). */
+  architecture?: { input_modalities?: unknown } | null;
+}
+
+/** Known input modalities OpenRouter advertises — anything else is dropped as junk. */
+const KNOWN_MODALITIES = new Set(["text", "image", "file", "audio", "video"]);
+
+/**
+ * Accepted input modalities from `architecture.input_modalities`. Keeps only the
+ * known string modalities; defaults to `["text"]` when absent/empty/junk (every
+ * model accepts text). Pure — node-tested.
+ */
+export function parseInputModalities(raw: unknown): string[] {
+  const arch = raw && typeof raw === "object" ? (raw as RawModel).architecture : null;
+  const mods = arch && typeof arch === "object" ? arch.input_modalities : undefined;
+  if (!Array.isArray(mods)) return ["text"];
+  const out = mods.filter((m): m is string => typeof m === "string" && KNOWN_MODALITIES.has(m));
+  return out.length > 0 ? out : ["text"];
 }
 
 /** True when the model advertises tool/function-calling support (`supported_parameters` includes "tools"). */
@@ -167,6 +191,7 @@ export function parseModelCatalog(apiJson: unknown): CatalogModel[] {
       price: input,
       inputPrice: input,
       outputPrice: outputPriceOf(m),
+      inputModalities: parseInputModalities(m),
     });
   }
   return out;

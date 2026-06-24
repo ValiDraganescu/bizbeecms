@@ -20,6 +20,7 @@ import {
   filterCatalog,
   providerOf,
   pricePerMillion,
+  parseInputModalities,
 } from "../src/lib/chat/models.ts";
 
 test("DEFAULT_MODEL is itself an allowlisted id", () => {
@@ -88,6 +89,7 @@ const SAMPLE = {
       name: "Anthropic: Claude 3.5 Sonnet",
       pricing: { prompt: "0.000003", completion: "0.000015" },
       supported_parameters: ["tools", "temperature"],
+      architecture: { input_modalities: ["text", "image"] },
     },
     {
       id: "openai/gpt-4o-mini",
@@ -135,6 +137,28 @@ test("parseModelCatalog extracts id/name/provider/price from the OpenRouter shap
   assert.equal(noPrice.price, null);
   assert.equal(noPrice.inputPrice, null);
   assert.equal(noPrice.outputPrice, null);
+  // architecture.input_modalities is parsed; default ["text"] when absent.
+  const claude = cat.find((m) => m.id === "anthropic/claude-3.5-sonnet");
+  assert.deepEqual(claude.inputModalities, ["text", "image"]);
+  assert.deepEqual(small.inputModalities, ["text"]); // no architecture → default
+});
+
+test("parseInputModalities reads known modalities, defaults to ['text']", () => {
+  assert.deepEqual(parseInputModalities({ architecture: { input_modalities: ["text", "image"] } }), [
+    "text",
+    "image",
+  ]);
+  assert.deepEqual(parseInputModalities({}), ["text"]); // absent → default
+  assert.deepEqual(parseInputModalities({ architecture: { input_modalities: [] } }), ["text"]); // empty → default
+  assert.deepEqual(parseInputModalities({ architecture: { input_modalities: "image" } }), ["text"]); // not an array → default
+  // junk modalities filtered; an empty result falls back to ["text"]
+  assert.deepEqual(parseInputModalities({ architecture: { input_modalities: ["bogus", 42] } }), [
+    "text",
+  ]);
+  assert.deepEqual(
+    parseInputModalities({ architecture: { input_modalities: ["file", "junk", "audio"] } }),
+    ["file", "audio"],
+  );
 });
 
 test("pricePerMillion formats USD/token as USD per 1M tokens, 2dp", () => {
