@@ -201,6 +201,22 @@ stable id + slug (Slice 3) so this isn't a retrofit.
   api/invite/route.ts (canInviteRole) — re-verify once that lands. NO bundle regen /
   NO EN/FI/ET (AI-tool descs are model-facing). Live D1/visual = HITL.
 
+- DONE (2026-06-24): **Import/export (CSV/JSON) per collection.** PURE
+  `lib/content/import-export.ts` (`rowsToCsv`/`parseCsv` RFC-4180-ish + `parseImport`
+  csv|json → row objects; DROPS generated system cols id/archived_at/created_at/
+  updated_at on import, KEEPS slug+status) + export route GET
+  `/api/collections/[name]/export?format=csv|json` (reuses Slice-3 `listItems`
+  archived:all → serializer, attachment download) + import route POST
+  `/api/collections/[name]/import` `{format,text}` → loops Slice-3 `createItem` (full
+  validate/coerce/fence per row, continue-on-error, MAX_IMPORT_ROWS=1000,
+  `{created,failed,errors[]}`) + operator UI in collection-items.tsx (Export CSV/JSON
+  download links + `ImportForm`: file picker + paste + per-row error list). EN/FI/ET
+  `collections.{exportCsv,exportJson,import,importing,import*,close}` + cms-bundle
+  regen. 10 node tests (scripts/import-export.test.mjs); tsc 0; npm test 896; next
+  build green w/ both routes in manifest (opennext build itself blocked ONLY by a
+  parallel worker's in-flight chat-widget.tsx — documented clash, not mine). Live
+  D1 = HITL.
+
 - TODO: **Phase 3 (later, not greenlit) — route-driven detail pages + cross-collection
   refs.** "The item for the current route" (dynamic `/blog/[slug]` → the matching
   item) and `ref` fields (post→author) resolved during binding. Bigger (dynamic

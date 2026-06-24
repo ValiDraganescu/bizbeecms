@@ -59,7 +59,8 @@
       "overrideActive": "Mukautettu kehote: {label}",
       "overrideActiveUnnamed": "Mukautettu kehote käytössä",
       "overrideTitle": "Tallennettu järjestelmäkehotteen versio on käytössä vain istunnossasi.",
-      "overrideClear": "Käytä oletusta"
+      "overrideClear": "Käytä oletusta",
+      "resize": "Muuta keskustelun kokoa vetämällä"
     },
     "debug": {
       "context": "Sivun konteksti",

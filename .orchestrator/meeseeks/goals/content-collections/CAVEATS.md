@@ -407,3 +407,20 @@ Read every line before working. Each entry was learned the hard way by a previou
   collections/[name]`), NOT `collections-manager.tsx` (that's the create/list page).
   `SchemaManager` (rename/drop) + `AddFieldForm` are both there, behind the
   "Manage schema" / "Add field" toolbar buttons.
+
+- **(Import/export, 2026-06-24) The PURE serializer is `lib/content/import-export.ts`;
+  NO new data path — export reuses Slice-3 `listItems`, import LOOPS Slice-3
+  `createItem` (full validate/coerce/fence PER ROW).** So import inherits every
+  Slice-3 rule for free (coercion, required, options, fence) — don't add a second
+  bulk-insert that skips it. Generated system columns (id/archived_at/created_at/
+  updated_at) are DROPPED on import (`DROPPED_ON_IMPORT`); slug+status are kept
+  (createItem accepts them). Empty CSV cells become `""` → createItem treats `""` as
+  absent → column DEFAULT/null. Import continue-on-error returns
+  `{created,failed,errors[{row,error}]}` (1-based row #), capped at
+  MAX_IMPORT_ROWS=1000 (matches the read cap). Export is a plain `<a download>` to the
+  GET route (content-disposition attachment) — no JS blob needed.
+- **(Import/export, 2026-06-24) `parseCsv` is a hand-rolled RFC-4180-ish state
+  machine** (quoted fields, `""` escapes, embedded commas/newlines, LF or CRLF). If a
+  new field type stores a value containing commas/quotes/newlines, `rowsToCsv`'s
+  `csvEscape` already quotes it — round-trip is node-tested. multiselect round-trips
+  as its JSON-array TEXT string (a quoted CSV cell); createItem re-parses it on import.

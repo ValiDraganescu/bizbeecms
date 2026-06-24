@@ -59,7 +59,8 @@
       "overrideActive": "Custom prompt: {label}",
       "overrideActiveUnnamed": "Custom prompt active",
       "overrideTitle": "A saved system-prompt version is active for your session only.",
-      "overrideClear": "Use default"
+      "overrideClear": "Use default",
+      "resize": "Drag to resize the chat"
     },
     "debug": {
       "context": "Page context",

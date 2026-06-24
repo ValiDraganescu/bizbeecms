@@ -437,3 +437,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/components/content/collection-items.tsx,
   CMS/src/components/content/confirm-modal.tsx, CMS/messages/{en,fi,et}.json,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js.
+
+## 2026-06-24 15:36 — Import/export (CSV/JSON) per collection
+- **Status:** DONE
+- **What I did:** Operator bulk in/out for collection items. PURE
+  `lib/content/import-export.ts` (`rowsToCsv` RFC-4180-ish quoting, `parseCsv`
+  state-machine parser handling quoted commas/newlines/escaped `""`, `parseImport`
+  csv|json → row objects; DROPS generated system cols id/archived_at/created_at/
+  updated_at on import, KEEPS slug+status; cells "" so column DEFAULTs apply).
+  Export route GET `/api/collections/[name]/export?format=csv|json` → downloadable
+  file (reuses Slice-3 `listItems` archived:"all" + registry fields → serializer,
+  content-disposition attachment). Import route POST `/api/collections/[name]/import`
+  `{format,text}` → loops Slice-3 `createItem` (full validate/coerce/fence per row),
+  continue-on-error, MAX_IMPORT_ROWS=1000, returns `{created,failed,errors[]}`.
+  Operator UI in collection-items.tsx: Export CSV / Export JSON `<a download>` links
+  + Import button → inline `ImportForm` (file picker + paste textarea + per-row
+  error list). EN/FI/ET `collections.{exportCsv,exportJson,import,importing,import*,
+  close}` + cms-bundle regen.
+- **Verified:** 10 node tests in scripts/import-export.test.mjs (csv round-trip,
+  quote/comma/newline escaping, system-col drop, json parse, error cases) — all
+  pass. `npx tsc --noEmit` clean. `npm test` 896/896. `npx next build` green with
+  both new routes in the manifest (`/api/collections/[name]/export` + `/import`).
+  cms-bundle regen'd. opennextjs-cloudflare build itself died on a PARALLEL worker's
+  in-flight chat-widget.tsx (dialog/Esc snippet — NOT mine; the documented
+  parallel-build-clash caveat) — next build (which opennext runs internally) is
+  green incl. my routes, so my slice is sound. Live D1 = HITL.
+- **Files:** CMS/src/lib/content/import-export.ts,
+  CMS/src/app/api/collections/[name]/export/route.ts,
+  CMS/src/app/api/collections/[name]/import/route.ts,
+  CMS/src/components/content/collection-items.tsx, CMS/scripts/import-export.test.mjs,
+  CMS/messages/{en,fi,et}.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js.

@@ -59,7 +59,8 @@
       "overrideActive": "Kohandatud viip: {label}",
       "overrideActiveUnnamed": "Kohandatud viip aktiivne",
       "overrideTitle": "Salvestatud süsteemiviipa versioon on aktiivne ainult sinu seansis.",
-      "overrideClear": "Kasuta vaikimisi"
+      "overrideClear": "Kasuta vaikimisi",
+      "resize": "Lohista vestluse suuruse muutmiseks"
     },
     "debug": {
       "context": "Lehe kontekst",
