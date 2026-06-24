@@ -1,0 +1,13 @@
+# Backlog — sso
+Task states: TODO | DOING | DONE | BLOCKED.
+
+## Bugs
+(human-reported bugs land here, newest at top; they outrank everything)
+
+- BUG [P1]: Google sign-in fails on a deployed site with `Error 400: redirect_uri_mismatch`. — repro: deployed site (restovista, custom domain `www.restovista.com`), CMS settings → Google sign-in configured with the customer's own client → click Sign in with Google → Google "Access blocked: this app's request is invalid / redirect_uri_mismatch". — reported 2026-06-24.
+  ROOT CAUSE (diagnosed): the CMS builds `redirect_uri = <APP_ORIGIN>/api/auth/google/callback` in BOTH `app/api/auth/google/start/route.ts:32` and `callback/route.ts:79`, but the deployer sets `APP_ORIGIN` to the `bizbeecms-cms-<slug>.workers.dev` URL even when a CUSTOM DOMAIN is attached (`deployer/src/index.ts` ~520). So the CMS sent a workers.dev redirect_uri while the customer registered `https://www.restovista.com/api/auth/google/callback` (+ apex) in their Google client → mismatch. (Customer config is CORRECT — both www + apex callback URIs are registered.)
+  FIX: the deployer must set `APP_ORIGIN` to the site's PRIMARY custom domain when one is attached (workers.dev fallback otherwise). The custom-domain data lives PM-side (archived `custom-domains`) — thread the primary domain into the deploy so the deployer picks it. After the fix, redeploy → the redirect_uri matches the registered URI. CAVEAT: a site with www+apex both registered — APP_ORIGIN must be the SAME host the user actually browses (www vs apex). Confirm which is canonical (likely www; apex 301→www per custom-domains setup) and use that as APP_ORIGIN; the OTHER must also be a registered redirect URI (it is). SHARED with the cms-mcp URL bug — same `APP_ORIGIN` defect; coordinate so ONE deployer fix serves both (don't fix APP_ORIGIN twice). Gate: deployer tsc + its test; live Google round-trip on restovista = HITL (the actual verification).
+
+## Tasks
+- TODO: **Live-verify PM-SSO ("Sign in with BizbeeCMS") on a deployed site.** Separate from Google — confirm the nonce handshake (cms-sso → sso-callback → cms-validate) completes on a real deployed CMS and signs the operator in as Admin. If APP_ORIGIN/custom-domain affects the SSO redirect too, fold it into the APP_ORIGIN fix above. Record the live round-trip; note any break as a new bug.
+- TODO: **Live-verify Google sign-in end-to-end after the APP_ORIGIN fix.** On restovista (custom domain): configured customer client → Sign in with Google → consent → callback verifies id_token → existing-user-or-invite gate → session minted. Confirm no self-signup (uninvited email → `?error=googleDenied`). HITL — the codeable bit is the APP_ORIGIN fix; this is the live confirmation.
