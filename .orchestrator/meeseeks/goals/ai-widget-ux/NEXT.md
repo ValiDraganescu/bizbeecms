@@ -1,21 +1,24 @@
 # Note to the next Meeseeks (ai-widget-ux)
 
-Model persistence is DONE (2026-06-24): `lib/chat/selected-model.ts`
-(`resolveInitialModel` + `loadModel`/`saveModel`, localStorage `bizbee.chat.model`) +
-`chat-widget.tsx` (`setModel` writes through; mount effect validates the stored id against
-`/api/chat/models` and falls back to DEFAULT_MODEL if removed).
+Unread badge is DONE (2026-06-24): `lib/chat/unread-badge.ts` (`nextUnread(current,{open,
+replyFinished})`) + `chat-widget.tsx` (`unread` state set on the save effect's busy→idle finish
+edge when `!open`; cleared by a `useEffect([open])`; danger dot on the launcher when `unread &&
+!open`, `chat.widget.unread` aria/title in EN/FI/ET).
 
 Remaining TODOs in BACKLOG.md — good next picks:
-- **"Unread badge when minimized + new reply arrives"** — self-contained, pure
-  badge-visibility helper (minimized, lastSeenMessageId, latestMessageId) + node test, state in
-  `chat-widget.tsx`. Set on busy→idle edge while `!open`, clear on open. EN/FI/ET if an aria label
-  is added. (The save effect at `chat-widget.tsx` ~line 117 already detects the busy→idle finish edge —
-  reuse that signal.)
-- **"Tool-call cards: stop repeating the name + accordion"** — bigger; threads SSE `tool` event +
-  `ToolResult` to carry args/result through `chat-conversation.tsx`. Coordinate with the
-  tool-persistence task (store the enriched shape so reloaded cards expand).
-- The two PM-SSO debug tasks (export JSON, system-prompt editor) — these ADD server routes; build
-  the `isPmSsoUser(user)` predicate ONCE and share. Read the CAVEATS block on them first.
+- **"Tool-call cards: stop repeating the name + accordion"** — `chat-conversation.tsx` `ToolCard`
+  (~line 294) shows the tool name twice (fix `tool.ok`/`tool.err` strings + the
+  `subject = component ?? page ?? target ?? name` dup). Then make each card a `<details>` accordion
+  exposing input(args)/output(result) — needs the SSE `tool` event + `ToolResult` type (~line 24)
+  to carry args + raw result; thread them through `addTool`. Coordinate with the persistence task
+  so the STORED tool shape == the RENDERED one.
+- **"Persist tool calls in chat history"** — extend `lib/chat/history.ts` `validateThreadInput` +
+  `db/chat-history-store.ts` to round-trip each assistant turn's `tools: ToolResult[]`; `seed()`
+  (~line 134) currently sets `tools: []`. Migration if a column is added. Do this WITH the accordion
+  task so reloaded cards expand too.
+- The two PM-SSO debug tasks (export JSON, system-prompt editor) — these ADD server routes + (for
+  the editor) a D1 table/migration. Build `isPmSsoUser(user)` ONCE and share. Read the CAVEATS block
+  on them first (server-side gate, override is session-only).
 
 Gotchas (all in CAVEATS):
 - `CMS/messages/{en,fi,et}.json` is SHARED with ai-openrouter — stage ONLY your keys; rebuild the

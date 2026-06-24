@@ -49,3 +49,19 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   818 pass; `npx opennextjs-cloudflare build` succeeded (dev confirmed OFF, port 3601 free). Did NOT
   regen the PM cms-bundle (concurrent ai-openrouter loop edits the same CMS dir; auto-regens on PM deploy).
 - **Files:** CMS/src/lib/chat/selected-model.ts (+test), CMS/src/components/chat/chat-widget.tsx.
+
+## 2026-06-24 14:10 — Unread badge on the launcher when minimized + a reply arrives
+- **Status:** DONE
+- **What I did:** New pure helper `CMS/src/lib/chat/unread-badge.ts`:
+  `nextUnread(current, {open, replyFinished})` — opening always clears, a reply finishing while
+  closed sets, otherwise unchanged. In `chat-widget.tsx`: added `unread` state; set it on the existing
+  busy→idle finish edge (the save effect, ~line 138) via `setUnread(cur => nextUnread(cur, {open,
+  replyFinished:true}))` and added `open` to that effect's deps; a dedicated `useEffect([open])` clears
+  `unread` whenever the panel opens. Rendered a small `bg-danger` dot (border-surface ring) absolutely
+  positioned top-right on the launcher button, shown only when `unread && !open`, with `role="status"`
+  + `chat.widget.unread` aria-label/title. Added EN/FI/ET `chat.widget.unread`.
+- **Verified:** `node --test unread-badge.test.ts` 5 pass; `npx tsc --noEmit` clean; full `npm test`
+  831 pass; `npx opennextjs-cloudflare build` succeeded (dev confirmed OFF, port 3601 free). Did NOT
+  regen the PM cms-bundle (concurrent ai-openrouter loop edits the same CMS dir; auto-regens on PM deploy).
+- **Files:** CMS/src/lib/chat/unread-badge.ts (+test), CMS/src/components/chat/chat-widget.tsx,
+  CMS/messages/{en,fi,et}.json (only the `chat.widget.unread` key staged).
