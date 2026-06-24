@@ -338,6 +338,15 @@ export function ChatWidget() {
           className="fixed bottom-24 right-6 z-50 flex resize flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
           style={panel ? { width: panel.width, height: panel.height } : undefined}
           onMouseUp={captureDrag}
+          // Esc minimizes the panel — keyboard parity with the close button. Bound
+          // on the dialog (focus lives inside it); ignore Esc while a textarea/input
+          // is mid-composition so it doesn't fight IME/typing escape.
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setOpen(false);
+            }
+          }}
           role="dialog"
           aria-label={t("title")}
         >
@@ -352,7 +361,7 @@ export function ChatWidget() {
                 onClick={newConversation}
                 aria-label={t("new")}
                 title={t("new")}
-                className="rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+                className="rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
                   <path d="M12 5v14M5 12h14" />
@@ -365,7 +374,7 @@ export function ChatWidget() {
                 aria-pressed={historyOpen}
                 title={t("history")}
                 className={
-                  "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground " +
+                  "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
                   (historyOpen ? "bg-surface-muted text-foreground" : "text-foreground-muted")
                 }
               >
@@ -382,7 +391,7 @@ export function ChatWidget() {
                 aria-pressed={debug}
                 title={t("debug")}
                 className={
-                  "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground " +
+                  "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
                   (debug ? "bg-surface-muted text-foreground" : "text-foreground-muted")
                 }
               >
@@ -398,7 +407,7 @@ export function ChatWidget() {
                 aria-pressed={panel?.preset === "half"}
                 title={panel?.preset === "half" ? t("sizeCompact") : t("sizeHalf")}
                 className={
-                  "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground " +
+                  "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
                   (panel?.preset === "half" ? "bg-surface-muted text-foreground" : "text-foreground-muted")
                 }
               >
@@ -416,7 +425,7 @@ export function ChatWidget() {
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label={t("minimize")}
-                className="rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+                className="rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
                   <line x1="5" y1="12" x2="19" y2="12" />
@@ -516,7 +525,7 @@ export function ChatWidget() {
         aria-expanded={open}
         aria-label={open ? t("close") : t("open")}
         title={open ? t("close") : t("open")}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
       >
         {unread && !open && (
           <span

@@ -106,6 +106,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   chain collapses. Auto-scroll lives in a `useEffect([messages])` gated by `isAtBottom`
   (`lib/chat/scroll-anchor.ts`, 24px tolerance so streaming sub-pixel drift doesn't flap the pill);
   don't re-add an unconditional scroll-to-bottom or you'll yank a scrolled-up reader back down.
+- **Esc-to-minimize is wired (a11y DONE 2026-06-24)** via `onKeyDown` on the open dialog `<div>` in
+  `chat-widget.tsx` (`e.key==="Escape"` → `setOpen(false)`, with `stopPropagation`). It fires for ANY
+  focused element inside the panel — including the textarea. If you add an inner overlay/menu that
+  needs its OWN Esc (e.g. close a dropdown first), handle+`stopPropagation` it there so it doesn't
+  fall through and minimize the whole panel. Focus-ring on the icon-buttons uses
+  `focus-visible:ring-2 focus-visible:ring-ring` (token `--color-ring` in globals.css); the launcher
+  adds `ring-offset-2 ring-offset-surface`. Reuse this exact idiom for any new widget button.
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.

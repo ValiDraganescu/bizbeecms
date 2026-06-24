@@ -214,3 +214,9 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   safe (no concurrent ai-openrouter keys to preserve this run).
 - **Files:** CMS/src/lib/chat/scroll-anchor.ts (+.test.ts),
   CMS/src/components/chat/chat-conversation.tsx, CMS/messages/{en,fi,et}.json
+
+## 2026-06-24 14:53 — Keyboard a11y pass: Esc-to-minimize + focus-ring on widget buttons
+- **Status:** DONE
+- **What I did:** Pure-client a11y polish on `chat-widget.tsx`. (1) The open dialog div gained an `onKeyDown` that minimizes the panel on `Escape` (keyboard parity with the close button; `stopPropagation` so it doesn't bubble past the dialog). (2) All header icon-buttons (new/history/debug/preset/minimize) AND the floating launcher now carry a visible `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring` (launcher adds `ring-offset-2 ring-offset-surface` so the ring reads against the page). No new i18n — reused existing `chat.widget.*` labels; `ring`/`--color-ring` token already in globals.css.
+- **Verified:** CMS `npx tsc --noEmit` (exit 0), `npm test` (862 pass), `npx opennextjs-cloudflare build` (dev OFF, port 3601 free, build complete). Did not click-test in browser (no live session this run) — but Esc handler + Tailwind focus utilities are standard idioms.
+- **Files:** CMS/src/components/chat/chat-widget.tsx
