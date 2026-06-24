@@ -20,6 +20,7 @@ import {
   pricePerMillion,
   type CatalogModel,
 } from "@/lib/chat/models";
+import { coerceCatalog } from "@/lib/chat/catalog-coerce";
 
 /** Minimal inline glyph per input modality (design-system stroke icons). */
 function ModalityIcon({ modality, label }: { modality: string; label: string }) {
@@ -99,9 +100,13 @@ export function ModelPicker({
       try {
         const res = await fetch("/api/chat/models");
         if (!res.ok) return;
-        const j = (await res.json()) as { models?: CatalogModel[] };
-        if (!cancelled && Array.isArray(j.models) && j.models.length > 0) {
-          setCatalog(j.models);
+        const j = (await res.json()) as { models?: unknown };
+        // Coerce the wire shape: a D1-CACHED payload may come from an older
+        // bundle missing fields the renderer reads (e.g. inputModalities) →
+        // BUG [P1] `.map` of undefined. Backfill so every entry is render-safe.
+        const models = coerceCatalog(j.models);
+        if (!cancelled && models.length > 0) {
+          setCatalog(models);
         }
       } catch {
         /* offline / no binding — keep the static fallback */
@@ -226,7 +231,7 @@ export function ModelPicker({
                             <span className="flex min-w-0 items-center gap-1.5">
                               <span className="truncate">{m.label}</span>
                               <span className="flex shrink-0 items-center gap-0.5 text-foreground-muted">
-                                {m.inputModalities.map((mod) => (
+                                {(m.inputModalities ?? ["text"]).map((mod) => (
                                   <ModalityIcon
                                     key={mod}
                                     modality={mod}

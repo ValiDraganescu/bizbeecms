@@ -122,6 +122,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   `stopPropagation` its Tab keydown (like Esc) so it doesn't fall through to the panel trap.
   `focusables()` recomputes per Tab, so it tracks the panel mode (history/debug/conversation) — no
   stale refs. Don't focus elements outside the panel while open.
+- **The model picker must COERCE `/api/chat/models`, never trust its shape (BUG [P1] DONE 2026-06-24).**
+  `GET /api/chat/models` serves a D1-CACHED `CatalogModel[]` row. A row written by an OLDER bundle lacks
+  fields ai-openrouter later added (`inputModalities`, prices) — and `model-picker.tsx` did
+  `m.inputModalities.map(...)` → `undefined.map` → error boundary. Fix lives in WIDGET territory: pure
+  `lib/chat/catalog-coerce.ts` `coerceCatalog(j.models)` backfills render-read fields + drops junk; the
+  picker coerces on load (not a bare cast) + has a `(m.inputModalities ?? ["text"])` guard at the `.map`.
+  RULE: anytime the picker reads a NEW field off a catalog model, add it to `coerceCatalogModel` too, or a
+  stale cache row will crash again. Don't "fix" this by editing `models.ts` (ai-openrouter's). The stale
+  cache also means: after a catalog-shape change, the deployed site needs a REDEPLOY (clears/rewrites the
+  D1 cache) — a code fix alone won't heal already-cached rows on the live worker until then (HITL).
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.

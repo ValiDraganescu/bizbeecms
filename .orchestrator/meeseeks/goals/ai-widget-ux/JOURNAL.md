@@ -232,3 +232,20 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **What I did:** Pure `nextTabStop(count,current,shift)` in `lib/chat/focus-trap.ts` (wrap math, pulls stray focus in when current=-1). `chat-widget.tsx`: panel div now `aria-modal="true"` + `tabIndex={-1}`; open→focus effect (rAF) focuses the textarea (fallback: panel); the panel `onKeyDown` gained a Tab/Shift+Tab trap using a live `focusables()` collector (DOM order, skips disabled/aria-hidden/`offsetParent===null`) + `preventDefault`. Builds on the Esc-to-minimize a11y work. No new strings.
 - **Verified:** `node --test` focus-trap (6/6); full `npm test` 873 pass (was 867 +6); `npx tsc --noEmit` clean; `npx opennextjs-cloudflare build` complete (dev off, port 3601 free). Could not verify live keyboard cycling in a real browser (no DOM in a Meeseeks run) — the index math is unit-tested and the DOM wiring is standard.
 - **Files:** CMS/src/lib/chat/focus-trap.ts, CMS/src/lib/chat/focus-trap.test.ts, CMS/src/components/chat/chat-widget.tsx
+
+## 2026-06-24 15:28 — BUG [P1] fix: model picker crash (undefined.map)
+- **Status:** DONE
+- **What I did:** Fixed the `Cannot read properties of undefined (reading 'map')` crash when opening the
+  model picker. Root cause: `model-picker.tsx` mapped `m.inputModalities` over models loaded from
+  `/api/chat/models`, trusting the wire shape — but the route serves a D1-CACHED catalog row that can be
+  written by an OLDER bundle (before ai-openrouter added `inputModalities`), so cached entries lack the
+  field → `.map` of undefined. Stayed in widget territory (did NOT touch ai-openrouter's `models.ts`):
+  added pure `lib/chat/catalog-coerce.ts` (`coerceCatalog`/`coerceCatalogModel`) that backfills every
+  render-read field (inputModalities→["text"], prices→null, label/provider from id) + drops junk;
+  `model-picker.tsx` coerces `j.models` on load instead of casting it, plus a `(m.inputModalities ?? ["text"])`
+  belt-and-suspenders guard at the render `.map`.
+- **Verified:** new `scripts/catalog-coerce.test.mjs` (7 cases, incl. an OLD row missing inputModalities →
+  no throw, the exact crash) passes; `npx tsc --noEmit` clean; full `npm test` 884 pass; `npx opennextjs-cloudflare build`
+  (dev off, port 3601 free) complete. Could NOT verify live in a browser (no live session); the deployed
+  test-1 still needs a redeploy to clear the stale D1 cache / ship the new bundle (HITL — Meeseeks don't deploy).
+- **Files:** CMS/src/lib/chat/catalog-coerce.ts, CMS/scripts/catalog-coerce.test.mjs, CMS/src/components/chat/model-picker.tsx
