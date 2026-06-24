@@ -282,6 +282,8 @@ right per-Site CMS Worker by `Host`.
 | PM | `DEPLOYER_SECRET` (secret) | bearer PM→deployer | ✅ set |
 | PM | `CMS_AUTH_SECRET` (secret) | bearer PM's `/api/auth/cms-validate` checks incoming CMS requests against | ✅ **set 2026-06-18** (= deployer's value) |
 | PM | `CF_API_TOKEN`, `CF_ACCOUNT_ID` (secrets) | legacy Script-Upload path | ⚠️ set but unused by the container path |
+| PM | `SITE_SECRET_KEY` (secret) | 32-byte base64 AES-256-GCM KEK; encrypts each Site's OpenRouter key at rest (`src/lib/crypto/secret-box.ts`). **NOT** reusable from `CMS_AUTH_SECRET` (that's a bearer string, wrong shape). | ✅ **set 2026-06-23** (`openssl rand -base64 32`) |
+| PM | `OPENROUTER_PROVISIONING_KEY` (secret) | the SINGLE PM-held OpenRouter **Provisioning** key (not an `sk-or-` inference key); mints/deletes a per-Site runtime key on deploy (`src/lib/openrouter/provision.ts`). Unset ⇒ mint-on-deploy degrades to the deployer global key (`mintWarning` Alert). | ✅ **set 2026-06-23** |
 | **deployer Worker** ✅ deployed (2026-06-17) | `CF_API_TOKEN` (secret) | Workers Scripts/KV/R2: Edit — deploys the CMS Worker; **+ Zone · SSL and Certificates · Edit + Zone · Zone · Read** (zone bizbeecms.com) for `/attach-domain` custom_hostnames | ⚠️ set, but **zone-scoped perms not yet added** (token is all Account-scoped) |
 | deployer | `CF_ZONE_ID` (secret) | bizbeecms.com zone id (`dfaec5f7…`) — custom_hostnames target | ✅ **set 2026-06-18** |
 | deployer | `HOST_MAP` (KV `1c276b01…`) | host → slug map written by `/attach-domain` | ✅ provisioned + bound |
@@ -291,16 +293,53 @@ right per-Site CMS Worker by `Host`.
 | deployer | `GITHUB_TOKEN` (secret) | PAT to clone (if repo private) | ✅ set |
 | deployer | `PM_CALLBACK_ORIGIN` (secret) | PM origin for deploy status callback + step-events **+ fallback for PM_ORIGIN** | ✅ **`https://manager.bizbeecms.com`** (updated 2026-06-19; was stale workers.dev → stuck deploys, trap #5) |
 | deployer | `CMS_AUTH_SECRET` (secret) | passed to each CMS via `--var`; **without it CMS auth fails closed → every admin route 401s** | ✅ **set 2026-06-18** (= PM's value) |
+| deployer | `OPENROUTER_API_KEY` (secret) | **global fallback** OpenRouter key, set as each CMS Worker's `OPENROUTER_API_KEY` **secret** (not a `--var`) when PM sends no per-Site key. Per-Site minted key (PM body `openrouterApiKey`) overrides it; blank ⇒ secret-put skipped, CMS falls back to CF `AI` (`deployer/src/index.ts` `effectiveOpenrouterKey`). | ✅ set |
+| deployer | `SITE_SECRET_KEY` (secret) | present on the deployer too, but **PM is the only encryptor** — deployer receives the per-Site key already decrypted in the POST body. Kept in sync with PM's value. | ✅ set |
 | deployer | `PM_ORIGIN` (var, **committed**) | injected into each CMS as `PM_ORIGIN`; where CMS calls `/api/auth/cms-validate` + nonce-exchange | ✅ **`https://manager.bizbeecms.com`** — now a committed `vars` entry in `deployer/wrangler.jsonc` (not a secret); code falls back to `PM_CALLBACK_ORIGIN` if unset (`deployer/src/index.ts:262`) |
 | **CMS Worker** (per-Site) | `SITE_ID` / `PM_ORIGIN` / `CMS_AUTH_SECRET` (vars) | injected by deployer `--var` at deploy. `PM_ORIGIN`=`manager.bizbeecms.com`. **Baked in at deploy time — a stale origin requires a REDEPLOY (trap #5).** | auto on deploy (empty placeholders in `CMS/wrangler.jsonc`); served at `bizbeecms-cms-<slug>.vali-draganescu88.workers.dev` |
 | CMS | `DB` (per-Site D1) | the Site's content | ❌ **NOT auto-created** — manual (see below) |
 | CMS | `MEDIA` (R2 bucket) | media library | ❌ **NOT auto-created** — manual |
-| CMS | `AI` (Workers AI) + AI Gateway `bizbeecms-ai-gateway` | chat / AI tools / `/api/translate` | ✅ **gateway `bizbeecms-ai-gateway` exists on the account (2026-06-19)**; `AI` binding is declared in `CMS/wrangler.jsonc` (auto on deploy, no key). Slug MUST match the gateway or `env.AI.run` fails `2001: Please configure AI Gateway`. Local dev: `env.AI` needs `wrangler login` + the route's `requireAdmin` guard passes first, so a 503/401 locally is the binding/auth gate, not the gateway. |
+| CMS | `OPENROUTER_API_KEY` (secret, injected by deployer) | the active AI provider key. `getAi()` (`CMS/src/lib/ports/ai.ts`) is its SOLE reader. **Precedence: CMS-local user key → `env.OPENROUTER_API_KEY` (minted/global) → CF `AI` binding → 503.** | auto per-Site on deploy (set as a Worker **secret**, not a `--var`; skipped if blank → CF AI fallback) |
+| CMS | CMS-local OpenRouter user key (in CMS D1, encrypted) | operator pastes their OWN `sk-or-` key in CMS settings; encrypted at rest with `CMS_AUTH_SECRET` as the KEK (`CMS/src/db/openrouter-key-store.ts`). **Preferred over the deployed `OPENROUTER_API_KEY`.** | per-Site, operator-set in the CMS UI (no deploy needed) |
+| CMS | `AI` (Workers AI) + AI Gateway `bizbeecms-ai-gateway` | LAST-RESORT fallback when no OpenRouter key resolves: chat / AI tools / `/api/translate` | ✅ **gateway `bizbeecms-ai-gateway` exists on the account (2026-06-19)**; `AI` binding is declared in `CMS/wrangler.jsonc` (auto on deploy, no key). Slug MUST match the gateway or `env.AI.run` fails `2001: Please configure AI Gateway`. Local dev: `env.AI` needs `wrangler login` + the route's `requireAdmin` guard passes first, so a 503/401 locally is the binding/auth gate, not the gateway. |
 | **router Worker** ✅ deployed (2026-06-18) | `HOST_MAP` (KV `1c276b01…`) | host → slug lookup | ✅ bound |
 | router | `WORKERS_SUBDOMAIN` (var) | builds the per-Site `.workers.dev` proxy target (`vali-draganescu88`) | ✅ set |
 
 Legend: ✅ verified live · ❌ not provisioned / not automated · ⚠️ caveat. **All control-plane secrets
-are now set — the only open items are per-Site/account infra (D1, R2, AI Gateway) and verification.**
+are now set (incl. the OpenRouter mint chain, 2026-06-23) — the only open items are per-Site/account
+infra (D1, R2, AI Gateway) and live verification (the OpenRouter live mint/chat round-trip is HITL, see
+`HITL.md` P1).**
+
+### OpenRouter AI-provider key flow (ai-openrouter, added 2026-06-23)
+
+Three places hold a key; one wins at runtime per the precedence below. PM mints, encrypts, and threads
+a per-Site key into the deploy; the operator can override it from either end.
+
+```
+  OPENROUTER_PROVISIONING_KEY (PM secret) ── PM mints a per-Site key on deploy (idempotent)
+        │                                     encrypts with SITE_SECRET_KEY (PM secret),
+        │                                     stores ciphertext+hash on the Site row
+        ▼
+  PM deploy POST body { openrouterApiKey: <decrypted> } ──▶ deployer
+        │                                                     effectiveOpenrouterKey():
+        │                                                     per-Site key ?? OPENROUTER_API_KEY (global)
+        ▼
+  CMS Worker secret OPENROUTER_API_KEY  ◀── deployer `wrangler secret put` (skipped if blank)
+        │
+        ▼  getAi() precedence (CMS/src/lib/ports/ai.ts):
+  CMS-local user key (CMS settings UI, encrypted in CMS D1 under CMS_AUTH_SECRET)
+        └─▶ env.OPENROUTER_API_KEY (minted, else deployer global)
+              └─▶ CF `AI` binding (Workers AI via gateway)
+                    └─▶ 503
+```
+
+- **PM mints** only when the Site has minting enabled and no stored key hash (`shouldMintOnDeploy`).
+  A mint failure NEVER crashes the deploy — it falls back to the deployer global key and PM shows a
+  non-blocking `mintWarning`. A decrypt failure of an existing key shows `keyWarning` and degrades the same way.
+- **Two unrelated KEKs, don't conflate:** `SITE_SECRET_KEY` (PM) encrypts the *minted* key; `CMS_AUTH_SECRET`
+  (CMS) encrypts the *CMS-local operator* key. Neither is reusable as the other.
+- **Live verification is HITL** — needs a real provisioning key (set ✅ 2026-06-23) plus a real Site with
+  minting enabled, then a redeploy + a CMS chat/translate round-trip. Tracked `HITL.md` P1.
 
 ---
 
@@ -324,6 +363,9 @@ cell; the bash-container strings and wrangler files are the exceptions (noted in
 | CF apex anycast IPs | `104.21.34.242`, `172.67.210.25` | `hosts.ts` (`CUSTOM_DOMAIN_APEX_IPS`) · `deployer/src/index.ts` (`CUSTOM_DOMAIN_APEX_IPS`) | A records shown to customer for apex domains |
 | Originless fallback DNS | `AAAA 100::` (NOT `192.0.2.1` — 522s) | **dashboard only** (DNS record, not in code) | CF for SaaS fallback origin — see trap #6 |
 | AI Gateway slug | `bizbeecms-ai-gateway` | `CMS/wrangler.jsonc` (`vars.AI_GATEWAY`) + `CMS/src/lib/ports/ai.ts` (`DEFAULT_AI_GATEWAY`) | CMS `env.AI.run()` via gateway. Must name a real account gateway or every chat message errors `2001`. |
+| OpenRouter chat URL | `https://openrouter.ai/api/v1/chat/completions` | `CMS/src/lib/ports/ai.ts` (`OPENROUTER_CHAT_URL`) | CMS `OpenRouterAi` adapter |
+| OpenRouter default model | `openai/gpt-4o-mini` | `CMS/src/lib/chat/models` (`DEFAULT_MODEL`) | CMS chat + `/api/translate` (translate unified onto it 2026-06-23) |
+| OpenRouter provisioning API base | `https://openrouter.ai/api/v1/keys` | `ProjectManager/src/lib/openrouter/provision.ts` (`OPENROUTER_KEYS_URL`) | PM mint (`POST`) / delete (`DELETE /:hash`) of per-Site keys |
 
 > **PM ↔ deployer duplication is deliberate.** `hosts.ts` and `deployer/src/index.ts` each
 > hold their own copy of the worker prefix / fallback origin / apex IPs because they're

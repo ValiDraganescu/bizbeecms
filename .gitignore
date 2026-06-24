@@ -6,3 +6,4 @@ node_modules/
 
 # wrangler local cache/state (per-machine)
 .wrangler/
+.impeccable/
