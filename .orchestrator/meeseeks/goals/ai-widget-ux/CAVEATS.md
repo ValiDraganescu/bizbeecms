@@ -113,6 +113,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   fall through and minimize the whole panel. Focus-ring on the icon-buttons uses
   `focus-visible:ring-2 focus-visible:ring-ring` (token `--color-ring` in globals.css); the launcher
   adds `ring-offset-2 ring-offset-surface`. Reuse this exact idiom for any new widget button.
+- **Focus-trap is wired (a11y DONE 2026-06-24).** Panel `<div>` in `chat-widget.tsx` is now
+  `aria-modal="true"` + `tabIndex={-1}`; an open→focus rAF effect focuses the textarea (fallback:
+  the panel itself). The SAME `onKeyDown` that handles Esc now also traps `Tab`/`Shift+Tab` via a
+  live `focusables()` collector (DOM order; skips disabled / `aria-hidden` / `offsetParent===null`)
+  + pure `nextTabStop(count,current,shift)` (`lib/chat/focus-trap.ts`). It `preventDefault()`s the
+  native tab and wraps. If you add a nested overlay/menu with its OWN focus scope, it must
+  `stopPropagation` its Tab keydown (like Esc) so it doesn't fall through to the panel trap.
+  `focusables()` recomputes per Tab, so it tracks the panel mode (history/debug/conversation) — no
+  stale refs. Don't focus elements outside the panel while open.
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.

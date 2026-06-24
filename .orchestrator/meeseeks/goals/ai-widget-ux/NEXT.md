@@ -1,21 +1,22 @@
 # Note to the next Meeseeks (ai-widget-ux)
 
-Tool-card "show more" truncation is **DONE** (2026-06-24): `blobView` in `lib/chat/tool-card.ts`
-gives `{full, preview, hidden, truncated}`; `ToolBlob` toggles preview↔full with a focus-ring button.
-EN/FI/ET `chat.tool.{showMore,showLess}` added.
+Focus-trap + initial-focus is **DONE** (2026-06-24): pure `nextTabStop` in `lib/chat/focus-trap.ts`;
+`chat-widget.tsx` panel is `aria-modal`+`tabIndex={-1}`, focuses the textarea on open, traps
+Tab/Shift+Tab in the same `onKeyDown` that handles Esc. See CAVEATS for the `focusables()` collector
++ "nested overlay must stopPropagation its own Tab" rule.
 
-**No queued TODO — pick the next valuable widget-UX slice (never idle).** Remaining candidates,
-client/UX-only, smallest-first (honour CAVEATS):
-- **Focus-trap / initial-focus** in the open dialog: on open, move focus into the panel (textarea)
-  and keep Tab cycling within it while open. Pure client, builds on the Esc-to-minimize a11y work.
-  Reuse the focus-visible ring idiom already in place.
-- **Versions rename:** the prompt-version select only supports create/select/delete; add rename.
-  Needs a `PATCH /api/chat/prompts` — small `requirePmSso`-gated server tail (store + pure helpers
-  in `prompt-version.ts` already exist). The one remaining named GOAL-ish slice with a server tail.
+**No queued TODO — pick the next valuable widget-UX slice (never idle).** Remaining candidate:
+- **Versions rename** (the one named GOAL-ish slice left): the prompt-version `<select>` in
+  `ChatDebugPanel` supports create/select/delete but not rename. Add a `PATCH /api/chat/prompts`
+  (`requirePmSso`-gated; store `db/prompt-version-store.ts` + pure `lib/chat/prompt-version.ts`
+  already exist — extend with an update + reuse `validatePromptInput`) and a rename control in the
+  panel. PM-SSO-only, gated on the SERVER (403 + ignore for non-SSO). EN/FI/ET for new strings.
+  This BREAKS the client-only rule on purpose (server tail) — same exception as export/versions.
+- Or another pure client polish (e.g. copy-message-to-clipboard button on transcript turns).
 
-GATES (all green this run): CMS `npx tsc --noEmit` + `npm test` (867 pass) +
+GATES (all green this run): CMS `npx tsc --noEmit` + `npm test` (873 pass) +
 `npx opennextjs-cloudflare build` (dev OFF — port 3601 must be free; NEVER build while dev is up).
 Do NOT run `bundle:cms` (auto-regens on PM deploy). `messages/{en,fi,et}.json` SHARED with
-ai-openrouter — they were CLEAN this run, so a plain add was safe; if dirty when you add keys,
-rebuild your locale from `git show HEAD:CMS/messages/<loc>.json` + ONLY your keys before staging.
-`lib/chat/models.ts` is ai-openrouter's — tsc/build may transiently fail mid-their-edit; just re-run.
+ai-openrouter — if you add keys and the files are dirty, rebuild your locale from
+`git show HEAD:CMS/messages/<loc>.json` + ONLY your keys before staging. `lib/chat/models.ts` is
+ai-openrouter's — tsc/build may transiently fail mid-their-edit; just re-run.

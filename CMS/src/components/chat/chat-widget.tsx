@@ -24,6 +24,7 @@ import { ModelPicker } from "@/components/chat/model-picker";
 import { resolveInitialModel, loadModel, saveModel } from "@/lib/chat/selected-model";
 import { formatUsd } from "@/lib/chat/credit";
 import { nextUnread } from "@/lib/chat/unread-badge";
+import { nextTabStop } from "@/lib/chat/focus-trap";
 import {
   type PanelPreset,
   type PanelSize,
@@ -267,6 +268,33 @@ export function ChatWidget() {
     if (open) setUnread(false);
   }, [open]);
 
+  // On open, move focus INTO the panel (a11y): the message textarea if present,
+  // else the panel container itself (it's `tabIndex={-1}`). A microtask defer
+  // lets the panel mount first. Pairs with the Tab-trap keydown below so focus
+  // can't escape the open dialog.
+  useEffect(() => {
+    if (!open) return;
+    const id = requestAnimationFrame(() => {
+      const el = panelRef.current;
+      if (!el) return;
+      const ta = el.querySelector<HTMLTextAreaElement>("textarea");
+      (ta ?? el).focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open]);
+
+  // Collect the panel's currently-focusable elements in DOM order (skip
+  // disabled / aria-hidden / display:none). Recomputed per Tab so it tracks the
+  // panel's mode (history / debug / conversation) without stale refs.
+  function focusables(): HTMLElement[] {
+    const el = panelRef.current;
+    if (!el) return [];
+    const sel = "button, [href], input, textarea, select, [tabindex]:not([tabindex='-1'])";
+    return Array.from(el.querySelectorAll<HTMLElement>(sel)).filter(
+      (n) => !n.hasAttribute("disabled") && n.getAttribute("aria-hidden") !== "true" && n.offsetParent !== null,
+    );
+  }
+
   // Load the in-use key's remaining credit when the panel opens (ai-openrouter).
   // Only the env/minted key reports credit; the route returns null otherwise.
   useEffect(() => {
@@ -341,13 +369,26 @@ export function ChatWidget() {
           // Esc minimizes the panel — keyboard parity with the close button. Bound
           // on the dialog (focus lives inside it); ignore Esc while a textarea/input
           // is mid-composition so it doesn't fight IME/typing escape.
+          // Tab/Shift+Tab is trapped so focus can't leak to the page behind the
+          // open dialog (see `lib/chat/focus-trap.ts` for the wrap math).
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.stopPropagation();
               setOpen(false);
+              return;
+            }
+            if (e.key === "Tab") {
+              const items = focusables();
+              if (items.length === 0) return;
+              const current = items.indexOf(document.activeElement as HTMLElement);
+              const next = nextTabStop(items.length, current, e.shiftKey);
+              e.preventDefault();
+              items[next]?.focus();
             }
           }}
           role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
           aria-label={t("title")}
         >
           <header className="flex items-center justify-between gap-2 border-b border-border bg-surface-raised px-4 py-3">
