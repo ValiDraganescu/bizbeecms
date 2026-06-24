@@ -70,6 +70,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   system prompt + messages + tool schemas + resolved model and returning JSON (no model call). The
   debug panel filters empty-content turns before sending (an in-progress assistant turn would 400).
   `GET /api/chat/debug` now also returns `isPmSso` so the panel shows the export button only for SSO.
+- **System-prompt versions SERVER slice is BUILT (DONE 2026-06-24) — the UI is what's left.** D1
+  table `prompt_version` (migration `0015_sleepy_mephisto.sql`, generated via `npm run db:generate`),
+  store `db/prompt-version-store.ts`, pure `lib/chat/prompt-version.ts`
+  (`validatePromptInput`, `effectiveSystemPrompt`), gated CRUD `/api/chat/prompts` (`requirePmSso`).
+  The chat route ALREADY honours a per-request `systemPromptOverride` body field — applied ONLY when
+  `currentUserIsPmSso()` (it's resolved only if the field is present, to skip the lookup otherwise).
+  Don't rebuild any of this; the UI slice just wires the widget to these endpoints. The override is
+  session-only (per-request) — NEVER write it as a site default. `effectiveSystemPrompt` is the single
+  trust gate (override wins only when PM-SSO + non-empty string); the route ignores it for non-SSO.
+- **`withSystemPrompt` is now 4-arg** (`messages, context, override?, isPmSso?`) in `route.ts`. If you
+  touch the chat POST, keep passing the override through; default both new args so old callers are safe.
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.

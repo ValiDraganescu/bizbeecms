@@ -202,6 +202,22 @@ export const chatThread = sqliteTable("chat_thread", {
 });
 
 /**
+ * Saved system-prompt versions (ai-widget-ux — PM-SSO prompt editor). Per-Site
+ * (the DB IS the Site boundary). Each row is a FULL prompt an operator saved to
+ * compare; selecting one applies to the tester's SESSION ONLY (sent as a
+ * per-request override), it never changes the site default real users get.
+ * Shared by all PM-SSO operators on the site.
+ */
+export const promptVersion = sqliteTable("prompt_version", {
+  id: text("id").primaryKey(),
+  label: text("label").notNull().default(""),
+  prompt: text("prompt").notNull().default(""),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+/**
  * API key — a per-Site bearer credential for the remote MCP server (cms-mcp).
  * A local agent (Claude Code) authenticates to THIS site's CMS Worker with
  * `Authorization: Bearer <key>`; the key authorizes managing this one Site only
@@ -430,6 +446,8 @@ export type PageVersion = typeof pageVersion.$inferSelect;
 export type NewPageVersion = typeof pageVersion.$inferInsert;
 export type ApiKey = typeof apiKey.$inferSelect;
 export type NewApiKey = typeof apiKey.$inferInsert;
+export type PromptVersion = typeof promptVersion.$inferSelect;
+export type NewPromptVersion = typeof promptVersion.$inferInsert;
 export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;
 export type Session = typeof session.$inferSelect;

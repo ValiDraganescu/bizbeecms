@@ -31,9 +31,10 @@ import {
 } from "@/lib/chat/tool-scopes";
 import { runTool, toolSchemasForContext } from "@/lib/chat/tool-dispatch";
 import { assembleSystemPrompt } from "@/lib/chat/assemble-prompt";
+import { effectiveSystemPrompt } from "@/lib/chat/prompt-version";
 import { resolveModel } from "@/lib/chat/models";
 import { getModelCatalogCache } from "@/db/settings-store";
-import { requireAdmin } from "@/lib/auth/guard";
+import { requireAdmin, currentUserIsPmSso } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -96,7 +97,16 @@ export async function POST(request: Request): Promise<Response> {
   // persona) + its existing components + the bounded utility-class vocabulary, so
   // generated artifacts match the Site and reference real components/classes.
   // Only if the client didn't already supply a system message.
-  const messages = await withSystemPrompt(parsed.messages, context);
+  // PM-SSO operators may send a per-request `systemPromptOverride` to test a
+  // saved prompt version against their OWN session. It's applied ONLY when the
+  // caller is PM-SSO (the override is otherwise ignored — defense in depth on
+  // top of the prompts route gate). Never mutates the site default.
+  const override =
+    typeof body === "object" && body !== null
+      ? (body as { systemPromptOverride?: unknown }).systemPromptOverride
+      : undefined;
+  const isPmSso = override != null ? await currentUserIsPmSso() : false;
+  const messages = await withSystemPrompt(parsed.messages, context, override, isPmSso);
 
   const tools = toolSchemasForContext(context);
   const gatewayId = await getGatewayId();
@@ -153,9 +163,12 @@ function resolveContext(body: unknown): AdminPageContext {
 async function withSystemPrompt(
   messages: ChatMessage[],
   context: AdminPageContext,
+  override?: unknown,
+  isPmSso = false,
 ): Promise<ChatMessage[]> {
   if (messages.some((m) => m.role === "system")) return messages;
-  const system = await assembleSystemPrompt(context);
+  const assembled = await assembleSystemPrompt(context);
+  const system = effectiveSystemPrompt({ override, isPmSso, assembled });
   return [{ role: "system", content: system }, ...messages];
 }
 

@@ -135,3 +135,28 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/chat/export/route.ts (new), CMS/src/app/api/chat/debug/route.ts,
   CMS/src/components/chat/chat-debug-panel.tsx, CMS/src/components/chat/chat-widget.tsx,
   CMS/messages/{en,fi,et}.json (only the three chat.debug keys staged).
+
+## 2026-06-24 14:32 — System-prompt versions: SERVER slice (table + CRUD route + chat-route override)
+- **Status:** DONE
+- **What I did:** Built the whole SERVER half of the in-chat system-prompt editor (the UI
+  dropdown is the next run's slice — decomposed for scope). (1) New D1 table `prompt_version`
+  (id, label, prompt, createdAt) in `schema.ts` + generated migration
+  `migrations/0015_sleepy_mephisto.sql` (`npm run db:generate`). (2) Thin store
+  `db/prompt-version-store.ts`: `listPromptVersions`/`createPromptVersion`/`deletePromptVersion`
+  (id `pv_<ts36>_<rand>`, newest-first, limit 100, injectable Db for tests). (3) Pure
+  `lib/chat/prompt-version.ts` (+8-case test): `validatePromptInput` (label 1..80, prompt
+  1..20000, trimmed) + `effectiveSystemPrompt({override,isPmSso,assembled})` — override wins
+  ONLY when PM-SSO AND non-empty string, else assembled (the single trust gate). (4) Gated CRUD
+  route `GET/POST/DELETE /api/chat/prompts` — `requirePmSso` on EVERY verb (reused, not rebuilt).
+  (5) Wired the override into `POST /api/chat/route.ts`: reads untrusted `systemPromptOverride`
+  from the body, resolves `currentUserIsPmSso()` ONLY if present, passes both into the now-
+  4-arg `withSystemPrompt` which applies `effectiveSystemPrompt`. Non-SSO override is ignored
+  (defense-in-depth atop the route gate); site default real users get is never touched.
+- **Verified:** `node --test prompt-version.test.ts` 7 pass; `npx tsc --noEmit` clean; full
+  `npm test` 855 pass; `npx opennextjs-cloudflare build` succeeded (dev confirmed OFF, :3601 free).
+  Did NOT regen the PM cms-bundle (concurrent loops share the CMS dir; auto-regens on PM deploy).
+  Live D1 (migration apply + real CRUD) is HITL — build-verified only. No new i18n THIS run (the
+  user-facing strings land with the UI slice next run).
+- **Files:** CMS/src/db/schema.ts, CMS/migrations/0015_sleepy_mephisto.sql (+ meta/_journal.json),
+  CMS/src/db/prompt-version-store.ts (new), CMS/src/lib/chat/prompt-version.ts (+test, new),
+  CMS/src/app/api/chat/prompts/route.ts (new), CMS/src/app/api/chat/route.ts.
