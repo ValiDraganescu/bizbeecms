@@ -611,7 +611,15 @@
     "save": "Tallenna",
     "saving": "Tallennetaan…",
     "cancel": "Peruuta",
-    "confirmDeleteItem": "Poistetaanko tämä kohde? Tätä ei voi kumota."
+    "confirmDeleteItem": "Poistetaanko tämä kohde? Tätä ei voi kumota.",
+    "manageSchema": "Hallitse rakennetta",
+    "schemaFields": "Kentät",
+    "renameField": "Nimeä uudelleen",
+    "dropField": "Poista",
+    "renameFieldTitle": "Nimeä kenttä ”{name}” uudelleen",
+    "newFieldName": "Kentän uusi nimi",
+    "rename": "Nimeä uudelleen",
+    "confirmDropField": "Poistetaanko kenttä ”{name}” ja kaikki sen tiedot? Taulu rakennetaan uudelleen; tätä ei voi kumota."
   },
   "apiKeys": {
     "title": "API-avaimet",

@@ -611,7 +611,15 @@
     "save": "Save",
     "saving": "Saving…",
     "cancel": "Cancel",
-    "confirmDeleteItem": "Delete this item? This cannot be undone."
+    "confirmDeleteItem": "Delete this item? This cannot be undone.",
+    "manageSchema": "Manage schema",
+    "schemaFields": "Fields",
+    "renameField": "Rename",
+    "dropField": "Drop",
+    "renameFieldTitle": "Rename field “{name}”",
+    "newFieldName": "New field name",
+    "rename": "Rename",
+    "confirmDropField": "Drop field “{name}” and all its data? The table is rebuilt; this cannot be undone."
   },
   "apiKeys": {
     "title": "API keys",

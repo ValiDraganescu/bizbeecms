@@ -411,3 +411,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   → NO cms-bundle regen, NO EN/FI/ET (per Slice 6 CAVEAT).
 - **Files:** CMS/src/lib/chat/collection-tools.ts, CMS/src/lib/chat/tool-dispatch.ts,
   CMS/src/lib/chat/tool-scopes.ts, CMS/scripts/collection-tools.test.mjs.
+
+## 2026-06-24 15:28 — Drop/rename-field OPERATOR UI (closes the schema-evolution slice)
+- **Status:** DONE
+- **What I did:** Added the LAST piece of the drop/rename slice — the operator UI.
+  New `SchemaManager` component in `collection-items.tsx` (toggled by a "Manage
+  schema" toolbar button on the item-manager page): lists each user field
+  (name+type) with RENAME (inline ConfirmModal + text input → PATCH
+  `_op:"rename_field"`) and DROP (danger ConfirmModal → PATCH `_op:"drop_field"`).
+  Both hit `/api/collections/[name]` and refresh the collection + item list on
+  success (the rebuild route returns the updated CollectionView). Extended
+  `confirm-modal.tsx` with optional `title` + `children` so the rename modal can
+  carry an input (message now optional). Added EN/FI/ET strings (`manageSchema`,
+  `schemaFields`, `renameField`, `dropField`, `renameFieldTitle`, `newFieldName`,
+  `rename`, `confirmDropField`) + regen'd the PM cms-bundle.
+- **ALSO fixed a latent bug:** `AddFieldForm` PATCHed the BARE field object, but
+  the route reads `obj.field` (the add-field contract since Slice 2). So add-field
+  via the UI was silently 400ing. Now sends `{ field }`. (AI add-field always
+  worked — it calls the store directly.)
+- **Verified:** CMS tsc clean; `npm test` 877/877; `npx opennextjs-cloudflare
+  build` green (dev OFF); cms-bundle regen'd + new strings grep-confirmed in
+  cms-bundle.generated.js. Live D1 / visual = HITL (the UI needs a real binding
+  to exercise; logic mirrors the verified AI/REST path). Used in-app ConfirmModal
+  throughout — NO native confirm()/prompt().
+- **Files:** CMS/src/components/content/collection-items.tsx,
+  CMS/src/components/content/confirm-modal.tsx, CMS/messages/{en,fi,et}.json,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js.

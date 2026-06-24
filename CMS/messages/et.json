@@ -611,7 +611,15 @@
     "save": "Salvesta",
     "saving": "Salvestan…",
     "cancel": "Tühista",
-    "confirmDeleteItem": "Kas kustutada see element? Seda ei saa tagasi võtta."
+    "confirmDeleteItem": "Kas kustutada see element? Seda ei saa tagasi võtta.",
+    "manageSchema": "Halda skeemi",
+    "schemaFields": "Väljad",
+    "renameField": "Nimeta ümber",
+    "dropField": "Kustuta",
+    "renameFieldTitle": "Nimeta väli „{name}“ ümber",
+    "newFieldName": "Välja uus nimi",
+    "rename": "Nimeta ümber",
+    "confirmDropField": "Kas kustutada väli „{name}“ ja kõik selle andmed? Tabel ehitatakse uuesti; seda ei saa tagasi võtta."
   },
   "apiKeys": {
     "title": "API-võtmed",

@@ -12,6 +12,8 @@
 
 export function ConfirmModal({
   message,
+  title,
+  children,
   confirmLabel,
   cancelLabel,
   danger,
@@ -19,7 +21,9 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: {
-  message: string;
+  message?: string;
+  title?: string;
+  children?: React.ReactNode; // optional form body (e.g. a rename input)
   confirmLabel: string;
   cancelLabel: string;
   danger?: boolean;
@@ -41,7 +45,9 @@ export function ConfirmModal({
         className="flex w-full max-w-sm flex-col gap-4 rounded-lg border border-border bg-surface-raised p-5 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="text-foreground">{message}</p>
+        {title && <h2 className="text-lg font-semibold text-foreground">{title}</h2>}
+        {message && <p className="text-foreground">{message}</p>}
+        {children}
         <div className="flex justify-end gap-2">
           <button
             type="button"

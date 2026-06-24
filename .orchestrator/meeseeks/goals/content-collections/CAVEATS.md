@@ -390,3 +390,20 @@ Read every line before working. Each entry was learned the hard way by a previou
   newlines. `contentDdl` now does this. (The fence already guarantees single-statement,
   so prepare().run() is safe.) This was the real root cause of the P1 "collection
   create broken" bug — NOT the pure builders (they were fine).
+
+- **(Operator-UI, 2026-06-24) `PATCH /api/collections/[name]` ADD-FIELD reads
+  `obj.field`, NOT the bare body.** The route's contract (since Slice 2) is
+  `{ field: {...} }` for add-field and `{ _op, field, to? }` for drop/rename. The
+  Slice-5 `AddFieldForm` was sending the BARE field object → `obj.field` was
+  undefined → silent 400. FIXED 2026-06-24 (now sends `{ field }`). Any UI/AI add-
+  field MUST wrap in `{ field }`. (AI add-field calls the store directly so it never
+  hit this.)
+- **(Operator-UI, 2026-06-24) `ConfirmModal` now takes optional `title` + `children`
+  + optional `message`.** Use it for confirm-with-input flows (the rename-field
+  modal passes a `<label><input/></label>` as children). Don't build a second modal
+  — extend this one. Still NO native confirm()/prompt() (browser-review hang).
+- **(Operator-UI, 2026-06-24) The schema editor (add/rename/drop fields) lives in
+  `collection-items.tsx`, the per-collection ITEM MANAGER page** (`app/admin/
+  collections/[name]`), NOT `collections-manager.tsx` (that's the create/list page).
+  `SchemaManager` (rename/drop) + `AddFieldForm` are both there, behind the
+  "Manage schema" / "Add field" toolbar buttons.

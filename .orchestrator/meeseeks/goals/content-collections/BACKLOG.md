@@ -228,10 +228,15 @@ stable id + slug (Slice 3) so this isn't a retrofit.
     → tool-dispatch.ts handlers calling `rebuildCollectionSchema({op:"drop"|"rename"})`
     → tool-scopes.ts (KNOWN_TOOL_NAMES + collections context + prompt). 4 node tests,
     tsc + npm test 877 + opennext build green. Model-facing → no cms-bundle regen.
-  - REMAINING for a follow-up slice: operator UI ONLY (drop/rename affordance in the
-    collection schema editor; PATCH the `_op:"drop_field"|"rename_field"` shapes) +
-    EN/FI/ET for the UI + cms-bundle regen. RETYPE still NOT covered (needs value
-    coercion between affinities — separate slice).
+  - DONE (2026-06-24): **OPERATOR UI.** `SchemaManager` in `collection-items.tsx`
+    ("Manage schema" toolbar button): per-field RENAME (inline ConfirmModal + input
+    → PATCH `_op:"rename_field"`) + DROP (danger modal → PATCH `_op:"drop_field"`).
+    Extended `confirm-modal.tsx` w/ optional title+children. EN/FI/ET strings +
+    cms-bundle regen. ALSO fixed a latent add-field UI bug (was sending bare field;
+    route reads `obj.field` → now `{field}`). tsc + npm test 877 + opennext build
+    green. SCHEMA-EVOLUTION (drop/rename) slice is now COMPLETE end-to-end
+    (planner→store→route→AI tools→operator UI). RETYPE still NOT covered (affinity-
+    change value coercion — separate slice).
 
 - TODO: **Phase 2 (later) — FTS5 full-text search (DEFERRED from v1, USER DECISION
   2026-06-22).** Per content table, a CONTENTLESS/external-content `content_<slug>_fts`
