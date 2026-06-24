@@ -467,3 +467,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/collections/[name]/import/route.ts,
   CMS/src/components/content/collection-items.tsx, CMS/scripts/import-export.test.mjs,
   CMS/messages/{en,fi,et}.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js.
+
+## 2026-06-24 15:43 — Operator raw-SELECT console (guarded, SELECT-only, NOT for AI)
+- **Status:** DONE
+- **What I did:** Added the operator's ad-hoc raw-SELECT console (NEXT item #1).
+  Route POST `/api/collections/sql` `{sql}` → runs ONE fenced read-only SELECT via
+  `contentSelect` (which calls `assertStatement(sql,"read")` BEFORE D1, so NO new
+  trust surface — the Slice-0 fence already guarantees SELECT-only, content_*-scoped,
+  no built-ins/PRAGMA/ATTACH/multi-statement). Returns `{columns, rows, truncated}`;
+  rows capped at MAX_READ_ROWS(1000); fence rejections + D1 errors → 400 (operator's
+  own bad query, never a 500 leak). Admin-gated via requireAdmin. NOT exposed to the
+  AI (USER DECISION 2026-06-22: AI gets structured tools only). Pure helper
+  `result-shape.ts:columnsOf` (union of row keys, first-seen order) shapes the UI
+  column list. UI: collapsible `SqlConsole` client component mounted on the
+  collections index page (textarea + Run + results table; danger-styled inline
+  errors). EN/FI/ET strings (sqlConsole/Hint/Placeholder/Run/Truncated) + cms-bundle regen.
+- **Verified:** new `scripts/sql-console.test.mjs` (4 tests) — columnsOf union/sparse;
+  content_* SELECT reaches the fake D1 + returns rows; SELECT vs built-in `page` is
+  rejected BEFORE D1 (prepared.length===0); DELETE on read path rejected. tsc 0,
+  `npm test` 904/904, `npx next build` green w/ `/api/collections/sql` in the manifest.
+  Live D1 + visual = HITL. No open bugs.
+- **Files:** CMS/src/app/api/collections/sql/route.ts, CMS/src/lib/content/result-shape.ts,
+  CMS/src/components/content/sql-console.tsx, CMS/src/app/admin/collections/page.tsx,
+  CMS/scripts/sql-console.test.mjs, CMS/messages/{en,fi,et}.json,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js.

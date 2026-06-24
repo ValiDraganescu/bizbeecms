@@ -56,11 +56,11 @@
       "creditTitle": "Käytössä olevan OpenRouter-avaimen jäljellä oleva saldo",
       "sizeHalf": "Laajenna puoleen näyttöön",
       "sizeCompact": "Pienennä kompaktiksi",
+      "resize": "Muuta keskustelun kokoa vetämällä",
       "overrideActive": "Mukautettu kehote: {label}",
       "overrideActiveUnnamed": "Mukautettu kehote käytössä",
       "overrideTitle": "Tallennettu järjestelmäkehotteen versio on käytössä vain istunnossasi.",
-      "overrideClear": "Käytä oletusta",
-      "resize": "Muuta keskustelun kokoa vetämällä"
+      "overrideClear": "Käytä oletusta"
     },
     "debug": {
       "context": "Sivun konteksti",
@@ -620,7 +620,24 @@
     "renameFieldTitle": "Nimeä kenttä ”{name}” uudelleen",
     "newFieldName": "Kentän uusi nimi",
     "rename": "Nimeä uudelleen",
-    "confirmDropField": "Poistetaanko kenttä ”{name}” ja kaikki sen tiedot? Taulu rakennetaan uudelleen; tätä ei voi kumota."
+    "confirmDropField": "Poistetaanko kenttä ”{name}” ja kaikki sen tiedot? Taulu rakennetaan uudelleen; tätä ei voi kumota.",
+    "exportCsv": "Vie CSV",
+    "exportJson": "Vie JSON",
+    "import": "Tuo",
+    "importing": "Tuodaan…",
+    "importTitle": "Tuo kohteita",
+    "importFormat": "Muoto",
+    "importFile": "Valitse tiedosto",
+    "importPaste": "…tai liitä CSV / JSON",
+    "importPlaceholder": "slug,status,title\\nhello,draft,Hei maailma",
+    "importResult": "Luotu {created}, epäonnistui {failed}.",
+    "importRowError": "Rivi {row}: {error}",
+    "close": "Sulje",
+    "sqlConsole": "SQL-konsoli",
+    "sqlConsoleHint": "Suorita vain luku -SELECT kokoelmataulujesi yli. Vain SELECT content_*-tauluihin on sallittu.",
+    "sqlPlaceholder": "SELECT * FROM content_blog_posts WHERE status = 'published' LIMIT 50",
+    "sqlRun": "Suorita kysely",
+    "sqlTruncated": "tulokset rajattu 1000 riviin"
   },
   "apiKeys": {
     "title": "API-avaimet",

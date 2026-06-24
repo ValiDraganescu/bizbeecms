@@ -216,6 +216,18 @@ stable id + slug (Slice 3) so this isn't a retrofit.
   build green w/ both routes in manifest (opennext build itself blocked ONLY by a
   parallel worker's in-flight chat-widget.tsx — documented clash, not mine). Live
   D1 = HITL.
+- DONE (2026-06-24): **Operator raw-SELECT console (guarded, SELECT-only, NOT for
+  AI).** Route POST `/api/collections/sql` `{sql}` → ONE fenced read-only SELECT via
+  `contentSelect` (calls `assertStatement(sql,"read")` before D1 — NO new trust
+  surface; the Slice-0 fence already enforces SELECT-only/content_*-scoped/no
+  built-ins/PRAGMA/multi-stmt). Returns `{columns,rows,truncated}`, rows capped at
+  MAX_READ_ROWS(1000), bad SQL → 400 (never a 500 leak). Admin-gated. Pure
+  `lib/content/result-shape.ts:columnsOf` shapes the UI column list. UI: collapsible
+  `SqlConsole` on the collections index page (textarea + Run + results table).
+  EN/FI/ET `collections.{sqlConsole,sqlConsoleHint,sqlPlaceholder,sqlRun,sqlTruncated}`
+  + cms-bundle regen. 4 tests (scripts/sql-console.test.mjs: built-in SELECT rejected
+  BEFORE D1). tsc 0, npm test 904, next build green w/ route in manifest. AI stays on
+  structured tools only (USER DECISION). Live D1 = HITL.
 
 - TODO: **Phase 3 (later, not greenlit) — route-driven detail pages + cross-collection
   refs.** "The item for the current route" (dynamic `/blog/[slug]` → the matching

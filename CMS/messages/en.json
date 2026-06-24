@@ -56,11 +56,11 @@
       "creditTitle": "Remaining credit on the in-use OpenRouter key",
       "sizeHalf": "Expand to half screen",
       "sizeCompact": "Shrink to compact",
+      "resize": "Drag to resize the chat",
       "overrideActive": "Custom prompt: {label}",
       "overrideActiveUnnamed": "Custom prompt active",
       "overrideTitle": "A saved system-prompt version is active for your session only.",
-      "overrideClear": "Use default",
-      "resize": "Drag to resize the chat"
+      "overrideClear": "Use default"
     },
     "debug": {
       "context": "Page context",
@@ -620,7 +620,24 @@
     "renameFieldTitle": "Rename field “{name}”",
     "newFieldName": "New field name",
     "rename": "Rename",
-    "confirmDropField": "Drop field “{name}” and all its data? The table is rebuilt; this cannot be undone."
+    "confirmDropField": "Drop field “{name}” and all its data? The table is rebuilt; this cannot be undone.",
+    "exportCsv": "Export CSV",
+    "exportJson": "Export JSON",
+    "import": "Import",
+    "importing": "Importing…",
+    "importTitle": "Import items",
+    "importFormat": "Format",
+    "importFile": "Choose a file",
+    "importPaste": "…or paste CSV / JSON",
+    "importPlaceholder": "slug,status,title\\nhello,draft,Hello world",
+    "importResult": "Created {created}, failed {failed}.",
+    "importRowError": "Row {row}: {error}",
+    "close": "Close",
+    "sqlConsole": "SQL console",
+    "sqlConsoleHint": "Run a read-only SELECT over your collection tables. Only SELECT on content_* tables is allowed.",
+    "sqlPlaceholder": "SELECT * FROM content_blog_posts WHERE status = 'published' LIMIT 50",
+    "sqlRun": "Run query",
+    "sqlTruncated": "results capped at 1000 rows"
   },
   "apiKeys": {
     "title": "API keys",

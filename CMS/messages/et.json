@@ -56,11 +56,11 @@
       "creditTitle": "Kasutusel oleva OpenRouter-võtme järelejäänud krediit",
       "sizeHalf": "Laienda pool ekraani",
       "sizeCompact": "Vähenda kompaktseks",
+      "resize": "Lohista vestluse suuruse muutmiseks",
       "overrideActive": "Kohandatud viip: {label}",
       "overrideActiveUnnamed": "Kohandatud viip aktiivne",
       "overrideTitle": "Salvestatud süsteemiviipa versioon on aktiivne ainult sinu seansis.",
-      "overrideClear": "Kasuta vaikimisi",
-      "resize": "Lohista vestluse suuruse muutmiseks"
+      "overrideClear": "Kasuta vaikimisi"
     },
     "debug": {
       "context": "Lehe kontekst",
@@ -620,7 +620,24 @@
     "renameFieldTitle": "Nimeta väli „{name}“ ümber",
     "newFieldName": "Välja uus nimi",
     "rename": "Nimeta ümber",
-    "confirmDropField": "Kas kustutada väli „{name}“ ja kõik selle andmed? Tabel ehitatakse uuesti; seda ei saa tagasi võtta."
+    "confirmDropField": "Kas kustutada väli „{name}“ ja kõik selle andmed? Tabel ehitatakse uuesti; seda ei saa tagasi võtta.",
+    "exportCsv": "Ekspordi CSV",
+    "exportJson": "Ekspordi JSON",
+    "import": "Impordi",
+    "importing": "Importimine…",
+    "importTitle": "Impordi kirjeid",
+    "importFormat": "Vorming",
+    "importFile": "Vali fail",
+    "importPaste": "…või kleebi CSV / JSON",
+    "importPlaceholder": "slug,status,title\\nhello,draft,Tere maailm",
+    "importResult": "Loodud {created}, ebaõnnestus {failed}.",
+    "importRowError": "Rida {row}: {error}",
+    "close": "Sulge",
+    "sqlConsole": "SQL-konsool",
+    "sqlConsoleHint": "Käivita kirjutuskaitsega SELECT oma kogumiku tabelite üle. Lubatud on ainult SELECT content_* tabelitele.",
+    "sqlPlaceholder": "SELECT * FROM content_blog_posts WHERE status = 'published' LIMIT 50",
+    "sqlRun": "Käivita päring",
+    "sqlTruncated": "tulemused piiratud 1000 reaga"
   },
   "apiKeys": {
     "title": "API-võtmed",

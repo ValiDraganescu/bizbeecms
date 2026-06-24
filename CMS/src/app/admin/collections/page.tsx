@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { CollectionsManager } from "@/components/content/collections-manager";
+import { SqlConsole } from "@/components/content/sql-console";
 import { listCollections, type CollectionView } from "@/db/collection-store";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,7 @@ export default async function CollectionsPage() {
         <LocaleSwitcher />
       </header>
       <CollectionsManager initial={collections} />
+      <SqlConsole />
     </main>
   );
 }
