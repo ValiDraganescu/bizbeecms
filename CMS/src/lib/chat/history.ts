@@ -4,12 +4,19 @@
  * REST route (`api/chat/history`) and the store own the binding; this module
  * only shapes + validates the UNTRUSTED save body and derives the list label.
  *
- * A thread is `{ id, title, messages }`: `messages` is the transcript TEXT only
- * (`[{role, content}]`) — tool cards are re-derived client-side, not stored.
+ * A thread is `{ id, title, messages }`: `messages` is `[{role, content, tools?}]`.
+ * `tools` (assistant turns only) is the array of tool-call cards for that turn —
+ * stored opaquely as plain objects (the client's `ToolResult` shape incl.
+ * input/output) so reloaded cards expand exactly like live ones. The pure layer
+ * never imports `ToolResult` (stays node-testable); it just bounds + sanitizes.
  */
 
 export type ThreadRole = "user" | "assistant" | "system";
-export type ThreadMessage = { role: ThreadRole; content: string };
+/** A stored tool-call card: an opaque plain object (the client's ToolResult). */
+export type StoredTool = Record<string, unknown>;
+export type ThreadMessage = { role: ThreadRole; content: string; tools?: StoredTool[] };
+
+const MAX_TOOLS = 50;
 
 export type ThreadInput = {
   id: string;
@@ -37,6 +44,27 @@ export function deriveTitle(
 }
 
 /**
+ * Bound + sanitize a turn's `tools` into plain objects, or undefined. Keeps only
+ * array-of-plain-object entries (drops primitives/null/nested arrays), caps the
+ * count, and JSON-roundtrips each to strip anything non-serializable (functions,
+ * cycles) so the column is always clean JSON. Returns undefined when empty.
+ */
+export function sanitizeTools(raw: unknown): StoredTool[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: StoredTool[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) continue;
+    try {
+      out.push(JSON.parse(JSON.stringify(item)) as StoredTool);
+    } catch {
+      continue; // non-serializable → drop
+    }
+    if (out.length >= MAX_TOOLS) break;
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/**
  * Validate + normalize an UNTRUSTED save body into a `ThreadInput`, or return
  * the reason it's rejected. Drops malformed messages, bounds counts/lengths,
  * and auto-derives the title when absent. The id, if absent/garbage, is left to
@@ -59,9 +87,11 @@ export function validateThreadInput(
     const m = raw as Record<string, unknown>;
     if (typeof m.role !== "string" || !ROLES.has(m.role as ThreadRole)) continue;
     if (typeof m.content !== "string") continue;
+    const tools = m.role === "assistant" ? sanitizeTools(m.tools) : undefined;
     messages.push({
       role: m.role as ThreadRole,
       content: m.content.length > MAX_CONTENT ? m.content.slice(0, MAX_CONTENT) : m.content,
+      ...(tools ? { tools } : {}),
     });
     if (messages.length >= MAX_MESSAGES) break;
   }
@@ -100,7 +130,8 @@ export function parseStoredMessages(raw: unknown): ThreadMessage[] {
     const r = (m as Record<string, unknown>).role;
     const c = (m as Record<string, unknown>).content;
     if (typeof r === "string" && ROLES.has(r as ThreadRole) && typeof c === "string") {
-      out.push({ role: r as ThreadRole, content: c });
+      const tools = r === "assistant" ? sanitizeTools((m as Record<string, unknown>).tools) : undefined;
+      out.push({ role: r as ThreadRole, content: c, ...(tools ? { tools } : {}) });
     }
   }
   return out;

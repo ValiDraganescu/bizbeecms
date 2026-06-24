@@ -137,15 +137,20 @@ export function useChat(
   }
 
   // History (Slice 4 sub-slice 3): seed the transcript from a loaded thread, or
-  // clear it for a new conversation. Tool cards aren't stored, so a loaded
-  // assistant turn comes back with no tools — fine, the text is what matters.
-  function seed(seedMessages: { role: string; content: string }[]) {
+  // clear it for a new conversation. Tool cards now round-trip (ai-widget-ux):
+  // a loaded assistant turn restores its stored `tools` so the cards (incl. the
+  // input/output accordion) reappear; a turn that predates persistence has none.
+  function seed(seedMessages: { role: string; content: string; tools?: unknown[] }[]) {
     setError(null);
     setMessages(
       seedMessages.map((m) =>
         m.role === "user"
           ? { role: "user", content: m.content }
-          : { role: "assistant", content: m.content, tools: [] },
+          : {
+              role: "assistant",
+              content: m.content,
+              tools: Array.isArray(m.tools) ? (m.tools as ToolResult[]) : [],
+            },
       ),
     );
   }

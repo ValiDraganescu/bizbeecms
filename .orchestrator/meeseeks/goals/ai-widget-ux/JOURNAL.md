@@ -86,3 +86,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/chat/tool-card.ts (+test), CMS/src/lib/chat/client-sse.ts,
   CMS/src/app/api/chat/route.ts, CMS/src/components/chat/chat-conversation.tsx,
   CMS/messages/{en,fi,et}.json (only the three chat.tool keys staged).
+
+## 2026-06-24 14:20 — Persist tool calls in chat history (survive refresh / reload)
+- **Status:** DONE
+- **What I did:** Tool cards now round-trip. NO migration — the `chat_thread.messages`
+  column is already a JSON blob, so tools live inside each assistant message object.
+  `lib/chat/history.ts`: `ThreadMessage` gained optional `tools?: StoredTool[]`
+  (`StoredTool = Record<string,unknown>` — the opaque client `ToolResult` shape, kept
+  opaque so the pure module never imports `@/`). New exported `sanitizeTools(raw)`:
+  keeps only array-of-plain-object entries, JSON-roundtrips each (strips functions/
+  cycles), caps at 50, returns undefined when empty. `validateThreadInput` attaches
+  sanitized `tools` to ASSISTANT turns only (user-turn tools dropped); `parseStoredMessages`
+  restores them the same way (garbage → dropped, legacy threads with no field load fine).
+  Store unchanged — `JSON.stringify(input.messages)` already carries tools through.
+  `chat-widget.tsx`: save payload includes `tools: m.tools` for assistant turns; `openThread`
+  JSON type widened with `tools?`. `chat-conversation.tsx` `seed()` now restores
+  `tools` (`Array.isArray(m.tools) ? m.tools as ToolResult[] : []`) instead of `[]`.
+  Stored shape = the enriched accordion shape (input/output) so reloaded cards expand.
+- **Verified:** `node --test history.test.ts` 6 pass (round-trip incl. input/output,
+  assistant-only, garbage drop, 50-cap, legacy load); `npx tsc --noEmit` clean; full
+  `npm test` 845 pass; `npx opennextjs-cloudflare build` succeeded (dev confirmed OFF,
+  :3601 free). Did NOT regen the PM cms-bundle (concurrent loops edit the shared CMS dir;
+  auto-regens on PM deploy). No new i18n strings (no visible label changed).
+- **Files:** CMS/src/lib/chat/history.ts (+new history.test.ts),
+  CMS/src/components/chat/chat-widget.tsx, CMS/src/components/chat/chat-conversation.tsx.

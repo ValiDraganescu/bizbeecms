@@ -144,7 +144,11 @@ export function ChatWidget() {
     setUnread((cur) => nextUnread(cur, { open, replyFinished: true }));
     const payload = {
       id: threadId.current,
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: messages.map((m) =>
+        m.role === "assistant"
+          ? { role: m.role, content: m.content, tools: m.tools }
+          : { role: m.role, content: m.content },
+      ),
     };
     void (async () => {
       try {
@@ -174,7 +178,9 @@ export function ChatWidget() {
     try {
       const res = await fetch(`/api/chat/history?id=${encodeURIComponent(id)}`);
       if (!res.ok) return;
-      const j = (await res.json()) as { thread?: { id: string; messages: { role: string; content: string }[] } };
+      const j = (await res.json()) as {
+        thread?: { id: string; messages: { role: string; content: string; tools?: unknown[] }[] };
+      };
       if (!j.thread) return;
       chat.seed(j.thread.messages);
       threadId.current = j.thread.id;

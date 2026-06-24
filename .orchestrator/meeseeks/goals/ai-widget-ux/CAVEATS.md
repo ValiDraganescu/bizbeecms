@@ -46,6 +46,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   frame minus the threaded `input`). The chat route frames `{ ...data, input: call.args }`. The
   PERSISTENCE task MUST store this enriched shape (input+output) so reloaded cards expand too — not
   just name/ok/action. `seed()` (~line 141 now) still sets `tools: []`.
+- **Tool calls now persist (DONE 2026-06-24) inside the `messages` JSON — NO separate column.**
+  `ThreadMessage` has optional `tools?: StoredTool[]` (`StoredTool = Record<string,unknown>`, the
+  opaque client `ToolResult`); the pure `history.ts` never imports `@/`/`ToolResult` on purpose.
+  `sanitizeTools` (exported) gates them: assistant-turn-only, plain-objects-only, JSON-roundtripped,
+  capped at 50. If you change the rendered `ToolResult` shape, the STORED shape changes automatically
+  (it's opaque) — but `seed()` casts `m.tools as ToolResult[]`, so a card field the renderer now
+  requires that an OLD stored thread lacks must be optional/defensive in the render layer (it already
+  is: `toolSummary`/`formatBlob` tolerate missing fields). Don't add a tools column/migration — wasteful.
 - **No native confirm/dialog** (breaks browser-review sessions) — use in-app components. Design-system
   tokens + EN/FI/ET for every new string. Gate each slice on CMS tsc + `npm test` +
   `npx opennextjs-cloudflare build` (dev OFF, NEVER while `npm run dev` is up) + cms-bundle regen.
