@@ -54,11 +54,15 @@ import {
   UPDATE_COLLECTION_ITEM_TOOL,
   ARCHIVE_COLLECTION_ITEM_TOOL,
   QUERY_COLLECTION_TOOL,
+  DROP_COLLECTION_FIELD_TOOL,
+  RENAME_COLLECTION_FIELD_TOOL,
   validateCreateCollection,
   validateAddItem,
   validateUpdateItem,
   validateArchiveItem,
   validateQuery,
+  validateDropField,
+  validateRenameField,
 } from "./collection-tools";
 import {
   BIND_COMPONENT_TOOL,
@@ -108,7 +112,7 @@ import {
   getPageBlocks,
   setPageBlocks,
 } from "@/db/page-store";
-import { getCollection } from "@/db/collection-store";
+import { getCollection, rebuildCollectionSchema } from "@/db/collection-store";
 import { applyTranslation } from "@/db/translate-store";
 import {
   getContentLocales,
@@ -157,6 +161,8 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   update_collection_item: UPDATE_COLLECTION_ITEM_TOOL,
   archive_collection_item: ARCHIVE_COLLECTION_ITEM_TOOL,
   query_collection: QUERY_COLLECTION_TOOL,
+  drop_collection_field: DROP_COLLECTION_FIELD_TOOL,
+  rename_collection_field: RENAME_COLLECTION_FIELD_TOOL,
   bind_component: BIND_COMPONENT_TOOL,
   create_list: CREATE_LIST_TOOL,
   bind_list: BIND_LIST_TOOL,
@@ -435,6 +441,34 @@ async function handleQueryCollection(args: unknown): Promise<Record<string, unkn
   }
 }
 
+// Schema evolution beyond ADD-field: drop/rename a user field via the system-
+// generated table rebuild (rebuildCollectionSchema → contentDdlBatch). The planner
+// rejects system columns / unknown fields / name collisions; we just shape args.
+
+async function handleDropCollectionField(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateDropField(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  try {
+    const res = await rebuildCollectionSchema(valid.value.collection, { op: "drop", field: valid.value.field });
+    if (!res.ok) return { ok: false, errors: [res.error] };
+    return { ok: true, action: "dropped_field", collection: res.plan.tableName, field: valid.value.field, fields: res.plan.fields };
+  } catch (err) {
+    return { ok: false, errors: [`failed to drop field: ${(err as Error).message}`] };
+  }
+}
+
+async function handleRenameCollectionField(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateRenameField(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  try {
+    const res = await rebuildCollectionSchema(valid.value.collection, { op: "rename", field: valid.value.field, to: valid.value.to });
+    if (!res.ok) return { ok: false, errors: [res.error] };
+    return { ok: true, action: "renamed_field", collection: res.plan.tableName, field: valid.value.field, to: valid.value.to, fields: res.plan.fields };
+  } catch (err) {
+    return { ok: false, errors: [`failed to rename field: ${(err as Error).message}`] };
+  }
+}
+
 // ── content-collections (Slice D): component↔collection BINDING tools ─────────
 // These mutate a PAGE's draft block tree (NOT a collection store): load the
 // blocks, find the target block, validate the binding against the registry + the
@@ -618,6 +652,8 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   update_collection_item: handleUpdateCollectionItem,
   archive_collection_item: handleArchiveCollectionItem,
   query_collection: handleQueryCollection,
+  drop_collection_field: handleDropCollectionField,
+  rename_collection_field: handleRenameCollectionField,
   bind_component: handleBindComponent,
   create_list: handleCreateList,
   bind_list: handleBindList,

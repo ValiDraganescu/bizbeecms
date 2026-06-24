@@ -370,6 +370,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   name, same as the API. Reuse `field-input.tsx`/`confirm-modal.tsx` in Phase-2
   binding UI (Slice C) rather than rebuilding inputs.
 
+- **(Schema-rebuild AI tools, 2026-06-24) `drop_collection_field`/`rename_collection_field`
+  call the STORE (`rebuildCollectionSchema`), NOT the REST route** — same as the
+  Slice-6 collection tools (one shared registry, no fork). The store maps the
+  planner's `PlanResult` `!ok` → `{ok:false,error}`; the handler wraps it
+  `{ok:false,errors:[error]}` so the model gets a recoverable message. Validators
+  (`validateDropField`/`validateRenameField`) only SHAPE args (require the strings)
+  — the planner owns system-col/unknown-field/collision/name-shape rejection, so
+  don't duplicate those checks in the validator. Wired in all THREE places
+  (KNOWN_TOOL_NAMES, TOOL_BY_NAME, HANDLERS) + the `collections` TOOLS_BY_CONTEXT;
+  the registry-coverage test auto-asserts the names line up. Tool descriptions +
+  the `collections` system prompt are MODEL-facing → NO cms-bundle regen / NO i18n.
+
 - **(BUG fix 2026-06-24) D1's `exec()` SPLITS its input on NEWLINES and runs each
   line as a SEPARATE statement.** A multi-line single statement (e.g. our generated
   `CREATE TABLE content_x (\n  col,\n ...\n)`) gets chopped → "incomplete input:

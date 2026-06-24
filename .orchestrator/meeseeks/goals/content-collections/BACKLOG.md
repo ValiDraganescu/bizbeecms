@@ -223,10 +223,15 @@ stable id + slug (Slice 3) so this isn't a retrofit.
     registry). Route: PATCH `/api/collections/[name]` `_op:"drop_field"|"rename_field"`
     (no `_op` = v1 add-field). 2 node tests (864 total), tsc + opennext build green.
     No UI strings → no cms-bundle regen.
-  - REMAINING for a follow-up slice: operator UI (drop/rename affordance in the
-    collection schema editor) + AI tool (`drop_collection_field`/`rename_collection_field`
-    in collection-tools.ts) + EN/FI/ET for the UI + cms-bundle regen. RETYPE still NOT
-    covered (needs value coercion between affinities — separate slice).
+  - DONE (2026-06-24): **AI TOOLS.** `drop_collection_field`/`rename_collection_field`
+    in collection-tools.ts (schemas + pure `validateDropField`/`validateRenameField`)
+    → tool-dispatch.ts handlers calling `rebuildCollectionSchema({op:"drop"|"rename"})`
+    → tool-scopes.ts (KNOWN_TOOL_NAMES + collections context + prompt). 4 node tests,
+    tsc + npm test 877 + opennext build green. Model-facing → no cms-bundle regen.
+  - REMAINING for a follow-up slice: operator UI ONLY (drop/rename affordance in the
+    collection schema editor; PATCH the `_op:"drop_field"|"rename_field"` shapes) +
+    EN/FI/ET for the UI + cms-bundle regen. RETYPE still NOT covered (needs value
+    coercion between affinities — separate slice).
 
 - TODO: **Phase 2 (later) — FTS5 full-text search (DEFERRED from v1, USER DECISION
   2026-06-22).** Per content table, a CONTENTLESS/external-content `content_<slug>_fts`

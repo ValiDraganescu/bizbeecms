@@ -179,6 +179,49 @@ export const QUERY_COLLECTION_TOOL = {
   },
 } as const;
 
+export const DROP_COLLECTION_FIELD_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "drop_collection_field",
+    description:
+      "Permanently remove one user-defined field (and its data) from a " +
+      "collection's schema. Identify the collection by its table name " +
+      "(content_<slug>). System fields (id, slug, status, created_at, " +
+      "updated_at, archived_at) cannot be dropped. This rebuilds the table — " +
+      "the field's column and all its values are gone for good.",
+    parameters: {
+      type: "object",
+      properties: {
+        collection: { type: "string", description: "The collection's table name (content_<slug>)." },
+        field: { type: "string", description: "The name of the user field to drop." },
+      },
+      required: ["collection", "field"],
+    },
+  },
+} as const;
+
+export const RENAME_COLLECTION_FIELD_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "rename_collection_field",
+    description:
+      "Rename one user-defined field of a collection, preserving its data. " +
+      "Identify the collection by its table name (content_<slug>). System " +
+      "fields cannot be renamed, and the new name must not collide with an " +
+      "existing field. The new name is lowercase letters, digits and " +
+      "underscores, starting with a letter.",
+    parameters: {
+      type: "object",
+      properties: {
+        collection: { type: "string", description: "The collection's table name (content_<slug>)." },
+        field: { type: "string", description: "The current name of the user field." },
+        to: { type: "string", description: "The new field name." },
+      },
+      required: ["collection", "field", "to"],
+    },
+  },
+} as const;
+
 // ── Pure arg validation/coercion (no store, no CF — node-testable) ────────────
 
 /** Result of validating a tool's args: a clean payload, or an error message. */
@@ -260,6 +303,36 @@ export function validateUpdateItem(
   if (!values) return { ok: false, error: "values must be an object of field → value" };
   if (Object.keys(values).length === 0) return { ok: false, error: "values must name at least one field to change" };
   return { ok: true, value: { collection, id, values } };
+}
+
+/** drop_collection_field: { collection, field }. The store/planner enforce
+ *  system-column + existence rules; here we only require both strings. */
+export function validateDropField(
+  args: unknown,
+): ArgResult<{ collection: string; field: string }> {
+  const rec = asRecord(args);
+  if (!rec) return { ok: false, error: "expected an object with collection and field" };
+  const collection = str(rec, "collection");
+  if (!collection) return { ok: false, error: "collection (table name) is required" };
+  const field = str(rec, "field");
+  if (!field) return { ok: false, error: "field is required" };
+  return { ok: true, value: { collection, field } };
+}
+
+/** rename_collection_field: { collection, field, to }. The planner enforces
+ *  system-column/collision/name-shape rules; here we only require the strings. */
+export function validateRenameField(
+  args: unknown,
+): ArgResult<{ collection: string; field: string; to: string }> {
+  const rec = asRecord(args);
+  if (!rec) return { ok: false, error: "expected an object with collection, field and to" };
+  const collection = str(rec, "collection");
+  if (!collection) return { ok: false, error: "collection (table name) is required" };
+  const field = str(rec, "field");
+  if (!field) return { ok: false, error: "field is required" };
+  const to = str(rec, "to");
+  if (!to) return { ok: false, error: "to (the new field name) is required" };
+  return { ok: true, value: { collection, field, to } };
 }
 
 export type ArchiveOp = "archive" | "unarchive" | "delete";

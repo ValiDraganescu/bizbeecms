@@ -61,6 +61,9 @@ export const KNOWN_TOOL_NAMES = [
   "update_collection_item",
   "archive_collection_item",
   "query_collection",
+  // content-collections Phase-2: drop/rename a field (system-generated rebuild).
+  "drop_collection_field",
+  "rename_collection_field",
   // Slice D (content-collections P2-bind): component↔collection binding tools.
   "bind_component",
   "create_list",
@@ -190,6 +193,8 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "update_collection_item",
     "archive_collection_item",
     "query_collection",
+    "drop_collection_field",
+    "rename_collection_field",
   ],
   // Anywhere else: full toolset.
   general: [...KNOWN_TOOL_NAMES],
@@ -213,7 +218,7 @@ const CONTEXT_PROMPTS: Record<AdminPageContext, string> = {
 
   media: `You are in the Media library. Help the operator find and reference uploaded assets (list_assets) by their /media/<key> URLs.`,
 
-  collections: `You are in Collections — the site's structured data. You can define a new typed collection (create_collection: name + typed fields; each collection gets system fields id/slug/status/created_at/updated_at automatically). You can add, update, archive/unarchive/delete items (add_collection_item / update_collection_item / archive_collection_item), and find items with structured filters/sort/search (query_collection — collections are addressed by their content_<slug> table name). Prefer query_collection to discover a collection's table name and item ids before editing. Prefer archiving over deleting.`,
+  collections: `You are in Collections — the site's structured data. You can define a new typed collection (create_collection: name + typed fields; each collection gets system fields id/slug/status/created_at/updated_at automatically). You can add, update, archive/unarchive/delete items (add_collection_item / update_collection_item / archive_collection_item), and find items with structured filters/sort/search (query_collection — collections are addressed by their content_<slug> table name). You can also evolve a collection's schema: drop a user field (drop_collection_field — permanent, data lost) or rename one keeping its data (rename_collection_field). System fields can't be dropped or renamed. Prefer query_collection to discover a collection's table name and item ids before editing. Prefer archiving over deleting.`,
 
   general: `You are the site's AI assistant. You can author components, compose pages, translate content, and reference uploaded media. Help the operator with whatever they need.`,
 };

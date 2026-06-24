@@ -392,3 +392,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   not UI copy → NO cms-bundle regen (per CAVEATS).
 - **Files:** CMS/src/lib/content/content-db.ts, CMS/src/db/collection-store.ts,
   CMS/src/app/api/collections/[name]/route.ts, CMS/scripts/content-fence.test.mjs.
+
+## 2026-06-24 15:01 — AI tools: drop_collection_field + rename_collection_field
+- **Status:** DONE
+- **What I did:** Added the two schema-evolution AI tools that close the
+  drop/rename slice's AI half (the LIVE store + REST `_op` path shipped 2026-06-24;
+  this exposes them to the assistant). New tool schemas + pure arg validators
+  `validateDropField`/`validateRenameField` in `collection-tools.ts`; wired into
+  `tool-dispatch.ts` (TOOL_BY_NAME + handlers `handleDropCollectionField`/
+  `handleRenameCollectionField` calling `rebuildCollectionSchema({op:"drop"|
+  "rename",...})`) and `tool-scopes.ts` (KNOWN_TOOL_NAMES + the `collections`
+  context + a sentence in the `collections` system prompt). Handlers reuse the
+  shared store (NO forked path); the planner enforces system-col/unknown/collision
+  rejections → mapped to recoverable `{ok:false,errors}` for the model.
+- **Verified:** CMS tsc clean; `npm test` 877/877 (added 4 validator tests +
+  registry-coverage auto-covers the 2 new names); `npx opennextjs-cloudflare build`
+  green (dev OFF). Tool descriptions + system prompt are MODEL-facing, not UI copy
+  → NO cms-bundle regen, NO EN/FI/ET (per Slice 6 CAVEAT).
+- **Files:** CMS/src/lib/chat/collection-tools.ts, CMS/src/lib/chat/tool-dispatch.ts,
+  CMS/src/lib/chat/tool-scopes.ts, CMS/scripts/collection-tools.test.mjs.

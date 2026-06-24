@@ -15,6 +15,8 @@ import {
   validateUpdateItem,
   validateArchiveItem,
   validateQuery,
+  validateDropField,
+  validateRenameField,
 } from "../src/lib/chat/collection-tools.ts";
 
 // ── create_collection ─────────────────────────────────────────────────────────
@@ -122,4 +124,32 @@ test("query_collection: invalid archived value is dropped (not an error)", () =>
   const r = validateQuery({ collection: "content_blog", archived: "weird" });
   assert.ok(r.ok);
   assert.equal(r.value.spec.archived, undefined);
+});
+
+// ── drop_collection_field ─────────────────────────────────────────────────────
+test("drop_collection_field: collection + field (trimmed) passes", () => {
+  const r = validateDropField({ collection: "content_blog", field: "  tags  " });
+  assert.ok(r.ok);
+  assert.deepEqual(r.value, { collection: "content_blog", field: "tags" });
+});
+
+test("drop_collection_field: rejects missing collection / field", () => {
+  assert.equal(validateDropField({ field: "tags" }).ok, false);
+  assert.equal(validateDropField({ collection: "content_blog" }).ok, false);
+  assert.equal(validateDropField({ collection: "content_blog", field: "  " }).ok, false);
+  assert.equal(validateDropField(null).ok, false);
+});
+
+// ── rename_collection_field ───────────────────────────────────────────────────
+test("rename_collection_field: collection + field + to passes", () => {
+  const r = validateRenameField({ collection: "content_blog", field: "tags", to: "labels" });
+  assert.ok(r.ok);
+  assert.deepEqual(r.value, { collection: "content_blog", field: "tags", to: "labels" });
+});
+
+test("rename_collection_field: rejects missing collection / field / to", () => {
+  assert.equal(validateRenameField({ field: "tags", to: "labels" }).ok, false);
+  assert.equal(validateRenameField({ collection: "content_blog", to: "labels" }).ok, false);
+  assert.equal(validateRenameField({ collection: "content_blog", field: "tags" }).ok, false);
+  assert.equal(validateRenameField(null).ok, false);
 });
