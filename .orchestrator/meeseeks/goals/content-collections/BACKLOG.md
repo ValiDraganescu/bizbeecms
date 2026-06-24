@@ -214,13 +214,19 @@ stable id + slug (Slice 3) so this isn't a retrofit.
   col; rename maps old→new positionally; system cols always carried; every stmt
   asserted through the Slice-0 fence; rejections (404 unknown / 400 system-col,
   bad-name, non-content / 409 collision). 16 node tests
-  (scripts/schema-rebuild.test.mjs), tsc clean. REMAINING for a follow-up slice:
-  the thin LIVE store (run the 4 stmts via `contentDdl` inside whatever atomic
-  boundary D1 gives — ideally one batch; D1 has no nested TXN, so on partial
-  failure the temp table is an orphan — decide cleanup) + write `newSchema` to the
-  registry; route (PATCH/DELETE field on /api/collections/[name]); operator UI +
-  AI tool + EN/FI/ET + cms-bundle regen. RETYPE is still NOT covered (needs value
-  coercion between affinities — separate slice).
+  (scripts/schema-rebuild.test.mjs), tsc clean.
+  - DONE (2026-06-24): **LIVE STORE + ROUTE.** `content-db.ts` `contentDdlBatch`
+    (fence every stmt → ONE `d1.batch()` atomic; rollback on partial fail leaves the
+    original table intact — orphan-temp concern eliminated by the atomic batch;
+    fallback to ordered run() if no batch()). `collection-store.ts`
+    `rebuildCollectionSchema(tableName, change)` (404→plan→batch→write newSchema to
+    registry). Route: PATCH `/api/collections/[name]` `_op:"drop_field"|"rename_field"`
+    (no `_op` = v1 add-field). 2 node tests (864 total), tsc + opennext build green.
+    No UI strings → no cms-bundle regen.
+  - REMAINING for a follow-up slice: operator UI (drop/rename affordance in the
+    collection schema editor) + AI tool (`drop_collection_field`/`rename_collection_field`
+    in collection-tools.ts) + EN/FI/ET for the UI + cms-bundle regen. RETYPE still NOT
+    covered (needs value coercion between affinities — separate slice).
 
 - TODO: **Phase 2 (later) — FTS5 full-text search (DEFERRED from v1, USER DECISION
   2026-06-22).** Per content table, a CONTENTLESS/external-content `content_<slug>_fts`

@@ -13,13 +13,14 @@
  */
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "../lib/ports/db.ts";
-import { contentDdl } from "../lib/content/content-db.ts";
+import { contentDdl, contentDdlBatch } from "../lib/content/content-db.ts";
 import {
   planCreate,
   planAddField,
   type CreatePlan,
   type PlanResult,
 } from "../lib/content/collection-plan.ts";
+import { planRebuild, type SchemaChange } from "../lib/content/schema-rebuild.ts";
 import type { CollectionField } from "../lib/content/collection-schema.ts";
 import type { Collection } from "./schema.ts";
 
@@ -171,4 +172,40 @@ export async function deleteCollection(tableName: string): Promise<PlanResult<{ 
   await db.delete(schema.collection).where(eq(schema.collection.tableName, tableName));
 
   return { ok: true, plan: { tableName } };
+}
+
+/**
+ * Evolve a collection's schema by DROPPING or RENAMING one user field (Phase-2,
+ * beyond v1 ADD-ONLY). The decision logic is PURE (`planRebuild`): it emits the
+ * 4-statement safe table-rebuild (CREATE temp → INSERT…SELECT → DROP old →
+ * RENAME new) + the revised registry schema. This store runs the 4 fenced
+ * statements as ONE atomic `d1.batch()` (D1 has no nested TXN — the batch is the
+ * safe boundary; a partial failure rolls back, leaving the original table) and,
+ * only AFTER they succeed, writes the new schema JSON to the registry. 404 if the
+ * collection is unknown.
+ */
+export async function rebuildCollectionSchema(
+  tableName: string,
+  change: SchemaChange,
+): Promise<PlanResult<CollectionView>> {
+  const existing = await getCollection(tableName);
+  if (!existing) return { ok: false, status: 404, error: "collection not found" };
+
+  const planned = planRebuild({ tableName, fields: existing.fields }, change);
+  if (!planned.ok) return planned;
+
+  // All 4 fenced statements land together or not at all.
+  await contentDdlBatch(planned.plan.statements);
+
+  const db = await getDb();
+  const now = new Date();
+  await db
+    .update(schema.collection)
+    .set({ schema: JSON.stringify(planned.plan.newSchema.fields), updatedAt: now })
+    .where(eq(schema.collection.tableName, tableName));
+
+  return {
+    ok: true,
+    plan: { ...existing, fields: planned.plan.newSchema.fields, updatedAt: now.getTime() },
+  };
 }

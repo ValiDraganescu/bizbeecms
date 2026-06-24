@@ -347,6 +347,22 @@ Read every line before working. Each entry was learned the hard way by a previou
   (a corrupted registry name → 400, never inlined). Don't reorder one side without
   the other — the copy is positional, not name-matched.
 
+- **(Schema-rebuild LIVE store, 2026-06-24) Run the 4 rebuild statements via
+  `contentDdlBatch` (content-db.ts), NOT a loop of `contentDdl`.** `contentDdlBatch`
+  fences EVERY statement (write mode) BEFORE any D1 call, then runs them as ONE
+  `d1.batch()` — D1 has no nested TXN, so the batch IS the atomic boundary; a
+  partial failure rolls the whole thing back, leaving the ORIGINAL table intact (the
+  earlier "orphan temp on partial fail" worry is GONE because of the batch). The
+  store (`rebuildCollectionSchema`) writes `plan.newSchema.fields` to the registry
+  ONLY AFTER the batch succeeds. `D1Like.batch?` is OPTIONAL — node test fakes
+  without it fall back to ordered `run()`; the real binding always has `batch()`.
+- **(Schema-rebuild route, 2026-06-24) The drop/rename trigger is a PATCH `_op`
+  control on `/api/collections/[name]`, mirroring the Slice-3 item `_op` pattern.**
+  `{_op:"drop_field",field}` / `{_op:"rename_field",field,to}` → `rebuildCollectionSchema`;
+  a PATCH body WITHOUT `_op` (i.e. `{field:{...}}`) stays the v1 add-field path. The
+  follow-up operator UI + AI tools should POST/PATCH these same `_op` shapes — don't
+  add a separate route. RETYPE is still unimplemented (affinity-change value coercion).
+
 - **(Slice 5) Admin UI talks to the Slice 2-4 REST routes only — no new data path.**
   Item create OMITS empty-string field values so column DEFAULTs apply; edit sends
   all keys (PATCH semantics). multiselect round-trips as a JSON-array string (parse on

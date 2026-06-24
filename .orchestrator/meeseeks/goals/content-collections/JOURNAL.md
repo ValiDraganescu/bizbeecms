@@ -364,3 +364,31 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Verified:** `npx tsc --noEmit` clean; `npm test` 862/862 green; `npx
   opennextjs-cloudflare build` green (dev confirmed OFF first). No UI strings changed.
 - **Files:** CMS/src/components/admin-sidebar.tsx.
+
+## 2026-06-24 14:55 — Schema-rebuild LIVE store + drop/rename-field route
+- **Status:** DONE
+- **What I did:** Wired the already-PURE drop/rename planner (`schema-rebuild.ts`,
+  `planRebuild`) into a live execution path so an operator/AI can DROP or RENAME a
+  collection field (Phase-2, beyond v1 ADD-ONLY). Three pieces:
+  (1) `content-db.ts`: new `contentDdlBatch(sqls, db?)` — fences EVERY statement
+  (write mode) BEFORE any D1 call, then runs them as ONE `d1.batch()` (D1 has no
+  nested TXN — a single batch is the atomic boundary; a partial failure rolls back,
+  leaving the original table intact). Falls back to ordered `prepare().run()` when a
+  binding/fake has no `batch()`. Also extracted a `D1PreparedLike` type + made
+  `batch?` optional on `D1Like`.
+  (2) `collection-store.ts`: new `rebuildCollectionSchema(tableName, change)` —
+  load registry (404 if unknown) → `planRebuild` (maps !ok → its HTTP status) →
+  `contentDdlBatch(plan.statements)` (CREATE temp → INSERT…SELECT → DROP old →
+  RENAME new) → ONLY THEN UPDATE the registry schema JSON to `plan.newSchema.fields`.
+  Mirrors the Slice-2 store shape (PURE planner decides, thin store executes).
+  (3) `app/api/collections/[name]/route.ts` PATCH: added an `_op` control —
+  `{_op:"drop_field",field}` / `{_op:"rename_field",field,to}` → rebuild; no `_op`
+  (with `field`) stays the v1 add-field path. Admin-gated, `[name]` = content_<slug>.
+- **Verified:** `npx tsc --noEmit` clean. `npm test` 864/864 (added 2 contentDdlBatch
+  tests in content-fence.test.mjs: fences-every-statement-then-batches-in-order +
+  bad-statement-aborts-before-any-D1-call + no-batch()-fallback-runs-in-order).
+  `npx opennextjs-cloudflare build` green (dev confirmed OFF first). Live D1 = HITL
+  (the rebuild batch needs a real binding). NO new UI strings + route/store/AI are
+  not UI copy → NO cms-bundle regen (per CAVEATS).
+- **Files:** CMS/src/lib/content/content-db.ts, CMS/src/db/collection-store.ts,
+  CMS/src/app/api/collections/[name]/route.ts, CMS/scripts/content-fence.test.mjs.

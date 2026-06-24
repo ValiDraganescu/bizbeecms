@@ -18,7 +18,7 @@ import {
   validateStatement,
   assertStatement,
 } from "../src/lib/content/fence.ts";
-import { contentSelect, contentWrite, contentDdl, MAX_READ_ROWS } from "../src/lib/content/content-db.ts";
+import { contentSelect, contentWrite, contentDdl, contentDdlBatch, MAX_READ_ROWS } from "../src/lib/content/content-db.ts";
 import { buildCreateTableSql } from "../src/lib/content/collection-schema.ts";
 
 const ok = (sql, mode) => assert.equal(validateStatement(sql, mode).ok, true, `should ACCEPT: ${sql}`);
@@ -201,6 +201,50 @@ test("contentDdl handles multi-line generated DDL (D1 exec newline-split regress
   // Must NOT throw — the fix avoids exec() for multi-line DDL.
   await contentDdl(createSql, d1);
   assert.equal(execFragments, null, "contentDdl must not call the newline-splitting exec()");
+});
+
+// contentDdlBatch — schema-rebuild path: fence EVERY statement BEFORE D1, run
+// them as ONE d1.batch() in order (atomic). A rejected statement aborts the WHOLE
+// batch before any D1 call (no partial run).
+test("contentDdlBatch fences every statement then runs them via d1.batch() in order", async () => {
+  let batched = null;
+  const d1 = {
+    prepare: (sql) => ({ __sql: sql, run: async () => ({ meta: { changes: 0 } }) }),
+    exec: async () => { throw new Error("must not exec"); },
+    batch: async (stmts) => { batched = stmts.map((s) => s.__sql); return []; },
+  };
+  const sqls = [
+    "CREATE TABLE content_x_new (id TEXT PRIMARY KEY)",
+    "INSERT INTO content_x_new (id) SELECT id FROM content_x",
+    "DROP TABLE content_x",
+    "ALTER TABLE content_x_new RENAME TO content_x",
+  ];
+  await contentDdlBatch(sqls, d1);
+  assert.deepEqual(batched, sqls, "all 4 statements batched IN ORDER");
+
+  // One bad statement → reject BEFORE any batch call (atomic intent: nothing runs).
+  let called = false;
+  const d2 = {
+    prepare: (sql) => ({ __sql: sql, run: async () => ({}) }),
+    exec: async () => ({}),
+    batch: async () => { called = true; return []; },
+  };
+  await assert.rejects(
+    () => contentDdlBatch(["CREATE TABLE content_x_new (id TEXT)", "DROP TABLE page"], d2),
+    /content fence rejected/,
+  );
+  assert.equal(called, false, "a single bad statement aborts the batch before any D1 call");
+});
+
+test("contentDdlBatch falls back to ordered run() when the binding has no batch()", async () => {
+  const ran = [];
+  const d1 = {
+    prepare: (sql) => ({ run: async () => { ran.push(sql); return { meta: { changes: 0 } }; } }),
+    exec: async () => { throw new Error("must not exec"); },
+  };
+  const sqls = ["DROP TABLE content_x", "ALTER TABLE content_x_new RENAME TO content_x"];
+  await contentDdlBatch(sqls, d1);
+  assert.deepEqual(ran, sqls, "no batch() → run each fenced statement in order");
 });
 
 test("MAX_READ_ROWS is a sane backstop", () => {

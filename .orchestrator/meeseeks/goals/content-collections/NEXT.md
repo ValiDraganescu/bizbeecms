@@ -1,23 +1,27 @@
 # Note to the next Meeseeks (content-collections)
 
-## Just fixed (2026-06-24)
-BUG [P2] "Collections nav item has no icon" is DONE — added `"collections"` to the
-`IconKey` union + a database SVG `case` in `admin-sidebar.tsx`'s `NavIcon`. No i18n,
-no cms-bundle regen (label already existed). **ALL BUGS ARE NOW CLEAR.**
+## Just shipped (2026-06-24) — Schema-rebuild LIVE store + drop/rename route
+The drop/rename-field schema evolution now EXECUTES (was pure-planner-only):
+- `content-db.ts` `contentDdlBatch` — fences every stmt → ONE atomic `d1.batch()`.
+- `collection-store.ts` `rebuildCollectionSchema(tableName, change)`.
+- PATCH `/api/collections/[name]` `_op:"drop_field"|"rename_field"` (no `_op` = add-field).
+- 864 tests, tsc + opennext build green. No UI strings → no cms-bundle regen.
+NO open bugs.
 
-## DO THIS NEXT — pick a feature slice
-No open bugs left. v1 (Slices 0–6) DONE; Phase-2 binding (Slices A+B+C+D) DONE.
-Pick the next valuable Phase-2/Phase-3 slice per GOAL.md. Strongest candidates,
-roughly in value order:
-1. **Schema-rebuild LIVE store** — the PURE planner (`lib/content/schema-rebuild.ts`)
-   is DONE (BACKLOG "PARTIAL"); build the thin live store that runs the 4 fenced
-   statements via `d1.batch()` (D1 has no nested TXN — orphan temp on partial fail is
-   a v1 non-concern, mirror Slice-2 stance), writes `plan.newSchema` to the registry,
-   a PATCH/DELETE-field route, operator UI + AI tool + EN/FT/ET + cms-bundle regen.
+## DO THIS NEXT — finish the drop/rename slice's UI+AI, OR pick another feature
+The rebuild data path is done end-to-end (store+route); the OPERATOR UI and AI
+tools to drive it are NOT built yet. Strongest candidates, value order:
+1. **Drop/rename-field UI + AI tools** (completes the slice just shipped):
+   - Operator: add a drop/rename affordance to the collection schema editor; PATCH
+     the `_op:"drop_field"|"rename_field"` shapes. NEEDS EN/FI/ET + cms-bundle regen.
+   - AI: `drop_collection_field` / `rename_collection_field` tools in
+     `lib/chat/collection-tools.ts` → wire in tool-dispatch.ts + tool-scopes.ts
+     (3 places: KNOWN_TOOL_NAMES, TOOL_BY_NAME, HANDLERS). Reuse `rebuildCollectionSchema`.
+     Tool descriptions are model-facing → NO regen for the AI part.
 2. **Import/export (CSV/JSON)** per collection.
 3. **Operator raw-SELECT console** (guarded, SELECT-only, fenced — NOT for the AI).
 4. **FTS5 return** (mind the D1 export-with-fts5 bug — see CAVEATS).
-5. **Phase-3 route-driven detail pages** (not greenlit — needs user).
+5. **Phase-3 route-driven detail pages** (NOT greenlit — needs user).
 
 ## Gate (every slice)
 CMS `tsc` + `npm test` + `npx opennextjs-cloudflare build` (dev OFF) + cms-bundle

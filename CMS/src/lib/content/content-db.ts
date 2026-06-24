@@ -21,16 +21,20 @@ export const MAX_READ_ROWS = 1000;
  * Minimal D1 surface we use. Decoupled from the full `D1Database` type so this
  * module is testable against an in-memory fake (see `content-db.test.mjs`).
  */
-export interface D1Like {
-  prepare(sql: string): {
-    bind(...params: unknown[]): {
-      all(): Promise<{ results: unknown[] }>;
-      run(): Promise<{ meta?: { changes?: number } }>;
-    };
+export interface D1PreparedLike {
+  bind(...params: unknown[]): {
     all(): Promise<{ results: unknown[] }>;
     run(): Promise<{ meta?: { changes?: number } }>;
   };
+  all(): Promise<{ results: unknown[] }>;
+  run(): Promise<{ meta?: { changes?: number } }>;
+}
+
+export interface D1Like {
+  prepare(sql: string): D1PreparedLike;
   exec(sql: string): Promise<unknown>;
+  /** Run an ordered array of prepared statements in one implicit transaction. */
+  batch?(statements: D1PreparedLike[]): Promise<unknown[]>;
 }
 
 /** Resolve the live per-Site D1 binding. The ONLY env.DB read in this module. */
@@ -89,4 +93,26 @@ export async function contentDdl(sql: string, db?: D1Like): Promise<void> {
   // rejects multi-statement), so run it via the prepared-statement path, which
   // executes the single statement intact regardless of newlines.
   await d1.prepare(sql).run();
+}
+
+/**
+ * Run an ORDERED list of fenced, SYSTEM-generated DDL statements as ONE atomic
+ * batch (D1's `batch()` wraps them in an implicit transaction — D1 has no nested
+ * transactions, so a single batch is the safe atomic boundary for a multi-step
+ * rebuild). EACH statement is validated (write mode) before it touches D1.
+ *
+ * Used by the schema-rebuild path (create temp → INSERT…SELECT → DROP → RENAME):
+ * all four land together or not at all, so a partial failure leaves the original
+ * table intact (the batch rolls back).
+ */
+export async function contentDdlBatch(sqls: string[], db?: D1Like): Promise<void> {
+  for (const sql of sqls) assertStatement(sql, "write");
+  const d1 = db ?? (await liveDb());
+  if (typeof d1.batch === "function") {
+    await d1.batch(sqls.map((sql) => d1.prepare(sql)));
+    return;
+  }
+  // ponytail: no batch() on the binding (or a test fake without one) → run in
+  // order without a transaction. The live D1 binding always has batch().
+  for (const sql of sqls) await d1.prepare(sql).run();
 }

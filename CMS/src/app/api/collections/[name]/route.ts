@@ -15,7 +15,9 @@ import {
   addCollectionField,
   deleteCollection,
   getCollection,
+  rebuildCollectionSchema,
 } from "@/db/collection-store";
+import type { SchemaChange } from "@/lib/content/schema-rebuild";
 
 export const dynamic = "force-dynamic";
 
@@ -51,12 +53,26 @@ export async function PATCH(
   }
   const obj = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
 
+  // `_op` selects schema evolution beyond v1 ADD-ONLY (drop/rename a field via the
+  // safe table-rebuild). Without `_op`, the body is an add-field (`{ field: {...} }`).
+  const op = obj._op;
   try {
+    if (op === "drop_field" || op === "rename_field") {
+      const field = typeof obj.field === "string" ? obj.field : "";
+      const change: SchemaChange =
+        op === "drop_field"
+          ? { op: "drop", field }
+          : { op: "rename", field, to: typeof obj.to === "string" ? obj.to : "" };
+      const result = await rebuildCollectionSchema(name, change);
+      if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
+      return Response.json(result.plan);
+    }
+
     const result = await addCollectionField(name, obj.field);
     if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
     return Response.json(result.plan);
   } catch (err) {
-    return Response.json({ error: (err as Error).message ?? "failed to add field" }, { status: 500 });
+    return Response.json({ error: (err as Error).message ?? "failed to update collection" }, { status: 500 });
   }
 }
 
