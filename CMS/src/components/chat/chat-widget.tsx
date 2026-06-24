@@ -21,6 +21,14 @@ import { ChatDebugPanel } from "@/components/chat/chat-debug-panel";
 import { detectAdminContext } from "@/lib/chat/tool-scopes";
 import { DEFAULT_MODEL } from "@/lib/chat/models";
 import { ModelPicker } from "@/components/chat/model-picker";
+import {
+  type PanelPreset,
+  type PanelSize,
+  resolveSize,
+  nextPreset,
+  loadPref,
+  savePref,
+} from "@/lib/chat/panel-size";
 
 type ThreadSummary = { id: string; title: string; updatedAt: number };
 
@@ -36,6 +44,11 @@ export function ChatWidget() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [model, setModel] = useState(DEFAULT_MODEL);
+  // Resizable panel (ai-widget-ux): preset toggle (default ⇄ half-screen) plus
+  // free-drag via native CSS `resize`. Size is resolved against the live
+  // viewport so a panel sized big on one screen is clamped, never lost.
+  const [panel, setPanel] = useState<PanelSize | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const pathname = usePathname();
   // The conversation lives at the widget level so it SURVIVES minimize (closing
   // the panel just hides it; the transcript is intact when reopened).
@@ -182,6 +195,39 @@ export function ChatWidget() {
     setHistoryOpen(false);
   }
 
+  // Resolve the stored size preference against the current viewport. Runs on
+  // mount and whenever the window resizes so a clamped panel re-fits.
+  useEffect(() => {
+    function apply() {
+      const pref = loadPref();
+      const preset = pref?.preset ?? "default";
+      const stored = pref && pref.width > 0 ? { width: pref.width, height: pref.height } : null;
+      setPanel(resolveSize(preset, stored, window.innerWidth, window.innerHeight));
+    }
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, []);
+
+  function togglePreset() {
+    setPanel((cur) => {
+      const preset: PanelPreset = nextPreset(cur?.preset ?? "default");
+      const next = resolveSize(preset, null, window.innerWidth, window.innerHeight);
+      savePref({ preset, width: next.width, height: next.height });
+      return next;
+    });
+  }
+
+  // Capture a free-drag (native CSS resize) as a "custom" px size to persist.
+  function captureDrag() {
+    const el = panelRef.current;
+    if (!el) return;
+    const width = el.offsetWidth;
+    const height = el.offsetHeight;
+    setPanel({ preset: "custom", width, height });
+    savePref({ preset: "custom", width, height });
+  }
+
   function toggleHistory() {
     setHistoryOpen((h) => {
       const next = !h;
@@ -194,7 +240,10 @@ export function ChatWidget() {
     <>
       {open && (
         <div
-          className="fixed bottom-24 right-6 z-50 flex h-[min(70vh,560px)] w-[min(92vw,380px)] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
+          ref={panelRef}
+          className="fixed bottom-24 right-6 z-50 flex resize flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
+          style={panel ? { width: panel.width, height: panel.height } : undefined}
+          onMouseUp={captureDrag}
           role="dialog"
           aria-label={t("title")}
         >
@@ -247,6 +296,27 @@ export function ChatWidget() {
                   <circle cx="12" cy="12" r="3" />
                   <path d="M12 5V3M12 21v-2M5 12H3M21 12h-2M7 7 5.5 5.5M18.5 18.5 17 17M17 7l1.5-1.5M5.5 18.5 7 17" />
                 </svg>
+              </button>
+              <button
+                type="button"
+                onClick={togglePreset}
+                aria-label={panel?.preset === "half" ? t("sizeCompact") : t("sizeHalf")}
+                aria-pressed={panel?.preset === "half"}
+                title={panel?.preset === "half" ? t("sizeCompact") : t("sizeHalf")}
+                className={
+                  "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground " +
+                  (panel?.preset === "half" ? "bg-surface-muted text-foreground" : "text-foreground-muted")
+                }
+              >
+                {panel?.preset === "half" ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                    <path d="M14 10 21 3M21 3h-5M21 3v5M10 14l-7 7M3 21h5M3 21v-5" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                    <path d="M3 9V3h6M21 15v6h-6M21 9V3h-6M3 15v6h6" />
+                  </svg>
+                )}
               </button>
               <button
                 type="button"
