@@ -41,7 +41,13 @@
       "historyUntitled": "Untitled",
       "historyDelete": "Delete conversation",
       "modelSearch": "Search models…",
-      "modelNoResults": "No models found"
+      "modelNoResults": "No models found",
+      "modelPriceIn": "in",
+      "modelPriceOut": "out",
+      "modelPricePerMillion": "/1M",
+      "modelPriceTitle": "Price per 1M tokens (input / output)",
+      "sizeHalf": "Expand to half screen",
+      "sizeCompact": "Shrink to compact"
     },
     "debug": {
       "context": "Page context",

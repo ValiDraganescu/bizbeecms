@@ -19,6 +19,7 @@ import {
   sortByPrice,
   filterCatalog,
   providerOf,
+  pricePerMillion,
 } from "../src/lib/chat/models.ts";
 
 test("DEFAULT_MODEL is itself an allowlisted id", () => {
@@ -116,8 +117,20 @@ test("parseModelCatalog extracts id/name/provider/price from the OpenRouter shap
   assert.equal(small.provider, "openai");
   assert.equal(small.label, "OpenAI: GPT-4o-mini");
   assert.equal(small.price, 0.00000015);
+  assert.equal(small.inputPrice, 0.00000015);
+  assert.equal(small.outputPrice, 0.0000006); // pricing.completion
   const noPrice = cat.find((m) => m.id === "google/gemini-flash-1.5");
   assert.equal(noPrice.price, null);
+  assert.equal(noPrice.inputPrice, null);
+  assert.equal(noPrice.outputPrice, null);
+});
+
+test("pricePerMillion formats USD/token as USD per 1M tokens, 2dp", () => {
+  assert.equal(pricePerMillion(0.00000015), "0.15"); // 0.15 / 1M
+  assert.equal(pricePerMillion(0.0000006), "0.60");
+  assert.equal(pricePerMillion(0.000003), "3.00");
+  assert.equal(pricePerMillion(0), "0.00");
+  assert.equal(pricePerMillion(null), null); // no price → no string
 });
 
 test("parseModelCatalog tolerates a bare array (no data wrapper) + junk", () => {

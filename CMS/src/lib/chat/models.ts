@@ -35,6 +35,10 @@ export interface CatalogModel {
   provider: string;
   /** Per-input-token USD price (sort key); null when the API exposes none. */
   price: number | null;
+  /** Per-input-token USD price (= `price`); null when none. For display. */
+  inputPrice: number | null;
+  /** Per-output-token USD price (`pricing.completion`); null when none. */
+  outputPrice: number | null;
 }
 
 /**
@@ -48,24 +52,32 @@ export const CHAT_MODELS: ReadonlyArray<CatalogModel> = [
     label: "GPT-4o mini (fast)",
     provider: "openai",
     price: null,
+    inputPrice: null,
+    outputPrice: null,
   },
   {
     id: "openai/gpt-4o",
     label: "GPT-4o (strong)",
     provider: "openai",
     price: null,
+    inputPrice: null,
+    outputPrice: null,
   },
   {
     id: "anthropic/claude-3.5-sonnet",
     label: "Claude 3.5 Sonnet",
     provider: "anthropic",
     price: null,
+    inputPrice: null,
+    outputPrice: null,
   },
   {
     id: "google/gemini-flash-1.5",
     label: "Gemini Flash 1.5",
     provider: "google",
     price: null,
+    inputPrice: null,
+    outputPrice: null,
   },
 ];
 
@@ -92,16 +104,33 @@ function labelOf(id: string): string {
 interface RawModel {
   id?: unknown;
   name?: unknown;
-  pricing?: { prompt?: unknown } | null;
+  pricing?: { prompt?: unknown; completion?: unknown } | null;
+}
+
+/** Coerce a USD-per-token pricing field (string|number) to a finite number, else null. */
+function toPrice(raw: unknown): number | null {
+  const n = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : NaN;
+  return Number.isFinite(n) ? n : null;
 }
 
 /** Extract the per-input-token price (USD/token) from `pricing.prompt`, or null. */
 function priceOf(m: RawModel): number | null {
   const p = m.pricing;
   if (!p || typeof p !== "object") return null;
-  const raw = (p as { prompt?: unknown }).prompt;
-  const n = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : NaN;
-  return Number.isFinite(n) ? n : null;
+  return toPrice((p as { prompt?: unknown }).prompt);
+}
+
+/** Extract the per-output-token price (USD/token) from `pricing.completion`, or null. */
+function outputPriceOf(m: RawModel): number | null {
+  const p = m.pricing;
+  if (!p || typeof p !== "object") return null;
+  return toPrice((p as { completion?: unknown }).completion);
+}
+
+/** Format a USD-per-token price as USD per 1M tokens, 2 decimals (`null` → null). */
+export function pricePerMillion(usdPerToken: number | null): string | null {
+  if (usdPerToken == null) return null;
+  return (usdPerToken * 1_000_000).toFixed(2);
 }
 
 /**
@@ -118,11 +147,14 @@ export function parseModelCatalog(apiJson: unknown): CatalogModel[] {
   const out: CatalogModel[] = [];
   for (const m of list) {
     if (!m || typeof m.id !== "string" || m.id.length === 0) continue;
+    const input = priceOf(m);
     out.push({
       id: m.id,
       label: typeof m.name === "string" && m.name.trim() ? m.name.trim() : labelOf(m.id),
       provider: providerOf(m.id),
-      price: priceOf(m),
+      price: input,
+      inputPrice: input,
+      outputPrice: outputPriceOf(m),
     });
   }
   return out;

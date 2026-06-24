@@ -333,3 +333,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** `ProjectManager/src/app/api/sites/[id]/deploy/route.ts`,
   `ProjectManager/src/app/(app)/sites/deploy-form.tsx`,
   `ProjectManager/scripts/deploy-mint-warning.test.mjs`, `ProjectManager/messages/{en,fi,et}.json`
+
+## 2026-06-24 13:55 — Model picker: show input/output price per 1M tokens (not raw $/token)
+- **Status:** DONE
+- **What I did:** The picker printed `${m.price}` = raw USD/token (e.g. "$0.00000015"),
+  unreadable. `models.ts`: `CatalogModel` gained `inputPrice`/`outputPrice` (USD/token, null
+  when absent); kept `price` as the input-price sort key (zero churn to sort/group). `RawModel`
+  + parser now read `pricing.completion` too (new `outputPriceOf`, shared `toPrice` coercion).
+  New pure `pricePerMillion(usdPerToken)` = `(× 1e6).toFixed(2)` or null. Static `CHAT_MODELS`
+  carry both new fields = null (sort/format unaffected). `model-picker.tsx` renders
+  "in $X.XX / out $Y.YY /1M" (each half shown only if present; nothing when both null) via the
+  new helper, tabular-nums, with a `title` tooltip. i18n `modelPriceIn/Out/PerMillion/Title`
+  in EN/FI/ET.
+- **Verified:** `models.test.mjs` 13/13 (incl. new inputPrice/outputPrice asserts + a per-1M
+  formatting test: 0.00000015→"0.15", null→null); CMS tsc 0 in my files; `npx
+  opennextjs-cloudflare build` GREEN (dev off). Full suite 803/804 — the 1 fail is
+  `panel-size.test.ts` ("nextPreset toggles default<->half"), a CONCURRENT ai-widget-ux
+  Meeseeks's untracked file, NOT mine. Could NOT verify: live picker render (no deployed CMS).
+- **Files:** `CMS/src/lib/chat/models.ts`, `CMS/src/components/chat/model-picker.tsx`,
+  `CMS/scripts/models.test.mjs`, `CMS/messages/{en,fi,et}.json`

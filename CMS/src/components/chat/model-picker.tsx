@@ -17,6 +17,7 @@ import {
   CHAT_MODELS,
   filterCatalog,
   groupByProvider,
+  pricePerMillion,
   type CatalogModel,
 } from "@/lib/chat/models";
 
@@ -167,11 +168,23 @@ export function ModelPicker({
                             } ${m.id === value ? "font-semibold text-primary" : "text-foreground"}`}
                           >
                             <span className="truncate">{m.label}</span>
-                            {m.price != null && (
-                              <span className="shrink-0 text-foreground-muted">
-                                ${m.price}
-                              </span>
-                            )}
+                            {(() => {
+                              const inP = pricePerMillion(m.inputPrice);
+                              const outP = pricePerMillion(m.outputPrice);
+                              if (inP == null && outP == null) return null;
+                              return (
+                                <span
+                                  className="shrink-0 text-[10px] tabular-nums text-foreground-muted"
+                                  title={t("modelPriceTitle")}
+                                >
+                                  {inP != null && `${t("modelPriceIn")} $${inP}`}
+                                  {inP != null && outP != null && " / "}
+                                  {outP != null && `${t("modelPriceOut")} $${outP}`}
+                                  {" "}
+                                  {t("modelPricePerMillion")}
+                                </span>
+                              );
+                            })()}
                           </button>
                         </li>
                       );

@@ -41,7 +41,13 @@
       "historyUntitled": "Pealkirjata",
       "historyDelete": "Kustuta vestlus",
       "modelSearch": "Otsi mudeleid…",
-      "modelNoResults": "Mudeleid ei leitud"
+      "modelNoResults": "Mudeleid ei leitud",
+      "modelPriceIn": "sisse",
+      "modelPriceOut": "välja",
+      "modelPricePerMillion": "/1 M",
+      "modelPriceTitle": "Hind / 1 M tokenit (sisend / väljund)",
+      "sizeHalf": "Laienda pool ekraani",
+      "sizeCompact": "Vähenda kompaktseks"
     },
     "debug": {
       "context": "Lehe kontekst",

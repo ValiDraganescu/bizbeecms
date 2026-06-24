@@ -41,7 +41,13 @@
       "historyUntitled": "Nimetön",
       "historyDelete": "Poista keskustelu",
       "modelSearch": "Hae malleja…",
-      "modelNoResults": "Malleja ei löytynyt"
+      "modelNoResults": "Malleja ei löytynyt",
+      "modelPriceIn": "sis.",
+      "modelPriceOut": "ulos",
+      "modelPricePerMillion": "/1 M",
+      "modelPriceTitle": "Hinta / 1 M tokenia (syöte / tuotos)",
+      "sizeHalf": "Laajenna puoleen näyttöön",
+      "sizeCompact": "Pienennä kompaktiksi"
     },
     "debug": {
       "context": "Sivun konteksti",

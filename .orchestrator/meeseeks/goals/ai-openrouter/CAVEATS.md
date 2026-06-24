@@ -157,3 +157,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   + `sites.deploy.keyWarning` in PM `messages/{en,fi,et}.json`. Regression: `scripts/deploy-mint-warning.test.mjs`
   (10 tests) source-greps the route's conditional `...(degraded ? { keyWarning: true } : {})` + form
   reads + i18n parity — the route can't be imported under Node (pulls the CF context).
+- MODEL PRICE DISPLAY (2026-06-24): `CatalogModel.price` is the INPUT-price SORT KEY — DON'T remove
+  it; `sortByPrice`/`groupByProvider` depend on it. New `inputPrice`/`outputPrice` are for DISPLAY
+  (USD/token, null when absent). Format with the pure `pricePerMillion()` (× 1e6, `.toFixed(2)`),
+  never print raw `$/token`. Static `CHAT_MODELS` have all three null (no live price) — the picker
+  shows nothing for them, by design; keep new static models null unless you have a real price.
+- CONCURRENT ai-widget-ux Meeseeks shares `CMS/messages/{en,fi,et}.json` + `chat-widget.tsx`.
+  As of this run those files also carry their `sizeHalf`/`sizeCompact` keys and a `panel-size.*`
+  feature. If `npm test` shows a `panel-size.test.ts` fail ("nextPreset toggles default<->half"),
+  it's THEIRS (untracked file), not a regression in this goal — don't chase it.
