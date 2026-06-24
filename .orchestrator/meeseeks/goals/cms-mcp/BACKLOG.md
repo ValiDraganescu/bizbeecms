@@ -59,6 +59,28 @@ node tests + EN/FI/ET for new strings.
   the `/mcp` URL + bearer to Claude Code, confirm tools/list + a tools/call
   round-trip. Non-codeable; see HITL.md.
 
+- TODO: **MCP URL must use the site's custom domain when one is configured.** BUG (USER 2026-06-24):
+  the "Connect Claude Code" snippets show the `bizbeecms-cms-<slug>.workers.dev` URL even when the
+  site has a custom domain. Root cause: Slice 5's `mcpUrlFromRequest()` (`api-keys/page.tsx:20`)
+  derives the URL from the INCOMING REQUEST HOST — admin is browsed on workers.dev, so the snippet
+  shows workers.dev; and `deployer/src/index.ts:520` ALWAYS sets `APP_ORIGIN` to the workers.dev URL
+  even when a custom domain is attached (the deployer sets up the custom-domain DNS at ~293-294 but
+  never feeds the chosen domain into APP_ORIGIN). The MCP endpoint should be advertised at the site's
+  PRIMARY PUBLIC origin (the custom domain if attached, else workers.dev). FIX (two layers — confirm
+  scope before splitting):
+  (a) **Deployer:** when the site has an attached/primary custom domain, set `APP_ORIGIN` to
+  `https://<custom-domain>` instead of the workers.dev URL (the custom-domain data lives PM-side — see
+  archived `custom-domains`; thread the primary domain into the deploy so the deployer can pick it).
+  Keep workers.dev as the fallback when no custom domain.
+  (b) **CMS page:** stop deriving the MCP URL purely from the request host — prefer the deployed
+  `APP_ORIGIN` (the site's configured public origin) for the advertised `/mcp` URL, falling back to the
+  request host only when APP_ORIGIN is unset. Pure helper choosing the origin (customDomainOrigin ??
+  appOrigin ?? requestHost) + node test. EN/FI/ET unaffected (URL only). Gate: CMS tsc + `npm test` +
+  `npx opennextjs-cloudflare build` (dev OFF) + cms-bundle regen; deployer tsc + its test if (a) is in
+  scope. NOTE cross-track: (a) touches the deployer + PM custom-domain data (archived `custom-domains`
+  is read-only — read it, don't write it); if (a) is bigger than one run, do (b) first (correct as soon
+  as APP_ORIGIN is right) and file (a) as its own follow-up.
+
 - TODO (later) — **scoped / least-privilege keys.** If needed: per-key tool scopes
   (read-only key vs. full) reusing the tool-scopes contexts. Only if a real need
   shows up — v1 keys grant the full tool set for the site.

@@ -3,7 +3,12 @@
 > **Future agents: read THIS before investigating deploy.** It is the current, verified map of
 > how PM, the deployer, and per-Site CMS Workers relate, the exact env-var / secret status, and
 > the ordered procedure to deploy. It exists so you don't re-run a blind multi-file search.
-> Last verified **2026-06-19** against the live account (custom-domain cutover + live SSO walk).
+> Last verified **2026-06-24** against the live account (custom-domain cutover, live SSO walk,
+> OpenRouter mint chain, apex→www redirect, GitHub-Action deploy).
+>
+> **Deploy is now via GitHub Action.** A `git push` runs `deploy.sh` (path-filtered) which deploys
+> ProjectManager, deployer, and router AND applies PM D1 migrations. Don't `wrangler deploy` by hand.
+> Per-Site **CMS** deploys are still separate: PM → deployer container, built from a `cms-v*` git tag.
 >
 > Supersedes the old `DEPLOY.md` (deleted). The CMS deploy path is now **PM → deployer Worker →
 > Sandbox Container running `wrangler deploy`** — wrangler handles Durable Objects and static
@@ -65,9 +70,12 @@ CF-for-SaaS. It took several wrong turns; this is the verified-working setup. AL
 2. **Customer adds DNS at their registrar** (the PM UI now shows all of these — see fix in trap #7):
    - **Routing:** `CNAME www.<domain> → cf.bizbeecms.com` (subdomain). An apex can't CNAME → use
      `A @ → 104.21.34.242` + `A @ → 172.67.210.25` (CF anycast).
-   - **Cert validation:** add the `_acme-challenge.<host>` **TXT** record(s) CF returns (the hostname
-     is created with TXT method, so the TXT — NOT the DCV CNAME — is what validates it). Two TXT values
-     are returned; add both. Cert goes `pending_validation` → `active` within minutes.
+   - **Cert validation:** either the **DCV delegation CNAME** (recommended — the PM UI shows it first;
+     it delegates validation to CF so the cert AUTO-RENEWS forever with no further DNS changes), OR the
+     one-time `_acme-challenge.<host>` **TXT** record(s) CF returns (add all). The hostname is created
+     with TXT method, so the TXT validates the initial issue; without the DCV CNAME, renewal relies on
+     CF's HTTP-validation fallback. Cert goes `pending_validation` → `active` within minutes
+     (`Pending Deployment` after that = CF rolling the cert to its edge; wait, don't redeploy).
 3. **Fallback Origin = `cf.bizbeecms.com`** (SSL/TLS → Custom Hostnames → Fallback Origin), and its DNS
    record MUST be **originless: `AAAA 100::`, Proxied** — ⚠️ NOT `A 192.0.2.1`. A real IP makes CF
    attempt an origin pull → **522 Connection timed out**. `100::` is the documented black-hole that tells
@@ -197,6 +205,9 @@ out-of-band, can't be killed). If the worker is actually live (callback just fai
                                                                    │   SITE_ID                │
                                                                    │   PM_ORIGIN              │
                                                                    │   CMS_AUTH_SECRET        │
+                                                                   │   APP_ORIGIN             │
+                                                                   │  secret (← secret put):  │
+                                                                   │   OPENROUTER_API_KEY     │
                                                                    └──────────────────────────┘
 ```
 
@@ -207,10 +218,12 @@ out-of-band, can't be killed). If the worker is actually live (callback just fai
    POSTs `{siteId, slug}` to `${DEPLOYER_URL}/deploy` with `Bearer DEPLOYER_SECRET`.
 2. The **deployer Worker** (`deployer/src/index.ts`) writes a parameterized bash script into its
    **Sandbox Container** and starts it detached; the Worker returns immediately.
-3. In-container: `git clone REPO_URL` → `npm ci` → `opennextjs-cloudflare build` over `CMS/` →
-   `npx wrangler deploy --name bizbeecms-cms-<slug> --var SITE_ID:… --var PM_ORIGIN:… --var CMS_AUTH_SECRET:…`
-   (`deployer/src/index.ts:191-194`). **wrangler deploys natively** → DOs + `.open-next/assets`
-   handled correctly.
+3. In-container: `git clone REPO_URL` (the cms-v* tag) → `npm ci` → `opennextjs-cloudflare build`
+   over `CMS/` → `npx wrangler deploy --name bizbeecms-cms-<slug> --var SITE_ID:… --var PM_ORIGIN:…
+   --var CMS_AUTH_SECRET:… --var APP_ORIGIN:…`, THEN (post-deploy, if non-blank)
+   `wrangler secret put OPENROUTER_API_KEY` (a SECRET, never a `--var` — and it must NOT be declared
+   in `CMS/wrangler.jsonc` `vars`, or the secret-put collides `10053: binding name already in use`).
+   **wrangler deploys natively** → DOs + `.open-next/assets` handled correctly.
 4. Deployer POSTs status back to PM at `${PM_CALLBACK_ORIGIN}/api/deploy-callback`; PM sets
    Site `status=deployed` (+ `worker_name`) or `failed`.
 5. Once live, every CMS admin request runs `requireAdmin` → CMS forwards the `bizbee_session`
@@ -236,20 +249,30 @@ right per-Site CMS Worker by `Host`.
   └──────────────────────────┘                  └──────────────────────────┘
 ```
 
-- **Router** (`router/src/index.ts`): reads `Host`, looks up the slug in `HOST_MAP`
-  KV, proxies to `https://bizbeecms-cms-<slug>.<WORKERS_SUBDOMAIN>.workers.dev`
-  (preserving path/query, forwarding original host as `x-forwarded-host`). Proxies by
-  `.workers.dev` URL rather than service binding — Sites are created at runtime, so a
-  static binding can't exist for them.
+- **Router** (`router/src/index.ts`): reads `Host`, looks up the value in `HOST_MAP`
+  KV. **A bare slug → SERVE**: proxies to `https://bizbeecms-cms-<slug>.<WORKERS_SUBDOMAIN>.workers.dev`
+  (preserving path/query, forwarding the original host as a SIGNED `x-bizbee-host`). **A value
+  prefixed `">"` → REDIRECT**: `301` to that absolute https target with the request path+query
+  grafted on (e.g. `restovista.com → ">https://www.restovista.com"`). Pure `redirectTargetFor()`
+  is unit-tested (`router/src/redirect.test.ts`). Proxies by `.workers.dev` URL rather than a
+  service binding — Sites are created at runtime, so a static binding can't exist for them.
 - **Attach** (`deployer/src/index.ts` `POST /attach-domain`, Bearer `DEPLOYER_SECRET`,
-  body `{slug, hostname}`): registers the custom hostname via the CF
-  `zones/<CF_ZONE_ID>/custom_hostnames` API (`ssl: txt/dv`), writes `hostname → slug`
-  to `HOST_MAP` KV, returns the DNS records the customer must add (`cname` →
-  `cf.bizbeecms.com`, `txt` for DV). Idempotent (reuses existing on CF error 1406).
-- **Fallback origin**: `cf.bizbeecms.com` — dummy proxied A record (`192.0.2.1`) in the
-  bizbeecms.com zone; set as the CF for SaaS Fallback Origin.
-- **Apex caveat**: customer apex domains can't always CNAME — registrar needs CNAME
-  flattening, else an A record to CF's anycast IPs. PM UI should show both.
+  body `{slug, hostname, redirectTo?}`): registers the custom hostname via the CF
+  `zones/<CF_ZONE_ID>/custom_hostnames` API (`ssl: txt/dv`) — ALWAYS, so even a redirect host
+  gets a cert + reaches our edge. Writes `HOST_MAP[hostname]` = the bare `slug` (serve) or
+  `">"+redirectTo` (redirect). Returns the DNS records the customer must add: routing (`cname` →
+  `cf.bizbeecms.com`, or apex `A`/CNAME-flatten), the **DCV delegation `cname`** (auto-renews the
+  cert — recommended), and the one-time `txt`. Idempotent (reuses existing on CF error 1406).
+- **PM serve-vs-redirect UI** (`sites/custom-domain-form.tsx` + `/api/sites/<id>/custom-domain`):
+  operator picks per hostname — **Serve this Site** or **Redirect to** another host (default
+  `www.<apex>` for an apex). Persisted in `site_domains.redirect_to` (migration `0013`; NULL =
+  serve). The Site's displayed URL always uses the first SERVING domain, never a redirect host.
+- **Fallback origin**: `cf.bizbeecms.com` — set as the CF for SaaS Fallback Origin. Its DNS MUST be
+  **originless `AAAA 100::`, Proxied** (NOT a real A record like `192.0.2.1`, which 522s — see trap
+  #6 step 3).
+- **Apex options** (PM UI shows all): customer apex can't always CNAME — offer **A records** to CF
+  anycast IPs OR a **flattened CNAME** to `cf.bizbeecms.com` (registrars like Cloudflare/Namecheap).
+  An apex that should bounce to www is attached as a **redirect**, not served.
 
 ### Status (updated 2026-06-19)
 - ✅ `bizbeecms-router` deployed. Routes: `cf.bizbeecms.com/*` AND `*.site.bizbeecms.com/*`
@@ -257,7 +280,8 @@ right per-Site CMS Worker by `Host`.
   `HOST_MAP` KV (`1c276b01cd5a41f0b8c98ace07b4c064`) bound to both router and deployer.
 - ✅ Infra Worker custom domains live on the zone: `manager.bizbeecms.com` (PM),
   `deployer.bizbeecms.com` (deployer). DNS dashboard shows both as Type=Worker, Proxied.
-- ✅ `cf.bizbeecms.com` dummy proxied A record (`192.0.2.1`) in the zone.
+- ✅ `cf.bizbeecms.com` originless proxied record (`AAAA 100::`) in the zone — see trap #6 step 3
+  (a real A like `192.0.2.1` 522s).
 - ✅ **Stale `*.bizbeecms.com/*` → `bizbee-platform-dispatcher` route DELETED** (trap #1) —
   it was shadowing the infra custom domains. Do NOT re-add a bare `*.bizbeecms.com/*` route
   (trap #2). If you ever need a zone-wide route, point it at `bizbeecms-router`, not a dispatcher.
@@ -366,6 +390,8 @@ cell; the bash-container strings and wrangler files are the exceptions (noted in
 | OpenRouter chat URL | `https://openrouter.ai/api/v1/chat/completions` | `CMS/src/lib/ports/ai.ts` (`OPENROUTER_CHAT_URL`) | CMS `OpenRouterAi` adapter |
 | OpenRouter default model | `openai/gpt-4o-mini` | `CMS/src/lib/chat/models` (`DEFAULT_MODEL`) | CMS chat + `/api/translate` (translate unified onto it 2026-06-23) |
 | OpenRouter provisioning API base | `https://openrouter.ai/api/v1/keys` | `ProjectManager/src/lib/openrouter/provision.ts` (`OPENROUTER_KEYS_URL`) | PM mint (`POST`) / delete (`DELETE /:hash`) of per-Site keys |
+| HOST_MAP value shape | bare `<slug>` = SERVE · `">"+<https url>` = REDIRECT (301) | written by `deployer/src/index.ts` `/attach-domain` | read by `router/src/index.ts` (`redirectTargetFor`) |
+| CMS release tag scheme | `cms-v<x.y.z>` (version in `CMS/package.json`) | `/cms-release` skill cuts it | deployer clones `--branch <tag>`; PM Site "CMS version" picker |
 
 > **PM ↔ deployer duplication is deliberate.** `hosts.ts` and `deployer/src/index.ts` each
 > hold their own copy of the worker prefix / fallback origin / apex IPs because they're
@@ -393,19 +419,22 @@ cell; the bash-container strings and wrangler files are the exceptions (noted in
 
 ---
 
-## Part A — Deploy PM itself (already done; re-run after PM changes)
+## Part A — Deploy the control-plane Workers (PM + deployer + router)
 
-Runs inside **`ProjectManager/`** (its own npm package, not a workspace).
+**Normal path: just push.** A GitHub Action (`.github/workflows/deploy.yml`) runs `deploy.sh` on push
+to `main`, path-filtered, deploying only the changed components AND applying PM D1 migrations
+(`cd ProjectManager && wrangler d1 migrations apply bizbeecms --remote`). `git push` IS the deploy —
+**do not `wrangler deploy` by hand** for PM/deployer/router.
 
+Manual fallback (CF-authed shell), same script the Action runs:
 ```bash
-cd ProjectManager
-npm run bundle:cms     # regenerate the committed CMS bundle if CMS/ changed (see note ‡)
-npm run deploy         # = (predeploy: preflight) → opennextjs-cloudflare build && deploy
+./deploy.sh                 # all three + PM migrations
+./deploy.sh pm              # just ProjectManager (+ migrations)
+./deploy.sh deployer router # just those (no migrations — only PM has a D1)
 ```
 
-- `predeploy`→`preflight` (`scripts/preflight-deploy.mjs`) is an npm pre-script that **aborts** the
-  deploy if `wrangler.jsonc` still has placeholder zero-ids, missing `nodejs_compat` /
-  `global_fetch_strictly_public` flags, or a missing/short/structurally-broken CMS bundle.
+- PM's `predeploy`→`preflight` (`scripts/preflight-deploy.mjs`) **aborts** on placeholder zero-ids,
+  missing `nodejs_compat` / `global_fetch_strictly_public` flags, or a broken CMS bundle.
 - **NEVER run the OpenNext build while `next dev` is on 3601/3602** — it corrupts `.next` and 500s
   the server. `lsof -ti:3601 -ti:3602`; if a `next-server` is there, kill it + `rm -rf .next .open-next`.
 - Confirm: `npx wrangler deployments list` · `curl -sS https://manager.bizbeecms.com/login` (expect 200).
@@ -465,6 +494,13 @@ The deployer only builds + `wrangler deploy`s the CMS Worker; it does **not** cr
   customer domain. Login at `manager.bizbeecms.com` → open `www.restovista.com/admin` → SSO completes and
   the user **stays on `www.restovista.com/admin`** (no workers.dev bounce). Required: trap #5 (origins),
   trap #8 (host chain: signed `x-bizbee-host` + relative callback redirect).
+- ✅ **SSO button shows whenever `PM_ORIGIN` is set** (2026-06-24, `cms-v0.9.2`). Was gated on a PM
+  referer / `?from=pm`, but a Next layout doesn't reliably get the query string and an apex→www 301
+  strips the Referer — so `/admin` showed no SSO. Now `shouldShowSsoButton(pmOrigin)` is the whole gate;
+  the button only LINKS to PM's access-gated `cms-sso`, so always-showing is safe.
+- ✅ **Apex→www redirect verified LIVE** (2026-06-24): `https://restovista.com` `301`→
+  `https://www.restovista.com` → test-1 (`200`). Apex attached as a REDIRECT in PM; DNS = flattened
+  CNAME → `cf.bizbeecms.com`; `HOST_MAP[restovista.com] = ">https://www.restovista.com"`.
 - ✅ **Deploy callback + step-events verified** — fixed by the `PM_CALLBACK_ORIGIN` update (trap #5);
   deploys now complete (no more stuck `deploying` rows from a 404'd callback).
 - ⚠️ **Per-Site D1 / R2** still not auto-provisioned (manual, Part C). test-1 runs because its infra was
@@ -475,12 +511,20 @@ The deployer only builds + `wrangler deploy`s the CMS Worker; it does **not** cr
 
 ## Pointers (don't re-derive these)
 
+- Deploy script (all components + PM migrations): `deploy.sh`; CI wrapper `.github/workflows/deploy.yml`
 - PM→deployer trigger: `ProjectManager/src/app/api/sites/[id]/deploy/route.ts`
-- deployer + container + `wrangler deploy` command: `deployer/src/index.ts` (`:191-194`; var fallbacks `:117-123`)
-- deployer required secrets: `deployer/wrangler.jsonc:26-32` (comment block)
+- deployer + container + `wrangler deploy`/`secret put` command: `deployer/src/index.ts` (the bash
+  template — search `wrangler deploy --name`; `attachDomain()` for custom-hostname registration)
+- deployer required secrets: `deployer/wrangler.jsonc` (comment block)
 - CMS auth bridge: `ProjectManager/src/app/api/auth/cms-validate/route.ts` ←→ `CMS/src/lib/auth/guard-core.ts` + `guard.ts`
-- CMS per-Site vars declared empty: `CMS/wrangler.jsonc` (`SITE_ID`/`PM_ORIGIN`/`CMS_AUTH_SECRET`)
+- CMS per-Site vars declared empty: `CMS/wrangler.jsonc` (`SITE_ID`/`PM_ORIGIN`/`CMS_AUTH_SECRET`/`APP_ORIGIN`).
+  `OPENROUTER_API_KEY` is NOT declared here — it's a post-deploy secret (collision otherwise).
+- SSO button gate: `CMS/src/lib/auth/guard-core.ts` `shouldShowSsoButton(pmOrigin)`; used in `CMS/src/app/admin/layout.tsx`
+- Custom domains + apex redirect: router `router/src/index.ts` (`redirectTargetFor`); attach endpoint
+  `deployer/src/index.ts` (`/attach-domain`, `attachDomain()`); PM UI `sites/custom-domain-form.tsx` +
+  `/api/sites/[id]/custom-domain/route.ts`; persistence `site_domains.redirect_to`; `HOST_MAP` KV `1c276b01cd5a41f0b8c98ace07b4c064`
+- OpenRouter key flow: PM `src/lib/openrouter/provision.ts` + deploy route; CMS `src/lib/ports/ai.ts` (`getAi`)
+- CMS release: `/cms-release` skill; tags `cms-v*`; notes under `release-notes/`
 - Auth decision rationale: memory `pm-cms-auth-decision`; deploy mechanism: memory `pm-cms-deploy-via-container`
-- Custom domains: router `router/src/index.ts`; attach endpoint `deployer/src/index.ts` (`/attach-domain`, `attachDomain()`); fallback origin `cf.bizbeecms.com`; `HOST_MAP` KV `1c276b01cd5a41f0b8c98ace07b4c064`
 - Live HITL items to verify post-deploy: `HITL.md`
 ```
