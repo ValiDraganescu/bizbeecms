@@ -326,15 +326,36 @@ function DomainCard({
         )}
       </dl>
 
-      {/* Cert-validation records — on demand (CF-issued, not stored). */}
+      {/* Cert-validation records — on demand (CF-issued, not stored). Two ways to
+          validate; we show both with the auto-renewing DCV delegation CNAME first
+          (recommended — the cert renews forever with no further action), and the
+          one-time TXT as the alternative. */}
       <p className="mt-3 text-sm font-medium">{t("step2Cert")}</p>
       {validation ? (
-        validation.txt.length > 0 ? (
-          <dl className="mt-1 flex flex-col gap-2">
-            <p className="text-xs text-foreground-muted">{t("txtAdd")}</p>
-            {validation.txt.map((r) => (
-              <DnsRow key={r.value} type="TXT" name={r.name} value={r.value} />
-            ))}
+        validation.dcv || validation.txt.length > 0 ? (
+          <dl className="mt-1 flex flex-col gap-3">
+            {validation.dcv ? (
+              <div className="flex flex-col gap-1">
+                <p className="text-xs font-medium">{t("dcvRecommended")}</p>
+                <p className="text-xs text-foreground-muted">{t("dcvBody")}</p>
+                <DnsRow
+                  type="CNAME"
+                  name={validation.dcv.name}
+                  value={validation.dcv.value}
+                />
+              </div>
+            ) : null}
+            {validation.txt.length > 0 ? (
+              <div className="flex flex-col gap-1">
+                <p className="text-xs font-medium">
+                  {validation.dcv ? t("txtAlternative") : t("txtOnly")}
+                </p>
+                <p className="text-xs text-foreground-muted">{t("txtAdd")}</p>
+                {validation.txt.map((r) => (
+                  <DnsRow key={r.value} type="TXT" name={r.name} value={r.value} />
+                ))}
+              </div>
+            ) : null}
           </dl>
         ) : (
           <p className="mt-1 text-sm text-foreground-muted">{t("certIssued")}</p>

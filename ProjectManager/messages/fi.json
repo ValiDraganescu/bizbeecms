@@ -484,7 +484,11 @@
         "redirectHint": "Ohjaa kävijät toiseen verkkotunnukseen 301-uudelleenohjauksella — esim. ohjaa juuriverkkotunnus example.com osoitteeseen www.example.com.",
         "targetLabel": "Uudelleenohjaa osoitteeseen",
         "targetHint": "Verkkotunnus, johon kävijät ohjataan, esim. www.example.com. Oletuksena www. juuriverkkotunnukselle."
-      }
+      },
+      "dcvRecommended": "Suositeltu — ottaa käyttöön automaattisen uusinnan:",
+      "dcvBody": "Lisää tämä CNAME, joka delegoi varmenteen vahvistuksen Cloudflarelle. Varmenne uusitaan tämän jälkeen automaattisesti ikuisesti ilman uusia DNS-muutoksia.",
+      "txtAlternative": "Tai kertaluonteinen vahvistus (TXT):",
+      "txtOnly": "Vahvista varmenne:"
     }
   },
   "designSystem": {

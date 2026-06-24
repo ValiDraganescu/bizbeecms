@@ -484,7 +484,11 @@
         "redirectHint": "Saada külastajad teisele domeenile 301-ümbersuunamisega — nt suuna juurdomeen example.com aadressile www.example.com.",
         "targetLabel": "Suuna ümber aadressile",
         "targetHint": "Domeen, kuhu külastajad suunatakse, nt www.example.com. Vaikimisi www. juurdomeeni puhul."
-      }
+      },
+      "dcvRecommended": "Soovitatav — lubab automaatse uuendamise:",
+      "dcvBody": "Lisa see CNAME, mis delegeerib sertifikaadi valideerimise Cloudflare'ile. Seejärel uueneb sertifikaat automaatselt igavesti, ilma edasiste DNS-muudatusteta.",
+      "txtAlternative": "Või ühekordne valideerimine (TXT):",
+      "txtOnly": "Valideeri sertifikaat:"
     }
   },
   "designSystem": {

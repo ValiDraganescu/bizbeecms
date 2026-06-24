@@ -484,7 +484,11 @@
         "redirectHint": "Send visitors to another domain with a 301 — e.g. redirect the apex example.com to www.example.com.",
         "targetLabel": "Redirect to",
         "targetHint": "The domain to send visitors to, e.g. www.example.com. Defaults to www. for an apex."
-      }
+      },
+      "dcvRecommended": "Recommended — adds auto-renewal:",
+      "dcvBody": "Add this CNAME to delegate certificate validation to Cloudflare. The certificate then renews automatically forever, with no further DNS changes.",
+      "txtAlternative": "Or, one-time validation (TXT):",
+      "txtOnly": "Validate the certificate:"
     }
   },
   "designSystem": {
