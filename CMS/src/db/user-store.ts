@@ -47,6 +47,8 @@ export async function createUser(
     email: string;
     passwordHash: string | null;
     role: CmsRole;
+    /** PM user id for SSO-provisioned rows; null/omitted for local/Google users. */
+    pmUserId?: string | null;
   },
   injectedDb?: Db,
 ): Promise<User> {
@@ -56,6 +58,7 @@ export async function createUser(
     id,
     email: normalizeEmail(input.email),
     passwordHash: input.passwordHash,
+    pmUserId: input.pmUserId ?? null,
     role: input.role,
   });
   const [stored] = await db.select().from(schema.user).where(eq(schema.user.id, id));
@@ -85,25 +88,35 @@ export async function upsertSsoUser(
   const synthetic = ssoSyntheticEmail(pmUserId);
   const email = realEmail && realEmail.trim() ? normalizeEmail(realEmail) : "";
 
+  // Stamp pmUserId on any existing row that lacks it (so rows provisioned before
+  // the pm_user_id column — keyed on the real email — are recognised as PM-SSO).
+  const ensurePmUserId = async (row: User): Promise<User> => {
+    if (row.pmUserId === pmUserId) return row;
+    const db = injectedDb ?? (await getDb());
+    await db.update(schema.user).set({ pmUserId }).where(eq(schema.user.id, row.id));
+    return { ...row, pmUserId };
+  };
+
   if (!email) {
     // No real email available — synthetic-keyed upsert (Slice-2 fallback).
-    return (await findUserByEmail(synthetic, injectedDb)) ??
-      (await createUser({ email: synthetic, passwordHash: null, role: "Admin" }, injectedDb));
+    const found = await findUserByEmail(synthetic, injectedDb);
+    if (found) return ensurePmUserId(found);
+    return createUser({ email: synthetic, passwordHash: null, role: "Admin", pmUserId }, injectedDb);
   }
 
   // Real email present. Prefer an existing real-email row.
   const existing = await findUserByEmail(email, injectedDb);
-  if (existing) return existing;
+  if (existing) return ensurePmUserId(existing);
 
   // Backfill an earlier synthetic row to the real email (one-time migration).
   const legacy = await findUserByEmail(synthetic, injectedDb);
   if (legacy) {
     const db = injectedDb ?? (await getDb());
-    await db.update(schema.user).set({ email }).where(eq(schema.user.id, legacy.id));
-    return { ...legacy, email };
+    await db.update(schema.user).set({ email, pmUserId }).where(eq(schema.user.id, legacy.id));
+    return { ...legacy, email, pmUserId };
   }
 
-  return createUser({ email, passwordHash: null, role: "Admin" }, injectedDb);
+  return createUser({ email, passwordHash: null, role: "Admin", pmUserId }, injectedDb);
 }
 
 /** All CMS users, newest first — for the user-management list (Slice 5). */

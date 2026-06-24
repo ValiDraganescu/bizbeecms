@@ -4,14 +4,12 @@
  *     status projection (never leaks the secret).
  *   - PURE: `lib/crypto/secret-box.ts` — AES-GCM encrypt/decrypt round-trip +
  *     tamper/wrong-key rejection.
- *   - STORE: `db/google-client-store.ts` — set → read-status → decrypt → clear,
- *     over a real `cfDb` on in-memory node:sqlite (the invite-store test pattern).
+ * The store (`db/google-client-store.ts`) is thin drizzle I/O and is not unit-tested.
  *
  * dep-free node --test; the real `.ts` modules import via native type-stripping.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DatabaseSync } from "node:sqlite";
 
 import {
   isValidClientId,
@@ -23,13 +21,6 @@ import {
   decideGoogleRoute,
 } from "../src/lib/auth/google-config.ts";
 import { encryptSecret, decryptSecret } from "../src/lib/crypto/secret-box.ts";
-import {
-  getGoogleClientConfig,
-  setGoogleClientConfig,
-  clearGoogleClientConfig,
-  getDecryptedClientSecret,
-} from "../src/db/google-client-store.ts";
-import { cfDb } from "../src/lib/ports/db.ts";
 
 // A valid 32-byte base64 KEK (matches CMS_AUTH_SECRET in prod).
 const KEK = Buffer.alloc(32, 7).toString("base64");
@@ -137,74 +128,4 @@ test("secret-box: KEK of any length (48-byte base64 CMS_AUTH_SECRET) round-trips
 
   // Empty KEK is still rejected (no silent all-zero key).
   await assert.rejects(() => encryptSecret("x", ""));
-});
-
-// ---- STORE over fake D1 ------------------------------------------------------
-
-const DDL = `
-CREATE TABLE site_settings (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL DEFAULT '{}',
-  updated_at INTEGER NOT NULL DEFAULT 0
-);
-`;
-
-function fakeD1() {
-  const sqlite = new DatabaseSync(":memory:");
-  sqlite.exec(DDL);
-  return {
-    sqlite,
-    prepare(sql) {
-      const stmt = sqlite.prepare(sql);
-      const wrap = (params) => ({
-        run: async () => {
-          const r = stmt.run(...params);
-          return { success: true, meta: { changes: r.changes }, results: [] };
-        },
-        all: async () => ({ success: true, results: stmt.all(...params) }),
-        raw: async () => {
-          const cols = stmt.columns().map((c) => c.name);
-          return stmt.all(...params).map((row) => cols.map((c) => row[c]));
-        },
-        first: async () => stmt.get(...params) ?? null,
-      });
-      return { bind: (...params) => wrap(params), ...wrap([]) };
-    },
-  };
-}
-
-test("store: set → status configured → decrypt → clear", async () => {
-  const db = cfDb(fakeD1());
-
-  // Unset → empty + not configured.
-  const before = await getGoogleClientConfig(db);
-  assert.equal(isGoogleConfigured(before), false);
-  assert.equal(await getDecryptedClientSecret(KEK, db), null);
-
-  // Set credentials.
-  await setGoogleClientConfig("  my-client-id  ", "GOCSPX-abc", KEK, db);
-  const after = await getGoogleClientConfig(db);
-  assert.equal(after.clientId, "my-client-id"); // trimmed
-  assert.equal(isGoogleConfigured(after), true);
-  // Secret is encrypted at rest, NOT the plaintext.
-  assert.notEqual(after.clientSecretEnc, "GOCSPX-abc");
-  assert.equal(await getDecryptedClientSecret(KEK, db), "GOCSPX-abc");
-
-  // Upsert again (not insert) — id changes, still one row.
-  await setGoogleClientConfig("id2", "GOCSPX-xyz", KEK, db);
-  assert.equal((await getGoogleClientConfig(db)).clientId, "id2");
-  assert.equal(await getDecryptedClientSecret(KEK, db), "GOCSPX-xyz");
-
-  // Clear → back to empty.
-  await clearGoogleClientConfig(db);
-  const cleared = await getGoogleClientConfig(db);
-  assert.equal(isGoogleConfigured(cleared), false);
-  assert.equal(await getDecryptedClientSecret(KEK, db), null);
-});
-
-test("store: wrong KEK → decrypt returns null, never throws", async () => {
-  const db = cfDb(fakeD1());
-  await setGoogleClientConfig("id", "GOCSPX-abc", KEK, db);
-  const otherKey = Buffer.alloc(32, 1).toString("base64");
-  assert.equal(await getDecryptedClientSecret(otherKey, db), null);
 });

@@ -1,0 +1,1 @@
+ALTER TABLE `user` ADD `pm_user_id` text;

@@ -275,6 +275,11 @@ export const user = sqliteTable(
     // PBKDF2-100k self-describing hash (see lib/auth/password.ts). NULL for
     // SSO-only / Google-only users with no local password.
     passwordHash: text("password_hash"),
+    // PM user id when this row was provisioned via the PM "Sign in with BizbeeCMS"
+    // SSO handshake; NULL for local/Google-only users. This — NOT the email — is
+    // the reliable PM-SSO marker (SSO rows are keyed on the operator's real email,
+    // so the email suffix can't identify them). See lib/auth/pm-sso.isPmSsoUser.
+    pmUserId: text("pm_user_id"),
     // pm-roles role NAME (no scope). New rows default to least-privilege.
     role: text("role").notNull().$type<CmsRole>().default("Editor"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
