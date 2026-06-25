@@ -121,6 +121,12 @@ export const sites = sqliteTable(
     // Per-Site monthly spend cap (USD) for the minted key; maps to `mintKey`'s
     // `limit`. Null = no cap.
     openrouterMonthlyLimitUsd: integer("openrouter_monthly_limit_usd"),
+    // Per-Site build-timeout OVERRIDE (minutes). The deployer kills a build that
+    // runs longer (anti-stall — a hung build bills memory+disk on wall-clock).
+    // The EFFECTIVE timeout is max(this, global) so a site can only RAISE the cap,
+    // never drop below the global floor (see effectiveBuildTimeoutMin). Null =
+    // use the global setting unchanged.
+    buildTimeoutMin: integer("build_timeout_min"),
     country: text("country"),
     createdBy: text("created_by")
       .notNull()
@@ -299,6 +305,22 @@ export const siteTags = sqliteTable(
   (t) => [primaryKey({ columns: [t.siteId, t.tagId] })],
 );
 
+/**
+ * Global app settings — a tiny key/value store (one row per setting). Used for
+ * operator-tunable values that aren't per-Site, currently just the global build
+ * timeout. Key/value keeps it open for future settings without a migration each.
+ */
+export const appSettings = sqliteTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
+// Setting key for the global build timeout (minutes), stored as a string in
+// app_settings.value. Single source of truth for readers/writers.
+export const BUILD_TIMEOUT_MIN_KEY = "build_timeout_min";
+
+export type AppSetting = typeof appSettings.$inferSelect;
+export type NewAppSetting = typeof appSettings.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Invite = typeof invites.$inferSelect;

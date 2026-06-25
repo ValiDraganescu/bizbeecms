@@ -116,3 +116,42 @@ test("parseChatBody: rejects bad role / empty content", () => {
   assert.ok("error" in parseChatBody({ messages: [{ role: "user", content: "  " }] }));
   assert.ok("error" in parseChatBody({ messages: [{ role: "user", content: 42 }] }));
 });
+
+// ── structured tool protocol (OpenAI/Claude round-trip) ───────────────────────
+test("parseChatBody: an assistant tool_calls turn may have EMPTY content", () => {
+  const r = parseChatBody({
+    messages: [
+      { role: "user", content: "create a section" },
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [{ id: "c1", type: "function", function: { name: "list_pages", arguments: "{}" } }],
+      },
+      { role: "tool", tool_call_id: "c1", name: "list_pages", content: '{"pages":[]}' },
+      { role: "user", content: "continue" },
+    ],
+  });
+  assert.ok("messages" in r, "structured turn accepted (no empty-content 400)");
+  const assistant = r.messages.find((m) => m.role === "assistant");
+  assert.equal(assistant.tool_calls[0].id, "c1");
+  assert.equal(assistant.tool_calls[0].function.arguments, "{}"); // JSON string preserved
+  const tool = r.messages.find((m) => m.role === "tool");
+  assert.equal(tool.tool_call_id, "c1");
+});
+
+test("parseChatBody: a plain assistant turn with empty content + no tool_calls is still rejected", () => {
+  assert.ok("error" in parseChatBody({ messages: [{ role: "assistant", content: "" }] }));
+  assert.ok("error" in parseChatBody({ messages: [{ role: "assistant", content: "  " }] }));
+});
+
+test("parseChatBody: a tool message without tool_call_id is rejected", () => {
+  assert.ok("error" in parseChatBody({ messages: [{ role: "tool", content: "{}" }] }));
+});
+
+test("parseChatBody: malformed tool_calls (missing id/name) is rejected as empty content", () => {
+  // tool_calls present but invalid → not treated as a valid tool turn → empty content fails.
+  const r = parseChatBody({
+    messages: [{ role: "assistant", content: "", tool_calls: [{ type: "function", function: { name: "x", arguments: "{}" } }] }],
+  });
+  assert.ok("error" in r);
+});

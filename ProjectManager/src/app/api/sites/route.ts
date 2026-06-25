@@ -4,6 +4,7 @@ import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { authorizeSiteCountry, canUserCreateSite } from "@/lib/site/authz";
 import { createSite, isSlugTaken, isValidSlug } from "@/lib/site/site";
 import { parseOpenrouterMinting } from "@/lib/site/openrouter-minting";
+import { coerceTimeoutMin } from "@/lib/deploy/build-timeout";
 
 export type SiteErrorKey =
   | "nameRequired"
@@ -24,6 +25,8 @@ export type SiteBody = {
   openrouterMintingEnabled?: unknown;
   /** Monthly spend cap in whole USD for the minted key, or null for no cap. */
   openrouterMonthlyLimitUsd?: unknown;
+  /** Per-Site build-timeout override (minutes), or null to use the global. */
+  buildTimeoutMin?: unknown;
 };
 
 /** Parse the country field: empty / "GLOBAL" → null; else a validated code. */
@@ -40,6 +43,8 @@ export type ParsedSite = {
   openrouterMintingEnabled: boolean;
   /** Monthly spend cap in whole USD for the minted key, or null for no cap. */
   openrouterMonthlyLimitUsd: number | null;
+  /** Per-Site build-timeout override (minutes), or null to use the global. */
+  buildTimeoutMin: number | null;
 };
 
 /** Shared field parse + validation for create/update. Returns an error key or the value. */
@@ -64,6 +69,14 @@ export function parseSiteBody(
   const { openrouterMintingEnabled, openrouterMonthlyLimitUsd } =
     parseOpenrouterMinting(body);
 
+  // Per-Site build-timeout override (minutes). Blank/empty/invalid → null (use
+  // the global). coerceTimeoutMin clamps to the allowed range; the effective cap
+  // at deploy time is max(global, this) — see effectiveBuildTimeoutMin.
+  const buildTimeoutMin =
+    body.buildTimeoutMin === "" || body.buildTimeoutMin == null
+      ? null
+      : coerceTimeoutMin(body.buildTimeoutMin);
+
   return {
     ok: true,
     value: {
@@ -72,6 +85,7 @@ export function parseSiteBody(
       country,
       openrouterMintingEnabled,
       openrouterMonthlyLimitUsd,
+      buildTimeoutMin,
     },
   };
 }

@@ -31,6 +31,7 @@ import { DeployForm } from "../deploy-form";
 import { DeployTimeline } from "../deploy-timeline";
 import { CustomDomainForm } from "../custom-domain-form";
 import { isDeployStuck } from "@/lib/deploy";
+import { getGlobalBuildTimeoutMin } from "@/lib/deploy/settings";
 import { SiteForm } from "../site-form";
 
 const statusTone: Record<SiteStatus, BadgeTone> = {
@@ -67,6 +68,8 @@ export default async function SiteDetailPage({
 
   const creator = await findUserById(site.createdBy);
   const domains = await listSiteDomains(site.id);
+  // Shown as the default in the per-Site build-timeout override field.
+  const globalBuildTimeoutMin = await getGlobalBuildTimeoutMin();
 
   // Public URL of the deployed CMS Worker, if deployed. Prefer a custom domain
   // that SERVES the Site (CF-for-SaaS) over the raw workers.dev URL — but never a
@@ -242,6 +245,8 @@ export default async function SiteDetailPage({
                 hasMintedOpenrouterKey={site.openrouterKeyHash != null}
                 initialMintingEnabled={site.openrouterMintingEnabled}
                 initialMonthlyLimitUsd={site.openrouterMonthlyLimitUsd}
+                initialBuildTimeoutMin={site.buildTimeoutMin}
+                globalBuildTimeoutMin={globalBuildTimeoutMin}
               />
             </CardContent>
           </Card>

@@ -135,7 +135,7 @@ export interface ToolResult {
  * each result with the synthesized assistant `tool_calls` entry by index.
  */
 export type RunToolsRound = (
-  calls: { name: string; args: unknown }[],
+  calls: { id: string; name: string; args: unknown }[],
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
 ) => Promise<ToolResult[]>;
@@ -156,7 +156,7 @@ async function consumeTurn(
   upstream: ReadableStream<Uint8Array>,
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
-): Promise<{ text: string; calls: { name: string; args: unknown }[] }> {
+): Promise<{ text: string; calls: { id: string; name: string; args: unknown }[] }> {
   const decoder = new TextDecoder();
   const parser = new SseDeltaParser();
   const tools = new ToolCallAccumulator();
@@ -191,13 +191,13 @@ async function consumeTurn(
 /** Synthesize the assistant turn that requested these tool calls (OpenAI shape). */
 function assistantToolCallMessage(
   text: string,
-  calls: { name: string; args: unknown }[],
+  calls: { id: string; name: string; args: unknown }[],
 ): ChatMessage {
   return {
     role: "assistant",
     content: text,
-    tool_calls: calls.map((c, i) => ({
-      id: `call_${i}`,
+    tool_calls: calls.map((c) => ({
+      id: c.id,
       type: "function",
       function: { name: c.name, arguments: JSON.stringify(c.args ?? {}) },
     })),
@@ -244,12 +244,14 @@ export function streamChatRounds(
 
           if (round === maxRounds - 1) break; // cap: ran the tools, but no follow-up turn
 
-          // Feed the round back: the assistant's tool_calls, then each result.
+          // Feed the round back: the assistant's tool_calls, then each result,
+          // each keyed by the SAME provider call id (OpenAI/Claude require the
+          // tool_call_id ↔ tool_calls[].id match).
           transcript.push(assistantToolCallMessage(text, calls));
           results.forEach((r, i) => {
             transcript.push({
               role: "tool",
-              tool_call_id: `call_${i}`,
+              tool_call_id: calls[i].id,
               name: r.name,
               content: JSON.stringify(r.data),
             });

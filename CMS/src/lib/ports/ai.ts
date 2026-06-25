@@ -22,10 +22,23 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDecryptedOpenrouterUserKey } from "../../db/openrouter-key-store.ts";
 import { effectiveOpenrouterKey } from "../settings/openrouter-key.ts";
 
-/** A chat message in the OpenAI-compatible shape Workers AI accepts. */
+/**
+ * A chat message in the OpenAI-compatible shape Workers AI / OpenRouter accept.
+ * `user`/`system` carry plain text; an `assistant` turn may carry `tool_calls`
+ * (then `content` may be ""); a `tool` message carries one result keyed by
+ * `tool_call_id`. The adapters forward these fields verbatim so the structured
+ * tool protocol round-trips to OpenAI- and Claude-family models alike.
+ */
 export interface ChatMessage {
   role: string;
   content: string;
+  tool_calls?: {
+    id: string;
+    type: "function";
+    function: { name: string; arguments: string };
+  }[];
+  tool_call_id?: string;
+  name?: string;
 }
 
 /** Options for a streaming chat completion. `tools` is the OpenAI tool array. */

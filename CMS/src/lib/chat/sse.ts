@@ -21,7 +21,7 @@
 /** A parsed upstream event: a text delta, a tool-call fragment, or the terminal marker. */
 export type UpstreamEvent =
   | { type: "delta"; text: string }
-  | { type: "tool_call"; index: number; name?: string; argsFragment?: string }
+  | { type: "tool_call"; index: number; id?: string; name?: string; argsFragment?: string }
   | { type: "done" };
 
 /**
@@ -110,16 +110,20 @@ export function extractToolCall(chunk: unknown): UpstreamEvent | null {
   if (!Array.isArray(calls) || calls.length === 0) return null;
   const call = calls[0] as {
     index?: unknown;
+    id?: unknown;
     function?: { name?: unknown; arguments?: unknown };
   };
   const index = typeof call.index === "number" ? call.index : 0;
+  // The provider's own call id arrives once (opening fragment); we round-trip it so
+  // a later tool_result references the SAME id (OpenAI/Claude both require the match).
+  const id = typeof call.id === "string" && call.id !== "" ? call.id : undefined;
   const fn = call.function;
   const name =
     fn && typeof fn.name === "string" && fn.name !== "" ? fn.name : undefined;
   const argsFragment =
     fn && typeof fn.arguments === "string" ? fn.arguments : undefined;
-  if (name === undefined && argsFragment === undefined) return null;
-  return { type: "tool_call", index, name, argsFragment };
+  if (id === undefined && name === undefined && argsFragment === undefined) return null;
+  return { type: "tool_call", index, id, name, argsFragment };
 }
 
 /**
@@ -129,11 +133,12 @@ export function extractToolCall(chunk: unknown): UpstreamEvent | null {
  * collected calls (name + concatenated raw argument string). PURE.
  */
 export class ToolCallAccumulator {
-  private calls = new Map<number, { name: string; args: string }>();
+  private calls = new Map<number, { id: string; name: string; args: string }>();
 
   /** Add one streamed tool-call fragment. */
-  add(ev: { index: number; name?: string; argsFragment?: string }): void {
-    const cur = this.calls.get(ev.index) ?? { name: "", args: "" };
+  add(ev: { index: number; id?: string; name?: string; argsFragment?: string }): void {
+    const cur = this.calls.get(ev.index) ?? { id: "", name: "", args: "" };
+    if (ev.id) cur.id = ev.id;
     if (ev.name) cur.name = ev.name;
     if (ev.argsFragment) cur.args += ev.argsFragment;
     this.calls.set(ev.index, cur);
@@ -145,20 +150,22 @@ export class ToolCallAccumulator {
   }
 
   /**
-   * Return the assembled calls in index order, each with the raw concatenated
-   * `args` string parsed to JSON (or `null` if the model emitted invalid JSON).
+   * Return the assembled calls in index order, each with the provider's call `id`
+   * (synthesized from the index when a provider omits it — Workers AI sometimes
+   * does), and the raw concatenated `args` string parsed to JSON (or `null` if the
+   * model emitted invalid JSON).
    */
-  finish(): { name: string; args: unknown }[] {
+  finish(): { id: string; name: string; args: unknown }[] {
     return [...this.calls.entries()]
       .sort((a, b) => a[0] - b[0])
-      .map(([, c]) => {
+      .map(([index, c]) => {
         let args: unknown = null;
         try {
           args = c.args === "" ? {} : JSON.parse(c.args);
         } catch {
           args = null;
         }
-        return { name: c.name, args };
+        return { id: c.id || `call_${index}`, name: c.name, args };
       });
   }
 }
@@ -191,9 +198,47 @@ export function frameEvent(
  * input contract is unit-testable. Returns the cleaned messages or an error
  * string (the route turns that into a 400).
  */
+/**
+ * A tool call requested by the assistant (OpenAI/Claude structured-tool shape).
+ * `id` pairs with the matching `role:"tool"` result's `tool_call_id`.
+ */
+export interface ToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+}
+
+/**
+ * An OpenAI-compatible chat message. `user`/`system` carry plain text. An
+ * `assistant` turn may instead (or also) carry `tool_calls` — then its `content`
+ * may be empty. A `tool` message carries one tool result, keyed by `tool_call_id`.
+ */
 export interface ChatMessage {
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   content: string;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+  name?: string;
+}
+
+/** Validate one assistant `tool_calls` array; returns the cleaned calls or null if malformed. */
+function parseToolCalls(raw: unknown): ToolCall[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const out: ToolCall[] = [];
+  for (const c of raw) {
+    if (typeof c !== "object" || c === null) return null;
+    const id = (c as { id?: unknown }).id;
+    const fn = (c as { function?: unknown }).function;
+    if (typeof id !== "string" || id === "") return null;
+    if (typeof fn !== "object" || fn === null) return null;
+    const name = (fn as { name?: unknown }).name;
+    const args = (fn as { arguments?: unknown }).arguments;
+    if (typeof name !== "string" || name === "") return null;
+    // arguments is a JSON STRING in the OpenAI shape; tolerate a missing one as "{}".
+    const argString = typeof args === "string" ? args : "{}";
+    out.push({ id, type: "function", function: { name, arguments: argString } });
+  }
+  return out;
 }
 
 export function parseChatBody(
@@ -213,9 +258,43 @@ export function parseChatBody(
     }
     const role = (m as { role?: unknown }).role;
     const content = (m as { content?: unknown }).content;
-    if (role !== "user" && role !== "assistant" && role !== "system") {
+    if (role !== "user" && role !== "assistant" && role !== "system" && role !== "tool") {
       return { error: `invalid message role: ${String(role)}` };
     }
+
+    // A `tool` result message: content is the JSON result, keyed by tool_call_id.
+    if (role === "tool") {
+      const id = (m as { tool_call_id?: unknown }).tool_call_id;
+      if (typeof id !== "string" || id === "") {
+        return { error: "tool message must have a tool_call_id" };
+      }
+      if (typeof content !== "string") {
+        return { error: "tool message content must be a string" };
+      }
+      const name = (m as { name?: unknown }).name;
+      cleaned.push({
+        role: "tool",
+        content,
+        tool_call_id: id,
+        ...(typeof name === "string" && name !== "" ? { name } : {}),
+      });
+      continue;
+    }
+
+    // An assistant turn may carry tool_calls; then empty content is valid (the
+    // turn IS the tool request). This is the structured round-trip that lets
+    // OpenAI- and Claude-family models continue a tool conversation.
+    if (role === "assistant") {
+      const toolCalls = parseToolCalls((m as { tool_calls?: unknown }).tool_calls);
+      const text = typeof content === "string" ? content : "";
+      if (!toolCalls && text.trim() === "") {
+        return { error: "message content must be a non-empty string" };
+      }
+      cleaned.push({ role: "assistant", content: text, ...(toolCalls ? { tool_calls: toolCalls } : {}) });
+      continue;
+    }
+
+    // user / system: plain non-empty text.
     if (typeof content !== "string" || content.trim() === "") {
       return { error: "message content must be a non-empty string" };
     }

@@ -18,7 +18,7 @@
  * (`scripts/chat-sse.test.mjs`); the live model call needs a real `AI` binding +
  * gateway (HITL — can't be exercised offline).
  */
-import { getAi, getGatewayId } from "@/lib/ports/ai";
+import { getAi, getGatewayId, type ChatMessage as AiChatMessage } from "@/lib/ports/ai";
 import { frameEvent, parseChatBody } from "@/lib/chat/sse";
 import {
   streamChatRounds,
@@ -114,7 +114,7 @@ export async function POST(request: Request): Promise<Response> {
   // the loop re-asks with the SAME model/tool scope/gateway. Tools stay enabled on
   // every round so the model can chain (discover → act → act again).
   const turn = (msgs: TurnMessage[]) =>
-    ai.chat(msgs as { role: string; content: string }[], { model, tools, gatewayId });
+    ai.chat(msgs as AiChatMessage[], { model, tools, gatewayId });
 
   let upstream: ReadableStream<Uint8Array>;
   try {
@@ -138,7 +138,7 @@ export async function POST(request: Request): Promise<Response> {
   });
 }
 
-type ChatMessage = { role: string; content: string };
+type ChatMessage = AiChatMessage;
 
 /**
  * Resolve the admin page context from the raw request body. The client may send
@@ -182,16 +182,19 @@ async function withSystemPrompt(
  * so one bad tool call can't kill the stream.
  */
 async function runToolsRound(
-  calls: { name: string; args: unknown }[],
+  calls: { id: string; name: string; args: unknown }[],
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
 ): Promise<ToolResult[]> {
   const results: ToolResult[] = [];
   for (const call of calls) {
     const data = await runTool(call.name, call.args);
-    // Thread the call args onto the frame so the client's tool-card accordion can
-    // show input(args) alongside output(result). ai-widget-ux.
-    controller.enqueue(encoder.encode(frameEvent("tool", { ...data, input: call.args })));
+    // Thread the call id + args onto the frame so the client can (a) show input
+    // alongside output in the accordion, and (b) store the id to round-trip the
+    // structured tool protocol on the next request (build-history). ai-widget-ux.
+    controller.enqueue(
+      encoder.encode(frameEvent("tool", { ...data, id: call.id, input: call.args })),
+    );
     results.push({ name: data.name, data });
   }
   return results;

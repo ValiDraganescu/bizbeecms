@@ -670,5 +670,27 @@
       "active": "Aktiivinen",
       "invited": "Kutsuttu"
     }
+  },
+  "settings": {
+    "navLink": "Asetukset",
+    "back": "Takaisin koontinäyttöön",
+    "title": "Asetukset",
+    "subtitle": "Koko tilin laajuiset julkaisuasetukset.",
+    "buildTimeout": {
+      "title": "Käännöksen aikakatkaisu",
+      "description": "Enimmäisaika, jonka CMS-käännös ja -julkaisu saa kestää ennen sen lopettamista. Estää jumiutunutta käännöstä pitämästä konttia käynnissä (ja laskutuksessa) loputtomiin. Tulee voimaan seuraavasta julkaisusta alkaen.",
+      "label": "Yleinen käännöksen aikakatkaisu",
+      "unit": "minuuttia",
+      "hint": "Välillä {min}–{max} minuuttia. Tavallinen käännös kestää noin 6 minuuttia. Sivusto voi nostaa tätä omille julkaisuilleen, mutta ei laskea.",
+      "save": "Tallenna",
+      "saving": "Tallennetaan…",
+      "saved": "Tallennettu.",
+      "error": "Tallennus epäonnistui. Yritä uudelleen."
+    },
+    "siteOverride": {
+      "label": "Aikakatkaisun ohitus",
+      "hint": "Minuutteja. Jätä tyhjäksi käyttääksesi yleistä asetusta. Voimassa oleva aikakatkaisu on tämän ja yleisen suurempi.",
+      "placeholderGlobal": "Yleinen ({min} min)"
+    }
   }
 }

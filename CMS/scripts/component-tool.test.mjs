@@ -130,9 +130,17 @@ test("extractToolCall: pulls name + arg fragment from a delta", () => {
   assert.deepEqual(ev, {
     type: "tool_call",
     index: 0,
+    id: undefined,
     name: "create_component",
     argsFragment: '{"na',
   });
+});
+
+test("extractToolCall: pulls the provider's call id when present", () => {
+  const ev = extractToolCall({
+    choices: [{ delta: { tool_calls: [{ index: 0, id: "toolu_123", function: { name: "create_page" } }] } }],
+  });
+  assert.equal(ev.id, "toolu_123");
 });
 
 test("extractToolCall: null when no tool_calls present", () => {
@@ -145,6 +153,7 @@ test("parseLine: a tool_call SSE line parses to a tool_call event (not a token)"
   assert.deepEqual(parseLine(line), {
     type: "tool_call",
     index: 0,
+    id: undefined,
     name: undefined,
     argsFragment: "x",
   });

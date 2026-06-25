@@ -26,7 +26,35 @@ type Env = {
   // must additionally hold "SSL and Certificates: Edit" for the custom_hostnames call.
   CF_ZONE_ID?: string;
   HOST_MAP?: KVNamespace;
+  // Hard ceiling (seconds) on a single build+deploy run. A stalled build (hung
+  // wrangler prompt, frozen npm, OOM-thrash) otherwise keeps the standard-1
+  // instance AWAKE indefinitely — memory+disk bill on wall-clock, not CPU, so an
+  // unkilled 7h stall cost ~30x a real 6min build (observed Jun 2026). The build
+  // script re-execs itself under coreutils `timeout`; on expiry it SIGKILLs and
+  // the EXIT trap reports `failed` to PM so the instance exits. PM sends a
+  // per-deploy override in the body; this is the fallback default. 720s = 12min.
+  BUILD_TIMEOUT_SEC?: string;
 };
+
+// Default build timeout (seconds) when neither the PM body nor the deployer env
+// supplies one. A real CMS build is ~6min; 12min leaves generous headroom.
+const DEFAULT_BUILD_TIMEOUT_SEC = 720;
+
+/**
+ * Resolve the effective build timeout in seconds. Precedence: per-deploy value
+ * from the PM body → deployer env BUILD_TIMEOUT_SEC → DEFAULT. Anything that
+ * isn't a positive finite integer is ignored (falls through). Pure — unit-tested.
+ */
+export function resolveBuildTimeoutSec(
+  fromBody: number | undefined | null,
+  fromEnv: string | undefined | null,
+): number {
+  const cand = [fromBody, fromEnv != null ? Number(fromEnv) : undefined];
+  for (const v of cand) {
+    if (typeof v === "number" && Number.isInteger(v) && v > 0) return v;
+  }
+  return DEFAULT_BUILD_TIMEOUT_SEC;
+}
 
 type DeployBody = {
   siteId?: string;
@@ -36,6 +64,10 @@ type DeployBody = {
   // when the Site has its own key that PM decrypted cleanly. Set as the CMS
   // Worker SECRET OPENROUTER_API_KEY; absent → fall back to the deployer global.
   openrouterApiKey?: string;
+  // Hard build-run ceiling (seconds) for THIS deploy. PM computes it from its
+  // global + per-Site settings; absent → deployer falls back to BUILD_TIMEOUT_SEC
+  // env, then DEFAULT_BUILD_TIMEOUT_SEC. See resolveBuildTimeoutSec().
+  buildTimeoutSec?: number;
 };
 type AttachBody = {
   slug?: string;
@@ -122,12 +154,20 @@ export default {
           ? body.openrouterApiKey
           : undefined;
 
+      // Per-deploy build timeout from PM (max of global+per-Site, in seconds).
+      // Non-numbers fall through to the env/default in resolveBuildTimeoutSec.
+      const bodyTimeout =
+        typeof body.buildTimeoutSec === "number"
+          ? body.buildTimeoutSec
+          : undefined;
+
       try {
         await startDeploy(env, {
           siteId,
           slug,
           ref,
           openrouterApiKey: perSiteOpenrouterKey,
+          buildTimeoutSec: bodyTimeout,
         });
       } catch (err) {
         return Response.json(
@@ -476,10 +516,15 @@ async function startDeploy(
     slug: string;
     ref: string;
     openrouterApiKey?: string;
+    buildTimeoutSec?: number;
   },
 ): Promise<void> {
   const workerName = `${WORKER_PREFIX}${input.slug}`.slice(0, 63);
   const sandbox = getSandbox(env.Sandbox, `deploy-${input.slug}`);
+  const buildTimeoutSec = resolveBuildTimeoutSec(
+    input.buildTimeoutSec,
+    env.BUILD_TIMEOUT_SEC,
+  );
   // One id per deploy invocation, like SITE_ID — every per-step emit AND the
   // final callback carry it so the timeline can isolate a single run's events.
   const deployId = crypto.randomUUID();
@@ -508,6 +553,8 @@ async function startDeploy(
       SLUG: input.slug,
       SITE_ID: input.siteId,
       DEPLOY_ID: deployId,
+      // Hard run ceiling (seconds). The script re-execs itself under `timeout`.
+      BUILD_TIMEOUT_SEC: String(buildTimeoutSec),
       CALLBACK_URL: env.PM_CALLBACK_ORIGIN
         ? `${env.PM_CALLBACK_ORIGIN.replace(/\/+$/, "")}/api/deploy-callback`
         : "",
@@ -554,6 +601,29 @@ async function startDeploy(
 function buildScript(): string {
   return `#!/usr/bin/env bash
 set -uo pipefail
+
+# --- Hard run timeout (anti-stall) ------------------------------------------
+# A stalled build (hung wrangler prompt, frozen npm, OOM-thrash) keeps the
+# instance AWAKE — and memory+disk bill on wall-clock, not CPU. So bound the
+# WHOLE run: re-exec this script once under coreutils \`timeout\`, which SIGTERMs
+# the process group at $BUILD_TIMEOUT_SEC (then SIGKILLs 10s later if it ignores
+# the term). The SIGTERM trap below reports \`failed\` to PM so the run finalizes
+# instead of hanging. BUILD_TIMEOUT_GUARD marks the re-exec so we wrap only once.
+if [ -z "\${BUILD_TIMEOUT_GUARD:-}" ]; then
+  export BUILD_TIMEOUT_GUARD=1
+  # --kill-after gives a real build a chance to flush on TERM before the hard KILL.
+  exec timeout --kill-after=10s "\${BUILD_TIMEOUT_SEC:-720}s" bash "$0" "$@"
+fi
+
+# Fire on the timeout SIGTERM: tell PM the run was killed for exceeding the cap,
+# then exit non-zero. Without this the killed process reports nothing and the
+# Site is stuck \`deploying\` until the stuck-detector reaps it.
+on_timeout() {
+  report failed "build exceeded \${BUILD_TIMEOUT_SEC:-720}s timeout (killed)"
+  exit 124
+}
+trap on_timeout TERM
+# ----------------------------------------------------------------------------
 
 report() {
   # $1=status (deployed|failed) ; $2=optional error

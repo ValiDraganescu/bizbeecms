@@ -45,6 +45,7 @@ export async function PATCH(
     country,
     openrouterMintingEnabled,
     openrouterMonthlyLimitUsd,
+    buildTimeoutMin,
   } = parsed.value;
 
   const authzError = authorizeSiteCountry(user, actorCountries, country);
@@ -65,6 +66,7 @@ export async function PATCH(
       country,
       openrouterMintingEnabled,
       openrouterMonthlyLimitUsd,
+      buildTimeoutMin,
     });
 
     return NextResponse.json({ savedId: siteId });

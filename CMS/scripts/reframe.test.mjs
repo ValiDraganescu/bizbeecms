@@ -183,7 +183,8 @@ test("interleaved text + tool call: tokens forwarded live, tool ran at stream en
     ["token", "tool", "done"],
   );
   assert.equal(events[0].data.text, "Creating page");
-  assert.deepEqual(assembled, [{ name: "create_page", args: { slug: "about" } }]);
+  // id synthesized from the index when the provider stream omits one.
+  assert.deepEqual(assembled, [{ id: "call_0", name: "create_page", args: { slug: "about" } }]);
 });
 
 test("a mid-stream read error frames an error event instead of done", async () => {

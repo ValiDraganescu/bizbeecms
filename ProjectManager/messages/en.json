@@ -670,5 +670,27 @@
       "active": "Active",
       "invited": "Invited"
     }
+  },
+  "settings": {
+    "navLink": "Settings",
+    "back": "Back to dashboard",
+    "title": "Settings",
+    "subtitle": "Account-wide settings for deploys.",
+    "buildTimeout": {
+      "title": "Build timeout",
+      "description": "Maximum time a CMS build+deploy may run before it is killed. Prevents a stalled build from keeping a container running (and billing) indefinitely. Applies starting with the next deploy.",
+      "label": "Global build timeout",
+      "unit": "minutes",
+      "hint": "Between {min} and {max} minutes. A normal build takes about 6 minutes. A site can raise this for its own deploys, never lower it.",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Saved.",
+      "error": "Couldn’t save. Try again."
+    },
+    "siteOverride": {
+      "label": "Build timeout override",
+      "hint": "Minutes. Leave blank to use the global setting. The effective timeout is the larger of this and the global.",
+      "placeholderGlobal": "Global ({min} min)"
+    }
   }
 }

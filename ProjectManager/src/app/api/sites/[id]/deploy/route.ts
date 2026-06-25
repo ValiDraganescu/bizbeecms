@@ -8,6 +8,8 @@ import {
   setSiteDeployStatus,
 } from "@/lib/site/site";
 import { canStartDeploy } from "@/lib/deploy";
+import { getGlobalBuildTimeoutMin } from "@/lib/deploy/settings";
+import { effectiveBuildTimeoutSec } from "@/lib/deploy/build-timeout";
 import { decryptSecret, encryptSecret } from "@/lib/crypto/secret-box";
 import { decideDeployOpenrouterField } from "@/lib/site/deploy-openrouter-key";
 import { shouldMintOnDeploy } from "@/lib/site/mint-on-deploy";
@@ -143,6 +145,14 @@ export async function POST(
     );
   }
 
+  // Effective build timeout (anti-stall): max(global, per-Site override). Sent
+  // to the deployer as seconds; it kills a run that exceeds it so a stalled
+  // build can't keep the container awake (memory+disk bill on wall-clock).
+  const buildTimeoutSec = effectiveBuildTimeoutSec(
+    await getGlobalBuildTimeoutMin(),
+    site.buildTimeoutMin,
+  );
+
   // Latch to `deploying` before dispatching, so a refresh shows progress and
   // re-clicks are guarded by canStartDeploy.
   await setSiteDeployStatus(siteId, "deploying");
@@ -157,6 +167,7 @@ export async function POST(
       body: JSON.stringify({
         siteId,
         slug: site.slug,
+        buildTimeoutSec,
         ...(ref ? { ref } : {}),
         ...openrouterBody,
       }),

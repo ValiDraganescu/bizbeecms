@@ -27,6 +27,7 @@ export async function AppNav({ user }: { user: User }) {
   const tTags = await getTranslations("tags");
   const tUsers = await getTranslations("users");
   const tRoles = await getTranslations("roles");
+  const tSettings = await getTranslations("settings");
 
   // Admin+ may manage the global user list + the tag vocabulary.
   const isAdminPlus = user.role === "SuperAdmin" || user.role === "Admin";
@@ -48,6 +49,9 @@ export async function AppNav({ user }: { user: User }) {
           ) : null}
           {isAdminPlus ? (
             <NavLink href="/users" label={tUsers("navLink")} />
+          ) : null}
+          {isAdminPlus ? (
+            <NavLink href="/settings" label={tSettings("navLink")} />
           ) : null}
           {canUserCreateSite(user) ? (
             <NavLink href="/tags" label={tTags("navLink")} />

@@ -76,6 +76,8 @@ export type UpdateSiteInput = {
   openrouterMintingEnabled: boolean;
   /** Monthly spend cap in whole USD for the minted key, or null for no cap. */
   openrouterMonthlyLimitUsd: number | null;
+  /** Per-Site build-timeout override (minutes), or null to use the global. */
+  buildTimeoutMin: number | null;
 };
 
 /** Update a Site's editable fields. Status/workerName are managed elsewhere. */
@@ -92,6 +94,7 @@ export async function updateSite(
       country: input.country,
       openrouterMintingEnabled: input.openrouterMintingEnabled,
       openrouterMonthlyLimitUsd: input.openrouterMonthlyLimitUsd,
+      buildTimeoutMin: input.buildTimeoutMin,
     })
     .where(eq(schema.sites.id, id))
     .returning();

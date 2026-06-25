@@ -53,7 +53,11 @@
   // so CMS workers don't depend on PM's .workers.dev URL. (Code falls back to
   // PM_CALLBACK_ORIGIN if this is ever unset — deployer/src/index.ts:262.)
   "vars": {
-    "PM_ORIGIN": "https://manager.bizbeecms.com"
+    "PM_ORIGIN": "https://manager.bizbeecms.com",
+    // Fallback hard timeout (seconds) for a build+deploy run when PM sends no
+    // per-deploy override. A stalled build otherwise keeps the instance awake
+    // indefinitely (memory+disk bill on wall-clock). Real build ~6min; 12min cap.
+    "BUILD_TIMEOUT_SEC": "720"
   }
 
   // Secrets (set via `wrangler secret put`, NOT committed):

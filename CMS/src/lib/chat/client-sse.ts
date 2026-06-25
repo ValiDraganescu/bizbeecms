@@ -27,6 +27,8 @@ export type ChatEvent =
 
 /** A tool-execution result frame (`event: tool`). Shape from the route's `runTools`. */
 export interface ToolResult {
+  /** The provider's tool-call id — round-tripped so the next request's tool_call_id matches. */
+  id?: string;
   /** Tool name: create_component | create_page | translate. */
   name: string;
   ok: boolean;
@@ -140,6 +142,7 @@ function toToolResult(data: Record<string, unknown>): ToolResult {
     ? data.errors.filter((e): e is string => typeof e === "string")
     : undefined;
   return {
+    id: typeof data.id === "string" ? data.id : undefined,
     name: typeof data.name === "string" ? data.name : "tool",
     ok: data.ok === true,
     action: typeof data.action === "string" ? data.action : undefined,
@@ -151,14 +154,16 @@ function toToolResult(data: Record<string, unknown>): ToolResult {
     errors,
     input: data.input,
     // The whole frame IS the tool output (name/ok/action/... + per-tool payload).
-    // Expose it for the accordion minus the input we threaded onto the frame.
-    output: stripInput(data),
+    // Expose it for the accordion minus the transport-only keys we threaded on
+    // (input = the args, id = the call id), which aren't part of the tool's result.
+    output: stripTransport(data),
   };
 }
 
-/** A shallow copy of the tool frame without the threaded `input` key (that's the args, not the output). */
-function stripInput(data: Record<string, unknown>): Record<string, unknown> {
-  const { input: _input, ...rest } = data;
+/** A shallow copy of the tool frame without the threaded transport keys (`input`, `id`). */
+function stripTransport(data: Record<string, unknown>): Record<string, unknown> {
+  const { input: _input, id: _id, ...rest } = data;
   void _input;
+  void _id;
   return rest;
 }

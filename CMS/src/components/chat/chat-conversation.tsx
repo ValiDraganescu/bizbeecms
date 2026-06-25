@@ -24,6 +24,7 @@ import {
 } from "react";
 import { useTranslations } from "next-intl";
 import { ChatEventParser, type ToolResult } from "@/lib/chat/client-sse";
+import { buildModelHistory } from "@/lib/chat/build-history";
 import { toolSummary, blobView } from "@/lib/chat/tool-card";
 import { isAtBottom } from "@/lib/chat/scroll-anchor";
 import {
@@ -83,10 +84,11 @@ export function useChat(
     // MODEL-facing message only; the user's transcript bubble shows their raw text.
     const inline = getInlineContext?.()?.trim();
     const modelContent = inline ? `${inline}\n\n${trimmed}` : trimmed;
-    const history = [
-      ...messages.map((m) => ({ role: m.role, content: m.content })),
-      { role: "user" as const, content: modelContent },
-    ];
+    // Flatten the transcript into the {role,content} history the route accepts:
+    // assistant turns that were pure tool calls (no text) carry their tool block
+    // so content is never empty (route 400s otherwise) and the model sees prior
+    // tool results instead of re-discovering. (See lib/chat/build-history.ts.)
+    const history = buildModelHistory(messages, modelContent);
     setMessages((prev) => [
       ...prev,
       { role: "user", content: trimmed },

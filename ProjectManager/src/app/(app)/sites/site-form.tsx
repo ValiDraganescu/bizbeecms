@@ -52,6 +52,8 @@ export function SiteForm({
   hasMintedOpenrouterKey = false,
   initialMintingEnabled = false,
   initialMonthlyLimitUsd = null,
+  initialBuildTimeoutMin = null,
+  globalBuildTimeoutMin,
 }: {
   /** Required in edit mode — the Site being updated. */
   siteId?: string;
@@ -64,8 +66,13 @@ export function SiteForm({
   initialMintingEnabled?: boolean;
   /** Edit mode only: initial monthly spend cap (whole USD), or null for no cap. */
   initialMonthlyLimitUsd?: number | null;
+  /** Edit mode only: initial per-Site build-timeout override (min), or null = global. */
+  initialBuildTimeoutMin?: number | null;
+  /** Edit mode only: the current global build timeout (min), shown as the default. */
+  globalBuildTimeoutMin?: number;
 }) {
   const t = useTranslations("sites");
+  const tSettings = useTranslations("settings.siteOverride");
   const router = useRouter();
   const [error, setError] = useState<SiteErrorKey | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -103,6 +110,10 @@ export function SiteForm({
   const [mintingEnabled, setMintingEnabled] = useState(initialMintingEnabled);
   const [monthlyLimit, setMonthlyLimit] = useState(
     initialMonthlyLimitUsd == null ? "" : String(initialMonthlyLimitUsd),
+  );
+  // Per-Site build-timeout override (minutes). Blank = use the global.
+  const [buildTimeout, setBuildTimeout] = useState(
+    initialBuildTimeoutMin == null ? "" : String(initialBuildTimeoutMin),
   );
   // Locally track whether a minted key exists so the delete button hides after
   // a successful revoke without a full page reload.
@@ -154,6 +165,8 @@ export function SiteForm({
       const trimmed = monthlyLimit.trim();
       payload.openrouterMonthlyLimitUsd =
         trimmed === "" ? null : Number(trimmed);
+      const bt = buildTimeout.trim();
+      payload.buildTimeoutMin = bt === "" ? null : Number(bt);
     }
     try {
       const res =
@@ -319,6 +332,32 @@ export function SiteForm({
               <FieldHint>{t("form.openrouterKeyMinted")}</FieldHint>
             </div>
           ) : null}
+        </Field>
+      ) : null}
+
+      {mode === "edit" ? (
+        <Field>
+          <FieldLabel htmlFor="site-build-timeout">
+            {tSettings("label")}
+          </FieldLabel>
+          <Input
+            id="site-build-timeout"
+            name="buildTimeoutMin"
+            type="number"
+            min={1}
+            max={60}
+            step={1}
+            inputMode="numeric"
+            value={buildTimeout}
+            onChange={(e) => setBuildTimeout(e.target.value)}
+            placeholder={
+              globalBuildTimeoutMin != null
+                ? tSettings("placeholderGlobal", { min: globalBuildTimeoutMin })
+                : undefined
+            }
+            className="w-40 font-mono text-sm"
+          />
+          <FieldHint>{tSettings("hint")}</FieldHint>
         </Field>
       ) : null}
 

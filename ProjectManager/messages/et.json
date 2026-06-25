@@ -670,5 +670,27 @@
       "active": "Aktiivne",
       "invited": "Kutsutud"
     }
+  },
+  "settings": {
+    "navLink": "Seaded",
+    "back": "Tagasi töölauale",
+    "title": "Seaded",
+    "subtitle": "Kontoülesed juurutamise seaded.",
+    "buildTimeout": {
+      "title": "Ehituse ajalõpp",
+      "description": "Maksimaalne aeg, mille jooksul CMS-i ehitus ja juurutus võib töötada, enne kui see peatatakse. Hoiab ära olukorra, kus seiskunud ehitus hoiab konteinerit (ja arveldust) lõputult töös. Rakendub alates järgmisest juurutamisest.",
+      "label": "Üldine ehituse ajalõpp",
+      "unit": "minutit",
+      "hint": "Vahemikus {min}–{max} minutit. Tavaline ehitus võtab umbes 6 minutit. Sait saab seda enda juurutuste jaoks tõsta, mitte langetada.",
+      "save": "Salvesta",
+      "saving": "Salvestan…",
+      "saved": "Salvestatud.",
+      "error": "Salvestamine ebaõnnestus. Proovi uuesti."
+    },
+    "siteOverride": {
+      "label": "Ajalõpu alistamine",
+      "hint": "Minutites. Jäta tühjaks, et kasutada üldist seadet. Kehtiv ajalõpp on selle ja üldise suurem.",
+      "placeholderGlobal": "Üldine ({min} min)"
+    }
   }
 }

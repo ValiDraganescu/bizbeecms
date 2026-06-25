@@ -19,9 +19,9 @@ const dec = new TextDecoder();
 
 const deltaLine = (text) =>
   `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n`;
-const toolLine = (index, name, argsFragment) =>
+const toolLine = (index, name, argsFragment, id) =>
   `data: ${JSON.stringify({
-    choices: [{ delta: { tool_calls: [{ index, function: { name, arguments: argsFragment } }] } }],
+    choices: [{ delta: { tool_calls: [{ index, ...(id ? { id } : {}), function: { name, arguments: argsFragment } }] } }],
   })}\n`;
 
 function turnStream(pieces) {
@@ -103,6 +103,23 @@ test("tool result is FED BACK: round 1 calls a tool, round 2 sees it and answers
   assert.ok(toolMsg, "tool result message fed back");
   assert.equal(toolMsg.tool_call_id, assistantTurn.tool_calls[0].id);
   assert.equal(JSON.parse(toolMsg.content).name, "list_components");
+});
+
+test("the PROVIDER's real tool-call id round-trips (assistant tool_calls ↔ tool_call_id)", async () => {
+  // Round 1 streams a tool call WITH the provider's own id (e.g. Claude/OpenAI emit one).
+  const round1 = turnStream([toolLine(0, "list_pages", "{}", "toolu_real_42"), "data: [DONE]\n"]);
+  const round2 = turnStream([deltaLine("done"), "data: [DONE]\n"]);
+  let fed;
+  const nextTurn = async (messages) => {
+    fed = messages;
+    return round2;
+  };
+  await drain(streamChatRounds(round1, [], nextTurn, runToolsRound));
+
+  const assistantTurn = fed.find((m) => m.role === "assistant" && m.tool_calls);
+  assert.equal(assistantTurn.tool_calls[0].id, "toolu_real_42", "provider id preserved, not re-synthesized");
+  const toolMsg = fed.find((m) => m.role === "tool");
+  assert.equal(toolMsg.tool_call_id, "toolu_real_42", "tool result references the provider id");
 });
 
 test("maxRounds caps a runaway loop: tools run each round but no infinite follow-up", async () => {
