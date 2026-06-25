@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.6.0",
+      "tag": "r-1.6.0",
+      "markdown": "# CMS v1.6.0\n\n_2026-06-25 · changes since r-1.5.0_\n\n## Features\n- Chat: the assistant's page context and system prompt now incorporate your site settings, so its answers and edits respect per-site configuration.\n"
+    },
+    {
       "version": "1.5.0",
       "tag": "r-1.5.0",
       "markdown": "# CMS v1.5.0\n\n_2026-06-25 · changes since r-1.4.1_\n\n## Features\n- Page builder now refreshes live when the chat assistant edits a page, so tool-driven changes appear immediately without a manual reload.\n"
@@ -19,11 +24,6 @@
       "version": "1.2.0",
       "tag": "r-1.2.0",
       "markdown": "# CMS v1.2.0\n\n_2026-06-25 · changes since r-1.1.0_\n\n## Features\n- Chat: rebuild conversation history from the persisted message log (build-history reframe), so the assistant's context stays consistent across reloads and tool round-trips.\n"
-    },
-    {
-      "version": "1.1.0",
-      "tag": "r-1.1.0",
-      "markdown": "# CMS v1.1.0\n\n_2026-06-25 · changes since r-1.0.1_\n\n## Features\n- **Page-aware AI assistant in the Page Builder.** When you have a page selected, your next message to the AI assistant automatically tells it which page you're editing (path, slug, draft/published), so page requests apply to the right page. It updates as you switch pages and clears when you leave the Page Builder.\n- **\"Page context attached\" chip.** A small chip above the chat input shows when page context will be sent; click it to see the exact text being attached to your message.\n\n## Other\n- The AI assistant's debug (context & tools) button now uses a proper cog/settings icon instead of the previous sun-like one.\n"
     },
     {
       "version": "0.11.0",
