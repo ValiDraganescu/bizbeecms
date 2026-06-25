@@ -1,5 +1,5 @@
 ---
-description: Repo-specific CMS release tooling for bizbeecms. `commit` ships ordinary changes (delegates to /orc-commit). `release` cuts a CMS release — drafts release-notes/<x.y.z>.md from commits since the last r-* tag, STOPS for human edit, then bumps CMS/package.json, commits, annotated-tags r-<x.y.z>, and pushes the tag + branch.
+description: Repo-specific CMS release tooling for bizbeecms. `commit` ships ordinary changes (delegates to /orc-commit). `release` cuts a CMS release end-to-end — drafts release-notes/<x.y.z>.md from commits since the last r-* tag, then bumps CMS/package.json, commits, annotated-tags r-<x.y.z>, and pushes the tag + branch (no confirmation pause).
 argument-hint: "[commit | release [major|minor|patch]] — default: release"
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 ---
@@ -14,7 +14,7 @@ commit), so the `r-` scheme starts clean and the deployer keys off `r-*`. Two co
 
 - `commit` — ship ordinary working-tree changes. **Delegate to `/orc-commit`** (it
   bumps the right version file, commits, pushes). No tagging. Use this for normal work.
-- `release` — cut a CMS release: draft notes → **human edits** → bump → tag → push.
+- `release` — cut a CMS release end-to-end: draft notes → bump → tag → push (no pause).
 
 The first token of `$ARGUMENTS` is the command (`commit` or `release`); default
 `release`. For `release`, an optional second token forces the semver level
@@ -76,7 +76,7 @@ last tag**, not a single diff. Take the **highest** level present in the range.
 
 Call the result `NEW=<x.y.z>`.
 
-### Step 3 — DRAFT `release-notes/<NEW>.md` (then STOP for human edit)
+### Step 3 — Write `release-notes/<NEW>.md`
 Create the file `release-notes/<NEW>.md` (create the `release-notes/` dir if missing).
 Group the commits since `LAST` into sections; drop pure-chore/memory commits if they
 add no user value. Template:
@@ -100,16 +100,11 @@ Drafting rules:
 - Omit empty sections.
 - Timestamp the line with `date "+%Y-%m-%d"`.
 
-**Then STOP and hand off to the human.** Print:
-> Drafted `release-notes/<NEW>.md` (level: <level>, <old> → <NEW>). Edit it, then say
-> "continue" / re-run `release` to tag.
+Write the notes, then continue straight to Step 4 — do not pause for confirmation.
+(The user has opted into auto-release: draft → bump → tag → push in one go. They can
+always edit the notes and re-tag afterward if needed.)
 
-Do **not** bump, commit, or tag yet. The human edit step is mandatory (USER DECISION).
-If the user has clearly already edited and asked to proceed (e.g. they re-ran with the
-notes file present and confirmed), continue to Step 4.
-
-### Step 4 — Bump, commit, annotated-tag, push (after human confirms)
-Only run this once the notes are edited and the user confirms.
+### Step 4 — Bump, commit, annotated-tag, push
 1. Bump `CMS/package.json` `"version"` → `<NEW>` (edit only that field; preserve JSON
    formatting).
 2. Stage **only** the version file + the notes (never `git add -A`):
@@ -149,5 +144,5 @@ chosen level and old→new. PM's deployer `GET /tags` will now list it.
   deployer/PM wiring is separate slices.
 - `cms-v*` is CMS-only. If you ever need to version PM, that's a separate scheme — do
   not reuse `cms-v*` for PM.
-- Never tag without the human-edited notes. Never auto-push a tag the user hasn't seen
-  notes for.
+- Notes are auto-drafted and the tag is cut without a confirmation pause. Still draft
+  honest, user-facing notes — the user can edit and re-tag afterward if they want.

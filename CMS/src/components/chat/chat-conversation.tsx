@@ -25,6 +25,7 @@ import {
 import { useTranslations } from "next-intl";
 import { ChatEventParser, type ToolResult } from "@/lib/chat/client-sse";
 import { buildModelHistory } from "@/lib/chat/build-history";
+import { parseMarkdown, type Block, type Inline, type ListBlock } from "@/lib/chat/markdown";
 import { toolSummary, blobView } from "@/lib/chat/tool-card";
 import { isAtBottom } from "@/lib/chat/scroll-anchor";
 import {
@@ -396,6 +397,132 @@ export function ChatConversation({
   );
 }
 
+/**
+ * Render assistant Markdown as safe React elements (never dangerouslySetInnerHTML).
+ * Parsing is the pure, unit-tested `lib/chat/markdown.ts`; this only maps the
+ * block/inline tree to elements styled with the bounded utility tokens. Links are
+ * restricted to http(s) and open in a new tab with `noopener`.
+ */
+function Markdown({ source }: { source: string }) {
+  return (
+    <div className="flex flex-col gap-2">
+      {parseMarkdown(source).map((block, i) => (
+        <MarkdownBlock key={i} block={block} />
+      ))}
+    </div>
+  );
+}
+
+function MarkdownBlock({ block }: { block: Block }) {
+  switch (block.type) {
+    case "heading": {
+      const size =
+        block.level <= 1 ? "text-lg" : block.level === 2 ? "text-base" : "text-sm";
+      return <p className={`font-semibold ${size}`}><Inlines nodes={block.children} /></p>;
+    }
+    case "paragraph":
+      return <p className="whitespace-pre-wrap"><Inlines nodes={block.children} /></p>;
+    case "code":
+      return (
+        <pre className="overflow-x-auto rounded-md bg-surface px-2 py-1 text-sm">
+          <code>{block.value}</code>
+        </pre>
+      );
+    case "list":
+      return <MarkdownList list={block} />;
+    case "blockquote":
+      return (
+        <blockquote className="border-l-2 border-border pl-3 text-foreground-muted italic">
+          <Inlines nodes={block.children} />
+        </blockquote>
+      );
+    case "table":
+      return (
+        <div className="overflow-x-auto">
+          <table className="border-collapse text-sm">
+            <thead>
+              <tr>
+                {block.header.map((cell, i) => (
+                  <th key={i} className="border border-border px-2 py-1 text-left font-semibold">
+                    <Inlines nodes={cell} />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row, r) => (
+                <tr key={r}>
+                  {row.map((cell, c) => (
+                    <td key={c} className="border border-border px-2 py-1">
+                      <Inlines nodes={cell} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+  }
+}
+
+/** Recursive list renderer — an item's `sublist` nests another list inside its <li>. */
+function MarkdownList({ list }: { list: ListBlock }) {
+  const Tag = list.ordered ? "ol" : "ul";
+  return (
+    <Tag className="ml-5 flex flex-col gap-1" style={{ listStyleType: list.ordered ? "decimal" : "disc" }}>
+      {list.items.map((item, i) => (
+        <li key={i}>
+          <Inlines nodes={item.children} />
+          {item.sublist && <MarkdownList list={item.sublist} />}
+        </li>
+      ))}
+    </Tag>
+  );
+}
+
+function Inlines({ nodes }: { nodes: Inline[] }) {
+  return (
+    <>
+      {nodes.map((n, i) => (
+        <InlineNode key={i} node={n} />
+      ))}
+    </>
+  );
+}
+
+/** http(s)-only guard so a parsed `href` can never be a javascript:/data: URL. */
+function safeHref(href: string): string | undefined {
+  return /^https?:\/\//i.test(href) ? href : undefined;
+}
+
+function InlineNode({ node }: { node: Inline }) {
+  switch (node.type) {
+    case "text":
+      return <>{node.value}</>;
+    case "bold":
+      return <strong className="font-semibold"><Inlines nodes={node.children} /></strong>;
+    case "italic":
+      return <em className="italic"><Inlines nodes={node.children} /></em>;
+    case "code":
+      return <code className="rounded-sm bg-surface px-1 text-sm">{node.value}</code>;
+    case "link": {
+      const href = safeHref(node.href);
+      if (!href) return <Inlines nodes={node.children} />; // drop unsafe scheme, keep text
+      return (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline hover:text-primary-hover"
+        >
+          <Inlines nodes={node.children} />
+        </a>
+      );
+    }
+  }
+}
+
 function UserBubble({ content, label }: { content: string; label: string }) {
   return (
     <div className="self-end max-w-[80%]">
@@ -423,8 +550,12 @@ function AssistantBubble({
   return (
     <div className="self-start max-w-[80%]">
       <p className="mb-1 text-foreground-muted">{label}</p>
-      <div className="rounded-lg bg-surface-muted px-3 py-2 text-foreground whitespace-pre-wrap">
-        {content || (thinking ? t("thinking") : "")}
+      <div className="rounded-lg bg-surface-muted px-3 py-2 text-foreground">
+        {content ? (
+          <Markdown source={content} />
+        ) : (
+          <span className="whitespace-pre-wrap">{thinking ? t("thinking") : ""}</span>
+        )}
       </div>
       {tools.map((tool, i) => (
         <ToolCard key={i} tool={tool} t={t} />
