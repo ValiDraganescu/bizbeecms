@@ -36,6 +36,7 @@ import {
 } from "@/lib/pages/page-picker";
 import type { PageSummary } from "@/db/page-store";
 import { setActivePageContext } from "@/lib/chat/page-context";
+import { PAGE_MUTATION_EVENT } from "@/lib/chat/page-mutation-signal";
 import { filterGroups } from "@/lib/components/rail-filter";
 import type { ComponentGroup } from "@/lib/components/grouped";
 import {
@@ -299,6 +300,19 @@ export function PageBuilderShell({
   useEffect(() => {
     setPreviewVersionId(null);
   }, [selected]);
+
+  // When the AI assistant mutates the page/component/theme (it writes the SAME
+  // draft the editor uses), reload so the canvas isn't stale: always refresh the
+  // preview iframe; refetch the editor draft too UNLESS the operator has unsaved
+  // local edits (don't clobber in-progress manual work — they can save/reload).
+  useEffect(() => {
+    function onMutated() {
+      setPreviewNonce((n) => n + 1);
+      if (!dirty) setDraftReloadNonce((n) => n + 1);
+    }
+    window.addEventListener(PAGE_MUTATION_EVENT, onMutated);
+    return () => window.removeEventListener(PAGE_MUTATION_EVENT, onMutated);
+  }, [dirty]);
 
   function onAddSection() {
     setBlocks((b) => addSection(b));

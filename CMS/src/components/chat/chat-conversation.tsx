@@ -24,6 +24,7 @@ import {
 } from "react";
 import { useTranslations } from "next-intl";
 import { ChatEventParser, type ToolResult } from "@/lib/chat/client-sse";
+import { mutatesRenderedPage, signalPageMutation } from "@/lib/chat/page-mutation-signal";
 import { buildModelHistory } from "@/lib/chat/build-history";
 import { parseMarkdown, type Block, type Inline, type ListBlock } from "@/lib/chat/markdown";
 import { toolSummary, blobView } from "@/lib/chat/tool-card";
@@ -155,8 +156,14 @@ export function useChat(
           : parser.push(decoder.decode(value, { stream: true }));
         for (const ev of events) {
           if (ev.type === "token") appendToken(ev.text);
-          else if (ev.type === "tool") addTool(ev.result);
-          else if (ev.type === "error") streamError = ev.message;
+          else if (ev.type === "tool") {
+            addTool(ev.result);
+            // A page/component/theme write means the builder canvas is now stale —
+            // signal it to refetch (cross-sibling, via a window event).
+            if (mutatesRenderedPage(ev.result.name, ev.result.ok)) {
+              signalPageMutation(ev.result.name);
+            }
+          } else if (ev.type === "error") streamError = ev.message;
         }
         if (done) break;
       }

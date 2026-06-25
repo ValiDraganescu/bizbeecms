@@ -120,9 +120,8 @@ import {
   upsertPage,
   listPages,
   getPageById,
-  getPageBlocks,
-  setPageBlocks,
 } from "@/db/page-store";
+import { getDraft, saveDraftBlocks } from "@/db/page-version-store";
 import { getCollection, rebuildCollectionSchema } from "@/db/collection-store";
 import { applyTranslation } from "@/db/translate-store";
 import {
@@ -343,6 +342,41 @@ async function handleUpdateComponent(args: unknown): Promise<Record<string, unkn
   }
 }
 
+// The AI page tools read+write the page's DRAFT version — the SAME store the
+// Page Builder editor and the preview iframe use (`/api/pages/[id]/draft` →
+// saveDraftBlocks). Writing legacy `page.blocks` instead made AI edits invisible
+// in the builder (the draft-based preview never reads page.blocks). These two
+// helpers mirror getPageBlocks/setPageBlocks against the draft.
+
+/** Read the page's draft blocks (create-if-absent), or null if the page is gone. */
+async function getDraftBlocks(
+  pageId: string,
+): Promise<{ id: string; blocks: Block[]; meta: string } | null> {
+  const draft = await getDraft(pageId);
+  if (!draft) return null;
+  let blocks: Block[];
+  try {
+    blocks = JSON.parse(draft.blocks) as Block[];
+  } catch {
+    blocks = [];
+  }
+  return { id: pageId, blocks, meta: draft.meta };
+}
+
+/**
+ * Persist blocks to the page's draft version (the editor's write path). Preserves
+ * the draft's existing `meta` — the blocks editor never changes meta, so neither
+ * do we (pass the meta read alongside the blocks via getDraftBlocks).
+ */
+async function setDraftBlocks(
+  pageId: string,
+  blocks: Block[],
+  meta: string,
+): Promise<{ ok: true } | { ok: false; errors: string[] }> {
+  const saved = await saveDraftBlocks(pageId, { blocks: JSON.stringify(blocks), meta });
+  return saved ? { ok: true } : { ok: false, errors: ["page not found"] };
+}
+
 /** Replace an existing page's block tree (validateBlocks gate, like the editor). */
 async function handleUpdatePageBlocks(args: unknown): Promise<Record<string, unknown>> {
   const id = coerceIdArg(args, "id");
@@ -358,7 +392,9 @@ async function handleUpdatePageBlocks(args: unknown): Promise<Record<string, unk
     if (missing.length > 0) {
       return { ok: false, errors: [`unknown components (create them first): ${missing.join(", ")}`] };
     }
-    const res = await setPageBlocks(id, valid.blocks);
+    const draft = await getDraftBlocks(id);
+    if (!draft) return { ok: false, errors: ["page not found"] };
+    const res = await setDraftBlocks(id, valid.blocks, draft.meta);
     if (!res.ok) return { ok: false, errors: res.errors };
     return { ok: true, action: "updated", page: id };
   } catch (err) {
@@ -518,7 +554,7 @@ async function handleBindComponent(args: unknown): Promise<Record<string, unknow
   if (!valid.ok) return { ok: false, errors: [valid.error] };
   const { page, block } = valid.value;
   try {
-    const loaded = await getPageBlocks(page);
+    const loaded = await getDraftBlocks(page);
     if (!loaded) return { ok: false, errors: [`no page with id "${page}"`] };
     const target = findBlock(loaded.blocks, block);
     if (!target) return { ok: false, errors: [`no block with id "${block}" on this page`] };
@@ -526,7 +562,7 @@ async function handleBindComponent(args: unknown): Promise<Record<string, unknow
     // Clear → drop the "item" binding (revert to static props).
     if (valid.value.clear) {
       const next = setBlockField(loaded.blocks, block, { bindings: undefined });
-      const res = await setPageBlocks(page, next);
+      const res = await setDraftBlocks(page, next, loaded.meta);
       if (!res.ok) return { ok: false, errors: res.errors };
       return { ok: true, action: "cleared", page, block };
     }
@@ -541,7 +577,7 @@ async function handleBindComponent(args: unknown): Promise<Record<string, unknow
     if (!check.ok) return { ok: false, errors: check.errors };
 
     const next = setBlockField(loaded.blocks, block, { bindings: { item: binding } });
-    const res = await setPageBlocks(page, next);
+    const res = await setDraftBlocks(page, next, loaded.meta);
     if (!res.ok) return { ok: false, errors: res.errors };
     return { ok: true, action: "bound", page, block, collection: valid.value.collection };
   } catch (err) {
@@ -554,7 +590,7 @@ async function handleCreateList(args: unknown): Promise<Record<string, unknown>>
   if (!valid.ok) return { ok: false, errors: [valid.error] };
   const { page, section, collection, template, filter, sort, limit, map } = valid.value;
   try {
-    const loaded = await getPageBlocks(page);
+    const loaded = await getDraftBlocks(page);
     if (!loaded) return { ok: false, errors: [`no page with id "${page}"`] };
     const sectionBlock = findBlock(loaded.blocks, section);
     if (!sectionBlock) return { ok: false, errors: [`no block with id "${section}" on this page`] };
@@ -577,7 +613,7 @@ async function handleCreateList(args: unknown): Promise<Record<string, unknown>>
     const shape = validateBlocks(next);
     if (!shape.ok) return { ok: false, errors: shape.errors };
 
-    const res = await setPageBlocks(page, shape.blocks);
+    const res = await setDraftBlocks(page, shape.blocks, loaded.meta);
     if (!res.ok) return { ok: false, errors: res.errors };
     return { ok: true, action: "created", page, list: listId, collection, template };
   } catch (err) {
@@ -590,7 +626,7 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
   if (!valid.ok) return { ok: false, errors: [valid.error] };
   const { page, block } = valid.value;
   try {
-    const loaded = await getPageBlocks(page);
+    const loaded = await getDraftBlocks(page);
     if (!loaded) return { ok: false, errors: [`no page with id "${page}"`] };
     const listBlock = findBlock(loaded.blocks, block);
     if (!listBlock) return { ok: false, errors: [`no block with id "${block}" on this page`] };
@@ -628,7 +664,7 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
 
     const shape = validateBlocks(next);
     if (!shape.ok) return { ok: false, errors: shape.errors };
-    const res = await setPageBlocks(page, shape.blocks);
+    const res = await setDraftBlocks(page, shape.blocks, loaded.meta);
     if (!res.ok) return { ok: false, errors: res.errors };
     return { ok: true, action: "bound", page, list: block, collection, template };
   } catch (err) {
