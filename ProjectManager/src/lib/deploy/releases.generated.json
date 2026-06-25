@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.7.0",
+      "tag": "r-1.7.0",
+      "markdown": "# CMS v1.7.0\n\n_2026-06-25 · changes since r-1.6.0_\n\n## Features\n- Chat: expanded assistant tooling for reading and writing page content and components.\n- Page builder: richer page-block handling.\n- Chat: improved model picker.\n- Localized UI strings added across English, Finnish, and Estonian.\n"
+    },
+    {
       "version": "1.6.0",
       "tag": "r-1.6.0",
       "markdown": "# CMS v1.6.0\n\n_2026-06-25 · changes since r-1.5.0_\n\n## Features\n- Chat: the assistant's page context and system prompt now incorporate your site settings, so its answers and edits respect per-site configuration.\n"
@@ -19,11 +24,6 @@
       "version": "1.3.0",
       "tag": "r-1.3.0",
       "markdown": "# CMS v1.3.0\n\n_2026-06-25 · changes since r-1.2.0_\n\n## Features\n- Chat: assistant replies now render as formatted markdown (headings, lists, code, links, emphasis) instead of plain text.\n"
-    },
-    {
-      "version": "1.2.0",
-      "tag": "r-1.2.0",
-      "markdown": "# CMS v1.2.0\n\n_2026-06-25 · changes since r-1.1.0_\n\n## Features\n- Chat: rebuild conversation history from the persisted message log (build-history reframe), so the assistant's context stays consistent across reloads and tool round-trips.\n"
     },
     {
       "version": "0.11.0",
