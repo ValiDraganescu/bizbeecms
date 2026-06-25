@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.5.0",
+      "tag": "r-1.5.0",
+      "markdown": "# CMS v1.5.0\n\n_2026-06-25 · changes since r-1.4.1_\n\n## Features\n- Page builder now refreshes live when the chat assistant edits a page, so tool-driven changes appear immediately without a manual reload.\n"
+    },
+    {
       "version": "1.4.1",
       "tag": "r-1.4.1",
       "markdown": "# CMS v1.4.1\n\n_2026-06-25 · changes since r-1.4.0_\n\n## Fixes\n- Chat debug panel now shows the active prompt override when one is set, instead of always showing the base prompt.\n"
@@ -19,11 +24,6 @@
       "version": "1.1.0",
       "tag": "r-1.1.0",
       "markdown": "# CMS v1.1.0\n\n_2026-06-25 · changes since r-1.0.1_\n\n## Features\n- **Page-aware AI assistant in the Page Builder.** When you have a page selected, your next message to the AI assistant automatically tells it which page you're editing (path, slug, draft/published), so page requests apply to the right page. It updates as you switch pages and clears when you leave the Page Builder.\n- **\"Page context attached\" chip.** A small chip above the chat input shows when page context will be sent; click it to see the exact text being attached to your message.\n\n## Other\n- The AI assistant's debug (context & tools) button now uses a proper cog/settings icon instead of the previous sun-like one.\n"
-    },
-    {
-      "version": "1.0.1",
-      "tag": "r-1.0.1",
-      "markdown": "# CMS v1.0.1\n\n_2026-06-24 · changes since r-1.0.0_\n\n## Fixes\n- The AI assistant's debug tools that are restricted to BizBeeCMS SSO operators (export chat as JSON, the system-prompt versions editor) now appear correctly. Operators who signed in via \"Sign in with BizbeeCMS\" were being treated as non-SSO when their CMS account used their real email, so the controls stayed hidden.\n\n## Notes\n- Adds a `pm_user_id` column to the CMS `user` table (auto-applied on deploy). SSO operators are stamped with it on their next sign-in.\n"
     },
     {
       "version": "0.11.0",
