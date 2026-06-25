@@ -1,5 +1,5 @@
 ---
-description: Repo-specific CMS release tooling for bizbeecms. `commit` ships ordinary changes (delegates to /orc-commit). `release` cuts a CMS release end-to-end — drafts release-notes/<x.y.z>.md from commits since the last r-* tag, then bumps CMS/package.json, commits, annotated-tags r-<x.y.z>, and pushes the tag + branch (no confirmation pause).
+description: Repo-specific CMS release tooling for bizbeecms. `commit` ships ordinary changes (delegates to /orc-commit). `release` cuts a CMS release end-to-end — commits & pushes any pending work first, then drafts release-notes/<x.y.z>.md from commits since the last r-* tag, bumps CMS/package.json, commits, annotated-tags r-<x.y.z>, and pushes the tag + branch (no confirmation pause).
 argument-hint: "[commit | release [major|minor|patch]] — default: release"
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 ---
@@ -14,7 +14,8 @@ commit), so the `r-` scheme starts clean and the deployer keys off `r-*`. Two co
 
 - `commit` — ship ordinary working-tree changes. **Delegate to `/orc-commit`** (it
   bumps the right version file, commits, pushes). No tagging. Use this for normal work.
-- `release` — cut a CMS release end-to-end: draft notes → bump → tag → push (no pause).
+- `release` — cut a CMS release end-to-end: commit & push pending work → draft notes →
+  bump → tag → push (no pause).
 
 The first token of `$ARGUMENTS` is the command (`commit` or `release`); default
 `release`. For `release`, an optional second token forces the semver level
@@ -40,11 +41,20 @@ up `r-*` now.
 ### Step 0 — Pre-flight
 Run in parallel:
 - `git rev-parse --show-toplevel` (work from the repo root)
-- `git status --short` (the tree should be clean OR only contain the release notes you
-  intend to ship — if there's unrelated uncommitted work, STOP and tell the user to
-  `commit` first; a release must be reproducible from a clean tree)
+- `git status --short` (see what's pending — Step 0.5 commits it)
 - `git fetch --tags` (so the "last tag" check sees remote tags)
 - `git rev-parse --abbrev-ref HEAD` (the branch you'll push)
+
+### Step 0.5 — Commit & push any pending work first
+A release must be reproducible from a clean tree, so if `git status --short` shows
+anything, commit it all and push **before** computing the range:
+```bash
+git add -A
+git commit -m "<conventional subject summarizing the pending work>"   # read the diff to write it
+git push origin "$(git rev-parse --abbrev-ref HEAD)"
+```
+Then re-check `git status --short` — it must be clean before Step 1. (The user has
+opted into this: `release` commits pending work, pushes, then tags, all in one go.)
 
 ### Step 1 — Find the last r-* tag and the commit range
 ```bash

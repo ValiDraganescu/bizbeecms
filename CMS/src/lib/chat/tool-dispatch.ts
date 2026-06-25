@@ -73,6 +73,17 @@ import {
   validateBindList,
 } from "./binding-tools";
 import {
+  LIST_PROMPTS_TOOL,
+  CREATE_PROMPT_TOOL,
+  UPDATE_PROMPT_TOOL,
+  DELETE_PROMPT_TOOL,
+  validateCreatePrompt,
+  validateUpdatePrompt,
+  coercePromptId,
+} from "./prompt-tools";
+import { EDIT_TEXT_TOOL, validateEditText } from "./edit-text-tool";
+import { applyEdit } from "./apply-edit";
+import {
   validateBlocks,
   findBlock,
   setBlockField,
@@ -133,6 +144,13 @@ import {
   deleteItem,
 } from "@/db/item-store";
 import { queryCollection } from "@/db/query-store";
+import {
+  listPromptVersions,
+  createPromptVersion,
+  updatePromptVersion,
+  deletePromptVersion,
+  getPromptVersion,
+} from "@/db/prompt-version-store";
 
 export type { DispatchResult } from "./tool-dispatch-core";
 
@@ -166,6 +184,11 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   bind_component: BIND_COMPONENT_TOOL,
   create_list: CREATE_LIST_TOOL,
   bind_list: BIND_LIST_TOOL,
+  list_prompts: LIST_PROMPTS_TOOL,
+  create_prompt: CREATE_PROMPT_TOOL,
+  update_prompt: UPDATE_PROMPT_TOOL,
+  delete_prompt: DELETE_PROMPT_TOOL,
+  edit_text: EDIT_TEXT_TOOL,
 };
 
 /** The tool SCHEMAS the assistant may use in this admin-page context (chat route). */
@@ -613,6 +636,105 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
   }
 }
 
+// ── System-prompt version CRUD ────────────────────────────────────────────────
+// Manage saved system-prompt versions (the named full prompts an operator keeps
+// to compare). Storing/editing a version NEVER changes the site's active default
+// — selecting one to actually use is the chat route's per-request override path.
+
+async function handleListPrompts(): Promise<Record<string, unknown>> {
+  try {
+    return { ok: true, prompts: await listPromptVersions() };
+  } catch (err) {
+    return { ok: false, errors: [`failed to list prompts: ${(err as Error).message}`] };
+  }
+}
+
+async function handleCreatePrompt(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateCreatePrompt(args);
+  if ("error" in valid) return { ok: false, errors: [valid.error] };
+  try {
+    const prompt = await createPromptVersion(valid);
+    return { ok: true, action: "created", prompt };
+  } catch (err) {
+    return { ok: false, errors: [`failed to create prompt: ${(err as Error).message}`] };
+  }
+}
+
+async function handleUpdatePrompt(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateUpdatePrompt(args);
+  if ("error" in valid) return { ok: false, errors: [valid.error] };
+  try {
+    const prompt = await updatePromptVersion(valid.id, { label: valid.label, prompt: valid.prompt });
+    if (!prompt) return { ok: false, errors: [`no prompt version with id "${valid.id}"`] };
+    return { ok: true, action: "updated", prompt };
+  } catch (err) {
+    return { ok: false, errors: [`failed to update prompt: ${(err as Error).message}`] };
+  }
+}
+
+async function handleDeletePrompt(args: unknown): Promise<Record<string, unknown>> {
+  const id = coercePromptId(args);
+  if (!id) return { ok: false, errors: ["id is required"] };
+  try {
+    await deletePromptVersion(id);
+    return { ok: true, action: "deleted", id };
+  } catch (err) {
+    return { ok: false, errors: [`failed to delete prompt: ${(err as Error).message}`] };
+  }
+}
+
+// ── edit_text: string-replace patch of a long-text field ──────────────────────
+// Load the targeted field, apply the snippet edit (apply-edit's cascading
+// matchers + safety rails), re-validate where needed, and persist. Never rewrites
+// the whole field; an ambiguous/absent oldString returns a recoverable error.
+
+async function handleEditText(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateEditText(args);
+  if ("error" in valid) return { ok: false, errors: [valid.error] };
+  const { target, selector, oldString, newString, replaceAll } = valid;
+
+  try {
+    if (target === "component.script" || target === "component.css") {
+      const row = await getComponentByName(selector);
+      if (!row) return { ok: false, errors: [`no component named "${selector}"`] };
+      const field = target === "component.script" ? "script" : "css";
+      const current = (row[field] as string) ?? "";
+      const edit = applyEdit(current, oldString, newString, replaceAll);
+      if (!edit.ok) return { ok: false, errors: [edit.error] };
+
+      // Re-pass the FULL artifact through the same validate gate as create/update
+      // (tree comes back as a JSON string from D1 → parse to the object shape).
+      let tree: unknown;
+      try {
+        tree = JSON.parse(row.tree as string);
+      } catch {
+        return { ok: false, errors: ["stored component tree is not valid JSON; use update_component"] };
+      }
+      const artifact = {
+        name: row.name,
+        tree,
+        script: field === "script" ? edit.content : ((row.script as string) ?? ""),
+        css: field === "css" ? edit.content : ((row.css as string) ?? ""),
+      };
+      const checked = validateComponentArtifact(artifact);
+      if (!checked.ok) return { ok: false, errors: checked.errors };
+      const res = await upsertComponent(checked.artifact);
+      return { ok: true, action: "edited", target, component: res.name, replacements: edit.replacements, matcher: edit.matcher };
+    }
+
+    // prompt.prompt
+    const version = await getPromptVersion(selector);
+    if (!version) return { ok: false, errors: [`no prompt version with id "${selector}"`] };
+    const edit = applyEdit(version.prompt, oldString, newString, replaceAll);
+    if (!edit.ok) return { ok: false, errors: [edit.error] };
+    const updated = await updatePromptVersion(selector, { prompt: edit.content });
+    if (!updated) return { ok: false, errors: [`no prompt version with id "${selector}"`] };
+    return { ok: true, action: "edited", target, prompt: updated, replacements: edit.replacements, matcher: edit.matcher };
+  } catch (err) {
+    return { ok: false, errors: [`failed to edit text: ${(err as Error).message}`] };
+  }
+}
+
 /** The id of the List just appended by addListToSection (the new block in `after`). */
 function newListId(before: Block[], after: Block[]): string {
   const had = new Set<string>();
@@ -657,6 +779,11 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   bind_component: handleBindComponent,
   create_list: handleCreateList,
   bind_list: handleBindList,
+  list_prompts: () => handleListPrompts(),
+  create_prompt: handleCreatePrompt,
+  update_prompt: handleUpdatePrompt,
+  delete_prompt: handleDeletePrompt,
+  edit_text: handleEditText,
 };
 
 /**

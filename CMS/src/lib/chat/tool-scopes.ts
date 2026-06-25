@@ -68,6 +68,13 @@ export const KNOWN_TOOL_NAMES = [
   "bind_component",
   "create_list",
   "bind_list",
+  // System-prompt version CRUD (operator config; general scope + MCP only).
+  "list_prompts",
+  "create_prompt",
+  "update_prompt",
+  "delete_prompt",
+  // String-replace edit for long-text fields (component script/css, prompt body).
+  "edit_text",
 ] as const;
 export type ToolName = (typeof KNOWN_TOOL_NAMES)[number];
 
@@ -148,6 +155,7 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "bind_component",
     "create_list",
     "bind_list",
+    "edit_text",
   ],
   // Component playground: discover + author/UPDATE components, see brand/theme + media.
   components: [
@@ -158,6 +166,7 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "get_component",
     "get_brand_identity",
     "get_theme",
+    "edit_text",
   ],
   // Pages list: discover pages, compose/UPDATE + translate them, reference media.
   pages: [

@@ -7,3 +7,6 @@ node_modules/
 # wrangler local cache/state (per-machine)
 .wrangler/
 .impeccable/
+
+# MCP server config (per-machine; may hold local endpoints/secrets)
+.mcp.json
