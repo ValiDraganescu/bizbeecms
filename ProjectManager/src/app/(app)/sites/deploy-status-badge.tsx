@@ -51,7 +51,7 @@ export function DeployStatusBadge({
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/sites/${siteId}/deploy-events`);
+      const res = await fetch(`/api/sites/${siteId}/deploy-events?latest=1`);
       if (!res.ok) return;
       const data = (await res.json()) as { status: SiteStatus; events: WireEvent[] };
       setStatus(data.status);
