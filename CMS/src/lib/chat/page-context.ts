@@ -15,6 +15,8 @@
  */
 
 export interface PageContextInput {
+  /** The page's id — the assistant uses this directly for update_page_blocks etc. */
+  id: string;
   /** URL-ish path, e.g. "/about" or "/blog/post". */
   path: string;
   slug: string;
@@ -30,7 +32,9 @@ export function formatPageContext(page: PageContextInput | null | undefined): st
   const status = page.published ? "published" : "draft";
   return (
     `[Page Builder context] The user is editing the page "${page.path}" ` +
-    `(slug: "${page.slug}", status: ${status}). ` +
+    `(id: "${page.id}", slug: "${page.slug}", status: ${status}). ` +
+    `Use this id directly for page tools (update_page_blocks, bind_component, ` +
+    `create_list, bind_list) — do NOT call list_pages or get_page to find it. ` +
     `Apply page-related requests to this page unless they say otherwise.`
   );
 }

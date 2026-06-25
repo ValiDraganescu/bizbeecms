@@ -275,7 +275,7 @@ export function PageBuilderShell({
   useEffect(() => {
     setActivePageContext(
       selected
-        ? { path: selected.path, slug: selected.slug, published: selected.published }
+        ? { id: selected.id, path: selected.path, slug: selected.slug, published: selected.published }
         : null,
     );
     return () => setActivePageContext(null);

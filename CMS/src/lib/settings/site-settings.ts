@@ -85,9 +85,47 @@ export function isEmptyIdentity(identity: SiteIdentity): boolean {
  * them instead of re-authoring); `utilityClasses` = the bounded A3 vocabulary it
  * may put in `className` (arbitrary Tailwind has NO runtime CSS).
  */
+/** One prop of a component definition, as folded into the system prompt. */
+export type PromptPropDef = {
+  name: string;
+  type: string;
+  required?: boolean;
+  description?: string;
+};
+
+/** A component's DEFINITION (not its implementation) for the system prompt. */
+export type PromptComponentDef = {
+  name: string;
+  props: PromptPropDef[];
+};
+
+/** A built-in block type (Section, …) for the system prompt. */
+export type PromptBuiltinDef = {
+  name: string;
+  description: string;
+};
+
+/** Render one component definition as a compact line: `Name(prop: type!, …)`. */
+function formatComponentDef(c: PromptComponentDef): string {
+  if (c.props.length === 0) return `${c.name} (no props)`;
+  const props = c.props
+    .map((p) => {
+      const req = p.required ? "!" : "";
+      const desc = p.description ? ` — ${p.description}` : "";
+      return `${p.name}: ${p.type}${req}${desc}`;
+    })
+    .join("; ");
+  return `${c.name} { ${props} }`;
+}
+
 export function buildSystemPrompt(opts: {
   identity?: SiteIdentity;
+  /** Component DEFINITIONS (name + props) — preferred over bare names. */
+  components?: PromptComponentDef[];
+  /** Legacy bare-name list (used only if `components` is absent). */
   componentNames?: string[];
+  /** Built-in block types (Section, …). */
+  builtins?: PromptBuiltinDef[];
   utilityClasses?: string[];
 }): string {
   const parts: string[] = [];
@@ -99,6 +137,14 @@ export function buildSystemPrompt(opts: {
       "translate (add per-locale content), and list_assets (read the Site's " +
       "uploaded media). Always create the components a page needs BEFORE " +
       "create_page — a page referencing an unknown component is rejected.",
+  );
+
+  parts.push(
+    "Follow the user's instructions as closely as possible. Do exactly what " +
+      "they ask — no more, no less. If a request is ambiguous or would mean " +
+      "more than they asked for (e.g. they say one section, not three), ask " +
+      "before doing extra. Don't add, remove, or restructure things they " +
+      "didn't request.",
   );
 
   parts.push(
@@ -116,12 +162,31 @@ export function buildSystemPrompt(opts: {
     );
   }
 
+  const builtins = opts.builtins ?? [];
+  if (builtins.length > 0) {
+    parts.push(
+      "Built-in block types (use directly in a page's block tree — no need to " +
+        "create them):\n" +
+        builtins.map((b) => `- ${b.name}: ${b.description}`).join("\n"),
+    );
+  }
+
+  const defs = opts.components ?? [];
   const names = opts.componentNames ?? [];
-  parts.push(
-    names.length > 0
-      ? `This Site already has these components — reuse them when they fit: ${names.join(", ")}.`
-      : "This Site has no components yet — create the ones each page needs.",
-  );
+  if (defs.length > 0) {
+    parts.push(
+      "This Site's existing components (reuse them when they fit; props shown — " +
+        "`!` = required). Set these props when you place a component in a page; " +
+        "do NOT call get_component just to learn props — they're listed here:\n" +
+        defs.map((c) => `- ${formatComponentDef(c)}`).join("\n"),
+    );
+  } else if (names.length > 0) {
+    parts.push(
+      `This Site already has these components — reuse them when they fit: ${names.join(", ")}.`,
+    );
+  } else {
+    parts.push("This Site has no components yet — create the ones each page needs.");
+  }
 
   parts.push(
     "When a design references an image, call list_assets and use a returned " +

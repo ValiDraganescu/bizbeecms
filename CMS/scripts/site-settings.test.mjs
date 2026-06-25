@@ -115,3 +115,40 @@ test("buildSystemPrompt: folds in identity, components, and utility classes", ()
   // Empty fields aren't emitted as blank lines.
   assert.doesNotMatch(p, /Tagline:/);
 });
+
+test("buildSystemPrompt: always instructs to follow user guidance closely", () => {
+  assert.match(buildSystemPrompt({}), /closely as possible/i);
+});
+
+test("buildSystemPrompt: folds in component DEFINITIONS (name + props) with required flag", () => {
+  const p = buildSystemPrompt({
+    components: [
+      { name: "Hero", props: [
+        { name: "title", type: "string", required: true, description: "Big heading" },
+        { name: "subtitle", type: "string" },
+      ] },
+      { name: "Spacer", props: [] },
+    ],
+  });
+  assert.match(p, /Hero \{ title: string! — Big heading; subtitle: string \}/);
+  assert.match(p, /Spacer \(no props\)/);
+  // Tells the model not to call get_component just for props.
+  assert.match(p, /do NOT call get_component/);
+});
+
+test("buildSystemPrompt: definitions win over the legacy bare-name list", () => {
+  const p = buildSystemPrompt({
+    components: [{ name: "Hero", props: [] }],
+    componentNames: ["IgnoredName"],
+  });
+  assert.match(p, /Hero \(no props\)/);
+  assert.doesNotMatch(p, /IgnoredName/);
+});
+
+test("buildSystemPrompt: folds in built-in block types", () => {
+  const p = buildSystemPrompt({
+    builtins: [{ name: "Section", description: "A layout container." }],
+  });
+  assert.match(p, /Built-in block types/);
+  assert.match(p, /Section: A layout container\./);
+});

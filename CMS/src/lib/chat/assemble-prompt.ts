@@ -14,22 +14,37 @@
  */
 import { contextPrompt, type AdminPageContext } from "@/lib/chat/tool-scopes";
 import { getSiteIdentity } from "@/db/settings-store";
-import { listComponentNames } from "@/db/component-store";
-import { buildSystemPrompt } from "@/lib/settings/site-settings";
+import { listComponents } from "@/db/component-store";
+import {
+  buildSystemPrompt,
+  type PromptComponentDef,
+} from "@/lib/settings/site-settings";
+import { parsePropsSchema } from "@/lib/pages/page-blocks";
+import { builtinBlockTypes } from "@/lib/chat/write-tools";
 import { allowedClasses } from "@/lib/render/utility-css";
 
 export async function assembleSystemPrompt(
   context: AdminPageContext,
 ): Promise<string> {
   let identity;
-  let componentNames: string[] = [];
+  let components: PromptComponentDef[] = [];
   try {
     identity = await getSiteIdentity();
   } catch {
     /* unbound D1 → no identity */
   }
   try {
-    componentNames = await listComponentNames();
+    // Component DEFINITIONS (name + declared props) — not implementations. So the
+    // model knows what exists + which props each takes WITHOUT calling get_component.
+    components = (await listComponents()).map((c) => ({
+      name: c.name,
+      props: parsePropsSchema(c.propsSchema).map((p) => ({
+        name: p.name,
+        type: p.type,
+        required: p.required,
+        description: p.description,
+      })),
+    }));
   } catch {
     /* unbound D1 → no components */
   }
@@ -37,7 +52,8 @@ export async function assembleSystemPrompt(
   return (
     buildSystemPrompt({
       identity,
-      componentNames,
+      components,
+      builtins: builtinBlockTypes(),
       utilityClasses: [...allowedClasses()].sort(),
     }) +
     "\n\n" +
