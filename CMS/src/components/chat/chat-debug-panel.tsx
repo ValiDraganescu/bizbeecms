@@ -362,7 +362,7 @@ export function ChatDebugPanel({
         )}
         {!loading && !error && (
           <pre className="flex-1 whitespace-pre-wrap break-words rounded bg-surface-muted p-2 text-xs text-foreground">
-            {prompt}
+            {override ?? prompt}
           </pre>
         )}
       </section>
