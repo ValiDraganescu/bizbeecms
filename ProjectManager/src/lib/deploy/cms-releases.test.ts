@@ -1,6 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeReleases, refForVersion, isUpdateAvailable } from "./cms-releases.ts";
+import { normalizeReleases, refForVersion, isUpdateAvailable, trimReleases } from "./cms-releases.ts";
+
+test("trimReleases: last 3 majors, 5 minors/major, last patch/minor", () => {
+  const v = (s: string) => ({ version: s, tag: `r-${s}` });
+  // newest-first input spanning 4 majors with extra minors and patches
+  const input = [
+    v("4.0.0"),
+    v("3.7.2"), v("3.7.1"), v("3.7.0"), // only 3.7.2 (last patch) should survive
+    v("3.6.0"), v("3.5.0"), v("3.4.0"), v("3.3.0"), v("3.2.0"), // 3.2.0 is the 6th minor → dropped
+    v("2.1.0"),
+    v("1.0.0"), // 4th-newest major → dropped entirely
+  ];
+  const out = trimReleases(input).map((r) => r.version);
+  assert.deepEqual(out, [
+    "4.0.0",
+    "3.7.2",
+    "3.6.0", "3.5.0", "3.4.0", "3.3.0", // 4 more minors → 5 total for major 3
+    "2.1.0",
+  ]);
+});
 
 test("normalizeReleases keeps valid cms-v releases", () => {
   assert.deepEqual(

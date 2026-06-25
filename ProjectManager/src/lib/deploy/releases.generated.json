@@ -1,0 +1,54 @@
+{
+  "releases": [
+    {
+      "version": "1.4.1",
+      "tag": "r-1.4.1",
+      "markdown": "# CMS v1.4.1\n\n_2026-06-25 · changes since r-1.4.0_\n\n## Fixes\n- Chat debug panel now shows the active prompt override when one is set, instead of always showing the base prompt.\n"
+    },
+    {
+      "version": "1.3.0",
+      "tag": "r-1.3.0",
+      "markdown": "# CMS v1.3.0\n\n_2026-06-25 · changes since r-1.2.0_\n\n## Features\n- Chat: assistant replies now render as formatted markdown (headings, lists, code, links, emphasis) instead of plain text.\n"
+    },
+    {
+      "version": "1.2.0",
+      "tag": "r-1.2.0",
+      "markdown": "# CMS v1.2.0\n\n_2026-06-25 · changes since r-1.1.0_\n\n## Features\n- Chat: rebuild conversation history from the persisted message log (build-history reframe), so the assistant's context stays consistent across reloads and tool round-trips.\n"
+    },
+    {
+      "version": "1.1.0",
+      "tag": "r-1.1.0",
+      "markdown": "# CMS v1.1.0\n\n_2026-06-25 · changes since r-1.0.1_\n\n## Features\n- **Page-aware AI assistant in the Page Builder.** When you have a page selected, your next message to the AI assistant automatically tells it which page you're editing (path, slug, draft/published), so page requests apply to the right page. It updates as you switch pages and clears when you leave the Page Builder.\n- **\"Page context attached\" chip.** A small chip above the chat input shows when page context will be sent; click it to see the exact text being attached to your message.\n\n## Other\n- The AI assistant's debug (context & tools) button now uses a proper cog/settings icon instead of the previous sun-like one.\n"
+    },
+    {
+      "version": "1.0.1",
+      "tag": "r-1.0.1",
+      "markdown": "# CMS v1.0.1\n\n_2026-06-24 · changes since r-1.0.0_\n\n## Fixes\n- The AI assistant's debug tools that are restricted to BizBeeCMS SSO operators (export chat as JSON, the system-prompt versions editor) now appear correctly. Operators who signed in via \"Sign in with BizbeeCMS\" were being treated as non-SSO when their CMS account used their real email, so the controls stayed hidden.\n\n## Notes\n- Adds a `pm_user_id` column to the CMS `user` table (auto-applied on deploy). SSO operators are stamped with it on their next sign-in.\n"
+    },
+    {
+      "version": "0.11.0",
+      "tag": "r-0.11.0",
+      "markdown": "# CMS v0.11.0\n\n_2026-06-24 · changes since cms-v0.10.0_\n\n## Features\n- Collections: import and export items as CSV or JSON, from a new operator UI.\n- Collections: a schema manager to add, drop, and rename fields, with atomic live-store rebuilds.\n- Collections: AI tools to drop and rename collection fields (schema evolution).\n- Collections: an operator raw-SELECT SQL console (fenced SELECT-only, not exposed to the AI).\n- AI chat panel resizes via a top-left pointer-drag handle (replacing the native CSS resize).\n- Chat: scroll-to-latest pill with follow-bottom-only transcript behavior.\n- Chat: tool cards get a show-more toggle for truncated input/output blobs.\n- Chat: inline active-override label near the input (PM-SSO).\n- Accessibility: focus trap and initial focus in the open chat dialog, Esc minimizes the panel, and focus-visible rings on widget buttons.\n\n## Fixes\n- Collections: fix collection-create failing when the CREATE TABLE spanned multiple lines (use prepared statement instead of D1 exec).\n- Collections: restore the missing Collections nav-item icon.\n- Chat: fix the model-picker crash on stale-cache rows from /api/chat/models.\n- Chat: fix the expand/shrink toggle getting stuck one-way (toggle on size, not preset).\n"
+    },
+    {
+      "version": "0.10.0",
+      "tag": "r-0.10.0",
+      "markdown": "# CMS v0.10.0\n\n_2026-06-24 · changes since cms-v0.9.2_\n\n## Features\n- AI chat assistant panel is now resizable, with default/half-screen preset toggles.\n- Chat input is a resizable textarea with a switch for Enter behavior (send vs. newline).\n- The model picker shows per-model prices (input/output USD per 1M tokens) and input-modality icons, and is filtered to tool-call-capable models only.\n- Your selected model now persists across reloads (validated against the live catalog).\n- The chat widget shows the remaining credit on the in-use OpenRouter key.\n- Tool calls are persisted in chat history and rendered as cards (name shown once, with an input/output accordion).\n- The launcher shows an unread badge when minimized and a new reply arrives.\n- PM-SSO operators can export a chat as the full model-payload JSON.\n- PM-SSO operators can edit system-prompt version overrides from the debug panel, backed by a new prompt-version store and gated prompts API.\n\n## Fixes\n- Accept 48-byte `CMS_AUTH_SECRET` values: the AES key is now SHA-256-derived instead of being rejected by the secret-box KEK.\n"
+    },
+    {
+      "version": "0.9.2",
+      "tag": "r-0.9.2",
+      "markdown": "# CMS v0.9.2\n\n_2026-06-24 · changes since cms-v0.9.1_\n\n## Fixes\n- **\"Sign in with BizBeeCMS\" SSO button now always shows on the admin login.** It was hidden unless you arrived from ProjectManager via a specific link, so opening `/admin` directly (or after an apex→www redirect) showed only email/password. The button now appears whenever the Site is wired to ProjectManager.\n"
+    },
+    {
+      "version": "0.8.0",
+      "tag": "r-0.8.0",
+      "markdown": "# CMS v0.8.0\n\n_2026-06-23 · changes since cms-v0.7.0_\n\n## Features\n\n### Per-site OpenRouter API key (new)\n- Each site can now use its **own** OpenRouter API key for the AI assistant, set in ProjectManager → Site settings (write-only field: shows \"key set\" / \"no key\", never reveals the stored value, with a \"Clear key\" action).\n- The key is **encrypted at rest** in ProjectManager (AES-256-GCM), decrypted only at deploy time, sent to the deployer over HTTPS, and installed as a real **secret** on that site's CMS Worker — never a plaintext variable, never written to a deploy log.\n- Graceful fallback at every step: a site with no key (or a key that can't be decrypted) falls back to the deployer's global OpenRouter key, and if that's also unset, to the built-in Workers-AI provider. A missing key never breaks a deploy.\n\n## Other\n- New ProjectManager secret `SITE_SECRET_KEY` (the encryption key) and a `sites.openrouterApiKeyEncrypted` column + migration.\n- The deployer now sets the CMS Worker's OpenRouter key via `wrangler secret put` instead of a build-time variable.\n"
+    },
+    {
+      "version": "0.7.0",
+      "tag": "r-0.7.0",
+      "markdown": "# CMS v0.7.0\n\n_2026-06-22 · changes since cms-v0.6.0_\n\n## Features\n\n### Content collections (new)\n- Define your own data collections — each becomes a real database table, created safely behind a hardened SQL fence (no raw SQL ever reaches the table layer).\n- Full admin UI: create and edit a collection's schema with a field-type picker, then manage its items in a table with the right input per type (date/time, number, select, boolean, multiselect, rich text).\n- Structured search, filter, sort and pagination over collection items.\n- Bind collection data into pages: a single block can pull one record's fields into its props, or a new built-in **List** block can stamp a component once per matching record — all authored visually in the page builder, with graceful empty states.\n- AI assistant can create collections, add/update/archive items, query data, and wire up component bindings — all through structured tools, never raw SQL.\n\n### CMS-local accounts & roles (new)\n- Sign in directly in the CMS with email + password, **Sign in with Google**, or PM single-sign-on — no more forced redirect to ProjectManager.\n- Four-role hierarchy (SuperAdmin / Admin / Manager / Editor) with server-enforced permissions on every admin route.\n- Invite teammates by email (sent via Cloudflare Email) with a role-limited invite form; accept-invite flow creates the account and signs them in.\n- User-management screen: list users and pending invites, change roles, and remove users — all gated by who's allowed to do what.\n\n### Manage a site from your own AI tools (new)\n- Each deployed CMS exposes a remote MCP server at `/mcp`, so you can connect Claude Code (or any MCP client) and manage the site with your own model.\n- Mint and revoke per-site API keys in **Settings → API Keys**, with a copy-paste \"Connect Claude Code\" snippet.\n\n### Component kits\n- Tag components, then export everything with a tag as a single installable kit bundle — and import a kit in one step.\n\n### AI provider\n- The AI assistant now runs on OpenRouter by default (with the built-in Workers-AI provider as fallback), and its model picker lists the full OpenRouter catalog.\n\n## Other\n- Hardened the runtime SQL fence with a parsing validator and an attack-string test corpus; added a schema-rebuild planner for future field drop/rename.\n- Numerous database migrations for the new auth, roles, tags, API-key, invite and collection tables (applied automatically on deploy).\n- Trilingual (EN/FI/ET) coverage for every new screen.\n"
+    }
+  ]
+}

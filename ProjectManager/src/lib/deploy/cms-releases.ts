@@ -57,6 +57,33 @@ export function normalizeReleases(payload: unknown): CmsRelease[] {
     out.push({ version, tag });
   }
   out.sort((a, b) => cmpSemverDesc(a.version, b.version));
+  return trimReleases(out);
+}
+
+/**
+ * Cap the picker to the last 3 major versions, the last 5 minors per major, and
+ * the last patch per minor (USER DECISION). Input must be sorted newest-first
+ * (as `normalizeReleases` does), so first-seen of each key is the newest.
+ */
+export function trimReleases(sorted: CmsRelease[]): CmsRelease[] {
+  const majors: number[] = [];
+  const minorsByMajor = new Map<number, number[]>();
+  const out: CmsRelease[] = [];
+  for (const r of sorted) {
+    const [maj, min] = semverParts(r.version);
+    if (!majors.includes(maj)) {
+      if (majors.length >= 3) continue; // older than the 3 newest majors
+      majors.push(maj);
+    }
+    let minors = minorsByMajor.get(maj);
+    if (!minors) minorsByMajor.set(maj, (minors = []));
+    if (!minors.includes(min)) {
+      if (minors.length >= 5) continue; // older than the 5 newest minors
+      minors.push(min);
+      out.push(r); // first (newest) patch of this minor
+    }
+    // already-seen minor → not the newest patch → drop
+  }
   return out;
 }
 

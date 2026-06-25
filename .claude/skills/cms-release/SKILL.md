@@ -114,12 +114,45 @@ Write the notes, then continue straight to Step 4 — do not pause for confirmat
 (The user has opted into auto-release: draft → bump → tag → push in one go. They can
 always edit the notes and re-tag afterward if needed.)
 
+### Step 3.6 — Regenerate the releases manifest
+The PM serves the version picker AND the in-app release notes from a **baked-in**
+manifest — `ProjectManager/src/lib/deploy/releases.generated.json` — NOT from the
+deployer (the deployer's `/tags` + `/release-notes` were deleted). So after writing
+`release-notes/<NEW>.md`, regenerate the manifest from ALL `release-notes/*.md`. It is
+**pre-trimmed** (last 3 majors / last 5 minors per major / last patch per minor) and
+**inlines** each note's markdown, so the PM routes are a pure static read. Run:
+```bash
+node --input-type=module -e '
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+const dir = "release-notes";
+const parts = v => v.split(".").map(Number);
+const cmpDesc = (a,b) => { const pa=parts(a),pb=parts(b); for(let i=0;i<3;i++) if(pa[i]!==pb[i]) return pb[i]-pa[i]; return 0; };
+const all = readdirSync(dir).filter(f => /^\d+\.\d+\.\d+\.md$/.test(f))
+  .map(f => { const version=f.replace(/\.md$/,""); return { version, tag:`r-${version}`, markdown:readFileSync(`${dir}/${f}`,"utf8") }; })
+  .sort((a,b)=>cmpDesc(a.version,b.version));
+const majors=[], minorsByMajor=new Map(), out=[];
+for (const r of all) {
+  const [maj,min]=parts(r.version);
+  if(!majors.includes(maj)){ if(majors.length>=3) continue; majors.push(maj); }
+  let minors=minorsByMajor.get(maj); if(!minors) minorsByMajor.set(maj,minors=[]);
+  if(!minors.includes(min)){ if(minors.length>=5) continue; minors.push(min); out.push(r); }
+}
+writeFileSync("ProjectManager/src/lib/deploy/releases.generated.json", JSON.stringify({ releases: out }, null, 2)+"\n");
+console.log("manifest:", out.map(r=>r.version).join(", "));
+'
+```
+This is the SINGLE source of truth for "what PM shows". The trim rule lives here AND
+mirrors `trimReleases` in `ProjectManager/src/lib/deploy/cms-releases.ts` (keep them in
+sync if the rule changes).
+
 ### Step 4 — Bump, commit, annotated-tag, push
 1. Bump `CMS/package.json` `"version"` → `<NEW>` (edit only that field; preserve JSON
    formatting).
-2. Stage **only** the version file + the notes (never `git add -A`):
+2. Stage **only** the version file + the notes + the regenerated manifest (never
+   `git add -A`):
    ```bash
-   git add -- CMS/package.json "release-notes/<NEW>.md"
+   git add -- CMS/package.json "release-notes/<NEW>.md" \
+     ProjectManager/src/lib/deploy/releases.generated.json
    ```
 3. Commit (conventional subject; match repo log style):
    ```bash
@@ -144,7 +177,8 @@ always edit the notes and re-tag afterward if needed.)
 
 ### Step 5 — Report
 One or two lines: `r-<NEW>` tagged + pushed, notes at `release-notes/<NEW>.md`, the
-chosen level and old→new. PM's deployer `GET /tags` will now list it.
+chosen level and old→new. The regenerated `releases.generated.json` means PM lists
+`<NEW>` in the picker as soon as PM is redeployed (it's baked into the PM bundle).
 
 ---
 
