@@ -15,11 +15,21 @@
  * the pure unit-tested `lib/chat/client-sse.ts`.
  */
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { useTranslations } from "next-intl";
 import { ChatEventParser, type ToolResult } from "@/lib/chat/client-sse";
 import { toolSummary, blobView } from "@/lib/chat/tool-card";
 import { isAtBottom } from "@/lib/chat/scroll-anchor";
+import {
+  getActivePageContext,
+  subscribeActivePageContext,
+} from "@/lib/chat/page-context";
 import {
   decideSendOnEnter,
   loadEnterMode,
@@ -48,11 +58,17 @@ export type ChatMsg =
  * a per-request `systemPromptOverride` (a selected prompt-version's text). Read
  * fresh per `send`. The route ignores it unless the caller is PM-SSO, so a
  * non-SSO surface sending it is harmless. Omit / return undefined → no override.
+ *
+ * `getInlineContext` (optional) returns a short text block prepended to the NEXT
+ * message SENT TO THE MODEL (not shown in the user's transcript bubble) — e.g. the
+ * Page Builder's currently-selected page. Read fresh per `send`, so each message
+ * carries the context that's current at send-time. Omit / "" → nothing prepended.
  */
 export function useChat(
   getContext?: () => string | undefined,
   getModel?: () => string | undefined,
   getOverride?: () => string | undefined,
+  getInlineContext?: () => string | undefined,
 ) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [busy, setBusy] = useState(false);
@@ -63,9 +79,13 @@ export function useChat(
     if (trimmed === "" || busy) return;
 
     setError(null);
+    // Inline context (e.g. the Page Builder's selected page) is prepended to the
+    // MODEL-facing message only; the user's transcript bubble shows their raw text.
+    const inline = getInlineContext?.()?.trim();
+    const modelContent = inline ? `${inline}\n\n${trimmed}` : trimmed;
     const history = [
       ...messages.map((m) => ({ role: m.role, content: m.content })),
-      { role: "user" as const, content: trimmed },
+      { role: "user" as const, content: modelContent },
     ];
     setMessages((prev) => [
       ...prev,
@@ -169,6 +189,49 @@ export function useChat(
   }
 
   return { messages, busy, error, send, seed, reset };
+}
+
+/**
+ * "Context attached" chip — visible when the assistant will append inline context
+ * (e.g. the Page Builder's selected page) to the next message. Click to expand the
+ * exact text being sent. Subscribes to the page-context store so it shows/hides as
+ * the user navigates between pages. Renders nothing when no context is attached.
+ */
+function ContextChip() {
+  const t = useTranslations("chat");
+  const context = useSyncExternalStore(
+    subscribeActivePageContext,
+    getActivePageContext,
+    () => "", // server snapshot: never attached during SSR
+  );
+  const [open, setOpen] = useState(false);
+  if (!context) return null;
+  return (
+    <div className="rounded-md border border-border bg-surface-muted px-2 py-1 text-xs">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-1.5 text-foreground-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+          <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+        </svg>
+        <span className="truncate">{t("contextAttached")}</span>
+        <svg
+          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+          className={"ml-auto shrink-0 transition-transform " + (open ? "rotate-180" : "")}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <pre className="mt-1.5 whitespace-pre-wrap break-words border-t border-border pt-1.5 text-foreground-muted">
+          {context}
+        </pre>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -291,6 +354,7 @@ export function ChatConversation({
           void onSend();
         }}
       >
+        <ContextChip />
         <textarea
           className="min-h-[5.5rem] max-h-64 w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-foreground"
           rows={3}

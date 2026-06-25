@@ -19,6 +19,7 @@ import { useTranslations } from "next-intl";
 import { ChatConversation, useChat } from "@/components/chat/chat-conversation";
 import { ChatDebugPanel } from "@/components/chat/chat-debug-panel";
 import { detectAdminContext } from "@/lib/chat/tool-scopes";
+import { getActivePageContext } from "@/lib/chat/page-context";
 import { DEFAULT_MODEL, type CatalogModel } from "@/lib/chat/models";
 import { ModelPicker } from "@/components/chat/model-picker";
 import { resolveInitialModel, loadModel, saveModel } from "@/lib/chat/selected-model";
@@ -95,6 +96,7 @@ export function ChatWidget() {
     () => detectAdminContext(pathname),
     () => model,
     () => promptOverride ?? undefined,
+    () => getActivePageContext() || undefined,
   );
 
   // History (Slice 4 sub-slice 3): the current thread's server id (null = a new,
@@ -477,9 +479,9 @@ export function ChatWidget() {
                   (debug ? "bg-surface-muted text-foreground" : "text-foreground-muted")
                 }
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 5V3M12 21v-2M5 12H3M21 12h-2M7 7 5.5 5.5M18.5 18.5 17 17M17 7l1.5-1.5M5.5 18.5 7 17" />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
                 </svg>
               </button>
               <button

@@ -93,7 +93,8 @@
       "send": "↵ Saada",
       "newline": "↵ Reavahetus",
       "aria": "Lülita Enter-klahvi käitumist: saada sõnum või lisa reavahetus"
-    }
+    },
+    "contextAttached": "Lehe kontekst lisatud"
   },
   "contentLocales": {
     "title": "Sisukeeled",

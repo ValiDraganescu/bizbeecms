@@ -93,7 +93,8 @@
       "send": "↵ Lähetä",
       "newline": "↵ Rivinvaihto",
       "aria": "Vaihda Enter-näppäimen toiminto: lähetä viesti tai lisää rivinvaihto"
-    }
+    },
+    "contextAttached": "Sivun konteksti liitetty"
   },
   "contentLocales": {
     "title": "Sisältökielet",

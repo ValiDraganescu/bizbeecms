@@ -35,6 +35,7 @@ import {
   type PageOption,
 } from "@/lib/pages/page-picker";
 import type { PageSummary } from "@/db/page-store";
+import { setActivePageContext } from "@/lib/chat/page-context";
 import { filterGroups } from "@/lib/components/rail-filter";
 import type { ComponentGroup } from "@/lib/components/grouped";
 import {
@@ -266,6 +267,18 @@ export function PageBuilderShell({
       live = false;
     };
   }, [selected, draftReloadNonce]);
+
+  // Publish the selected page to the AI assistant's inline-context channel, so the
+  // user's next ChatWidget message tells the assistant which page they're editing.
+  // Re-runs on selection change; clears on unmount (leaving the Page Builder).
+  useEffect(() => {
+    setActivePageContext(
+      selected
+        ? { path: selected.path, slug: selected.slug, published: selected.published }
+        : null,
+    );
+    return () => setActivePageContext(null);
+  }, [selected]);
 
   // Versioning slice 4: restore a past version into a new draft, then re-load the
   // draft into the editor so it shows the restored blocks. Source untouched.
