@@ -18,10 +18,37 @@ import {
   groupByProvider,
   sortByPrice,
   filterCatalog,
+  filterByModalities,
+  catalogModalities,
   providerOf,
   pricePerMillion,
   parseInputModalities,
 } from "../src/lib/chat/models.ts";
+
+const CAT = [
+  { id: "a/x", label: "X", provider: "a", inputModalities: ["text"] },
+  { id: "a/y", label: "Y", provider: "a", inputModalities: ["text", "image"] },
+  { id: "b/z", label: "Z", provider: "b", inputModalities: ["text", "image", "file"] },
+  { id: "b/w", label: "W", provider: "b" }, // no modalities → text-only
+];
+
+test("filterByModalities: empty required keeps everything", () => {
+  assert.equal(filterByModalities(CAT, []).length, 4);
+});
+
+test("filterByModalities: AND — a model must have EVERY selected modality", () => {
+  assert.deepEqual(filterByModalities(CAT, ["image"]).map((m) => m.id), ["a/y", "b/z"]);
+  assert.deepEqual(filterByModalities(CAT, ["image", "file"]).map((m) => m.id), ["b/z"]);
+});
+
+test("filterByModalities: a model with no declared modalities is text-only", () => {
+  assert.deepEqual(filterByModalities(CAT, ["text"]).map((m) => m.id), ["a/x", "a/y", "b/z", "b/w"]);
+  assert.equal(filterByModalities(CAT, ["image"]).some((m) => m.id === "b/w"), false);
+});
+
+test("catalogModalities: distinct, ordered text→image→file→audio→video", () => {
+  assert.deepEqual(catalogModalities(CAT), ["text", "image", "file"]);
+});
 
 test("DEFAULT_MODEL is itself an allowlisted id", () => {
   assert.ok(CHAT_MODELS.some((m) => m.id === DEFAULT_MODEL));

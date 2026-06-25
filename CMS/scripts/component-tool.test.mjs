@@ -67,13 +67,17 @@ test("validate: rejects a non-renderable tree", () => {
   assert.ok(res.errors.some((e) => /tree/.test(e)));
 });
 
-test("validate: rejects unknown utility classes in the tree", () => {
+test("validate: rejects unknown utility classes in the tree AND lists the accepted ones", () => {
   const res = validateComponentArtifact({
     name: "X",
     tree: { tag: "div", props: { className: "flex made-up-class p-4" } },
   });
   assert.equal(res.ok, false);
-  assert.ok(res.errors.some((e) => e.includes("made-up-class")));
+  const err = res.errors.find((e) => e.includes("made-up-class"));
+  assert.ok(err, "error names the offending class");
+  // The error carries the accepted vocabulary so the model can self-correct.
+  assert.match(err, /Use ONLY these/);
+  assert.match(err, /\bflex\b/, "lists a real accepted class like flex");
 });
 
 test("validate: rejects unknown css classes", () => {

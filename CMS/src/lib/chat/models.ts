@@ -237,6 +237,32 @@ export function filterCatalog(
   );
 }
 
+/**
+ * Keep only models that accept EVERY required input modality (AND, not OR). An
+ * empty `required` keeps the whole catalog. A model with no declared modalities
+ * is treated as text-only (the catalog default).
+ */
+export function filterByModalities(
+  catalog: ReadonlyArray<CatalogModel>,
+  required: ReadonlyArray<string>,
+): CatalogModel[] {
+  if (required.length === 0) return [...catalog];
+  return catalog.filter((m) => {
+    const have = new Set(m.inputModalities ?? ["text"]);
+    return required.every((r) => have.has(r));
+  });
+}
+
+/** All distinct input modalities present in the catalog, in a stable order. */
+export function catalogModalities(catalog: ReadonlyArray<CatalogModel>): string[] {
+  const ORDER = ["text", "image", "file", "audio", "video"];
+  const seen = new Set<string>();
+  for (const m of catalog) for (const mod of m.inputModalities ?? ["text"]) seen.add(mod);
+  const known = ORDER.filter((o) => seen.has(o));
+  const extra = [...seen].filter((s) => !ORDER.includes(s)).sort();
+  return [...known, ...extra];
+}
+
 // ── Untrusted model resolution ──────────────────────────────────────────────
 
 const STATIC_IDS = new Set(CHAT_MODELS.map((m) => m.id));

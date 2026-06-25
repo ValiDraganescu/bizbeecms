@@ -31,6 +31,7 @@ import {
   mergeTranslations,
   validateBlockProps,
   validateBlocks,
+  normalizeSectionColumns,
 } from "../src/lib/pages/page-blocks.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -394,4 +395,57 @@ test("mergeTranslations: ignores locales not in the Site list and empty strings"
     locales,
   );
   assert.deepEqual(next.title, { en: "Hi", fi: "Moi" });
+});
+
+// ── normalizeSectionColumns — the renderer drops components placed straight under
+// a Section (planSection only renders __section_column__ children), so we wrap them.
+
+test("normalizeSectionColumns wraps a stray component child of a Section into a column", () => {
+  const out = normalizeSectionColumns([
+    { id: "Section-1", component: "Section", props: { columns: 1 }, children: [
+      { id: "Hero-1", component: "Hero", props: { title: "Hi" } },
+    ] },
+  ]);
+  const sec = out[0];
+  assert.equal(sec.children.length, 1);
+  const col = sec.children[0];
+  assert.equal(col.component, "__section_column__");
+  assert.deepEqual(col.children.map((c) => c.component), ["Hero"]);
+});
+
+test("normalizeSectionColumns leaves a well-formed Section unchanged (idempotent)", () => {
+  const good = [
+    { id: "Section-1", component: "Section", props: { columns: 1 }, children: [
+      { id: "col-1", component: "__section_column__", children: [
+        { id: "Hero-1", component: "Hero" },
+      ] },
+    ] },
+  ];
+  assert.deepEqual(normalizeSectionColumns(good), good);
+});
+
+test("normalizeSectionColumns keeps existing columns and appends stray children as a new column", () => {
+  const out = normalizeSectionColumns([
+    { id: "Section-1", component: "Section", props: { columns: 2 }, children: [
+      { id: "col-1", component: "__section_column__", children: [{ id: "A-1", component: "A" }] },
+      { id: "B-1", component: "B" },
+    ] },
+  ]);
+  const cols = out[0].children;
+  assert.equal(cols.length, 2);
+  assert.equal(cols[0].id, "col-1");
+  assert.equal(cols[1].component, "__section_column__");
+  assert.deepEqual(cols[1].children.map((c) => c.component), ["B"]);
+});
+
+test("validateBlocks auto-repairs a Section with a direct component child", () => {
+  const r = validateBlocks([
+    { id: "Section-1", component: "Section", props: { columns: 1 }, children: [
+      { id: "Hero-1", component: "Hero" },
+    ] },
+  ]);
+  assert.ok(r.ok);
+  const col = r.blocks[0].children[0];
+  assert.equal(col.component, "__section_column__");
+  assert.deepEqual(col.children.map((c) => c.component), ["Hero"]);
 });

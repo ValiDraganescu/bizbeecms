@@ -1,5 +1,5 @@
 ---
-description: Repo-specific CMS release tooling for bizbeecms. `commit` ships ordinary changes (delegates to /orc-commit). `release` cuts a CMS release end-to-end — commits & pushes any pending work first, then drafts release-notes/<x.y.z>.md from commits since the last r-* tag, bumps CMS/package.json, commits, annotated-tags r-<x.y.z>, and pushes the tag + branch (no confirmation pause).
+description: Repo-specific CMS release tooling for bizbeecms. `commit` ships ordinary changes (delegates to /orc-commit). `release` cuts a CMS release end-to-end — commits any pending work (no push yet), drafts release-notes/<x.y.z>.md from commits since the last r-* tag, bumps CMS/package.json, regenerates the PM manifest, commits, annotated-tags r-<x.y.z>, then pushes branch + tag in ONE push (single CI deploy; no confirmation pause).
 argument-hint: "[commit | release [major|minor|patch]] — default: release"
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 ---
@@ -14,8 +14,8 @@ commit), so the `r-` scheme starts clean and the deployer keys off `r-*`. Two co
 
 - `commit` — ship ordinary working-tree changes. **Delegate to `/orc-commit`** (it
   bumps the right version file, commits, pushes). No tagging. Use this for normal work.
-- `release` — cut a CMS release end-to-end: commit & push pending work → draft notes →
-  bump → tag → push (no pause).
+- `release` — cut a CMS release end-to-end: commit pending work → draft notes → bump →
+  tag → one combined push of branch + tag (no pause; single push = single CI deploy).
 
 The first token of `$ARGUMENTS` is the command (`commit` or `release`); default
 `release`. For `release`, an optional second token forces the semver level
@@ -45,16 +45,17 @@ Run in parallel:
 - `git fetch --tags` (so the "last tag" check sees remote tags)
 - `git rev-parse --abbrev-ref HEAD` (the branch you'll push)
 
-### Step 0.5 — Commit & push any pending work first
+### Step 0.5 — Commit any pending work (DO NOT push yet)
 A release must be reproducible from a clean tree, so if `git status --short` shows
-anything, commit it all and push **before** computing the range:
+anything, commit it all **before** computing the range — but **do not push here**.
+Pushing now would trigger a CI deploy for the work commit AND a second one for the
+release commit (two deploys per release). All pushing is deferred to Step 4 so the
+branch + tag go up in a single push = one deploy.
 ```bash
 git add -A
 git commit -m "<conventional subject summarizing the pending work>"   # read the diff to write it
-git push origin "$(git rev-parse --abbrev-ref HEAD)"
 ```
-Then re-check `git status --short` — it must be clean before Step 1. (The user has
-opted into this: `release` commits pending work, pushes, then tags, all in one go.)
+Then re-check `git status --short` — it must be clean before Step 1.
 
 ### Step 1 — Find the last r-* tag and the commit range
 ```bash
@@ -167,10 +168,11 @@ sync if the rule changes).
    ```bash
    git tag -a "r-<NEW>" -m "CMS v<NEW>"
    ```
-5. Push the branch **and** the tag:
+5. Push the branch **and** the tag in **one** push — this is the ONLY push in the whole
+   `release` flow (Step 0.5 deliberately didn't push). A single push = a single CI
+   deploy, even when there were pending work commits:
    ```bash
-   git push origin "$(git rev-parse --abbrev-ref HEAD)"
-   git push origin "r-<NEW>"
+   git push origin "$(git rev-parse --abbrev-ref HEAD)" "r-<NEW>"
    ```
    Do not force-push. If on `main` and the repo's flow requires a PR, push the tag only
    and tell the user the branch needs its normal review.

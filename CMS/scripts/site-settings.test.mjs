@@ -102,18 +102,23 @@ test("buildSystemPrompt: always ships base + tools, omits empty identity", () =>
   assert.doesNotMatch(p, /Brand name:/);
 });
 
-test("buildSystemPrompt: folds in identity, components, and utility classes", () => {
+test("buildSystemPrompt: folds in identity + components", () => {
   const p = buildSystemPrompt({
     identity: { ...emptySiteIdentity(), brandName: "Acme", voice: "warm" },
     componentNames: ["Hero", "PricingCard"],
-    utilityClasses: ["bg-primary", "max-w-prose"],
   });
   assert.match(p, /Brand name: Acme/);
   assert.match(p, /Brand voice\/tone: warm/);
   assert.match(p, /Hero, PricingCard/);
-  assert.match(p, /bg-primary, max-w-prose/);
   // Empty fields aren't emitted as blank lines.
   assert.doesNotMatch(p, /Tagline:/);
+});
+
+test("buildSystemPrompt: does NOT dump the class vocabulary; defers it to the error", () => {
+  const p = buildSystemPrompt({});
+  // The full comma-list is gone; the prompt just points at the create_component error.
+  assert.doesNotMatch(p, /bg-primary,/);
+  assert.match(p, /the error lists every accepted class/);
 });
 
 test("buildSystemPrompt: always instructs to follow user guidance closely", () => {

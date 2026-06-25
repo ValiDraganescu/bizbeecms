@@ -76,8 +76,11 @@ export const GET_PAGE_TOOL = {
   function: {
     name: "get_page",
     description:
-      "Fetch one page's metadata (slug, parent, publish status, per-locale meta " +
-      "fields) by its id. Use list_pages first to discover ids.",
+      "Fetch one page by id: its metadata (slug, parent, publish status, " +
+      "per-locale meta fields) AND its current draft `blocks` — the page's block " +
+      "tree (each block's id, component, props, and children) so you can see " +
+      "what's rendered and with which property values. Call this before editing a " +
+      "page so update_page_blocks re-passes the full, current tree.",
     parameters: {
       type: "object",
       properties: {

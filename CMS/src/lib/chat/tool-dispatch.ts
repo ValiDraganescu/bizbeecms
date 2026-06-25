@@ -295,7 +295,11 @@ async function handleGetPage(args: unknown): Promise<Record<string, unknown>> {
   try {
     const page = await getPageById(id);
     if (!page) return { ok: false, errors: [`no page with id "${id}"`] };
-    return { ok: true, page };
+    // Include the DRAFT block tree (what the editor/canvas show + the AI edits):
+    // each block's component + props, so the model sees what's rendered and with
+    // which values. NOT the components' html/js/css — those are implementation.
+    const draft = await getDraftBlocks(id);
+    return { ok: true, page, blocks: draft?.blocks ?? [] };
   } catch (err) {
     return { ok: false, errors: [`failed to get page: ${(err as Error).message}`] };
   }

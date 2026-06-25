@@ -161,8 +161,12 @@ export function builtinBlockTypes(): { name: string; description: string }[] {
     {
       name: SECTION_COMPONENT,
       description:
-        "A layout container. Its column children are laid out in a CSS grid row. " +
-        "Set props.columns (1-4); drop components into the columns.",
+        "A layout container. Set props.columns (1-4). Its DIRECT children must be " +
+        "column blocks named '__section_column__' (one per column); your actual " +
+        "components go inside a column's `children` — NEVER directly under the " +
+        "Section (a component placed straight under a Section is not rendered). " +
+        "Shape: { component:'Section', props:{columns:1}, children:[ " +
+        "{ component:'__section_column__', children:[ { component:'Hero', props:{…} } ] } ] }.",
     },
   ];
 }

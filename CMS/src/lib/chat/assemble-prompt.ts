@@ -21,7 +21,6 @@ import {
 } from "@/lib/settings/site-settings";
 import { parsePropsSchema } from "@/lib/pages/page-blocks";
 import { builtinBlockTypes } from "@/lib/chat/write-tools";
-import { allowedClasses } from "@/lib/render/utility-css";
 
 export async function assembleSystemPrompt(
   context: AdminPageContext,
@@ -54,7 +53,6 @@ export async function assembleSystemPrompt(
       identity,
       components,
       builtins: builtinBlockTypes(),
-      utilityClasses: [...allowedClasses()].sort(),
     }) +
     "\n\n" +
     contextPrompt(context)

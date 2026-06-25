@@ -125,11 +125,13 @@ export function validateComponentArtifact(
     } catch (err) {
       errors.push(`tree is not renderable: ${(err as Error).message}`);
     }
-    // Bound the allowed styling vocabulary.
+    // Bound the allowed styling vocabulary. List the full accepted set in the
+    // error so the model can self-correct (the prompt no longer carries it).
     const bad = collectBadClasses(tree);
     if (bad.length > 0) {
       errors.push(
-        `unknown utility classes (not in the allowed vocabulary): ${bad.join(", ")}`,
+        `unknown className utility classes: ${bad.join(", ")}. ` +
+          `Use ONLY these (for one-off values use inline style instead): ${allowedClassList()}.`,
       );
     }
   }
@@ -146,7 +148,9 @@ export function validateComponentArtifact(
     .split(/\s+/)
     .filter((c) => c !== "" && !allowedClasses().has(c));
   if (badCss.length > 0) {
-    errors.push(`unknown css classes: ${badCss.join(", ")}`);
+    errors.push(
+      `unknown css classes: ${badCss.join(", ")}. Use ONLY these: ${allowedClassList()}.`,
+    );
   }
 
   if (errors.length > 0) return { ok: false, errors };
@@ -170,6 +174,11 @@ function coerceTree(raw: unknown): TreeNode | undefined {
  * Walk a tree collecting every `className` token that isn't in the allowed
  * utility vocabulary. (Class names live in `props.className`, space-separated.)
  */
+/** The full accepted utility-class vocabulary, sorted, comma-joined (for errors). */
+function allowedClassList(): string {
+  return [...allowedClasses()].sort().join(", ");
+}
+
 function collectBadClasses(node: TreeNode): string[] {
   const allowed = allowedClasses();
   const bad = new Set<string>();

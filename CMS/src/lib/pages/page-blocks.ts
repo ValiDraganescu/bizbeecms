@@ -62,6 +62,13 @@ export function validateBlocks(
   const ids = new Set<string>();
   value.forEach((b, i) => walk(b, `blocks[${i}]`));
 
+  // Repair the common "component directly under a Section" mistake (the renderer
+  // would silently drop it) BEFORE returning — only once the shape is valid, so
+  // we never run it over malformed input. The wrapped tree is what we persist.
+  if (errors.length === 0) {
+    value = normalizeSectionColumns(value as Block[]);
+  }
+
   if (errors.length === 0) {
     // Reuse the renderer's own walker (empty component map): unknown components
     // become hidden placeholders and never throw, so a throw = structurally broken.
@@ -474,6 +481,46 @@ export function isSection(block: Block): boolean {
 /** True if a block is a Section COLUMN (holds dropped components in children). */
 export function isSectionColumn(block: Block): boolean {
   return block.component === SECTION_COLUMN_COMPONENT;
+}
+
+/**
+ * A Section renders ONLY its `__section_column__` children — any component placed
+ * DIRECTLY under a Section is silently dropped by the renderer (`planSection`). A
+ * model (or a hand-written block tree) commonly emits `Section → [Hero]` instead
+ * of `Section → [column → [Hero]]`, so the Hero vanishes. This pure pass repairs
+ * that: for any Section whose direct children include non-column blocks, it wraps
+ * all those stray children into ONE column (preserving order; existing columns
+ * stay). Idempotent — a well-formed tree passes through unchanged. Recurses into
+ * columns' children so nested Sections are fixed too.
+ */
+export function normalizeSectionColumns(blocks: Block[]): Block[] {
+  const seen = allIds(blocks);
+  function fix(list: Block[]): Block[] {
+    return list.map((b) => {
+      const children = b.children ? fix(b.children) : b.children;
+      if (!isSection(b) || !children) return children === b.children ? b : { ...b, children };
+      const stray = children.filter((c) => !isSectionColumn(c));
+      if (stray.length === 0) return children === b.children ? b : { ...b, children };
+      // Wrap stray children into a fresh column; keep existing columns in place.
+      const cols = children.filter(isSectionColumn);
+      const id = uniqueIdAcrossSeen(SECTION_COLUMN_COMPONENT, seen);
+      const wrap: Block = { id, component: SECTION_COLUMN_COMPONENT, children: stray };
+      return { ...b, children: [...cols, wrap] };
+    });
+  }
+  return fix(blocks);
+}
+
+/** Like uniqueIdAcrossTree but against a mutable seen-set (multi-call safe). */
+function uniqueIdAcrossSeen(component: string, seen: Set<string>): string {
+  const base = component.replace(/[^a-zA-Z0-9]/g, "").slice(0, 24) || "block";
+  for (let n = 1; ; n++) {
+    const id = `${base}-${n}`;
+    if (!seen.has(id)) {
+      seen.add(id);
+      return id;
+    }
+  }
 }
 
 /** All ids used anywhere in the tree (top-level + nested children). */

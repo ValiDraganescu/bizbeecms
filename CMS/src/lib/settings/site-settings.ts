@@ -126,7 +126,6 @@ export function buildSystemPrompt(opts: {
   componentNames?: string[];
   /** Built-in block types (Section, …). */
   builtins?: PromptBuiltinDef[];
-  utilityClasses?: string[];
 }): string {
   const parts: string[] = [];
 
@@ -153,14 +152,13 @@ export function buildSystemPrompt(opts: {
       "`script` (trusted, runs in the browser).",
   );
 
-  const classes = opts.utilityClasses ?? [];
-  if (classes.length > 0) {
-    parts.push(
-      "For `className` use ONLY these bounded utility classes (arbitrary " +
-        "Tailwind has no CSS at runtime); for one-off values use inline " +
-        `style instead: ${classes.join(", ")}.`,
-    );
-  }
+  parts.push(
+    "For `className` use only a bounded set of utility classes (arbitrary " +
+      "Tailwind has no CSS at runtime); for one-off values use inline `style` " +
+      "instead. If you use a class outside the accepted set, create_component " +
+      "fails and the error lists every accepted class — fix and retry from that " +
+      "list.",
+  );
 
   const builtins = opts.builtins ?? [];
   if (builtins.length > 0) {

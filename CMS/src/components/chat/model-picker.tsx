@@ -16,6 +16,8 @@ import { useTranslations } from "next-intl";
 import {
   CHAT_MODELS,
   filterCatalog,
+  filterByModalities,
+  catalogModalities,
   groupByProvider,
   pricePerMillion,
   type CatalogModel,
@@ -89,6 +91,7 @@ export function ModelPicker({
   const [catalog, setCatalog] = useState<ReadonlyArray<CatalogModel>>(CHAT_MODELS);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [modFilter, setModFilter] = useState<string[]>([]);
   const [active, setActive] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -134,7 +137,16 @@ export function ModelPicker({
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  const filtered = useMemo(() => filterCatalog(catalog, query), [catalog, query]);
+  // Distinct modalities available in the catalog → the toggle bar (text alone is
+  // every model's default, so it's not worth a toggle; only offer the rest).
+  const modalities = useMemo(
+    () => catalogModalities(catalog).filter((m) => m !== "text"),
+    [catalog],
+  );
+  const filtered = useMemo(
+    () => filterByModalities(filterCatalog(catalog, query), modFilter),
+    [catalog, query, modFilter],
+  );
   const groups = useMemo(() => groupByProvider(filtered), [filtered]);
   // Flat list of ids in display order, for keyboard nav across groups.
   const flat = useMemo(() => groups.flatMap((g) => g.models), [groups]);
@@ -146,6 +158,13 @@ export function ModelPicker({
     onChange(id);
     setOpen(false);
     setQuery("");
+  }
+
+  function toggleMod(mod: string) {
+    setActive(0);
+    setModFilter((cur) =>
+      cur.includes(mod) ? cur.filter((m) => m !== mod) : [...cur, mod],
+    );
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -203,6 +222,30 @@ export function ModelPicker({
               aria-label={t("modelSearch")}
               className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
             />
+            {modalities.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label={t("modelModalityFilter")}>
+                {modalities.map((mod) => {
+                  const on = modFilter.includes(mod);
+                  const label = t(`modality${mod.charAt(0).toUpperCase()}${mod.slice(1)}`);
+                  return (
+                    <button
+                      key={mod}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggleMod(mod)}
+                      className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
+                        on
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-foreground-muted hover:bg-surface-muted"
+                      }`}
+                    >
+                      <ModalityIcon modality={mod} label={label} />
+                      <span className="capitalize">{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <ul className="max-h-56 overflow-y-auto py-1" role="listbox">
             {flat.length === 0 ? (
@@ -228,18 +271,7 @@ export function ModelPicker({
                               idx === active ? "bg-primary/10" : ""
                             } ${m.id === value ? "font-semibold text-primary" : "text-foreground"}`}
                           >
-                            <span className="flex min-w-0 items-center gap-1.5">
-                              <span className="truncate">{m.label}</span>
-                              <span className="flex shrink-0 items-center gap-0.5 text-foreground-muted">
-                                {(m.inputModalities ?? ["text"]).map((mod) => (
-                                  <ModalityIcon
-                                    key={mod}
-                                    modality={mod}
-                                    label={t(`modality${mod.charAt(0).toUpperCase()}${mod.slice(1)}`)}
-                                  />
-                                ))}
-                              </span>
-                            </span>
+                            <span className="min-w-0 truncate">{m.label}</span>
                             {(() => {
                               const inP = pricePerMillion(m.inputPrice);
                               const outP = pricePerMillion(m.outputPrice);
