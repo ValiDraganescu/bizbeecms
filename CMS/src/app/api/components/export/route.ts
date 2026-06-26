@@ -28,19 +28,28 @@ function fileSlug(tag: string): string {
 export async function GET(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);
   if (denied) return denied;
-  const tag = (new URL(request.url).searchParams.get("tag") ?? "").trim();
+  const params = new URL(request.url).searchParams;
+  const tag = (params.get("tag") ?? "").trim();
   if (!tag) return Response.json({ error: "tag is required" }, { status: 400 });
+  // Optional operator metadata: a custom kit name + description (bounded). Falls
+  // back to the tag for the name and no note (component-kits: kit metadata).
+  const name = (params.get("name") ?? "").trim().slice(0, 120);
+  const note = (params.get("note") ?? "").trim().slice(0, 2000);
   try {
     const rows = await listComponents();
     const tagged = filterByTag(rows, tag);
     if (tagged.length === 0) {
       return Response.json({ error: `no components tagged "${tag}"` }, { status: 404 });
     }
-    const bundle = buildKitBundle(tagged, tag, { exportedAt: new Date().toISOString() });
+    const bundle = buildKitBundle(tagged, tag, {
+      exportedAt: new Date().toISOString(),
+      ...(name ? { name } : {}),
+      ...(note ? { note } : {}),
+    });
     return new Response(JSON.stringify(bundle, null, 2), {
       headers: {
         "Content-Type": "application/json",
-        "Content-Disposition": `attachment; filename="${fileSlug(tag)}.kit.json"`,
+        "Content-Disposition": `attachment; filename="${fileSlug(name || tag)}.kit.json"`,
       },
     });
   } catch (err) {

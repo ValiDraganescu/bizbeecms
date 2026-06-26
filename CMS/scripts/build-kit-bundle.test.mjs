@@ -85,3 +85,20 @@ test("buildKitBundle: meta is included when passed", () => {
   const kit = buildKitBundle([card], "marketing", { exportedAt: "2026-06-22" });
   assert.equal(kit.meta?.exportedAt, "2026-06-22");
 });
+
+test("buildKitBundle: name override + note metadata (kit metadata)", () => {
+  const kit = buildKitBundle([card], "marketing", {
+    name: "  Growth Pack  ",
+    note: "  Hero + Card for landing pages  ",
+  });
+  // name trimmed, overrides the tag; tag stays as the source tag.
+  assert.equal(kit.name, "Growth Pack");
+  assert.equal(kit.tag, "marketing");
+  assert.equal(kit.meta?.note, "Hero + Card for landing pages");
+});
+
+test("buildKitBundle: blank name falls back to the tag, no note → no meta", () => {
+  const kit = buildKitBundle([card], "marketing", { name: "   ", note: "  " });
+  assert.equal(kit.name, "marketing");
+  assert.equal(kit.meta, undefined);
+});

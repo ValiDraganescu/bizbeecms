@@ -210,3 +210,32 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   ponytail; existing kit-route/import/preview tests cover the routed data.
 - **Files:** CMS/src/components/components/components-manager.tsx,
   CMS/messages/{en,fi,et}.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-26 09:00 — Slice 9: kit metadata on export (name + description)
+- **Status:** DONE
+- **What I did:** Backlog had no open TODO (slices 1-8 all DONE), so per NEXT.md
+  I invented the next worthwhile slice — let the operator NAME and DESCRIBE a kit
+  on export instead of always deriving the name from the tag. The `bizbeecms.kit`
+  envelope already had `name` + `meta.note` fields; this wires them end-to-end:
+  - `buildKitBundle(rows, tag, opts)` now takes `{ exportedAt, name?, note? }`:
+    `name` (trimmed) overrides the kit name (falls back to the tag), `note`
+    (trimmed) lands in `meta.note`; `tag` always stays the source tag.
+  - `GET /api/components/export` accepts `&name=` (≤120 chars) + `&note=` (≤2000),
+    passes them to `buildKitBundle`, and slugs the download filename from the name.
+  - `parseKitBundle` now reads + bounds (`slice(0,2000)`) the untrusted `meta.note`
+    and returns it; `summarizeKitBundle`/`KitPreview` surface `note` so the preview
+    panel shows the operator's description before install.
+  - UI: a name + description input row appears under the tag filter when a tag is
+    selected; `exportKit` builds the query from them; the preview panel renders
+    `kitPreview.note` under the title. 3 i18n keys EN/FI/ET (kitNameLabel,
+    kitNoteLabel, kitNotePlaceholder).
+- **Verified:** CMS `tsc --noEmit` clean; 20/20 kit tests pass (added 3:
+  name-override+note in build-kit-bundle, blank-name fallback, note surfaced in
+  summarize); `npm run bundle:cms` (opennext gate) green + PM cms-bundle regenerated.
+  NOTE: the gate first failed on a STALE "Another next build process is already
+  running" lock from a manual `next build` I ran to debug — NOT my code; killed the
+  process + cleared `.next`, then it passed (see CAVEATS).
+- **Files:** CMS/src/lib/components/portable.ts, CMS/src/app/api/components/export/route.ts,
+  CMS/src/components/components/components-manager.tsx, CMS/messages/{en,fi,et}.json,
+  CMS/scripts/{build-kit-bundle,summarize-kit-bundle}.test.mjs,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js

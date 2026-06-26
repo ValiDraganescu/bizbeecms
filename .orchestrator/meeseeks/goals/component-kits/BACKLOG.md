@@ -5,6 +5,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-26): **Slice 9 — kit metadata on export.** Operator can NAME +
+  DESCRIBE a kit on export (vs deriving the name from the tag), carried in the
+  `bizbeecms.kit` envelope (`name` + `meta.note`) and shown in the preview panel.
+  `buildKitBundle` takes `{name?,note?}`; export route accepts `&name=&note=`;
+  `parseKitBundle`/`summarizeKitBundle` surface the bounded `note`. UI: name+desc
+  inputs under the tag filter; preview shows the note. 3 EN/FI/ET keys. 20/20 tests
+  (+3); tsc + opennext gate green; cms-bundle regenerated.
+
 - DONE (2026-06-26): **Slice 8 — surface per-component kit-install results.** Both
   kit paths (paste/upload import + starter-kit install) already returned `installed[]`
   ({name, action}) + `skipped[]` reasons, but the UI only showed count summaries. Added

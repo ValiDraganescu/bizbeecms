@@ -30,6 +30,7 @@ type ComponentSummary = {
 type KitPreview = {
   name: string;
   tag: string;
+  note: string;
   components: { name: string; tags: string[]; action: "create" | "update" }[];
   tags: string[];
   assets: string[];
@@ -75,6 +76,10 @@ export function ComponentsManager({
   // "add tag" input text keyed by component name.
   const [tagFilter, setTagFilter] = useState("");
   const [tagDraft, setTagDraft] = useState<Record<string, string>>({});
+  // Kit metadata: optional name + description the operator sets when exporting a
+  // tag as a kit. Empty name → the kit name defaults to the tag.
+  const [kitName, setKitName] = useState("");
+  const [kitNote, setKitNote] = useState("");
   // Preview-before-install: a read-only summary of a pasted/uploaded kit bundle
   // (component names + create/update + tags + missing deps) shown BEFORE writing.
   const [kitPreview, setKitPreview] = useState<KitPreview | null>(null);
@@ -152,7 +157,10 @@ export function ComponentsManager({
     setNotice(null);
     if (!tag) return;
     try {
-      const res = await fetch(`/api/components/export?tag=${encodeURIComponent(tag)}`);
+      const params = new URLSearchParams({ tag });
+      if (kitName.trim()) params.set("name", kitName.trim());
+      if (kitNote.trim()) params.set("note", kitNote.trim());
+      const res = await fetch(`/api/components/export?${params.toString()}`);
       if (!res.ok) {
         setError(await errorOf(res));
         return;
@@ -161,7 +169,8 @@ export function ComponentsManager({
       const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${tag.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "kit"}.kit.json`;
+      const slugSrc = kitName.trim() || tag;
+      a.download = `${slugSrc.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "kit"}.kit.json`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -581,6 +590,32 @@ export function ComponentsManager({
             </div>
           )}
         </div>
+        {/* Kit metadata: optional name + description for the exported kit (applies
+            to the next Export-kit). Only meaningful with a tag selected. */}
+        {allTags.length > 0 && tagFilter && (
+          <div className="flex flex-wrap items-end gap-3 rounded-md border border-border bg-surface px-3 py-2">
+            <label className="flex flex-col gap-1 text-sm text-foreground-muted">
+              {t("kitNameLabel")}
+              <input
+                type="text"
+                className="rounded-md border border-border bg-surface-raised px-2 py-1 text-sm text-foreground"
+                placeholder={tagFilter}
+                value={kitName}
+                onChange={(e) => setKitName(e.target.value)}
+              />
+            </label>
+            <label className="flex flex-1 flex-col gap-1 text-sm text-foreground-muted">
+              {t("kitNoteLabel")}
+              <input
+                type="text"
+                className="rounded-md border border-border bg-surface-raised px-2 py-1 text-sm text-foreground"
+                placeholder={t("kitNotePlaceholder")}
+                value={kitNote}
+                onChange={(e) => setKitNote(e.target.value)}
+              />
+            </label>
+          </div>
+        )}
         {/* Shared autocomplete source for all per-component add-tag inputs. */}
         <datalist id="component-tags">
           {allTags.map((tg) => (
@@ -668,6 +703,9 @@ export function ComponentsManager({
             <span className="text-sm font-medium text-foreground">
               {t("previewTitle", { name: kitPreview.name })}
             </span>
+            {kitPreview.note && (
+              <span className="text-sm text-foreground-muted">{kitPreview.note}</span>
+            )}
             <span className="text-sm text-foreground-muted">
               {t("previewCount", { count: kitPreview.components.length })}
             </span>

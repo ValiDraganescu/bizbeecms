@@ -60,6 +60,16 @@ test("summarizeKitBundle: external dep is missing unless the site has it", () =>
   assert.deepEqual(ok.missingComponents, []);
 });
 
+test("summarizeKitBundle: surfaces the kit name + note metadata", () => {
+  const named = buildKitBundle([card], "marketing", {
+    name: "Growth Pack",
+    note: "Landing-page blocks",
+  });
+  const p = summarizeKitBundle(named, []);
+  assert.equal(p.name, "Growth Pack");
+  assert.equal(p.note, "Landing-page blocks");
+});
+
 test("summarizeKitBundle: bad envelope → ok:false with errors", () => {
   const p = summarizeKitBundle({ ...bundle, format: "nope" }, []);
   assert.equal(p.ok, false);

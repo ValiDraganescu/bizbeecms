@@ -1,40 +1,42 @@
 # Note to the next Meeseeks (component-kits)
 
-ALL slices DONE (1-8). Core goal fully delivered end-to-end: tag components →
-export by tag as a kit → preview a kit before install → import the kit → SEE a
-per-component install result (created/updated chip per name + skipped reasons),
-plus rail grouping by tag. No open TODO, no bugs.
+ALL slices DONE (1-9). Core goal fully delivered AND polished: tag components →
+export by tag as a kit (now with an optional NAME + DESCRIPTION) → preview a kit
+(shows name, description, per-component create/update, tags, missing deps) before
+install → import the kit → SEE a per-component install result → rail grouping by
+tag. No open TODO, no bugs.
 
-Slice 8 (this run): added a `kitResult` state + a per-component result panel in
-`components-manager.tsx`. Both kit paths (paste/upload import via `/api/components`
-POST→importKit, AND starter-kit install via `/api/components/kit`) ALREADY returned
-`installed[]` ({name, action}) + `skipped[]` reasons — the UI just wasn't showing
-them, only count notices. Now each installed component renders with a created/updated
-chip (success token for created) and skipped components list their validation reason.
-4 i18n keys EN/FI/ET. UI-only render over existing route data — no new test (existing
-kit-route/import/preview tests cover the routed data). tsc + opennext build green.
+Slice 9 (this run): kit metadata on export. The `bizbeecms.kit` envelope already
+had `name` + `meta.note`; this run wired them end-to-end — `buildKitBundle(rows,
+tag, {name?,note?})` (name overrides the tag, note → meta.note, both trimmed),
+`GET /api/components/export?...&name=&note=` (bounded 120/2000), `parseKitBundle`
+reads+bounds the untrusted note, `summarizeKitBundle`/`KitPreview` surface it, and
+the UI got name/description inputs (shown under the tag filter when a tag is
+selected) + a note line in the preview panel. 3 i18n keys EN/FI/ET. +3 node tests
+(20/20). tsc + opennext gate green; cms-bundle regenerated.
 
-PICK NEXT — backlog empty, so INVENT the next worthwhile slice toward GOAL.md.
-Remaining candidates (judge value first; do ONE):
-- **Filter export-by-tag / rail by MULTIPLE tags (AND/OR)** — only if operators
-  accumulate many tags and it reads as needed. Probably low value right now.
+PICK NEXT — backlog empty, so INVENT the next worthwhile slice toward GOAL.md
+ONLY IF it clearly helps an operator. The CORE directive (tag → export-by-tag →
+import) plus preview/result/grouping/metadata is fully satisfied; remaining ideas
+are diminishing-returns polish — judge value HARD before doing one:
 - **Bulk tag editing** — select N components, add/remove a tag across all at once.
-  Useful when assembling a kit from many existing components.
-- **Kit metadata** — let the operator name/describe a kit on export (vs deriving
-  the name from the tag), carried in the `bizbeecms.kit` envelope + shown in preview.
-If none adds real value, find another slice that sharpens the kit-building flow.
-The CORE directive (tag → export-by-tag → import) is fully satisfied; further work
-is polish — keep it lazy and only do what clearly helps an operator.
+  Useful when assembling a kit from many existing components. Highest residual value.
+- **Multi-tag filter/export (AND/OR)** — only if operators accumulate many tags.
+- **A "kits" overview** — list distinct tags with component counts + one-click
+  export per tag (vs the current select-then-export). Minor convenience.
+If none reads as genuinely valuable, the goal is effectively COMPLETE — say so and
+do a small hardening/test-coverage slice rather than inventing busywork.
 
 WATCH OUT:
+- NEW: the opennext gate can fail on a STALE `next build` lock (trace points at
+  page-builder-shell:1146 — RED HERRING). See CAVEATS top entry. Don't run a
+  standalone `next build` to "debug"; it leaves the lock. pkill + rm -rf .next.
 - STAY OUT of other workers' files in the shared tree. STAGE ONLY YOUR OWN PATHS.
   Your only PM file is `ProjectManager/src/lib/deploy/cms-bundle.generated.js`.
-  NEVER `git add -A`.
+  NEVER `git add -A`. (Memory says "commit all = git add -A" but that's the USER's
+  rule for their own work — here, with parallel workers, stage your paths only.)
 - `npm run bundle:cms` (from ProjectManager/) IS the opennext gate AND regens the
   PM bundle in one step. NEVER run it (or raw opennext) while CMS `npm run dev`
   (port 3601) is up.
-- Both kit handlers reset `kitResult` (and preview/deps) at the start, so a fresh
-  install never shows a stale result. Starter kits never skip (authored+gated) →
-  `skipped` always empty there, rendered uniformly.
-- `success`/`success-subtle` tokens exist in CMS globals.css — used for the
-  "created" chip. Don't invent color tokens.
+- The kit envelope's `tag` always stays the SOURCE tag even when `name` overrides
+  the display name — import still tags installed components by the tag, not the name.

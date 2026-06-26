@@ -278,6 +278,9 @@
     "removeTag": "Eemalda silt {tag}",
     "exportKit": "Ekspordi komplekt",
     "exportKitPickTag": "Vali eksporditav silt",
+    "kitNameLabel": "Komplekti nimi (valikuline)",
+    "kitNoteLabel": "Komplekti kirjeldus (valikuline)",
+    "kitNotePlaceholder": "Milleks see komplekt on mõeldud",
     "previewKit": "Eelvaata komplekti",
     "previewTitle": "Komplekt „{name}” — eelvaade",
     "previewCount": "Paigaldatakse {count} komponenti.",
@@ -412,6 +415,12 @@
       "default": "Vaikimisi",
       "quarter": "¼",
       "half": "½"
+    },
+    "panel": {
+      "collapseLeft": "Ahenda komponentide paneel",
+      "expandLeft": "Laienda komponentide paneel",
+      "collapseRight": "Ahenda inspektori paneel",
+      "expandRight": "Laienda inspektori paneel"
     },
     "kit": {
       "blog": "Ajaveebi komplekt",

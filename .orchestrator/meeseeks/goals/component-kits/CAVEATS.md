@@ -1,6 +1,16 @@
 # Caveats — component-kits
 Read every line before working. Each entry was learned the hard way by a previous Meeseeks.
 
+- **The opennext gate can fail on a STALE next-build LOCK, not your code.** Slice 9:
+  `npm run bundle:cms` failed with a trace pointing at `page-builder-shell.tsx:1146`
+  — a RED HERRING. The real error (further up the opennext log) was `⨯ Another next
+  build process is already running.` — a lock left by a manual `npx next build` I ran
+  to debug. A plain `next build` had SUCCEEDED; only opennext (which runs `next build`
+  internally) hit the lock. Fix: `pkill -f "next build"`, then `rm -rf .next .open-next`,
+  then re-run the gate. NEVER run a standalone `next build` to "debug" while the gate
+  is your real check — it leaves the lock that breaks the gate. The trace's top frame
+  (page-builder-shell) is just where opennext re-throws; read the LOG above the trace.
+
 - **`git commit` includes ALREADY-STAGED changes you didn't add.** Slice 8: the
   curator had pre-staged a batch of `R ` (rename→archive) entries in the index
   before this run. `git add -- <my paths>` only adds MY paths, but `git commit`

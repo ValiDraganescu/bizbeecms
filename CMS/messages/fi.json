@@ -278,6 +278,9 @@
     "removeTag": "Poista tunniste {tag}",
     "exportKit": "Vie paketti",
     "exportKitPickTag": "Valitse vietävä tunniste",
+    "kitNameLabel": "Paketin nimi (valinnainen)",
+    "kitNoteLabel": "Paketin kuvaus (valinnainen)",
+    "kitNotePlaceholder": "Mihin tämä paketti on tarkoitettu",
     "previewKit": "Esikatsele pakettia",
     "previewTitle": "Paketti ”{name}” — esikatselu",
     "previewCount": "{count} komponenttia asennetaan.",
@@ -412,6 +415,12 @@
       "default": "Oletus",
       "quarter": "¼",
       "half": "½"
+    },
+    "panel": {
+      "collapseLeft": "Pienennä komponenttipaneeli",
+      "expandLeft": "Laajenna komponenttipaneeli",
+      "collapseRight": "Pienennä tarkastinpaneeli",
+      "expandRight": "Laajenna tarkastinpaneeli"
     },
     "kit": {
       "blog": "Blogipaketti",

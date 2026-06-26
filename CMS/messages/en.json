@@ -278,6 +278,9 @@
     "removeTag": "Remove tag {tag}",
     "exportKit": "Export kit",
     "exportKitPickTag": "Pick a tag to export as a kit",
+    "kitNameLabel": "Kit name (optional)",
+    "kitNoteLabel": "Kit description (optional)",
+    "kitNotePlaceholder": "What this kit is for",
     "previewKit": "Preview kit",
     "previewTitle": "Kit “{name}” — preview",
     "previewCount": "{count} component(s) will be installed.",
@@ -412,6 +415,12 @@
       "default": "Default",
       "quarter": "¼",
       "half": "½"
+    },
+    "panel": {
+      "collapseLeft": "Collapse components panel",
+      "expandLeft": "Expand components panel",
+      "collapseRight": "Collapse inspector panel",
+      "expandRight": "Expand inspector panel"
     },
     "kit": {
       "blog": "Blog kit",

@@ -281,12 +281,24 @@ export interface KitBundle {
  * PURE so it's offline-testable. Component deps satisfied by ANOTHER component in
  * the same kit are dropped from the kit-level `componentDeps` (the kit installs
  * them itself), leaving only EXTERNAL deps the target Site must already have.
+ *
+ * `opts.name` overrides the kit name (defaults to the tag) and `opts.note` is an
+ * optional operator description carried in `meta.note` — both are operator
+ * metadata set at export time (component-kits: kit metadata).
  */
 export function buildKitBundle(
   rows: ComponentRow[],
   tag: string,
-  meta?: { exportedAt?: string; note?: string },
+  opts?: { exportedAt?: string; name?: string; note?: string },
 ): KitBundle {
+  const name = opts?.name?.trim() || tag;
+  const meta =
+    opts?.exportedAt || opts?.note?.trim()
+      ? {
+          ...(opts?.exportedAt ? { exportedAt: opts.exportedAt } : {}),
+          ...(opts?.note?.trim() ? { note: opts.note.trim() } : {}),
+        }
+      : undefined;
   const components = rows.map((r) => serializeComponent(r, meta));
   const names = new Set(components.map((c) => c.component.name));
   const assets = new Set<string>();
@@ -299,7 +311,7 @@ export function buildKitBundle(
   return {
     format: KIT_FORMAT,
     version: KIT_VERSION,
-    name: tag,
+    name,
     tag,
     ...(meta ? { meta } : {}),
     assets: [...assets].sort(),
@@ -328,6 +340,7 @@ export function parseKitBundle(
       ok: true;
       name: string;
       tag: string;
+      note: string;
       components: ImportedComponent[];
       assets: string[];
       componentDeps: string[];
@@ -358,6 +371,11 @@ export function parseKitBundle(
 
   const tag = typeof b.tag === "string" ? b.tag : "";
   const name = typeof b.name === "string" && b.name !== "" ? b.name : tag;
+  // Operator description (untrusted free-text); bounded so a bundle can't smuggle
+  // a huge blob into the preview. Never executed, only shown.
+  const meta = b.meta && typeof b.meta === "object" ? (b.meta as Record<string, unknown>) : null;
+  const note =
+    meta && typeof meta.note === "string" ? meta.note.slice(0, 2000) : "";
 
   // ── per-component trust boundary: validate EACH, skip + record the bad ones ──
   const components: ImportedComponent[] = [];
@@ -386,6 +404,7 @@ export function parseKitBundle(
     ok: true,
     name,
     tag,
+    note,
     components,
     assets: [...assets].sort(),
     componentDeps: [...componentDeps].filter((d) => !installed.has(d)).sort(),
@@ -405,6 +424,8 @@ export interface KitPreview {
   ok: boolean;
   name: string;
   tag: string;
+  /** Operator description carried in the bundle's `meta.note` (bounded). */
+  note: string;
   /** One row per VALID component, in bundle order. */
   components: { name: string; tags: string[]; action: "create" | "update" }[];
   /** Distinct, sorted union of every valid component's tags. */
@@ -434,6 +455,7 @@ export function summarizeKitBundle(
       ok: false,
       name: "",
       tag: "",
+      note: "",
       components: [],
       tags: [],
       assets: [],
@@ -457,6 +479,7 @@ export function summarizeKitBundle(
     ok: true,
     name: parsed.name,
     tag: parsed.tag,
+    note: parsed.note,
     components,
     tags: [...tags].sort(),
     assets: parsed.assets,
