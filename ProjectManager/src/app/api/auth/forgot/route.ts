@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getTranslations } from "next-intl/server";
 import { findUserByEmail } from "@/lib/auth/user";
 import { normalizeEmail, validateEmail } from "@/lib/auth/validation";
 import { sendResetEmail } from "@/lib/mail/send-invite";
+import { inviteSubject } from "@/lib/mail/invite-subject";
 import { createPasswordReset } from "@/lib/reset/reset";
 
 type Body = { email?: unknown };
@@ -38,10 +40,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     try {
       const reset = await createPasswordReset(user.id);
       const t = await getTranslations("auth.forgot.email");
+      // Domain-prefixed subject when the site has a custom domain attached
+      // (derived from APP_ORIGIN to stay consistent with the emailed link).
+      const appOrigin = (
+        getCloudflareContext().env as unknown as Record<string, unknown>
+      ).APP_ORIGIN;
+      const subject = inviteSubject(
+        typeof appOrigin === "string" ? appOrigin : undefined,
+        t("subject"),
+        (domain) => t("subjectWithDomain", { domain }),
+      );
       await sendResetEmail({
         to: email,
         token: reset.token,
-        subject: t("subject"),
+        subject,
         body: (url) => t("body", { url }),
       });
     } catch (err) {

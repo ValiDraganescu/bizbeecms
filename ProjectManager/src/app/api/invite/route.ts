@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getTranslations } from "next-intl/server";
 import type { Role } from "@/db/schema";
 import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
@@ -12,6 +13,7 @@ import { normalizeEmail, validateEmail } from "@/lib/auth/validation";
 import { authorizeInvite, INVITABLE_ROLES } from "@/lib/invite/authz";
 import { createInvite, hasPendingInvite } from "@/lib/invite/invite";
 import { sendInviteEmail } from "@/lib/mail/send-invite";
+import { inviteSubject } from "@/lib/mail/invite-subject";
 
 export type InviteErrorKey =
   | "emailRequired"
@@ -121,10 +123,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
 
     const t = await getTranslations("invites.email");
+    // Domain-prefixed subject when the site has a custom domain attached
+    // (derived from APP_ORIGIN to stay consistent with the emailed link).
+    const appOrigin = (
+      getCloudflareContext().env as unknown as Record<string, unknown>
+    ).APP_ORIGIN;
+    const subject = inviteSubject(
+      typeof appOrigin === "string" ? appOrigin : undefined,
+      t("subject"),
+      (domain) => t("subjectWithDomain", { domain }),
+    );
     const result = await sendInviteEmail({
       to: email,
       token: invite.token,
-      subject: t("subject"),
+      subject,
       body: (url) => t("body", { url }),
     });
     return NextResponse.json({

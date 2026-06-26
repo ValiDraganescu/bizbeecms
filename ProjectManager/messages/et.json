@@ -172,6 +172,7 @@
     "forgot": {
       "email": {
         "subject": "Lähtesta oma bizbeecms ProjectManageri parool",
+        "subjectWithDomain": "{domain}: Lähtesta oma parool",
         "body": "Saime taotluse lähtestada sinu bizbeecms ProjectManageri parool. Määra uus parool siin:\n\n{url}\n\nSee link aegub 7 päevaga. Kui sa seda ei taotlenud, võid selle e-kirja eirata."
       },
       "title": "Lähtesta oma parool",
@@ -237,6 +238,7 @@
     },
     "email": {
       "subject": "Sind on kutsutud bizbeecms ProjectManagerisse",
+      "subjectWithDomain": "{domain}: Sind on kutsutud kasutama BizBeeCMS-i",
       "body": "Sind on kutsutud liituma bizbeecms ProjectManageriga. Võta kutse vastu ja määra oma parool siin:\n\n{url}\n\nSee link aegub 7 päevaga."
     },
     "accept": {

@@ -282,3 +282,31 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/invite/route.ts (env APP_ORIGIN + inviteSubject),
   CMS/messages/{en,fi,et}.json (inviteEmail.subjectWithDomain),
   ProjectManager/src/lib/deploy/cms-bundle.generated.js (regenerated)
+
+## 2026-06-26 — BUG [P1] part (2): PM invite + reset subject carries custom domain
+- **Status:** DONE (PM half of part 2 — mirrors the CMS run)
+- **What I did:** Mirrored the CMS invite-subject fix into the PM app (one-app-per-run).
+  New pure alias-free `ProjectManager/src/lib/mail/invite-subject.ts` (exact copy of
+  CMS's `customDomain`/`inviteSubject`: workers.dev/localhost/empty/malformed → no
+  custom domain → generic subject; else strip leading `www.`). Wired BOTH PM mail
+  routes: `app/api/invite/route.ts` (invite) and `app/api/auth/forgot/route.ts`
+  (reset) read `APP_ORIGIN` from `getCloudflareContext().env` (cast via `unknown` —
+  APP_ORIGIN isn't on the typed `CloudflareEnv`) and build the subject through
+  `inviteSubject(appOrigin, t("subject"), (d) => t("subjectWithDomain",{domain:d}))`.
+  Added `invites.email.subjectWithDomain` (`"{domain}: You are invited to use
+  BizBeeCMS"`, mirroring CMS's exact EN/FI/ET wording) and `auth.forgot.email.
+  subjectWithDomain` (reset-specific `"{domain}: Reset your password"` + FI/ET) in all
+  three locales. Did the reset subject too per NEXT.md's recommended default.
+  Derived from APP_ORIGIN ⇒ pre the deployer APP_ORIGIN fix (part 1) APP_ORIGIN is
+  workers.dev ⇒ generic subject ⇒ zero behavior change; prefix auto-activates once
+  part 1 lands.
+- **Verified:** ports clear; `tsc` exit 0; `npm test` 210 pass/0 fail (+7 new
+  `invite-subject.test.ts`); fail-before PROVEN (replace `.workers.dev` guard with
+  `false` ⇒ both workers.dev tests fail; reverted ⇒ 7/7); opennext build complete.
+  PM-only — did NOT touch cms-bundle (PM never does) or fix part (1) link host.
+  Did NOT exercise live email (runtime/HITL only).
+- **Files:** ProjectManager/src/lib/mail/invite-subject.ts (new),
+  ProjectManager/src/lib/mail/invite-subject.test.ts (new),
+  ProjectManager/src/app/api/invite/route.ts (env APP_ORIGIN + inviteSubject),
+  ProjectManager/src/app/api/auth/forgot/route.ts (env APP_ORIGIN + inviteSubject for reset),
+  ProjectManager/messages/{en,fi,et}.json (invites.email.subjectWithDomain + auth.forgot.email.subjectWithDomain)

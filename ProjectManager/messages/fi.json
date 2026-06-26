@@ -172,6 +172,7 @@
     "forgot": {
       "email": {
         "subject": "Nollaa bizbeecms ProjectManager -salasanasi",
+        "subjectWithDomain": "{domain}: Nollaa salasanasi",
         "body": "Saimme pyynnön nollata bizbeecms ProjectManager -salasanasi. Aseta uusi salasana täällä:\n\n{url}\n\nTämä linkki vanhenee 7 päivässä. Jos et tehnyt tätä pyyntöä, voit jättää tämän sähköpostin huomiotta."
       },
       "title": "Nollaa salasanasi",
@@ -237,6 +238,7 @@
     },
     "email": {
       "subject": "Sinut on kutsuttu bizbeecms ProjectManageriin",
+      "subjectWithDomain": "{domain}: Sinut on kutsuttu käyttämään BizBeeCMS:ää",
       "body": "Sinut on kutsuttu liittymään bizbeecms ProjectManageriin. Hyväksy kutsusi ja aseta salasanasi täällä:\n\n{url}\n\nTämä linkki vanhenee 7 päivässä."
     },
     "accept": {

@@ -172,6 +172,7 @@
     "forgot": {
       "email": {
         "subject": "Reset your bizbeecms ProjectManager password",
+        "subjectWithDomain": "{domain}: Reset your password",
         "body": "We received a request to reset your bizbeecms ProjectManager password. Set a new password here:\n\n{url}\n\nThis link expires in 7 days. If you didn't request this, you can ignore this email."
       },
       "title": "Reset your password",
@@ -237,6 +238,7 @@
     },
     "email": {
       "subject": "You've been invited to bizbeecms ProjectManager",
+      "subjectWithDomain": "{domain}: You are invited to use BizBeeCMS",
       "body": "You've been invited to join bizbeecms ProjectManager. Accept your invitation and set your password here:\n\n{url}\n\nThis link expires in 7 days."
     },
     "accept": {

@@ -153,6 +153,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   the prefix auto-activates once part 1 lands. The PM invite mail
   (`invites.email.subject`) STILL needs the same treatment in a separate PM run —
   mirror `inviteSubject` (PM route already has `getCloudflareContext`/env access).
+- BUG-P1 SUBJECT PM (2026-06-26, learned): mirrored CMS's `invite-subject.ts` into
+  `ProjectManager/src/lib/mail/invite-subject.ts` (identical pure helper) and wired
+  BOTH PM mail routes (invite `api/invite/route.ts` + reset `api/auth/forgot/route.ts`).
+  GOTCHA: PM reads `APP_ORIGIN` off `getCloudflareContext().env` but APP_ORIGIN is NOT
+  on the generated `CloudflareEnv` type → a direct `as Record<string,unknown>` cast
+  FAILS tsc (TS2352, no index signature) — must double-cast `as unknown as
+  Record<string,unknown>`. PM `subjectWithDomain` strings live under `invites.email.*`
+  (invite) and `auth.forgot.email.*` (reset) — PM's nested `auth.*` convention, NOT
+  CMS's top-level. Both apps' invite+reset subjects are now domain-prefixed; only the
+  live HITL verify (after the deployer APP_ORIGIN part-1 fix) remains before flipping
+  the bug DONE.
 - P5 NON-DUPLICATION: the enumeration-safe hit===miss invariant is already locked
   STRUCTURALLY by `forgot-route.test.ts` (exactly one `{ok:true}` returned AFTER
   the `if(user)` block). Don't add a runtime deep-equal of `{ok:true}` vs
