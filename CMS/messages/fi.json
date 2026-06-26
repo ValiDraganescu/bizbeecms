@@ -100,7 +100,19 @@
       "newline": "↵ Rivinvaihto",
       "aria": "Vaihda Enter-näppäimen toiminto: lähetä viesti tai lisää rivinvaihto"
     },
-    "contextAttached": "Sivun konteksti liitetty"
+    "contextAttached": "Sivun konteksti liitetty",
+    "attach": {
+      "add": "Liitä tiedosto",
+      "remove": "Poista liite",
+      "textOnly": "Tämä malli tukee vain tekstiä — se ei voi lukea liitteitä.",
+      "rejected": "{name}: tämä malli ei voi lukea {kind}-tiedostoja.",
+      "tooLarge": "{name} ylittää {max} Mt.",
+      "uploadFailed": "{name} lataus epäonnistui.",
+      "kindImage": "kuva",
+      "kindFile": "tämän tyyppisiä",
+      "kindAudio": "ääni",
+      "kindVideo": "video"
+    }
   },
   "contentLocales": {
     "title": "Sisältökielet",

@@ -39,6 +39,8 @@ import {
   saveEnterMode,
   type EnterMode,
 } from "@/lib/chat/enter-mode";
+import { acceptsFile, mimeToModality, type Modality } from "@/lib/chat/attachments";
+import { MAX_ASSET_SIZE } from "@/lib/render/asset";
 
 export type ChatMsg =
   | { role: "user"; content: string }
@@ -250,21 +252,104 @@ function ContextChip() {
  * `height` on the page). `footer` lets the parent slot extra controls (the page
  * has none today; later slices add debug/model-picker).
  */
+/** A file attached to the pending message: uploaded to R2, awaiting send. */
+export type PendingAttachment = {
+  key: string;
+  url: string;
+  name: string;
+  mime: string;
+};
+
 export function ChatConversation({
   chat,
   transcriptClassName,
   footer,
+  inputModalities,
 }: {
   chat: ReturnType<typeof useChat>;
   transcriptClassName?: string;
   footer?: ReactNode;
+  /**
+   * The SELECTED model's input modalities (ai-attachments). When it includes a
+   * non-text modality the `+`/drop-zone is enabled and gates each file via
+   * `acceptsFile`. Omitted / text-only → attachments disabled (a hint explains).
+   */
+  inputModalities?: string[];
 }) {
   const t = useTranslations("chat");
   const [input, setInput] = useState("");
   const [enterMode, setEnterMode] = useState<EnterMode>("send");
   const [atBottom, setAtBottom] = useState(true);
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { messages, busy, error, send } = chat;
+
+  // The model accepts non-text input → attachments are offered. Empty/undefined
+  // modalities mean text-only (the catalog default), so the affordance is off.
+  const mods = inputModalities ?? [];
+  const canAttach = mods.some((m) => m !== "text");
+
+  // Localized label for a MIME's modality, for the rejection message.
+  function kindLabel(mime: string): string {
+    const m: Modality = mimeToModality(mime);
+    return t(
+      m === "image"
+        ? "attach.kindImage"
+        : m === "audio"
+          ? "attach.kindAudio"
+          : m === "video"
+            ? "attach.kindVideo"
+            : "attach.kindFile",
+    );
+  }
+
+  // Upload one accepted file via the EXISTING /api/assets route (reused, not
+  // forked) and add a removable chip. Gating + size are checked before upload.
+  async function addFiles(files: FileList | File[]) {
+    setAttachError(null);
+    const list = Array.from(files);
+    for (const file of list) {
+      if (!canAttach) {
+        setAttachError(t("attach.textOnly"));
+        return;
+      }
+      if (!acceptsFile(mods, file.type)) {
+        setAttachError(t("attach.rejected", { name: file.name, kind: kindLabel(file.type) }));
+        continue;
+      }
+      if (file.size > MAX_ASSET_SIZE) {
+        setAttachError(t("attach.tooLarge", { name: file.name, max: MAX_ASSET_SIZE / 1024 / 1024 }));
+        continue;
+      }
+      setUploading(true);
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch("/api/assets", { method: "POST", body: form });
+        if (!res.ok) {
+          setAttachError(t("attach.uploadFailed", { name: file.name }));
+          continue;
+        }
+        const row = (await res.json()) as { key: string; url: string };
+        setAttachments((cur) => [
+          ...cur,
+          { key: row.key, url: row.url, name: file.name, mime: file.type },
+        ]);
+      } catch {
+        setAttachError(t("attach.uploadFailed", { name: file.name }));
+      } finally {
+        setUploading(false);
+      }
+    }
+  }
+
+  function removeAttachment(key: string) {
+    setAttachments((cur) => cur.filter((a) => a.key !== key));
+  }
 
   // Restore the Enter-behaviour pref on mount (client-only; localStorage).
   useEffect(() => {
@@ -298,9 +383,13 @@ export function ChatConversation({
 
   async function onSend() {
     const text = input.trim();
-    if (text === "" || busy) return;
+    if ((text === "" && attachments.length === 0) || busy || uploading) return;
     setInput("");
+    setAttachments([]);
+    setAttachError(null);
     scrollToBottom();
+    // ponytail: attachments are cleared from the pending bar on send; threading
+    // them into the model request as inline base64 is the next task (BACKLOG 3).
     await send(text);
     scrollToBottom();
   }
@@ -365,8 +454,43 @@ export function ChatConversation({
         }}
       >
         <ContextChip />
+
+        {attachError && (
+          <p role="alert" className="text-xs text-danger">
+            {attachError}
+          </p>
+        )}
+
+        {attachments.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5">
+            {attachments.map((a) => (
+              <li
+                key={a.key}
+                className="flex max-w-[14rem] items-center gap-1.5 rounded-md border border-border bg-surface-muted px-2 py-1 text-xs text-foreground"
+              >
+                <span className="truncate" title={a.name}>{a.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(a.key)}
+                  aria-label={t("attach.remove")}
+                  title={t("attach.remove")}
+                  className="shrink-0 text-foreground-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                  </svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
         <textarea
-          className="min-h-[5.5rem] max-h-64 w-full resize-y rounded-md border border-border bg-surface px-3 py-2 text-foreground"
+          className={
+            "min-h-[5.5rem] max-h-64 w-full resize-y rounded-md border bg-surface px-3 py-2 text-foreground " +
+            (dragOver && canAttach ? "border-primary ring-2 ring-ring" : "border-border")
+          }
           rows={3}
           placeholder={t("placeholder")}
           value={input}
@@ -379,22 +503,61 @@ export function ChatConversation({
               void onSend();
             }
           }}
+          onDragOver={(e) => {
+            if (!canAttach) return;
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            setDragOver(false);
+            if (!canAttach || e.dataTransfer.files.length === 0) return;
+            e.preventDefault();
+            void addFiles(e.dataTransfer.files);
+          }}
           aria-label={t("placeholder")}
         />
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files) void addFiles(e.target.files);
+            e.target.value = ""; // allow re-picking the same file
+          }}
+        />
+
         <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={toggleEnterMode}
-            className="rounded-md border border-border px-2 py-1 text-foreground-muted hover:text-foreground"
-            aria-label={t("enterMode.aria")}
-            title={t("enterMode.aria")}
-          >
-            {enterMode === "send" ? t("enterMode.send") : t("enterMode.newline")}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!canAttach || busy || uploading}
+              className="rounded-md border border-border px-2 py-1 text-foreground-muted hover:text-foreground disabled:opacity-50"
+              aria-label={t("attach.add")}
+              title={canAttach ? t("attach.add") : t("attach.textOnly")}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={toggleEnterMode}
+              className="rounded-md border border-border px-2 py-1 text-foreground-muted hover:text-foreground"
+              aria-label={t("enterMode.aria")}
+              title={t("enterMode.aria")}
+            >
+              {enterMode === "send" ? t("enterMode.send") : t("enterMode.newline")}
+            </button>
+          </div>
           <button
             type="submit"
             className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-            disabled={busy || input.trim() === ""}
+            disabled={busy || uploading || (input.trim() === "" && attachments.length === 0)}
           >
             {busy ? t("sending") : t("send")}
           </button>

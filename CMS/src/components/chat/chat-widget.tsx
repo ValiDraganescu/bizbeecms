@@ -20,7 +20,8 @@ import { ChatConversation, useChat } from "@/components/chat/chat-conversation";
 import { ChatDebugPanel } from "@/components/chat/chat-debug-panel";
 import { detectAdminContext } from "@/lib/chat/tool-scopes";
 import { getActivePageContext } from "@/lib/chat/page-context";
-import { DEFAULT_MODEL, type CatalogModel } from "@/lib/chat/models";
+import { CHAT_MODELS, DEFAULT_MODEL, type CatalogModel } from "@/lib/chat/models";
+import { coerceCatalog } from "@/lib/chat/catalog-coerce";
 import { ModelPicker } from "@/components/chat/model-picker";
 import { resolveInitialModel, loadModel, saveModel } from "@/lib/chat/selected-model";
 import { formatUsd } from "@/lib/chat/credit";
@@ -58,6 +59,12 @@ export function ChatWidget() {
   // through on change. Until the catalog loads we trust a stored id (the chat
   // route validates the model server-side regardless).
   const [model, setModelState] = useState(DEFAULT_MODEL);
+  // The live model catalog (ai-attachments): needed to know the SELECTED model's
+  // input modalities so the attachment `+`/drop-zone gates correctly. Seeded with
+  // the static fallback; replaced once /api/chat/models loads.
+  const [catalog, setCatalog] = useState<ReadonlyArray<CatalogModel>>(CHAT_MODELS);
+  const selectedModalities =
+    catalog.find((m) => m.id === model)?.inputModalities ?? ["text"];
   function setModel(id: string) {
     setModelState(id);
     saveModel(id);
@@ -253,8 +260,12 @@ export function ChatWidget() {
       try {
         const res = await fetch("/api/chat/models");
         if (res.ok) {
-          const j = (await res.json()) as { models?: CatalogModel[] };
-          ids = (j.models ?? []).map((m) => m.id);
+          const j = (await res.json()) as { models?: unknown };
+          // Coerce the wire shape (a D1-cached payload from an older bundle may
+          // lack fields like inputModalities) so the gate reads a safe catalog.
+          const models = coerceCatalog(j.models);
+          if (!cancelled && models.length > 0) setCatalog(models);
+          ids = models.map((m) => m.id);
         }
       } catch {
         /* offline / no binding — empty ids → trust the stored id */
@@ -563,6 +574,7 @@ export function ChatWidget() {
               <ChatConversation
                 chat={chat}
                 transcriptClassName="flex-1"
+                inputModalities={selectedModalities}
                 footer={
                   <div className="flex flex-col gap-1 text-xs text-foreground-muted">
                     {promptOverride !== null && (

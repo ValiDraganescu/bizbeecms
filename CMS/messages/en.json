@@ -100,7 +100,19 @@
       "newline": "↵ Newline",
       "aria": "Toggle Enter key behaviour: send message or insert newline"
     },
-    "contextAttached": "Page context attached"
+    "contextAttached": "Page context attached",
+    "attach": {
+      "add": "Attach file",
+      "remove": "Remove attachment",
+      "textOnly": "This model is text-only — it can't read attachments.",
+      "rejected": "{name}: this model can't read {kind} files.",
+      "tooLarge": "{name} exceeds {max}MB.",
+      "uploadFailed": "{name} failed to upload.",
+      "kindImage": "image",
+      "kindFile": "this kind of",
+      "kindAudio": "audio",
+      "kindVideo": "video"
+    }
   },
   "contentLocales": {
     "title": "Content languages",

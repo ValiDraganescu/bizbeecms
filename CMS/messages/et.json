@@ -100,7 +100,19 @@
       "newline": "↵ Reavahetus",
       "aria": "Lülita Enter-klahvi käitumist: saada sõnum või lisa reavahetus"
     },
-    "contextAttached": "Lehe kontekst lisatud"
+    "contextAttached": "Lehe kontekst lisatud",
+    "attach": {
+      "add": "Lisa fail",
+      "remove": "Eemalda manus",
+      "textOnly": "See mudel toetab ainult teksti — see ei saa manuseid lugeda.",
+      "rejected": "{name}: see mudel ei saa lugeda {kind}-faile.",
+      "tooLarge": "{name} ületab {max} MB.",
+      "uploadFailed": "{name} üleslaadimine ebaõnnestus.",
+      "kindImage": "pildi",
+      "kindFile": "sellist tüüpi",
+      "kindAudio": "heli",
+      "kindVideo": "video"
+    }
   },
   "contentLocales": {
     "title": "Sisukeeled",
