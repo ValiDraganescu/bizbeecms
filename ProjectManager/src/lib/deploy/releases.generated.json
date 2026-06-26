@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.9.0",
+      "tag": "r-1.9.0",
+      "markdown": "# CMS v1.9.0\n\n_2026-06-26 · changes since r-1.8.0_\n\n## Features\n- Chat attachments: attach images/files to a chat message via a picker or drag-and-drop, gated to models that support them; attachments are sent inline to the assistant.\n- Component kits: preview a kit's contents before installing (uploaded kits included), see per-component install results, and add a name + description to a kit on export.\n- Component tags: bulk-edit tags across components, and group the page-builder component rail by tag.\n- Page builder: collapsible left rail and right inspector, plus a resizable inspector with three preset widths.\n- MCP: the CMS advertises its MCP URL from the site's configured custom domain (via APP_ORIGIN) instead of the request host, fixing the URL on custom domains.\n\n## Fixes\n- MCP URL was derived from the incoming request host, which broke on custom domains — now uses the site's APP_ORIGIN.\n"
+    },
+    {
       "version": "1.8.0",
       "tag": "r-1.8.0",
       "markdown": "# CMS v1.8.0\n\n_2026-06-26 · changes since r-1.7.0_\n\n## Features\n- Page preview now applies your site theme, so previews match the published look.\n- Chat: additional read tools let the assistant inspect more of your site when answering and editing.\n"
@@ -19,11 +24,6 @@
       "version": "1.5.0",
       "tag": "r-1.5.0",
       "markdown": "# CMS v1.5.0\n\n_2026-06-25 · changes since r-1.4.1_\n\n## Features\n- Page builder now refreshes live when the chat assistant edits a page, so tool-driven changes appear immediately without a manual reload.\n"
-    },
-    {
-      "version": "1.4.1",
-      "tag": "r-1.4.1",
-      "markdown": "# CMS v1.4.1\n\n_2026-06-25 · changes since r-1.4.0_\n\n## Fixes\n- Chat debug panel now shows the active prompt override when one is set, instead of always showing the base prompt.\n"
     },
     {
       "version": "0.11.0",
