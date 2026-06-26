@@ -688,17 +688,41 @@ read_ram_mb() {
   if [ -n "$kb" ]; then echo $(( kb / 1024 )); fi
 }
 
-# During-build RAM heartbeat. The build is the OOM-prone step and can go SILENT
-# for minutes (no Next.js output) right when it's thrashing — so a sampler writes
-# a "[mem] N MB free" line into build.log every 10s. It rides the existing log
-# stream (the poller tails build.log), so it needs no new POST path or schema:
-# a silent build whose [mem] keeps dropping = OOM thrash; silent with stable mem
-# = a real deadlock. Lets the next hang explain itself.
+# During-build heartbeat. The build is the OOM-prone step and can go SILENT for
+# minutes (no Next.js output) right when it's thrashing OR when it's just slowly
+# compiling — and a bare "[mem]" line can't tell those apart. So every 10s the
+# sampler writes ONE line carrying three signals, enough to diagnose a hang from
+# the PM timeline alone without shelling into the container:
+#   [hb +Ns] mem=N MB cpu=N% busy procs=N | last: <newest non-[hb] build line>
+#   • elapsed  — seconds since the build step started (so "how long stuck" is read
+#                directly, not computed from wall-clock timestamps).
+#   • mem      — free RAM. Dropping toward 0 across beats = OOM thrash.
+#   • cpu/busy — total %CPU of node/next/wrangler procs + their count. >~50% =
+#                actively compiling (slow, wait); ~0% with stable mem = a REAL
+#                deadlock (waiting on a socket/lock), not progress — cancel it.
+#   • last     — the newest real build line (skipping our own [hb] lines), so a
+#                silent OpenNext phase ("Creating an optimized production build",
+#                "Bundling", "Copying assets") still names WHICH phase is silent.
+# Rides the existing build.log stream — no new POST path/schema.
 MEM_SAMPLER_PID=""
+HB_T0=""
+# Sum %CPU and count of the build's worker processes (node/next/wrangler/esbuild).
+# `ps` is in coreutils/procps on the container; if absent the field reads "?".
+read_build_cpu() {
+  ps -eo pcpu,comm 2>/dev/null \
+    | awk 'tolower($2) ~ /node|next|wrangler|esbuild|tsc/ { c+=$1; n++ }
+           END { if (n>0) printf "%.0f %d", c, n; else printf "0 0" }'
+}
 start_mem_sampler() {
+  HB_T0=$(now_ms)
   ( while :; do
-      mb=$(read_ram_mb)
-      [ -n "$mb" ] && echo "[mem] \${mb} MB free" >> /workspace/build.log
+      mb=$(read_ram_mb); [ -n "$mb" ] || mb="?"
+      set -- $(read_build_cpu); cpu="\${1:-?}"; procs="\${2:-?}"
+      el=$(( ( $(now_ms) - HB_T0 ) / 1000 ))
+      # Newest build line that isn't one of our own heartbeats (so we echo the
+      # build's real progress, never our previous beat). Trimmed to keep it short.
+      last=$(grep -av '^\\[hb ' /workspace/build.log 2>/dev/null | tail -n 1 | cut -c1-120)
+      echo "[hb +\${el}s] mem=\${mb} MB cpu=\${cpu}% busy procs=\${procs} | last: \${last}" >> /workspace/build.log
       sleep 10
     done ) &
   MEM_SAMPLER_PID=$!
