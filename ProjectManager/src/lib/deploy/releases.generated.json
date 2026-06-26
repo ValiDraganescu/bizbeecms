@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "1.13.0",
-      "tag": "r-1.13.0",
-      "markdown": "# CMS v1.13.0\n\n_2026-06-26 · changes since r-1.12.3_\n\n## Features\n- Chat debug export now expands tool cards into the full model-facing history — structured tool calls and their results, not just the text turns — for complete payload visibility.\n"
+      "version": "1.13.1",
+      "tag": "r-1.13.1",
+      "markdown": "# CMS v1.13.1\n\n_2026-06-26 · changes since r-1.13.0_\n\n## Fixes\n- Chat panel no longer grows off the top of the screen when resized — its max height now fits the space above the bottom anchor, so the input and latest messages stay visible.\n"
     },
     {
       "version": "1.12.3",
