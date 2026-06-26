@@ -273,7 +273,17 @@
     "addTagFor": "Lisa silt komponendile {name}",
     "removeTag": "Eemalda silt {tag}",
     "exportKit": "Ekspordi komplekt",
-    "exportKitPickTag": "Vali eksporditav silt"
+    "exportKitPickTag": "Vali eksporditav silt",
+    "previewKit": "Eelvaata komplekti",
+    "previewTitle": "Komplekt „{name}” — eelvaade",
+    "previewCount": "Paigaldatakse {count} komponenti.",
+    "previewCreate": "uus",
+    "previewUpdate": "uuendab olemasolevat",
+    "previewMissingDeps": "Puuduvad komponendisõltuvused, mida sait vajab: {deps}",
+    "previewAssets": "Viitab {count} ressursile — laadi need üles või seo pärast paigaldust ümber.",
+    "previewSkipped": "{count} komponenti ei läbinud valideerimist ja jäetakse vahele.",
+    "previewConfirm": "Kinnita paigaldus",
+    "previewCancel": "Tühista"
   },
   "adminAuth": {
     "forbiddenTitle": "Juurdepääs keelatud",

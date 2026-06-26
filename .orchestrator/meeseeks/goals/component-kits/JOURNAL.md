@@ -172,3 +172,9 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/db/component-store.ts, CMS/src/app/api/components/grouped/route.ts,
   CMS/src/components/page-builder/page-builder-shell.tsx, CMS/messages/{en,fi,et}.json,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-26 08:46 — Slice 6: preview a kit's contents before install
+- **Status:** DONE
+- **What I did:** Added preview-before-install for kit bundles. Pure `summarizeKitBundle(raw, existingNames)` in `portable.ts` (reuses `parseKitBundle` — same trust boundary — and folds in the Site's existing component names so each row is create-vs-update; unions tags; narrows external component deps to the ones the Site is actually missing; surfaces asset deps + skipped-validation count). New read-only `POST /api/components/preview` route (kit envelope only; no D1 write; reads existing names via `listComponentNames`). UI (`components-manager.tsx`): a "Preview kit" button appears when the paste is a `bizbeecms.kit`, opens a panel listing each component with new/updates + tags, missing deps, asset count, skipped count, and a Confirm-install (runs the existing gated `importBundle`) / Cancel. Editing the paste or importing clears the preview.
+- **Verified:** `node --test summarize-kit-bundle.test.mjs` 4/4; full `npm test` 951/951; `npx tsc --noEmit` clean; `npm run bundle:cms` (opennext gate) green + cms-bundle regenerated. Could not verify live D1 (needs a real binding — HITL).
+- **Files:** CMS/src/lib/components/portable.ts, CMS/src/app/api/components/preview/route.ts, CMS/src/components/components/components-manager.tsx, CMS/messages/{en,fi,et}.json, CMS/scripts/summarize-kit-bundle.test.mjs, ProjectManager/src/lib/deploy/cms-bundle.generated.js

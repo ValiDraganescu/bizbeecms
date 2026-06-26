@@ -273,7 +273,17 @@
     "addTagFor": "Add a tag to {name}",
     "removeTag": "Remove tag {tag}",
     "exportKit": "Export kit",
-    "exportKitPickTag": "Pick a tag to export as a kit"
+    "exportKitPickTag": "Pick a tag to export as a kit",
+    "previewKit": "Preview kit",
+    "previewTitle": "Kit “{name}” — preview",
+    "previewCount": "{count} component(s) will be installed.",
+    "previewCreate": "new",
+    "previewUpdate": "updates existing",
+    "previewMissingDeps": "Missing component deps this site needs: {deps}",
+    "previewAssets": "References {count} asset(s) — upload them or rebind after install.",
+    "previewSkipped": "{count} component(s) failed validation and will be skipped.",
+    "previewConfirm": "Confirm install",
+    "previewCancel": "Cancel"
   },
   "adminAuth": {
     "forbiddenTitle": "Access denied",

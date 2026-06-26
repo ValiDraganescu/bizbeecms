@@ -273,7 +273,17 @@
     "addTagFor": "Lisää tunniste komponenttiin {name}",
     "removeTag": "Poista tunniste {tag}",
     "exportKit": "Vie paketti",
-    "exportKitPickTag": "Valitse vietävä tunniste"
+    "exportKitPickTag": "Valitse vietävä tunniste",
+    "previewKit": "Esikatsele pakettia",
+    "previewTitle": "Paketti ”{name}” — esikatselu",
+    "previewCount": "{count} komponenttia asennetaan.",
+    "previewCreate": "uusi",
+    "previewUpdate": "päivittää olemassa olevan",
+    "previewMissingDeps": "Puuttuvat komponenttiriippuvuudet, joita sivusto tarvitsee: {deps}",
+    "previewAssets": "Viittaa {count} resurssiin — lataa ne tai sido uudelleen asennuksen jälkeen.",
+    "previewSkipped": "{count} komponenttia ei läpäissyt vahvistusta ja ohitetaan.",
+    "previewConfirm": "Vahvista asennus",
+    "previewCancel": "Peruuta"
   },
   "adminAuth": {
     "forbiddenTitle": "Pääsy estetty",

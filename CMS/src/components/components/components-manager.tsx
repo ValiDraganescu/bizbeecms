@@ -25,6 +25,18 @@ type ComponentSummary = {
   tags: string[];
 };
 
+// Preview shape returned by POST /api/components/preview (mirrors KitPreview in
+// lib/components/portable.ts — kept local so this client file imports no server code).
+type KitPreview = {
+  name: string;
+  tag: string;
+  components: { name: string; tags: string[]; action: "create" | "update" }[];
+  tags: string[];
+  assets: string[];
+  missingComponents: string[];
+  errors: string[];
+};
+
 // Starter kits the UI offers. Keep in sync with the KITS registry in
 // `api/components/kit/route.ts`; `labelKey` is the i18n key for the button.
 const KITS = [
@@ -63,6 +75,9 @@ export function ComponentsManager({
   // "add tag" input text keyed by component name.
   const [tagFilter, setTagFilter] = useState("");
   const [tagDraft, setTagDraft] = useState<Record<string, string>>({});
+  // Preview-before-install: a read-only summary of a pasted/uploaded kit bundle
+  // (component names + create/update + tags + missing deps) shown BEFORE writing.
+  const [kitPreview, setKitPreview] = useState<KitPreview | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const allTags = distinctTags(components);
@@ -171,6 +186,44 @@ export function ComponentsManager({
     }
   }
 
+  // Preview-before-install: a kit bundle (text or upload) gets a read-only
+  // summary (no D1 write) so the operator sees what's inside before committing.
+  // Detect the kit envelope client-side; a non-kit bundle just imports directly.
+  function isKitBundle(text: string): boolean {
+    try {
+      return (JSON.parse(text) as { format?: unknown }).format === "bizbeecms.kit";
+    } catch {
+      return false;
+    }
+  }
+
+  async function previewKit(text: string) {
+    setError(null);
+    setNotice(null);
+    setKitPreview(null);
+    if (text.trim() === "") {
+      setError(t("importEmpty"));
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/components/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) {
+        setError(await errorOf(res));
+        return;
+      }
+      setKitPreview((await res.json()) as KitPreview);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // `rebindMap` (H3b p1): re-import the SAME bundle with a {oldKey: newKey|null}
   // map applied. The server route + pure validator already accept {rebind}.
   async function importBundle(text: string, rebindMap?: Record<string, string | null>) {
@@ -178,6 +231,7 @@ export function ComponentsManager({
     setNotice(null);
     setAssetDeps([]);
     setMissingComponents([]);
+    setKitPreview(null);
     if (text.trim() === "") {
       setError(t("importEmpty"));
       return;
@@ -532,6 +586,73 @@ export function ComponentsManager({
         )}
       </section>
 
+      {/* Kit preview (preview-before-install): a read-only summary of a pasted
+          kit bundle — what it would create/update + its tags + missing deps —
+          with a Confirm install that runs the SAME gated import path. */}
+      {kitPreview && (
+        <div className="flex flex-col gap-3 rounded-md border border-border bg-surface-raised px-3 py-3">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-foreground">
+              {t("previewTitle", { name: kitPreview.name })}
+            </span>
+            <span className="text-sm text-foreground-muted">
+              {t("previewCount", { count: kitPreview.components.length })}
+            </span>
+          </div>
+          <ul className="flex flex-col gap-1">
+            {kitPreview.components.map((c) => (
+              <li key={c.name} className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-sm text-foreground">{c.name}</span>
+                <span className="text-xs text-foreground-muted">
+                  {c.action === "create" ? t("previewCreate") : t("previewUpdate")}
+                </span>
+                {c.tags.map((tg) => (
+                  <span
+                    key={tg}
+                    className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs text-foreground"
+                  >
+                    {tg}
+                  </span>
+                ))}
+              </li>
+            ))}
+          </ul>
+          {kitPreview.missingComponents.length > 0 && (
+            <span className="text-sm text-danger">
+              {t("previewMissingDeps", { deps: kitPreview.missingComponents.join(", ") })}
+            </span>
+          )}
+          {kitPreview.assets.length > 0 && (
+            <span className="text-sm text-foreground-muted">
+              {t("previewAssets", { count: kitPreview.assets.length })}
+            </span>
+          )}
+          {kitPreview.errors.length > 0 && (
+            <span className="text-sm text-danger">
+              {t("previewSkipped", { count: kitPreview.errors.length })}
+            </span>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="self-start rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+              disabled={busy}
+              onClick={() => void importBundle(paste)}
+            >
+              {busy ? t("importing") : t("previewConfirm")}
+            </button>
+            <button
+              type="button"
+              className="self-start rounded-md border border-border px-4 py-2 text-foreground hover:bg-surface disabled:opacity-50"
+              disabled={busy}
+              onClick={() => setKitPreview(null)}
+            >
+              {t("previewCancel")}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Import: paste or upload */}
       <section className="flex flex-col gap-3 border-t border-border pt-6">
         <h2 className="text-lg font-semibold text-foreground">{t("importTitle")}</h2>
@@ -554,21 +675,37 @@ export function ComponentsManager({
           <textarea
             className="h-40 rounded-md border border-border bg-surface px-3 py-2 font-mono text-sm text-foreground"
             value={paste}
-            onChange={(e) => setPaste(e.target.value)}
+            onChange={(e) => {
+              setPaste(e.target.value);
+              setKitPreview(null);
+            }}
             placeholder={t("pastePlaceholder")}
             disabled={busy}
             aria-label={t("pasteLabel")}
           />
         </label>
 
-        <button
-          type="button"
-          className="self-start rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-          disabled={busy}
-          onClick={() => void importBundle(paste)}
-        >
-          {busy ? t("importing") : t("import")}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {/* A kit bundle gets a Preview button; everything else imports directly. */}
+          {isKitBundle(paste) && (
+            <button
+              type="button"
+              className="self-start rounded-md border border-border px-4 py-2 text-foreground hover:bg-surface disabled:opacity-50"
+              disabled={busy}
+              onClick={() => void previewKit(paste)}
+            >
+              {t("previewKit")}
+            </button>
+          )}
+          <button
+            type="button"
+            className="self-start rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+            disabled={busy}
+            onClick={() => void importBundle(paste)}
+          >
+            {busy ? t("importing") : t("import")}
+          </button>
+        </div>
       </section>
     </div>
   );

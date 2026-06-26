@@ -46,6 +46,16 @@ export-by-tag, then kit import. Each slice gates on CMS tsc + opennext build gre
   helper node-tested (good bundle, bad format/version, per-component validation
   failure). EN/FI/ET.
 
+- DONE (2026-06-26): **Slice 6 — preview a kit's contents before install.** Pure
+  `summarizeKitBundle(raw, existingNames)` in `lib/components/portable.ts` (reuses
+  `parseKitBundle`; returns per-component create/update vs existing names, unioned
+  tags, external asset deps, component deps the Site is MISSING, skipped-validation
+  count). New read-only `POST /api/components/preview` (no D1 write; kit envelope
+  only). UI: a "Preview kit" button (shown when the paste is a `bizbeecms.kit`) →
+  preview panel listing components + new/updates + tags + missing deps + Confirm
+  install (runs the SAME gated import path) / Cancel. EN/FI/ET 12 new keys. 4 node
+  tests. tsc + opennext build green; cms-bundle regenerated.
+
 - DONE (2026-06-26): **Slice 5 — rail grouping by tag.** New pure
   `groupComponentsByTag(components)` in `lib/components/grouped.ts` (alphabetical tag
   groups, a component appears under each of its tags, untagged bucket last, names

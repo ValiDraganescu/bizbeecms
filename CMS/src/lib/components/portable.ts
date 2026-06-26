@@ -393,6 +393,78 @@ export function parseKitBundle(
   };
 }
 
+/**
+ * A read-only preview of what installing a kit bundle WOULD do (component-kits:
+ * preview-before-install). PURE — never writes. Reuses `parseKitBundle` (so the
+ * same trust boundary decides what's valid) and folds in the set of component
+ * names that ALREADY exist on the target Site so the UI can show created-vs-
+ * updated per component, the kit's tags, and any unresolved deps — all BEFORE the
+ * operator commits the install.
+ */
+export interface KitPreview {
+  ok: boolean;
+  name: string;
+  tag: string;
+  /** One row per VALID component, in bundle order. */
+  components: { name: string; tags: string[]; action: "create" | "update" }[];
+  /** Distinct, sorted union of every valid component's tags. */
+  tags: string[];
+  /** External `/media/<key>` asset deps the kit references (deduped). */
+  assets: string[];
+  /** External component deps not satisfied within the kit AND missing on the Site. */
+  missingComponents: string[];
+  /** Per-component validation failures that would be SKIPPED on install. */
+  errors: string[];
+}
+
+/**
+ * Summarize an UNTRUSTED kit bundle into a preview (no D1 write). `existingNames`
+ * is the set of component names already on this Site (so each row is create vs
+ * update) and `siteComponentNames` lets us narrow external deps to the ones the
+ * Site is actually MISSING. PURE so it's offline-testable; the route supplies the
+ * two name sets from D1.
+ */
+export function summarizeKitBundle(
+  raw: unknown,
+  existingNames: Iterable<string> = [],
+): KitPreview {
+  const parsed = parseKitBundle(raw);
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      name: "",
+      tag: "",
+      components: [],
+      tags: [],
+      assets: [],
+      missingComponents: [],
+      errors: parsed.errors,
+    };
+  }
+  const existing = new Set(existingNames);
+  const tags = new Set<string>();
+  const components = parsed.components.map((c) => {
+    for (const t of c.tags) tags.add(t);
+    return {
+      name: c.name,
+      tags: c.tags,
+      action: (existing.has(c.name) ? "update" : "create") as "create" | "update",
+    };
+  });
+  // The bundle's external componentDeps that the Site does NOT already have.
+  const missingComponents = parsed.componentDeps.filter((d) => !existing.has(d));
+  return {
+    ok: true,
+    name: parsed.name,
+    tag: parsed.tag,
+    components,
+    tags: [...tags].sort(),
+    assets: parsed.assets,
+    missingComponents,
+    errors: parsed.errors,
+  };
+}
+
 /** The validated, ready-to-upsert import result. */
 export interface ImportedComponent {
   name: string;
