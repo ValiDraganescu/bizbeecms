@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "1.12.0",
-      "tag": "r-1.12.0",
-      "markdown": "# CMS v1.12.0\n\n_2026-06-26 · changes since r-1.11.0_\n\n## Features\n- Chat: expanded assistant tooling (component tools, translation, prompt assembly) for richer page and content editing.\n- Content binding improvements for connecting collection data to components.\n- Broader utility-CSS support in rendering.\n- Site-settings enhancements feeding the editor and assistant.\n"
+      "version": "1.12.1",
+      "tag": "r-1.12.1",
+      "markdown": "# CMS v1.12.1\n\n_2026-06-26 · changes since r-1.12.0_\n\n## Other\n- No CMS-facing changes. This release accompanies deployer-side updates; the CMS bundle is unchanged from r-1.12.0.\n"
     },
     {
       "version": "1.11.0",
