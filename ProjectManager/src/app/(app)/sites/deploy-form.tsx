@@ -217,13 +217,13 @@ export function DeployForm({
               ? t("redeploy")
               : t("deploy")}
           </Button>
-          {status === "deploying" && stuck ? (
+          {status === "deploying" ? (
             <Button
               type="button"
               variant="secondary"
               onClick={onCancel}
               loading={cancelling}
-              disabled={cancelling || pending}
+              disabled={cancelling}
               className="w-fit"
             >
               {t("cancel")}

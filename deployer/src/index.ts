@@ -189,6 +189,40 @@ export default {
       return Response.json({ accepted: true, slug });
     }
 
+    if (url.pathname === "/cancel" && request.method === "POST") {
+      const auth = request.headers.get("authorization") ?? "";
+      const token = auth.replace(/^Bearer\s+/i, "");
+      if (!env.DEPLOYER_SECRET || token !== env.DEPLOYER_SECRET) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+      let body: { slug?: unknown };
+      try {
+        body = (await request.json()) as { slug?: unknown };
+      } catch {
+        return Response.json({ error: "badRequest" }, { status: 400 });
+      }
+      const slug = String(body.slug ?? "").trim();
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+        return Response.json({ error: "badRequest" }, { status: 400 });
+      }
+      // Kill the build container immediately: the deploy ran detached in the
+      // named Sandbox DO (`deploy-<slug>`); re-fetch it and destroy() tears the
+      // whole container down (idempotent — coalesces if already destroying).
+      // The killed deploy.sh can no longer POST a completion callback, so PM's
+      // own status flip (in the cancel route) is the authority.
+      try {
+        const sandbox = getSandbox(env.Sandbox, `deploy-${slug}`);
+        await sandbox.destroy();
+      } catch (err) {
+        // Already-gone / never-started is success for cancel's purpose.
+        return Response.json({
+          cancelled: true,
+          note: String(err).slice(0, 200),
+        });
+      }
+      return Response.json({ cancelled: true, slug });
+    }
+
     if (url.pathname === "/attach-domain" && request.method === "POST") {
       const auth = request.headers.get("authorization") ?? "";
       const token = auth.replace(/^Bearer\s+/i, "");
