@@ -799,12 +799,35 @@ step_start build
 # Sample free RAM (best-effort) for the OOM-prone build step; reported on the
 # build event as ramAvailableMb (instance was bumped standard-1->standard-2 here).
 STEP_RAM_MB=$(read_ram_mb)
+# Restore Next's .next/cache from R2 so this build is incremental, not cold (the
+# "No build cache found" warning = every deploy recompiling from scratch). The
+# cache is keyed ONCE, shared across ALL sites: every CMS build compiles the same
+# source from the same tag, so Next's content-hashed cache entries are reusable
+# across slugs. Best-effort — a miss/corruption just means a cold build, never a
+# failure. \`tar\` is lenient on a partial/garbage archive (|| true).
+# ponytail: single global cache object, no per-tag keying. If two different tags
+# thrash the cache, key the object name by $REF.
+CACHE_BUCKET="bizbeecms-build-cache"
+npx wrangler r2 bucket create "$CACHE_BUCKET" >/dev/null 2>&1 || true
+if npx wrangler r2 object get "$CACHE_BUCKET/next-cache.tar" --file /workspace/next-cache.tar >/dev/null 2>&1; then
+  echo "[cache] restoring .next/cache from R2"
+  mkdir -p .next && tar -xf /workspace/next-cache.tar -C . 2>/dev/null || true
+else
+  echo "[cache] no .next/cache in R2 — cold build"
+fi
 # Heartbeat RAM into build.log every 10s so a SILENT hang (next build emits
 # nothing for minutes when thrashing) still shows whether memory is dropping.
 start_mem_sampler
 npx opennextjs-cloudflare build
 build_rc=$?
 stop_mem_sampler
+# Save the warmed .next/cache back to R2 for the next deploy (only on a clean
+# build — caching a failed build's partial cache risks poisoning the next one).
+if [ $build_rc -eq 0 ] && [ -d .next/cache ]; then
+  echo "[cache] saving .next/cache to R2"
+  tar -cf /workspace/next-cache.tar .next/cache 2>/dev/null \
+    && npx wrangler r2 object put "$CACHE_BUCKET/next-cache.tar" --file /workspace/next-cache.tar >/dev/null 2>&1 || true
+fi
 # Re-sample after the build so the reported value reflects post-build headroom.
 STEP_RAM_MB=$(read_ram_mb)
 if [ $build_rc -ne 0 ]; then step_fail "opennext build failed"; report failed "opennext build failed"; exit 1; fi
