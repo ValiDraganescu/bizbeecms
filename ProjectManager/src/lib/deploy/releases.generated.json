@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.8.0",
+      "tag": "r-1.8.0",
+      "markdown": "# CMS v1.8.0\n\n_2026-06-26 · changes since r-1.7.0_\n\n## Features\n- Page preview now applies your site theme, so previews match the published look.\n- Chat: additional read tools let the assistant inspect more of your site when answering and editing.\n"
+    },
+    {
       "version": "1.7.0",
       "tag": "r-1.7.0",
       "markdown": "# CMS v1.7.0\n\n_2026-06-25 · changes since r-1.6.0_\n\n## Features\n- Chat: expanded assistant tooling for reading and writing page content and components.\n- Page builder: richer page-block handling.\n- Chat: improved model picker.\n- Localized UI strings added across English, Finnish, and Estonian.\n"
@@ -19,11 +24,6 @@
       "version": "1.4.1",
       "tag": "r-1.4.1",
       "markdown": "# CMS v1.4.1\n\n_2026-06-25 · changes since r-1.4.0_\n\n## Fixes\n- Chat debug panel now shows the active prompt override when one is set, instead of always showing the base prompt.\n"
-    },
-    {
-      "version": "1.3.0",
-      "tag": "r-1.3.0",
-      "markdown": "# CMS v1.3.0\n\n_2026-06-25 · changes since r-1.2.0_\n\n## Features\n- Chat: assistant replies now render as formatted markdown (headings, lists, code, links, emphasis) instead of plain text.\n"
     },
     {
       "version": "0.11.0",
