@@ -60,3 +60,29 @@ export function toInlineContentPart(mime: string, base64: string, name: string):
   }
   return { type: "file", file: { filename: name, file_data: url } };
 }
+
+/** One attachment's bytes, ready to inline (base64 already read from R2/the upload). */
+export interface InlineAttachment {
+  mime: string;
+  base64: string;
+  name: string;
+}
+
+/**
+ * Build the OpenAI/OpenRouter `content` for a user message that carries
+ * attachments: a text part (when there's text) followed by one inline part per
+ * file. No attachments → return the plain string (the route still accepts that
+ * shape, and it keeps single-text messages on the cheap path). PURE.
+ */
+export function buildUserContent(
+  text: string,
+  attachments: readonly InlineAttachment[],
+): string | ContentPart[] {
+  if (attachments.length === 0) return text;
+  const parts: ContentPart[] = [];
+  if (text !== "") parts.push({ type: "text", text });
+  for (const a of attachments) {
+    parts.push(toInlineContentPart(a.mime, a.base64, a.name));
+  }
+  return parts;
+}

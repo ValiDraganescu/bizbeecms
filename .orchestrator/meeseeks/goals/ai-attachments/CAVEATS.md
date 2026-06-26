@@ -21,6 +21,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   end-to-end NOW. To support PDFs/docs/audio for file/audio models, WIDEN `ALLOWED_ASSET_TYPES` + the
   `EXT_BY_TYPE` map first (and the `validateAsset` test). Out of scope for the picker task; do it when task 3
   or a file-model need arrives.
+- **Message `content` is now `string | ContentPart[]` (ai-attachments task 3).** A user turn with
+  attachments carries an ARRAY (text part + inline image/file parts). This is threaded through
+  `sse.ts` (`ChatMessage`/`parseChatBody` `parseContentParts`), `build-history.ts`
+  (`OutMessage`/`buildModelHistory`), the `Ai` port + `reframe.ts`. The OpenRouter adapter
+  `JSON.stringify`s `messages` verbatim so the array survives upstream — DON'T re-stringify or
+  assume string content. `parseChatBody` rejects assistant content-arrays (only USER attachments).
+- **Attachment bytes are base64'd in the BROWSER on send** (`blobToBase64` in chat-conversation.tsx,
+  via `btoa(String.fromCharCode(...))`). `send` re-fetches `/media/<key>` (the upload's `url`) to get
+  bytes — a per-file fetch failure silently DROPS that file, it doesn't abort the send. The transcript
+  bubble is still plain text (📎 name lines via `bubbleText`); the inline data only goes to the model.
 - **The widget owns the catalog for gating.** `chat-widget.tsx` now keeps `catalog` state (from
   `/api/chat/models` via `coerceCatalog`) and passes the SELECTED model's `inputModalities` to
   `ChatConversation` as the `inputModalities` prop. Any NEW chat surface must pass it too, else attachments

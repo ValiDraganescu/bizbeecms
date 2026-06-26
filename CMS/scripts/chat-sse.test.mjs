@@ -155,3 +155,31 @@ test("parseChatBody: malformed tool_calls (missing id/name) is rejected as empty
   });
   assert.ok("error" in r);
 });
+
+// ── parseChatBody: attachment content arrays (ai-attachments) ────────────────
+test("parseChatBody: a user content ARRAY of text + image parts is accepted", () => {
+  const content = [
+    { type: "text", text: "what is this?" },
+    { type: "image_url", image_url: { url: "data:image/png;base64,QUJD" } },
+  ];
+  const r = parseChatBody({ messages: [{ role: "user", content }] });
+  assert.ok(!("error" in r));
+  assert.deepEqual(r.messages[0].content, content);
+});
+
+test("parseChatBody: a file content part round-trips", () => {
+  const content = [
+    { type: "file", file: { filename: "a.pdf", file_data: "data:application/pdf;base64,JVBE" } },
+  ];
+  const r = parseChatBody({ messages: [{ role: "user", content }] });
+  assert.ok(!("error" in r));
+  assert.deepEqual(r.messages[0].content, content);
+});
+
+test("parseChatBody: malformed / empty content arrays are rejected", () => {
+  assert.ok("error" in parseChatBody({ messages: [{ role: "user", content: [] }] }));
+  assert.ok("error" in parseChatBody({ messages: [{ role: "user", content: [{ type: "nope" }] }] }));
+  assert.ok("error" in parseChatBody({ messages: [{ role: "user", content: [{ type: "image_url", image_url: {} }] }] }));
+  // assistant content arrays aren't supported (only user attachments)
+  assert.ok("error" in parseChatBody({ messages: [{ role: "assistant", content: [{ type: "text", text: "x" }] }] }));
+});

@@ -33,6 +33,16 @@ export interface HistoryMessage {
   tools?: HistoryTool[];
 }
 
+/**
+ * An OpenAI/OpenRouter content part (ai-attachments). The NEXT user turn may carry
+ * a `ContentPart[]` (text + inline file parts) instead of a string. Structural copy
+ * of `ContentPart` in `./attachments.ts` so this module stays dep-free.
+ */
+export type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "file"; file: { filename: string; file_data: string } };
+
 /** One OpenAI-compatible tool call on an assistant turn. */
 export interface OutToolCall {
   id: string;
@@ -43,7 +53,7 @@ export interface OutToolCall {
 /** An OpenAI-compatible message in the history we POST. */
 export interface OutMessage {
   role: "user" | "assistant" | "tool";
-  content: string;
+  content: string | ContentPart[];
   tool_calls?: OutToolCall[];
   tool_call_id?: string;
   name?: string;
@@ -80,7 +90,7 @@ function toolResultContent(t: HistoryTool): string {
  */
 export function buildModelHistory(
   transcript: ReadonlyArray<HistoryMessage>,
-  nextUserContent: string,
+  nextUserContent: string | ContentPart[],
 ): OutMessage[] {
   const out: OutMessage[] = [];
   let turnIndex = 0;
@@ -130,7 +140,13 @@ export function buildModelHistory(
     turnIndex++;
   }
 
-  const next = nextUserContent.trim();
-  if (next !== "") out.push({ role: "user", content: next });
+  // A content ARRAY (attachments) is always a real turn; a string is trimmed and
+  // dropped if empty (same as before).
+  if (Array.isArray(nextUserContent)) {
+    if (nextUserContent.length > 0) out.push({ role: "user", content: nextUserContent });
+  } else {
+    const next = nextUserContent.trim();
+    if (next !== "") out.push({ role: "user", content: next });
+  }
   return out;
 }

@@ -39,12 +39,40 @@ import {
   saveEnterMode,
   type EnterMode,
 } from "@/lib/chat/enter-mode";
-import { acceptsFile, mimeToModality, type Modality } from "@/lib/chat/attachments";
+import {
+  acceptsFile,
+  mimeToModality,
+  buildUserContent,
+  type Modality,
+  type InlineAttachment,
+} from "@/lib/chat/attachments";
 import { MAX_ASSET_SIZE } from "@/lib/render/asset";
 
 export type ChatMsg =
   | { role: "user"; content: string }
   | { role: "assistant"; content: string; tools: ToolResult[] };
+
+/** Base64-encode a Blob's bytes (browser). Used to inline R2 attachments. */
+async function blobToBase64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+/**
+ * The text shown in the user's transcript bubble. Attachments aren't sent inline to
+ * the bubble (it's plain text), so when a message is files-only we surface their
+ * names so the turn isn't an empty bubble. With text, the names are appended below.
+ */
+function bubbleText(
+  text: string,
+  attachments: ReadonlyArray<{ name: string }>,
+): string {
+  if (attachments.length === 0) return text;
+  const names = attachments.map((a) => `📎 ${a.name}`).join("\n");
+  return text === "" ? names : `${text}\n\n${names}`;
+}
 
 /**
  * Streaming chat state + a `send` action, shared by every chat surface.
@@ -79,15 +107,40 @@ export function useChat(
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function send(text: string) {
+  async function send(text: string, attachments: PendingAttachment[] = []) {
     const trimmed = text.trim();
-    if (trimmed === "" || busy) return;
+    if ((trimmed === "" && attachments.length === 0) || busy) return;
 
     setError(null);
     // Inline context (e.g. the Page Builder's selected page) is prepended to the
     // MODEL-facing message only; the user's transcript bubble shows their raw text.
     const inline = getInlineContext?.()?.trim();
-    const modelContent = inline ? `${inline}\n\n${trimmed}` : trimmed;
+    const modelText = inline ? `${inline}\n\n${trimmed}` : trimmed;
+
+    // Read each pending attachment's bytes from R2 (the /media/<key> url the
+    // uploader returned) and base64-encode them, then build the OpenRouter content
+    // ARRAY (text + one inline part per file). A fetch failure drops that file
+    // rather than aborting the send (its chip already went on the transcript text).
+    let inlineFiles: InlineAttachment[] = [];
+    if (attachments.length > 0) {
+      setBusy(true);
+      inlineFiles = (
+        await Promise.all(
+          attachments.map(async (a): Promise<InlineAttachment | null> => {
+            try {
+              const r = await fetch(a.url);
+              if (!r.ok) return null;
+              const base64 = await blobToBase64(await r.blob());
+              return { mime: a.mime, base64, name: a.name };
+            } catch {
+              return null;
+            }
+          }),
+        )
+      ).filter((x): x is InlineAttachment => x !== null);
+    }
+    const modelContent = buildUserContent(modelText, inlineFiles);
+
     // Flatten the transcript into the {role,content} history the route accepts:
     // assistant turns that were pure tool calls (no text) carry their tool block
     // so content is never empty (route 400s otherwise) and the model sees prior
@@ -95,7 +148,7 @@ export function useChat(
     const history = buildModelHistory(messages, modelContent);
     setMessages((prev) => [
       ...prev,
-      { role: "user", content: trimmed },
+      { role: "user", content: bubbleText(trimmed, attachments) },
       { role: "assistant", content: "", tools: [] },
     ]);
     setBusy(true);
@@ -384,13 +437,14 @@ export function ChatConversation({
   async function onSend() {
     const text = input.trim();
     if ((text === "" && attachments.length === 0) || busy || uploading) return;
+    const pending = attachments;
     setInput("");
     setAttachments([]);
     setAttachError(null);
     scrollToBottom();
-    // ponytail: attachments are cleared from the pending bar on send; threading
-    // them into the model request as inline base64 is the next task (BACKLOG 3).
-    await send(text);
+    // Attachments go inline (base64 data-URIs) to the model via `send`; the R2
+    // key stays on each (history/transcript can reference it). BACKLOG 3.
+    await send(text, pending);
     scrollToBottom();
   }
 

@@ -109,7 +109,9 @@ export function reframe(
 /** An OpenAI-compatible message — what the model both reads and (for tools) we synthesize. */
 export interface ChatMessage {
   role: string;
-  content: string;
+  // A `user` turn may carry an OpenAI content-part array (ai-attachments); the
+  // rest are strings. reframe only appends string-content assistant/tool turns.
+  content: string | unknown[];
   /** Present only on the assistant turn that requested tools (we synthesize it). */
   tool_calls?: { id: string; type: "function"; function: { name: string; arguments: string } }[];
   /** Present only on a `role:"tool"` result message. */

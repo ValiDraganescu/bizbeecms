@@ -124,3 +124,20 @@ test("arguments are always a JSON string (OpenAI tool shape), never an object", 
   assert.equal(typeof call.function.arguments, "string");
   assert.deepEqual(JSON.parse(call.function.arguments), { slug: "home" });
 });
+
+test("array content (attachments) is appended as the final user turn verbatim", () => {
+  const parts = [
+    { type: "text", text: "what is this?" },
+    { type: "image_url", image_url: { url: "data:image/png;base64,QUJD" } },
+  ];
+  const out = buildModelHistory([{ role: "user", content: "hi" }], parts);
+  assert.deepEqual(out, [
+    { role: "user", content: "hi" },
+    { role: "user", content: parts },
+  ]);
+});
+
+test("empty array content adds no turn", () => {
+  const out = buildModelHistory([{ role: "user", content: "hi" }], []);
+  assert.deepEqual(out, [{ role: "user", content: "hi" }]);
+});

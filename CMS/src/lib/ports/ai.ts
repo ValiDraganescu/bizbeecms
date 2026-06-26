@@ -31,7 +31,12 @@ import { effectiveOpenrouterKey } from "../settings/openrouter-key.ts";
  */
 export interface ChatMessage {
   role: string;
-  content: string;
+  /**
+   * Plain text, OR an OpenAI/OpenRouter content-part array (ai-attachments) for a
+   * `user` turn carrying inline file attachments. The adapters forward it verbatim
+   * (JSON), so both the string and array shapes round-trip to the model.
+   */
+  content: string | unknown[];
   tool_calls?: {
     id: string;
     type: "function";

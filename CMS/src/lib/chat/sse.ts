@@ -209,13 +209,25 @@ export interface ToolCall {
 }
 
 /**
- * An OpenAI-compatible chat message. `user`/`system` carry plain text. An
+ * An OpenAI-compatible chat message content part (ai-attachments). A `user` turn
+ * with attachments carries an ARRAY of these instead of a plain string: a text
+ * part plus one inline (base64 data-URI) part per file. Mirrors `ContentPart` in
+ * `./attachments.ts` — kept structural here so `sse.ts` stays dep-free.
+ */
+export type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "file"; file: { filename: string; file_data: string } };
+
+/**
+ * An OpenAI-compatible chat message. `user`/`system` carry plain text, OR a `user`
+ * turn may carry a `ContentPart[]` (text + inline file parts — ai-attachments). An
  * `assistant` turn may instead (or also) carry `tool_calls` — then its `content`
  * may be empty. A `tool` message carries one tool result, keyed by `tool_call_id`.
  */
 export interface ChatMessage {
   role: "user" | "assistant" | "system" | "tool";
-  content: string;
+  content: string | ContentPart[];
   tool_calls?: ToolCall[];
   tool_call_id?: string;
   name?: string;
@@ -239,6 +251,40 @@ function parseToolCalls(raw: unknown): ToolCall[] | null {
     out.push({ id, type: "function", function: { name, arguments: argString } });
   }
   return out;
+}
+
+/**
+ * Validate a `user` content ARRAY (ai-attachments): a text part + inline image/file
+ * parts. Returns the cleaned parts, or null if malformed/empty. Each part must be a
+ * known `type` with its required field a string; unknown/empty arrays → null so the
+ * caller falls back to the string-content rule (and 400s an empty message).
+ */
+function parseContentParts(raw: unknown[]): ContentPart[] | null {
+  const out: ContentPart[] = [];
+  for (const p of raw) {
+    if (typeof p !== "object" || p === null) return null;
+    const type = (p as { type?: unknown }).type;
+    if (type === "text") {
+      const text = (p as { text?: unknown }).text;
+      if (typeof text !== "string") return null;
+      out.push({ type: "text", text });
+    } else if (type === "image_url") {
+      const url = (p as { image_url?: { url?: unknown } }).image_url?.url;
+      if (typeof url !== "string" || url === "") return null;
+      out.push({ type: "image_url", image_url: { url } });
+    } else if (type === "file") {
+      const file = (p as { file?: { filename?: unknown; file_data?: unknown } }).file;
+      const filename = file?.filename;
+      const fileData = file?.file_data;
+      if (typeof filename !== "string" || typeof fileData !== "string" || fileData === "") {
+        return null;
+      }
+      out.push({ type: "file", file: { filename, file_data: fileData } });
+    } else {
+      return null;
+    }
+  }
+  return out.length > 0 ? out : null;
 }
 
 export function parseChatBody(
@@ -291,6 +337,16 @@ export function parseChatBody(
         return { error: "message content must be a non-empty string" };
       }
       cleaned.push({ role: "assistant", content: text, ...(toolCalls ? { tool_calls: toolCalls } : {}) });
+      continue;
+    }
+
+    // user with attachments: a content ARRAY of text + inline file parts.
+    if (role === "user" && Array.isArray(content)) {
+      const parts = parseContentParts(content);
+      if (!parts) {
+        return { error: "message content array must be valid content parts" };
+      }
+      cleaned.push({ role, content: parts });
       continue;
     }
 
