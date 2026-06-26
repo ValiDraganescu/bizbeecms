@@ -20,8 +20,14 @@
  * later slice actually has shared editor state to manage.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import {
+  type InspectorPreset,
+  inspectorWidth,
+  loadInspectorPreset,
+  saveInspectorPreset,
+} from "@/lib/page-builder/inspector-width";
 import {
   isValidSlug,
   setLocaleValue,
@@ -207,6 +213,28 @@ export function PageBuilderShell({
   // Forces the preview iframe's color mode via /preview/[id]?theme=.
   // "system" = no param (follows OS); "light"/"dark" force data-theme.
   const [previewTheme, setPreviewTheme] = useState<"system" | "light" | "dark">("system");
+
+  // page-builder-ux: resizable right-side inspector. The operator picks one of 3
+  // preset widths (default/¼/½); we measure the 3-column area and resolve the
+  // preset → clamped px (canvas keeps a minimum). Persisted in localStorage.
+  const [inspectorPreset, setInspectorPreset] = useState<InspectorPreset>("default");
+  const [editorW, setEditorW] = useState(0);
+  const columnsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    setInspectorPreset(loadInspectorPreset());
+  }, []);
+  useEffect(() => {
+    const el = columnsRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setEditorW(entry.contentRect.width));
+    ro.observe(el);
+    setEditorW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+  function onPickInspectorPreset(p: InspectorPreset) {
+    setInspectorPreset(p);
+    saveInspectorPreset(p);
+  }
 
   // Real page list + the operator's current selection. The center/right panels
   // key off `selected`; later slices load that page's blocks / settings.
@@ -667,7 +695,7 @@ export function PageBuilderShell({
       </header>
 
       {/* ── 3 COLUMNS ─────────────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div ref={columnsRef} className="flex flex-1 overflow-hidden">
         {/* LEFT RAIL — Components */}
         <aside className="flex w-[260px] shrink-0 flex-col border-r border-border bg-surface-raised">
           <div className="border-b border-border px-4 py-3">
@@ -857,8 +885,36 @@ export function PageBuilderShell({
           </div>
         </section>
 
-        {/* RIGHT RAIL — Block / Page / SEO */}
-        <aside className="flex w-[320px] shrink-0 flex-col border-l border-border bg-surface-raised">
+        {/* RIGHT RAIL — Block / Page / SEO. Width is operator-chosen (3 presets,
+            persisted); resolved against the measured 3-column width + clamped so
+            the canvas keeps a minimum. */}
+        <aside
+          className="flex shrink-0 flex-col border-l border-border bg-surface-raised"
+          style={{ width: inspectorWidth(inspectorPreset, editorW) }}
+        >
+          <div className="flex items-center justify-end gap-1 border-b border-border px-2 py-1">
+            <span className="mr-auto pl-1 font-mono text-[10px] uppercase tracking-wide text-foreground-muted">
+              {t("inspectorWidth.label")}
+            </span>
+            <div className="flex rounded-md border border-border" role="group" aria-label={t("inspectorWidth.label")}>
+              {(["default", "quarter", "half"] as InspectorPreset[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => onPickInspectorPreset(p)}
+                  aria-pressed={inspectorPreset === p}
+                  title={t(`inspectorWidth.${p}`)}
+                  className={`px-2 py-0.5 text-[11px] first:rounded-l-md last:rounded-r-md ${
+                    inspectorPreset === p
+                      ? "bg-surface-muted font-medium text-foreground"
+                      : "text-foreground-muted hover:bg-surface-muted"
+                  }`}
+                >
+                  {t(`inspectorWidth.${p}`)}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex border-b border-border">
             {rightTabs.map((tab) => (
               <button
