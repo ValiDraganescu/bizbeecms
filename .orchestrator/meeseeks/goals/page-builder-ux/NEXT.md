@@ -1,16 +1,23 @@
 # Note to the next Meeseeks (page-builder-ux)
 
-First TODO (resizable 3-preset inspector width) is DONE. The shell now measures the
-3-column area with a `ResizeObserver` (`columnsRef`) and resolves a localStorage
-preset via `CMS/src/lib/page-builder/inspector-width.ts` (default/¼/½, clamped so the
-canvas keeps a 360px minimum). Preset selector sits above the right-rail tabs.
+Collapsible left rail + right inspector is DONE. Both rails collapse to a `w-9`
+strip (CollapseToggle double-chevron in each panel header), state persisted via
+`lib/page-builder/panel-collapse.ts` (`bizbee.builder.{left,right}Collapsed`,
+default-expanded). Collapsed overrides the inspector width preset. i18n
+`pageBuilder.panel.*` already in all 3 locales.
 
-Backlog is empty — INVENT the next valuable builder-UX slice toward GOAL.md. Good candidates:
-- **Free-drag handle** on the inspector's left edge (the REQUIRED 3-preset bit shipped; a
-  drag-to-custom-width was flagged nice-to-have). Mirror panel-size.ts `sizeFromDrag` + a
-  `"custom"` preset persisting exact px. Reuse `inspector-width.ts` clamp.
-- **Resizable LEFT components rail** (same preset+persist+clamp pattern; it's fixed `w-[260px]`).
-- **Collapsible panels** (hide left/right rail for a wider canvas), persisted.
+Backlog is empty — INVENT the next valuable builder-UX slice toward GOAL.md.
+Good candidates (carried forward, still unshipped):
+- **Free-drag handle** on the inspector's left edge (the 3-preset selector
+  shipped; drag-to-custom-width was flagged nice-to-have). Mirror panel-size.ts
+  `sizeFromDrag` + a `"custom"` preset persisting exact px; reuse
+  `inspector-width.ts` clamp. When collapsed, the handle is hidden.
+- **Resizable LEFT components rail** (fixed `w-[260px]`) — same preset+persist+
+  clamp pattern; play nice with leftCollapsed.
+- **Keyboard shortcut** to toggle each panel collapse (e.g. `[` / `]`).
 
-Gate every slice: CMS `tsc --noEmit` + `npm test` + `npx opennextjs-cloudflare build` (dev OFF)
-+ EN/FI/ET parity. DON'T run `bundle:cms` while other loops have uncommitted CMS edits.
+Gate every slice: CMS `tsc --noEmit` + `npm test` + `npx opennextjs-cloudflare
+build` (dev OFF). The cf build can flake in prerender — just re-run it.
+DON'T run `bundle:cms` or stage CMS/messages/*.json while other loops have
+uncommitted CMS edits (currently components-manager.tsx + lib/components/tags.ts
++ en.json bulk-tag keys belong to another loop).

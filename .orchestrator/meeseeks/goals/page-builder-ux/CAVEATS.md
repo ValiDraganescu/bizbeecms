@@ -13,3 +13,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   edits (it'd capture their WIP); the bundle auto-regens on PM deploy.
 - **Gate every slice:** CMS `npx tsc --noEmit` + `npm test` + `npx opennextjs-cloudflare build`
   (dev OFF — never while `npm run dev` is up on :3601) + EN/FI/ET parity.
+- **The cf build can FLAKE during static-page data collection** (saw a transient fail at
+  `components-manager.tsx:761` unrelated to my change). tsc passed, compile passed — it died in
+  prerender/worker bundling. Just re-run `npx opennextjs-cloudflare build`; it passed clean on retry
+  (worker.js bundled). Don't chase a one-off prerender error in a file you didn't touch.
+- **A dead worker may leave i18n already committed but code uncommitted.** This run's `panel.*` keys
+  were in HEAD (all 3 locales) while the shell code was still untracked WIP. Check `git show
+  HEAD:CMS/messages/en.json` before re-adding strings — don't double-add or stage another loop's
+  unrelated en.json edits.

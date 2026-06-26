@@ -7,3 +7,10 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Verified:** New node test (6 cases) green; CMS `tsc --noEmit` clean; full `npm test` 957 pass; `npx opennextjs-cloudflare build` (dev off) complete. JSON parity en/fi/et confirmed.
 - **Files:** CMS/src/lib/page-builder/inspector-width.ts (+.test.ts), CMS/src/components/page-builder/page-builder-shell.tsx, CMS/messages/{en,fi,et}.json
 - **Note:** Did NOT run `bundle:cms` — another loop has uncommitted CMS edits (components-manager.tsx); bundle auto-regens on PM deploy.
+
+## 2026-06-26 09:09 — Collapsible left rail AND right inspector
+- **Status:** DONE
+- **What I did:** Finished a previous worker's mid-task. Each side rail collapses entirely to a thin (`w-9`) re-expand strip, freeing its grid track to the canvas; expand restores it. New pure helper `CMS/src/lib/page-builder/panel-collapse.ts` (`resolveCollapsed` default-EXPANDED on unknown; `load/saveCollapsed` per side) persists in localStorage keys `bizbee.builder.leftCollapsed` / `bizbee.builder.rightCollapsed`. Shell: `leftCollapsed`/`rightCollapsed` state, load-on-mount effect, toggle handlers, and a `CollapseToggle` double-chevron button (mirrors the admin sidebar affordance) on each panel header. Collapsed overrides the inspector width preset. i18n keys `pageBuilder.panel.{collapse,expand}{Left,Right}` were already committed by the dead worker (present in all 3 locales).
+- **Verified:** New node test green; CMS `tsc --noEmit` clean; full `npm test` 961 pass; `npx opennextjs-cloudflare build` (dev off) complete (first attempt flaked on prerender of UNRELATED components-manager.tsx:761 — retry passed clean, worker.js bundled).
+- **Files:** CMS/src/lib/page-builder/panel-collapse.ts (+.test.ts), CMS/src/components/page-builder/page-builder-shell.tsx
+- **Note:** Did NOT run `bundle:cms` and did NOT stage CMS/messages/*.json — another loop has uncommitted CMS edits (components-manager.tsx, lib/components/tags.ts, en.json bulk-tag keys). i18n strings were already in HEAD.

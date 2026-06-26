@@ -28,6 +28,7 @@ import {
   loadInspectorPreset,
   saveInspectorPreset,
 } from "@/lib/page-builder/inspector-width";
+import { loadCollapsed, saveCollapsed } from "@/lib/page-builder/panel-collapse";
 import {
   isValidSlug,
   setLocaleValue,
@@ -197,6 +198,50 @@ function PreviewThemeIcon({ kind }: { kind: "light" | "system" | "dark" }) {
   }
 }
 
+/**
+ * Double-chevron collapse/expand toggle for a side rail (mirrors the admin
+ * sidebar's affordance). `side` picks which way the chevrons point when
+ * expanded; `collapsed` flips them so the icon always points "toward" the
+ * direction the panel will move on click.
+ */
+function CollapseToggle({
+  side,
+  collapsed,
+  onClick,
+  label,
+}: {
+  side: "left" | "right";
+  collapsed: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  // Expanded: chevrons point toward the rail's outer edge (collapse direction).
+  // left rail → point left (◀◀); right rail → point right (▶▶). Collapsed flips.
+  const pointsLeft = side === "left" ? !collapsed : collapsed;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="flex items-center justify-center rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        className={"transition-transform duration-200 " + (pointsLeft ? "" : "rotate-180")}
+      >
+        <path d="M11 17l-5-5 5-5" />
+        <path d="M18 17l-5-5 5-5" />
+      </svg>
+    </button>
+  );
+}
+
 export function PageBuilderShell({
   contentLocales,
 }: {
@@ -220,8 +265,14 @@ export function PageBuilderShell({
   const [inspectorPreset, setInspectorPreset] = useState<InspectorPreset>("default");
   const [editorW, setEditorW] = useState(0);
   const columnsRef = useRef<HTMLDivElement>(null);
+  // page-builder-ux: each side rail collapses entirely to widen the canvas;
+  // collapsed state persists per side (localStorage). Default-expanded.
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
   useEffect(() => {
     setInspectorPreset(loadInspectorPreset());
+    setLeftCollapsed(loadCollapsed("left"));
+    setRightCollapsed(loadCollapsed("right"));
   }, []);
   useEffect(() => {
     const el = columnsRef.current;
@@ -234,6 +285,18 @@ export function PageBuilderShell({
   function onPickInspectorPreset(p: InspectorPreset) {
     setInspectorPreset(p);
     saveInspectorPreset(p);
+  }
+  function toggleLeftCollapsed() {
+    setLeftCollapsed((c) => {
+      saveCollapsed("left", !c);
+      return !c;
+    });
+  }
+  function toggleRightCollapsed() {
+    setRightCollapsed((c) => {
+      saveCollapsed("right", !c);
+      return !c;
+    });
   }
 
   // Real page list + the operator's current selection. The center/right panels
@@ -696,32 +759,51 @@ export function PageBuilderShell({
 
       {/* ── 3 COLUMNS ─────────────────────────────────────────────────── */}
       <div ref={columnsRef} className="flex flex-1 overflow-hidden">
-        {/* LEFT RAIL — Components */}
-        <aside className="flex w-[260px] shrink-0 flex-col border-r border-border bg-surface-raised">
-          <div className="border-b border-border px-4 py-3">
-            <p className="font-mono text-xs uppercase tracking-wide text-foreground-muted">
-              {t("components")}
-            </p>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("searchComponents")}
-              aria-label={t("searchComponents")}
-              className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-foreground-muted"
+        {/* LEFT RAIL — Components. Collapses to a thin re-expand strip. */}
+        {leftCollapsed ? (
+          <aside className="flex w-9 shrink-0 flex-col items-center border-r border-border bg-surface-raised py-2">
+            <CollapseToggle
+              side="left"
+              collapsed
+              onClick={toggleLeftCollapsed}
+              label={t("panel.expandLeft")}
             />
-          </div>
-          <ComponentsRail
-            groups={groupBy === "tag" ? tagGroups : groups}
-            groupBy={groupBy}
-            onGroupByChange={setGroupBy}
-            search={search}
-            canEdit={!!selected}
-            onAddSection={onAddSection}
-            onInsertComponent={onInsertComponent}
-            onInsertList={onInsertList}
-          />
-        </aside>
+          </aside>
+        ) : (
+          <aside className="flex w-[260px] shrink-0 flex-col border-r border-border bg-surface-raised">
+            <div className="flex items-start justify-between gap-2 border-b border-border px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-xs uppercase tracking-wide text-foreground-muted">
+                  {t("components")}
+                </p>
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t("searchComponents")}
+                  aria-label={t("searchComponents")}
+                  className="mt-2 w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-foreground-muted"
+                />
+              </div>
+              <CollapseToggle
+                side="left"
+                collapsed={false}
+                onClick={toggleLeftCollapsed}
+                label={t("panel.collapseLeft")}
+              />
+            </div>
+            <ComponentsRail
+              groups={groupBy === "tag" ? tagGroups : groups}
+              groupBy={groupBy}
+              onGroupByChange={setGroupBy}
+              search={search}
+              canEdit={!!selected}
+              onAddSection={onAddSection}
+              onInsertComponent={onInsertComponent}
+              onInsertList={onInsertList}
+            />
+          </aside>
+        )}
 
         {/* CENTER — Layers / Preview */}
         <section className="flex min-w-0 flex-1 flex-col">
@@ -887,12 +969,29 @@ export function PageBuilderShell({
 
         {/* RIGHT RAIL — Block / Page / SEO. Width is operator-chosen (3 presets,
             persisted); resolved against the measured 3-column width + clamped so
-            the canvas keeps a minimum. */}
+            the canvas keeps a minimum. Collapses to a thin re-expand strip
+            (collapsed overrides the width preset). */}
+        {rightCollapsed ? (
+          <aside className="flex w-9 shrink-0 flex-col items-center border-l border-border bg-surface-raised py-2">
+            <CollapseToggle
+              side="right"
+              collapsed
+              onClick={toggleRightCollapsed}
+              label={t("panel.expandRight")}
+            />
+          </aside>
+        ) : (
         <aside
           className="flex shrink-0 flex-col border-l border-border bg-surface-raised"
           style={{ width: inspectorWidth(inspectorPreset, editorW) }}
         >
           <div className="flex items-center justify-end gap-1 border-b border-border px-2 py-1">
+            <CollapseToggle
+              side="right"
+              collapsed={false}
+              onClick={toggleRightCollapsed}
+              label={t("panel.collapseRight")}
+            />
             <span className="mr-auto pl-1 font-mono text-[10px] uppercase tracking-wide text-foreground-muted">
               {t("inspectorWidth.label")}
             </span>
@@ -1044,6 +1143,7 @@ export function PageBuilderShell({
               })()}
           </div>
         </aside>
+        )}
       </div>
     </div>
   );
