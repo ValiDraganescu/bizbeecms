@@ -5,6 +5,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-26): **Slice 7 — uploaded kits get the preview flow too.** `onFile`
+  now loads the dropped file's text into the paste box (no blind import), so the
+  SAME Preview/Import buttons (incl. the kit Preview button gated on `isKitBundle`)
+  apply uniformly to pasted and uploaded bundles. No new strings. tsc + opennext
+  build green; cms-bundle regenerated.
+
 Build order: tags on the data + portable envelope first, then the UI, then
 export-by-tag, then kit import. Each slice gates on CMS tsc + opennext build green
 + regen PM cms-bundle + EN/FI/ET for new strings.

@@ -307,11 +307,17 @@ export function ComponentsManager({
     void importBundle(lastBundle, map);
   }
 
+  // Load the uploaded bundle into the paste box (do NOT import yet) so the same
+  // Preview/Import buttons below apply to uploaded bundles just like pasted ones —
+  // a kit then gets the Preview-before-install affordance instead of importing blind.
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const text = await file.text();
-    await importBundle(text);
+    setPaste(text);
+    setKitPreview(null);
+    setError(null);
+    setNotice(null);
   }
 
   // Install a starter kit by id (epics G1/G2): one POST to the kit route, which

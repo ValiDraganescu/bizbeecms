@@ -178,3 +178,16 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **What I did:** Added preview-before-install for kit bundles. Pure `summarizeKitBundle(raw, existingNames)` in `portable.ts` (reuses `parseKitBundle` — same trust boundary — and folds in the Site's existing component names so each row is create-vs-update; unions tags; narrows external component deps to the ones the Site is actually missing; surfaces asset deps + skipped-validation count). New read-only `POST /api/components/preview` route (kit envelope only; no D1 write; reads existing names via `listComponentNames`). UI (`components-manager.tsx`): a "Preview kit" button appears when the paste is a `bizbeecms.kit`, opens a panel listing each component with new/updates + tags, missing deps, asset count, skipped count, and a Confirm-install (runs the existing gated `importBundle`) / Cancel. Editing the paste or importing clears the preview.
 - **Verified:** `node --test summarize-kit-bundle.test.mjs` 4/4; full `npm test` 951/951; `npx tsc --noEmit` clean; `npm run bundle:cms` (opennext gate) green + cms-bundle regenerated. Could not verify live D1 (needs a real binding — HITL).
 - **Files:** CMS/src/lib/components/portable.ts, CMS/src/app/api/components/preview/route.ts, CMS/src/components/components/components-manager.tsx, CMS/messages/{en,fi,et}.json, CMS/scripts/summarize-kit-bundle.test.mjs, ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-26 08:48 — Slice 7: uploaded kits get the preview flow
+- **Status:** DONE
+- **What I did:** `onFile` in `components-manager.tsx` no longer imports a dropped
+  bundle blind — it loads the file text into the paste box (`setPaste(text)` + clear
+  preview/error/notice). The existing Preview (gated on `isKitBundle`) + Import
+  buttons then apply uniformly to pasted AND uploaded bundles, so an uploaded kit
+  gets the same Preview-before-install affordance as a pasted one. No new copy.
+- **Verified:** CMS `tsc --noEmit` clean; `npm run bundle:cms` (opennext build gate)
+  green + cms-bundle regenerated. UI-only behavioral glue (no new pure logic) — no
+  new test; existing preview/import path tests cover the logic this routes into.
+- **Files:** CMS/src/components/components/components-manager.tsx,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js
