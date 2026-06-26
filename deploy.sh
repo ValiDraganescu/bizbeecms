@@ -45,7 +45,7 @@ if $want_pm; then
   # site detail page). Idempotent: already-applied migrations are skipped.
   ( cd ProjectManager && npx wrangler d1 migrations apply bizbeecms --remote )
 
-  step "Deploying ProjectManager (bundle:cms + preflight + opennext)"
+  step "Deploying ProjectManager (preflight + opennext)"
   ( cd ProjectManager && npm run deploy )
 fi
 

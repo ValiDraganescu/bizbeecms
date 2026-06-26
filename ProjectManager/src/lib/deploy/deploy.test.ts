@@ -11,7 +11,6 @@ import {
   isValidWorkerName,
   workerNameForSlug,
 } from "./worker-name.ts";
-import { buildScriptUploadForm } from "./script-upload.ts";
 
 test("workerNameForSlug prefixes the slug and is a valid Worker name", () => {
   const name = workerNameForSlug("acme-shop");
@@ -42,40 +41,4 @@ test("isValidWorkerName rejects bad names", () => {
   assert.ok(!isValidWorkerName(""));
   assert.ok(isValidWorkerName("a"));
   assert.ok(isValidWorkerName("bizbeecms-cms-foo"));
-});
-
-test("buildScriptUploadForm carries metadata + every module file", async () => {
-  const form = buildScriptUploadForm({
-    scriptName: "bizbeecms-cms-foo",
-    mainModule: "worker.js",
-    files: { "worker.js": "export default {}", "chunk-1.js": "//x" },
-  });
-
-  // metadata part
-  const metaPart = form.get("metadata");
-  assert.ok(metaPart instanceof Blob);
-  const meta = JSON.parse(await (metaPart as Blob).text());
-  assert.equal(meta.main_module, "worker.js");
-  assert.deepEqual(meta.compatibility_flags, [
-    "nodejs_compat",
-    "global_fetch_strictly_public",
-  ]);
-  assert.equal(typeof meta.compatibility_date, "string");
-
-  // one part per module file
-  assert.ok(form.get("worker.js") instanceof Blob);
-  assert.ok(form.get("chunk-1.js") instanceof Blob);
-});
-
-test("buildScriptUploadForm honours overridden compat settings", async () => {
-  const form = buildScriptUploadForm({
-    scriptName: "x",
-    mainModule: "main.js",
-    files: { "main.js": "//" },
-    compatibilityDate: "2024-01-01",
-    compatibilityFlags: ["nodejs_compat"],
-  });
-  const meta = JSON.parse(await (form.get("metadata") as Blob).text());
-  assert.equal(meta.compatibility_date, "2024-01-01");
-  assert.deepEqual(meta.compatibility_flags, ["nodejs_compat"]);
 });

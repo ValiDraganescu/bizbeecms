@@ -1,23 +1,14 @@
-// Public surface of the Site-deploy engine. The deploy UI action (next slice)
-// imports from here.
-export {
-  deploySite,
-  canStartDeploy,
-  isDeployStuck,
-  STUCK_AFTER_MS,
-} from "./deploy";
-export type { DeployResult, DeployErrorKey, DeploySiteInput } from "./deploy";
+// Public surface of the Site-deploy engine. The actual build runs in the
+// bizbeecms-deployer Worker's container (real `opennextjs-cloudflare build` +
+// `wrangler deploy` off a git tag) — see src/app/api/sites/[id]/deploy/route.ts.
+// This barrel only exposes the pure helpers that route + the UI still need.
 export {
   workerNameForSlug,
   isValidWorkerName,
   CMS_WORKER_PREFIX,
 } from "./worker-name";
 export {
-  uploadWorkerScript,
-  getCloudflareCreds,
-  buildScriptUploadForm,
-} from "./cloudflare";
-export type { CfApiResult, CfApiError } from "./cloudflare";
-export type { WorkerScriptUpload } from "./script-upload";
-export { buildCmsBundle, cmsBundleBuiltAt } from "./cms-bundle";
-export type { CmsBundle } from "./cms-bundle";
+  canStartDeploy,
+  isDeployStuck,
+  STUCK_AFTER_MS,
+} from "./deploy-state";

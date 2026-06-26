@@ -433,19 +433,13 @@ Manual fallback (CF-authed shell), same script the Action runs:
 ./deploy.sh deployer router # just those (no migrations — only PM has a D1)
 ```
 
-- PM's `predeploy`→`preflight` (`scripts/preflight-deploy.mjs`) **aborts** on placeholder zero-ids,
-  missing `nodejs_compat` / `global_fetch_strictly_public` flags, or a broken CMS bundle.
+- PM's `predeploy`→`preflight` (`scripts/preflight-deploy.mjs`) **aborts** on placeholder zero-ids or
+  missing `nodejs_compat` / `global_fetch_strictly_public` flags.
 - **NEVER run the OpenNext build while `next dev` is on 3601/3602** — it corrupts `.next` and 500s
   the server. `lsof -ti:3601 -ti:3602`; if a `next-server` is there, kill it + `rm -rf .next .open-next`.
 - Confirm: `npx wrangler deployments list` · `curl -sS https://manager.bizbeecms.com/login` (expect 200).
 - **PM deploy disables workers.dev** (no `workers_dev` key) — the old `*.workers.dev` PM URL 404s after.
   This is expected; `manager.bizbeecms.com` is the only entry point.
-
-‡ **CMS bundle note:** PM's preflight requires `src/lib/deploy/cms-bundle.generated.js`, a committed
-pre-bundled CMS artifact. It is a leftover gate from the **old** Script-Upload path — the live CMS
-deploy now goes through the deployer Container (which builds CMS fresh from a git clone), so the
-committed bundle is **not what gets deployed**. Keep regenerating it (`npm run bundle:cms`) only to
-keep preflight green; it does not affect the container deploy.
 
 ## Part B — First-run bootstrap (in the deployed PM)
 

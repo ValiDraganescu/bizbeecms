@@ -4,19 +4,17 @@
 // `wrangler deploy` is caught before it ships:
 //   - wrangler.jsonc still has placeholder zero-ids for D1 / KV
 //   - required OpenNext compat flags are missing
-//   - the committed CMS deploy bundle is missing / empty / wrong-shaped
 //
 // Run: `npm run preflight` (from ProjectManager/). Pure read-only checks —
 // no Cloudflare auth needed, so it runs in any env. Exit 0 = ready to deploy.
 //
-// ponytail: string/regex checks over the config + a require() of the bundle
-// artifact. No JSONC parser dep — strip comments + JSON.parse. Upgrade to a
-// real jsonc lib only if the config grows tricky (it won't).
+// ponytail: string/regex checks over the config. No JSONC parser dep — strip
+// comments + JSON.parse. Upgrade to a real jsonc lib only if the config grows
+// tricky (it won't).
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { validateBundleSource } from "./bundle-selfcheck.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -90,36 +88,6 @@ if (cfg) {
   const r = validateWranglerConfig(cfg);
   errors.push(...r.errors);
   warnings.push(...r.warnings);
-}
-
-// --- 2. CMS deploy bundle artifact ------------------------------------------
-try {
-  const mod = await import("../src/lib/deploy/cms-bundle.generated.js");
-  if (mod.mainModule !== "worker.js") {
-    errors.push(`cms-bundle.generated.js: mainModule is "${mod.mainModule}", expected "worker.js".`);
-  }
-  const src = mod.files?.["worker.js"];
-  if (typeof src !== "string" || src.length === 0) {
-    errors.push(`cms-bundle.generated.js: files["worker.js"] is missing or empty — re-run \`npm run bundle:cms\`.`);
-  } else if (src.length < 100_000) {
-    // a real OpenNext worker bundle is multi-MB; <100KB means a broken/partial build
-    errors.push(
-      `cms-bundle.generated.js: worker.js source is only ${src.length} bytes — looks broken/partial. ` +
-        `Re-run \`npm run bundle:cms\`.`
-    );
-  } else {
-    // Structural boot self-check: entry contract, DO-binding gap, leftover bare
-    // imports. The one link no other offline check covers.
-    const r = validateBundleSource(mod.mainModule, src);
-    errors.push(...r.errors);
-    warnings.push(...r.warnings);
-  }
-  if (!mod.builtAt) warnings.push(`cms-bundle.generated.js: no builtAt timestamp.`);
-} catch (e) {
-  errors.push(
-    `cms-bundle.generated.js missing or invalid (${e.message}). ` +
-      `Generate the CMS deploy bundle with \`npm run bundle:cms\`.`
-  );
 }
 
 // --- report ------------------------------------------------------------------

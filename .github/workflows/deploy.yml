@@ -56,7 +56,8 @@ jobs:
           fi
 
   # PM: apply D1 migrations FIRST (so new code never queries missing columns),
-  # then bundle:cms (builds CMS via opennext) + preflight + opennext deploy.
+  # then preflight + opennext deploy. The CMS is built+deployed separately by
+  # the deployer container off a git tag — PM no longer bundles it.
   pm:
     needs: changes
     if: needs.changes.outputs.pm == 'true'
@@ -68,9 +69,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: "**/package-lock.json" }
-      - name: Install CMS deps (bundle:cms builds CMS)
-        run: npm ci
-        working-directory: CMS
       - name: Install ProjectManager deps
         run: npm ci
         working-directory: ProjectManager
