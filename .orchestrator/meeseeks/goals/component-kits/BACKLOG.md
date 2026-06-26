@@ -5,6 +5,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-26): **Hardening — foundation tag-helper tests.** The most-reused
+  helper `normalizeTags` (and `parseTags`/`serializeTags`/`distinctTags`/`filterByTag`)
+  had NO direct tests — only `applyBulkTag` did. Added `scripts/tags-normalize.test.mjs`
+  (10 tests) pinning the trust-boundary edge cases: untrusted non-string entries
+  dropped (import safety), over-long (>40ch) labels rejected, count cap at 50,
+  case-insensitive dedupe keeps first spelling, sorting, parseTags-never-throws,
+  parse↔serialize round-trip. Pure test-only slice — no prod code/strings/schema
+  changed, so no i18n / opennext / cms-bundle needed. 10/10 green.
+
 - DONE (2026-06-26): **Slice 10 — bulk tag editing.** Select N components (per-row
   checkbox + select-all-visible) then add/remove a tag across all in one action.
   Pure `applyBulkTag(components, tag, op)` in `lib/components/tags.ts` returns only the

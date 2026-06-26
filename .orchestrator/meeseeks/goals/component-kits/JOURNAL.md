@@ -261,3 +261,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/components/tags.ts,
   CMS/src/components/components/components-manager.tsx, CMS/messages/{en,fi,et}.json,
   CMS/scripts/bulk-tag.test.mjs, ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-26 — Hardening: foundation tag-helper tests
+- **Task:** The goal's feature work is complete (all 10 slices DONE). Per NEXT.md's
+  guidance ("prefer a small test-coverage slice over busywork"), filled the one real
+  coverage gap: the foundation tag helpers had NO direct tests — only `applyBulkTag`
+  did. `normalizeTags` is reused by every other helper AND is the trust boundary for
+  tags arriving in an import envelope, so its edge cases are the ones worth pinning.
+- **What:** Added `CMS/scripts/tags-normalize.test.mjs` (10 tests) for
+  `normalizeTags`/`parseTags`/`serializeTags`/`distinctTags`/`filterByTag`: untrusted
+  non-string entries dropped (import safety: `["ok",1,null,{},["x"],true]` → `["ok"]`),
+  non-array input → `[]`, over-long (>40ch) labels rejected, count cap at 50,
+  case-insensitive dedupe keeps first spelling, sorting, parseTags-never-throws on bad
+  JSON, parse↔serialize round-trip, distinctTags union, filterByTag blank=passthrough.
+- **Verified:** 10/10 new tests pass via `node --test` (importing the real `.ts`).
+  Pure test-only slice — NO production code, NO new strings, NO schema change — so the
+  opennext gate + cms-bundle regen are not applicable (nothing buildable changed).
+- **Files:** CMS/scripts/tags-normalize.test.mjs (+ goal memory).
+- **Status:** GOAL COMPLETE. No open TODO, no bug. Next Meeseeks: declare complete
+  unless a genuinely valuable idea appears; don't invent busywork.
