@@ -389,6 +389,10 @@
     "componentsEmpty": "No components yet — import a kit or component.",
     "componentsNoMatch": "No components match your search.",
     "kitIndividual": "Individually imported",
+    "groupByLabel": "Group components by",
+    "groupByKit": "Kit",
+    "groupByTag": "Tag",
+    "tagUntagged": "Untagged",
     "kit": {
       "blog": "Blog kit",
       "landing": "Landing kit",

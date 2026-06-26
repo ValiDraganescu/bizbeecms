@@ -2,7 +2,7 @@
 // node --test does NOT resolve the @/ alias → import via relative .ts path.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { groupComponentsByKit } from "./grouped.ts";
+import { groupComponentsByKit, groupComponentsByTag } from "./grouped.ts";
 
 test("groups by kit, in kitOrder, with ungrouped last and names sorted", () => {
   const groups = groupComponentsByKit(
@@ -46,4 +46,36 @@ test("empty input → empty groups", () => {
   assert.deepEqual(groupComponentsByKit([], ["blog"]), [
     { kit: "blog", components: [] },
   ]);
+});
+
+// --- groupComponentsByTag (component-kits Slice 5) -------------------------
+
+test("groups by tag, alphabetical, untagged last, names sorted, overlap allowed", () => {
+  const groups = groupComponentsByTag([
+    { name: "Hero", tags: ["marketing", "dark"] },
+    { name: "Card", tags: ["marketing"] },
+    { name: "Footer", tags: [] },
+  ]);
+  assert.deepEqual(
+    groups.map((g) => g.kit),
+    ["dark", "marketing", null], // tags sorted, untagged last
+  );
+  assert.deepEqual(groups[0].components, ["Hero"]); // dark
+  assert.deepEqual(groups[1].components, ["Card", "Hero"]); // marketing, sorted + overlap
+  assert.deepEqual(groups[2].components, ["Footer"]); // untagged
+});
+
+test("no untagged group when every component has a tag", () => {
+  const groups = groupComponentsByTag([{ name: "Hero", tags: ["a"] }]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].kit, "a");
+});
+
+test("blank/whitespace tags are ignored (treated as untagged)", () => {
+  const groups = groupComponentsByTag([{ name: "Hero", tags: ["  ", ""] }]);
+  assert.deepEqual(groups, [{ kit: null, components: ["Hero"] }]);
+});
+
+test("empty input → empty tag groups", () => {
+  assert.deepEqual(groupComponentsByTag([]), []);
 });

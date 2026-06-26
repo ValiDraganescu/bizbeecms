@@ -389,6 +389,10 @@
     "componentsEmpty": "Ei vielä komponentteja — tuo paketti tai komponentti.",
     "componentsNoMatch": "Mikään komponentti ei vastaa hakuasi.",
     "kitIndividual": "Erikseen tuodut",
+    "groupByLabel": "Ryhmittele komponentit",
+    "groupByKit": "Paketti",
+    "groupByTag": "Tunniste",
+    "tagUntagged": "Ei tunnisteita",
     "kit": {
       "blog": "Blogipaketti",
       "landing": "Laskeutumispaketti",

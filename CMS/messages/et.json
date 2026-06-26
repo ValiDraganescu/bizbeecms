@@ -389,6 +389,10 @@
     "componentsEmpty": "Komponente pole veel — impordi komplekt või komponent.",
     "componentsNoMatch": "Ükski komponent ei vasta otsingule.",
     "kitIndividual": "Eraldi imporditud",
+    "groupByLabel": "Rühmita komponendid",
+    "groupByKit": "Komplekt",
+    "groupByTag": "Silt",
+    "tagUntagged": "Sildistamata",
     "kit": {
       "blog": "Ajaveebi komplekt",
       "landing": "Maandumiskomplekt",

@@ -15,7 +15,7 @@ import type { ComponentArtifactInput } from "@/lib/chat/component-tool";
 import type { ComponentRow, ImportedComponent } from "@/lib/components/portable";
 // Relative .ts import (not @/) — node --test can't resolve the @/ alias for a
 // RUNTIME import (the @/ imports here are type-only and erased). See CAVEATS.
-import { serializeTags } from "../lib/components/tags.ts";
+import { serializeTags, parseTags } from "../lib/components/tags.ts";
 
 /**
  * List the Site's component names (for the AI system prompt — so the model
@@ -50,15 +50,20 @@ export async function listComponents(): Promise<ComponentRow[]> {
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** A component name + the kit it was installed from (null = individually imported). */
+/**
+ * A component name + the kit it was installed from (null = individually imported)
+ * + its operator tags (component-kits) — feeds both rail groupings (by kit / by tag).
+ */
 export interface NamedKitComponent {
   name: string;
   sourceKit: string | null;
+  tags: string[];
 }
 
 /**
- * List every component's name + its `sourceKit` tag (for the page-builder rail's
- * grouped view). Names only — the rail doesn't need the full artifact to list.
+ * List every component's name + its `sourceKit` origin + operator `tags` (for the
+ * page-builder rail's grouped views — by kit AND by tag). Names only — the rail
+ * doesn't need the full artifact to list.
  */
 export async function listComponentsWithKit(): Promise<NamedKitComponent[]> {
   const db = await getDb();
@@ -66,9 +71,14 @@ export async function listComponentsWithKit(): Promise<NamedKitComponent[]> {
     .select({
       name: schema.component.name,
       sourceKit: schema.component.sourceKit,
+      tags: schema.component.tags,
     })
     .from(schema.component);
-  return rows;
+  return rows.map((r) => ({
+    name: r.name,
+    sourceKit: r.sourceKit,
+    tags: parseTags(r.tags),
+  }));
 }
 
 /**

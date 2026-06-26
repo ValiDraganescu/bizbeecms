@@ -1,10 +1,11 @@
 /**
  * Grouped component listing for the page-builder Components rail (page-builder epic).
  *
- *   GET → the Site's components GROUPED by their source kit, plus a trailing
- *         "individually-imported" group (sourceKit = null). One group per known
- *         kit (in registry order) even if it has 0 installed components, so the
- *         rail can show every kit; a stale-tagged kit id still surfaces.
+ *   GET → the Site's components GROUPED two ways: by their source kit (`groups`,
+ *         plus a trailing "individually-imported" sourceKit=null group, one group
+ *         per known kit even with 0 components) AND by operator tags (`tagGroups`,
+ *         a component appears under each of its tags + a trailing untagged group).
+ *         The rail picks which grouping to render via its Kit/Tag toggle.
  *
  * Closes the kit↔component GAP: components are stored FLAT in D1 with an optional
  * `sourceKit` tag (set at kit-install time). This endpoint reads those tags
@@ -15,7 +16,7 @@
  * REST-only (no server actions). Live D1 read needs a real binding (HITL).
  */
 import { listComponentsWithKit } from "@/db/component-store";
-import { groupComponentsByKit } from "@/lib/components/grouped";
+import { groupComponentsByKit, groupComponentsByTag } from "@/lib/components/grouped";
 import { BLOG_KIT_ID } from "@/lib/components/blog-kit";
 import { LANDING_KIT_ID } from "@/lib/components/landing-kit";
 import { DOCS_KIT_ID } from "@/lib/components/docs-kit";
@@ -32,7 +33,8 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const components = await listComponentsWithKit();
     const groups = groupComponentsByKit(components, KIT_ORDER);
-    return Response.json({ groups });
+    const tagGroups = groupComponentsByTag(components);
+    return Response.json({ groups, tagGroups });
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to list components" },

@@ -46,7 +46,11 @@ export-by-tag, then kit import. Each slice gates on CMS tsc + opennext build gre
   helper node-tested (good bundle, bad format/version, per-component validation
   failure). EN/FI/ET.
 
-- TODO: **Slice 5 (optional) — rail grouping by tag.** `lib/components/grouped.ts`
-  `groupComponentsByKit` could gain a by-TAG grouping so the page-builder component
-  rail can show components grouped by tag, not just kit origin. Small, additive —
-  do only if it reads as useful after Slices 1-4. EN/FI/ET. Gate.
+- DONE (2026-06-26): **Slice 5 — rail grouping by tag.** New pure
+  `groupComponentsByTag(components)` in `lib/components/grouped.ts` (alphabetical tag
+  groups, a component appears under each of its tags, untagged bucket last, names
+  sorted — reuses the `ComponentGroup` shape so `filterGroups`/render are unchanged).
+  `listComponentsWithKit` now also returns `tags` (parsed). `GET /api/components/grouped`
+  returns `{ groups, tagGroups }`. Page-builder rail got a Kit/Tag toggle that switches
+  which grouping renders. EN/FI/ET `groupByLabel/groupByKit/groupByTag/tagUntagged`.
+  4 node tests added. tsc + opennext build green; cms-bundle regenerated.

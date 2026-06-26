@@ -139,3 +139,36 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/components/components-manager.tsx,
   CMS/messages/{en,fi,et}.json, CMS/scripts/parse-kit-bundle.test.mjs,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-26 08:40 — Slice 5: page-builder rail grouping by tag
+- **Status:** DONE
+- **What I did:**
+  - `lib/components/grouped.ts`: new pure `groupComponentsByTag(components)` +
+    `NamedTaggedComponent`/`TagGroup` types. Groups flat components by their operator
+    `tags` (a component with N tags appears in N groups — overlap is the point),
+    tag groups sorted alphabetically, an untagged bucket (`kit:null`) always last and
+    only when present, names sorted. REUSES the existing `ComponentGroup` shape so the
+    rail's `filterGroups` + render path work unchanged (the `kit` field carries the tag).
+    Blank/whitespace tags treated as untagged.
+  - `db/component-store.ts`: `listComponentsWithKit` now also selects + `parseTags`
+    the `tags` column; `NamedKitComponent` gained `tags: string[]` (feeds BOTH
+    groupings). Imported `parseTags` alongside `serializeTags`.
+  - `app/api/components/grouped/route.ts`: returns `{ groups, tagGroups }`
+    (`groupComponentsByKit` + `groupComponentsByTag`).
+  - Rail UI (`page-builder-shell.tsx`): new `groupBy: "kit"|"tag"` state + `tagGroups`
+    state; fetch captures both; `ComponentsRail` got `groupBy`/`onGroupByChange` props
+    and a Kit/Tag segmented toggle in the COMPONENTS header (aria-pressed, design-system
+    tokens). `groupLabel` returns the tag itself in tag mode (null → `tagUntagged`).
+  - i18n: 4 new `pageBuilder` keys (`groupByLabel/groupByKit/groupByTag/tagUntagged`)
+    in en/fi/et.
+  - Tests: 4 cases appended to `lib/components/grouped.test.ts` (alpha order + overlap +
+    untagged-last, no-untagged-group, blank-tags-ignored, empty input).
+- **Verified:** `node --test grouped.test.ts` 8/8 green; CMS `tsc --noEmit` clean;
+  `npm run bundle:cms` (from ProjectManager/, runs opennext build internally) green +
+  cms-bundle regenerated (8278 KB, builtAt 2026-06-26T05:40:53Z). No native confirm/alert.
+  Impeccable `broken-image` finding (L~1650) is a PRE-EXISTING doc-comment in the
+  unrelated `MetaImagePicker` ("native <img>"), not a real tag — false positive, untouched.
+- **Files:** CMS/src/lib/components/grouped.ts, CMS/src/lib/components/grouped.test.ts,
+  CMS/src/db/component-store.ts, CMS/src/app/api/components/grouped/route.ts,
+  CMS/src/components/page-builder/page-builder-shell.tsx, CMS/messages/{en,fi,et}.json,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js

@@ -70,3 +70,57 @@ export function groupComponentsByKit(
 
   return groups;
 }
+
+/** A component name + its operator tags (component-kits goal). */
+export interface NamedTaggedComponent {
+  name: string;
+  tags: string[];
+}
+
+/** One group in the rail when grouping by TAG (kit = the tag, null = untagged). */
+export type TagGroup = ComponentGroup;
+
+/**
+ * Group flat components by their operator TAGS (component-kits Slice 5) — a
+ * parallel shaping to `groupComponentsByKit` for the rail's "by tag" view.
+ *
+ * - A component with N tags appears in N groups (tags overlap; that's the point —
+ *   the operator may want the same Hero under both "marketing" and "dark").
+ * - Tag groups are alphabetical; the `null` (untagged) bucket is always last and
+ *   only present when at least one component has no tags.
+ * - Component names within a group are sorted. Reuses the SAME `ComponentGroup`
+ *   shape so the rail's `filterGroups`/render path works unchanged (the `kit`
+ *   field carries the tag, `null` = untagged).
+ *
+ * ponytail: read straight off the existing `tags` column; no managed tag table.
+ */
+export function groupComponentsByTag(components: NamedTaggedComponent[]): TagGroup[] {
+  const byTag = new Map<string, string[]>();
+  const untagged: string[] = [];
+
+  for (const c of components) {
+    const tags = (c.tags ?? []).filter((t) => typeof t === "string" && t.trim() !== "");
+    if (tags.length === 0) {
+      untagged.push(c.name);
+      continue;
+    }
+    for (const tag of tags) {
+      const arr = byTag.get(tag) ?? [];
+      arr.push(c.name);
+      byTag.set(tag, arr);
+    }
+  }
+
+  const groups: TagGroup[] = [...byTag.keys()]
+    .sort((a, b) => a.localeCompare(b))
+    .map((tag) => ({
+      kit: tag,
+      components: (byTag.get(tag) ?? []).slice().sort((a, b) => a.localeCompare(b)),
+    }));
+
+  if (untagged.length > 0) {
+    groups.push({ kit: null, components: untagged.slice().sort((a, b) => a.localeCompare(b)) });
+  }
+
+  return groups;
+}

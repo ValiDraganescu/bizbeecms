@@ -213,8 +213,11 @@ export function PageBuilderShell({
   const [pages, setPages] = useState<PageSummary[]>([]);
   const [selected, setSelected] = useState<PageOption | null>(null);
 
-  // Components rail: the Site's kit/component groups + the search query.
+  // Components rail: the Site's component groups (by source kit AND by operator
+  // tag) + the search query + which grouping the rail renders.
   const [groups, setGroups] = useState<ComponentGroup[]>([]);
+  const [tagGroups, setTagGroups] = useState<ComponentGroup[]>([]);
+  const [groupBy, setGroupBy] = useState<"kit" | "tag">("kit");
   const [search, setSearch] = useState("");
   // name → raw propsSchema JSON (Block tab renders a settings form per declared prop).
   const [propsSchemas, setPropsSchemas] = useState<Record<string, string | null>>({});
@@ -510,8 +513,12 @@ export function PageBuilderShell({
     void (async () => {
       const res = await fetch("/api/components/grouped");
       if (live && res.ok) {
-        const body = (await res.json()) as { groups?: ComponentGroup[] };
+        const body = (await res.json()) as {
+          groups?: ComponentGroup[];
+          tagGroups?: ComponentGroup[];
+        };
         setGroups(body.groups ?? []);
+        setTagGroups(body.tagGroups ?? []);
       }
     })();
     void (async () => {
@@ -677,7 +684,9 @@ export function PageBuilderShell({
             />
           </div>
           <ComponentsRail
-            groups={groups}
+            groups={groupBy === "tag" ? tagGroups : groups}
+            groupBy={groupBy}
+            onGroupByChange={setGroupBy}
             search={search}
             canEdit={!!selected}
             onAddSection={onAddSection}
@@ -999,6 +1008,8 @@ export function PageBuilderShell({
  */
 function ComponentsRail({
   groups,
+  groupBy,
+  onGroupByChange,
   search,
   canEdit,
   onAddSection,
@@ -1006,6 +1017,8 @@ function ComponentsRail({
   onInsertList,
 }: {
   groups: ComponentGroup[];
+  groupBy: "kit" | "tag";
+  onGroupByChange: (g: "kit" | "tag") => void;
   search: string;
   canEdit: boolean;
   onAddSection: () => void;
@@ -1027,8 +1040,11 @@ function ComponentsRail({
 
   const visible = filterGroups(groups, search);
 
-  // Map a kit id to a display label; null = the individually-imported bucket.
+  // Map a group's `kit` field to a display label. In KIT mode it's a kit id
+  // (null = individually-imported); in TAG mode it's the tag itself (null =
+  // untagged). The `ComponentGroup.kit` field carries whichever.
   function groupLabel(kit: string | null): string {
+    if (groupBy === "tag") return kit ?? t("tagUntagged");
     if (kit == null) return t("kitIndividual");
     // i18n keys kit.blog/kit.landing/kit.docs; fall back to the raw id.
     const key = `kit.${kit}`;
@@ -1074,11 +1090,30 @@ function ComponentsRail({
         </ul>
       </div>
 
-      {/* COMPONENTS — grouped by source kit. */}
+      {/* COMPONENTS — grouped by source kit OR operator tag (toggle). */}
       <div>
-        <p className="px-1 font-mono text-[11px] uppercase tracking-wide text-foreground-muted">
-          {t("categoryComponents")}
-        </p>
+        <div className="flex items-center justify-between gap-2 px-1">
+          <p className="font-mono text-[11px] uppercase tracking-wide text-foreground-muted">
+            {t("categoryComponents")}
+          </p>
+          <div className="flex rounded-md border border-border" role="group" aria-label={t("groupByLabel")}>
+            {(["kit", "tag"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => onGroupByChange(mode)}
+                aria-pressed={groupBy === mode}
+                className={`px-2 py-0.5 text-[11px] first:rounded-l-md last:rounded-r-md ${
+                  groupBy === mode
+                    ? "bg-surface-muted font-medium text-foreground"
+                    : "text-foreground-muted hover:bg-surface-muted"
+                }`}
+              >
+                {mode === "kit" ? t("groupByKit") : t("groupByTag")}
+              </button>
+            ))}
+          </div>
+        </div>
         {visible.length === 0 ? (
           <p className="mt-1.5 px-1 text-sm text-foreground-muted">
             {search.trim() ? t("componentsNoMatch") : t("componentsEmpty")}

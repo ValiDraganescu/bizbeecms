@@ -87,6 +87,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   `scripts/models.test.mjs` that are NOT this goal. STAY OUT of chat; stage ONLY your
   own component-kit paths. NEVER `git add -A`.
 
+- **`ComponentGroup.kit` is overloaded by design (Slice 5).** The rail's grouping fns
+  (`groupComponentsByKit`, `groupComponentsByTag`) BOTH return `ComponentGroup`; in tag
+  mode the `kit` field carries the TAG (null = untagged), not a kit id. This lets
+  `filterGroups` + the rail render path stay single-pathed. The rail's `groupLabel`
+  branches on `groupBy` to interpret it. Don't "fix" the field name — keep the shared shape.
+
+- **The page-builder rail's broken-image impeccable finding is a FALSE POSITIVE.** It's a
+  doc-comment in `MetaImagePicker` ("native <img>") — no actual tag. Every edit to
+  `page-builder-shell.tsx` re-triggers it at a shifted line. Ignore it; it's not your code.
+
 - **A new column on `component` ripples to all 5 premade kits.** Their `bundle()`
   wrappers build a `PortableComponent` literal; a new REQUIRED envelope field (Slice 1's
   `tags`) breaks `tsc` in blog/docs/landing/pricing/portfolio-kit.ts until each sets it.
