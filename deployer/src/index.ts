@@ -739,7 +739,17 @@ step_ok
 cd /workspace/src/CMS || { report failed "CMS dir missing"; exit 1; }
 
 step_start npm
-npm ci || npm install
+# npm ci was hanging ~9min silently (twice) right after the deprecation warnings,
+# i.e. while fetching packages: npm's default per-request fetch-timeout is 5min,
+# so it sits on a stalled socket for minutes. Make it FAIL FAST and RETRY rather
+# than hang (60s timeout, 5 retries w/ backoff), skip audit/fund (extra registry
+# round-trips), and cap the whole step under coreutils \`timeout\` so a wedged
+# socket can't eat the build window — on expiry, one clean retry.
+export npm_config_fetch_timeout=60000
+export npm_config_fetch_retries=5
+export npm_config_audit=false
+export npm_config_fund=false
+timeout 360s npm ci || { echo "npm ci stalled/failed — retrying once"; timeout 360s npm ci; }
 if [ $? -ne 0 ]; then step_fail "npm install failed"; report failed "npm install failed"; exit 1; fi
 step_ok
 
