@@ -501,6 +501,9 @@ report() {
   # here — after this the deploy is resolved and PM prunes the streamed rows
   # (prune-on-resolve). One final flush so the console shows the last lines that
   # landed inside the 2s poll gap (e.g. the actual error of a failing step).
+  # Stop the mem sampler FIRST so its last [mem] line is in build.log before the
+  # final flush (a timed-out build dies via this path with the sampler running).
+  stop_mem_sampler
   flush_log_stream
   stop_log_stream
   if [ -z "$CALLBACK_URL" ]; then return; fi
@@ -651,6 +654,28 @@ read_ram_mb() {
   if [ -n "$kb" ]; then echo $(( kb / 1024 )); fi
 }
 
+# During-build RAM heartbeat. The build is the OOM-prone step and can go SILENT
+# for minutes (no Next.js output) right when it's thrashing — so a sampler writes
+# a "[mem] N MB free" line into build.log every 10s. It rides the existing log
+# stream (the poller tails build.log), so it needs no new POST path or schema:
+# a silent build whose [mem] keeps dropping = OOM thrash; silent with stable mem
+# = a real deadlock. Lets the next hang explain itself.
+MEM_SAMPLER_PID=""
+start_mem_sampler() {
+  ( while :; do
+      mb=$(read_ram_mb)
+      [ -n "$mb" ] && echo "[mem] \${mb} MB free" >> /workspace/build.log
+      sleep 10
+    done ) &
+  MEM_SAMPLER_PID=$!
+}
+stop_mem_sampler() {
+  [ -z "$MEM_SAMPLER_PID" ] && return
+  kill "$MEM_SAMPLER_PID" 2>/dev/null || true
+  wait "$MEM_SAMPLER_PID" 2>/dev/null || true
+  MEM_SAMPLER_PID=""
+}
+
 step_start() {
   # $1=step name. Records start time + emits a started event.
   STEP_NAME="$1"
@@ -730,8 +755,12 @@ step_start build
 # Sample free RAM (best-effort) for the OOM-prone build step; reported on the
 # build event as ramAvailableMb (instance was bumped standard-1->standard-2 here).
 STEP_RAM_MB=$(read_ram_mb)
+# Heartbeat RAM into build.log every 10s so a SILENT hang (next build emits
+# nothing for minutes when thrashing) still shows whether memory is dropping.
+start_mem_sampler
 npx opennextjs-cloudflare build
 build_rc=$?
+stop_mem_sampler
 # Re-sample after the build so the reported value reflects post-build headroom.
 STEP_RAM_MB=$(read_ram_mb)
 if [ $build_rc -ne 0 ]; then step_fail "opennext build failed"; report failed "opennext build failed"; exit 1; fi
