@@ -707,7 +707,7 @@ read_ram_mb() {
 MEM_SAMPLER_PID=""
 HB_T0=""
 # Sum %CPU and count of the build's worker processes (node/next/wrangler/esbuild).
-# `ps` is in coreutils/procps on the container; if absent the field reads "?".
+# \`ps\` is in coreutils/procps on the container; if absent the field reads "?".
 read_build_cpu() {
   ps -eo pcpu,comm 2>/dev/null \
     | awk 'tolower($2) ~ /node|next|wrangler|esbuild|tsc/ { c+=$1; n++ }
