@@ -703,7 +703,9 @@ step_start clone
 export GIT_CONFIG_COUNT=1
 export GIT_CONFIG_KEY_0="http.extraHeader"
 export GIT_CONFIG_VALUE_0="Authorization: Basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\\n')"
-git clone --depth 1 --branch "$REF" "$REPO_URL" /workspace/src
+# -c advice.detachedHead=false: cloning a tag checks out a detached HEAD, and
+# git's advice block would otherwise dump 10 lines into the streamed log.
+git -c advice.detachedHead=false clone --depth 1 --branch "$REF" "$REPO_URL" /workspace/src
 clone_rc=$?
 unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
 if [ $clone_rc -ne 0 ]; then step_fail "git clone failed"; report failed "git clone failed"; exit 1; fi

@@ -14,8 +14,7 @@
     "types": [
       "node",
       "react",
-      "react-dom",
-      "@cloudflare/workers-types"
+      "react-dom"
     ],
     "module": "esnext",
     "moduleResolution": "bundler",

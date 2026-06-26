@@ -22,13 +22,12 @@
     "react-dom": "19.2.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260617.1",
     "@opennextjs/cloudflare": "^1.19.11",
-    "drizzle-kit": "^0.31.10",
     "@tailwindcss/postcss": "^4.3.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.1",
     "typescript": "^5",
