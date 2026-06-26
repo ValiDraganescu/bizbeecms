@@ -1,29 +1,30 @@
 # Note to the next Meeseeks (auth-reset)
 
-**FEATURE + BEHAVIORAL-TEST HARDENING COMPLETE for BOTH apps (PM P1–P5, CMS C1–C5,
-TEST-HARNESS-PM, TEST-HARNESS-CMS).** The whole auth-reset goal is delivered.
+**BUG [P1] is OPEN — bugs come first.** This run fixed only the **CMS** half of
+**part (2)** (the domain-prefixed invite SUBJECT). Two pieces remain:
 
-DONE this run: **TEST-HARNESS-CMS** — CMS reset route tests are now BEHAVIORAL (not
-source-grep), mirroring PM. Ported `CMS/src/lib/test/fake-d1.ts`; gave `CMS/src/lib/
-reset/reset.ts` the injected-Db seam (RELATIVE imports + lazy `getDb` from
-`../ports/db.ts` + optional injected `Db`); `forgot-route.test.ts` +
-`reset-route.test.ts` drive the real fns over a fake D1. Gates green: tsc 0 / 760
-node tests / opennext build.
+1. **PM invite subject (part 2, PM app)** — the NEXT task. Mirror the CMS fix in the
+   PM app (one app per run): add `ProjectManager/src/lib/mail/invite-subject.ts`
+   (copy CMS's pure `customDomain`/`inviteSubject`, alias-free), wire
+   `ProjectManager/src/app/api/invite/route.ts` to read `APP_ORIGIN` from
+   `getCloudflareContext` and build `subject` via `inviteSubject(appOrigin,
+   t("subject"), (d) => t("subjectWithDomain", { domain: d }))`, add
+   `invites.email.subjectWithDomain` (`"{domain}: You are invited to use BizBeeCMS"`)
+   EN/FI/ET. Add a node test (mirror `invite-subject.test.ts`), prove fail-before.
+   Gate: PM tsc + npm test + opennext build (ports down first). PM does NOT touch
+   cms-bundle.
+   - Consider also the RESET email subject (`sendResetEmail` callers in both apps):
+     the bug says confirm whether reset mail should carry the domain too. Default:
+     mirror the invite (prefixed when custom domain) for consistency — small slice,
+     do it alongside or right after the PM invite subject.
 
-**ONE LOOSE END — `bundle:cms` was DEFERRED** (see JOURNAL + the BUNDLE:CMS
-CONCURRENCY caveat). At my run-time, cms-auth + ai-openrouter had UNCOMMITTED
-in-flight CMS/PM source (`CMS/src/app/admin/layout.tsx`, PM site files), so
-regenerating the committed PM `cms-bundle.generated.js` would have baked their
-unfinished work into my commit. My change was test-only + a behavior-neutral seam,
-so the bundle didn't NEED regen for correctness.
+2. **part (1) link host** — NOT this goal's code. Shared deployer APP_ORIGIN fix
+   tracked in `sso`/`cms-mcp` (deployer `src/index.ts` ~520). Do NOT fix APP_ORIGIN
+   here. After it lands + a site redeploys, the link host AND the subject prefix
+   both go live — verify in a live HITL round-trip (invite a user on a
+   custom-domain site, check the email link host + the `<domain>:` subject).
 
-**NEXT TASK (only if a real source/behavior change shipped since the last bundle):**
-once the CMS tree is CLEAN of other workers' in-flight changes (`git status`),
-run `bundle:cms` (from the ProjectManager dir) to resync the committed CMS bundle,
-then PM tsc + opennext build after the regen. If nothing functional changed in CMS
-since the last good bundle, this is unnecessary — don't regen busywork.
-
-After the bundle is confirmed in sync, **flag auth-reset for archival** (it's done) —
-do NOT invent new auth-reset work. Gate any run: CMS tsc + node tests + opennext
-build, NOT while dev (3601/3602) up — `lsof` first. ONE app per run.
-</content>
+Once both apps' subject halves are done and the deployer fix is verified live, flip
+the bug to DONE. Gate every run: app tsc + node tests + opennext build, NOT while
+dev (3601/3602) up — `lsof` first. ONE app per run. CMS slices regen PM cms-bundle
+as their LAST step (this run already did, with a clean tree).

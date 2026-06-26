@@ -684,6 +684,7 @@
   },
   "inviteEmail": {
     "subject": "Sind on kutsutud BizbeeCMS-i",
+    "subjectWithDomain": "{domain}: Sind on kutsutud kasutama BizBeeCMS-i",
     "body": "Sind on kutsutud seda saiti haldama. Võta kutse vastu ja määra parool siin:\n\n{url}\n\nLink aegub 7 päeva pärast."
   },
   "resetEmail": {

@@ -252,3 +252,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   COMPLETE (PM + CMS); bundle regen is the only loose end.**
 - **Files:** CMS/src/lib/test/fake-d1.ts (new), CMS/src/lib/reset/reset.ts,
   CMS/src/lib/reset/forgot-route.test.ts, CMS/src/lib/reset/reset-route.test.ts
+
+## 2026-06-26 09:38 — BUG [P1] part (2): CMS invite subject carries the custom domain
+- **Status:** DONE (CMS half of part 2)
+- **What I did:** Fixed the generic-subject half of the P1 bug for the CMS app
+  (one-app-per-run; the repro subject "You're invited to BizbeeCMS" is the CMS
+  `inviteEmail.subject`). New pure, alias-free `CMS/src/lib/mail/invite-subject.ts`:
+  `customDomain(appOrigin)` parses APP_ORIGIN's host, returns null for empty/
+  malformed/`*.workers.dev`/`localhost`, else strips a leading `www.` and returns
+  the host; `inviteSubject(appOrigin, generic, withDomain)` returns the
+  domain-prefixed subject when a custom domain is attached, else the generic. Wired
+  `CMS/src/app/api/invite/route.ts` to read `APP_ORIGIN` from the CF env and build
+  the subject via `inviteSubject(...)`, rendering `inviteEmail.subjectWithDomain`
+  for the custom-domain case. Added top-level `inviteEmail.subjectWithDomain`
+  (`"{domain}: You are invited to use BizBeeCMS"`) EN/FI/ET. Derived from APP_ORIGIN
+  so it stays consistent with the link; once the deployer APP_ORIGIN fix (part 1,
+  tracked in sso/cms-mcp) lands, the prefix auto-activates — pre-fix APP_ORIGIN is
+  workers.dev so the generic subject is used (no behavior change yet).
+- **Verified:** ports 3601/3602 down; CMS `tsc --noEmit` clean; `npm test` 984
+  pass/0 fail (+7 new in `invite-subject.test.ts`); fail-before PROVEN (replaced the
+  `.workers.dev` guard with `false` ⇒ both workers.dev tests fail; reverted);
+  `opennextjs-cloudflare build` green. Then ran `npm run bundle:cms` from PM (tree
+  was clean of other workers — only my 4 tracked + 2 untracked files) regenerating
+  `cms-bundle.generated.js` (8311 KB); PM `tsc` clean + PM opennext build green
+  after regen. Did NOT exercise live email (runtime/HITL only) or fix part (1)
+  link host (shared deployer APP_ORIGIN fix — by design out of scope here).
+- **Files:** CMS/src/lib/mail/invite-subject.ts (new),
+  CMS/src/lib/mail/invite-subject.test.ts (new),
+  CMS/src/app/api/invite/route.ts (env APP_ORIGIN + inviteSubject),
+  CMS/messages/{en,fi,et}.json (inviteEmail.subjectWithDomain),
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js (regenerated)

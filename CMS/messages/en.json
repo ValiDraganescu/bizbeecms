@@ -684,6 +684,7 @@
   },
   "inviteEmail": {
     "subject": "You're invited to BizbeeCMS",
+    "subjectWithDomain": "{domain}: You are invited to use BizBeeCMS",
     "body": "You've been invited to manage this site. Accept your invitation and set a password here:\n\n{url}\n\nThis link expires in 7 days."
   },
   "resetEmail": {

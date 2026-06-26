@@ -1,10 +1,12 @@
 import { getTranslations } from "next-intl/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { checkAdmin } from "@/lib/auth/guard";
 import type { CmsRole } from "@/db/schema";
 import { findUserByEmail, normalizeEmail } from "@/db/user-store";
 import { canInvite, canInviteRole, INVITABLE_ROLES } from "@/lib/auth/roles";
 import { createInvite, hasPendingInvite } from "@/db/invite-store";
 import { sendInviteEmail } from "@/lib/mail/send-invite";
+import { inviteSubject } from "@/lib/mail/invite-subject";
 
 /**
  * CMS invite endpoint (cms-auth Slice 4). A Manager+ invites a CMS user by email
@@ -79,10 +81,14 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     const t = await getTranslations("inviteEmail");
+    const { env } = await getCloudflareContext({ async: true });
+    const appOrigin = (env as unknown as { APP_ORIGIN?: string }).APP_ORIGIN;
     const result = await sendInviteEmail({
       to: email,
       token: invite.token,
-      subject: t("subject"),
+      subject: inviteSubject(appOrigin, t("subject"), (domain) =>
+        t("subjectWithDomain", { domain }),
+      ),
       body: (url) => t("body", { url }),
     });
     return Response.json({

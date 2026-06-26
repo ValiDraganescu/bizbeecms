@@ -141,6 +141,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   first; if dirty with others' files AND your change is test-only / behavior-neutral
   (e.g. a backward-compatible seam refactor), DEFER the bundle and say so — a later
   worker regenerates it cleanly. tsc/build still run fine (read-only of source).
+- BUG-P1 SUBJECT (2026-06-26, learned): the custom-domain invite subject is derived
+  from `APP_ORIGIN`'s host, NOT from any per-site DB field — keeps it consistent with
+  the emailed link (which also comes from APP_ORIGIN). Pure helper lives in
+  `CMS/src/lib/mail/invite-subject.ts` (`customDomain` + `inviteSubject`), kept
+  ALIAS-FREE so node --test can load it (send-invite.ts pulls
+  `@opennextjs/cloudflare` at import and can't run under the runner — same TESTABILITY
+  rule as reset-logic). `customDomain` treats `*.workers.dev`/`localhost`/empty/
+  malformed as "no custom domain" → generic subject. So PRE the deployer APP_ORIGIN
+  fix (part 1), APP_ORIGIN is workers.dev ⇒ generic subject ⇒ zero behavior change;
+  the prefix auto-activates once part 1 lands. The PM invite mail
+  (`invites.email.subject`) STILL needs the same treatment in a separate PM run —
+  mirror `inviteSubject` (PM route already has `getCloudflareContext`/env access).
 - P5 NON-DUPLICATION: the enumeration-safe hit===miss invariant is already locked
   STRUCTURALLY by `forgot-route.test.ts` (exactly one `{ok:true}` returned AFTER
   the `if(user)` block). Don't add a runtime deep-equal of `{ok:true}` vs
