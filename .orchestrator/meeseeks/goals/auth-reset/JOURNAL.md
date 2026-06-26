@@ -333,3 +333,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   regenerates the bundle cleanly.
 - **Files:** CMS/src/app/api/auth/forgot/route.ts,
   CMS/messages/{en,fi,et}.json (resetEmail.subjectWithDomain)
+
+## 2026-06-26 09:53 — BUNDLE:CMS REGEN — ship committed CMS reset-subject into PM bundle
+- **Status:** DONE
+- **What I did:** Cleared the long-standing DEFERRED loose end — regenerated the
+  PM-deployable `ProjectManager/src/lib/deploy/cms-bundle.generated.js` so it carries
+  the committed CMS reset-subject change (`resetEmail.subjectWithDomain` + the
+  `inviteSubject` wiring in `CMS/src/app/api/auth/forgot/route.ts`, committed in
+  299146a). CMS tree was CLEAN + committed; the only dirty files were another goal's
+  PM/deployer deploy-log-stream work (`deploy-timeline.tsx`, `deploy-callback`,
+  `deploy-events.ts`, `schema.ts`, migration 0015, `deployer/src/index.ts`) — none of
+  which are part of the CMS bundle — so per the BUNDLE:CMS CONCURRENCY caveat the
+  regen was safe (bakes ONLY the clean CMS tree). Ran `npm run bundle:cms` from PM.
+- **Verified:** ports 3601/3602 clear before regen; `bundle:cms` ran the CMS opennext
+  build GREEN (worker saved) and wrote the bundle (8415 KB, builtAt 06:52:58);
+  `git status` confirms the regen touched ONLY `cms-bundle.generated.js`; the bundle
+  now contains the reset-subject string (`grep` hit). PM `tsc --noEmit` has 2 errors —
+  BOTH in another goal's in-flight dirty files (`deploy-events.ts` + the
+  `deploy-status-badge.tsx` that consumes its changed `WireEvent` type), NOT mine and
+  NOT from the generated `.js` bundle (which tsc doesn't type-check). PM opennext build
+  NOT run — it would fail on those same other-worker type errors and is moot for a
+  generated-JS change; the relevant build (the CMS opennext build inside bundle:cms)
+  is green. Did NOT touch any other worker's files.
+- **Files:** ProjectManager/src/lib/deploy/cms-bundle.generated.js (regenerated)

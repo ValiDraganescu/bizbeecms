@@ -1,42 +1,34 @@
 # Note to the next Meeseeks (auth-reset)
 
-**BUG [P1] is STILL OPEN but ALL CODE is now done in both apps.** Full subject
-parity landed: PM invite, PM reset, CMS invite, AND CMS reset (this run) all
-domain-prefix their email subject when a custom domain is attached. The only
-remaining work is NOT codeable here — a live verification gated on another goal's
-deployer fix:
+**ALL CODE IS DONE AND SHIPPED.** Both apps' forgot/reset flows are complete, and
+the BUG [P1] subject-prefix fix is in all four mails (PM+CMS × invite+reset). As of
+2026-06-26 09:53 the `bundle:cms` regen loose end is **CLOSED** — the PM-deployable
+`ProjectManager/src/lib/deploy/cms-bundle.generated.js` now carries the CMS
+reset-subject change. **There is no codeable work left in this goal.**
 
-1. **part (1) link host** — shared deployer `APP_ORIGIN` fix tracked in
-   `sso`/`cms-mcp` (deployer `src/index.ts` ~520 always sets APP_ORIGIN to
-   workers.dev even when a custom domain is attached). Do NOT fix APP_ORIGIN here.
-   When it lands + a custom-domain site redeploys, BOTH the email link host AND the
-   subject prefix go live together (the subject is derived from APP_ORIGIN, so it
-   auto-activates — no code change needed in this goal).
+**The ONLY remaining item is NOT codeable here — a live HITL verify gated on another
+goal's deployer fix:**
 
-2. **Live HITL verify, then flip the bug DONE** — once the deployer fix lands +
+1. **part (1) link host** — shared deployer `APP_ORIGIN` fix tracked in `sso`/`cms-mcp`
+   (deployer `src/index.ts` ~520 sets APP_ORIGIN to workers.dev even with a custom
+   domain). DO NOT fix APP_ORIGIN here. When it lands + a custom-domain site redeploys,
+   BOTH the email link host AND the subject prefix go live together (the subject is
+   derived from APP_ORIGIN, so it auto-activates — no code change in this goal).
+
+2. **Live HITL verify, then flip BUG [P1] DONE** — once the deployer fix lands +
    redeploy: invite a user AND request a reset on a custom-domain site (e.g.
-   restovista.com) in BOTH apps → confirm (a) email link host is the custom domain
-   (not workers.dev), (b) invite subject is `<domain>: You are invited to use
-   BizBeeCMS`, (c) reset subject is `<domain>: Reset your password`. If all check
-   out, flip BUG [P1] to DONE in BACKLOG.md.
+   restovista.com) in BOTH apps → confirm (a) email link host is the custom domain,
+   (b) invite subject is `<domain>: You are invited to use BizBeeCMS`, (c) reset
+   subject is `<domain>: Reset your password`. If all check out, flip BUG [P1] DONE.
 
-**OUTSTANDING CODE LOOSE END (the ONLY codeable item left):**
-- **`bundle:cms` was DEFERRED this run** because the tree had OTHER workers'
-  in-flight PM changes (migrations 0015 + `schema.ts` + `deploy-events.ts`). The
-  committed PM `cms-bundle.generated.js` does NOT yet contain the CMS reset-subject
-  change. A later CMS run on a CLEAN tree must run `bundle:cms` (from PM) as its
-  LAST step to bake it in. The change is inert until the deployer APP_ORIGIN fix, so
-  no rush, but the bundle is stale until then. **Check `git status` is clean of
-  others' files before running bundle:cms** (BUNDLE:CMS CONCURRENCY caveat).
+**If you wake with nothing to do:** the bug is purely awaiting a cross-goal fix +
+human verification. There is no productive code task in auth-reset right now — every
+slice (PM P1–P5, CMS C1–C5, behavioral test harness, subject parity, bundle regen) is
+DONE. Don't invent busywork; report that the goal is code-complete and blocked on the
+deployer fix + HITL. (If you must do something, re-read main/GOAL.md for an adjacent
+gap — but auth-reset itself is done.)
 
-**Code status (all DONE):**
-- PM invite + reset subjects: domain-prefixed via
-  `ProjectManager/src/lib/mail/invite-subject.ts`.
-- CMS invite subject: `CMS/src/app/api/invite/route.ts` via
-  `CMS/src/lib/mail/invite-subject.ts`.
-- CMS reset subject (this run): `CMS/src/app/api/auth/forgot/route.ts` via the same
-  `inviteSubject` helper + `resetEmail.subjectWithDomain` EN/FI/ET.
-
-Gate every run: app tsc + node tests + opennext build, NOT while dev (3601/3602)
-up — `lsof` first. ONE app per run. CMS slices regen PM cms-bundle LAST (clean
-tree only); PM slices never touch cms-bundle.
+Gate every run: app tsc + node tests + opennext build, NOT while dev (3601/3602) up —
+`lsof` first. NOTE: PM `tsc` currently reports errors in the deploy-log-stream goal's
+in-flight dirty files (`deploy-events.ts`, `deploy-status-badge.tsx`) — those are NOT
+auth-reset's and clear once that goal commits. ONE app per run.

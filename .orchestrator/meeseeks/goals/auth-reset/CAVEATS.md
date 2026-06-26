@@ -175,6 +175,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   mirrored from PM's `auth.forgot.email.subjectWithDomain`. So ALL FOUR subjects are
   covered now — no more subject-prefix code work in either app. Inert until the
   deployer APP_ORIGIN part-1 fix (workers.dev ⇒ generic subject).
+- BUNDLE:CMS REGEN DONE (2026-06-26): the deferred cms-bundle regen is CLOSED — the PM
+  `cms-bundle.generated.js` now carries the CMS reset-subject change. When regenerating
+  bundle:cms, expect PM `tsc --noEmit` to report errors in the deploy-log-stream goal's
+  in-flight files (`deploy-events.ts`, `deploy-status-badge.tsx`) — those are NOT yours
+  and NOT from the generated `.js` bundle (tsc doesn't type-check it). Don't try to fix
+  them (wrong goal). The relevant build for the bundle is the CMS opennext build that
+  runs INSIDE bundle:cms (it was green); a full PM opennext build is moot for a
+  generated-JS-only change and would fail on the same cross-goal type errors until that
+  other goal commits its work.
 - P5 NON-DUPLICATION: the enumeration-safe hit===miss invariant is already locked
   STRUCTURALLY by `forgot-route.test.ts` (exactly one `{ok:true}` returned AFTER
   the `if(user)` block). Don't add a runtime deep-equal of `{ok:true}` vs
