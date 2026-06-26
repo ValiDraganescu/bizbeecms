@@ -20,7 +20,7 @@ import type {
   NewDeployEvent,
 } from "../../db/schema.ts";
 
-const STATUSES: readonly DeployEventStatus[] = ["started", "ok", "failed"];
+const STATUSES: readonly DeployEventStatus[] = ["started", "ok", "failed", "log"];
 
 /**
  * Service-to-service auth check, identical semantics to deploy-callback: the
@@ -43,6 +43,10 @@ export type ParsedDeployEvent = {
   durationMs: number | null;
   error: string | null;
   ramAvailableMb: number | null;
+  // Build-log chunk on a `status:"log"` row (deploy-log-stream); null otherwise.
+  logChunk: string | null;
+  // Monotonic emit order for log rows; null on non-log rows.
+  seq: number | null;
 };
 
 function asNullableInt(v: unknown): number | null {
@@ -88,6 +92,9 @@ export function parseDeployEvent(
       ? b.deployId.trim()
       : null;
 
+  const logChunk =
+    typeof b.logChunk === "string" && b.logChunk.length > 0 ? b.logChunk : null;
+
   return {
     ok: true,
     event: {
@@ -99,6 +106,8 @@ export function parseDeployEvent(
       durationMs: asNullableInt(b.durationMs),
       error,
       ramAvailableMb: asNullableInt(b.ramAvailableMb),
+      logChunk,
+      seq: asNullableInt(b.seq),
     },
   };
 }
@@ -133,6 +142,8 @@ export function buildFailedCallbackEvent(
     durationMs: null,
     error: combined,
     ramAvailableMb: null,
+    logChunk: null,
+    seq: null,
   };
 }
 
@@ -151,7 +162,29 @@ export type TimelineRow = {
   durationMs: number | null;
   error: string | null;
   ramAvailableMb: number | null;
+  logChunk: string | null;
+  seq: number | null;
 };
+
+/**
+ * Concatenate a run's streamed build-log chunks (deploy-log-stream) into one
+ * console string, in emit order. Reads ONLY `status:"log"` rows (the step rows
+ * carry no logChunk); orders by `seq` (the monotonic per-deploy counter the
+ * container stamps), falling back to startedAt for any row missing one. Pure —
+ * no I/O — so it's node-testable. Feed it the raw (un-collapsed) run events.
+ */
+export function concatLogForRun(events: readonly TimelineRow[]): string {
+  return events
+    .filter((e) => e.status === "log" && e.logChunk !== null)
+    .slice()
+    .sort((a, b) => {
+      const as = a.seq ?? Date.parse(a.startedAt);
+      const bs = b.seq ?? Date.parse(b.startedAt);
+      return as - bs;
+    })
+    .map((e) => e.logChunk)
+    .join("");
+}
 
 /**
  * Keep only the LATEST deploy run's events, fixing the bug where a fresh deploy
@@ -187,6 +220,8 @@ export type DeployRun = {
   steps: TimelineRow[];
   /** When the run started (min startedAt across its steps), ms epoch. */
   startedAt: number;
+  /** Concatenated streamed build log for this run (deploy-log-stream), "" if none. */
+  log: string;
 };
 
 /**
@@ -212,7 +247,8 @@ export function groupRunsByDeployId(
   }
 
   const runs: DeployRun[] = order.map((deployId) => {
-    const steps = collapseDeployEvents(byRun.get(deployId)!);
+    const raw = byRun.get(deployId)!;
+    const steps = collapseDeployEvents(raw);
     const startedAt = steps.reduce((min, s) => {
       const at = Date.parse(s.startedAt);
       return Number.isNaN(at) ? min : Math.min(min, at);
@@ -221,6 +257,7 @@ export function groupRunsByDeployId(
       deployId,
       steps,
       startedAt: Number.isFinite(startedAt) ? startedAt : 0,
+      log: concatLogForRun(raw),
     };
   });
 
@@ -244,6 +281,9 @@ export function groupRunsByDeployId(
 export function collapseDeployEvents(events: readonly TimelineRow[]): TimelineRow[] {
   const byStep = new Map<string, TimelineRow>();
   for (const e of events) {
+    // Log rows (deploy-log-stream) are console output, not steps — never fold
+    // them into the step timeline. They reach the UI via concatLogForRun.
+    if (e.status === "log") continue;
     const prev = byStep.get(e.step);
     if (!prev) {
       byStep.set(e.step, { ...e });
@@ -258,6 +298,9 @@ export function collapseDeployEvents(events: readonly TimelineRow[]): TimelineRo
       durationMs: e.durationMs ?? prev.durationMs,
       error: e.error ?? prev.error,
       ramAvailableMb: e.ramAvailableMb ?? prev.ramAvailableMb,
+      // Step rows never carry log content (log rows are skipped above).
+      logChunk: null,
+      seq: null,
     });
   }
   return [...byStep.values()];
@@ -360,8 +403,37 @@ export async function insertDeployEvent(
     durationMs: event.durationMs,
     error: event.error,
     ramAvailableMb: event.ramAvailableMb,
+    logChunk: event.logChunk,
+    seq: event.seq,
   };
   await db.insert(schema.deployEvents).values(row);
+}
+
+/**
+ * Drop a run's streamed build-log rows once the deploy resolves (deploy-log-stream,
+ * prune-on-resolve). The live console is only useful WHILE deploying; after that
+ * the step timeline + the failed-step error tail tell the story, so the (many,
+ * bulky) `status:"log"` rows are deleted to keep the trail from bloating. Scoped
+ * to one deployId so concurrent runs don't clobber each other; null deployId is a
+ * no-op (can't isolate a run). Best-effort — caller try/catches. `injectedDb` is
+ * the test seam.
+ */
+export async function pruneLogRows(
+  siteId: string,
+  deployId: string | null,
+  injectedDb?: Db,
+): Promise<void> {
+  if (!deployId) return;
+  const db = injectedDb ?? (await (await import("../../db/index.ts")).getDb());
+  await db
+    .delete(schema.deployEvents)
+    .where(
+      and(
+        eq(schema.deployEvents.siteId, siteId),
+        eq(schema.deployEvents.deployId, deployId),
+        eq(schema.deployEvents.status, "log"),
+      ),
+    );
 }
 
 /**

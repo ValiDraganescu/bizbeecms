@@ -373,7 +373,8 @@
       "noMore": "No earlier deployments.",
       "runAt": "Deployed {time}",
       "currentRun": "Current deployment",
-      "total": "Total {duration}"
+      "total": "Total {duration}",
+      "consoleLabel": "Build console output"
     },
     "assign": {
       "title": "Assigned users",

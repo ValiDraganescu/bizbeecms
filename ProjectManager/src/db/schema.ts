@@ -176,7 +176,7 @@ export type SiteDomain = typeof siteDomains.$inferSelect;
  * operators see the timeline: step name, when it started, how long it took, and
  * any error text — instead of only the single terminal deploy-callback.
  */
-export type DeployEventStatus = "started" | "ok" | "failed";
+export type DeployEventStatus = "started" | "ok" | "failed" | "log";
 
 export const deployEvents = sqliteTable("deploy_events", {
   id: text("id").primaryKey(),
@@ -195,6 +195,15 @@ export const deployEvents = sqliteTable("deploy_events", {
   error: text("error"),
   // Container MemAvailable (MB) sampled around the heavy build step; nullable.
   ramAvailableMb: integer("ram_available_mb"),
+  // Streamed build-log lines (deploy-log-stream). Set ONLY on `status:"log"`
+  // rows — a chunk of build.log the container tails while the build runs, so the
+  // UI renders a live Vercel-style console. Pruned on the terminal callback
+  // (kept only in the failed-step `error` tail). Null on every non-log row.
+  logChunk: text("log_chunk"),
+  // Monotonic per-deploy sequence for log rows, so the console concatenates
+  // chunks in emit order even when createdAt ties at ms resolution. Null on
+  // non-log rows (the step timeline orders by startedAt/createdAt instead).
+  seq: integer("seq"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

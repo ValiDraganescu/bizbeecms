@@ -21,6 +21,10 @@ type WireEvent = {
   durationMs: number | null;
   error: string | null;
   ramAvailableMb: number | null;
+  // Always null/absent in this view — the `?latest=1` API strips log rows — but
+  // the shape must satisfy TimelineRow for collapseDeployEvents/selectLatestRun.
+  logChunk: string | null;
+  seq: number | null;
 };
 
 const statusTone: Record<SiteStatus, BadgeTone> = {

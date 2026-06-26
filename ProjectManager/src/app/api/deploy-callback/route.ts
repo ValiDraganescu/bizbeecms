@@ -4,6 +4,7 @@ import { findSiteById, setSiteDeployStatus } from "@/lib/site/site";
 import {
   buildFailedCallbackEvent,
   insertDeployEvent,
+  pruneLogRows,
 } from "@/lib/deploy/deploy-events";
 import { deployedVersionFromCallback } from "@/lib/deploy/cms-version";
 
@@ -96,6 +97,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     workerName ?? undefined,
     deployedCmsVersion,
   );
+
+  // Prune-on-resolve (deploy-log-stream): the live-console `status:"log"` rows
+  // have served their purpose now the run is terminal; drop them so the trail
+  // doesn't accumulate hundreds of bulky rows per deploy. The failed-step tail
+  // is preserved above in the `callback` event's error. Best-effort.
+  try {
+    await pruneLogRows(siteId, String((body as { deployId?: unknown }).deployId ?? "") || null);
+  } catch (e) {
+    console.error(`[deploy-callback] failed to prune log rows: ${String(e)}`);
+  }
 
   return NextResponse.json({ ok: true });
 }

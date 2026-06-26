@@ -373,7 +373,8 @@
       "noMore": "Ei aiempia julkaisuja.",
       "runAt": "Julkaistu {time}",
       "currentRun": "Nykyinen julkaisu",
-      "total": "Yhteensä {duration}"
+      "total": "Yhteensä {duration}",
+      "consoleLabel": "Käännöskonsolin tuloste"
     },
     "assign": {
       "title": "Liitetyt käyttäjät",

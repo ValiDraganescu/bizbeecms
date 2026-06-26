@@ -373,7 +373,8 @@
       "noMore": "Varasemaid juurutusi pole.",
       "runAt": "Juurutatud {time}",
       "currentRun": "Praegune juurutus",
-      "total": "Kokku {duration}"
+      "total": "Kokku {duration}",
+      "consoleLabel": "Ehituskonsooli väljund"
     },
     "assign": {
       "title": "Määratud kasutajad",

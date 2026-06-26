@@ -556,6 +556,68 @@ emit_event() {
 
 now_ms() { date +%s%3N; }
 
+# --- Live build-log streaming (deploy-log-stream) ---------------------------
+# Tail the growing build.log and POST new content as status:"log" events so PM
+# renders a live Vercel-style console. Runs as a background loop for the duration
+# of ONE step (the build); stopped via stop_log_stream. Best-effort: a failed
+# POST is swallowed (|| true) and never touches the build. PM prunes these rows
+# once the deploy resolves (prune-on-resolve), so volume here is fine.
+LOG_SEQ=0          # monotonic per-deploy chunk counter (PM orders the console by it)
+LOG_STREAM_PID=""  # set while the tailer is running
+emit_log_chunk() {
+  # $1=raw chunk text. JSON-escape (backslash, quote, control chars→space, strip
+  # CRs) and cap so one POST body can't balloon. Skips empty chunks.
+  [ -z "$EVENTS_URL" ] && return
+  local raw="$1"
+  [ -z "$raw" ] && return
+  # JSON-string-escape the chunk in ONE awk pass: backslash FIRST (so it doesn't
+  # double-escape the rest), then quote and tab, with real newlines re-emitted as
+  # the two-char \\n escape (NR>1). CRs are stripped. cut caps body size.
+  local esc
+  esc=$(printf '%s' "$raw" | tr -d '\\r' | awk '
+    BEGIN { ORS="" }
+    { gsub(/\\\\/, "\\\\\\\\"); gsub(/"/, "\\\\\\""); gsub(/\\t/, "\\\\t");
+      if (NR > 1) printf "\\\\n"; printf "%s", \$0 }
+  ' | cut -c1-8000)
+  LOG_SEQ=$((LOG_SEQ + 1))
+  local body="{\\"siteId\\":\\"$SITE_ID\\",\\"deployId\\":\\"$DEPLOY_ID\\",\\"step\\":\\"$STEP_NAME\\",\\"status\\":\\"log\\",\\"startedAt\\":\\"$(now_ms)\\",\\"seq\\":\\"$LOG_SEQ\\",\\"logChunk\\":\\"$esc\\"}"
+  curl -sS -X POST "$EVENTS_URL" \
+    -H "Authorization: Bearer $DEPLOYER_SECRET" \
+    -H "Content-Type: application/json" \
+    --data "$body" >/dev/null 2>&1 || true
+}
+
+start_log_stream() {
+  # Poll build.log by byte offset every 2s and POST whatever was appended since
+  # the last poll. A plain offset diff (no tail -F, no nested subshells) is the
+  # whole mechanism — one delta = one batched POST, so a chatty build is ~1 row
+  # every 2s, not one per line. ponytail: 2s poll, fine for a human-watched console.
+  [ -z "$EVENTS_URL" ] && return
+  (
+    local off=0 size delta
+    while :; do
+      sleep 2
+      [ -f /workspace/build.log ] || continue
+      size=$(wc -c < /workspace/build.log 2>/dev/null || echo 0)
+      if [ "$size" -gt "$off" ]; then
+        # tail -c +N is 1-indexed (byte N onward), so +off+1 starts just past
+        # what we already sent. Reads the delta in one go (not byte-by-byte).
+        delta=$(tail -c +$((off + 1)) /workspace/build.log 2>/dev/null)
+        off=$size
+        emit_log_chunk "$delta"
+      fi
+    done
+  ) &
+  LOG_STREAM_PID=$!
+}
+
+stop_log_stream() {
+  [ -z "$LOG_STREAM_PID" ] && return
+  kill "$LOG_STREAM_PID" 2>/dev/null || true
+  wait "$LOG_STREAM_PID" 2>/dev/null || true
+  LOG_STREAM_PID=""
+}
+
 # Best-effort container free RAM in MB from /proc/meminfo (portable Linux source;
 # the Sandbox container is Linux per Dockerfile). Prints nothing if MemAvailable
 # is absent — caller leaves STEP_RAM_MB empty and no ram field is emitted.
@@ -629,6 +691,10 @@ npm run cf-typegen
 if [ $? -ne 0 ]; then step_fail "cf-typegen failed"; report failed "cf-typegen failed"; exit 1; fi
 
 step_start build
+# Stream build output live (deploy-log-stream) — this is THE step that hangs, so
+# the console is what tells you WHERE (compile / static-gen / OOM) before the
+# timeout kills it. stop_log_stream runs whether the build passes or fails.
+start_log_stream
 # Sample free RAM (best-effort) for the OOM-prone build step; reported on the
 # build event as ramAvailableMb (instance was bumped standard-1->standard-2 here).
 STEP_RAM_MB=$(read_ram_mb)
@@ -636,6 +702,7 @@ npx opennextjs-cloudflare build
 build_rc=$?
 # Re-sample after the build so the reported value reflects post-build headroom.
 STEP_RAM_MB=$(read_ram_mb)
+stop_log_stream
 if [ $build_rc -ne 0 ]; then step_fail "opennext build failed"; report failed "opennext build failed"; exit 1; fi
 step_ok
 

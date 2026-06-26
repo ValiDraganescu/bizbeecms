@@ -16,6 +16,7 @@ import {
   collapseDeployEvents,
   selectLatestRun,
   groupRunsByDeployId,
+  concatLogForRun,
   deployProgress,
   runTotalDurationMs,
   fmtElapsed,
@@ -226,6 +227,8 @@ const row = (o: Partial<TimelineRow> & { step: string; status: TimelineRow["stat
   durationMs: null,
   error: null,
   ramAvailableMb: null,
+  logChunk: null,
+  seq: null,
   ...o,
 });
 
@@ -311,6 +314,65 @@ test("collapseDeployEvents preserves first-seen startedAt, id, and ram from the 
   assert.equal(rows[0].ramAvailableMb, 900);
 });
 
+test("parseDeployEvent accepts a log event with a chunk + seq", () => {
+  const r = parseDeployEvent({
+    siteId: "s",
+    deployId: "run-1",
+    step: "build",
+    status: "log",
+    startedAt: 5,
+    seq: "3",
+    logChunk: "Compiled successfully\n",
+  });
+  assert.equal(r.ok, true);
+  if (!r.ok) return;
+  assert.equal(r.event.status, "log");
+  assert.equal(r.event.seq, 3);
+  assert.equal(r.event.logChunk, "Compiled successfully\n");
+});
+
+test("collapseDeployEvents drops log rows — they are console output, not steps", () => {
+  const rows = collapseDeployEvents([
+    row({ step: "build", status: "started" }),
+    row({ step: "build", status: "log", logChunk: "compiling…\n", seq: 1 }),
+    row({ step: "build", status: "log", logChunk: "done\n", seq: 2 }),
+    row({ step: "build", status: "ok", durationMs: 4200 }),
+  ]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].step, "build");
+  assert.equal(rows[0].status, "ok");
+});
+
+test("concatLogForRun joins only log chunks, ordered by seq", () => {
+  // Deliberately out of order + a non-log row mixed in.
+  const log = concatLogForRun([
+    row({ step: "build", status: "started" }),
+    row({ step: "build", status: "log", logChunk: "second\n", seq: 2 }),
+    row({ step: "build", status: "log", logChunk: "first\n", seq: 1 }),
+    row({ step: "build", status: "ok", durationMs: 10 }),
+    row({ step: "build", status: "log", logChunk: "third\n", seq: 3 }),
+  ]);
+  assert.equal(log, "first\nsecond\nthird\n");
+});
+
+test("concatLogForRun is empty when a run has no log rows", () => {
+  assert.equal(
+    concatLogForRun([row({ step: "build", status: "ok", durationMs: 10 })]),
+    "",
+  );
+});
+
+test("groupRunsByDeployId attaches the concatenated log and excludes it from steps", () => {
+  const [run] = groupRunsByDeployId([
+    row({ deployId: "r1", step: "build", status: "started" }),
+    row({ deployId: "r1", step: "build", status: "log", logChunk: "x\n", seq: 1 }),
+    row({ deployId: "r1", step: "build", status: "ok", durationMs: 5 }),
+  ]);
+  assert.equal(run.log, "x\n");
+  assert.equal(run.steps.length, 1);
+  assert.equal(run.steps[0].status, "ok");
+});
+
 test("runTotalDurationMs: spans first step start to last step end (start + duration)", () => {
   // clone @10:00:00 +2s, build @10:00:02 +300s → total 302s = 302000ms.
   const total = runTotalDurationMs([
@@ -393,6 +455,8 @@ const dbRow = (o: { id: string; created_at: number }) => ({
   duration_ms: null,
   error: null,
   ram_available_mb: null,
+  log_chunk: null,
+  seq: null,
   created_at: o.created_at,
 });
 

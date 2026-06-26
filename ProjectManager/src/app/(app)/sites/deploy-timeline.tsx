@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Badge, type BadgeTone, Button } from "@/components/ui";
 import type { DeployEventStatus, SiteStatus } from "@/db/schema";
@@ -10,6 +10,37 @@ import {
   fmtElapsed,
   type DeployRun,
 } from "@/lib/deploy/deploy-events";
+
+/**
+ * Live build console (deploy-log-stream). Renders the run's streamed build log
+ * in a scrolling terminal box and auto-sticks to the bottom while new lines
+ * arrive — unless the user has scrolled up to read history, in which case we
+ * leave their position alone. Empty log → nothing renders.
+ */
+function BuildConsole({ log, label }: { log: string; label: string }) {
+  const ref = useRef<HTMLPreElement>(null);
+  const stick = useRef(true);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el && stick.current) el.scrollTop = el.scrollHeight;
+  }, [log]);
+
+  if (!log) return null;
+  return (
+    <pre
+      ref={ref}
+      aria-label={label}
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+      }}
+      className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-foreground/95 p-3 font-mono text-xs leading-relaxed text-background"
+    >
+      {log}
+    </pre>
+  );
+}
 
 /** A deploy event as it arrives over JSON (Date columns serialize to ISO strings). */
 type WireEvent = {
@@ -21,6 +52,8 @@ type WireEvent = {
   durationMs: number | null;
   error: string | null;
   ramAvailableMb: number | null;
+  logChunk: string | null;
+  seq: number | null;
 };
 
 type PageResponse = {
@@ -33,6 +66,9 @@ const statusTone: Record<DeployEventStatus, BadgeTone> = {
   started: "primary",
   ok: "success",
   failed: "danger",
+  // Log rows are dropped before any badge renders (collapseDeployEvents skips
+  // them); this entry just satisfies the exhaustive Record type.
+  log: "neutral",
 };
 
 function fmtTime(iso: string): string {
@@ -186,6 +222,7 @@ export function DeployTimeline({
             </p>
           ) : null}
           <RunSteps steps={current.steps} t={t} />
+          <BuildConsole log={current.log} label={t("consoleLabel")} />
         </div>
       ) : null}
 

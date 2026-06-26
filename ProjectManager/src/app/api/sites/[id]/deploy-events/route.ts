@@ -53,9 +53,11 @@ export async function GET(
   });
   // status is sourced from the Site row so the client knows when to stop polling.
   if (latestOnly) {
+    // The Sites-list badge shows live state only — no console — so strip the
+    // (bulky, numerous) streamed log rows; it just needs the step events.
     return NextResponse.json({
       status: site.status,
-      events: latestRunEvents(events),
+      events: latestRunEvents(events).filter((e) => e.status !== "log"),
       nextCursor: null,
     });
   }
