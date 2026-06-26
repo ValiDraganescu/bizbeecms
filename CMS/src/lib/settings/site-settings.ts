@@ -105,6 +105,12 @@ export type PromptBuiltinDef = {
   description: string;
 };
 
+/** A content collection (table name + field names) for the system prompt. */
+export type PromptCollectionDef = {
+  tableName: string;
+  fields: string[];
+};
+
 /** Render one component definition as a compact line: `Name(prop: type!, …)`. */
 function formatComponentDef(c: PromptComponentDef): string {
   if (c.props.length === 0) return `${c.name} (no props)`;
@@ -126,6 +132,8 @@ export function buildSystemPrompt(opts: {
   componentNames?: string[];
   /** Built-in block types (Section, …). */
   builtins?: PromptBuiltinDef[];
+  /** Content collections (so the model uses the right table name, not a guess). */
+  collections?: PromptCollectionDef[];
 }): string {
   const parts: string[] = [];
 
@@ -153,11 +161,13 @@ export function buildSystemPrompt(opts: {
   );
 
   parts.push(
-    "For `className` use only a bounded set of utility classes (arbitrary " +
-      "Tailwind has no CSS at runtime); for one-off values use inline `style` " +
-      "instead. If you use a class outside the accepted set, create_component " +
-      "fails and the error lists every accepted class — fix and retry from that " +
-      "list.",
+    "For `className` use standard Tailwind utilities — the normal scales are all " +
+      "supported (spacing/sizing/positioning like p-4, w-32, h-48, top-2, plus " +
+      "object-cover, aspect-video, z-10, etc.). Only truly arbitrary one-off " +
+      "values (e.g. h-[37px]) have no runtime CSS — for those use inline `style` " +
+      "instead. If a class isn't supported, create_component fails and names the " +
+      "exact rejected class and tells you to use inline `style` — fix just those " +
+      "and retry; do not abandon Tailwind classes wholesale.",
   );
 
   const builtins = opts.builtins ?? [];
@@ -184,6 +194,18 @@ export function buildSystemPrompt(opts: {
     );
   } else {
     parts.push("This Site has no components yet — create the ones each page needs.");
+  }
+
+  const collections = opts.collections ?? [];
+  if (collections.length > 0) {
+    parts.push(
+      "This Site's content collections (pass the EXACT table name to " +
+        "query_collection / bind_component / bind_list — do NOT guess the bare " +
+        "label, the tables are prefixed `content_`):\n" +
+        collections
+          .map((c) => `- ${c.tableName} (${c.fields.join(", ") || "no user fields"})`)
+          .join("\n"),
+    );
   }
 
   parts.push(

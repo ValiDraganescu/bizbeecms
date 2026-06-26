@@ -114,11 +114,20 @@ test("buildSystemPrompt: folds in identity + components", () => {
   assert.doesNotMatch(p, /Tagline:/);
 });
 
-test("buildSystemPrompt: does NOT dump the class vocabulary; defers it to the error", () => {
+test("buildSystemPrompt: does NOT dump the class vocabulary; tells the model normal Tailwind works + inline style for one-offs", () => {
   const p = buildSystemPrompt({});
-  // The full comma-list is gone; the prompt just points at the create_component error.
+  // The full comma-list is gone; the prompt says the normal scale is supported.
   assert.doesNotMatch(p, /bg-primary,/);
-  assert.match(p, /the error lists every accepted class/);
+  assert.match(p, /standard Tailwind utilities/);
+  assert.match(p, /inline `style`/);
+});
+
+test("buildSystemPrompt: lists content collections with exact table names + fields", () => {
+  const p = buildSystemPrompt({
+    collections: [{ tableName: "content_restaurants", fields: ["name", "price"] }],
+  });
+  assert.match(p, /content_restaurants \(name, price\)/);
+  assert.match(p, /EXACT table name/);
 });
 
 test("buildSystemPrompt: always instructs to follow user guidance closely", () => {

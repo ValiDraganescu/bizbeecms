@@ -114,6 +114,12 @@ export function useChat(
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The in-flight request's aborter, so `stop()` can cancel mid-stream.
+  const abortRef = useRef<AbortController | null>(null);
+
+  function stop() {
+    abortRef.current?.abort();
+  }
 
   async function send(
     text: string,
@@ -187,6 +193,8 @@ export function useChat(
         return next;
       });
 
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       const context = getContext?.();
       const model = getModel?.();
@@ -199,6 +207,7 @@ export function useChat(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
       if (!res.ok || !res.body) {
         let msg = `HTTP ${res.status}`;
@@ -239,8 +248,10 @@ export function useChat(
       }
       if (streamError) setError(streamError);
     } catch (err) {
-      setError((err as Error).message);
+      // A user-initiated stop() aborts the fetch — that's not an error.
+      if ((err as Error).name !== "AbortError") setError((err as Error).message);
     } finally {
+      abortRef.current = null;
       setBusy(false);
     }
   }
@@ -268,7 +279,7 @@ export function useChat(
     setMessages([]);
   }
 
-  return { messages, busy, error, send, seed, reset };
+  return { messages, busy, error, send, seed, reset, stop };
 }
 
 /**
@@ -360,7 +371,7 @@ export function ChatConversation({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { messages, busy, error, send } = chat;
+  const { messages, busy, error, send, stop } = chat;
 
   // The model accepts non-text input → attachments are offered. Empty/undefined
   // modalities mean text-only (the catalog default), so the affordance is off.
@@ -750,17 +761,29 @@ export function ChatConversation({
               {enterMode === "send" ? t("enterMode.send") : t("enterMode.newline")}
             </button>
           </div>
-          <button
-            type="submit"
-            className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-            disabled={
-              busy ||
-              uploading ||
-              (input.trim() === "" && attachments.length === 0 && references.length === 0)
-            }
-          >
-            {busy ? t("sending") : t("send")}
-          </button>
+          {busy ? (
+            <button
+              type="button"
+              onClick={stop}
+              className="flex items-center gap-2 rounded-md border border-border bg-surface-muted px-4 py-2 text-foreground hover:bg-surface"
+              aria-label={t("stop")}
+              title={t("stop")}
+            >
+              <Spinner />
+              {t("stop")}
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+              disabled={
+                uploading ||
+                (input.trim() === "" && attachments.length === 0 && references.length === 0)
+              }
+            >
+              {uploading ? t("sending") : t("send")}
+            </button>
+          )}
         </div>
       </form>
 
@@ -773,6 +796,18 @@ export function ChatConversation({
         />
       )}
     </div>
+  );
+}
+
+/** A small spinning loader (CSS `animate-spin`). */
+function Spinner() {
+  return (
+    <svg
+      width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2.5} strokeLinecap="round" className="animate-spin" aria-hidden
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
   );
 }
 
@@ -958,8 +993,13 @@ function AssistantBubble({
       <div className="rounded-lg bg-surface-muted px-3 py-2 text-foreground">
         {content ? (
           <Markdown source={content} />
+        ) : thinking ? (
+          <span className="flex items-center gap-2 text-foreground-muted">
+            <Spinner />
+            {t("thinking")}
+          </span>
         ) : (
-          <span className="whitespace-pre-wrap">{thinking ? t("thinking") : ""}</span>
+          ""
         )}
       </div>
       {tools.map((tool, i) => (

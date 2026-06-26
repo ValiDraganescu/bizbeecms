@@ -123,7 +123,7 @@ import {
   getPageById,
 } from "@/db/page-store";
 import { getDraft, saveDraftBlocks } from "@/db/page-version-store";
-import { getCollection, rebuildCollectionSchema } from "@/db/collection-store";
+import { getCollection, listCollections, rebuildCollectionSchema } from "@/db/collection-store";
 import { applyTranslation } from "@/db/translate-store";
 import {
   getContentLocales,
@@ -224,7 +224,7 @@ async function handleCreatePage(args: unknown): Promise<Record<string, unknown>>
     // model learns to create_component first (not silent placeholders).
     const missing = await missingComponents(valid.componentNames);
     if (missing.length > 0) {
-      return { ok: false, errors: [`unknown components (create them first): ${missing.join(", ")}`] };
+      return { ok: false, errors: [await unknownComponentMessage(missing)] };
     }
     const res = await upsertPage(valid.page);
     if (!res.ok) return { ok: false, errors: res.errors };
@@ -406,7 +406,7 @@ async function handleUpdatePageBlocks(args: unknown): Promise<Record<string, unk
   try {
     const missing = await missingComponents(valid.componentNames);
     if (missing.length > 0) {
-      return { ok: false, errors: [`unknown components (create them first): ${missing.join(", ")}`] };
+      return { ok: false, errors: [await unknownComponentMessage(missing)] };
     }
     const draft = await getDraftBlocks(id);
     if (!draft) return { ok: false, errors: ["page not found"] };
@@ -507,13 +507,52 @@ async function handleArchiveCollectionItem(args: unknown): Promise<Record<string
 async function handleQueryCollection(args: unknown): Promise<Record<string, unknown>> {
   const valid = validateQuery(args);
   if (!valid.ok) return { ok: false, errors: [valid.error] };
+  // Be proactive: if the named collection doesn't exist, tell the model the
+  // EXACT available table names (+ their fields) so it can retry without guessing
+  // (the common failure: guessing `restaurants` for `content_restaurants`).
+  const requested = valid.value.collection;
+  if (!(await getCollection(requested))) {
+    return { ok: false, errors: [await unknownCollectionMessage(requested)] };
+  }
   try {
-    const res = await queryCollection(valid.value.collection, valid.value.spec);
+    const res = await queryCollection(requested, valid.value.spec);
     if (!res.ok) return { ok: false, errors: [res.error] };
     return { ok: true, items: res.plan.items, total: res.plan.total, limit: res.plan.limit, offset: res.plan.offset };
   } catch (err) {
     return { ok: false, errors: [`failed to query collection: ${(err as Error).message}`] };
   }
+}
+
+/** Actionable "unknown component" error: name the missing ones + list what exists. */
+async function unknownComponentMessage(missing: string[]): Promise<string> {
+  let existing: string[] = [];
+  try {
+    existing = (await listComponents()).map((c) => c.name);
+  } catch {
+    /* unbound D1 */
+  }
+  const have = existing.length > 0
+    ? ` Existing components you can use: ${existing.join(", ")}.`
+    : " This Site has no components yet.";
+  return (
+    `These components don't exist (create them with create_component first, ` +
+    `BEFORE referencing them in a page): ${missing.join(", ")}.${have}`
+  );
+}
+
+/** Actionable "no such collection" error: name the requested one + list real ones. */
+async function unknownCollectionMessage(requested: string): Promise<string> {
+  const cols = await listCollections();
+  if (cols.length === 0) {
+    return `Collection "${requested}" does not exist, and this Site has no collections yet. Create one with create_collection before querying.`;
+  }
+  const list = cols
+    .map((c) => `${c.tableName} (${c.fields.map((f) => f.name).join(", ") || "no user fields"})`)
+    .join("; ");
+  return (
+    `Collection "${requested}" does not exist. Use one of these exact table names: ${list}. ` +
+    `Collection tables are prefixed "content_" — pass the full table name (e.g. content_restaurants), not the bare label.`
+  );
 }
 
 // Schema evolution beyond ADD-field: drop/rename a user field via the system-
@@ -588,6 +627,7 @@ async function handleBindComponent(args: unknown): Promise<Record<string, unknow
       map: valid.value.map!,
     };
     const fields = await collectionFields(valid.value.collection!);
+    if (fields === null) return { ok: false, errors: [await unknownCollectionMessage(valid.value.collection!)] };
     const declared = await declaredProps(target.component);
     const check = validateBinding(binding, fields, declared);
     if (!check.ok) return { ok: false, errors: check.errors };
@@ -614,6 +654,7 @@ async function handleCreateList(args: unknown): Promise<Record<string, unknown>>
 
     const listSource = { collection, filter, sort, limit };
     const fields = await collectionFields(collection);
+    if (fields === null) return { ok: false, errors: [await unknownCollectionMessage(collection)] };
     const declared = await declaredProps(template);
     const check = validateListBinding(listSource, map, fields, declared);
     if (!check.ok) return { ok: false, errors: check.errors };
@@ -666,6 +707,7 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
     if (!template) return { ok: false, errors: ["this list has no template yet — pass `template`"] };
 
     const fields = await collectionFields(collection);
+    if (fields === null) return { ok: false, errors: [await unknownCollectionMessage(collection)] };
     const declared = await declaredProps(template);
     const check = validateListBinding(listSource, listMap, fields, declared);
     if (!check.ok) return { ok: false, errors: check.errors };

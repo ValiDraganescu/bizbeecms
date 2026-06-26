@@ -67,7 +67,7 @@ test("validate: rejects a non-renderable tree", () => {
   assert.ok(res.errors.some((e) => /tree/.test(e)));
 });
 
-test("validate: rejects unknown utility classes in the tree AND lists the accepted ones", () => {
+test("validate: rejects unknown class, names it, points to inline style, does NOT dump the whole list", () => {
   const res = validateComponentArtifact({
     name: "X",
     tree: { tag: "div", props: { className: "flex made-up-class p-4" } },
@@ -75,9 +75,22 @@ test("validate: rejects unknown utility classes in the tree AND lists the accept
   assert.equal(res.ok, false);
   const err = res.errors.find((e) => e.includes("made-up-class"));
   assert.ok(err, "error names the offending class");
-  // The error carries the accepted vocabulary so the model can self-correct.
-  assert.match(err, /Use ONLY these/);
-  assert.match(err, /\bflex\b/, "lists a real accepted class like flex");
+  // Philosophy: name the bad class + the fix (inline style) — NOT the 700-class list.
+  assert.match(err, /not supported/i);
+  assert.match(err, /inline `?style`?/i, "tells the model to use inline style");
+  assert.ok(!err.includes("flex, flex-col, flex-row"), "must NOT dump the full vocabulary");
+});
+
+test("validate: the normal Tailwind scale (h-48, top-2, object-cover, w-32) is now accepted", () => {
+  const res = validateComponentArtifact({
+    name: "Card",
+    tree: {
+      tag: "div",
+      props: { className: "relative w-32 h-48 overflow-hidden" },
+      children: [{ tag: "img", props: { className: "w-full h-full object-cover" } }],
+    },
+  });
+  assert.equal(res.ok, true, JSON.stringify(res.errors));
 });
 
 test("validate: rejects unknown css classes", () => {

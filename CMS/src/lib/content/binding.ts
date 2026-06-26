@@ -39,6 +39,12 @@ function columnNames(fields: CollectionField[]): Set<string> {
   return set;
 }
 
+/** "available fields: a, b, …" — appended to unknown-field errors so the model
+ * can self-correct without another round-trip (AI error philosophy). */
+function availableFields(fields: CollectionField[]): string {
+  return ` (available fields: ${[...columnNames(fields)].join(", ")})`;
+}
+
 /**
  * Parse a component's `propsSchema` JSON into the set of DECLARED prop names —
  * the binding allowlist (same allowlist the `{{slot}}` binding uses). Bad/empty
@@ -84,20 +90,21 @@ export function validateBinding(
   }
 
   const cols = columnNames(fields);
+  const avail = availableFields(fields);
 
   for (const [propName, fieldName] of Object.entries(binding.map)) {
     if (!cols.has(fieldName)) {
-      errors.push(`unknown field "${fieldName}" on "${binding.source.collection}"`);
+      errors.push(`unknown field "${fieldName}" on "${binding.source.collection}"${avail}`);
     }
     if (!declared.has(propName)) {
       errors.push(`prop "${propName}" is not declared on the target component`);
     }
   }
   for (const f of binding.source.filter ?? []) {
-    if (!cols.has(f.field)) errors.push(`unknown filter field "${f.field}"`);
+    if (!cols.has(f.field)) errors.push(`unknown filter field "${f.field}"${avail}`);
   }
   for (const s of binding.source.sort ?? []) {
-    if (!cols.has(s.field)) errors.push(`unknown sort field "${s.field}"`);
+    if (!cols.has(s.field)) errors.push(`unknown sort field "${s.field}"${avail}`);
   }
 
   return errors.length === 0 ? { ok: true } : { ok: false, errors };
@@ -134,16 +141,17 @@ export function validateListBinding(
   }
 
   const cols = columnNames(fields);
+  const avail = availableFields(fields);
 
   for (const f of listSource.filter ?? []) {
-    if (!cols.has(f.field)) errors.push(`unknown filter field "${f.field}"`);
+    if (!cols.has(f.field)) errors.push(`unknown filter field "${f.field}"${avail}`);
   }
   for (const s of listSource.sort ?? []) {
-    if (!cols.has(s.field)) errors.push(`unknown sort field "${s.field}"`);
+    if (!cols.has(s.field)) errors.push(`unknown sort field "${s.field}"${avail}`);
   }
   for (const [propName, fieldName] of Object.entries(listMap ?? {})) {
     if (!cols.has(fieldName)) {
-      errors.push(`unknown field "${fieldName}" on "${listSource.collection}"`);
+      errors.push(`unknown field "${fieldName}" on "${listSource.collection}"${avail}`);
     }
     if (!declared.has(propName)) {
       errors.push(`prop "${propName}" is not declared on the template component`);

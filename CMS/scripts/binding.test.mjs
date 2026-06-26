@@ -44,11 +44,14 @@ test("validateBinding rejects an unknown collection (null fields)", () => {
   assert.match(r.errors[0], /unknown collection/);
 });
 
-test("validateBinding rejects an unknown mapped field", () => {
+test("validateBinding rejects an unknown mapped field AND lists the available ones", () => {
   const b = { source: { collection: "c" }, map: { heading: "nope" } };
   const r = validateBinding(b, fields, declared);
   assert.equal(r.ok, false);
-  assert.ok(r.errors.some((e) => /unknown field "nope"/.test(e)));
+  const err = r.errors.find((e) => /unknown field "nope"/.test(e));
+  assert.ok(err);
+  // Philosophy: the rejection names the real columns so the model self-corrects.
+  assert.match(err, /available fields:/);
 });
 
 test("validateBinding rejects an undeclared target prop", () => {

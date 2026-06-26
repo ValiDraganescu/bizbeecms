@@ -58,7 +58,8 @@ export const CREATE_COMPONENT_TOOL = {
       "Create or update a reusable UI component for this site. The component is " +
       "stored as a data artifact: a JSON element 'tree' the server renders to " +
       "HTML, an optional client-side 'script' string the browser runs, and " +
-      "'css' utility classes. Use only the allowed utility classes for styling.",
+      "'css' utility classes. Style with standard Tailwind utilities (normal " +
+      "scales supported); for truly one-off values use an inline `style` object.",
     parameters: {
       type: "object",
       properties: {
@@ -125,14 +126,13 @@ export function validateComponentArtifact(
     } catch (err) {
       errors.push(`tree is not renderable: ${(err as Error).message}`);
     }
-    // Bound the allowed styling vocabulary. List the full accepted set in the
-    // error so the model can self-correct (the prompt no longer carries it).
+    // Bound the styling vocabulary. Per the AI error philosophy: name ONLY the
+    // rejected classes and the concrete fix (inline style) — do NOT flood the
+    // model with the whole accepted list (it covers the full sane Tailwind scale,
+    // so a rejection means a truly one-off value that belongs in `style`).
     const bad = collectBadClasses(tree);
     if (bad.length > 0) {
-      errors.push(
-        `unknown className utility classes: ${bad.join(", ")}. ` +
-          `Use ONLY these (for one-off values use inline style instead): ${allowedClassList()}.`,
-      );
+      errors.push(badClassMessage(bad));
     }
   }
 
@@ -148,9 +148,7 @@ export function validateComponentArtifact(
     .split(/\s+/)
     .filter((c) => c !== "" && !allowedClasses().has(c));
   if (badCss.length > 0) {
-    errors.push(
-      `unknown css classes: ${badCss.join(", ")}. Use ONLY these: ${allowedClassList()}.`,
-    );
+    errors.push(badClassMessage(badCss));
   }
 
   if (errors.length > 0) return { ok: false, errors };
@@ -174,9 +172,21 @@ function coerceTree(raw: unknown): TreeNode | undefined {
  * Walk a tree collecting every `className` token that isn't in the allowed
  * utility vocabulary. (Class names live in `props.className`, space-separated.)
  */
-/** The full accepted utility-class vocabulary, sorted, comma-joined (for errors). */
-function allowedClassList(): string {
-  return [...allowedClasses()].sort().join(", ");
+/**
+ * The actionable rejection message: name the exact bad classes and tell the
+ * model the fix. The accepted vocabulary already covers the full sane Tailwind
+ * scale, so a rejection means a one-off value → use inline `style`. We do NOT
+ * dump the whole allowed list (that floods the context; see the error philosophy).
+ */
+function badClassMessage(bad: string[]): string {
+  return (
+    `These className utility classes are not supported: ${bad.join(", ")}. ` +
+    `The accepted set already covers the normal Tailwind scale (e.g. w-32, h-48, ` +
+    `top-2, object-cover, p-4, text-xl); these specific ones are outside it. ` +
+    `For one-off values, put them in an inline \`style\` object instead of a class ` +
+    `(e.g. style:{"height":"12.5rem"} rather than h-50). Remove or replace the ` +
+    `classes above and retry.`
+  );
 }
 
 function collectBadClasses(node: TreeNode): string[] {

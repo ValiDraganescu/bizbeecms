@@ -15,9 +15,11 @@
 import { contextPrompt, type AdminPageContext } from "@/lib/chat/tool-scopes";
 import { getSiteIdentity } from "@/db/settings-store";
 import { listComponents } from "@/db/component-store";
+import { listCollections } from "@/db/collection-store";
 import {
   buildSystemPrompt,
   type PromptComponentDef,
+  type PromptCollectionDef,
 } from "@/lib/settings/site-settings";
 import { parsePropsSchema } from "@/lib/pages/page-blocks";
 import { builtinBlockTypes } from "@/lib/chat/write-tools";
@@ -27,6 +29,7 @@ export async function assembleSystemPrompt(
 ): Promise<string> {
   let identity;
   let components: PromptComponentDef[] = [];
+  let collections: PromptCollectionDef[] = [];
   try {
     identity = await getSiteIdentity();
   } catch {
@@ -47,12 +50,23 @@ export async function assembleSystemPrompt(
   } catch {
     /* unbound D1 → no components */
   }
+  try {
+    // Collection table names + fields so the model passes the EXACT name (the
+    // common failure is guessing `restaurants` for `content_restaurants`).
+    collections = (await listCollections()).map((c) => ({
+      tableName: c.tableName,
+      fields: c.fields.map((f) => f.name),
+    }));
+  } catch {
+    /* unbound D1 → no collections */
+  }
 
   return (
     buildSystemPrompt({
       identity,
       components,
       builtins: builtinBlockTypes(),
+      collections,
     }) +
     "\n\n" +
     contextPrompt(context)

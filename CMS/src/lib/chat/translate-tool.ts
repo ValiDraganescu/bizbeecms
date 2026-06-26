@@ -191,7 +191,8 @@ function validateLocaleMap(
     }
     if (allowed && !allowed.has(norm)) {
       errors.push(
-        `fields["${field}"]: locale "${code}" is not a configured site content locale`,
+        `fields["${field}"]: locale "${code}" is not a configured site content locale ` +
+          `(use one of: ${[...allowed].join(", ")})`,
       );
       continue;
     }

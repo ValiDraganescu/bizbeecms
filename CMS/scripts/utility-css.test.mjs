@@ -23,7 +23,7 @@ test("every rule becomes exactly one CSS block in the sheet", () => {
   const css = generateUtilityCss();
   // One `{...}` block per rule. The 3 per-viewport hide rules each emit an
   // EXTRA inner block (`@media …{.cls{display:none}}`) on top of utilityRules.
-  const blocks = css.match(/\.[a-z0-9\\:-]+\{[^}]*\}/g) ?? [];
+  const blocks = css.match(/\.[a-z0-9\\:./-]+\{[^}]*\}/g) ?? [];
   assert.equal(blocks.length, rules.length + 3);
 });
 
@@ -95,9 +95,10 @@ test("selectors are valid and start with a dot + class name", () => {
   const css = generateUtilityCss();
   for (const line of css.split("\n")) {
     // Either a plain `.cls{decl}` rule, or a per-viewport `@media …{.cls{decl}}`.
+    // Class names may contain CSS-escaped `.` and `/` (e.g. .gap-0\.5, .w-1\/2).
     const ok =
-      /^\.[a-zA-Z0-9\\-]+\{[^{}]+\}$/.test(line) ||
-      /^@media [^{]+\{\.[a-zA-Z0-9\\-]+\{[^{}]+\}\}$/.test(line);
+      /^\.[a-zA-Z0-9\\./-]+\{[^{}]+\}$/.test(line) ||
+      /^@media [^{]+\{\.[a-zA-Z0-9\\./-]+\{[^{}]+\}\}$/.test(line);
     assert.ok(ok, `bad CSS line: ${line}`);
   }
 });

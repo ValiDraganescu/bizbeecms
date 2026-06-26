@@ -20,10 +20,12 @@
  * (`--color-surface`, `--color-foreground`, …) so the runtime sheet follows the
  * active light/dark theme exactly like the build-scanned utilities do.
  *
- * Scope = a deliberately small, common-need vocabulary. Grow it explicitly as
- * the AI needs more — never open it up to arbitrary Tailwind (that defeats the
- * "bounded" guarantee and re-opens the scanner gap). Arbitrary one-off values
- * are handled via inline `style` in the artifact `tree`, not classes.
+ * Scope = every Tailwind utility a sane person reaches for (the full spacing /
+ * sizing / positioning ladders, object-fit, aspect, z-index), so the AI is never
+ * rejected for a normal `h-32`/`top-2`. It stays BOUNDED (generated from explicit
+ * data, never arbitrary Tailwind) so the scanner gap stays closed; truly one-off
+ * values (e.g. `top-[37px]`) are handled via inline `style`, and the
+ * create_component error names the exact rejected class + says to use `style`.
  */
 
 // ── The purpose color tokens (must mirror globals.css @theme inline) ─────────
@@ -54,21 +56,31 @@ const COLOR_TOKENS = [
   "info-subtle",
 ] as const;
 
-// ── Spacing scale (rem). Used by p-*, m-*, gap-*. Tailwind's 0.25rem step. ────
-const SPACING: Record<string, string> = {
-  "0": "0",
-  "1": "0.25rem",
-  "2": "0.5rem",
-  "3": "0.75rem",
-  "4": "1rem",
-  "5": "1.25rem",
-  "6": "1.5rem",
-  "8": "2rem",
-  "10": "2.5rem",
-  "12": "3rem",
-  "16": "4rem",
-  "20": "5rem",
-  "24": "6rem",
+// ── Spacing scale (rem). Used by p-*, m-*, gap-*, w-*, h-*, top-*… The full
+// Tailwind 0.25rem step ladder — accept everything a sane person would reach for
+// so the AI never gets rejected for a normal `h-32`/`top-2` (see the AI error
+// philosophy: support all sane inputs, only reject the genuinely unsupported).
+const SPACING: Record<string, string> = (() => {
+  const steps = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 96];
+  const out: Record<string, string> = {};
+  for (const s of steps) out[String(s)] = s === 0 ? "0" : `${s * 0.25}rem`;
+  return out;
+})();
+
+// Fractional sizes (Tailwind's percentage widths/heights) for w-*/h-*.
+const FRACTIONS: Record<string, string> = {
+  "1/2": "50%",
+  "1/3": "33.333333%",
+  "2/3": "66.666667%",
+  "1/4": "25%",
+  "2/4": "50%",
+  "3/4": "75%",
+  "1/5": "20%",
+  "2/5": "40%",
+  "3/5": "60%",
+  "4/5": "80%",
+  "1/6": "16.666667%",
+  "5/6": "83.333333%",
 };
 
 // ── Font sizes (with sensible line-heights, matching Tailwind defaults) ──────
@@ -173,14 +185,35 @@ export function utilityRules(): Rule[] {
   }
   add("mx-auto", "margin-left:auto;margin-right:auto");
 
-  // Width / height
+  // Width / height — full spacing ladder + fractions + keywords.
   add("w-full", "width:100%");
   add("w-auto", "width:auto");
   add("w-screen", "width:100vw");
+  add("w-min", "width:min-content");
+  add("w-max", "width:max-content");
+  add("w-fit", "width:fit-content");
   add("h-full", "height:100%");
   add("h-auto", "height:auto");
   add("h-screen", "height:100vh");
+  add("h-min", "height:min-content");
+  add("h-max", "height:max-content");
+  add("h-fit", "height:fit-content");
+  for (const [k, v] of Object.entries(SPACING)) {
+    add(`w-${k}`, `width:${v}`);
+    add(`h-${k}`, `height:${v}`);
+    add(`min-w-${k}`, `min-width:${v}`);
+    add(`min-h-${k}`, `min-height:${v}`);
+    add(`max-h-${k}`, `max-height:${v}`);
+  }
+  for (const [k, v] of Object.entries(FRACTIONS)) {
+    add(`w-${k}`, `width:${v}`);
+    add(`h-${k}`, `height:${v}`);
+  }
+  add("min-w-full", "min-width:100%");
+  add("min-h-full", "min-height:100%");
   add("min-h-screen", "min-height:100vh");
+  add("max-h-full", "max-height:100%");
+  add("max-h-screen", "max-height:100vh");
   for (const [k, v] of Object.entries(MAX_W)) add(`max-w-${k}`, `max-width:${v}`);
 
   // Typography
@@ -230,7 +263,35 @@ export function utilityRules(): Rule[] {
   // Position / misc
   add("relative", "position:relative");
   add("absolute", "position:absolute");
+  add("fixed", "position:fixed");
+  add("sticky", "position:sticky");
   add("static", "position:static");
+  // Inset offsets (top/right/bottom/left/inset) over the spacing ladder + full/auto.
+  for (const [k, v] of Object.entries(SPACING)) {
+    add(`top-${k}`, `top:${v}`);
+    add(`right-${k}`, `right:${v}`);
+    add(`bottom-${k}`, `bottom:${v}`);
+    add(`left-${k}`, `left:${v}`);
+    add(`inset-${k}`, `top:${v};right:${v};bottom:${v};left:${v}`);
+  }
+  for (const side of ["top", "right", "bottom", "left"]) {
+    add(`${side}-full`, `${side}:100%`);
+    add(`${side}-auto`, `${side}:auto`);
+  }
+  add("inset-auto", "top:auto;right:auto;bottom:auto;left:auto");
+  // z-index (common steps)
+  for (const z of ["0", "10", "20", "30", "40", "50"]) add(`z-${z}`, `z-index:${z}`);
+  // Object fit/position (for images inside fixed-size boxes)
+  for (const v of ["contain", "cover", "fill", "none", "scale-down"]) {
+    add(`object-${v}`, `object-fit:${v}`);
+  }
+  add("object-center", "object-position:center");
+  add("object-top", "object-position:top");
+  add("object-bottom", "object-position:bottom");
+  // Aspect ratio
+  add("aspect-auto", "aspect-ratio:auto");
+  add("aspect-square", "aspect-ratio:1/1");
+  add("aspect-video", "aspect-ratio:16/9");
   add("overflow-hidden", "overflow:hidden");
   add("overflow-auto", "overflow:auto");
   add("cursor-pointer", "cursor:pointer");
