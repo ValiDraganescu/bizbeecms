@@ -374,7 +374,7 @@
       "runAt": "Deployed {time}",
       "currentRun": "Current deployment",
       "total": "Total {duration}",
-      "consoleLabel": "Build console output"
+      "consoleLabel": "{step} console output"
     },
     "assign": {
       "title": "Assigned users",

@@ -374,7 +374,7 @@
       "runAt": "Juurutatud {time}",
       "currentRun": "Praegune juurutus",
       "total": "Kokku {duration}",
-      "consoleLabel": "Ehituskonsooli väljund"
+      "consoleLabel": "{step} konsooli väljund"
     },
     "assign": {
       "title": "Määratud kasutajad",

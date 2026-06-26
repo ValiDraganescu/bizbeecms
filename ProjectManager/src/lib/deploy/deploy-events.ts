@@ -187,6 +187,28 @@ export function concatLogForRun(events: readonly TimelineRow[]): string {
 }
 
 /**
+ * Split a run's streamed log into one concatenated string PER step (deploy-log-stream).
+ * Each log row is tagged with the step that was in flight when it was emitted, so
+ * the UI can show clone/npm/build/deploy output inline under its own step row.
+ * Within a step, chunks stay in seq order (concatLogForRun handles that). Steps
+ * with no output are absent from the map. Pure — node-testable.
+ */
+export function logByStepForRun(
+  events: readonly TimelineRow[],
+): Record<string, string> {
+  const byStep: Record<string, TimelineRow[]> = {};
+  for (const e of events) {
+    if (e.status !== "log" || e.logChunk === null) continue;
+    (byStep[e.step] ??= []).push(e);
+  }
+  const out: Record<string, string> = {};
+  for (const [step, rows] of Object.entries(byStep)) {
+    out[step] = concatLogForRun(rows);
+  }
+  return out;
+}
+
+/**
  * Keep only the LATEST deploy run's events, fixing the bug where a fresh deploy
  * rendered interleaved with the previous (failed) run's rows. The latest run is
  * the `deployId` of the event with the greatest `startedAt`; ties keep the
@@ -222,6 +244,8 @@ export type DeployRun = {
   startedAt: number;
   /** Concatenated streamed build log for this run (deploy-log-stream), "" if none. */
   log: string;
+  /** Streamed log split per step name (deploy-log-stream); steps with no output absent. */
+  logByStep: Record<string, string>;
 };
 
 /**
@@ -258,6 +282,7 @@ export function groupRunsByDeployId(
       steps,
       startedAt: Number.isFinite(startedAt) ? startedAt : 0,
       log: concatLogForRun(raw),
+      logByStep: logByStepForRun(raw),
     };
   });
 

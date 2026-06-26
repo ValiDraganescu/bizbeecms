@@ -374,7 +374,7 @@
       "runAt": "Julkaistu {time}",
       "currentRun": "Nykyinen julkaisu",
       "total": "Yhteensä {duration}",
-      "consoleLabel": "Käännöskonsolin tuloste"
+      "consoleLabel": "{step}-konsolin tuloste"
     },
     "assign": {
       "title": "Liitetyt käyttäjät",

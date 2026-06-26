@@ -35,7 +35,7 @@ function BuildConsole({ log, label }: { log: string; label: string }) {
         const el = e.currentTarget;
         stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
       }}
-      className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-foreground/95 p-3 font-mono text-xs leading-relaxed text-background"
+      className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-[oklch(0.21_0.012_268)] p-3 font-mono text-xs leading-relaxed text-[oklch(0.92_0.006_268)]"
     >
       {log}
     </pre>
@@ -87,18 +87,26 @@ function fmtDuration(ms: number | null): string | null {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-/** One deploy run's collapsed steps, rendered as a vertical list. */
+/**
+ * One deploy run's collapsed steps, rendered as a vertical list. Each step shows
+ * its own streamed console (deploy-log-stream) inline, so a failure/hang in ANY
+ * step — clone, npm, build, provision, migrate, deploy, secret — surfaces its
+ * real output right under that step, not in one merged box.
+ */
 function RunSteps({
   steps,
+  logByStep,
   t,
 }: {
   steps: DeployRun["steps"];
+  logByStep: DeployRun["logByStep"];
   t: ReturnType<typeof useTranslations>;
 }) {
   return (
     <ol className="flex flex-col gap-3">
       {steps.map((e) => {
         const duration = fmtDuration(e.durationMs);
+        const stepLog = logByStep[e.step] ?? "";
         return (
           <li
             key={e.id}
@@ -121,6 +129,7 @@ function RunSteps({
                 </span>
               ) : null}
             </div>
+            <BuildConsole log={stepLog} label={t("consoleLabel", { step: e.step })} />
             {e.status === "failed" && e.error ? (
               <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-danger-subtle p-2 font-mono text-xs text-danger">
                 {e.error}
@@ -221,8 +230,7 @@ export function DeployTimeline({
               {t("total", { duration: fmtElapsed(currentTotal) })}
             </p>
           ) : null}
-          <RunSteps steps={current.steps} t={t} />
-          <BuildConsole log={current.log} label={t("consoleLabel")} />
+          <RunSteps steps={current.steps} logByStep={current.logByStep} t={t} />
         </div>
       ) : null}
 
@@ -246,7 +254,7 @@ export function DeployTimeline({
                 ) : null}
               </summary>
               <div className="mt-3 pl-4">
-                <RunSteps steps={run.steps} t={t} />
+                <RunSteps steps={run.steps} logByStep={run.logByStep} t={t} />
               </div>
             </details>
           ))}

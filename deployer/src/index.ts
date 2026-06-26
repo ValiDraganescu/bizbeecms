@@ -497,6 +497,12 @@ trap on_timeout TERM
 
 report() {
   # $1=status (deployed|failed) ; $2=optional error
+  # This is the single terminal funnel for the run, so stop the live log poller
+  # here — after this the deploy is resolved and PM prunes the streamed rows
+  # (prune-on-resolve). One final flush so the console shows the last lines that
+  # landed inside the 2s poll gap (e.g. the actual error of a failing step).
+  flush_log_stream
+  stop_log_stream
   if [ -z "$CALLBACK_URL" ]; then return; fi
   if [ "$1" = "deployed" ]; then
     body="{\\"siteId\\":\\"$SITE_ID\\",\\"deployId\\":\\"$DEPLOY_ID\\",\\"status\\":\\"deployed\\",\\"workerName\\":\\"$WORKER_NAME\\",\\"deployedRef\\":\\"$REF\\"}"
@@ -562,7 +568,6 @@ now_ms() { date +%s%3N; }
 # of ONE step (the build); stopped via stop_log_stream. Best-effort: a failed
 # POST is swallowed (|| true) and never touches the build. PM prunes these rows
 # once the deploy resolves (prune-on-resolve), so volume here is fine.
-LOG_SEQ=0          # monotonic per-deploy chunk counter (PM orders the console by it)
 LOG_STREAM_PID=""  # set while the tailer is running
 emit_log_chunk() {
   # $1=raw chunk text. JSON-escape (backslash, quote, control chars→space, strip
@@ -579,35 +584,54 @@ emit_log_chunk() {
     { gsub(/\\\\/, "\\\\\\\\"); gsub(/"/, "\\\\\\""); gsub(/\\t/, "\\\\t");
       if (NR > 1) printf "\\\\n"; printf "%s", \$0 }
   ' | cut -c1-8000)
-  LOG_SEQ=$((LOG_SEQ + 1))
-  local body="{\\"siteId\\":\\"$SITE_ID\\",\\"deployId\\":\\"$DEPLOY_ID\\",\\"step\\":\\"$STEP_NAME\\",\\"status\\":\\"log\\",\\"startedAt\\":\\"$(now_ms)\\",\\"seq\\":\\"$LOG_SEQ\\",\\"logChunk\\":\\"$esc\\"}"
+  # seq + step come from FILES so the poller subshell and the parent's final
+  # flush agree (a forked subshell can't see the parent's later STEP_NAME, and
+  # its own LOG_SEQ++ wouldn't survive back to the parent). seq increments
+  # atomically enough for a single 2s poller + one final flush.
+  local seq step
+  seq=$(( $(cat "$LOG_SEQ_FILE" 2>/dev/null || echo 0) + 1 ))
+  echo "$seq" > "$LOG_SEQ_FILE"
+  step=$(cat /workspace/.log_step 2>/dev/null || echo "build")
+  local body="{\\"siteId\\":\\"$SITE_ID\\",\\"deployId\\":\\"$DEPLOY_ID\\",\\"step\\":\\"$step\\",\\"status\\":\\"log\\",\\"startedAt\\":\\"$(now_ms)\\",\\"seq\\":\\"$seq\\",\\"logChunk\\":\\"$esc\\"}"
   curl -sS -X POST "$EVENTS_URL" \
     -H "Authorization: Bearer $DEPLOYER_SECRET" \
     -H "Content-Type: application/json" \
     --data "$body" >/dev/null 2>&1 || true
 }
 
-start_log_stream() {
-  # Poll build.log by byte offset every 2s and POST whatever was appended since
-  # the last poll. A plain offset diff (no tail -F, no nested subshells) is the
-  # whole mechanism — one delta = one batched POST, so a chatty build is ~1 row
-  # every 2s, not one per line. ponytail: 2s poll, fine for a human-watched console.
+# Offset/seq live in FILES, not shell vars, because the poller runs in a
+# subshell (its var writes wouldn't survive to the parent's final flush). Both
+# the poller and flush_log_stream share these so bytes are sent exactly once and
+# seq never collides across them. LOG_SEQ is sourced from the file in emit.
+LOG_OFF_FILE=/workspace/.log_off
+LOG_SEQ_FILE=/workspace/.log_seq
+
+flush_log_stream() {
+  # POST whatever was appended to build.log since the last recorded offset, then
+  # advance the offset. Shared by the poller (every 2s) and report() (final
+  # flush). No-op when EVENTS_URL is unset or nothing new was written.
   [ -z "$EVENTS_URL" ] && return
-  (
-    local off=0 size delta
-    while :; do
-      sleep 2
-      [ -f /workspace/build.log ] || continue
-      size=$(wc -c < /workspace/build.log 2>/dev/null || echo 0)
-      if [ "$size" -gt "$off" ]; then
-        # tail -c +N is 1-indexed (byte N onward), so +off+1 starts just past
-        # what we already sent. Reads the delta in one go (not byte-by-byte).
-        delta=$(tail -c +$((off + 1)) /workspace/build.log 2>/dev/null)
-        off=$size
-        emit_log_chunk "$delta"
-      fi
-    done
-  ) &
+  [ -f /workspace/build.log ] || return
+  local off size delta
+  off=$(cat "$LOG_OFF_FILE" 2>/dev/null || echo 0)
+  size=$(wc -c < /workspace/build.log 2>/dev/null || echo 0)
+  [ "$size" -le "$off" ] && return
+  # tail -c +N is 1-indexed (byte N onward), so +off+1 starts just past what we
+  # already sent. Reads the delta in one go (not byte-by-byte).
+  delta=$(tail -c +$((off + 1)) /workspace/build.log 2>/dev/null)
+  echo "$size" > "$LOG_OFF_FILE"
+  emit_log_chunk "$delta"
+}
+
+start_log_stream() {
+  # Poll build.log every 2s and flush the delta — one delta = one batched POST,
+  # so a chatty build is ~1 row every 2s, not one per line. Runs for the WHOLE
+  # run (clone…secret), tagging each chunk with the live STEP_NAME.
+  # ponytail: 2s poll, fine for a human-watched console.
+  [ -z "$EVENTS_URL" ] && return
+  echo 0 > "$LOG_OFF_FILE"
+  echo 0 > "$LOG_SEQ_FILE"
+  ( while :; do sleep 2; flush_log_stream; done ) &
   LOG_STREAM_PID=$!
 }
 
@@ -632,6 +656,9 @@ step_start() {
   STEP_NAME="$1"
   STEP_START_MS=$(now_ms)
   STEP_RAM_MB=""
+  # Publish the live step name to a file so the log-stream poller (a subshell
+  # that forked before this step) tags its chunks with the CURRENT step.
+  echo "$STEP_NAME" > /workspace/.log_step 2>/dev/null || true
   emit_event "$STEP_NAME" started "$STEP_START_MS"
 }
 
@@ -659,6 +686,13 @@ set +e
 # its name) can be sent back in the callback. tee keeps it on the container's
 # stdout too (visible via the Sandbox process logs).
 exec > >(tee /workspace/build.log) 2>&1
+
+# Stream the WHOLE run live (deploy-log-stream), not just the build: clone, npm,
+# cf-typegen, build, provision, migrate, deploy and secret all write to the same
+# build.log, and each chunk is tagged with the in-flight STEP_NAME. So a failure
+# (or hang) in ANY step shows its real output in the console. Started once here,
+# stopped right before the terminal callback below.
+start_log_stream
 
 rm -rf /workspace/src
 
@@ -691,10 +725,6 @@ npm run cf-typegen
 if [ $? -ne 0 ]; then step_fail "cf-typegen failed"; report failed "cf-typegen failed"; exit 1; fi
 
 step_start build
-# Stream build output live (deploy-log-stream) — this is THE step that hangs, so
-# the console is what tells you WHERE (compile / static-gen / OOM) before the
-# timeout kills it. stop_log_stream runs whether the build passes or fails.
-start_log_stream
 # Sample free RAM (best-effort) for the OOM-prone build step; reported on the
 # build event as ramAvailableMb (instance was bumped standard-1->standard-2 here).
 STEP_RAM_MB=$(read_ram_mb)
@@ -702,7 +732,6 @@ npx opennextjs-cloudflare build
 build_rc=$?
 # Re-sample after the build so the reported value reflects post-build headroom.
 STEP_RAM_MB=$(read_ram_mb)
-stop_log_stream
 if [ $build_rc -ne 0 ]; then step_fail "opennext build failed"; report failed "opennext build failed"; exit 1; fi
 step_ok
 

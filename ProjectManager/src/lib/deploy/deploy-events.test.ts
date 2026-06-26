@@ -17,6 +17,7 @@ import {
   selectLatestRun,
   groupRunsByDeployId,
   concatLogForRun,
+  logByStepForRun,
   deployProgress,
   runTotalDurationMs,
   fmtElapsed,
@@ -371,6 +372,38 @@ test("groupRunsByDeployId attaches the concatenated log and excludes it from ste
   assert.equal(run.log, "x\n");
   assert.equal(run.steps.length, 1);
   assert.equal(run.steps[0].status, "ok");
+});
+
+test("logByStepForRun buckets log chunks under their own step, seq-ordered", () => {
+  const map = logByStepForRun([
+    row({ step: "clone", status: "log", logChunk: "Cloning…\n", seq: 1 }),
+    row({ step: "npm", status: "log", logChunk: "added 412 packages\n", seq: 2 }),
+    row({ step: "build", status: "log", logChunk: "page 2\n", seq: 4 }),
+    row({ step: "build", status: "log", logChunk: "page 1\n", seq: 3 }),
+    row({ step: "build", status: "ok", durationMs: 5 }), // non-log: ignored
+  ]);
+  assert.deepEqual(Object.keys(map).sort(), ["build", "clone", "npm"]);
+  assert.equal(map.clone, "Cloning…\n");
+  assert.equal(map.npm, "added 412 packages\n");
+  // build's two chunks ordered by seq (3 before 4) regardless of arrival order.
+  assert.equal(map.build, "page 1\npage 2\n");
+});
+
+test("logByStepForRun omits steps with no streamed output", () => {
+  const map = logByStepForRun([
+    row({ step: "clone", status: "ok", durationMs: 5 }),
+    row({ step: "build", status: "log", logChunk: "x\n", seq: 1 }),
+  ]);
+  assert.deepEqual(Object.keys(map), ["build"]);
+});
+
+test("groupRunsByDeployId exposes logByStep per run", () => {
+  const [run] = groupRunsByDeployId([
+    row({ deployId: "r1", step: "clone", status: "log", logChunk: "c\n", seq: 1 }),
+    row({ deployId: "r1", step: "deploy", status: "log", logChunk: "d\n", seq: 2 }),
+  ]);
+  assert.equal(run.logByStep.clone, "c\n");
+  assert.equal(run.logByStep.deploy, "d\n");
 });
 
 test("runTotalDurationMs: spans first step start to last step end (start + duration)", () => {
