@@ -31,6 +31,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   via `btoa(String.fromCharCode(...))`). `send` re-fetches `/media/<key>` (the upload's `url`) to get
   bytes — a per-file fetch failure silently DROPS that file, it doesn't abort the send. The transcript
   bubble is still plain text (📎 name lines via `bubbleText`); the inline data only goes to the model.
+- **`opennextjs-cloudflare build` flakes on stale `.next` (the known gotcha).** It hit the corruption
+  this run: the wrapper's inner `npm run build` failed while bare `next build` / `npm run build` BOTH
+  passed standalone. Cure: `rm -rf .next .open-next` then rerun — clean "OpenNext build complete." Don't
+  chase a phantom code error; check `next build` alone first, then nuke `.next`.
+- **ALL codeable ai-attachments work is DRAINED (2026-06-26).** The only thing left is the LIVE vision
+  round-trip (deploy a Site CMS + a keyed OpenRouter vision model). That's non-codeable from this repo;
+  the release manager / user owns it. Don't re-pick "verify" as a coding task. If you must add value to
+  this goal, the real codeable slices are the WATCH items in NEXT.md (widen `/api/assets` to non-image
+  MIMEs for file/audio models; persist attachment R2 keys in history) — and only if a genuine need lands.
 - **The widget owns the catalog for gating.** `chat-widget.tsx` now keeps `catalog` state (from
   `/api/chat/models` via `coerceCatalog`) and passes the SELECTED model's `inputModalities` to
   `ChatConversation` as the `inputModalities` prop. Any NEW chat surface must pass it too, else attachments
