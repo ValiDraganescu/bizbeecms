@@ -2,31 +2,25 @@
 
 Read `../main/GOAL.md`, then this goal's `GOAL.md` + `CAVEATS.md` first.
 
-ALL CMS-side codeable slices are DONE & gate-green (Slices 1–5 + the custom-domain
-MCP-URL fix part b). The CMS now advertises the MCP URL from `APP_ORIGIN` via the
-pure `chooseMcpUrl()` helper (`app/mcp/mcp-core.ts`), not the request host.
+THE BACKLOG IS CLEARED of codeable work. All slices (1–5), the custom-domain
+MCP-URL fix part (b), AND part (a) (deployer sets `APP_ORIGIN` to the site's
+custom domain) are DONE and gate-green.
 
-OPEN ITEMS (neither is CMS-only):
+What's left is NON-CODEABLE / out-of-scope:
 
-1. **Part (a) — DEPLOYER + PM follow-up (the real remaining work).** The deployer
-   (`deployer/src/index.ts:~520`) still ALWAYS sets `APP_ORIGIN` to the workers.dev
-   URL even when a custom domain is attached. Until that's fixed, part (b) advertises
-   workers.dev because that's what APP_ORIGIN holds. FIX: thread the site's primary
-   custom domain (PM-side data; archived `custom-domains` is READ-ONLY) into the
-   deploy and set `APP_ORIGIN=https://<custom-domain>` when present. This is a
-   deployer+PM track, NOT CMS — consider flagging the curator for a dedicated subgoal.
-   Gate: deployer tsc + its test; PM change to pass the domain through.
+1. **Live HITL spot-check** (the real remaining item, non-codeable): deploy a Site
+   that HAS a custom domain, mint a key, add the `/mcp` URL + bearer to Claude Code,
+   confirm `tools/list` + a `tools/call` round-trip AND that the advertised URL is the
+   custom domain (not workers.dev). Flag to the user — a Meeseeks can't do a live deploy.
 
-2. **Live HITL spot-check** — deployed Worker + minted key → add the `/mcp` URL +
-   bearer to Claude Code, confirm tools/list + a tools/call round-trip. Non-codeable
-   (see HITL.md). Flag to the user; don't try to "do" it from a Meeseeks run.
+2. **Scoped / least-privilege keys** (BACKLOG, "later"): YAGNI — v1 keys grant the
+   full tool set. Skip unless a real need shows up.
 
-If the loop won't stop and you can't pick up part (a) (cross-track): the only other
-queued item is the deferred/optional **scoped/least-privilege keys** task in
-BACKLOG (YAGNI says skip — v1 keys grant the full tool set). Otherwise: nothing to
-build on the CMS side — surface item 1+2 and stop.
+So: there is NOTHING to build on this goal right now. If the loop summons you again,
+DON'T invent busywork on a finished track — surface item 1 (HITL) + item 2 (YAGNI)
+in your `result` and stop. The user/curator decides whether to retire this subgoal.
 
-GATE every slice: CMS `tsc` + `npx opennextjs-cloudflare build` (NEVER while
-`npm run dev` is up) + `npm test` + EN/FI/ET, then `cd ProjectManager &&
-npm run bundle:cms` and commit the regenerated `cms-bundle.generated.js`. STAY OUT
-of `CMS/src/lib/render/**` and `lib/content/**` (parallel renderer worker's scope).
+If you DO touch deployer code: it has no local tsc/test runner — see CAVEATS
+(borrow `../CMS/node_modules/.bin/tsc`, keep pure logic in `*-core.ts`, run
+`node --test`). This part-(a) change touched deployer + PM only, NO `CMS/src/**`,
+so it needed NO cms-bundle regen.

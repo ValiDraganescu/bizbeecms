@@ -5,6 +5,7 @@ import { canManageSiteByCountry } from "@/lib/site/authz";
 import {
   findSiteById,
   isUserAssignedToSite,
+  primaryDomainBySite,
   setSiteDeployStatus,
 } from "@/lib/site/site";
 import { canStartDeploy } from "@/lib/deploy";
@@ -153,6 +154,15 @@ export async function POST(
     site.buildTimeoutMin,
   );
 
+  // Primary custom domain (cms-mcp part a): when the Site has a custom domain
+  // attached, send its origin so the deployer sets APP_ORIGIN to it instead of
+  // the workers.dev URL. APP_ORIGIN drives the MCP URL the CMS advertises and
+  // trusted invite/reset links — all should point at the custom domain. Absent
+  // → the deployer falls back to workers.dev. The deployer re-validates (https
+  // + hostname) in chooseAppOrigin, so a junk value can't slip through.
+  const primaryDomain = (await primaryDomainBySite([siteId])).get(siteId);
+  const appOrigin = primaryDomain ? `https://${primaryDomain}` : undefined;
+
   // Latch to `deploying` before dispatching, so a refresh shows progress and
   // re-clicks are guarded by canStartDeploy.
   await setSiteDeployStatus(siteId, "deploying");
@@ -169,6 +179,7 @@ export async function POST(
         slug: site.slug,
         buildTimeoutSec,
         ...(ref ? { ref } : {}),
+        ...(appOrigin ? { appOrigin } : {}),
         ...openrouterBody,
       }),
     });

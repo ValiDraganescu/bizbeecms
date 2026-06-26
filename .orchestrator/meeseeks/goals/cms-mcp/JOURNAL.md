@@ -178,3 +178,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/app/mcp/mcp-core.ts, CMS/src/app/mcp/mcp-core.test.ts,
   CMS/src/app/admin/settings/api-keys/page.tsx,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-26 08:42 — Part (a): deployer sets APP_ORIGIN to the site's custom domain
+- **Status:** DONE
+- **What I did:** Closed the cross-track follow-up so the CMS finally advertises the
+  RIGHT MCP URL (and trusted invite/reset links) when a Site has a custom domain. Two
+  sides, no CMS source touched:
+  - **deployer** (`deployer/src/index.ts`): `DeployBody` gains `appOrigin?: string`;
+    parsed in the `/deploy` handler, threaded into `startDeploy`, and used for the
+    `APP_ORIGIN` env var via the new pure `chooseAppOrigin(appOrigin, workersDevUrl)`.
+    It PREFERS the passed value but only if it's a valid `https://<hostname>` origin
+    (no path/query, no http, well-formed host) — else falls back to the workers.dev
+    URL. Helper lives in a NEW pure `deployer/src/origin-core.ts` (no `@cloudflare/sandbox`
+    import) so `node --test` can load it; `index.ts` imports it.
+  - **PM** (`ProjectManager/src/app/api/sites/[id]/deploy/route.ts`): before
+    dispatching, looks up the Site's primary serve domain via the EXISTING
+    `primaryDomainBySite([siteId])` (newest non-redirect custom hostname) and sends
+    `appOrigin: https://<domain>` in the deploy body when present (omitted otherwise).
+- **Verified:** `node --test deployer/src/origin-core.test.ts` → 8/8 green (prefers
+  valid https domain, strips trailing slash, trims ws, rejects http/path/query/junk/
+  malformed host, falls back on absent). deployer source tsc clean (CMS's tsc, -p its
+  tsconfig, excluding the new *.test.ts). PM `npx tsc --noEmit` clean. NO cms-bundle
+  regen needed — no `CMS/src/**` change (bundle ships CMS, not deployer/PM routes).
+  NOT verified live (HITL: needs a real deploy of a Site that has a custom domain).
+- **Files:** deployer/src/index.ts, deployer/src/origin-core.ts,
+  deployer/src/origin-core.test.ts, deployer/tsconfig.json,
+  ProjectManager/src/app/api/sites/[id]/deploy/route.ts

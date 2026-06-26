@@ -100,6 +100,23 @@ Read every line before working. Each entry was learned the hard way by a previou
   No native confirm()/alert() — in-app modal for key revoke (browser-review sessions
   hang on native dialogs).
 
+- **The `deployer/` package has NO tsc and NO test runner installed.** It's a tiny
+  standalone Worker (only `@cloudflare/sandbox` + wrangler). To typecheck it, borrow
+  another package's compiler: `cd deployer && ../CMS/node_modules/.bin/tsc --noEmit -p
+  tsconfig.json`. For pure node tests, keep dependency-free logic in a sibling
+  `*-core.ts` (no `@cloudflare/sandbox` import — index.ts can't be node-loaded because
+  of it) and run `node --test deployer/src/<x>-core.test.ts`. The tsconfig EXCLUDES
+  `src/**/*.test.ts` (the deployer has no `@types/node`, so test files would otherwise
+  error on `node:test` imports). Mirrors the CMS `*-core.ts` split.
+
+- **APP_ORIGIN now flows PM → deployer per deploy.** PM's deploy route sends
+  `appOrigin: https://<primary-custom-domain>` (from `primaryDomainBySite`) when the
+  Site has a serve domain; the deployer's pure `chooseAppOrigin()` validates it (https +
+  well-formed host, no path/query) and uses it for the CMS Worker's `APP_ORIGIN`, else
+  workers.dev. So a Site only advertises its custom-domain MCP URL after it's REDEPLOYED
+  with a domain attached. Reuse the EXISTING `primaryDomainBySite`/`listSiteDomains` —
+  don't write to `siteDomains` from the deploy path.
+
 - **Advertise public URLs from `APP_ORIGIN`, NOT the request host.** The MCP URL
   on the API-Keys page now uses `chooseMcpUrl(env.APP_ORIGIN, requestHost, proto)`
   (`app/mcp/mcp-core.ts`, pure + node-tested): prefer the deployer-injected

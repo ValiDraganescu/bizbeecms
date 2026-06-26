@@ -1,4 +1,5 @@
 import { getSandbox, type Sandbox } from "@cloudflare/sandbox";
+import { chooseAppOrigin } from "./origin-core";
 
 // Required re-export: the Sandbox Durable Object class the container runs in.
 export { Sandbox } from "@cloudflare/sandbox";
@@ -60,6 +61,11 @@ type DeployBody = {
   siteId?: string;
   slug?: string;
   ref?: string;
+  // The site's primary public origin (its custom domain as `https://<host>`)
+  // when one is attached. PM derives it from the newest non-redirect custom
+  // domain; absent → the deployer uses the workers.dev URL. Threaded into the
+  // CMS Worker as APP_ORIGIN (MCP URL + trusted links). See chooseAppOrigin().
+  appOrigin?: string;
   // Per-Site OpenRouter key (ai-openrouter Slice 4): plaintext, present ONLY
   // when the Site has its own key that PM decrypted cleanly. Set as the CMS
   // Worker SECRET OPENROUTER_API_KEY; absent → fall back to the deployer global.
@@ -161,6 +167,10 @@ export default {
           ? body.buildTimeoutSec
           : undefined;
 
+      // Site's primary public origin (custom domain), validated in chooseAppOrigin.
+      const appOrigin =
+        typeof body.appOrigin === "string" ? body.appOrigin : undefined;
+
       try {
         await startDeploy(env, {
           siteId,
@@ -168,6 +178,7 @@ export default {
           ref,
           openrouterApiKey: perSiteOpenrouterKey,
           buildTimeoutSec: bodyTimeout,
+          appOrigin,
         });
       } catch (err) {
         return Response.json(
@@ -370,6 +381,7 @@ async function startDeploy(
     ref: string;
     openrouterApiKey?: string;
     buildTimeoutSec?: number;
+    appOrigin?: string;
   },
 ): Promise<void> {
   const workerName = `${WORKER_PREFIX}${input.slug}`.slice(0, 63);
@@ -422,8 +434,13 @@ async function startDeploy(
       // The CMS guard calls PM at PM_ORIGIN; default to the callback origin.
       PM_ORIGIN: (env.PM_ORIGIN ?? env.PM_CALLBACK_ORIGIN ?? "").replace(/\/+$/, ""),
       // The CMS's OWN public origin — used to build trusted invite-accept links
-      // (cms-auth Slice 4). It's the deployed workers.dev URL for this Site.
-      APP_ORIGIN: `https://${workerName}${WORKERS_DEV_SUFFIX}`,
+      // (cms-auth) AND the MCP URL the CMS advertises (cms-mcp). Prefer the
+      // site's primary custom domain (PM passes it as appOrigin) when attached,
+      // else the deployed workers.dev URL. chooseAppOrigin validates the input.
+      APP_ORIGIN: chooseAppOrigin(
+        input.appOrigin,
+        `https://${workerName}${WORKERS_DEV_SUFFIX}`,
+      ),
       // AI provider key (ai-openrouter Slice 4): per-Site key (from PM body)
       // wins, else the deployer's own global, else empty. Set as a Worker
       // SECRET below (not a --var) so it never lands in CMS/wrangler.jsonc or a

@@ -69,16 +69,15 @@ node tests + EN/FI/ET for new strings.
   now advertises the right URL AS SOON AS the deployer sets APP_ORIGIN to the custom domain — that's
   part (a), filed below.
 
-- TODO (part a, follow-up — cross-track DEPLOYER + PM): **deployer must set `APP_ORIGIN` to the site's
-  primary custom domain when one is attached.** Today `deployer/src/index.ts:~520` ALWAYS sets
-  `APP_ORIGIN` to the workers.dev URL, even when the deployer already wires up custom-domain DNS
-  (~293-294). With part (b) landed, the CMS advertises whatever APP_ORIGIN holds — so once the deployer
-  feeds the primary custom domain into APP_ORIGIN, the MCP URL (and invite/google/reset links, which all
-  read APP_ORIGIN) become correct. FIX: thread the site's primary custom domain (data lives PM-side —
-  archived `custom-domains` is READ-ONLY, read it don't write it) into the deploy payload and have the
-  deployer set `APP_ORIGIN=https://<custom-domain>` when present, else keep workers.dev. Gate: deployer
-  tsc + its test; a PM-side change to pass the domain through the deploy request. NOTE: this is its own
-  track (deployer + PM, not CMS) — flag to the curator if it wants a dedicated subgoal.
+- DONE (2026-06-26, part a): **deployer sets `APP_ORIGIN` to the site's primary custom domain when
+  attached.** PM (`api/sites/[id]/deploy/route.ts`) looks up the Site's primary serve domain via the
+  existing `primaryDomainBySite([siteId])` and sends `appOrigin: https://<domain>` in the deploy body
+  when present. Deployer (`src/index.ts`) parses `DeployBody.appOrigin`, threads it to `startDeploy`,
+  and computes `APP_ORIGIN` via NEW pure `chooseAppOrigin()` in `src/origin-core.ts` (prefers a valid
+  `https://<host>` origin — rejects http/path/query/junk — else workers.dev). 8 node tests
+  (`origin-core.test.ts`); deployer + PM tsc clean. No CMS change → no bundle regen. With part (b)
+  already landed, the CMS now advertises the custom-domain MCP URL (and invite/reset links) as soon as
+  a Site with a custom domain is redeployed. HITL: verify on a live deploy of a custom-domain Site.
 
 - TODO (later) — **scoped / least-privilege keys.** If needed: per-key tool scopes
   (read-only key vs. full) reusing the tool-scopes contexts. Only if a real need
