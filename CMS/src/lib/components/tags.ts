@@ -74,3 +74,34 @@ export function filterByTag<T extends { tags?: unknown }>(components: T[], tag: 
   if (!t) return components;
   return components.filter((c) => normalizeTags(c.tags).some((x) => x.toLowerCase() === t));
 }
+
+/**
+ * Bulk-tag edit (component-kits Slice 10): given a set of components and one
+ * `tag`, compute each component's NEW tag set after adding or removing that tag.
+ * Returns ONLY the components whose tag set actually changes (op === "add" on a
+ * component that already has the tag, or "remove" on one that doesn't, is a
+ * no-op and is omitted) — so the caller only PATCHes what changed. PURE; reuses
+ * `normalizeTags` so the result is canonical. A blank tag yields no changes.
+ */
+export function applyBulkTag<T extends { name: string; tags?: unknown }>(
+  components: T[],
+  tag: string,
+  op: "add" | "remove",
+): { name: string; tags: string[] }[] {
+  const t = tag.trim();
+  if (!t) return [];
+  const key = t.toLowerCase();
+  const out: { name: string; tags: string[] }[] = [];
+  for (const c of components) {
+    const current = normalizeTags(c.tags);
+    const has = current.some((x) => x.toLowerCase() === key);
+    if (op === "add" && has) continue;
+    if (op === "remove" && !has) continue;
+    const next =
+      op === "add"
+        ? normalizeTags([...current, t])
+        : current.filter((x) => x.toLowerCase() !== key);
+    out.push({ name: c.name, tags: next });
+  }
+  return out;
+}

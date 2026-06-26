@@ -16,7 +16,7 @@
 
 import { useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { distinctTags, filterByTag, normalizeTags } from "@/lib/components/tags";
+import { applyBulkTag, distinctTags, filterByTag, normalizeTags } from "@/lib/components/tags";
 
 type ComponentSummary = {
   name: string;
@@ -76,6 +76,10 @@ export function ComponentsManager({
   // "add tag" input text keyed by component name.
   const [tagFilter, setTagFilter] = useState("");
   const [tagDraft, setTagDraft] = useState<Record<string, string>>({});
+  // Slice 10: bulk tag editing — which components are selected (by name) and the
+  // tag to add/remove across all of them in one action.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkTag, setBulkTag] = useState("");
   // Kit metadata: optional name + description the operator sets when exporting a
   // tag as a kit. Empty name → the kit name defaults to the tag.
   const [kitName, setKitName] = useState("");
@@ -135,6 +139,62 @@ export function ComponentsManager({
 
   function removeTag(c: ComponentSummary, tag: string) {
     void saveTags(c.name, c.tags.filter((x) => x !== tag));
+  }
+
+  function toggleSelected(name: string) {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  // Slice 10: add or remove `bulkTag` across every selected component in one go.
+  // `applyBulkTag` (pure) computes only the components whose tag set actually
+  // changes; we PATCH each via the existing tags-only route (no new endpoint),
+  // then sync local state. No-op components are skipped, so re-adding an existing
+  // tag costs zero requests.
+  async function applyBulkTagEdit(op: "add" | "remove") {
+    setError(null);
+    setNotice(null);
+    const tag = bulkTag.trim();
+    if (!tag || selected.size === 0) return;
+    const targets = components.filter((c) => selected.has(c.name));
+    const changes = applyBulkTag(targets, tag, op);
+    if (changes.length === 0) {
+      setNotice(t("bulkNoChange", { tag }));
+      return;
+    }
+    setBusy(true);
+    try {
+      for (const ch of changes) {
+        const res = await fetch("/api/components", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: ch.name, tags: ch.tags }),
+        });
+        if (!res.ok) {
+          setError(await errorOf(res));
+          break;
+        }
+        const j = (await res.json()) as { name: string; tags: string[] };
+        setComponents((cs) =>
+          cs.map((c) => (c.name === j.name ? { ...c, tags: j.tags } : c)),
+        );
+      }
+      setNotice(
+        t(op === "add" ? "bulkAdded" : "bulkRemoved", {
+          tag,
+          count: changes.length,
+        }),
+      );
+      setBulkTag("");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   // Load this Site's media keys so a rebind can target a real asset (H3b p1).
@@ -616,6 +676,70 @@ export function ComponentsManager({
             </label>
           </div>
         )}
+        {/* Slice 10: bulk tag editing — select N components, then add/remove a tag
+            across all of them in one action. Reuses the tags-only PATCH per row. */}
+        {visible.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface px-3 py-2">
+            <label className="flex items-center gap-2 text-sm text-foreground-muted">
+              <input
+                type="checkbox"
+                className="accent-primary"
+                disabled={busy}
+                aria-label={t("selectAll")}
+                checked={visible.length > 0 && visible.every((c) => selected.has(c.name))}
+                onChange={(e) =>
+                  setSelected((s) => {
+                    const next = new Set(s);
+                    for (const c of visible) {
+                      if (e.target.checked) next.add(c.name);
+                      else next.delete(c.name);
+                    }
+                    return next;
+                  })
+                }
+              />
+              {t("selectAll")}
+            </label>
+            <span className="text-sm text-foreground-muted">
+              {t("bulkSelected", { count: selected.size })}
+            </span>
+            <input
+              list="component-tags"
+              className="w-40 rounded-md border border-border bg-surface-raised px-2 py-1 text-sm text-foreground"
+              placeholder={t("bulkTagPlaceholder")}
+              aria-label={t("bulkTagPlaceholder")}
+              value={bulkTag}
+              disabled={busy}
+              onChange={(e) => setBulkTag(e.target.value)}
+            />
+            <button
+              type="button"
+              className="rounded-md border border-border px-3 py-1 text-sm text-foreground hover:bg-surface-raised disabled:opacity-40"
+              disabled={busy || selected.size === 0 || !bulkTag.trim()}
+              onClick={() => void applyBulkTagEdit("add")}
+            >
+              {t("bulkAdd")}
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-border px-3 py-1 text-sm text-foreground hover:bg-surface-raised disabled:opacity-40"
+              disabled={busy || selected.size === 0 || !bulkTag.trim()}
+              onClick={() => void applyBulkTagEdit("remove")}
+            >
+              {t("bulkRemove")}
+            </button>
+            {selected.size > 0 && (
+              <button
+                type="button"
+                className="text-sm text-foreground-muted hover:text-foreground disabled:opacity-40"
+                disabled={busy}
+                onClick={() => setSelected(new Set())}
+              >
+                {t("bulkClear")}
+              </button>
+            )}
+          </div>
+        )}
         {/* Shared autocomplete source for all per-component add-tag inputs. */}
         <datalist id="component-tags">
           {allTags.map((tg) => (
@@ -634,13 +758,23 @@ export function ComponentsManager({
                 className="flex flex-col gap-2 rounded-md border border-border bg-surface-raised px-3 py-2"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate font-mono text-foreground">{c.name}</span>
-                    <span className="text-sm text-foreground-muted">
-                      {[c.hasScript ? t("flagScript") : null, c.hasCss ? t("flagCss") : null]
-                        .filter(Boolean)
-                        .join(" · ") || t("flagStatic")}
-                    </span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="shrink-0 accent-primary"
+                      checked={selected.has(c.name)}
+                      disabled={busy}
+                      aria-label={t("selectFor", { name: c.name })}
+                      onChange={() => toggleSelected(c.name)}
+                    />
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate font-mono text-foreground">{c.name}</span>
+                      <span className="text-sm text-foreground-muted">
+                        {[c.hasScript ? t("flagScript") : null, c.hasCss ? t("flagCss") : null]
+                          .filter(Boolean)
+                          .join(" · ") || t("flagStatic")}
+                      </span>
+                    </div>
                   </div>
                   <button
                     type="button"

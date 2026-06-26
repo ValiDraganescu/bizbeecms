@@ -239,3 +239,25 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/components/components-manager.tsx, CMS/messages/{en,fi,et}.json,
   CMS/scripts/{build-kit-bundle,summarize-kit-bundle}.test.mjs,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-26 09:11 — Slice 10: bulk tag editing
+- **Status:** DONE
+- **What I did:** Backlog had no open TODO (1-9 DONE); per NEXT.md picked the
+  highest residual-value idea — bulk tag editing (select N components → add/remove
+  a tag across all in one action), which makes assembling a kit from many existing
+  components fast. Pure `applyBulkTag(components, tag, op)` in `lib/components/tags.ts`:
+  computes each component's NEW normalized tag set, returns ONLY the ones that
+  actually change (no-op add on a component already carrying the tag / remove on one
+  without it is omitted), case-insensitive. UI: a checkbox per visible row + a "select
+  all (visible)" toggle + a bulk bar (tag input w/ datalist autocomplete, Add-to-/
+  Remove-from-selected, Clear). The handler loops the EXISTING tags-only PATCH
+  /api/components per changed component (no new endpoint — ponytail) and syncs local
+  state; reports added/removed/no-change. 11 i18n keys EN/FI/ET.
+- **Verified:** CMS `tsc --noEmit` clean (EXIT 0 from the CMS dir); 6/6 new node
+  tests pass (add/remove, case-insensitive dedupe, no-op omission, blank-tag, source
+  not mutated); `npm run bundle:cms` (opennext gate) green + PM cms-bundle
+  regenerated. No dev server was running. Could not exercise the live PATCH loop
+  (needs a real D1 binding — HITL); the route + helper are unit/build-verified.
+- **Files:** CMS/src/lib/components/tags.ts,
+  CMS/src/components/components/components-manager.tsx, CMS/messages/{en,fi,et}.json,
+  CMS/scripts/bulk-tag.test.mjs, ProjectManager/src/lib/deploy/cms-bundle.generated.js

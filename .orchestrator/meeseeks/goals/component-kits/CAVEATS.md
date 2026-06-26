@@ -117,6 +117,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   doc-comment in `MetaImagePicker` ("native <img>") — no actual tag. Every edit to
   `page-builder-shell.tsx` re-triggers it at a shifted line. Ignore it; it's not your code.
 
+- **The Bash tool's working dir can silently be the repo ROOT.** Slice 10: a bare
+  `npx tsc --noEmit` ran from `/bizbeecms` (no tsconfig there) and exited 0
+  MEANINGLESSLY — it didn't typecheck CMS at all. Confirm `pwd` is `.../CMS` (the dir
+  persists across calls once you've `cd`'d in a non-compound command) before trusting
+  a tsc/test result. The opennext gate (`npm run bundle:cms` from `ProjectManager/`)
+  is the real safety net since it runs `next build` internally.
+
 - **A new column on `component` ripples to all 5 premade kits.** Their `bundle()`
   wrappers build a `PortableComponent` literal; a new REQUIRED envelope field (Slice 1's
   `tags`) breaks `tsc` in blog/docs/landing/pricing/portfolio-kit.ts until each sets it.

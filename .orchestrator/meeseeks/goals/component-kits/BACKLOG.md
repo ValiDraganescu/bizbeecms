@@ -5,6 +5,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-26): **Slice 10 — bulk tag editing.** Select N components (per-row
+  checkbox + select-all-visible) then add/remove a tag across all in one action.
+  Pure `applyBulkTag(components, tag, op)` in `lib/components/tags.ts` returns only the
+  components whose tag set changes (case-insensitive; no-ops omitted). UI loops the
+  EXISTING tags-only PATCH per changed component (no new endpoint). 11 EN/FI/ET keys.
+  6/6 new node tests; tsc + opennext gate green; cms-bundle regenerated.
+
 - DONE (2026-06-26): **Slice 9 — kit metadata on export.** Operator can NAME +
   DESCRIBE a kit on export (vs deriving the name from the tag), carried in the
   `bizbeecms.kit` envelope (`name` + `meta.note`) and shown in the preview panel.
