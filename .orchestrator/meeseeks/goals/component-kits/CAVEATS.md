@@ -1,6 +1,16 @@
 # Caveats — component-kits
 Read every line before working. Each entry was learned the hard way by a previous Meeseeks.
 
+- **`git commit` includes ALREADY-STAGED changes you didn't add.** Slice 8: the
+  curator had pre-staged a batch of `R ` (rename→archive) entries in the index
+  before this run. `git add -- <my paths>` only adds MY paths, but `git commit`
+  (no pathspec) commits the WHOLE index — so those curator renames rode along in my
+  commit. Harmless here (they were a completed curator action, not live edits), but
+  if you must keep your commit surgically clean, either `git commit -- <your paths>`
+  (commit only those pathspecs) or check `git status --short` for pre-staged `R`/`A`/`M`
+  rows in the FIRST column before committing. Never `git reset`/unstage another
+  worker's staged work to "clean up" — just commit your paths explicitly.
+
 - **The export/import machinery ALREADY EXISTS — extend, don't rebuild.** Verified
   2026-06-22: `lib/components/portable.ts` (`PortableComponent` envelope +
   `parsePortableComponent` trust boundary), `api/components` (export-one/import-one),
