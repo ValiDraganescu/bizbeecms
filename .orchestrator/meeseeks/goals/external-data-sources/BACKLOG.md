@@ -60,5 +60,3 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   dispatch). Validate against propsSchema. Node tests per tool (mock fetch/store).
   Gate.
 
-- TODO (later) — **OAuth2 client-credentials auth.** Token fetch from a token URL +
-  cache + refresh, as a 5th authType. Deferred from v1's header/query/basic/none.

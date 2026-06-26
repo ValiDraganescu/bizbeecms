@@ -3,6 +3,10 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
+- BUG [P1]: Invite/reset email uses the workers.dev address, not the site's custom domain. — repro: site with a custom domain attached → invite a user → email body link is `https://bizbeecms-cms-<slug>.<acct>.workers.dev/invite/accept/<token>` instead of the custom domain. Subject is also generic ("You're invited to BizbeeCMS"). — reported 2026-06-26.
+  TWO PARTS:
+  (1) **Link host** = the SHARED `APP_ORIGIN`-ignores-custom-domains defect already tracked in `sso` and `cms-mcp` (deployer `src/index.ts` ~520 always sets `APP_ORIGIN` to workers.dev even when a custom domain is attached). `lib/mail/send-invite.ts` builds the accept URL from `APP_ORIGIN`, so it inherits workers.dev. DO NOT fix APP_ORIGIN a fourth time — the ONE deployer fix (set APP_ORIGIN = primary custom domain when attached, www-canonical) serves invite + reset + Google redirect_uri + /mcp URL together. After that lands + redeploy, the invite/reset link is correct with no change here. Track it; verify the link host as part of the live HITL round-trip.
+  (2) **Subject line** (invite-specific, lives ONLY here): when the site has a custom domain, the invite subject must be `<domain>: You are invited to use BizBeeCMS` (e.g. `restovista.com: You are invited to use BizBeeCMS`); generic subject otherwise. The domain is the same primary custom-domain value APP_ORIGIN resolves to — derive the subject from APP_ORIGIN's host (strip scheme/`www.`?) so it stays consistent with the link. Applies to BOTH apps' invite mail and, by mirror, the reset mail subject if it should carry the domain too (confirm in CAVEATS). EN/FI/ET — the subject is a localized string with a `{domain}` placeholder; the generic (no-custom-domain) subject keeps the current wording. Gate: app tsc + node test the subject-builder (custom-domain → prefixed; no-domain → generic) + opennext build; CMS work regens PM `cms-bundle` last.
 
 ## Tasks
 PM first (slices P1–P5), then mirror in CMS (slices C1–C5). ONE app per worker run.
