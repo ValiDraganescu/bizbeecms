@@ -16,12 +16,17 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { detectAdminContext, toolsForContext } from "@/lib/chat/tool-scopes";
+import { buildModelHistory, type HistoryMessage } from "@/lib/chat/build-history";
 import type { PromptVersion } from "@/lib/chat/prompt-version";
 
 /** What the export button needs from the live conversation. */
 type ChatDebugPanelProps = {
-  /** Current transcript (role/content), so export can capture the exact payload. */
-  messages?: { role: string; content: string }[];
+  /**
+   * Current transcript. Assistant turns carry their tool cards (`tools`) so the
+   * export can expand them into the real `tool_calls` + `role:"tool"` result
+   * messages the model receives — full visibility, not just the text turns.
+   */
+  messages?: HistoryMessage[];
   /** Selected model id, mirrored into the exported payload. */
   model?: string;
   /** Active per-request system-prompt override (PM-SSO editor), or null. */
@@ -190,12 +195,16 @@ export function ChatDebugPanel({
       const res = await fetch("/api/chat/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Drop empty-content turns (an in-progress assistant turn) — the route
-        // rejects empty content, and they carry nothing to export.
+        // Expand the transcript into the EXACT model-facing history: each
+        // assistant tool card becomes a structured `tool_calls` entry + a paired
+        // `role:"tool"` result message (same transform the live chat replays via
+        // buildModelHistory). This is what gives the export full tool-call/result
+        // visibility instead of just the text turns. "" = no trailing user turn;
+        // it also drops empty/in-progress turns the route would 400 on.
         body: JSON.stringify({
           context,
           model,
-          messages: messages.filter((m) => m.content.trim() !== ""),
+          messages: buildModelHistory(messages, ""),
         }),
       });
       if (!res.ok) {
