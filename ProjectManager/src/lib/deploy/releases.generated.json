@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "1.10.4",
-      "tag": "r-1.10.4",
-      "markdown": "# CMS v1.10.4\n\n_2026-06-26 · changes since r-1.10.3_\n\n## Other\n- No CMS-facing changes. This release accompanies deployer-side updates; the CMS bundle is unchanged from r-1.10.3.\n"
+      "version": "1.10.5",
+      "tag": "r-1.10.5",
+      "markdown": "# CMS v1.10.5\n\n_2026-06-26 · changes since r-1.10.4_\n\n## Other\n- No CMS-facing changes. This release accompanies Project Manager deploy-form / deploy-cancel and deployer updates; the CMS bundle is unchanged from r-1.10.4.\n"
     },
     {
       "version": "1.9.0",
