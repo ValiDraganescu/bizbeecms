@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "1.10.0",
-      "tag": "r-1.10.0",
-      "markdown": "# CMS v1.10.0\n\n_2026-06-26 · changes since r-1.9.0_\n\n## Features\n- Invite and password-reset emails now carry the site's custom domain in the subject line (e.g. `example.com: You are invited to use BizBeeCMS`) when a custom domain is attached, falling back to the generic subject otherwise.\n"
+      "version": "1.10.1",
+      "tag": "r-1.10.1",
+      "markdown": "# CMS v1.10.1\n\n_2026-06-26 · changes since r-1.10.0_\n\n## Other\n- No CMS-facing changes. This release accompanies Project Manager deploy-timeline / deploy-log-stream improvements; the CMS bundle is unchanged from r-1.10.0.\n"
     },
     {
       "version": "1.9.0",
