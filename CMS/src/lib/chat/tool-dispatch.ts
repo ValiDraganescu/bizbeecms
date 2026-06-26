@@ -94,6 +94,7 @@ import {
   LIST_COMPONENT,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
+import { effectiveTheme } from "@/lib/render/theme";
 import {
   validateBinding,
   validateListBinding,
@@ -324,7 +325,18 @@ async function handleGetBrandIdentity(): Promise<Record<string, unknown>> {
 async function handleGetTheme(): Promise<Record<string, unknown>> {
   try {
     const [light, dark] = await Promise.all([getThemeOverrides(), getThemeOverridesDark()]);
-    return { ok: true, theme: { light, dark } };
+    // Return the EFFECTIVE theme (defaults + overrides) so the model sees the
+    // real color of every token — an empty override map is the DEFAULT theme,
+    // not "no theme". `overrides` keeps the diff for when it wants to know what
+    // the operator explicitly changed.
+    return {
+      ok: true,
+      theme: {
+        light: effectiveTheme(light, false),
+        dark: effectiveTheme(dark, true),
+      },
+      overrides: { light, dark },
+    };
   } catch (err) {
     return { ok: false, errors: [`failed to get theme: ${(err as Error).message}`] };
   }

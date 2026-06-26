@@ -119,8 +119,11 @@ export const GET_THEME_TOOL = {
   function: {
     name: "get_theme",
     description:
-      "Read the site's theme token overrides (light and dark color overrides), " +
-      "so you understand the active palette before authoring components.",
+      "Read the site's EFFECTIVE color theme — `theme.light` and `theme.dark` " +
+      "each map every color token to its active value (built-in defaults merged " +
+      "with the operator's overrides), so you see the real palette. `overrides` " +
+      "holds only the tokens the operator explicitly changed (empty = pure " +
+      "defaults, which is normal, not a misconfiguration).",
     parameters: { type: "object", properties: {}, required: [] },
   },
 } as const;

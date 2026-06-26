@@ -77,5 +77,19 @@ export default async function PreviewPage({
   const { plan } = await buildPlanFromPage(pageRow, blocks);
   const rendered = <RenderedPage plan={plan} />;
   // `data-theme` on a wrapper re-scopes the token cascade for the forced mode.
-  return theme ? <div data-theme={theme}>{rendered}</div> : rendered;
+  // The wrapper must PAINT the surface itself: `body{background:var(--color-surface)}`
+  // lives on <body> (the wrapper's ANCESTOR), and CSS custom properties only
+  // cascade DOWN — so the wrapper's forced `--color-surface` never reaches body,
+  // leaving the page background white in forced-dark. Painting the wrapper (which
+  // DOES see the forced token) + filling the viewport fixes the white background.
+  return theme ? (
+    <div
+      data-theme={theme}
+      style={{ backgroundColor: "var(--color-surface)", minHeight: "100vh" }}
+    >
+      {rendered}
+    </div>
+  ) : (
+    rendered
+  );
 }

@@ -370,6 +370,20 @@ export function normalizeThemeOverrides(raw: unknown): ThemeOverrides {
   return out;
 }
 
+/**
+ * The EFFECTIVE theme for a mode = the built-in defaults with the per-Site
+ * overrides applied on top. So a reader (e.g. the AI's get_theme) sees the real
+ * color of every token, not just the small override diff (which looks like "no
+ * theme set" when empty). `dark` picks the dark defaults base.
+ */
+export function effectiveTheme(
+  overrides: unknown,
+  dark = false,
+): Record<ThemeToken, string> {
+  const base = dark ? DARK_DEFAULT_THEME : DEFAULT_THEME;
+  return { ...base, ...normalizeThemeOverrides(overrides) };
+}
+
 /** `{tokenA:colorA,…}` → `--color-tokenA:colorA;…` (no wrapping selector). */
 function overridesToDecls(overrides: ThemeOverrides): string {
   return Object.entries(overrides)

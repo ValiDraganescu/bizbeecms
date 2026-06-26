@@ -18,11 +18,13 @@ import { dirname, join } from "node:path";
 import {
   THEME_TOKENS,
   DEFAULT_THEME,
+  DARK_DEFAULT_THEME,
   THEME_PRESETS,
   isThemeToken,
   isSafeColorValue,
   normalizeThemeOverrides,
   themeOverridesToCss,
+  effectiveTheme,
 } from "../src/lib/render/theme.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -205,4 +207,30 @@ test("themeOverridesToCss: emits a safe :root rule, empty for no overrides", () 
   // Never contains an element/declaration breakout, even from hostile input.
   const hostile = themeOverridesToCss({ primary: "red;}</style><script>x" });
   assert.equal(hostile, "", "hostile value dropped entirely");
+});
+
+// ── effectiveTheme — defaults merged with overrides (what get_theme returns) ──
+
+test("effectiveTheme: no overrides → the full default palette (every token)", () => {
+  const light = effectiveTheme({}, false);
+  assert.deepEqual(light, DEFAULT_THEME);
+  const dark = effectiveTheme({}, true);
+  assert.deepEqual(dark, DARK_DEFAULT_THEME);
+});
+
+test("effectiveTheme: an override wins over the default for that token only", () => {
+  const eff = effectiveTheme({ primary: "#ff0000" }, false);
+  assert.equal(eff.primary, "#ff0000");
+  // every other token is still the default
+  assert.equal(eff.surface, DEFAULT_THEME.surface);
+});
+
+test("effectiveTheme: dark base differs from light (so dark surface is dark)", () => {
+  assert.notEqual(effectiveTheme({}, true).surface, effectiveTheme({}, false).surface);
+});
+
+test("effectiveTheme: garbage/unknown overrides are dropped, defaults remain", () => {
+  const eff = effectiveTheme({ notAToken: "#fff", primary: "javascript:evil" }, false);
+  assert.equal(eff.primary, DEFAULT_THEME.primary, "unsafe value dropped → default kept");
+  assert.equal("notAToken" in eff, false, "unknown token dropped");
 });
