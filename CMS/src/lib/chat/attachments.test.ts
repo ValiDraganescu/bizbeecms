@@ -9,6 +9,7 @@ import {
   toDataUri,
   toInlineContentPart,
   buildUserContent,
+  buildReferencedAssetsText,
 } from "./attachments.ts";
 
 const VISION = ["text", "image"];
@@ -86,4 +87,18 @@ test("buildUserContent: files only (empty text) → no text part", () => {
     { type: "image_url", image_url: { url: "data:image/png;base64,QUJD" } },
     { type: "file", file: { filename: "b.pdf", file_data: "data:application/pdf;base64,JVBE" } },
   ]);
+});
+
+test("buildReferencedAssetsText: empty → empty string", () => {
+  assert.equal(buildReferencedAssetsText([]), "");
+});
+
+test("buildReferencedAssetsText: lists exact URLs + names and says don't invent", () => {
+  const out = buildReferencedAssetsText([
+    { url: "/media/abc", name: "hero.jpg" },
+    { url: "/media/def", name: "logo.png" },
+  ]);
+  assert.match(out, /\/media\/abc \(hero\.jpg\)/);
+  assert.match(out, /\/media\/def \(logo\.png\)/);
+  assert.match(out, /do not invent URLs/i);
 });

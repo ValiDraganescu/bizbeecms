@@ -47,6 +47,13 @@ export function DeployForm({
   // A stuck deploy is no longer really in flight — let the operator act on it.
   const inFlight = (status === "deploying" && !stuck) || pending;
 
+  // True only in the window between a successful dispatch and the server status
+  // catching up to `deploying`. While set, the prior run's stale `failed` status
+  // must NOT render the failure Alert (that was the "upload failed" flash before
+  // clone). Cleared as soon as we observe `deploying` (or a terminal status), so
+  // a deploy that genuinely fails AFTER running still shows the Alert.
+  const [justStarted, setJustStarted] = useState(false);
+
   // While a deploy is genuinely in flight, poll for the resolved status. A stuck
   // deploy won't resolve on its own, so stop polling and surface the controls.
   useEffect(() => {
@@ -54,6 +61,13 @@ export function DeployForm({
     const id = setInterval(() => router.refresh(), 5000);
     return () => clearInterval(id);
   }, [status, stuck, router]);
+
+  // The dispatch→status-caught-up window is over once the server reports a real
+  // state (deploying/deployed/failed all mean the latch propagated). Clear the
+  // stale-suppression flag so subsequent genuine failures aren't hidden.
+  useEffect(() => {
+    if (status === "deploying") setJustStarted(false);
+  }, [status]);
 
   // Load the available CMS releases once. Defaults the picker to the latest tag.
   useEffect(() => {
@@ -106,6 +120,7 @@ export function DeployForm({
       };
       if (res.ok && data.accepted) {
         setStarted(true);
+        setJustStarted(true); // suppress the prior run's stale `failed` until status catches up
         setMintWarning(data.mintWarning === true);
         setKeyWarning(data.keyWarning === true);
         router.refresh();
@@ -182,7 +197,13 @@ export function DeployForm({
           </Alert>
         ) : null}
 
-        {status === "failed" && started ? (
+        {/* Failure Alert. `justStarted` suppresses the brief window after a
+            successful dispatch where the server status still reads the PRIOR
+            run's `failed` (router.refresh is async) — that flashed "upload
+            failed" just before clone. It clears once status reaches `deploying`,
+            so a deploy that genuinely fails after running still shows the Alert,
+            as does a site already `failed` on page load. */}
+        {status === "failed" && !justStarted ? (
           <Alert tone="danger">
             <AlertBody>{t("errors.uploadFailed")}</AlertBody>
           </Alert>

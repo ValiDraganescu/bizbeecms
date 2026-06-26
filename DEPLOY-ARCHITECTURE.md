@@ -158,12 +158,23 @@ To find WHICH cms-validate gate fails (no-user vs no-site vs no-reach), add temp
 `cms-validate/route.ts` and read `wrangler tail bizbeecms-projectmanager` — **never** put diagnostics in
 the response body (info disclosure; security review will flag it).
 
-### Stuck-deploy recovery
+### Cancelling / stuck-deploy recovery
+**Cancel works at ANY time, not just when stuck, and now actually KILLS the build container.** The
+Cancel button shows whenever a Site is `deploying` (`deploy-form.tsx`). PM's cancel route
+(`src/app/api/sites/[id]/deploy/cancel/route.ts`) POSTs the deployer's **`POST /cancel`** (Bearer
+`DEPLOYER_SECRET`, body `{slug}`), which re-fetches the named Sandbox DO (`deploy-<slug>`) and calls
+`sandbox.destroy()` — tearing the container down immediately (idempotent; already-gone = success). The
+kill is **best-effort**: if the deployer is unreachable PM still flips the Site → `failed` so the
+operator is never wedged. A killed `deploy.sh` can't fire its completion callback, so the PM flip is
+authoritative. (Supersedes the old "container is out-of-band, can't be killed" — `destroy()` on the
+named sandbox does kill it. Needs the **deployer redeployed** to expose `/cancel`; until then PM's
+`/cancel` POST 404s → `containerKilled:false` but status still flips.)
+
 A `deploying` row past `STUCK_AFTER_MS` (10 min, `ProjectManager/src/lib/deploy/deploy-state.ts`) is
-flagged stuck in the UI with a Cancel/Restart button. Cancel sets status → `failed` (the container is
-out-of-band, can't be killed). If the worker is actually live (callback just failed), the honest fix is
-`UPDATE sites SET status='deployed' WHERE slug=… AND status='deploying'` via
-`wrangler d1 execute bizbeecms --remote`. Fixing the callback origin (trap #5) prevents future stuck rows.
+additionally flagged stuck in the UI (a warning + "redeploy" label). If the worker is actually live
+(callback just failed), the honest fix is `UPDATE sites SET status='deployed' WHERE slug=… AND
+status='deploying'` via `wrangler d1 execute bizbeecms --remote`. Fixing the callback origin (trap #5)
+prevents future stuck rows.
 
 ---
 
@@ -508,7 +519,16 @@ The deployer only builds + `wrangler deploy`s the CMS Worker; it does **not** cr
 - Deploy script (all components + PM migrations): `deploy.sh`; CI wrapper `.github/workflows/deploy.yml`
 - PM→deployer trigger: `ProjectManager/src/app/api/sites/[id]/deploy/route.ts`
 - deployer + container + `wrangler deploy`/`secret put` command: `deployer/src/index.ts` (the bash
-  template — search `wrangler deploy --name`; `attachDomain()` for custom-hostname registration)
+  template — search `wrangler deploy --name`; `attachDomain()` for custom-hostname registration).
+  Endpoints: `POST /deploy`, `POST /cancel` (`getSandbox(…).destroy()` kills the build container),
+  `POST /attach-domain`, `GET /health`.
+- Live deploy logs: the container streams `build.log` deltas as `status:"log"` deploy_events
+  (per-step console in `sites/deploy-timeline.tsx`; pruned on resolve). A `[mem] N MB free`
+  heartbeat is written into `build.log` every 10s DURING the build so a silent OOM-thrash is visible
+  (search `start_mem_sampler` / `start_log_stream` in `deployer/src/index.ts`).
+- npm-step resilience: `npm ci` runs under `timeout 360s` with `fetch-timeout 60s` + `fetch-retries 5`
+  (+ one clean retry) — it was hanging ~9min on stalled registry fetches with npm's 5-min default
+  (search `npm_config_fetch_timeout` in `deployer/src/index.ts`).
 - deployer required secrets: `deployer/wrangler.jsonc` (comment block)
 - CMS auth bridge: `ProjectManager/src/app/api/auth/cms-validate/route.ts` ←→ `CMS/src/lib/auth/guard-core.ts` + `guard.ts`
 - CMS per-Site vars declared empty: `CMS/wrangler.jsonc` (`SITE_ID`/`PM_ORIGIN`/`CMS_AUTH_SECRET`/`APP_ORIGIN`).

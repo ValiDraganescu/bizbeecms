@@ -43,10 +43,13 @@ import {
   acceptsFile,
   mimeToModality,
   buildUserContent,
+  buildReferencedAssetsText,
   type Modality,
   type InlineAttachment,
+  type ReferencedAsset,
 } from "@/lib/chat/attachments";
 import { MAX_ASSET_SIZE } from "@/lib/render/asset";
+import { ChatGalleryPicker, type GalleryAsset } from "@/components/chat/chat-gallery-picker";
 
 export type ChatMsg =
   | { role: "user"; content: string }
@@ -68,9 +71,14 @@ async function blobToBase64(blob: Blob): Promise<string> {
 function bubbleText(
   text: string,
   attachments: ReadonlyArray<{ name: string }>,
+  references: ReadonlyArray<{ name: string }> = [],
 ): string {
-  if (attachments.length === 0) return text;
-  const names = attachments.map((a) => `📎 ${a.name}`).join("\n");
+  const lines = [
+    ...attachments.map((a) => `📎 ${a.name}`), // read
+    ...references.map((a) => `🔗 ${a.name}`), // reference (use URL)
+  ];
+  if (lines.length === 0) return text;
+  const names = lines.join("\n");
   return text === "" ? names : `${text}\n\n${names}`;
 }
 
@@ -107,15 +115,22 @@ export function useChat(
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function send(text: string, attachments: PendingAttachment[] = []) {
+  async function send(
+    text: string,
+    attachments: PendingAttachment[] = [],
+    references: ReferencedAsset[] = [],
+  ) {
     const trimmed = text.trim();
-    if ((trimmed === "" && attachments.length === 0) || busy) return;
+    if ((trimmed === "" && attachments.length === 0 && references.length === 0) || busy) return;
 
     setError(null);
     // Inline context (e.g. the Page Builder's selected page) is prepended to the
     // MODEL-facing message only; the user's transcript bubble shows their raw text.
+    // Referenced gallery assets (use-by-URL, NOT read) are appended as a text
+    // block so the model gets their exact /media URLs without inlining bytes.
     const inline = getInlineContext?.()?.trim();
-    const modelText = inline ? `${inline}\n\n${trimmed}` : trimmed;
+    const refBlock = buildReferencedAssetsText(references);
+    const modelText = [inline, trimmed, refBlock].filter((s) => s && s !== "").join("\n\n");
 
     // Read each pending attachment's bytes from R2 (the /media/<key> url the
     // uploader returned) and base64-encode them, then build the OpenRouter content
@@ -148,7 +163,7 @@ export function useChat(
     const history = buildModelHistory(messages, modelContent);
     setMessages((prev) => [
       ...prev,
-      { role: "user", content: bubbleText(trimmed, attachments) },
+      { role: "user", content: bubbleText(trimmed, attachments, references) },
       { role: "assistant", content: "", tools: [] },
     ]);
     setBusy(true);
@@ -334,10 +349,16 @@ export function ChatConversation({
   const [enterMode, setEnterMode] = useState<EnterMode>("send");
   const [atBottom, setAtBottom] = useState(true);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  // Gallery assets attached to USE BY URL (dropped into components/pages), not read.
+  const [references, setReferences] = useState<ReferencedAsset[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // The `+` menu (open) and which gallery picker is showing ("read" | "reference" | null).
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [gallery, setGallery] = useState<null | "read" | "reference">(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { messages, busy, error, send } = chat;
 
@@ -404,6 +425,57 @@ export function ChatConversation({
     setAttachments((cur) => cur.filter((a) => a.key !== key));
   }
 
+  function removeReference(url: string) {
+    setReferences((cur) => cur.filter((r) => r.url !== url));
+  }
+
+  // "Read from gallery": the chosen gallery assets are already in R2 — turn each
+  // into a read PendingAttachment (gated by the model's modalities, like a disk
+  // upload). De-dupe against what's already attached.
+  function addGalleryToRead(picked: GalleryAsset[]) {
+    setGallery(null);
+    setAttachError(null);
+    for (const a of picked) {
+      const mime = a.contentType ?? "";
+      if (!canAttach) {
+        setAttachError(t("attach.textOnly"));
+        return;
+      }
+      if (!acceptsFile(mods, mime)) {
+        setAttachError(t("attach.rejected", { name: a.filename, kind: kindLabel(mime) }));
+        continue;
+      }
+      setAttachments((cur) =>
+        cur.some((x) => x.key === a.key)
+          ? cur
+          : [...cur, { key: a.key, url: a.url, name: a.filename, mime }],
+      );
+    }
+  }
+
+  // "Insert media URL from gallery": store the chosen assets to REFERENCE by URL
+  // (no inlining, no modality gate — works on any model). De-dupe by url.
+  function addGalleryToReference(picked: GalleryAsset[]) {
+    setGallery(null);
+    setReferences((cur) => {
+      const have = new Set(cur.map((r) => r.url));
+      const add = picked
+        .filter((a) => !have.has(a.url))
+        .map((a) => ({ url: a.url, name: a.filename }));
+      return [...cur, ...add];
+    });
+  }
+
+  // Close the `+` menu on an outside click.
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
+
   // Restore the Enter-behaviour pref on mount (client-only; localStorage).
   useEffect(() => {
     setEnterMode(loadEnterMode());
@@ -436,15 +508,18 @@ export function ChatConversation({
 
   async function onSend() {
     const text = input.trim();
-    if ((text === "" && attachments.length === 0) || busy || uploading) return;
+    if ((text === "" && attachments.length === 0 && references.length === 0) || busy || uploading)
+      return;
     const pending = attachments;
+    const refs = references;
     setInput("");
     setAttachments([]);
+    setReferences([]);
     setAttachError(null);
     scrollToBottom();
-    // Attachments go inline (base64 data-URIs) to the model via `send`; the R2
-    // key stays on each (history/transcript can reference it). BACKLOG 3.
-    await send(text, pending);
+    // Read attachments go inline (base64 data-URIs) to the model; referenced
+    // gallery assets go as a /media-URL text block (use-by-URL, not read).
+    await send(text, pending, refs);
     scrollToBottom();
   }
 
@@ -540,6 +615,36 @@ export function ChatConversation({
           </ul>
         )}
 
+        {references.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5">
+            {references.map((r) => (
+              <li
+                key={r.url}
+                className="flex max-w-[16rem] items-center gap-1.5 rounded-md border border-primary bg-primary-subtle px-2 py-1 text-xs text-foreground"
+                title={t("attach.referenceHint", { url: r.url })}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="shrink-0">
+                  <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                </svg>
+                <span className="truncate" title={r.name}>{r.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeReference(r.url)}
+                  aria-label={t("attach.remove")}
+                  title={t("attach.remove")}
+                  className="shrink-0 text-foreground-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                  </svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
         <textarea
           className={
             "min-h-[5.5rem] max-h-64 w-full resize-y rounded-md border bg-surface px-3 py-2 text-foreground " +
@@ -585,19 +690,56 @@ export function ChatConversation({
 
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!canAttach || busy || uploading}
-              className="rounded-md border border-border px-2 py-1 text-foreground-muted hover:text-foreground disabled:opacity-50"
-              aria-label={t("attach.add")}
-              title={canAttach ? t("attach.add") : t("attach.textOnly")}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            </button>
+            <div ref={menuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((o) => !o)}
+                disabled={busy || uploading}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                className="rounded-md border border-border px-2 py-1 text-foreground-muted hover:text-foreground disabled:opacity-50"
+                aria-label={t("attach.add")}
+                title={t("attach.add")}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+              {menuOpen && (
+                <div
+                  role="menu"
+                  className="absolute bottom-full left-0 z-50 mb-1 w-64 overflow-hidden rounded-md border border-border bg-surface-raised shadow-lg"
+                >
+                  <AttachMenuItem
+                    label={t("attach.readDisk")}
+                    hint={canAttach ? undefined : t("attach.textOnly")}
+                    disabled={!canAttach}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      fileInputRef.current?.click();
+                    }}
+                  />
+                  <AttachMenuItem
+                    label={t("attach.readGallery")}
+                    hint={canAttach ? undefined : t("attach.textOnly")}
+                    disabled={!canAttach}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setGallery("read");
+                    }}
+                  />
+                  <AttachMenuItem
+                    label={t("attach.insertGallery")}
+                    hint={t("attach.insertGalleryHint")}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setGallery("reference");
+                    }}
+                  />
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={toggleEnterMode}
@@ -611,13 +753,52 @@ export function ChatConversation({
           <button
             type="submit"
             className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
-            disabled={busy || uploading || (input.trim() === "" && attachments.length === 0)}
+            disabled={
+              busy ||
+              uploading ||
+              (input.trim() === "" && attachments.length === 0 && references.length === 0)
+            }
           >
             {busy ? t("sending") : t("send")}
           </button>
         </div>
       </form>
+
+      {gallery && (
+        <ChatGalleryPicker
+          title={gallery === "read" ? t("gallery.readTitle") : t("gallery.insertTitle")}
+          confirmLabel={gallery === "read" ? t("gallery.confirmRead") : t("gallery.confirmInsert")}
+          onConfirm={gallery === "read" ? addGalleryToRead : addGalleryToReference}
+          onClose={() => setGallery(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/** One row in the `+` attach menu. */
+function AttachMenuItem({
+  label,
+  hint,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  hint?: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full flex-col items-start px-3 py-2 text-left text-sm text-foreground hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <span>{label}</span>
+      {hint && <span className="text-xs text-foreground-muted">{hint}</span>}
+    </button>
   );
 }
 

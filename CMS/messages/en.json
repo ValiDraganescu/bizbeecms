@@ -102,7 +102,7 @@
     },
     "contextAttached": "Page context attached",
     "attach": {
-      "add": "Attach file",
+      "add": "Attach",
       "remove": "Remove attachment",
       "textOnly": "This model is text-only — it can't read attachments.",
       "rejected": "{name}: this model can't read {kind} files.",
@@ -111,7 +111,23 @@
       "kindImage": "image",
       "kindFile": "this kind of",
       "kindAudio": "audio",
-      "kindVideo": "video"
+      "kindVideo": "video",
+      "readDisk": "Attach a file to read (from disk)",
+      "readGallery": "Attach a file to read (from gallery)",
+      "insertGallery": "Insert media from gallery",
+      "insertGalleryHint": "Adds the file's URL for the assistant to use on the page",
+      "referenceHint": "URL the assistant can use: {url}"
+    },
+    "gallery": {
+      "readTitle": "Choose files for the assistant to read",
+      "insertTitle": "Choose media to insert",
+      "confirmRead": "Attach to read",
+      "confirmInsert": "Insert URL",
+      "close": "Close",
+      "cancel": "Cancel",
+      "loading": "Loading…",
+      "empty": "No media yet. Upload images in the Media library first.",
+      "selectedCount": "{count, plural, =0 {Nothing selected} one {# selected} other {# selected}}"
     }
   },
   "contentLocales": {

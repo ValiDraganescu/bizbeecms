@@ -102,7 +102,7 @@
     },
     "contextAttached": "Lehe kontekst lisatud",
     "attach": {
-      "add": "Lisa fail",
+      "add": "Lisa",
       "remove": "Eemalda manus",
       "textOnly": "See mudel toetab ainult teksti — see ei saa manuseid lugeda.",
       "rejected": "{name}: see mudel ei saa lugeda {kind}-faile.",
@@ -111,7 +111,23 @@
       "kindImage": "pildi",
       "kindFile": "sellist tüüpi",
       "kindAudio": "heli",
-      "kindVideo": "video"
+      "kindVideo": "video",
+      "readDisk": "Lisa loetav fail (kettalt)",
+      "readGallery": "Lisa loetav fail (galeriist)",
+      "insertGallery": "Lisa meedia galeriist",
+      "insertGalleryHint": "Lisab faili URL-i, mida assistent saab lehel kasutada",
+      "referenceHint": "URL, mida assistent saab kasutada: {url}"
+    },
+    "gallery": {
+      "readTitle": "Vali failid, mida assistent loeb",
+      "insertTitle": "Vali lisatav meedia",
+      "confirmRead": "Lisa lugemiseks",
+      "confirmInsert": "Lisa URL",
+      "close": "Sulge",
+      "cancel": "Tühista",
+      "loading": "Laadimine…",
+      "empty": "Meediat pole veel. Lae pildid esmalt meediakogusse.",
+      "selectedCount": "{count, plural, =0 {Midagi pole valitud} one {# valitud} other {# valitud}}"
     }
   },
   "contentLocales": {

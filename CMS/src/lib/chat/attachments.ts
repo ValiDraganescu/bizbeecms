@@ -68,6 +68,29 @@ export interface InlineAttachment {
   name: string;
 }
 
+/** A gallery asset the model should USE BY URL (e.g. drop into a component), not read. */
+export interface ReferencedAsset {
+  /** The public `/media/<key>` URL. */
+  url: string;
+  /** The original filename (so the model can pick the right one by name). */
+  name: string;
+}
+
+/**
+ * A plain-text block listing gallery assets the user attached for the model to
+ * REFERENCE (put their URLs into components/pages), as opposed to read. The model
+ * gets the real `/media/<key>` URLs so it never invents one. Returns "" for none.
+ * PURE — prepended to the model-facing message text by the caller.
+ */
+export function buildReferencedAssetsText(assets: readonly ReferencedAsset[]): string {
+  if (assets.length === 0) return "";
+  const lines = assets.map((a) => `- ${a.url} (${a.name})`);
+  return (
+    "[Attached media — use these exact URLs in components/pages; do not invent URLs]\n" +
+    lines.join("\n")
+  );
+}
+
 /**
  * Build the OpenAI/OpenRouter `content` for a user message that carries
  * attachments: a text part (when there's text) followed by one inline part per

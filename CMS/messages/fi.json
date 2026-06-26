@@ -102,7 +102,7 @@
     },
     "contextAttached": "Sivun konteksti liitetty",
     "attach": {
-      "add": "Liitä tiedosto",
+      "add": "Liitä",
       "remove": "Poista liite",
       "textOnly": "Tämä malli tukee vain tekstiä — se ei voi lukea liitteitä.",
       "rejected": "{name}: tämä malli ei voi lukea {kind}-tiedostoja.",
@@ -111,7 +111,23 @@
       "kindImage": "kuva",
       "kindFile": "tämän tyyppisiä",
       "kindAudio": "ääni",
-      "kindVideo": "video"
+      "kindVideo": "video",
+      "readDisk": "Liitä luettava tiedosto (levyltä)",
+      "readGallery": "Liitä luettava tiedosto (galleriasta)",
+      "insertGallery": "Lisää media galleriasta",
+      "insertGalleryHint": "Lisää tiedoston URL-osoitteen avustajan käytettäväksi sivulla",
+      "referenceHint": "URL, jota avustaja voi käyttää: {url}"
+    },
+    "gallery": {
+      "readTitle": "Valitse avustajan luettavat tiedostot",
+      "insertTitle": "Valitse lisättävä media",
+      "confirmRead": "Liitä luettavaksi",
+      "confirmInsert": "Lisää URL",
+      "close": "Sulje",
+      "cancel": "Peruuta",
+      "loading": "Ladataan…",
+      "empty": "Ei vielä mediaa. Lataa kuvia ensin mediakirjastossa.",
+      "selectedCount": "{count, plural, =0 {Ei valintoja} one {# valittu} other {# valittu}}"
     }
   },
   "contentLocales": {
