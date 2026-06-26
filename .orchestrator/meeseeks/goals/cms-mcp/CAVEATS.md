@@ -99,3 +99,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   while `npm run dev` is up). Regen the PM `cms-bundle`. EN/FI/ET for new UI strings.
   No native confirm()/alert() — in-app modal for key revoke (browser-review sessions
   hang on native dialogs).
+
+- **Advertise public URLs from `APP_ORIGIN`, NOT the request host.** The MCP URL
+  on the API-Keys page now uses `chooseMcpUrl(env.APP_ORIGIN, requestHost, proto)`
+  (`app/mcp/mcp-core.ts`, pure + node-tested): prefer the deployer-injected
+  `APP_ORIGIN` (the site's configured public origin — custom domain when attached),
+  fall back to the request host ONLY in local dev. Admin is often browsed on
+  workers.dev while the site serves a custom domain, so the request host lies.
+  Same rule already holds for invite/google/reset links (`send-invite.ts`).
+  BUT this only fixes the symptom once the DEPLOYER sets APP_ORIGIN to the custom
+  domain (part a, still TODO) — today the deployer always sets it to workers.dev.

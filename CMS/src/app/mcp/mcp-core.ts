@@ -175,3 +175,28 @@ export async function handleRpc(
       return rpcError(id, RPC_METHOD_NOT_FOUND, `unknown method: ${req.method}`);
   }
 }
+
+// ── Advertised MCP endpoint origin ────────────────────────────────────────────
+
+/**
+ * Choose the public origin to advertise the `/mcp` endpoint at (cms-mcp BUG fix,
+ * USER 2026-06-24). Prefer the deployer-injected `APP_ORIGIN` — the site's
+ * CONFIGURED public origin (its custom domain when one is attached, else the
+ * workers.dev URL). Only fall back to the incoming request host when APP_ORIGIN
+ * is unset (local dev), since the request host is what the admin happens to be
+ * browsing on and can be wrong (admin on workers.dev while the site serves a
+ * custom domain). Returns a placeholder when nothing is known.
+ *
+ * Trailing slashes on APP_ORIGIN are stripped so the caller appends `/mcp` once.
+ * ponytail: pure string choice, no URL parsing needed.
+ */
+export function chooseMcpUrl(
+  appOrigin: string | undefined | null,
+  requestHost: string | undefined | null,
+  proto: string | undefined | null,
+): string {
+  const configured = (appOrigin ?? "").trim().replace(/\/+$/, "");
+  if (configured) return `${configured}/mcp`;
+  if (requestHost) return `${(proto ?? "https")}://${requestHost}/mcp`;
+  return "https://<your-site>.workers.dev/mcp";
+}

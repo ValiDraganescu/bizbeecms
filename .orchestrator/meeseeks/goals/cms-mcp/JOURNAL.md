@@ -151,3 +151,30 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/app/admin/settings/api-keys/page.tsx,
   CMS/src/components/settings/api-keys-manager.tsx, CMS/messages/{en,fi,et}.json,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-26 08:36 — BUG fix (part b): advertise MCP URL from APP_ORIGIN, not request host
+- **Status:** DONE
+- **What I did:** Fixed the "Connect Claude Code" snippets showing the
+  workers.dev URL even when a site has a custom domain (USER 2026-06-24). The
+  root cause for the CMS layer: Slice 5's `mcpUrlFromRequest()` derived the URL
+  purely from the INCOMING REQUEST HOST — admin is browsed on workers.dev, so the
+  snippet showed workers.dev.
+  - New PURE helper `chooseMcpUrl(appOrigin, requestHost, proto)` in
+    `src/app/mcp/mcp-core.ts` (node-testable, no `@/`): prefer the deployer-injected
+    `APP_ORIGIN` (the site's configured public origin — custom domain when attached,
+    else workers.dev), strip trailing slashes, append `/mcp`; fall back to the
+    request host ONLY when APP_ORIGIN is unset (local dev); placeholder otherwise.
+  - `api-keys/page.tsx`: replaced `mcpUrlFromRequest()` with `mcpUrl()` which reads
+    `env.APP_ORIGIN` via `getCloudflareContext({async:true})` and calls
+    `chooseMcpUrl`. URL-only change → EN/FI/ET unaffected.
+  - Did PART (b) only (correct as soon as APP_ORIGIN is right). PART (a) — the
+    deployer setting `APP_ORIGIN` to the custom domain — is a cross-track follow-up
+    (deployer + PM custom-domain data); filed as its own TODO in BACKLOG.
+- **Verified:** `node --test src/app/mcp/mcp-core.test.ts` 13/13 (3 new
+  chooseMcpUrl cases). `tsc --noEmit` 0 errors tree-wide. `npm test` 943/943.
+  `npx opennextjs-cloudflare build` green (dev OFF). PM `npm run bundle:cms`
+  regenerated `cms-bundle.generated.js`. NOT verified live (HITL — needs a
+  deployed Worker with APP_ORIGIN set to a custom domain).
+- **Files:** CMS/src/app/mcp/mcp-core.ts, CMS/src/app/mcp/mcp-core.test.ts,
+  CMS/src/app/admin/settings/api-keys/page.tsx,
+  ProjectManager/src/lib/deploy/cms-bundle.generated.js

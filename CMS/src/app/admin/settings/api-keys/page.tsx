@@ -1,25 +1,29 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { getTranslations } from "next-intl/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { SettingsNav } from "@/components/settings/settings-nav";
 import { ApiKeysManager } from "@/components/settings/api-keys-manager";
 import { checkRoleFromHeaders, canManageApiKeys } from "@/lib/auth/guard";
+import { chooseMcpUrl } from "@/app/mcp/mcp-core";
 
 export const dynamic = "force-dynamic";
 
 /**
- * This site's public MCP endpoint, derived from the incoming request host.
- * Sites stay on `bizbeecms-cms-<slug>.workers.dev` (USER DECISION: no custom
- * subdomains), so the plain request host IS the right origin — no router HMAC
- * dance needed here. Falls back to a placeholder if the host header is missing.
- * ponytail: the host header is enough; verifyForwardedHost only matters for
- * router-proxied custom domains, which this product doesn't use.
+ * This site's public MCP endpoint. Prefer the deployer-injected `APP_ORIGIN`
+ * (the site's CONFIGURED public origin — its custom domain when attached, else
+ * the workers.dev URL); only fall back to the request host in local dev when
+ * APP_ORIGIN is unset (BUG fix, USER 2026-06-24: admin is often browsed on
+ * workers.dev while the site serves a custom domain, so the request host was
+ * advertising the wrong URL).
  */
-async function mcpUrlFromRequest(): Promise<string> {
+async function mcpUrl(): Promise<string> {
+  const { env } = await getCloudflareContext({ async: true });
+  const appOrigin = (env as unknown as { APP_ORIGIN?: string }).APP_ORIGIN;
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
   const proto = h.get("x-forwarded-proto") ?? "https";
-  return host ? `${proto}://${host}/mcp` : "https://<your-site>.workers.dev/mcp";
+  return chooseMcpUrl(appOrigin, host, proto);
 }
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -38,7 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ApiKeysPage() {
   const t = await getTranslations("apiKeys");
   const decision = await checkRoleFromHeaders(canManageApiKeys);
-  const mcpUrl = await mcpUrlFromRequest();
+  const url = await mcpUrl();
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
@@ -48,7 +52,7 @@ export default async function ApiKeysPage() {
         <p className="mt-1 text-foreground-muted">{t("subtitle")}</p>
       </header>
       {decision.allow ? (
-        <ApiKeysManager mcpUrl={mcpUrl} />
+        <ApiKeysManager mcpUrl={url} />
       ) : (
         <p
           role="alert"

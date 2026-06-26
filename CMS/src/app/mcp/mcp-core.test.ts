@@ -13,6 +13,7 @@ import {
   parseToolCall,
   toMcpTools,
   toMcpToolResult,
+  chooseMcpUrl,
   RPC_METHOD_NOT_FOUND,
   RPC_INVALID_REQUEST,
   MCP_PROTOCOL_VERSION,
@@ -113,4 +114,25 @@ test("parseToolCall guards non-object params", () => {
   assert.ok("error" in parseToolCall(null));
   assert.ok("error" in parseToolCall({ name: "" }));
   assert.deepEqual(parseToolCall({ name: "x", arguments: { a: 1 } }), { name: "x", args: { a: 1 } });
+});
+
+test("chooseMcpUrl prefers APP_ORIGIN over request host (custom-domain bug fix)", () => {
+  // APP_ORIGIN set (custom domain) wins even when admin is on workers.dev.
+  assert.equal(
+    chooseMcpUrl("https://cms.acme.com", "bizbeecms-cms-acme.workers.dev", "https"),
+    "https://cms.acme.com/mcp",
+  );
+  // Trailing slashes stripped so /mcp is appended once.
+  assert.equal(chooseMcpUrl("https://cms.acme.com/", null, null), "https://cms.acme.com/mcp");
+  assert.equal(chooseMcpUrl("https://cms.acme.com///", null, null), "https://cms.acme.com/mcp");
+});
+
+test("chooseMcpUrl falls back to request host when APP_ORIGIN is unset (local dev)", () => {
+  assert.equal(chooseMcpUrl(undefined, "localhost:3601", "http"), "http://localhost:3601/mcp");
+  assert.equal(chooseMcpUrl("", "site.workers.dev", "https"), "https://site.workers.dev/mcp");
+  assert.equal(chooseMcpUrl("  ", "site.workers.dev", null), "https://site.workers.dev/mcp"); // proto default
+});
+
+test("chooseMcpUrl returns a placeholder when nothing is known", () => {
+  assert.equal(chooseMcpUrl(null, null, null), "https://<your-site>.workers.dev/mcp");
 });
