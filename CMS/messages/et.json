@@ -249,6 +249,10 @@
     "kitInstalled": "Blogipakett paigaldatud: {created} loodud, {updated} uuendatud.",
     "kitImported": "Komplekt “{kit}” imporditud: {created} loodud, {updated} uuendatud.",
     "kitSkipped": "{count} komponent(i) vahele jäetud (vigane).",
+    "kitResultTitle": "Komplekt “{kit}” — mis paigaldati",
+    "resultCreated": "uus",
+    "resultUpdated": "uuendatud",
+    "resultSkippedTitle": "Vahele jäetud",
     "assetDepsTitle": "Meediasõltuvused",
     "assetDepsHint": "See komponent viitab allolevatele meediafailidele. Veendu, et need on sellel saidil olemas (laadi need üles, muidu kuvatakse need katkistena).",
     "componentDepsTitle": "Puuduvad komponendisõltuvused",
@@ -403,6 +407,12 @@
     "groupByKit": "Komplekt",
     "groupByTag": "Silt",
     "tagUntagged": "Sildistamata",
+    "inspectorWidth": {
+      "label": "Inspektori laius",
+      "default": "Vaikimisi",
+      "quarter": "¼",
+      "half": "½"
+    },
     "kit": {
       "blog": "Ajaveebi komplekt",
       "landing": "Maandumiskomplekt",

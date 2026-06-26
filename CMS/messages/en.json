@@ -249,6 +249,10 @@
     "kitInstalled": "Blog kit installed: {created} created, {updated} updated.",
     "kitImported": "Kit “{kit}” imported: {created} created, {updated} updated.",
     "kitSkipped": "{count} component(s) skipped (invalid).",
+    "kitResultTitle": "Kit “{kit}” — what was installed",
+    "resultCreated": "new",
+    "resultUpdated": "updated",
+    "resultSkippedTitle": "Skipped",
     "assetDepsTitle": "Asset dependencies",
     "assetDepsHint": "This component references the media assets below. Make sure they exist on this site (upload them, or they will appear broken).",
     "componentDepsTitle": "Missing component dependencies",
@@ -403,6 +407,12 @@
     "groupByKit": "Kit",
     "groupByTag": "Tag",
     "tagUntagged": "Untagged",
+    "inspectorWidth": {
+      "label": "Inspector width",
+      "default": "Default",
+      "quarter": "¼",
+      "half": "½"
+    },
     "kit": {
       "blog": "Blog kit",
       "landing": "Landing kit",

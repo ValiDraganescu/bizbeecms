@@ -249,6 +249,10 @@
     "kitInstalled": "Blogipaketti asennettu: {created} luotu, {updated} päivitetty.",
     "kitImported": "Paketti “{kit}” tuotu: {created} luotu, {updated} päivitetty.",
     "kitSkipped": "{count} komponentti(a) ohitettu (virheellinen).",
+    "kitResultTitle": "Paketti “{kit}” — mitä asennettiin",
+    "resultCreated": "uusi",
+    "resultUpdated": "päivitetty",
+    "resultSkippedTitle": "Ohitettu",
     "assetDepsTitle": "Mediariippuvuudet",
     "assetDepsHint": "Tämä komponentti viittaa alla oleviin mediatiedostoihin. Varmista, että ne ovat tällä sivustolla (lataa ne, muuten ne näkyvät rikkinäisinä).",
     "componentDepsTitle": "Puuttuvat komponenttiriippuvuudet",
@@ -403,6 +407,12 @@
     "groupByKit": "Paketti",
     "groupByTag": "Tunniste",
     "tagUntagged": "Ei tunnisteita",
+    "inspectorWidth": {
+      "label": "Tarkastimen leveys",
+      "default": "Oletus",
+      "quarter": "¼",
+      "half": "½"
+    },
     "kit": {
       "blog": "Blogipaketti",
       "landing": "Laskeutumispaketti",

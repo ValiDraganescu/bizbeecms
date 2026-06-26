@@ -191,3 +191,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   new test; existing preview/import path tests cover the logic this routes into.
 - **Files:** CMS/src/components/components/components-manager.tsx,
   ProjectManager/src/lib/deploy/cms-bundle.generated.js
+
+## 2026-06-26 08:52 — Slice 8: surface per-component kit-install results
+- **Status:** DONE
+- **What I did:** Closed the loop NEXT.md flagged. Both kit paths (paste/upload
+  import via `/api/components` POST→importKit, AND starter-kit install via
+  `/api/components/kit` POST) ALREADY returned `installed[]` ({name, action}) +
+  (for the import path) `skipped[]` reasons — but the UI only showed count notices.
+  Added a `kitResult` state and a per-component result panel that renders each
+  installed component with a created/updated chip (success token for created) and
+  lists any skipped components with their validation reason. Wired both handlers to
+  populate `kitResult` (starter kits never skip → empty skipped, rendered uniformly)
+  and reset it at the start of each import/install. 4 i18n keys EN/FI/ET
+  (kitResultTitle, resultCreated, resultUpdated, resultSkippedTitle).
+- **Verified:** CMS `tsc --noEmit` clean; `npm run bundle:cms` (opennext build gate)
+  green + PM cms-bundle regenerated; all 3 message JSONs parse. UI-only render over
+  data the routes already return (no new branch/parser logic) — no new test per
+  ponytail; existing kit-route/import/preview tests cover the routed data.
+- **Files:** CMS/src/components/components/components-manager.tsx,
+  CMS/messages/{en,fi,et}.json, ProjectManager/src/lib/deploy/cms-bundle.generated.js

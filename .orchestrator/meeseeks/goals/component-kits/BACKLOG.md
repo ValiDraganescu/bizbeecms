@@ -5,6 +5,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-06-26): **Slice 8 — surface per-component kit-install results.** Both
+  kit paths (paste/upload import + starter-kit install) already returned `installed[]`
+  ({name, action}) + `skipped[]` reasons, but the UI only showed count summaries. Added
+  a `kitResult` state + a per-component result panel (created/updated chip per name,
+  skipped reasons listed) so the post-install result closes the loop. 4 EN/FI/ET keys.
+  tsc + opennext build green; cms-bundle regenerated. UI-only render, no new test.
+
 - DONE (2026-06-26): **Slice 7 — uploaded kits get the preview flow too.** `onFile`
   now loads the dropped file's text into the paste box (no blind import), so the
   SAME Preview/Import buttons (incl. the kit Preview button gated on `isKitBundle`)

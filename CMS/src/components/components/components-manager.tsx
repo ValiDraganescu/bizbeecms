@@ -78,6 +78,14 @@ export function ComponentsManager({
   // Preview-before-install: a read-only summary of a pasted/uploaded kit bundle
   // (component names + create/update + tags + missing deps) shown BEFORE writing.
   const [kitPreview, setKitPreview] = useState<KitPreview | null>(null);
+  // Slice 8: per-component result AFTER a kit install (paste/upload OR starter kit).
+  // The kit routes already return `installed[]` ({name, action}) + `skipped[]`
+  // reasons; surface them so the operator sees exactly what landed, not just counts.
+  const [kitResult, setKitResult] = useState<{
+    kit: string;
+    installed: { name: string; action: "created" | "updated" }[];
+    skipped: string[];
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const allTags = distinctTags(components);
@@ -232,6 +240,7 @@ export function ComponentsManager({
     setAssetDeps([]);
     setMissingComponents([]);
     setKitPreview(null);
+    setKitResult(null);
     if (text.trim() === "") {
       setError(t("importEmpty"));
       return;
@@ -253,6 +262,7 @@ export function ComponentsManager({
         name?: string;
         // Kit import (Slice 4): many components in one step.
         kit?: string;
+        installed?: { name: string; action: "created" | "updated" }[];
         created?: number;
         updated?: number;
         skipped?: string[];
@@ -271,6 +281,13 @@ export function ComponentsManager({
               ? " " + t("kitSkipped", { count: j.skipped!.length })
               : ""),
         );
+        // Slice 8: keep the per-component breakdown so the operator sees exactly
+        // which components were created/updated and why any were skipped.
+        setKitResult({
+          kit: j.kit,
+          installed: j.installed ?? [],
+          skipped: j.skipped ?? [],
+        });
         setLastBundle(null); // a kit has no single re-importable bundle
       } else {
         setNotice(
@@ -327,6 +344,7 @@ export function ComponentsManager({
     setNotice(null);
     setAssetDeps([]);
     setMissingComponents([]);
+    setKitResult(null);
     setLastBundle(null); // kits have no single re-importable bundle → read-only deps
     setBusy(true);
     try {
@@ -340,12 +358,17 @@ export function ComponentsManager({
         return;
       }
       const j = (await res.json()) as {
+        id: string;
+        installed?: { name: string; action: "created" | "updated" }[];
         created: number;
         updated: number;
         assets?: string[];
         missingComponents?: string[];
       };
       setNotice(t("kitInstalled", { created: j.created, updated: j.updated }));
+      // Slice 8: per-component result (starter kits never skip — bundles are
+      // authored + gated — so skipped is always empty here, but render uniformly).
+      setKitResult({ kit: j.id, installed: j.installed ?? [], skipped: [] });
       setAssetDeps(j.assets ?? []);
       setMissingComponents(j.missingComponents ?? []);
       await refresh();
@@ -457,6 +480,50 @@ export function ComponentsManager({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {/* Slice 8: per-component kit-install result — what landed (created/updated)
+          and what was skipped (with the validation reason), closing the loop on
+          the count-only notice above. */}
+      {kitResult && (kitResult.installed.length > 0 || kitResult.skipped.length > 0) && (
+        <div
+          role="status"
+          className="flex flex-col gap-2 rounded-md border border-border bg-surface-raised px-3 py-2"
+        >
+          <span className="text-sm font-medium text-foreground">
+            {t("kitResultTitle", { kit: kitResult.kit })}
+          </span>
+          {kitResult.installed.length > 0 && (
+            <ul className="flex flex-col gap-0.5">
+              {kitResult.installed.map((c) => (
+                <li key={c.name} className="flex items-center gap-2 text-sm">
+                  <span
+                    className={
+                      "rounded px-1.5 py-0.5 text-xs font-medium " +
+                      (c.action === "created"
+                        ? "bg-success-subtle text-success"
+                        : "bg-surface text-foreground-muted")
+                    }
+                  >
+                    {c.action === "created" ? t("resultCreated") : t("resultUpdated")}
+                  </span>
+                  <span className="truncate font-mono text-foreground">{c.name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {kitResult.skipped.length > 0 && (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-danger">{t("resultSkippedTitle")}</span>
+              <ul className="flex flex-col gap-0.5">
+                {kitResult.skipped.map((reason, i) => (
+                  <li key={i} className="text-sm text-danger">
+                    {reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
