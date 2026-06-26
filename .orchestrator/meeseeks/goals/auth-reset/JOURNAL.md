@@ -310,3 +310,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   ProjectManager/src/app/api/invite/route.ts (env APP_ORIGIN + inviteSubject),
   ProjectManager/src/app/api/auth/forgot/route.ts (env APP_ORIGIN + inviteSubject for reset),
   ProjectManager/messages/{en,fi,et}.json (invites.email.subjectWithDomain + auth.forgot.email.subjectWithDomain)
+
+## 2026-06-26 09:48 — BUG [P1] pt2: CMS RESET email subject carries custom domain (parity)
+- **Status:** DONE (code) — bug stays OPEN pending live HITL verify (gated on deployer APP_ORIGIN fix)
+- **What I did:** Mirrored PM's reset-subject treatment into CMS so the password-reset
+  email subject is domain-prefixed when a custom domain is attached (was generic only).
+  Wired `inviteSubject(appOrigin, t("subject"), d => t("subjectWithDomain",{domain:d}))`
+  into `CMS/src/app/api/auth/forgot/route.ts` (reads `APP_ORIGIN` off
+  `getCloudflareContext().env`, same `as unknown as {APP_ORIGIN?}` cast as the CMS invite
+  route). Added `resetEmail.subjectWithDomain` EN/FI/ET, wording mirrored from PM's
+  `auth.forgot.email.subjectWithDomain` ("{domain}: Reset your password" / "Nollaa
+  salasanasi" / "Lähtesta oma parool"). Now ALL FOUR email subjects (PM+CMS invite,
+  PM+CMS reset) carry the domain prefix — full parity.
+- **Verified:** CMS tsc 0; node --test 985 pass (incl. i18n parity); opennextjs-cloudflare
+  build green. New key present in all 3 locales. Pre the deployer APP_ORIGIN fix,
+  APP_ORIGIN=workers.dev ⇒ `customDomain()` returns null ⇒ generic subject ⇒ zero behavior
+  change; prefix auto-activates once a custom domain resolves to APP_ORIGIN.
+- **bundle:cms DEFERRED:** working tree had other workers' in-flight PM changes
+  (migrations 0015 + schema.ts + deploy-events.ts) — per BUNDLE:CMS CONCURRENCY caveat,
+  did NOT run bundle:cms (would bake their unfinished work into the committed bundle).
+  My change is behavior-additive + inert pre-deployer-fix; a later clean-tree CMS run
+  regenerates the bundle cleanly.
+- **Files:** CMS/src/app/api/auth/forgot/route.ts,
+  CMS/messages/{en,fi,et}.json (resetEmail.subjectWithDomain)

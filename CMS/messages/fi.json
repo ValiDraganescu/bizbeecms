@@ -689,6 +689,7 @@
   },
   "resetEmail": {
     "subject": "Palauta BizbeeCMS-salasanasi",
+    "subjectWithDomain": "{domain}: Nollaa salasanasi",
     "body": "Saimme pyynnön palauttaa BizbeeCMS-salasanasi. Aseta uusi salasana täällä:\n\n{url}\n\nLinkki vanhenee 7 päivässä. Jos et pyytänyt tätä, voit jättää tämän viestin huomiotta."
   },
   "acceptInvite": {

@@ -689,6 +689,7 @@
   },
   "resetEmail": {
     "subject": "Lähtesta oma BizbeeCMS parool",
+    "subjectWithDomain": "{domain}: Lähtesta oma parool",
     "body": "Saime taotluse sinu BizbeeCMS parooli lähtestamiseks. Määra uus parool siin:\n\n{url}\n\nLink aegub 7 päeva pärast. Kui sa seda ei taotlenud, võid selle kirja eirata."
   },
   "acceptInvite": {

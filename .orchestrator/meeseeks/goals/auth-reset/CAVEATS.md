@@ -164,6 +164,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   CMS's top-level. Both apps' invite+reset subjects are now domain-prefixed; only the
   live HITL verify (after the deployer APP_ORIGIN part-1 fix) remains before flipping
   the bug DONE.
+- BUG-P1 CMS RESET SUBJECT (2026-06-26, learned): the CMS RESET email subject is
+  now domain-prefixed too (parity with CMS invite + both PM mails). Wired in
+  `CMS/src/app/api/auth/forgot/route.ts`: read `APP_ORIGIN` off
+  `getCloudflareContext({async:true}).env` with the SAME `as unknown as {APP_ORIGIN?:
+  string}` cast the CMS invite route uses (APP_ORIGIN isn't on `CloudflareEnv`), then
+  `inviteSubject(appOrigin, t("subject"), d => t("subjectWithDomain",{domain:d}))`
+  reusing the alias-free `CMS/src/lib/mail/invite-subject.ts` helper. The new string
+  is TOP-LEVEL `resetEmail.subjectWithDomain` (CMS convention) EN/FI/ET, wording
+  mirrored from PM's `auth.forgot.email.subjectWithDomain`. So ALL FOUR subjects are
+  covered now — no more subject-prefix code work in either app. Inert until the
+  deployer APP_ORIGIN part-1 fix (workers.dev ⇒ generic subject).
 - P5 NON-DUPLICATION: the enumeration-safe hit===miss invariant is already locked
   STRUCTURALLY by `forgot-route.test.ts` (exactly one `{ok:true}` returned AFTER
   the `if(user)` block). Don't add a runtime deep-equal of `{ok:true}` vs

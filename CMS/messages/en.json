@@ -689,6 +689,7 @@
   },
   "resetEmail": {
     "subject": "Reset your BizbeeCMS password",
+    "subjectWithDomain": "{domain}: Reset your password",
     "body": "We received a request to reset your BizbeeCMS password. Set a new password here:\n\n{url}\n\nThis link expires in 7 days. If you didn't request this, you can ignore this email."
   },
   "acceptInvite": {

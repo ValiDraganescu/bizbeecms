@@ -1,6 +1,8 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getTranslations } from "next-intl/server";
 import { findUserByEmail, normalizeEmail } from "@/db/user-store";
 import { sendResetEmail } from "@/lib/mail/send-invite";
+import { inviteSubject } from "@/lib/mail/invite-subject";
 import { createPasswordReset } from "@/lib/reset/reset";
 import {
   recentFailureTimestamps,
@@ -66,10 +68,18 @@ export async function POST(request: Request): Promise<Response> {
     try {
       const reset = await createPasswordReset(user.id);
       const t = await getTranslations("resetEmail");
+      // Domain-prefixed subject when the site has a custom domain attached
+      // (mirrors the invite route + PM reset). Pre the deployer APP_ORIGIN fix,
+      // APP_ORIGIN is workers.dev ⇒ generic subject; the prefix auto-activates
+      // once a custom domain resolves to APP_ORIGIN.
+      const { env } = await getCloudflareContext({ async: true });
+      const appOrigin = (env as unknown as { APP_ORIGIN?: string }).APP_ORIGIN;
       await sendResetEmail({
         to: email,
         token: reset.token,
-        subject: t("subject"),
+        subject: inviteSubject(appOrigin, t("subject"), (domain) =>
+          t("subjectWithDomain", { domain }),
+        ),
         body: (url) => t("body", { url }),
       });
     } catch (err) {
