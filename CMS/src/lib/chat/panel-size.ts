@@ -19,8 +19,14 @@ export interface PanelSize {
 
 export const PANEL_MIN_W = 300;
 export const PANEL_MIN_H = 320;
-// Keep a margin so the panel + its 6px/24px offsets stay on-screen.
+// Horizontal breathing room (the panel's right-6 = 24px offset + a left gap).
 const MARGIN = 32;
+// The panel is `fixed bottom-24` = 96px above the viewport bottom. Its height
+// must fit in the space ABOVE that anchor (vh - 96) minus a top gap, or the panel
+// grows up off the top of the screen and you can't scroll the transcript to its
+// bottom (the input + last rows sit below the fold). Reserve bottom offset + top gap.
+const BOTTOM_OFFSET = 96; // matches `bottom-24` in chat-widget.tsx
+const TOP_GAP = 24;
 
 /** Compact default — matches the legacy `w-[min(92vw,380px)] h-[min(70vh,560px)]`. */
 export function defaultSize(vw: number, vh: number): { width: number; height: number } {
@@ -34,7 +40,8 @@ export function halfSize(vw: number, vh: number): { width: number; height: numbe
 
 export function clamp(width: number, height: number, vw: number, vh: number): { width: number; height: number } {
   const maxW = Math.max(PANEL_MIN_W, vw - MARGIN);
-  const maxH = Math.max(PANEL_MIN_H, vh - MARGIN);
+  // Fit within the space above the bottom-24 anchor, not the full viewport.
+  const maxH = Math.max(PANEL_MIN_H, vh - BOTTOM_OFFSET - TOP_GAP);
   return {
     width: Math.round(Math.min(maxW, Math.max(PANEL_MIN_W, width))),
     height: Math.round(Math.min(maxH, Math.max(PANEL_MIN_H, height))),

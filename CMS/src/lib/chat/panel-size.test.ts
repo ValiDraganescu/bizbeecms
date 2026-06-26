@@ -38,8 +38,10 @@ test("clamp never goes below the minimums, never overflows viewport", () => {
   assert.equal(tiny.height, PANEL_MIN_H);
 
   const huge = clamp(99999, 99999, 1000, 800);
-  assert.equal(huge.width, 1000 - 32);
-  assert.equal(huge.height, 800 - 32);
+  assert.equal(huge.width, 1000 - 32); // vw - MARGIN
+  // Height fits ABOVE the bottom-24 anchor (96px) + a 24px top gap, not vh - 32,
+  // so an expanded panel can't grow off the top of the screen (scroll-to-bottom bug).
+  assert.equal(huge.height, 800 - 120);
 });
 
 test("clamp on a tiny viewport keeps min size (panel can't vanish)", () => {
@@ -53,7 +55,7 @@ test("resolveSize: stored custom restored & clamped to current viewport", () => 
   const r = resolveSize("custom", { width: 900, height: 700 }, 700, 600);
   assert.equal(r.preset, "custom");
   assert.equal(r.width, 700 - 32);
-  assert.equal(r.height, 600 - 32);
+  assert.equal(r.height, 600 - 120); // clamped to space above the bottom-24 anchor
 });
 
 test("resolveSize: half preset ignores stored px", () => {
@@ -123,7 +125,7 @@ test("sizeFromDrag: clamped to viewport so a huge drag can't overflow", () => {
   const start = { width: 400, height: 500 };
   const r = sizeFromDrag(start, -99999, -99999, 1000, 800);
   assert.equal(r.width, 1000 - 32);
-  assert.equal(r.height, 800 - 32);
+  assert.equal(r.height, 800 - 120);
 });
 
 // Regression for the one-way toggle bug: expand → (mouseup captures custom) →
