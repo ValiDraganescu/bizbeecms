@@ -26,7 +26,19 @@ import {
   outputCapFor,
   MAX_OUTPUT_CEILING,
   MIN_OUTPUT_FLOOR,
+  DEFAULT_TRANSLATE_MODEL,
+  resolveTranslateModel,
 } from "../src/lib/chat/models.ts";
+
+test("resolveTranslateModel: allowlisted id kept; untrusted/unknown → default", () => {
+  const allowed = new Set(["openai/gpt-4o-mini", "anthropic/claude-3.5"]);
+  assert.equal(resolveTranslateModel("anthropic/claude-3.5", allowed), "anthropic/claude-3.5");
+  assert.equal(resolveTranslateModel("evil/model", allowed), DEFAULT_TRANSLATE_MODEL);
+  assert.equal(resolveTranslateModel("", allowed), DEFAULT_TRANSLATE_MODEL);
+  assert.equal(resolveTranslateModel(123, allowed), DEFAULT_TRANSLATE_MODEL);
+  // No allowlist → can't trust anything → default.
+  assert.equal(resolveTranslateModel("openai/gpt-4o-mini"), DEFAULT_TRANSLATE_MODEL);
+});
 
 const CAT = [
   { id: "a/x", label: "X", provider: "a", inputModalities: ["text"] },

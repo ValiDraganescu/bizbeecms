@@ -180,8 +180,14 @@ test("planPage renders a Section as a grid of columns nesting components", () =>
   const col0 = grid.children[0];
   assert.equal(col0.kind === "element" && col0.tag, "div");
   if (col0.kind !== "element") return;
-  assert.equal(col0.children.length, 1, "Hero nested in column 0");
-  assert.equal(col0.children[0].kind === "element" && col0.children[0].tag, "h1");
+  assert.equal(col0.children.length, 1, "one block wrapper in column 0");
+  // Each block is wrapped in a width-controlling div (fill/wrap); the component
+  // root nests inside it. See wrapBlockWidth.
+  const wrap = col0.children[0];
+  assert.equal(wrap.kind === "element" && wrap.tag, "div");
+  if (wrap.kind !== "element") return;
+  assert.equal(wrap.props["data-block-wrap"], t[0].children![0].children![0].id);
+  assert.equal(wrap.children[0].kind === "element" && wrap.children[0].tag, "h1");
 });
 
 test("planPage collapse behavior shrinks empty columns to 0fr", () => {

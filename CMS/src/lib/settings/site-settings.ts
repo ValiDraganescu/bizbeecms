@@ -90,6 +90,8 @@ export type PromptPropDef = {
   name: string;
   type: string;
   required?: boolean;
+  /** Per-locale text prop (a `{{t}}` slot) — must be filled in EVERY site locale. */
+  translatable?: boolean;
   description?: string;
 };
 
@@ -117,8 +119,9 @@ function formatComponentDef(c: PromptComponentDef): string {
   const props = c.props
     .map((p) => {
       const req = p.required ? "!" : "";
+      const t = p.translatable ? " (t)" : "";
       const desc = p.description ? ` — ${p.description}` : "";
-      return `${p.name}: ${p.type}${req}${desc}`;
+      return `${p.name}: ${p.type}${req}${t}${desc}`;
     })
     .join("; ");
   return `${c.name} { ${props} }`;
@@ -134,6 +137,11 @@ export function buildSystemPrompt(opts: {
   builtins?: PromptBuiltinDef[];
   /** Content collections (so the model uses the right table name, not a guess). */
   collections?: PromptCollectionDef[];
+  /**
+   * The Site's content locales, default first (e.g. ["en","fi","et"]). Used to tell
+   * the model to fill translatable props in EVERY locale. Omitted/≤1 → no i18n rule.
+   */
+  locales?: string[];
 }): string {
   const parts: string[] = [];
 
@@ -169,8 +177,13 @@ export function buildSystemPrompt(opts: {
     "Component `html` is parsed and rendered server-side as a data walk — never " +
       "assume any JavaScript eval runs on the server. Author plain HTML: tags, " +
       "attributes (use `class` for utilities, `style` for one-offs), and nested " +
-      "elements. Put interactivity in the component `script` (trusted, runs in " +
-      "the browser). Reference another component by its PascalCase tag, e.g. " +
+      "elements. Write STANDARD HTML/SVG attribute names — lowercase and " +
+      "hyphenated (class, stroke-width, stroke-linecap, viewBox, for) — NOT React " +
+      "/JSX names (className, strokeWidth). For interactivity, put ALL of it in the " +
+      "component `script` (trusted, runs in the browser) and wire it up there by " +
+      "selecting elements (e.g. data-* hooks) — do NOT use inline event-handler " +
+      "attributes like onclick/onsubmit in the html; they are stripped at render. " +
+      "Reference another component by its PascalCase tag, e.g. " +
       "`<AuthorCard name=\"{{author}}\"></AuthorCard>`.",
   );
 
@@ -184,7 +197,10 @@ export function buildSystemPrompt(opts: {
       "copy, an actual price like \"$29\", a sample image URL), not the prop name " +
       "or 'TODO'. This placeholder data is what renders in the component preview, " +
       "so a component must look complete on its own. type is one of " +
-      "string|richtext|number|boolean|select. Omit propsSchema only for a fully " +
+      "string|richtext|number|boolean|select|image. Use type:\"image\" for any prop " +
+      "that holds an asset/image URL (e.g. a background or photo) — the editor then " +
+      "shows a media-gallery picker instead of a text box, and the default should be " +
+      "a real /media asset URL from list_assets. Omit propsSchema only for a fully " +
       "static component with no slots.",
   );
 
@@ -211,8 +227,9 @@ export function buildSystemPrompt(opts: {
   if (defs.length > 0) {
     parts.push(
       "This Site's existing components (reuse them when they fit; props shown — " +
-        "`!` = required). Set these props when you place a component in a page; " +
-        "do NOT call get_component just to learn props — they're listed here:\n" +
+        "`!` = required, `(t)` = translatable). Set these props when you place a " +
+        "component in a page; do NOT call get_component just to learn props — they're " +
+        "listed here:\n" +
         defs.map((c) => `- ${formatComponentDef(c)}`).join("\n"),
     );
   } else if (names.length > 0) {
@@ -221,6 +238,25 @@ export function buildSystemPrompt(opts: {
     );
   } else {
     parts.push("This Site has no components yet — create the ones each page needs.");
+  }
+
+  // Multi-locale sites: translatable (`(t)`) props must be filled in EVERY locale.
+  const locales = (opts.locales ?? []).filter((l) => typeof l === "string" && l);
+  if (locales.length > 1) {
+    const [def] = locales;
+    const example = `{ ${locales.map((l) => `"${l}":"…"`).join(", ")} }`;
+    parts.push(
+      `This Site publishes in ${locales.length} languages: ${locales.join(", ")} ` +
+        `(default ${def}). For ANY translatable prop (marked \`(t)\` above, from a ` +
+        `\`{{t}}\` slot) that you set on a page block — with set_block_props, ` +
+        `create_page, or update_page_blocks — pass its value as a LOCALE OBJECT with ` +
+        `text for ALL ${locales.length} locales, e.g. props:{ "title": ${example} }. ` +
+        `Do NOT set just the ${def} string on a block translatable prop and expect a ` +
+        `later step to fill the rest: a one-language value renders the raw text for the ` +
+        `missing locales. You must SUPPLY every translation yourself (translate the copy ` +
+        `into ${locales.join(", ")}). Non-translatable props (no \`(t)\`) take a single ` +
+        `plain value, not a locale object.`,
+    );
   }
 
   const collections = opts.collections ?? [];
@@ -238,6 +274,23 @@ export function buildSystemPrompt(opts: {
   parts.push(
     "When a design references an image, call list_assets and use a returned " +
       "/media/<key> URL — never invent image URLs.",
+  );
+
+  parts.push(
+    "Editing an EXISTING page's content: to change a block's text or props (a hero " +
+      "title, a button label, an image), call set_block_props with the page id, the " +
+      "block's `id` (from get_page), and a `props` object holding the prop name→value " +
+      "pairs to set. The `props` object MUST be NON-EMPTY and contain the actual new " +
+      "values — e.g. to set a hero's text: props:{ \"title\":\"Find the restaurant you " +
+      "like\", \"subtitle\":\"Make reservations…\" }. Use the prop NAMES from the " +
+      "component's prop list above (e.g. Hero has title, subtitle, …). Send only the " +
+      "props you're changing (they merge in; the rest are kept) — but ALWAYS send at " +
+      "least the ones you're setting; an empty props:{} changes nothing and is " +
+      "rejected. Do NOT use update_page_blocks for a text/prop tweak: it FULL-REPLACES " +
+      "the page, so any section or block you don't re-pass is DELETED. Reserve " +
+      "update_page_blocks for actually adding, removing, reordering, or restructuring " +
+      "blocks — and even then, get_page FIRST and re-pass the whole current tree with " +
+      "your change applied, never a partial tree.",
   );
 
   parts.push(

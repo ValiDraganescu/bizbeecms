@@ -61,7 +61,7 @@ import {
   type ReferencedAsset,
 } from "@/lib/chat/attachments";
 import { MAX_ASSET_SIZE } from "@/lib/render/asset";
-import { ChatGalleryPicker, type GalleryAsset } from "@/components/chat/chat-gallery-picker";
+import { GalleryPicker, type GalleryAsset } from "@/components/media/gallery-picker";
 import { subscribeChatAttachments } from "@/lib/chat/chat-attach-bus";
 
 /**
@@ -1138,7 +1138,7 @@ export function ChatConversation({
       </form>
 
       {gallery && (
-        <ChatGalleryPicker
+        <GalleryPicker
           title={gallery === "read" ? t("gallery.readTitle") : t("gallery.insertTitle")}
           confirmLabel={gallery === "read" ? t("gallery.confirmRead") : t("gallery.confirmInsert")}
           onConfirm={gallery === "read" ? addGalleryToRead : addGalleryToReference}

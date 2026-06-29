@@ -13,7 +13,7 @@
  * @/db + @/lib imports; the pure scoping logic stays in tool-scopes.ts.
  */
 import { contextPrompt, type AdminPageContext } from "@/lib/chat/tool-scopes";
-import { getSiteIdentity } from "@/db/settings-store";
+import { getSiteIdentity, getContentLocales } from "@/db/settings-store";
 import { listComponents } from "@/db/component-store";
 import { listCollections } from "@/db/collection-store";
 import {
@@ -44,11 +44,22 @@ export async function assembleSystemPrompt(
         name: p.name,
         type: p.type,
         required: p.required,
+        translatable: p.translatable,
         description: p.description,
       })),
     }));
   } catch {
     /* unbound D1 → no components */
+  }
+
+  // Content locales (default first) so the prompt can require translatable props in
+  // every language. Defensive: unbound D1 → no i18n rule (single-locale behavior).
+  let locales: string[] = [];
+  try {
+    const cl = await getContentLocales();
+    locales = [cl.default, ...cl.locales.filter((l) => l !== cl.default)];
+  } catch {
+    /* unbound D1 → no locales */
   }
   try {
     // Collection table names + fields so the model passes the EXACT name (the
@@ -67,6 +78,7 @@ export async function assembleSystemPrompt(
       components,
       builtins: builtinBlockTypes(),
       collections,
+      locales,
     }) +
     "\n\n" +
     contextPrompt(context)

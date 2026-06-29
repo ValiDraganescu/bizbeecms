@@ -17,7 +17,7 @@
  * unit-tested (`scripts/translate-request.test.mjs`).
  */
 import { getAi, getGatewayId } from "@/lib/ports/ai";
-import { DEFAULT_MODEL } from "@/lib/chat/models";
+import { DEFAULT_TRANSLATE_MODEL } from "@/lib/chat/models";
 import {
   buildTranslateMessages,
   collectStreamText,
@@ -27,7 +27,7 @@ import {
 } from "@/lib/chat/translate-request";
 import { validateTranslationInput } from "@/lib/chat/translate-tool";
 import { applyTranslation } from "@/db/translate-store";
-import { getContentLocales } from "@/db/settings-store";
+import { getContentLocales, getTranslateModel } from "@/db/settings-store";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -79,12 +79,22 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  // The operator-selected translation model (Settings → AI models), falling back
+  // to DEFAULT_TRANSLATE_MODEL when unset. A stored id was already validated against
+  // the catalog at PATCH time (resolveTranslateModel), so it's trusted here.
+  let translateModel = DEFAULT_TRANSLATE_MODEL;
+  try {
+    translateModel = (await getTranslateModel()) || DEFAULT_TRANSLATE_MODEL;
+  } catch {
+    /* no D1 → default */
+  }
+
   // Ask the model for the translations.
   let modelText: string;
   try {
     const upstream = await ai.chat(
       buildTranslateMessages(req.fromLocale, targetLocales, req.fields),
-      { model: DEFAULT_MODEL, gatewayId: await getGatewayId() },
+      { model: translateModel, gatewayId: await getGatewayId() },
     );
     modelText = await collectStreamText(upstream);
   } catch (err) {

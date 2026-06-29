@@ -149,7 +149,9 @@
       "tagsFailed": "Tunnisteiden tallennus epäonnistui: {message}"
     },
     "retry": "Yritä uudelleen",
-    "mention": { "label": "Sivun osiot" }
+    "mention": {
+      "label": "Sivun osiot"
+    }
   },
   "contentLocales": {
     "title": "Sisältökielet",
@@ -420,7 +422,10 @@
     "categoryLayout": "Asettelu",
     "categoryComponents": "Komponentit",
     "layoutSection": "Osio",
-    "renameSection": { "action": "Nimeä osio uudelleen", "label": "Osion nimi" },
+    "renameSection": {
+      "action": "Nimeä osio uudelleen",
+      "label": "Osion nimi"
+    },
     "layoutList": "Lista (kokoelmasta)",
     "bind": {
       "title": "Sido kokoelmaan",
@@ -456,6 +461,7 @@
     },
     "componentsEmpty": "Ei vielä komponentteja — tuo paketti tai komponentti.",
     "componentsNoMatch": "Mikään komponentti ei vastaa hakuasi.",
+    "componentPreviewLabel": "Esikatselu: {name}",
     "kitIndividual": "Erikseen tuodut",
     "groupByLabel": "Ryhmittele komponentit",
     "groupByKit": "Paketti",
@@ -602,6 +608,11 @@
     },
     "dropComponentHint": "Pudota komponentti tähän",
     "componentNoProps": "Tällä komponentilla ei ole muokattavia ominaisuuksia.",
+    "blockWidth": {
+      "label": "Leveys",
+      "fill": "Täytä",
+      "auto": "Sisältö"
+    },
     "localePickerLabel": "Muokattava kieli",
     "previewTheme": {
       "light": "Vaalea",
@@ -617,6 +628,13 @@
       "action": "Käännä tekoälyllä",
       "busy": "Käännetään…",
       "empty": "Lähdekielessä ei ole käännettävää."
+    },
+    "translateField": {
+      "menuLabel": "Käännä tekoälyllä",
+      "all": "Käännä kaikille kielille",
+      "one": "Käännä: {locale}",
+      "emptyHint": "Ei {locale}-tekstiä vielä — käytä Käännä tai kirjoita se.",
+      "emptyHintShort": "Ei {locale}-tekstiä vielä."
     }
   },
   "collections": {
@@ -863,7 +881,9 @@
   "mediaSettings": {
     "title": "Media",
     "subtitle": "Valitse AI-malli, joka kuvailee ladatut kuvat, jotta ne ovat haettavissa.",
-    "forbidden": "Sinulla ei ole oikeutta hallita media-asetuksia."
+    "forbidden": "Sinulla ei ole oikeutta hallita media-asetuksia.",
+    "imageModelHeading": "Kuvan kuvaus",
+    "translateModelHeading": "Käännös"
   },
   "imageModel": {
     "loading": "Ladataan…",
@@ -893,9 +913,20 @@
     "selectPrompt": "Valitse komponentti esikatsellaksesi sitä.",
     "propsTitle": "Propsit",
     "propsHint": "Muokkaa paikkamerkkiarvoja, jotka esikatselu sitoo. Tallennetaan komponentin oletuksiksi.",
-    "view": { "preview": "Esikatselu", "code": "Koodi" },
-    "viewport": { "desktop": "Työpöytä", "tablet": "Tabletti", "mobile": "Mobiili" },
-    "codeTab": { "html": "HTML", "script": "Skripti", "css": "CSS" },
+    "view": {
+      "preview": "Esikatselu",
+      "code": "Koodi"
+    },
+    "viewport": {
+      "desktop": "Työpöytä",
+      "tablet": "Tabletti",
+      "mobile": "Mobiili"
+    },
+    "codeTab": {
+      "html": "HTML",
+      "script": "Skripti",
+      "css": "CSS"
+    },
     "capture": {
       "send": "Lähetä esikatselu tekoälylle",
       "capturing": "Kaapataan…",
@@ -909,5 +940,11 @@
       "failed": "Tallennus epäonnistui",
       "loading": "Ladataan…"
     }
+  },
+  "translateModel": {
+    "loading": "Ladataan…",
+    "label": "Käännösmalli",
+    "hint": "Tämä tekoälymalli kääntää sivujen ja komponenttien tekstit sivuston muille kielille.",
+    "saved": "Tallennettu"
   }
 }

@@ -41,6 +41,7 @@ import {
 import {
   UPDATE_COMPONENT_TOOL,
   UPDATE_PAGE_BLOCKS_TOOL,
+  SET_BLOCK_PROPS_TOOL,
   UPDATE_BRAND_IDENTITY_TOOL,
   UPDATE_THEME_TOOL,
   LIST_BUILTIN_TYPES_TOOL,
@@ -86,6 +87,10 @@ import { applyEdit } from "./apply-edit";
 import {
   validateBlocks,
   findBlock,
+  mergeBlockProps,
+  patchBlockProps,
+  validateBlockProps,
+  parsePropsSchema,
   setBlockField,
   setBlockChildren,
   addListToSection,
@@ -173,6 +178,7 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   list_builtin_types: LIST_BUILTIN_TYPES_TOOL,
   update_component: UPDATE_COMPONENT_TOOL,
   update_page_blocks: UPDATE_PAGE_BLOCKS_TOOL,
+  set_block_props: SET_BLOCK_PROPS_TOOL,
   update_brand_identity: UPDATE_BRAND_IDENTITY_TOOL,
   update_theme: UPDATE_THEME_TOOL,
   create_collection: CREATE_COLLECTION_TOOL,
@@ -412,6 +418,19 @@ async function setDraftBlocks(
   return saved ? { ok: true } : { ok: false, errors: ["page not found"] };
 }
 
+/** Every block id in a tree (depth-first) — for a "no such block, here are the ids" error. */
+function collectBlockIds(blocks: Block[]): string[] {
+  const out: string[] = [];
+  const walk = (bs: Block[]) => {
+    for (const b of bs) {
+      if (b?.id) out.push(b.id);
+      if (b?.children?.length) walk(b.children);
+    }
+  };
+  walk(blocks);
+  return out;
+}
+
 /** Replace an existing page's block tree (validateBlocks gate, like the editor). */
 async function handleUpdatePageBlocks(args: unknown): Promise<Record<string, unknown>> {
   const id = coerceIdArg(args, "id");
@@ -434,6 +453,93 @@ async function handleUpdatePageBlocks(args: unknown): Promise<Record<string, unk
     return { ok: true, action: "updated", page: id };
   } catch (err) {
     return { ok: false, errors: [`failed to update page blocks: ${(err as Error).message}`] };
+  }
+}
+
+/**
+ * Patch ONE block's props by id — the SAFE per-block content edit (it can't drop
+ * the rest of the tree the way a full update_page_blocks re-pass can). Loads the
+ * draft, finds the block, MERGES the patch into its existing props (empty string
+ * clears a prop), validates against the component's propsSchema (same gate the
+ * editor uses), and saves. Built-in blocks (Section/List) carry no propsSchema, so
+ * their props pass through the legacy allowlist path unchanged.
+ */
+async function handleSetBlockProps(args: unknown): Promise<Record<string, unknown>> {
+  const id = coerceIdArg(args, "id");
+  if (!id) return { ok: false, errors: ["id is required (the page id, from list_pages/get_page)"] };
+  const a = (typeof args === "object" && args !== null ? args : {}) as Record<string, unknown>;
+  const blockId = typeof a.blockId === "string" ? a.blockId : "";
+  if (!blockId) return { ok: false, errors: ["blockId is required (every block in get_page has an `id`)"] };
+  if (typeof a.props !== "object" || a.props === null || Array.isArray(a.props)) {
+    return { ok: false, errors: ["props must be an object, e.g. { title: 'New title' }"] };
+  }
+  const patch = a.props as Record<string, unknown>;
+  try {
+    const loaded = await getDraftBlocks(id);
+    if (!loaded) return { ok: false, errors: [`no page with id "${id}"`] };
+    const target = findBlock(loaded.blocks, blockId);
+    if (!target) {
+      const ids = collectBlockIds(loaded.blocks);
+      return {
+        ok: false,
+        errors: [
+          `no block with id "${blockId}" on this page. Block ids: ${ids.join(", ") || "(none)"}`,
+        ],
+      };
+    }
+
+    const row = await getComponentByName(target.component);
+    const schema = parsePropsSchema(row?.propsSchema ?? null);
+    const editable = schema.map((f) => f.name);
+
+    // An EMPTY patch changes nothing — do NOT report success (that invites a retry
+    // loop). Name the props the model could actually set so it self-corrects.
+    if (Object.keys(patch).length === 0) {
+      return {
+        ok: false,
+        errors: [
+          `props was empty — nothing to change. Pass the values to set, e.g. ` +
+            `{ "props": { "title": "…" } }.` +
+            (editable.length ? ` Editable props on ${target.component}: ${editable.join(", ")}.` : ""),
+        ],
+      };
+    }
+
+    // Merge the patch over the block's current props; an empty string clears a key.
+    const merged = patchBlockProps(target.props, patch);
+    // Validate against the component's own schema (drop undeclared keys, coerce by
+    // type) — the same gate the editor's field path uses. A built-in/schemaless
+    // block has NO propsSchema; the schema-aware path would drop everything, so we
+    // keep the merged props verbatim there (Section/List config isn't this tool's
+    // job, but we must not silently nuke it).
+    const validated = schema.length > 0 ? validateBlockProps(merged, schema) : merged;
+
+    // If NO supplied key survived validation as a known prop, it's a no-op (the
+    // model used wrong prop names). Tell it which keys were rejected and what IS
+    // settable — don't report a false success. (We test key SURVIVAL, not value
+    // equality: validateBlockProps coerces values, e.g. "12" → 12, so a kept prop
+    // legitimately differs from the raw patch.) `width` is a reserved layout prop
+    // the validator keeps even when not in the schema — count it as known.
+    if (schema.length > 0) {
+      const known = new Set([...editable, "width"]);
+      const anyKnown = Object.keys(patch).some((k) => known.has(k));
+      if (!anyKnown) {
+        return {
+          ok: false,
+          errors: [
+            `none of [${Object.keys(patch).join(", ")}] are props of ${target.component}. ` +
+              `Editable props: ${editable.join(", ") || "(none)"}.`,
+          ],
+        };
+      }
+    }
+
+    const next = mergeBlockProps(loaded.blocks, blockId, validated);
+    const res = await setDraftBlocks(id, next, loaded.meta);
+    if (!res.ok) return { ok: false, errors: res.errors };
+    return { ok: true, action: "updated", page: id, block: blockId, props: validated };
+  } catch (err) {
+    return { ok: false, errors: [`failed to set block props: ${(err as Error).message}`] };
   }
 }
 
@@ -894,6 +1000,7 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   list_builtin_types: () => handleListBuiltinTypes(),
   update_component: handleUpdateComponent,
   update_page_blocks: handleUpdatePageBlocks,
+  set_block_props: handleSetBlockProps,
   update_brand_identity: handleUpdateBrandIdentity,
   update_theme: handleUpdateTheme,
   create_collection: handleCreateCollection,

@@ -32,6 +32,13 @@ export const DEFAULT_MODEL = "openai/gpt-4o-mini";
  */
 export const DEFAULT_IMAGE_MODEL = "openai/gpt-4o-mini";
 
+/**
+ * Default model for AI content translation (page/component text → other locales).
+ * A capable, inexpensive text model. Operator-overridable in CMS settings; this
+ * is the fallback when unset or when the saved id isn't in the catalog.
+ */
+export const DEFAULT_TRANSLATE_MODEL = "openai/gpt-4o-mini";
+
 /** A catalog entry as the UI + route consume it (the clean boundary shape). */
 export interface CatalogModel {
   /** Exact OpenRouter model id, e.g. `openai/gpt-4o-mini`. */
@@ -327,4 +334,16 @@ export function resolveImageModel(value: unknown, imageAllowed?: ReadonlySet<str
     return value;
   }
   return DEFAULT_IMAGE_MODEL;
+}
+
+/**
+ * Resolve an UNTRUSTED translation-model value: the value if it's in the supplied
+ * allowlist (any text model from the catalog), else `DEFAULT_TRANSLATE_MODEL`.
+ * Never throws — mirrors resolveImageModel.
+ */
+export function resolveTranslateModel(value: unknown, allowed?: ReadonlySet<string>): string {
+  if (typeof value === "string" && value.length > 0 && allowed?.has(value)) {
+    return value;
+  }
+  return DEFAULT_TRANSLATE_MODEL;
 }

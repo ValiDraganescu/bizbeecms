@@ -41,7 +41,6 @@ import { PAGE_MUTATION_EVENT } from "@/lib/chat/page-mutation-signal";
 import type { ComponentGroup } from "@/lib/components/grouped";
 import {
   addSection,
-  addComponentToSection,
   addComponentToColumn,
   isSection,
   isSectionColumn,
@@ -277,16 +276,6 @@ export function PageBuilderShell({
   function onAddSection() {
     setBlocks((b) => addSection(b));
     setDirty(true);
-  }
-
-  // Drop a rail component into the selected section (or the last one). Returns
-  // false if there's no section yet so the caller can prompt to add one.
-  function onInsertComponent(component: string): boolean {
-    const target = targetSectionId(blocks, selectedBlockId);
-    if (!target) return false;
-    setBlocks((b) => addComponentToSection(b, target, component));
-    setDirty(true);
-    return true;
   }
 
   // Drop a rail component into a specific Section COLUMN (DnD slice 2). No-op if
@@ -671,9 +660,7 @@ export function PageBuilderShell({
               onGroupByChange={setGroupBy}
               search={search}
               canEdit={!!selected}
-              onAddSection={onAddSection}
-              onInsertComponent={onInsertComponent}
-              onInsertList={onInsertList}
+              previewTheme={previewTheme}
             />
           </aside>
         )}
@@ -720,9 +707,15 @@ export function PageBuilderShell({
                 setLayersDropActive(false);
                 if (!selected) return;
                 const payload = readDragPayload(e);
-                if (payload?.kind !== "section") return;
-                e.preventDefault();
-                onAddSection();
+                // The LAYOUT primitives drop onto the Layers panel: a Section
+                // appends a new section; a List adds into the selected/last one.
+                if (payload?.kind === "section") {
+                  e.preventDefault();
+                  onAddSection();
+                } else if (payload?.kind === "list") {
+                  e.preventDefault();
+                  onInsertList();
+                }
               }}
               className={
                 "absolute inset-0 overflow-y-auto p-6 " +

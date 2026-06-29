@@ -16,6 +16,10 @@ import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import type { PageInput } from "@/lib/chat/page-tool";
 import type { PageMetaInput } from "@/lib/pages/page-meta";
 import { parseJsonColumn, type Block } from "../lib/render/tree.ts";
+import {
+  applyTranslatableFromSlots,
+  translatableSlotNames,
+} from "../lib/pages/page-blocks.ts";
 import type { Page } from "./schema.ts";
 
 /** Return the subset of `names` that have no matching `component.name` in D1. */
@@ -315,15 +319,30 @@ export async function setPageBlocks(
  * The block editor's palette WITH each component's `propsSchema` (C3 props UI) —
  * so the editor can render a field per declared prop for a selected block. Name +
  * raw propsSchema JSON string (the editor parses it via `parsePropsSchema`).
+ *
+ * The served schema is ENRICHED with translatable flags derived from the
+ * component's HTML `{{t prop}}` slots: the markup is the authoring source of truth
+ * for "this prop is per-locale", and the AI often omits `translatable:true` from
+ * the schema. So a prop slotted as `{{t title}}` edits per-locale even when its
+ * schema entry forgot the flag (see applyTranslatableFromSlots).
  */
 export async function listComponentPalette(): Promise<
   { name: string; propsSchema: string | null }[]
 > {
   const db = await getDb();
   const rows = await db
-    .select({ name: schema.component.name, propsSchema: schema.component.propsSchema })
+    .select({
+      name: schema.component.name,
+      propsSchema: schema.component.propsSchema,
+      html: schema.component.html,
+    })
     .from(schema.component);
-  return rows.sort((a, b) => a.name.localeCompare(b.name));
+  return rows
+    .map((r) => ({
+      name: r.name,
+      propsSchema: applyTranslatableFromSlots(r.propsSchema, translatableSlotNames(r.html)),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Delete a page. Refuses if it still has children (avoid orphaning the tree). */

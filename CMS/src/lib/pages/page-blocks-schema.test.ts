@@ -17,6 +17,10 @@ import {
   validateBlockProps,
   findBlock,
   mergeBlockProps,
+  patchBlockProps,
+  isImageProp,
+  translatableSlotNames,
+  applyTranslatableFromSlots,
   setLocalizedProp,
   localeFieldValue,
   SECTION_COMPONENT,
@@ -75,6 +79,61 @@ test("parsePropsSchema: each new field type round-trips", () => {
   assert.equal(by.weird.type, "string"); // unknown type degrades
 });
 
+test("isImageProp: type image, or string prop with an image-ish name → picker", () => {
+  // Explicit type wins.
+  assert.equal(isImageProp({ type: "image", name: "whatever" }), true);
+  // String props whose NAME looks image-ish (upgrades existing components).
+  assert.equal(isImageProp({ type: "string", name: "backgroundImage" }), true);
+  assert.equal(isImageProp({ type: "string", name: "heroPhoto" }), true);
+  assert.equal(isImageProp({ type: "string", name: "avatar" }), true);
+  assert.equal(isImageProp({ type: "richtext", name: "logoSvg" }), true);
+  // Plain text props that aren't images stay text inputs.
+  assert.equal(isImageProp({ type: "string", name: "title" }), false);
+  assert.equal(isImageProp({ type: "string", name: "subtitle" }), false);
+  // Non-text scalar types are never images.
+  assert.equal(isImageProp({ type: "number", name: "imageCount" }), false);
+  // A translatable text prop is per-locale text, never an image.
+  assert.equal(isImageProp({ type: "string", name: "image", translatable: true }), false);
+});
+
+test("parsePropsSchema/validateBlockProps: image type round-trips as a string URL", () => {
+  const schema = parsePropsSchema(
+    JSON.stringify({ bg: { type: "image", default: "/media/x.jpg" } }),
+  );
+  assert.equal(schema[0].type, "image"); // not degraded to "string"
+  assert.equal(schema[0].translatable, false); // image is never per-locale
+  // Kept like a string value; empty optional dropped.
+  assert.equal(validateBlockProps({ bg: "/media/y.png" }, schema).bg, "/media/y.png");
+  assert.equal("bg" in validateBlockProps({ bg: "" }, schema), false);
+});
+
+test("translatableSlotNames: extracts {{t prop}} names only (not plain {{prop}})", () => {
+  const html = `<div><h1>{{t title}}</h1><p>{{ t subtitle }}</p><span>{{label}}</span><img src="{{bg}}"></div>`;
+  const names = translatableSlotNames(html);
+  assert.equal(names.has("title"), true);
+  assert.equal(names.has("subtitle"), true); // inner whitespace tolerated
+  assert.equal(names.has("label"), false); // plain slot, not translatable
+  assert.equal(names.has("bg"), false);
+  assert.deepEqual(translatableSlotNames(null), new Set());
+});
+
+test("applyTranslatableFromSlots: marks slotted props translatable in the schema", () => {
+  // The AI wrote plain `string` props but used {{t title}} in the html.
+  const schema = JSON.stringify({
+    title: { type: "string" },
+    label: { type: "string" },
+  });
+  const enriched = applyTranslatableFromSlots(schema, new Set(["title"]));
+  const fields = parsePropsSchema(enriched);
+  const by = Object.fromEntries(fields.map((f) => [f.name, f]));
+  assert.equal(by.title.translatable, true); // slot → flag added
+  assert.equal(by.label.translatable, false); // untouched
+  // No slot names → unchanged; bad JSON → returned as-is; null → null.
+  assert.equal(applyTranslatableFromSlots(schema, new Set()), schema);
+  assert.equal(applyTranslatableFromSlots("not json", new Set(["title"])), "not json");
+  assert.equal(applyTranslatableFromSlots(null, new Set(["title"])), null);
+});
+
 test("parsePropsSchema: translatable ignored on non-text types", () => {
   const [num] = parsePropsSchema(JSON.stringify({ n: { type: "number", translatable: true } }));
   assert.equal(num.translatable, false);
@@ -115,6 +174,16 @@ test("validateBlockProps: required prop kept (default substituted), optional emp
   const out = validateBlockProps({ title: "", sub: "" }, schema);
   assert.equal(out.title, "Untitled"); // required → default kept
   assert.equal("sub" in out, false); // optional empty → dropped
+});
+
+test("validateBlockProps: reserved layout prop `width` survives schema validation", () => {
+  const schema = parsePropsSchema(JSON.stringify({ title: { type: "string" } }));
+  // width isn't in the schema, but it's a per-block layout setting the renderer
+  // reads — it must NOT be stripped when a field edit re-validates the props.
+  assert.equal(validateBlockProps({ title: "Hi", width: "auto" }, schema).width, "auto");
+  assert.equal(validateBlockProps({ title: "Hi", width: "fill" }, schema).width, "fill");
+  // A bogus width value is not preserved (only the two known values pass through).
+  assert.equal("width" in validateBlockProps({ width: "weird" }, schema), false);
 });
 
 test("validateBlockProps: legacy Set allowlist still works (no coercion)", () => {
@@ -193,6 +262,23 @@ test("findBlock: locates a NESTED component (top-level find would miss it)", () 
   assert.equal(findBlock(t, "hero-1")?.component, "Hero");
   assert.equal(findBlock(t, "sec-1")?.id, "sec-1");
   assert.equal(findBlock(t, "nope"), null);
+});
+
+test("patchBlockProps: merges over existing, empty string clears, others kept", () => {
+  // The set_block_props merge: a partial patch must NOT drop the props it omits.
+  const merged = patchBlockProps({ title: "old", subtitle: "keep me" }, { title: "new" });
+  assert.deepEqual(merged, { title: "new", subtitle: "keep me" });
+
+  // Empty string clears just that key (editor's "blank field → drop prop").
+  assert.deepEqual(patchBlockProps({ title: "x", badge: "y" }, { badge: "" }), { title: "x" });
+
+  // No current props → the patch becomes the props.
+  assert.deepEqual(patchBlockProps(undefined, { title: "first" }), { title: "first" });
+
+  // PURE: the input object is not mutated.
+  const input = { a: 1 };
+  patchBlockProps(input, { a: 2, b: 3 });
+  assert.deepEqual(input, { a: 1 });
 });
 
 test("mergeBlockProps: replaces a nested block's props immutably; {} drops props", () => {

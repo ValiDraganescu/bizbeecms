@@ -19,6 +19,7 @@ export const PAGE_MUTATION_EVENT = "cms:page-mutated";
  */
 const MUTATING_TOOLS = new Set<string>([
   "update_page_blocks",
+  "set_block_props",
   "bind_component",
   "create_list",
   "bind_list",

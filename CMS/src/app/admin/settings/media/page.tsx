@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { SettingsNav } from "@/components/settings/settings-nav";
 import { ImageModelManager } from "@/components/settings/image-model-manager";
+import { TranslateModelManager } from "@/components/settings/translate-model-manager";
 import { checkRoleFromHeaders, canManageUsers } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,20 @@ export default async function MediaSettingsPage() {
         <p className="mt-1 text-foreground-muted">{t("subtitle")}</p>
       </header>
       {decision.allow ? (
-        <ImageModelManager />
+        <div className="flex flex-col gap-8">
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
+              {t("imageModelHeading")}
+            </h2>
+            <ImageModelManager />
+          </section>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
+              {t("translateModelHeading")}
+            </h2>
+            <TranslateModelManager />
+          </section>
+        </div>
       ) : (
         <p
           role="alert"

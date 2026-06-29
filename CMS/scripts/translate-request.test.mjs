@@ -126,23 +126,32 @@ test("parseTranslateResponse: unparseable text → source-only, all missing", ()
   assert.deepEqual(missing, ["a[fi]"]);
 });
 
-// ── regression: translate route must use the catalog (OpenRouter) DEFAULT_MODEL ──
+// ── regression: translate route must use an OpenRouter model, not a @cf/ id ──
 // The route once hardcoded `@cf/meta/llama-3.1-8b-instruct`, which 502s against
-// the OpenRouter adapter `getAi()` returns on every keyed Site. Guard that it now
-// imports the catalog DEFAULT_MODEL and carries no `@cf/...` id.
+// the OpenRouter adapter `getAi()` returns on every keyed Site. The route now uses
+// the OPERATOR-CONFIGURED translate model (Settings), falling back to the catalog
+// DEFAULT_TRANSLATE_MODEL — an OpenRouter id. Guard that contract + no `@cf/`.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_MODEL } from "../src/lib/chat/models.ts";
+import { DEFAULT_TRANSLATE_MODEL } from "../src/lib/chat/models.ts";
 
-test("translate route uses the catalog DEFAULT_MODEL, not a hardcoded @cf/ id", () => {
+test("translate route uses the configured translate model (OpenRouter), not a @cf/ id", () => {
   const routePath = fileURLToPath(
     new URL("../src/app/api/translate/route.ts", import.meta.url),
   );
   const src = readFileSync(routePath, "utf8");
+  // Reads the operator's choice from settings, with the catalog default fallback.
   assert.ok(
-    /import\s*\{\s*DEFAULT_MODEL\s*\}\s*from\s*["']@\/lib\/chat\/models["']/.test(src),
-    "translate route must import DEFAULT_MODEL from the model catalog",
+    src.includes("getTranslateModel"),
+    "translate route must read the operator-selected translate model",
+  );
+  assert.ok(
+    /DEFAULT_TRANSLATE_MODEL/.test(src),
+    "translate route must fall back to the catalog DEFAULT_TRANSLATE_MODEL",
   );
   assert.ok(!src.includes("@cf/"), "translate route must not hardcode a @cf/ model id");
-  assert.ok(!DEFAULT_MODEL.startsWith("@cf/"), "catalog DEFAULT_MODEL is an OpenRouter id");
+  assert.ok(
+    !DEFAULT_TRANSLATE_MODEL.startsWith("@cf/"),
+    "catalog DEFAULT_TRANSLATE_MODEL is an OpenRouter id",
+  );
 });

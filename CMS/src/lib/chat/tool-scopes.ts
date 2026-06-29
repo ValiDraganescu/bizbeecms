@@ -75,6 +75,8 @@ export const KNOWN_TOOL_NAMES = [
   "delete_prompt",
   // String-replace edit for long-text fields (component script/css, prompt body).
   "edit_text",
+  // Targeted per-block prop patch (safe content edit; can't drop the rest of the tree).
+  "set_block_props",
 ] as const;
 export type ToolName = (typeof KNOWN_TOOL_NAMES)[number];
 
@@ -142,6 +144,7 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "create_page",
     "update_component",
     "update_page_blocks",
+    "set_block_props",
     "list_assets",
     "list_components",
     "get_component",
@@ -172,6 +175,7 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
   pages: [
     "create_page",
     "update_page_blocks",
+    "set_block_props",
     "translate",
     "list_assets",
     "list_pages",

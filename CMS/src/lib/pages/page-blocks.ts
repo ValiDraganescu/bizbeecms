@@ -128,6 +128,11 @@ export type PropFieldType =
   | "select"
   | "date"
   | "time"
+  // An asset URL (image). Stored + bound exactly like a string (a `/media/...`
+  // URL), but the editor renders a gallery picker instead of a text input. Never
+  // per-locale. The AI declares it for image slots; existing `string` image props
+  // are also offered the picker via the `isImageProp` name heuristic.
+  | "image"
   // A structured value (array/object) authored as JSON. Unlike the scalar types
   // it never binds into a `{{slot}}` as readable text — it is serialized into a
   // DOM attribute (slotString JSON-stringifies it) so a component's CLIENT script
@@ -167,8 +172,94 @@ const FIELD_TYPES = new Set<PropFieldType>([
   "select",
   "date",
   "time",
+  "image",
   "json",
 ]);
+
+/**
+ * Prop-name fragments that mark a (declared-as-string) prop as holding an image
+ * URL, so the editor offers the gallery picker for it without the component having
+ * to declare `type:"image"`. Matched case-insensitively as a substring of the prop
+ * name. Covers the common authoring vocabulary (backgroundImage, heroPhoto, …).
+ */
+const IMAGE_NAME_HINTS = [
+  "image",
+  "img",
+  "photo",
+  "picture",
+  "avatar",
+  "icon",
+  "logo",
+  "thumbnail",
+  "thumb",
+  "banner",
+  "cover",
+  "background",
+];
+
+/**
+ * Should this prop be edited with the image GALLERY PICKER (vs a text input)?
+ * True when it's declared `type:"image"`, OR it's a plain string/richtext prop
+ * whose NAME looks image-ish (the heuristic that upgrades existing components).
+ * A translatable prop is never an image (per-locale text, not an asset). PURE.
+ */
+export function isImageProp(field: { type: PropFieldType; name: string; translatable?: boolean }): boolean {
+  if (field.translatable) return false;
+  if (field.type === "image") return true;
+  if (field.type !== "string" && field.type !== "richtext") return false;
+  const n = field.name.toLowerCase();
+  return IMAGE_NAME_HINTS.some((h) => n.includes(h));
+}
+
+/** Matches a TRANSLATABLE slot `{{t propName}}` and captures the prop name. */
+const T_SLOT_RE = /\{\{\s*t\s+([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
+
+/**
+ * The set of prop names a component's HTML marks TRANSLATABLE via `{{t prop}}`
+ * slots. The `{{t}}` prefix is the authoring signal that a prop is per-locale; the
+ * `propsSchema` SHOULD also carry `translatable:true`, but the AI often forgets —
+ * so we derive it from the markup as the source of truth. PURE. "" → empty set.
+ */
+export function translatableSlotNames(html: string | null | undefined): Set<string> {
+  const out = new Set<string>();
+  if (!html) return out;
+  for (const m of html.matchAll(T_SLOT_RE)) out.add(m[1]);
+  return out;
+}
+
+/**
+ * Fold HTML-derived translatable flags into a raw `propsSchema` JSON STRING: any
+ * prop whose name is in `names` (from `translatableSlotNames`) gets
+ * `translatable:true`. So a component whose markup uses `{{t title}}` but whose
+ * schema forgot the flag still edits per-locale. Returns a new JSON string (or the
+ * original when nothing changes / on bad JSON). PURE — never throws.
+ */
+export function applyTranslatableFromSlots(
+  propsSchema: string | null | undefined,
+  names: Set<string>,
+): string | null {
+  if (!propsSchema || names.size === 0) return propsSchema ?? null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(propsSchema);
+  } catch {
+    return propsSchema;
+  }
+  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) return propsSchema;
+  const obj = parsed as Record<string, unknown>;
+  let changed = false;
+  for (const name of names) {
+    const spec = obj[name];
+    if (spec && typeof spec === "object" && !Array.isArray(spec)) {
+      const s = spec as Record<string, unknown>;
+      if (s.translatable !== true) {
+        s.translatable = true;
+        changed = true;
+      }
+    }
+  }
+  return changed ? JSON.stringify(obj) : propsSchema;
+}
 
 /** True if `raw` is valid JSON (or already a non-null array/object). PURE. */
 function isJsonValue(raw: unknown): boolean {
@@ -318,6 +409,10 @@ export function validateBlockProps(
 
   // Schema-aware path — coerce each declared prop by its type.
   const out: Record<string, unknown> = {};
+  // Reserved layout props aren't in the component schema but are per-block editor
+  // settings the renderer reads (see wrapBlockWidth). Preserve them so a field
+  // edit (which re-validates the whole props) doesn't strip the chosen layout.
+  if (props.width === "auto" || props.width === "fill") out.width = props.width;
   for (const f of declared) {
     const raw = props[f.name];
     if (f.type === "number") {
@@ -950,6 +1045,24 @@ export function moveNode(
  */
 export function findBlock(blocks: Block[], id: string): Block | null {
   return findNode(blocks, id);
+}
+
+/**
+ * Merge a PATCH over an existing props object for a targeted single-prop edit
+ * (the `set_block_props` tool). Keys in `patch` overwrite `current`; an EMPTY
+ * STRING value CLEARS that key (matches the editor's "blank field → drop prop").
+ * `current`'s other keys are preserved. PURE — returns a new object.
+ */
+export function patchBlockProps(
+  current: Record<string, unknown> | undefined,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...(current ?? {}) };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === "") delete out[k];
+    else out[k] = v;
+  }
+  return out;
 }
 
 /**

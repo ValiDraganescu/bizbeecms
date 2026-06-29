@@ -66,11 +66,14 @@ export const UPDATE_PAGE_BLOCKS_TOOL = {
   function: {
     name: "update_page_blocks",
     description:
-      "Replace the block tree of an EXISTING page (its layout/content), WITHOUT " +
-      "touching its slug/parent/SEO metadata. Use list_pages/get_page to find the " +
-      "page id, then pass the full new 'blocks' array. Each block references a " +
-      "component by name (which must already exist) or the reserved layout block " +
-      "'Section'. Re-pass the whole tree — this is a full replace, not a patch.",
+      "FULL-REPLACE the block tree of an EXISTING page (use ONLY to add/remove/" +
+      "reorder/restructure sections or blocks). To merely change a block's text or " +
+      "props (e.g. 'set the hero title'), use set_block_props instead — it edits ONE " +
+      "block and CANNOT delete the rest of the page. This tool overwrites the WHOLE " +
+      "tree: any section or block you omit is DELETED. So FIRST get_page to read the " +
+      "current tree, then re-pass it ENTIRE with only your intended change applied. " +
+      "Does not touch slug/parent/SEO. Each block references a component by name " +
+      "(must already exist) or the reserved layout block 'Section'.",
     parameters: {
       type: "object",
       properties: {
@@ -78,10 +81,43 @@ export const UPDATE_PAGE_BLOCKS_TOOL = {
         blocks: {
           type: "array",
           description:
-            "JSON array of blocks: { id, component, props?, children? }. Full replacement.",
+            "JSON array of blocks: { id, component, props?, children? }. FULL replacement — " +
+            "anything omitted is deleted. Re-pass the entire current tree plus your change.",
         },
       },
       required: ["id", "blocks"],
+    },
+  },
+} as const;
+
+export const SET_BLOCK_PROPS_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "set_block_props",
+    description:
+      "Patch the props of ONE block on a page WITHOUT rewriting the rest of the tree " +
+      "(the SAFE way to change text/content — it cannot delete other sections or " +
+      "blocks). Use this for requests like 'set the hero title' or 'change the button " +
+      "label'. The given props are MERGED into the block's existing props (other props " +
+      "are kept); an empty-string value clears that one prop. Find the page id and the " +
+      "block id with get_page (every block has an `id`). For a select/combobox List's " +
+      "config use bind_list, not this.",
+    parameters: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "The page's id (from list_pages/get_page)." },
+        blockId: {
+          type: "string",
+          description: "The id of the block to patch (from get_page — every block has an `id`).",
+        },
+        props: {
+          type: "object",
+          description:
+            "The props to set/merge, e.g. { title: 'Find the restaurant you like' }. " +
+            "Merged into the block's existing props; an empty string clears a prop.",
+        },
+      },
+      required: ["id", "blockId", "props"],
     },
   },
 } as const;

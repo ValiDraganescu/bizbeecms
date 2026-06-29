@@ -149,7 +149,9 @@
       "tagsFailed": "Could not save tags: {message}"
     },
     "retry": "Retry",
-    "mention": { "label": "Page sections" }
+    "mention": {
+      "label": "Page sections"
+    }
   },
   "contentLocales": {
     "title": "Content languages",
@@ -420,7 +422,10 @@
     "categoryLayout": "Layout",
     "categoryComponents": "Components",
     "layoutSection": "Section",
-    "renameSection": { "action": "Rename section", "label": "Section name" },
+    "renameSection": {
+      "action": "Rename section",
+      "label": "Section name"
+    },
     "layoutList": "List (from collection)",
     "bind": {
       "title": "Bind to collection",
@@ -456,6 +461,7 @@
     },
     "componentsEmpty": "No components yet — import a kit or component.",
     "componentsNoMatch": "No components match your search.",
+    "componentPreviewLabel": "Preview of {name}",
     "kitIndividual": "Individually imported",
     "groupByLabel": "Group components by",
     "groupByKit": "Kit",
@@ -602,6 +608,11 @@
     },
     "dropComponentHint": "Drop a component here",
     "componentNoProps": "This component has no configurable properties.",
+    "blockWidth": {
+      "label": "Width",
+      "fill": "Fill",
+      "auto": "Content"
+    },
     "localePickerLabel": "Editing language",
     "previewTheme": {
       "light": "Light",
@@ -617,6 +628,13 @@
       "action": "Translate with AI",
       "busy": "Translating…",
       "empty": "Nothing to translate in the source language."
+    },
+    "translateField": {
+      "menuLabel": "Translate with AI",
+      "all": "Translate to all languages",
+      "one": "Translate to {locale}",
+      "emptyHint": "No {locale} text yet — use Translate, or type it in.",
+      "emptyHintShort": "No {locale} text yet."
     }
   },
   "collections": {
@@ -863,7 +881,9 @@
   "mediaSettings": {
     "title": "Media",
     "subtitle": "Choose the AI model that describes uploaded images so they’re searchable.",
-    "forbidden": "You don’t have permission to manage media settings."
+    "forbidden": "You don’t have permission to manage media settings.",
+    "imageModelHeading": "Image description",
+    "translateModelHeading": "Translation"
   },
   "imageModel": {
     "loading": "Loading…",
@@ -893,9 +913,20 @@
     "selectPrompt": "Select a component to preview it.",
     "propsTitle": "Props",
     "propsHint": "Edit the placeholder values the preview binds. Saved as the component's defaults.",
-    "view": { "preview": "Preview", "code": "Code" },
-    "viewport": { "desktop": "Desktop", "tablet": "Tablet", "mobile": "Mobile" },
-    "codeTab": { "html": "HTML", "script": "Script", "css": "CSS" },
+    "view": {
+      "preview": "Preview",
+      "code": "Code"
+    },
+    "viewport": {
+      "desktop": "Desktop",
+      "tablet": "Tablet",
+      "mobile": "Mobile"
+    },
+    "codeTab": {
+      "html": "HTML",
+      "script": "Script",
+      "css": "CSS"
+    },
     "capture": {
       "send": "Send preview to AI",
       "capturing": "Capturing…",
@@ -909,5 +940,11 @@
       "failed": "Save failed",
       "loading": "Loading…"
     }
+  },
+  "translateModel": {
+    "loading": "Loading…",
+    "label": "Translation model",
+    "hint": "This AI model translates page and component text into the site’s other languages.",
+    "saved": "Saved"
   }
 }

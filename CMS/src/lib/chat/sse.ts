@@ -96,10 +96,7 @@ export class SseDeltaParser {
     // Split on newlines; keep the last (possibly partial) line buffered.
     const lines = this.buffer.split("\n");
     this.buffer = lines.pop() ?? "";
-    for (const line of lines) {
-      const ev = parseLine(line);
-      if (ev) events.push(ev);
-    }
+    for (const line of lines) events.push(...parseLineEvents(line));
     return events;
   }
 
@@ -107,8 +104,7 @@ export class SseDeltaParser {
   flush(): UpstreamEvent[] {
     const rest = this.buffer;
     this.buffer = "";
-    const ev = parseLine(rest);
-    return ev ? [ev] : [];
+    return parseLineEvents(rest);
   }
 }
 
@@ -149,6 +145,38 @@ export function parseLine(line: string): UpstreamEvent | null {
 }
 
 /**
+ * Like `parseLine` but returns ALL events a line carries — specifically EVERY
+ * entry in a delta's `tool_calls[]`, not just the first. A model that fans out
+ * PARALLEL tool calls can pack several into one delta (each at its own `index`);
+ * `parseLine` would surface only `tool_calls[0]`, so the others' args (and even
+ * the calls themselves) were silently dropped — the cause of "the model sent
+ * empty/garbled args". The streaming parser uses THIS; `parseLine` stays for the
+ * single-event callers/tests. Non-tool lines yield 0 or 1 event, same as before.
+ */
+export function parseLineEvents(line: string): UpstreamEvent[] {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith("data:")) return [];
+  const payload = trimmed.slice(5).trimStart();
+  if (payload === "" || payload === "[DONE]") {
+    return payload === "[DONE]" ? [{ type: "done" }] : [];
+  }
+  let chunk: unknown;
+  try {
+    chunk = JSON.parse(payload);
+  } catch {
+    return [];
+  }
+  const err = extractError(chunk);
+  if (err) return [err];
+  const usage = extractUsage(chunk);
+  if (usage) return [usage];
+  const tools = extractToolCalls(chunk);
+  if (tools.length > 0) return tools;
+  const text = extractDelta(chunk);
+  return text === null || text === "" ? [] : [{ type: "delta", text }];
+}
+
+/**
  * Pull a tool-call fragment out of an OpenAI-style streaming chunk (B2).
  *
  * Tool calls stream as `choices[0].delta.tool_calls[]`, each entry keyed by
@@ -160,29 +188,50 @@ export function parseLine(line: string): UpstreamEvent | null {
  * Returns null when the chunk has no tool-call delta.
  */
 export function extractToolCall(chunk: unknown): UpstreamEvent | null {
-  if (typeof chunk !== "object" || chunk === null) return null;
+  // Back-compat single-event form (callers/tests that expect one event). Delegates
+  // to the multi-entry extractor and returns the FIRST — but the streaming parser
+  // uses `extractToolCalls` so PARALLEL calls in one delta aren't dropped.
+  return extractToolCalls(chunk)[0] ?? null;
+}
+
+/**
+ * Pull EVERY tool-call fragment out of a streaming chunk's `delta.tool_calls[]`.
+ * A delta can carry MORE THAN ONE entry when the model fans out parallel calls
+ * (each keyed by its own `index`); we emit one `tool_call` event per entry so the
+ * accumulator can reassemble all of them. Returns [] when the chunk has no
+ * tool-call delta. PURE.
+ */
+export function extractToolCalls(chunk: unknown): UpstreamEvent[] {
+  if (typeof chunk !== "object" || chunk === null) return [];
   const choices = (chunk as { choices?: unknown }).choices;
-  if (!Array.isArray(choices) || choices.length === 0) return null;
+  if (!Array.isArray(choices) || choices.length === 0) return [];
   const delta = (choices[0] as { delta?: unknown }).delta;
-  if (typeof delta !== "object" || delta === null) return null;
+  if (typeof delta !== "object" || delta === null) return [];
   const calls = (delta as { tool_calls?: unknown }).tool_calls;
-  if (!Array.isArray(calls) || calls.length === 0) return null;
-  const call = calls[0] as {
-    index?: unknown;
-    id?: unknown;
-    function?: { name?: unknown; arguments?: unknown };
-  };
-  const index = typeof call.index === "number" ? call.index : 0;
-  // The provider's own call id arrives once (opening fragment); we round-trip it so
-  // a later tool_result references the SAME id (OpenAI/Claude both require the match).
-  const id = typeof call.id === "string" && call.id !== "" ? call.id : undefined;
-  const fn = call.function;
-  const name =
-    fn && typeof fn.name === "string" && fn.name !== "" ? fn.name : undefined;
-  const argsFragment =
-    fn && typeof fn.arguments === "string" ? fn.arguments : undefined;
-  if (id === undefined && name === undefined && argsFragment === undefined) return null;
-  return { type: "tool_call", index, id, name, argsFragment };
+  if (!Array.isArray(calls) || calls.length === 0) return [];
+
+  const out: UpstreamEvent[] = [];
+  for (let i = 0; i < calls.length; i++) {
+    const call = calls[i] as {
+      index?: unknown;
+      id?: unknown;
+      function?: { name?: unknown; arguments?: unknown };
+    };
+    // Fall back to the array position when the provider omits `index` (it keys the
+    // accumulator; a wrong/missing index would merge distinct parallel calls).
+    const index = typeof call.index === "number" ? call.index : i;
+    // The provider's own call id arrives once (opening fragment); we round-trip it
+    // so a later tool_result references the SAME id (OpenAI/Claude require the match).
+    const id = typeof call.id === "string" && call.id !== "" ? call.id : undefined;
+    const fn = call.function;
+    const name =
+      fn && typeof fn.name === "string" && fn.name !== "" ? fn.name : undefined;
+    const argsFragment =
+      fn && typeof fn.arguments === "string" ? fn.arguments : undefined;
+    if (id === undefined && name === undefined && argsFragment === undefined) continue;
+    out.push({ type: "tool_call", index, id, name, argsFragment });
+  }
+  return out;
 }
 
 /**

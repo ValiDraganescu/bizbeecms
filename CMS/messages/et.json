@@ -149,7 +149,9 @@
       "tagsFailed": "Siltide salvestamine ebaõnnestus: {message}"
     },
     "retry": "Proovi uuesti",
-    "mention": { "label": "Lehe sektsioonid" }
+    "mention": {
+      "label": "Lehe sektsioonid"
+    }
   },
   "contentLocales": {
     "title": "Sisukeeled",
@@ -420,7 +422,10 @@
     "categoryLayout": "Paigutus",
     "categoryComponents": "Komponendid",
     "layoutSection": "Sektsioon",
-    "renameSection": { "action": "Nimeta sektsioon ümber", "label": "Sektsiooni nimi" },
+    "renameSection": {
+      "action": "Nimeta sektsioon ümber",
+      "label": "Sektsiooni nimi"
+    },
     "layoutList": "Loend (kogumikust)",
     "bind": {
       "title": "Seo kogumikuga",
@@ -456,6 +461,7 @@
     },
     "componentsEmpty": "Komponente pole veel — impordi komplekt või komponent.",
     "componentsNoMatch": "Ükski komponent ei vasta otsingule.",
+    "componentPreviewLabel": "Eelvaade: {name}",
     "kitIndividual": "Eraldi imporditud",
     "groupByLabel": "Rühmita komponendid",
     "groupByKit": "Komplekt",
@@ -602,6 +608,11 @@
     },
     "dropComponentHint": "Lohista komponent siia",
     "componentNoProps": "Sellel komponendil pole muudetavaid omadusi.",
+    "blockWidth": {
+      "label": "Laius",
+      "fill": "Täida",
+      "auto": "Sisu"
+    },
     "localePickerLabel": "Muudetav keel",
     "previewTheme": {
       "light": "Hele",
@@ -617,6 +628,13 @@
       "action": "Tõlgi tehisintellektiga",
       "busy": "Tõlgin…",
       "empty": "Lähtekeeles pole midagi tõlkida."
+    },
+    "translateField": {
+      "menuLabel": "Tõlgi tehisintellektiga",
+      "all": "Tõlgi kõikidesse keeltesse",
+      "one": "Tõlgi: {locale}",
+      "emptyHint": "{locale} teksti veel pole — kasuta Tõlgi või kirjuta ise.",
+      "emptyHintShort": "{locale} teksti veel pole."
     }
   },
   "collections": {
@@ -863,7 +881,9 @@
   "mediaSettings": {
     "title": "Meedia",
     "subtitle": "Vali AI-mudel, mis kirjeldab üleslaaditud pilte, et need oleksid otsitavad.",
-    "forbidden": "Sul pole õigust meediaseadeid hallata."
+    "forbidden": "Sul pole õigust meediaseadeid hallata.",
+    "imageModelHeading": "Pildi kirjeldus",
+    "translateModelHeading": "Tõlge"
   },
   "imageModel": {
     "loading": "Laadimine…",
@@ -893,9 +913,20 @@
     "selectPrompt": "Vali komponent, et seda eelvaadata.",
     "propsTitle": "Propsid",
     "propsHint": "Muuda kohatäitja väärtusi, mida eelvaade seob. Salvestatakse komponendi vaikeväärtustena.",
-    "view": { "preview": "Eelvaade", "code": "Kood" },
-    "viewport": { "desktop": "Töölaud", "tablet": "Tahvelarvuti", "mobile": "Mobiil" },
-    "codeTab": { "html": "HTML", "script": "Skript", "css": "CSS" },
+    "view": {
+      "preview": "Eelvaade",
+      "code": "Kood"
+    },
+    "viewport": {
+      "desktop": "Töölaud",
+      "tablet": "Tahvelarvuti",
+      "mobile": "Mobiil"
+    },
+    "codeTab": {
+      "html": "HTML",
+      "script": "Skript",
+      "css": "CSS"
+    },
     "capture": {
       "send": "Saada eelvaade AI-le",
       "capturing": "Jäädvustan…",
@@ -909,5 +940,11 @@
       "failed": "Salvestamine ebaõnnestus",
       "loading": "Laadin…"
     }
+  },
+  "translateModel": {
+    "loading": "Laadimine…",
+    "label": "Tõlkemudel",
+    "hint": "See AI-mudel tõlgib lehtede ja komponentide teksti saidi teistesse keeltesse.",
+    "saved": "Salvestatud"
   }
 }

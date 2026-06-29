@@ -1,17 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   validateBlockProps,
-  setLocalizedProp,
-  localeFieldValue,
-  collectTranslatableSource,
-  mergeTranslations,
+  isImageProp,
   type PropField,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
-import { LocalePicker, useLocalePicker } from "./locale-picker";
+import { ImagePicker } from "./image-picker";
+import { TranslatableField } from "./translatable-field";
 
 /**
  * Right-rail Block tab when a COMPONENT block is selected — a settings form
@@ -39,71 +36,52 @@ export function ComponentSettings({
 }) {
   const t = useTranslations("pageBuilder");
   const props = (block.props ?? {}) as Record<string, unknown>;
-  const multi = locales.length > 1;
-  const defaultLocale = locales[0];
-  const picker = useLocalePicker(locales);
-  const hasTranslatable = schema.some((f) => f.translatable);
-  const [translating, setTranslating] = useState(false);
-  const [translateError, setTranslateError] = useState<string | null>(null);
 
   const label = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
   const input =
     "w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-foreground-muted";
+  const segLabel = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
+  const seg = "flex-1 rounded-md border px-2 py-1 text-sm transition-colors";
+  const segOn = "border-primary bg-primary-subtle text-foreground font-medium";
+  const segOff = "border-border text-foreground-muted hover:text-foreground";
 
   // Apply one field's new raw value, then re-validate the WHOLE props by schema so
-  // types coerce and required props stay present.
+  // types coerce and required props stay present (width is a reserved layout prop,
+  // preserved through validation).
   function setField(name: string, value: unknown) {
     onChange(validateBlockProps({ ...props, [name]: value }, schema));
   }
-  function setLocalized(name: string, locale: string, value: string) {
-    const current = props[name];
-    setField(name, setLocalizedProp(current, locale, value, locales));
+  // Per-block layout width: fill the column vs wrap to content (default fill).
+  const width: "fill" | "auto" = props.width === "auto" ? "auto" : "fill";
+  function setWidth(w: "fill" | "auto") {
+    onChange(validateBlockProps({ ...props, width: w }, schema));
   }
 
-  // "Translate with AI": collect every translatable prop's text in the ACTIVE
-  // (source) locale, POST it to the shared /api/translate engine, then merge the
-  // returned per-locale maps back into props for the user to review before Save.
-  async function translateAll() {
-    setTranslateError(null);
-    const fields = collectTranslatableSource(props, schema, picker.active, defaultLocale);
-    if (Object.keys(fields).length === 0) {
-      setTranslateError(t("translate.empty"));
-      return;
-    }
-    setTranslating(true);
-    try {
-      const res = await fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind: "component",
-          target: block.component,
-          fields,
-          fromLocale: picker.active,
-        }),
-      });
-      const j = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        translations?: Record<string, Record<string, string>>;
-        error?: string;
-        errors?: string[];
-      };
-      if (!res.ok || !j.ok || !j.translations) {
-        setTranslateError(j.error ?? j.errors?.join("; ") ?? `HTTP ${res.status}`);
-        return;
-      }
-      onChange(mergeTranslations(props, j.translations, schema, locales));
-    } catch (err) {
-      setTranslateError((err as Error).message);
-    } finally {
-      setTranslating(false);
-    }
-  }
+  // Width toggle (fill column vs wrap content) — shown for every component block.
+  const widthControl = (
+    <div className="flex flex-col gap-1.5">
+      <span className={segLabel}>{t("blockWidth.label")}</span>
+      <div className="flex gap-1">
+        {(["fill", "auto"] as const).map((w) => (
+          <button
+            key={w}
+            type="button"
+            onClick={() => setWidth(w)}
+            aria-pressed={width === w}
+            className={`${seg} ${width === w ? segOn : segOff}`}
+          >
+            {t(`blockWidth.${w}`)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   if (schema.length === 0) {
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-4">
         <p className="font-mono text-sm text-foreground">{block.component}</p>
+        {widthControl}
         <p className="text-sm text-foreground-muted">{t("componentNoProps")}</p>
       </div>
     );
@@ -112,25 +90,25 @@ export function ComponentSettings({
   return (
     <div className="flex flex-col gap-4">
       <p className="font-mono text-sm text-foreground">{block.component}</p>
-      {multi && hasTranslatable && (
-        <div className="flex flex-col gap-2">
-          <LocalePicker state={picker} label={t("localePickerLabel")} />
-          <button
-            type="button"
-            disabled={translating}
-            onClick={translateAll}
-            className="self-start rounded-md border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-surface-muted disabled:opacity-50"
-          >
-            {translating ? t("translate.busy") : t("translate.action")}
-          </button>
-          {translateError && (
-            <p className="text-xs text-danger">{translateError}</p>
-          )}
-        </div>
-      )}
+      {widthControl}
       {schema.map((f) => {
         const raw = props[f.name];
         const labelText = f.label || f.name;
+
+        // Translatable text → its own per-locale field (lang tabs + AI translate).
+        if (f.translatable) {
+          return (
+            <TranslatableField
+              key={f.name}
+              field={f}
+              block={block}
+              props={props}
+              locales={locales}
+              onChange={onChange}
+            />
+          );
+        }
+
         return (
           <fieldset key={f.name} className="flex flex-col gap-1.5">
             <span className={label}>
@@ -141,31 +119,13 @@ export function ComponentSettings({
               <span className="text-xs text-foreground-muted">{f.description}</span>
             )}
 
-            {/* Translatable text → the active locale only (LocalePicker above). */}
-            {f.translatable ? (
-              (() => {
-                const loc = picker.active;
-                const value = localeFieldValue(raw, loc, defaultLocale);
-                const aria = multi ? `${labelText} (${loc})` : labelText;
-                return f.type === "richtext" ? (
-                  <textarea
-                    className={`${input} min-h-16`}
-                    value={value}
-                    placeholder={f.default}
-                    aria-label={aria}
-                    onChange={(e) => setLocalized(f.name, loc, e.target.value)}
-                  />
-                ) : (
-                  <input
-                    type="text"
-                    className={input}
-                    value={value}
-                    placeholder={f.default}
-                    aria-label={aria}
-                    onChange={(e) => setLocalized(f.name, loc, e.target.value)}
-                  />
-                );
-              })()
+            {isImageProp(f) ? (
+              // Image prop (declared type:"image" or an image-ish name) → gallery
+              // picker instead of a raw URL field. Stores the chosen /media URL.
+              <ImagePicker
+                value={typeof raw === "string" ? raw : ""}
+                onChange={(url) => setField(f.name, url)}
+              />
             ) : f.type === "select" ? (
               <select
                 className={input}

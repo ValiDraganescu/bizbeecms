@@ -1,12 +1,13 @@
 /**
- * Media manager + picker for the chat input. Browses the Site's R2 media library
- * (GET /api/assets — the same source the page-builder + media library use, not
- * forked) as a thumbnail grid and lets the operator:
+ * The Site's ONE media gallery picker — a modal that browses the R2 media library
+ * (GET /api/assets) as a thumbnail grid. Used by the chat input (read/reference
+ * intent) AND the page-builder image fields (Block-tab image props + SEO OG image).
+ * Lets the operator:
  *   - SEARCH by the AI-generated description (or filename) — `?q=` keyword match
  *   - UPLOAD a new file (POST /api/assets; the server describes images on upload)
  *   - DELETE an unwanted file (DELETE /api/assets?key=, in-app confirm)
- *   - PICK one or more for the chat's "read" or "reference" intent (the caller
- *     decides which via the picker it opens; this returns the selected assets)
+ *   - PICK one or more assets (the caller takes what it needs — the chat may use
+ *     several, an image field takes the first) — returned via `onConfirm`
  *
  * Non-image assets (PDFs/docs) still show with a filename tile so they can be
  * picked for "read". REST-only; next-intl copy (chat.gallery.*); purpose tokens.
@@ -38,7 +39,7 @@ function isImage(a: GalleryAsset): boolean {
   return (a.contentType ?? "").toLowerCase().startsWith("image/");
 }
 
-export function ChatGalleryPicker({
+export function GalleryPicker({
   title,
   confirmLabel,
   onConfirm,
