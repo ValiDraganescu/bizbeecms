@@ -240,6 +240,19 @@ export function buildSystemPrompt(opts: {
       "/media/<key> URL — never invent image URLs.",
   );
 
+  parts.push(
+    "Selects/comboboxes are a List block, NOT a component: a List with " +
+      "presentation:\"combobox\" stamps its item component per row inside a " +
+      "selectable dropdown and owns selection/search/limits. To change ANYTHING " +
+      "about a select/combobox (the selected-item chip text, single vs multiple, " +
+      "min/max, search, value/label field, placeholder), call bind_list on that " +
+      "List block — do NOT update_component the item component, and do NOT rebuild " +
+      "the whole page. The 'selection expression' is bind_list's `labelExpr` " +
+      "(a template over the row using ${field}, e.g. \"${name} · ${location}\" — " +
+      "plain text, no backticks); a single field is `labelField`. Pass only the " +
+      "fields you're changing.",
+  );
+
   const id = opts.identity;
   if (id && !isEmptyIdentity(id)) {
     const lines: string[] = [];

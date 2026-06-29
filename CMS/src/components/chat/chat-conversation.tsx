@@ -32,7 +32,15 @@ import { isAtBottom } from "@/lib/chat/scroll-anchor";
 import {
   getActivePageContext,
   subscribeActivePageContext,
+  getActiveSections,
 } from "@/lib/chat/page-context";
+import {
+  findActiveMention,
+  filterSections,
+  applyMention,
+  segmentMentions,
+  type MentionSection,
+} from "@/lib/chat/mention";
 import {
   getActiveComponentContext,
   subscribeActiveComponentContext,
@@ -67,8 +75,11 @@ export type AssistantPart =
   | { kind: "text"; text: string }
   | { kind: "tool"; result: ToolResult };
 
+/** A media item shown inline in a user bubble (read attachment or referenced URL). */
+export type BubbleMedia = { name: string; url: string; mime?: string };
+
 export type ChatMsg =
-  | { role: "user"; content: string }
+  | { role: "user"; content: string; media?: BubbleMedia[] }
   | { role: "assistant"; content: string; tools: ToolResult[]; parts?: AssistantPart[] };
 
 /** Base64-encode a Blob's bytes (browser). Used to inline R2 attachments. */
@@ -79,19 +90,25 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
+/** A url whose extension or mime says it's a renderable image. */
+function isImageMedia(m: { url: string; mime?: string }): boolean {
+  return (m.mime?.startsWith("image/") ?? false) || /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(m.url);
+}
+
 /**
- * The text shown in the user's transcript bubble. Attachments aren't sent inline to
- * the bubble (it's plain text), so when a message is files-only we surface their
- * names so the turn isn't an empty bubble. With text, the names are appended below.
+ * The text shown in the user's transcript bubble. Image media render inline as
+ * thumbnails (see `media` on the message), so only NON-image attachments keep a
+ * filename line here — that way a files-only image turn isn't an empty bubble
+ * AND an image turn isn't both a thumbnail and a redundant `📎 name` line.
  */
 function bubbleText(
   text: string,
-  attachments: ReadonlyArray<{ name: string }>,
-  references: ReadonlyArray<{ name: string }> = [],
+  attachments: ReadonlyArray<BubbleMedia>,
+  references: ReadonlyArray<BubbleMedia> = [],
 ): string {
   const lines = [
-    ...attachments.map((a) => `📎 ${a.name}`), // read
-    ...references.map((a) => `🔗 ${a.name}`), // reference (use URL)
+    ...attachments.filter((a) => !isImageMedia(a)).map((a) => `📎 ${a.name}`), // read
+    ...references.filter((a) => !isImageMedia(a)).map((a) => `🔗 ${a.name}`), // reference (use URL)
   ];
   if (lines.length === 0) return text;
   const names = lines.join("\n");
@@ -118,14 +135,15 @@ function bubbleText(
  *
  * `getInlineContext` (optional) returns a short text block prepended to the NEXT
  * message SENT TO THE MODEL (not shown in the user's transcript bubble) — e.g. the
- * Page Builder's currently-selected page. Read fresh per `send`, so each message
- * carries the context that's current at send-time. Omit / "" → nothing prepended.
+ * Page Builder's currently-selected page, plus the resolved contents of any
+ * `@section` the message mentions. Receives the user's trimmed message text so it
+ * can resolve those mentions. Read fresh per `send`. Omit / "" → nothing prepended.
  */
 export function useChat(
   getContext?: () => string | undefined,
   getModel?: () => string | undefined,
   getOverride?: () => string | undefined,
-  getInlineContext?: () => string | undefined,
+  getInlineContext?: (message: string) => string | undefined,
 ) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [busy, setBusy] = useState(false);
@@ -140,6 +158,13 @@ export function useChat(
   } | null>(null);
   // The in-flight request's aborter, so `stop()` can cancel mid-stream.
   const abortRef = useRef<AbortController | null>(null);
+  // The last send's args, so a failed turn can be re-sent verbatim (the error
+  // row's "Retry"). Captured at the top of every send; null until the first.
+  const lastSendRef = useRef<{
+    text: string;
+    attachments: PendingAttachment[];
+    references: ReferencedAsset[];
+  } | null>(null);
 
   function stop() {
     abortRef.current?.abort();
@@ -153,12 +178,14 @@ export function useChat(
     const trimmed = text.trim();
     if ((trimmed === "" && attachments.length === 0 && references.length === 0) || busy) return;
 
+    // Remember this turn's exact inputs so the error row's "Retry" can re-send it.
+    lastSendRef.current = { text, attachments, references };
     setError(null);
     // Inline context (e.g. the Page Builder's selected page) is prepended to the
     // MODEL-facing message only; the user's transcript bubble shows their raw text.
     // Referenced gallery assets (use-by-URL, NOT read) are appended as a text
     // block so the model gets their exact /media URLs without inlining bytes.
-    const inline = getInlineContext?.()?.trim();
+    const inline = getInlineContext?.(trimmed)?.trim();
     const refBlock = buildReferencedAssetsText(references);
     const modelText = [inline, trimmed, refBlock].filter((s) => s && s !== "").join("\n\n");
 
@@ -191,9 +218,19 @@ export function useChat(
     // so content is never empty (route 400s otherwise) and the model sees prior
     // tool results instead of re-discovering. (See lib/chat/build-history.ts.)
     const history = buildModelHistory(messages, modelContent);
+    // Image attachments/references render inline in the user bubble; collect them
+    // (with url + mime) so the bubble can show thumbnails, not just filenames.
+    const media: BubbleMedia[] = [
+      ...attachments.map((a) => ({ name: a.name, url: a.url, mime: a.mime })),
+      ...references.map((r) => ({ name: r.name, url: r.url })),
+    ].filter(isImageMedia);
     setMessages((prev) => [
       ...prev,
-      { role: "user", content: bubbleText(trimmed, attachments, references) },
+      {
+        role: "user",
+        content: bubbleText(trimmed, attachments, references),
+        ...(media.length > 0 ? { media } : {}),
+      },
       { role: "assistant", content: "", tools: [], parts: [] },
     ]);
     setBusy(true);
@@ -256,6 +293,13 @@ export function useChat(
           /* non-JSON error body */
         }
         setError(msg);
+        // Nothing streamed — drop the empty assistant placeholder so the error
+        // row stands alone (and Retry won't pile up blank bubbles).
+        setMessages((prev) =>
+          prev.length > 0 && prev[prev.length - 1].role === "assistant" && prev[prev.length - 1].content === ""
+            ? prev.slice(0, -1)
+            : prev,
+        );
         setBusy(false);
         return;
       }
@@ -305,12 +349,15 @@ export function useChat(
   // a loaded assistant turn restores its stored `tools` so the cards (incl. the
   // input/output accordion) reappear; a turn that predates persistence has none.
   function seed(
-    seedMessages: { role: string; content: string; tools?: unknown[]; parts?: unknown[] }[],
+    seedMessages: { role: string; content: string; tools?: unknown[]; parts?: unknown[]; media?: unknown[] }[],
   ) {
     setError(null);
     setMessages(
       seedMessages.map((m) => {
-        if (m.role === "user") return { role: "user", content: m.content };
+        if (m.role === "user") {
+          const media = Array.isArray(m.media) ? (m.media as BubbleMedia[]) : undefined;
+          return { role: "user", content: m.content, ...(media && media.length > 0 ? { media } : {}) };
+        }
         const tools = Array.isArray(m.tools) ? (m.tools as ToolResult[]) : [];
         // Prefer stored interleaved order; older threads (no `parts`) fall back to
         // text-then-tools, which is what they always displayed anyway.
@@ -328,9 +375,18 @@ export function useChat(
     setError(null);
     setMessages([]);
     setUsage(null);
+    lastSendRef.current = null;
   }
 
-  return { messages, busy, error, send, seed, reset, stop, usage };
+  // Re-send the last turn after a failure (the error row's "Retry"). No-op if
+  // nothing was ever sent or a turn is already in flight.
+  function retry() {
+    const last = lastSendRef.current;
+    if (!last || busy) return;
+    void send(last.text, last.attachments, last.references);
+  }
+
+  return { messages, busy, error, send, seed, reset, stop, retry, usage };
 }
 
 /**
@@ -432,7 +488,57 @@ export function ChatConversation({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { messages, busy, error, send, stop } = chat;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Highlight overlay mirroring the textarea (renders `@section` tokens as code
+  // pills); kept scroll-aligned with the textarea so the pills sit under the text.
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const { messages, busy, error, send, stop, retry } = chat;
+
+  // Does the current text contain any `@mention` token? Only then do we paint the
+  // overlay + make the textarea text transparent (otherwise it's a plain box).
+  const hasMention = /`@[^`]+`/.test(input);
+
+  function syncOverlayScroll() {
+    const ta = textareaRef.current;
+    const ov = overlayRef.current;
+    if (ta && ov) {
+      ov.scrollTop = ta.scrollTop;
+      ov.scrollLeft = ta.scrollLeft;
+    }
+  }
+
+  // @section mentions: the active page's sections (page-aware, empty off-page) +
+  // the open `@query` token at the caret + the highlighted suggestion. The model
+  // already gets the section list via page-context, so an inserted `@Name`
+  // resolves server-side; this is the discoverable composer affordance.
+  const sections = useSyncExternalStore<MentionSection[]>(
+    subscribeActivePageContext,
+    getActiveSections,
+    () => [], // server snapshot: none during SSR
+  );
+  const [mentionCaret, setMentionCaret] = useState<number | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const activeMention =
+    mentionCaret !== null ? findActiveMention(input, mentionCaret) : null;
+  const mentionMatches =
+    activeMention && sections.length > 0 ? filterSections(sections, activeMention.query) : [];
+  const mentionOpen = activeMention !== null && mentionMatches.length > 0;
+
+  // Insert the chosen section as `@Name ` over the active `@query`, then restore
+  // focus + caret just after the inserted token.
+  function insertMention(name: string) {
+    if (!activeMention || mentionCaret === null) return;
+    const next = applyMention(input, mentionCaret, activeMention, name);
+    setInput(next.text);
+    setMentionCaret(null);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(next.caret, next.caret);
+      }
+    });
+  }
 
   // The model accepts non-text input → attachments are offered. Empty/undefined
   // modalities mean text-only (the catalog default), so the affordance is off.
@@ -614,6 +720,7 @@ export function ChatConversation({
     const pending = attachments;
     const refs = references;
     setInput("");
+    setMentionCaret(null);
     setAttachments([]);
     setReferences([]);
     setAttachError(null);
@@ -641,7 +748,7 @@ export function ChatConversation({
           )}
           {messages.map((m, i) =>
             m.role === "user" ? (
-              <UserBubble key={i} content={m.content} label={t("you")} />
+              <UserBubble key={i} content={m.content} media={m.media} label={t("you")} />
             ) : (
               <AssistantBubble
                 key={i}
@@ -667,12 +774,20 @@ export function ChatConversation({
       </div>
 
       {error && (
-        <p
+        <div
           role="alert"
-          className="rounded-md border border-danger bg-danger-subtle px-3 py-2 text-danger"
+          className="flex items-center gap-2 rounded-md border border-danger bg-danger-subtle px-3 py-2 text-danger"
         >
-          {t("error", { message: error })}
-        </p>
+          <span className="min-w-0 flex-1">{t("error", { message: error })}</span>
+          <button
+            type="button"
+            onClick={retry}
+            disabled={busy}
+            className="shrink-0 rounded font-medium underline hover:no-underline disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {t("retry")}
+          </button>
+        </div>
       )}
 
       {footer}
@@ -786,37 +901,142 @@ export function ChatConversation({
           </ul>
         )}
 
-        <textarea
-          className={
-            "min-h-[5.5rem] max-h-64 w-full resize-y rounded-md border bg-surface px-3 py-2 text-foreground " +
-            (dragOver && canAttach ? "border-primary ring-2 ring-ring" : "border-border")
-          }
-          rows={3}
-          placeholder={t("placeholder")}
-          value={input}
-          disabled={busy}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter") return;
-            if (decideSendOnEnter(enterMode, { shift: e.shiftKey, meta: e.metaKey, ctrl: e.ctrlKey })) {
-              e.preventDefault();
-              void onSend();
+        <div className="relative rounded-md bg-surface">
+          {/* @section autocomplete: anchored above the composer, listing the
+              active page's sections that match the open `@query`. */}
+          {mentionOpen && (
+            <ul
+              role="listbox"
+              aria-label={t("mention.label")}
+              className="absolute bottom-full left-0 z-50 mb-1 max-h-48 w-64 overflow-y-auto rounded-md border border-border bg-surface-raised py-1 shadow-lg"
+            >
+              {mentionMatches.map((s, idx) => {
+                const active = idx === Math.min(mentionIndex, mentionMatches.length - 1);
+                return (
+                  <li key={s.id} role="option" aria-selected={active}>
+                    <button
+                      type="button"
+                      // onMouseDown (not onClick) so the textarea doesn't blur
+                      // and close the dropdown before the insert runs.
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertMention(s.name);
+                      }}
+                      onMouseEnter={() => setMentionIndex(idx)}
+                      className={
+                        "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm " +
+                        (active ? "bg-surface-muted text-foreground" : "text-foreground hover:bg-surface-muted")
+                      }
+                    >
+                      <span className="text-foreground-muted">@</span>
+                      <span className="truncate">{s.name}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {/* Highlight overlay: a non-interactive mirror of the textarea text with
+              `@section` tokens painted as code pills. Same box metrics + wrapping
+              as the textarea (see the shared px/py/leading/whitespace classes) so
+              the pills sit exactly under the real glyphs. Only shown when the text
+              has a mention; otherwise the textarea renders its own (opaque) text. */}
+          {hasMention && (
+            <div
+              ref={overlayRef}
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-md border border-transparent px-3 py-2 text-base leading-normal text-foreground"
+            >
+              {/* Render the FULL token text (backticks included) so the overlay
+                  occupies the exact same character cells as the textarea — the
+                  caret stays glyph-aligned. Pill = a background tint + accent color
+                  ONLY (no padding / weight / spacing change), so glyph metrics
+                  match the textarea exactly and the highlight never drifts. */}
+              {segmentMentions(input).map((seg, i) =>
+                seg.mention ? (
+                  <span key={i} className="rounded bg-primary-subtle text-primary">
+                    {seg.text}
+                  </span>
+                ) : (
+                  <span key={i}>{seg.text}</span>
+                ),
+              )}
+              {/* trailing newline guard: a textarea shows a final empty line; mirror it. */}
+              {input.endsWith("\n") ? "\n" : ""}
+            </div>
+          )}
+          <textarea
+            ref={textareaRef}
+            className={
+              "relative min-h-[5.5rem] max-h-64 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-base leading-normal caret-foreground " +
+              (hasMention ? "text-transparent" : "text-foreground") +
+              " " +
+              (dragOver && canAttach ? "border-primary ring-2 ring-ring" : "border-border")
             }
-          }}
-          onDragOver={(e) => {
-            if (!canAttach) return;
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            setDragOver(false);
-            if (!canAttach || e.dataTransfer.files.length === 0) return;
-            e.preventDefault();
-            void addFiles(e.dataTransfer.files);
-          }}
-          aria-label={t("placeholder")}
-        />
+            rows={3}
+            placeholder={t("placeholder")}
+            value={input}
+            disabled={busy}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setMentionCaret(e.target.selectionStart);
+              setMentionIndex(0);
+            }}
+            onScroll={syncOverlayScroll}
+            // Keep the active-mention detection in sync as the caret moves by
+            // click or arrow keys (not just typing).
+            onClick={(e) => setMentionCaret((e.target as HTMLTextAreaElement).selectionStart)}
+            onKeyUp={(e) => {
+              if (e.key.startsWith("Arrow") || e.key === "Home" || e.key === "End") {
+                setMentionCaret((e.target as HTMLTextAreaElement).selectionStart);
+              }
+            }}
+            onKeyDown={(e) => {
+              // While the @section dropdown is open, arrows/enter/tab drive it and
+              // Esc closes it — none of these reach the send/newline logic.
+              if (mentionOpen) {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setMentionIndex((i) => (i + 1) % mentionMatches.length);
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setMentionIndex((i) => (i - 1 + mentionMatches.length) % mentionMatches.length);
+                  return;
+                }
+                if (e.key === "Enter" || e.key === "Tab") {
+                  e.preventDefault();
+                  insertMention(mentionMatches[Math.min(mentionIndex, mentionMatches.length - 1)].name);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setMentionCaret(null);
+                  return;
+                }
+              }
+              if (e.key !== "Enter") return;
+              if (decideSendOnEnter(enterMode, { shift: e.shiftKey, meta: e.metaKey, ctrl: e.ctrlKey })) {
+                e.preventDefault();
+                void onSend();
+              }
+            }}
+            onDragOver={(e) => {
+              if (!canAttach) return;
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              setDragOver(false);
+              if (!canAttach || e.dataTransfer.files.length === 0) return;
+              e.preventDefault();
+              void addFiles(e.dataTransfer.files);
+            }}
+            aria-label={t("placeholder")}
+          />
+        </div>
 
         <input
           ref={fileInputRef}
@@ -1093,12 +1313,38 @@ function InlineNode({ node }: { node: Inline }) {
   }
 }
 
-function UserBubble({ content, label }: { content: string; label: string }) {
+function UserBubble({
+  content,
+  media,
+  label,
+}: {
+  content: string;
+  media?: BubbleMedia[];
+  label: string;
+}) {
   return (
     <div className="self-end max-w-[80%]">
       <p className="mb-1 text-foreground-muted">{label}</p>
-      <div className="rounded-lg bg-primary-subtle px-3 py-2 text-foreground whitespace-pre-wrap">
-        {content}
+      <div className="rounded-lg bg-primary-subtle px-3 py-2 text-foreground">
+        {media && media.length > 0 && (
+          // Attached/referenced images render inline as thumbnails so the turn
+          // shows what was sent, not just a filename. They open full-size in a tab.
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {media.map((m) => (
+              <a
+                key={m.url}
+                href={m.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block h-20 w-20 overflow-hidden rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title={m.name}
+              >
+                <img src={m.url} alt={m.name} className="h-full w-full object-cover" />
+              </a>
+            ))}
+          </div>
+        )}
+        {content && <p className="whitespace-pre-wrap">{content}</p>}
       </div>
     </div>
   );

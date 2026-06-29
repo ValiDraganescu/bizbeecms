@@ -10,6 +10,7 @@ import {
   validateThreadInput,
   parseStoredMessages,
   sanitizeTools,
+  sanitizeMedia,
 } from "./history.ts";
 
 const tool = {
@@ -94,4 +95,48 @@ test("legacy threads (no tools field) still load fine", () => {
   const loaded = parseStoredMessages(column);
   assert.equal(loaded.length, 2);
   assert.equal(loaded[1].tools, undefined);
+});
+
+const img = { name: "hero.jpg", url: "/media/abc123", mime: "image/jpeg" };
+
+test("user media round-trips: validate → JSON column → parse", () => {
+  const v = validateThreadInput({
+    messages: [{ role: "user", content: "use this", media: [img] }],
+  });
+  assert.ok(v.ok);
+  const column = JSON.stringify((v as { ok: true; input: { messages: unknown[] } }).input.messages);
+  const loaded = parseStoredMessages(column);
+  assert.deepEqual(loaded[0].media, [img]);
+});
+
+test("media only attaches to user turns (dropped on assistant)", () => {
+  const v = validateThreadInput({
+    messages: [{ role: "assistant", content: "hi", media: [img] }],
+  });
+  assert.ok(v.ok);
+  assert.equal((v as { ok: true; input: { messages: { media?: unknown }[] } }).input.messages[0].media, undefined);
+});
+
+test("sanitizeMedia rejects unsafe url schemes, keeps relative/http/data:image", () => {
+  const out = sanitizeMedia([
+    { name: "ok-rel", url: "/media/x" },
+    { name: "ok-http", url: "https://cdn/x.png" },
+    { name: "ok-data", url: "data:image/png;base64,AAAA" },
+    { name: "evil", url: "javascript:alert(1)" },
+    { name: "evil2", url: "data:text/html,<script>" },
+    { url: "/media/no-name" }, // missing name
+    "nope", // not an object
+  ]);
+  assert.deepEqual(
+    out?.map((m) => m.name),
+    ["ok-rel", "ok-http", "ok-data"],
+    "only safe-scheme, well-formed items survive",
+  );
+});
+
+test("sanitizeMedia caps the count and ignores non-arrays", () => {
+  assert.equal(sanitizeMedia("nope"), undefined);
+  assert.equal(sanitizeMedia([]), undefined);
+  const many = Array.from({ length: 30 }, (_, i) => ({ name: `n${i}`, url: `/media/${i}` }));
+  assert.equal(sanitizeMedia(many)?.length, 20);
 });

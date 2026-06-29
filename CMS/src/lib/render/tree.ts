@@ -17,6 +17,11 @@
  */
 
 import { resolveLocalized } from "./localize.ts";
+import {
+  COMBOBOX_LIST_ASSET_KEY,
+  COMBOBOX_LIST_SCRIPT,
+  COMBOBOX_LIST_CSS,
+} from "./combobox-list-asset.ts";
 
 /**
  * Reserved component name for a layout Section — a builder primitive, NOT an
@@ -64,6 +69,22 @@ export function isBuiltinComponent(name: string): boolean {
   return (BUILTIN_COMPONENTS as readonly string[]).includes(name);
 }
 
+/**
+ * Canonicalize a combobox `labelExpr` to a bare TEMPLATE-LITERAL BODY: trimmed,
+ * with a single pair of surrounding backticks stripped if present. The field IS a
+ * template body (e.g. `${name} ★ ${rating}`) — the renderer wraps it back in
+ * backticks to evaluate. Accepting backticks here means neither the operator nor
+ * the AI has to know whether to add them; we store the clean form either way.
+ * Idempotent. "" / undefined → "".
+ */
+export function normalizeLabelExpr(expr: string | null | undefined): string {
+  const s = (expr ?? "").trim();
+  if (s.length >= 2 && s.startsWith("`") && s.endsWith("`")) {
+    return s.slice(1, -1).trim();
+  }
+  return s;
+}
+
 // ── Component element tree (what `component.tree` holds, parsed) ─────────────
 export type TreeNode =
   | string
@@ -109,6 +130,49 @@ export type ListSource = {
   sort?: Array<{ field: string; dir?: "asc" | "desc" }>;
   /** Max rows to stamp. Clamped by the query store; default = the store default. */
   limit?: number;
+  /**
+   * How the stamped rows are PRESENTED (default "list"):
+   *  - "list"     → the original List: a flat container of stamped rows.
+   *  - "combobox" → the List acts as a Combobox CONTAINER. It still stamps the
+   *    ITEM COMPONENT once per row (same `listMap` field→prop binding), but wraps
+   *    each stamped row as a selectable option inside a combobox shell. The
+   *    combobox client script owns selection/search/check/limits; the author's
+   *    item component is purely visual. Config below rides on the SAME List panel.
+   */
+  presentation?: "list" | "combobox";
+  // ── "combobox" presentation config (ignored for "list") ───────────────────
+  /** single = pick one (closes on select); multiple = pick many. Default multiple. */
+  select?: "single" | "multiple";
+  /** Minimum selectable (a selected item can't be removed below this). Default 0. */
+  min?: number;
+  /** Maximum selectable (0 = unlimited). Default 0. */
+  max?: number;
+  /** Show the in-panel search box (default true). */
+  searchable?: boolean;
+  /** Collection field whose value identifies each option (default the row `id`). */
+  valueField?: string;
+  /**
+   * Collection field shown as each selected item's chip in the trigger summary
+   * (and matched by search). Default: the option's rendered text content (the
+   * stamped item component flattened) — which can read mashed, hence this opt-in.
+   */
+  labelField?: string;
+  /**
+   * Advanced: a TEMPLATE-LITERAL BODY evaluated client-side against the ROW object
+   * to build the chip label — stored WITHOUT backticks, e.g. "${name} · ★ ${rating}"
+   * (see `normalizeLabelExpr`; the client wraps it in backticks before eval). Wins
+   * over `labelField`. Runs via `new Function` IN THE BROWSER (admin-authored, same
+   * trust as a component's client script). A throwing/empty expr falls back to
+   * labelField → text. NEVER evaluated on the server (Workers block Function); the
+   * renderer only stamps the row JSON + the expr string for the client to use.
+   */
+  labelExpr?: string;
+  /** Form field name for the hidden input the selection writes to. Default "selection". */
+  name?: string;
+  /** Trigger placeholder when nothing is selected. */
+  placeholder?: string;
+  /** Search box placeholder. */
+  searchPlaceholder?: string;
 };
 
 // ── Page block instances (what `page.blocks` holds, parsed) ──────────────────
@@ -153,6 +217,11 @@ export type ComponentArtifact = {
   name: string;
   tree: TreeNode;
   script?: string;
+  /** Component-scoped CSS (the artifact's `css` column). Shipped once per used
+   *  component, like `script`. Needed for styles that can't ride Tailwind utility
+   *  classes — e.g. rules targeting nodes a CLIENT script builds at runtime, which
+   *  never appear in the SSR plan the runtime Tailwind compiler reads. */
+  css?: string;
   // The component's declared props, a JSON string `{ name: { type, default } }`
   // (B2/H2 `propsSchema` column). Only props DECLARED here can be bound from a
   // page block — it is the allowlist for the `{{prop}}` slot binding below.
@@ -177,6 +246,8 @@ export type RenderPlan = {
   root: ElementPlan[];
   // Client scripts, in first-seen order, one per distinct component used.
   scripts: string[];
+  // Component-scoped CSS, in first-seen order, one per distinct component used.
+  styles: string[];
 };
 
 /**
@@ -388,7 +459,18 @@ function slotString(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
-  // Objects/arrays/functions are not valid slot content — drop to "".
+  // Arrays/plain objects = a `json` prop's structured value. Serialize to JSON so
+  // it can ride in a DOM attribute (e.g. `data-options='{{options}}'`) for the
+  // component's CLIENT script to JSON.parse — the only channel a static-SSR script
+  // has to receive instance data. React escapes it downstream (no injection).
+  // Functions and anything that can't stringify still drop to "".
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "";
+    }
+  }
   return "";
 }
 
@@ -487,15 +569,26 @@ export function planPage(
   locale?: LocaleContext,
 ): RenderPlan {
   const scripts: string[] = [];
-  const seenScripts = new Set<string>();
+  const styles: string[] = [];
+  const seenAssets = new Set<string>();
 
-  // Ship a component's client script once (first-use order). Shared by top-level
-  // block components AND nested-by-tag components resolved inside a tree.
+  // Ship a component's client script + scoped CSS once (first-use order). Shared
+  // by top-level block components AND nested-by-tag components resolved in a tree.
   function collectScript(artifact: ComponentArtifact): void {
-    if (artifact.script && !seenScripts.has(artifact.name)) {
-      seenScripts.add(artifact.name);
-      scripts.push(artifact.script);
-    }
+    if (seenAssets.has(artifact.name)) return;
+    seenAssets.add(artifact.name);
+    if (artifact.script) scripts.push(artifact.script);
+    if (artifact.css) styles.push(artifact.css);
+  }
+
+  // Ship the built-in combobox-list script + CSS once, only if a combobox-mode
+  // List is actually rendered (the List is a renderer primitive with no D1 row,
+  // so its client behavior can't come from the component registry — it lives here).
+  function useBuiltinComboboxAssets(): void {
+    if (seenAssets.has(COMBOBOX_LIST_ASSET_KEY)) return;
+    seenAssets.add(COMBOBOX_LIST_ASSET_KEY);
+    scripts.push(COMBOBOX_LIST_SCRIPT);
+    styles.push(COMBOBOX_LIST_CSS);
   }
 
   function planBlock(block: Block): ElementPlan {
@@ -514,7 +607,7 @@ export function planPage(
     // rows were hydrated into `block.listRows` by buildPlanFromPage; planList
     // stamps + binds per row and delegates each stamped block back to planBlock.
     if (block.component === LIST_COMPONENT) {
-      return planList(block, planBlock);
+      return planList(block, planBlock, useBuiltinComboboxAssets);
     }
     const artifact = components.get(block.component);
     if (!artifact) {
@@ -553,7 +646,7 @@ export function planPage(
     return { ...el, children: [...el.children, ...childPlans] };
   }
 
-  return { root: blocks.map(planBlock), scripts };
+  return { root: blocks.map(planBlock), scripts, styles };
 }
 
 // ── Built-in List → per-row stamp (Phase 2, Slice B) ─────────────────────────
@@ -602,6 +695,7 @@ function stampRow(
 function planList(
   block: Block,
   planBlock: (b: Block) => ElementPlan,
+  useComboboxAssets?: () => void,
 ): ElementPlan {
   const children = block.children ?? [];
   const template = children.filter((c) => c.listRole !== "empty");
@@ -611,18 +705,203 @@ function planList(
 
   // Empty / dead / un-hydrated result → the empty-state slot if authored, else
   // nothing (an empty container). NEVER a throw — mirrors Section's graceful path.
-  const stampedChildren: ElementPlan[] =
-    rows.length === 0
-      ? emptySlot.map(planBlock)
-      : rows.flatMap((row) =>
-          template.map((t) => planBlock(stampRow(t, row, map))),
-        );
+  if (rows.length === 0) {
+    return listWrapper(block, emptySlot.map(planBlock));
+  }
 
+  // Stamp the item component once PER ROW (the row's mapped fields bind into the
+  // stamped component's declared props). This is shared by both presentations.
+  const stampPlan = (row: Record<string, unknown>): ElementPlan[] =>
+    template.map((t) => planBlock(stampRow(t, row, map)));
+
+  // "combobox" presentation: wrap each stamped row in a selectable option element
+  // carrying a STABLE value, and nest the lot in the combobox shell. The combobox
+  // CLIENT script enhances these pre-stamped options (select/search/check/limits)
+  // — it does NOT build the rows; the rows are real server-stamped CMS components.
+  if (block.listSource?.presentation === "combobox") {
+    useComboboxAssets?.();
+    return planComboboxList(block, rows, stampPlan);
+  }
+
+  // Default: a flat list of stamped rows.
+  return listWrapper(block, rows.flatMap(stampPlan));
+}
+
+/** The plain List wrapper — a stable, style-free hook (mirrors Section). */
+function listWrapper(block: Block, children: ElementPlan[]): ElementPlan {
   return {
     kind: "element",
     tag: "div",
     props: { "data-list": block.id },
-    children: stampedChildren,
+    children,
+  };
+}
+
+/**
+ * Resolve the per-row VALUE used as an option's stable identity. Authoring picks
+ * the collection field via `listSource.valueField`; falls back to the row's `id`
+ * (every content row has one), then to the row index handled by the caller.
+ */
+function rowValue(
+  block: Block,
+  row: Record<string, unknown>,
+  index: number,
+): string {
+  const field = block.listSource?.valueField;
+  const raw = field ? row[field] : row.id;
+  return raw == null ? String(index) : String(raw);
+}
+
+/**
+ * "combobox" List presentation — the List acts as a Combobox CONTAINER:
+ *  - emits the combobox shell (trigger + summary + caret, and a panel with an
+ *    optional search box + an options list + empty/hint slots),
+ *  - stamps the chosen ITEM COMPONENT once per row as each option's BODY,
+ *  - wraps each option in `<li data-cb-option data-cb-value="…">` carrying a
+ *    combobox-owned check; the client `combobox-list` script (shipped as a normal
+ *    component script via the registry) wires selection/search/min/max/single-
+ *    multi over these PRE-STAMPED options. The author's item component is purely
+ *    visual — it never knows about selection.
+ *
+ * Config rides on `listSource` (mode/min/max/search/sort already authored on the
+ * List) so there is ONE authoring panel. Pure — no I/O.
+ */
+function planComboboxList(
+  block: Block,
+  rows: Array<Record<string, unknown>>,
+  stampPlan: (row: Record<string, unknown>) => ElementPlan[],
+): ElementPlan {
+  const src = block.listSource ?? ({} as ListSource);
+  const cfg = {
+    multiple: src.select !== "single",
+    min: src.min ?? 0,
+    max: src.max ?? 0,
+    searchable: src.searchable !== false,
+    name: src.name ?? "selection",
+    placeholder: src.placeholder ?? "Select…",
+    searchPlaceholder: src.searchPlaceholder ?? "Search…",
+  };
+
+  const labelField = src.labelField;
+  const options: ElementPlan[] = rows.map((row, i) => {
+    const liProps: Record<string, unknown> = {
+      "data-cb-option": "",
+      "data-cb-value": rowValue(block, row, i),
+      role: "option",
+      "aria-selected": "false",
+      className: "cb-opt",
+    };
+    // Chip label source, in precedence order the client applies: a resolved field
+    // value (data-cb-label), and the whole row JSON for the optional client-side
+    // label expression (data-cb-row). Absent both → the client falls back to the
+    // option's flattened text content.
+    if (labelField && row[labelField] != null) liProps["data-cb-label"] = String(row[labelField]);
+    if (src.labelExpr) liProps["data-cb-row"] = JSON.stringify(row);
+    return {
+      kind: "element" as const,
+      tag: "li",
+      props: liProps,
+      children: [
+        { kind: "element" as const, tag: "div", props: { className: "cb-opt-body" }, children: stampPlan(row) },
+        checkmarkPlan(),
+      ],
+    };
+  });
+
+  const panelChildren: ElementPlan[] = [];
+  if (cfg.searchable) {
+    panelChildren.push({
+      kind: "element",
+      tag: "div",
+      props: { className: "cb-search-wrap", "data-cb-search-wrap": "" },
+      children: [
+        {
+          kind: "element",
+          tag: "input",
+          props: { type: "text", "data-cb-search": "", className: "cb-search", placeholder: cfg.searchPlaceholder },
+          children: [],
+        },
+      ],
+    });
+  }
+  panelChildren.push({
+    kind: "element",
+    tag: "ul",
+    props: { "data-cb-list": "", role: "listbox", className: "cb-list" },
+    children: options,
+  });
+  panelChildren.push({
+    kind: "element",
+    tag: "div",
+    props: { "data-cb-empty": "", className: "cb-empty cb-hidden" },
+    children: [{ kind: "text", text: "No matches" }],
+  });
+  panelChildren.push({
+    kind: "element",
+    tag: "div",
+    props: { "data-cb-hint": "", className: "cb-hint cb-hidden" },
+    children: [],
+  });
+
+  const rootProps: Record<string, unknown> = {
+    "data-list": block.id,
+    "data-combobox-list": "",
+    "data-cb-multiple": cfg.multiple ? "true" : "false",
+    "data-cb-min": String(cfg.min),
+    "data-cb-max": String(cfg.max),
+    "data-cb-name": cfg.name,
+    "data-cb-placeholder": cfg.placeholder,
+    className: "cb-root",
+  };
+  // The optional client-side label expression (admin-authored, evaluated against
+  // each option's row in the browser). Stamped as data only — never run here.
+  // Normalize to a bare template-literal BODY (strip any stored backticks); the
+  // client wraps it back in backticks before eval. Handles both new clean values
+  // and legacy backtick-wrapped ones identically.
+  const labelExpr = normalizeLabelExpr(src.labelExpr);
+  if (labelExpr) rootProps["data-cb-label-expr"] = labelExpr;
+
+  return {
+    kind: "element",
+    tag: "div",
+    props: rootProps,
+    children: [
+      { kind: "element", tag: "input", props: { type: "hidden", "data-cb-value-input": "", name: cfg.name }, children: [] },
+      {
+        kind: "element",
+        tag: "button",
+        props: { type: "button", "data-cb-trigger": "", className: "cb-trigger" },
+        children: [
+          { kind: "element", tag: "span", props: { "data-cb-summary": "", className: "cb-summary" }, children: [{ kind: "text", text: cfg.placeholder }] },
+          caretPlan(),
+        ],
+      },
+      { kind: "element", tag: "div", props: { "data-cb-panel": "", className: "cb-panel cb-hidden" }, children: panelChildren },
+    ],
+  };
+}
+
+/** A combobox-owned selection checkmark (hidden until the option is selected). */
+function checkmarkPlan(): ElementPlan {
+  return {
+    kind: "element",
+    tag: "svg",
+    props: { className: "cb-check", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+    children: [
+      { kind: "element", tag: "path", props: { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M5 13l4 4L19 7" }, children: [] },
+    ],
+  };
+}
+
+/** The trigger's caret chevron. */
+function caretPlan(): ElementPlan {
+  return {
+    kind: "element",
+    tag: "svg",
+    props: { "data-cb-caret": "", className: "cb-caret", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+    children: [
+      { kind: "element", tag: "path", props: { "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "2", d: "M19 9l-7 7-7-7" }, children: [] },
+    ],
   };
 }
 

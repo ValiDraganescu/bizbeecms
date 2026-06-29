@@ -14,6 +14,9 @@ import {
   targetSectionId,
   moveNode,
   validateBlocks,
+  sectionName,
+  listSections,
+  renameSection,
 } from "./page-blocks.ts";
 import {
   planPage,
@@ -308,4 +311,41 @@ test("mergeSectionProps is a no-op for a non-Section id and never mutates", () =
   const before = JSON.stringify(t0);
   mergeSectionProps(t0, t0[0].id, { gap: 99 });
   assert.equal(JSON.stringify(t0), before, "input not mutated");
+});
+
+test("sectionName: falls back to 'Section N' (1-based) when unnamed", () => {
+  const t = addSection([]);
+  assert.equal(sectionName(t[0], 0), "Section 1");
+  assert.equal(sectionName(t[0], 2), "Section 3");
+});
+
+test("sectionName: uses props.name when set (trimmed)", () => {
+  const base = addSection([]);
+  const named = renameSection(base, base[0].id, "  Hero  ");
+  assert.equal(sectionName(named[0], 0), "Hero");
+});
+
+test("listSections: returns {id,name} in order with defaults + custom names", () => {
+  let blocks = addSection(addSection([])); // two sections
+  blocks = renameSection(blocks, blocks[0].id, "Intro");
+  const list = listSections(blocks);
+  assert.equal(list.length, 2);
+  assert.equal(list[0].name, "Intro");
+  assert.equal(list[1].name, "Section 2");
+  assert.equal(list[0].id, blocks[0].id);
+});
+
+test("renameSection: blank name clears back to the default", () => {
+  const b = addSection([]);
+  const named = renameSection(b, b[0].id, "Hero");
+  const cleared = renameSection(named, b[0].id, "   ");
+  assert.equal(cleared[0].props?.name, undefined);
+  assert.equal(sectionName(cleared[0], 0), "Section 1");
+});
+
+test("renameSection: does not mutate the input", () => {
+  const b = addSection([]);
+  const before = JSON.stringify(b);
+  renameSection(b, b[0].id, "Hero");
+  assert.equal(JSON.stringify(b), before);
 });

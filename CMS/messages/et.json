@@ -69,7 +69,10 @@
       "overrideActive": "Kohandatud viip: {label}",
       "overrideActiveUnnamed": "Kohandatud viip aktiivne",
       "overrideTitle": "Salvestatud süsteemiviipa versioon on aktiivne ainult sinu seansis.",
-      "overrideClear": "Kasuta vaikimisi"
+      "overrideClear": "Kasuta vaikimisi",
+      "historyDeleteConfirm": "Kustuta",
+      "historyDeleteCancel": "Tühista",
+      "more": "Rohkem"
     },
     "debug": {
       "context": "Lehe kontekst",
@@ -144,7 +147,9 @@
       "editTags": "Muuda silte",
       "removeTag": "Eemalda silt {tag}",
       "tagsFailed": "Siltide salvestamine ebaõnnestus: {message}"
-    }
+    },
+    "retry": "Proovi uuesti",
+    "mention": { "label": "Lehe sektsioonid" }
   },
   "contentLocales": {
     "title": "Sisukeeled",
@@ -415,6 +420,7 @@
     "categoryLayout": "Paigutus",
     "categoryComponents": "Komponendid",
     "layoutSection": "Sektsioon",
+    "renameSection": { "action": "Nimeta sektsioon ümber", "label": "Sektsiooni nimi" },
     "layoutList": "Loend (kogumikust)",
     "bind": {
       "title": "Seo kogumikuga",

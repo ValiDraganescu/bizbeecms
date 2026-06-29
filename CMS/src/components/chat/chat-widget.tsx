@@ -19,7 +19,11 @@ import { useTranslations } from "next-intl";
 import { ChatConversation, useChat } from "@/components/chat/chat-conversation";
 import { ChatDebugPanel } from "@/components/chat/chat-debug-panel";
 import { detectAdminContext } from "@/lib/chat/tool-scopes";
-import { getActivePageContext } from "@/lib/chat/page-context";
+import {
+  getActivePageContext,
+  getActiveSections,
+  formatMentionedSections,
+} from "@/lib/chat/page-context";
 import { getActiveComponentContext } from "@/lib/chat/component-context";
 import { CHAT_MODELS, DEFAULT_MODEL, type CatalogModel } from "@/lib/chat/models";
 import { coerceCatalog } from "@/lib/chat/catalog-coerce";
@@ -103,8 +107,16 @@ export function ChatWidget() {
   // closed; cleared when the panel opens. See `lib/chat/unread-badge.ts`.
   const [unread, setUnread] = useState(false);
   const [debug, setDebug] = useState(false);
+  // Overflow "⋯" menu in the header — holds the power-user Debug toggle so the
+  // header's primary row stays at four buttons (New / History / Size / Minimize).
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const overflowRef = useRef<HTMLDivElement | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [threads, setThreads] = useState<ThreadSummary[]>([]);
+  // Thread pending an inline delete-confirm (the trash icon arms; a second click
+  // on the confirm button deletes). null = nothing armed. Irreversible action,
+  // so it never fires on the first click.
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   // Persisted across reloads (ai-widget-ux): restored on mount from localStorage,
   // validated against the live catalog (a removed model can't stick), written
   // through on change. Until the catalog loads we trust a stored id (the chat
@@ -155,10 +167,16 @@ export function ChatWidget() {
     () => model,
     () => promptOverride ?? undefined,
     // Inline context for the next message: page context (Page Builder) and/or
-    // component context (Develop workbench). Only one is set at a time in practice
-    // (they're different routes), but combine defensively.
-    () =>
-      [getActivePageContext(), getActiveComponentContext()]
+    // component context (Develop workbench), plus the RESOLVED CONTENTS of any
+    // @section the message mentions (so the assistant targets the right nested
+    // block id instead of guessing). Only one base context is set at a time in
+    // practice (different routes), but combine defensively.
+    (message) =>
+      [
+        getActivePageContext(),
+        formatMentionedSections(message, getActiveSections()),
+        getActiveComponentContext(),
+      ]
         .filter((s) => s !== "")
         .join("\n\n") || undefined,
   );
@@ -229,7 +247,7 @@ export function ChatWidget() {
       messages: messages.map((m) =>
         m.role === "assistant"
           ? { role: m.role, content: m.content, tools: m.tools, parts: m.parts }
-          : { role: m.role, content: m.content },
+          : { role: m.role, content: m.content, media: m.media },
       ),
     };
     void (async () => {
@@ -261,7 +279,10 @@ export function ChatWidget() {
       const res = await fetch(`/api/chat/history?id=${encodeURIComponent(id)}`);
       if (!res.ok) return;
       const j = (await res.json()) as {
-        thread?: { id: string; messages: { role: string; content: string; tools?: unknown[] }[] };
+        thread?: {
+          id: string;
+          messages: { role: string; content: string; tools?: unknown[]; parts?: unknown[]; media?: unknown[] }[];
+        };
       };
       if (!j.thread) return;
       chat.seed(j.thread.messages);
@@ -339,6 +360,18 @@ export function ChatWidget() {
   useEffect(() => {
     if (open) setUnread(false);
   }, [open]);
+
+  // Close the header overflow menu on an outside click.
+  useEffect(() => {
+    if (!overflowOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setOverflowOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [overflowOpen]);
 
   // The Develop workbench's "Send preview to AI" opens the widget so its composer
   // mounts and receives the captured screenshots (the bus replays them on mount).
@@ -451,6 +484,7 @@ export function ChatWidget() {
   }
 
   function toggleHistory() {
+    setConfirmDelete(null); // never carry an armed delete across open/close
     setHistoryOpen((h) => {
       const next = !h;
       if (next) void loadThreads();
@@ -548,22 +582,6 @@ export function ChatWidget() {
               </button>
               <button
                 type="button"
-                onClick={() => setDebug((d) => !d)}
-                aria-label={t("debug")}
-                aria-pressed={debug}
-                title={t("debug")}
-                className={
-                  "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
-                  (debug ? "bg-surface-muted text-foreground" : "text-foreground-muted")
-                }
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-                </svg>
-              </button>
-              <button
-                type="button"
                 onClick={togglePreset}
                 aria-label={panelLarge ? t("sizeCompact") : t("sizeHalf")}
                 aria-pressed={panelLarge}
@@ -583,6 +601,50 @@ export function ChatWidget() {
                   </svg>
                 )}
               </button>
+              <div ref={overflowRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setOverflowOpen((o) => !o)}
+                  aria-label={t("more")}
+                  aria-haspopup="menu"
+                  aria-expanded={overflowOpen}
+                  title={t("more")}
+                  className={
+                    "rounded-md p-1.5 transition-colors hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+                    (overflowOpen || debug ? "bg-surface-muted text-foreground" : "text-foreground-muted")
+                  }
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                    <circle cx="5" cy="12" r="0.5" />
+                    <circle cx="12" cy="12" r="0.5" />
+                    <circle cx="19" cy="12" r="0.5" />
+                  </svg>
+                </button>
+                {overflowOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-md border border-border bg-surface-raised shadow-lg"
+                  >
+                    <button
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={debug}
+                      onClick={() => {
+                        setDebug((d) => !d);
+                        setOverflowOpen(false);
+                      }}
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-surface-muted focus-visible:outline-none focus-visible:bg-surface-muted"
+                    >
+                      <span>{t("debug")}</span>
+                      {debug && (
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                          <path d="M20 6 9 17l-5-5" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
@@ -615,17 +677,41 @@ export function ChatWidget() {
                       >
                         {th.title || t("historyUntitled")}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => void removeThread(th.id)}
-                        aria-label={t("historyDelete")}
-                        title={t("historyDelete")}
-                        className="shrink-0 rounded p-1 text-foreground-muted transition-colors hover:bg-danger-subtle hover:text-danger"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-                          <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
-                        </svg>
-                      </button>
+                      {confirmDelete === th.id ? (
+                        // Armed: explicit confirm/cancel — deleting a thread is
+                        // irreversible, so it never happens on a single click.
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmDelete(null);
+                              void removeThread(th.id);
+                            }}
+                            className="rounded bg-danger px-2 py-0.5 text-xs font-medium text-danger-foreground hover:bg-danger-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {t("historyDeleteConfirm")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDelete(null)}
+                            className="rounded px-2 py-0.5 text-xs text-foreground-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {t("historyDeleteCancel")}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDelete(th.id)}
+                          aria-label={t("historyDelete")}
+                          title={t("historyDelete")}
+                          className="shrink-0 rounded p-1 text-foreground-muted transition-colors hover:bg-danger-subtle hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   ))
                 )}
@@ -661,35 +747,41 @@ export function ChatWidget() {
                         </button>
                       </div>
                     )}
-                    <div className="flex items-center gap-2">
-                      <span className="shrink-0">{t("model")}</span>
-                      <ModelPicker value={model} onChange={setModel} />
-                    </div>
-                    {credit && (
-                      <span className="shrink-0 tabular-nums" title={t("creditTitle")}>
-                        {credit.limit != null && credit.remaining != null
-                          ? t("creditOf", {
-                              remaining: formatUsd(credit.remaining),
-                              limit: formatUsd(credit.limit),
+                    {/* One session-status line: the model picker leads, then
+                        credit + context usage sit inline to its right (wrapping
+                        only when the panel is narrow). They're all "current
+                        session facts", so they read as one row, not a stack. */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0">{t("model")}</span>
+                        <ModelPicker value={model} onChange={setModel} />
+                      </div>
+                      {credit && (
+                        <span className="shrink-0 tabular-nums" title={t("creditTitle")}>
+                          {credit.limit != null && credit.remaining != null
+                            ? t("creditOf", {
+                                remaining: formatUsd(credit.remaining),
+                                limit: formatUsd(credit.limit),
+                              })
+                            : t("creditUsage", { usage: formatUsd(credit.usage) })}
+                        </span>
+                      )}
+                      {chat.usage && (
+                        <ContextMeter
+                          used={chat.usage.promptTokens}
+                          max={catalog.find((m) => m.id === model)?.contextLength ?? null}
+                          label={t("contextUsage", {
+                            used: formatTokens(chat.usage.promptTokens),
+                          })}
+                          ofLabel={(maxTokens) =>
+                            t("contextOf", {
+                              used: formatTokens(chat.usage!.promptTokens),
+                              max: formatTokens(maxTokens),
                             })
-                          : t("creditUsage", { usage: formatUsd(credit.usage) })}
-                      </span>
-                    )}
-                    {chat.usage && (
-                      <ContextMeter
-                        used={chat.usage.promptTokens}
-                        max={catalog.find((m) => m.id === model)?.contextLength ?? null}
-                        label={t("contextUsage", {
-                          used: formatTokens(chat.usage.promptTokens),
-                        })}
-                        ofLabel={(maxTokens) =>
-                          t("contextOf", {
-                            used: formatTokens(chat.usage!.promptTokens),
-                            max: formatTokens(maxTokens),
-                          })
-                        }
-                      />
-                    )}
+                          }
+                        />
+                      )}
+                    </div>
                   </div>
                 }
               />

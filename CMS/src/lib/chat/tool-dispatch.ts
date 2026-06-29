@@ -708,16 +708,29 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
     if (!listBlock) return { ok: false, errors: [`no block with id "${block}" on this page`] };
     if (!isList(listBlock)) return { ok: false, errors: [`block "${block}" is not a List`] };
 
-    // Merge the patch onto the existing config so partial updates work.
+    // Merge the patch onto the existing config so partial updates work. Spreading
+    // prevSource first preserves any field the patch doesn't touch (presentation +
+    // combobox config included) — only explicitly-passed fields are overwritten.
     const prevSource = listBlock.listSource ?? { collection: "" };
     const collection = valid.value.collection ?? prevSource.collection;
     if (!collection) return { ok: false, errors: ["this list has no collection yet — pass `collection`"] };
-    const listSource = {
-      collection,
-      filter: valid.value.filter ?? prevSource.filter,
-      sort: valid.value.sort ?? prevSource.sort,
-      limit: valid.value.limit ?? prevSource.limit,
-    };
+    const v = valid.value;
+    const patch: Partial<typeof prevSource> = { collection };
+    if (v.filter !== undefined) patch.filter = v.filter;
+    if (v.sort !== undefined) patch.sort = v.sort;
+    if (v.limit !== undefined) patch.limit = v.limit;
+    if (v.presentation !== undefined) patch.presentation = v.presentation;
+    if (v.select !== undefined) patch.select = v.select;
+    if (v.min !== undefined) patch.min = v.min;
+    if (v.max !== undefined) patch.max = v.max;
+    if (v.searchable !== undefined) patch.searchable = v.searchable;
+    if (v.valueField !== undefined) patch.valueField = v.valueField;
+    if (v.labelField !== undefined) patch.labelField = v.labelField;
+    if (v.labelExpr !== undefined) patch.labelExpr = v.labelExpr;
+    if (v.name !== undefined) patch.name = v.name;
+    if (v.placeholder !== undefined) patch.placeholder = v.placeholder;
+    if (v.searchPlaceholder !== undefined) patch.searchPlaceholder = v.searchPlaceholder;
+    const listSource = { ...prevSource, ...patch };
     const listMap = valid.value.map ?? listBlock.listMap ?? {};
 
     // Template: the existing template child's component, unless replacing it.

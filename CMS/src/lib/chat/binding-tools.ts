@@ -25,6 +25,7 @@
  * `validateListBinding` in the dispatch handler, not re-implemented here.
  */
 import { FILTER_OPS } from "../content/query-compiler.ts";
+import { normalizeLabelExpr } from "../render/tree.ts";
 
 // ── Shared arg-shaping (mirrors collection-tools.validateQuery's filter/sort) ──
 
@@ -218,11 +219,15 @@ export const BIND_LIST_TOOL = {
   function: {
     name: "bind_list",
     description:
-      "Reconfigure an EXISTING List block on a page: change its collection query, its " +
-      "per-row template component, and/or the row-field → template-prop map. Identify " +
-      "the page by id and the List by its block id (get_page shows it; component is " +
-      "'List'). Pass only what you want to change; `collection`, `template` and `map` " +
-      "set the query, the template, and the binding respectively.",
+      "Reconfigure an EXISTING List block on a page: its collection query, its per-row " +
+      "template component, the row-field → template-prop map, AND its presentation. A " +
+      "List can present as a flat list (default) OR as a COMBOBOX/SELECT dropdown — the " +
+      "combobox/select control on a page IS a List block with `presentation:\"combobox\"`, " +
+      "NOT a separate component. To change anything about a select/combobox (how the " +
+      "chosen item's chip reads, single vs multiple, min/max, search, placeholder), call " +
+      "THIS tool with the combobox fields below — do NOT update_component the item " +
+      "component for that. Identify the page by id and the List by its block id (get_page " +
+      "shows it; component is 'List'). PATCH semantics: pass only what you want to change.",
     parameters: {
       type: "object",
       properties: {
@@ -234,6 +239,31 @@ export const BIND_LIST_TOOL = {
         sort: SORT_SCHEMA,
         limit: { type: "number", description: "Max rows to render." },
         map: MAP_SCHEMA,
+        presentation: {
+          type: "string",
+          enum: ["list", "combobox"],
+          description: "How rows are shown: 'list' (flat) or 'combobox' (a selectable dropdown). The fields below apply only to 'combobox'.",
+        },
+        select: {
+          type: "string",
+          enum: ["single", "multiple"],
+          description: "combobox: pick one ('single') or many ('multiple', default).",
+        },
+        min: { type: "number", description: "combobox: minimum selectable items (default 0)." },
+        max: { type: "number", description: "combobox: maximum selectable items (0 = unlimited)." },
+        searchable: { type: "boolean", description: "combobox: show the in-panel search box (default true)." },
+        valueField: { type: "string", description: "combobox: collection field identifying each option (default the row id)." },
+        labelField: { type: "string", description: "combobox: collection field shown as each selected item's chip in the trigger." },
+        labelExpr: {
+          type: "string",
+          description:
+            "combobox: a template for the selected-item chip text — use ${field} for row values, " +
+            'e.g. "${name} · ${rating} ★". Plain text, NO surrounding backticks (they are stripped). ' +
+            "Overrides labelField. THIS is the 'selection expression'.",
+        },
+        name: { type: "string", description: "combobox: the form field name the selection writes to (default 'selection')." },
+        placeholder: { type: "string", description: "combobox: trigger text when nothing is selected." },
+        searchPlaceholder: { type: "string", description: "combobox: search box placeholder." },
       },
       required: ["page", "block"],
     },
@@ -333,6 +363,18 @@ export interface BindListArgs {
   sort?: SortClause[];
   limit?: number;
   map?: Record<string, string>;
+  // Presentation + combobox config (all optional, PATCH-like).
+  presentation?: "list" | "combobox";
+  select?: "single" | "multiple";
+  min?: number;
+  max?: number;
+  searchable?: boolean;
+  valueField?: string;
+  labelField?: string;
+  labelExpr?: string;
+  name?: string;
+  placeholder?: string;
+  searchPlaceholder?: string;
 }
 
 export function validateBindList(args: unknown): ArgResult<BindListArgs> {
@@ -366,6 +408,31 @@ export function validateBindList(args: unknown): ArgResult<BindListArgs> {
     if (!map.ok) return map;
     out.map = map.value;
   }
+
+  // Presentation + combobox config (each independently optional).
+  const presentation = str(rec, "presentation");
+  if (presentation === "list" || presentation === "combobox") out.presentation = presentation;
+  else if (presentation) return { ok: false, error: 'presentation must be "list" or "combobox"' };
+  const select = str(rec, "select");
+  if (select === "single" || select === "multiple") out.select = select;
+  else if (select) return { ok: false, error: 'select must be "single" or "multiple"' };
+  if (typeof rec.min === "number" && Number.isFinite(rec.min)) out.min = rec.min;
+  if (typeof rec.max === "number" && Number.isFinite(rec.max)) out.max = rec.max;
+  if (typeof rec.searchable === "boolean") out.searchable = rec.searchable;
+  const valueField = str(rec, "valueField");
+  if (valueField) out.valueField = valueField;
+  const labelField = str(rec, "labelField");
+  if (labelField) out.labelField = labelField;
+  // Strip any backticks the model added — labelExpr is stored as a bare
+  // template-literal body; the renderer wraps it. (See normalizeLabelExpr.)
+  const labelExpr = normalizeLabelExpr(str(rec, "labelExpr"));
+  if (labelExpr) out.labelExpr = labelExpr;
+  const name = str(rec, "name");
+  if (name) out.name = name;
+  const placeholder = str(rec, "placeholder");
+  if (placeholder) out.placeholder = placeholder;
+  const searchPlaceholder = str(rec, "searchPlaceholder");
+  if (searchPlaceholder) out.searchPlaceholder = searchPlaceholder;
 
   return { ok: true, value: out };
 }

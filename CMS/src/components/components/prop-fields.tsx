@@ -93,6 +93,22 @@ export function PropFields({
                 aria-label={labelText}
                 onChange={(e) => onChange(f.name, e.target.value)}
               />
+            ) : f.type === "json" ? (
+              // Structured prop edited as JSON text. Object/array values (a saved
+              // default) are stringified for display; the renderer JSON-parses it.
+              <textarea
+                className={`${input} min-h-24 font-mono`}
+                value={
+                  typeof raw === "string"
+                    ? raw
+                    : raw != null
+                      ? JSON.stringify(raw, null, 2)
+                      : f.default
+                }
+                placeholder={f.default}
+                aria-label={labelText}
+                onChange={(e) => onChange(f.name, e.target.value)}
+              />
             ) : (
               <input
                 type="text"

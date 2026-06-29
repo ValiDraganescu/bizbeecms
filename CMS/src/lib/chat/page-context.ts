@@ -14,6 +14,8 @@
  * next message carries the new page's context automatically.
  */
 
+import type { Block } from "@/lib/render/tree";
+
 export interface PageContextInput {
   /** The page's id — the assistant uses this directly for update_page_blocks etc. */
   id: string;
@@ -21,11 +23,23 @@ export interface PageContextInput {
   path: string;
   slug: string;
   published: boolean;
+  /**
+   * The page's top-level sections as `{ id, name, block }`, in order. The id+name
+   * resolve an `@SectionName` mention to the right block id and feed the composer's
+   * autocomplete; `block` is the section's full subtree so a mention can inject the
+   * section's resolved contents into context. Omitted/empty → no section list.
+   */
+  sections?: SectionMention[];
 }
+
+/** A page section the user can @-mention in chat (incl. its full block subtree). */
+export type SectionMention = { id: string; name: string; block: Block };
 
 /**
  * The inline context block prepended to the next user message. Returns "" for a
  * null selection (no page open → nothing to append). Plain text, kept short.
+ * Section CONTENTS are injected per-message by `formatMentionedSections` only for
+ * the sections the user actually @-mentions — this block just names the page.
  */
 export function formatPageContext(page: PageContextInput | null | undefined): string {
   if (!page) return "";
@@ -39,17 +53,99 @@ export function formatPageContext(page: PageContextInput | null | undefined): st
   );
 }
 
-// Module-level latest value + subscribers. `send` reads it fresh; the UI chip
-// subscribes so it can show/hide as the user navigates between pages.
+/**
+ * Summarize ONE block subtree into a compact, model-facing outline: every block's
+ * id + component, nested by indentation, with the data-binding fields a List/bound
+ * block carries (so the model can target the right block id without a get_page).
+ * Pure + bounded; this is the payload `@section` injects.
+ */
+export function summarizeBlock(block: Block, depth = 0): string {
+  const pad = "  ".repeat(depth);
+  const parts: string[] = [`${block.component} (id: ${block.id})`];
+  // Surface the binding-relevant bits so the model knows what it's editing.
+  if (block.listSource) {
+    const ls = block.listSource;
+    parts.push(
+      `[List: collection=${ls.collection ?? "?"}, presentation=${ls.presentation ?? "?"}` +
+        (ls.labelExpr ? `, labelExpr=${JSON.stringify(ls.labelExpr)}` : "") +
+        (ls.labelField ? `, labelField=${ls.labelField}` : "") +
+        `]`,
+    );
+  }
+  if (block.bindings && Object.keys(block.bindings).length > 0) {
+    parts.push(`[bound: ${Object.keys(block.bindings).join(", ")}]`);
+  }
+  const head = `${pad}- ${parts.join(" ")}`;
+  const kids = (block.children ?? []).map((c) => summarizeBlock(c, depth + 1));
+  return [head, ...kids].join("\n");
+}
+
+/**
+ * Build the per-message context for the sections the user @-mentioned. Scans the
+ * message for `` `@<name>` `` (or bare `@<name>`) tokens, matches them against the
+ * page's sections (case-insensitive), and returns a labeled outline of each
+ * matched section's full contents — so the assistant operates on the RIGHT block
+ * id (e.g. the List nested inside the section) instead of guessing. Returns "" when
+ * nothing matches.
+ */
+export function formatMentionedSections(
+  message: string,
+  sections: ReadonlyArray<SectionMention>,
+): string {
+  if (sections.length === 0) return "";
+  const matched: SectionMention[] = [];
+  for (const s of sections) {
+    // Match `@Name` whether or not it's wrapped in backticks; word-ish boundary
+    // so "@Hero" doesn't also match a section literally named "Her".
+    const esc = s.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp("@" + esc + "(?![\\w-])", "i");
+    if (re.test(message) && !matched.some((m) => m.id === s.id)) matched.push(s);
+  }
+  if (matched.length === 0) return "";
+  const blocks = matched
+    .map(
+      (s) =>
+        `Section "${s.name}" (id: ${s.id}) — its current contents:\n${summarizeBlock(s.block)}`,
+    )
+    .join("\n\n");
+  return (
+    `[Mentioned sections] The user referenced these section(s) with @. ` +
+    `Operate on the exact block id shown — to change a select/list, target the List block's id, ` +
+    `NOT the Section. If the named section has no block matching the request, say so instead of guessing.\n\n` +
+    blocks
+  );
+}
+
+// Module-level latest value + subscribers. `send` reads the string fresh; the UI
+// chip + the @section autocomplete subscribe so they update as the user navigates
+// or edits sections. `activeSections` is the structured mirror of `active`.
 let active = "";
+let activeSections: SectionMention[] = [];
 const listeners = new Set<() => void>();
 
 /** Publish the current page context (or clear it with null). Notifies subscribers. */
 export function setActivePageContext(page: PageContextInput | null | undefined): void {
   const next = formatPageContext(page);
-  if (next === active) return;
+  const nextSections = page?.sections ?? [];
+  // Always store the freshest sections (their block subtrees change on every edit;
+  // send-time reads them for @mention resolution). Only NOTIFY when the
+  // autocomplete-visible shape (id+name list) or the prose string actually changes,
+  // so typing-in-a-section doesn't thrash subscribers.
+  const shapeChanged = next !== active || !sameSections(activeSections, nextSections);
   active = next;
-  for (const fn of listeners) fn();
+  activeSections = nextSections;
+  if (shapeChanged) for (const fn of listeners) fn();
+}
+
+/** Equality on the autocomplete-visible shape (id + name), ignoring block contents. */
+function sameSections(a: SectionMention[], b: SectionMention[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((s, i) => s.id === b[i].id && s.name === b[i].name);
+}
+
+/** The active page's sections (for the @section autocomplete). Empty when none. */
+export function getActiveSections(): SectionMention[] {
+  return activeSections;
 }
 
 /** The latest published context block, or "" when nothing is selected. */

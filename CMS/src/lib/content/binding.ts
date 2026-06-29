@@ -158,6 +158,14 @@ export function validateListBinding(
     }
   }
 
+  // Combobox config that references collection fields must name real columns.
+  if (listSource.valueField && !cols.has(listSource.valueField)) {
+    errors.push(`unknown valueField "${listSource.valueField}"${avail}`);
+  }
+  if (listSource.labelField && !cols.has(listSource.labelField)) {
+    errors.push(`unknown labelField "${listSource.labelField}"${avail}`);
+  }
+
   return errors.length === 0 ? { ok: true } : { ok: false, errors };
 }
 

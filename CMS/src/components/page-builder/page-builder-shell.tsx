@@ -65,6 +65,9 @@ import {
   setBlockChildren,
   isList,
   addListToSection,
+  listSections,
+  renameSection,
+  sectionName,
   parsePropsSchema,
   validateBlockProps,
   setLocalizedProp,
@@ -74,6 +77,7 @@ import {
   type PropField,
 } from "@/lib/pages/page-blocks";
 import type { Block, BindingRef, ListSource } from "@/lib/render/tree";
+import { normalizeLabelExpr } from "@/lib/render/tree";
 import { declaredPropNames } from "@/lib/content/binding";
 import { LocalePicker, useLocalePicker } from "./locale-picker";
 
@@ -369,11 +373,19 @@ export function PageBuilderShell({
   useEffect(() => {
     setActivePageContext(
       selected
-        ? { id: selected.id, path: selected.path, slug: selected.slug, published: selected.published }
+        ? {
+            id: selected.id,
+            path: selected.path,
+            slug: selected.slug,
+            published: selected.published,
+            // Republishes on every block edit so renames / new sections reach the
+            // assistant context and the @section autocomplete immediately.
+            sections: listSections(blocks),
+          }
         : null,
     );
     return () => setActivePageContext(null);
-  }, [selected]);
+  }, [selected, blocks]);
 
   // Versioning slice 4: restore a past version into a new draft, then re-load the
   // draft into the editor so it shows the restored blocks. Source untouched.
@@ -434,6 +446,13 @@ export function PageBuilderShell({
   // or move a component across columns/sections. The pure helper guards no-ops.
   function onMoveNode(dragId: string, targetId: string, position: "before" | "after" | "into") {
     setBlocks((b) => moveNode(b, dragId, targetId, position));
+    setDirty(true);
+  }
+
+  // Rename a Section (writes props.name; blank resets to the "Section N" default).
+  // Drives the Layers label, the @section autocomplete, and the assistant context.
+  function onRenameSection(sectionId: string, name: string) {
+    setBlocks((b) => renameSection(b, sectionId, name));
     setDirty(true);
   }
 
@@ -879,6 +898,7 @@ export function PageBuilderShell({
                   onMoveNode={onMoveNode}
                   onDeleteColumn={onDeleteColumn}
                   onDeleteNode={onDeleteNode}
+                  onRenameSection={onRenameSection}
                 />
               )}
               {/* Drop indicator: a blue line where the new Section appends. */}
@@ -1503,6 +1523,7 @@ function LayersTree({
   onMoveNode,
   onDeleteColumn,
   onDeleteNode,
+  onRenameSection,
 }: {
   blocks: Block[];
   selectedId: string | null;
@@ -1511,8 +1532,12 @@ function LayersTree({
   onMoveNode: (dragId: string, targetId: string, position: "before" | "after" | "into") => void;
   onDeleteColumn: (columnId: string) => void;
   onDeleteNode: (nodeId: string) => void;
+  onRenameSection: (sectionId: string, name: string) => void;
 }) {
   const t = useTranslations("pageBuilder");
+  // Which Section's name is being edited inline (null = none). The input seeds
+  // from the current display name and commits on Enter/blur, cancels on Esc.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
   // The column-drop slot under the cursor, keyed `${sectionId}:${colIndex}`.
   const [hoverSlot, setHoverSlot] = useState<string | null>(null);
   // Reorder hover: which node + which half (before/after) the cursor is over.
@@ -1643,14 +1668,56 @@ function LayersTree({
       {blocks.map((b, i) => (
         <li key={b.id}>
           <div className="flex items-start gap-1">
-            <button
-              type="button"
-              onClick={() => onSelect(b.id)}
-              className={nodeClass(b.id) + edgeClass(b.id)}
-              {...reorderProps(b.id)}
-            >
-              {isSection(b) ? `${t("layoutSection")} ${i + 1}` : b.component}
-            </button>
+            {isSection(b) && renamingId === b.id ? (
+              // Inline rename: commit on Enter/blur, cancel on Esc. Blank resets
+              // to the "Section N" default (handled by renameSection).
+              <input
+                autoFocus
+                defaultValue={sectionName(b, i)}
+                aria-label={t("renameSection.label")}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    onRenameSection(b.id, (e.target as HTMLInputElement).value);
+                    setRenamingId(null);
+                  } else if (e.key === "Escape") {
+                    setRenamingId(null);
+                  }
+                }}
+                onBlur={(e) => {
+                  onRenameSection(b.id, e.target.value);
+                  setRenamingId(null);
+                }}
+                className="w-full rounded-md border border-primary bg-surface px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => onSelect(b.id)}
+                onDoubleClick={() => isSection(b) && setRenamingId(b.id)}
+                className={nodeClass(b.id) + edgeClass(b.id)}
+                {...reorderProps(b.id)}
+              >
+                {isSection(b) ? sectionName(b, i) : b.component}
+              </button>
+            )}
+            {isSection(b) && renamingId !== b.id && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRenamingId(b.id);
+                }}
+                title={t("renameSection.action")}
+                aria-label={t("renameSection.action")}
+                className="rounded p-1 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+              >
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </button>
+            )}
             <DeleteNodeControl id={b.id} kind={isSection(b) ? "section" : "component"} />
           </div>
           {isSection(b) && (
@@ -2659,6 +2726,22 @@ function ComponentSettings({
                 aria-label={labelText}
                 onChange={(e) => setField(f.name, e.target.value)}
               />
+            ) : f.type === "json" ? (
+              // Structured prop edited as JSON text; renderer serializes it into a
+              // data-attribute for the component's client script to JSON.parse.
+              <textarea
+                className={`${input} min-h-24 font-mono`}
+                value={
+                  typeof raw === "string"
+                    ? raw
+                    : raw != null
+                      ? JSON.stringify(raw, null, 2)
+                      : f.default
+                }
+                placeholder={f.default}
+                aria-label={labelText}
+                onChange={(e) => setField(f.name, e.target.value)}
+              />
             ) : (
               <input
                 type="text"
@@ -3003,7 +3086,23 @@ function ListSettings({
   const templateProps = template ? [...declaredPropNames(propsSchemas[template.component])] : [];
   const componentNames = Object.keys(propsSchemas).sort();
 
+  const presentation = source?.presentation ?? "list";
+  // Carry the combobox config through edits (emitSource rebuilds `src` fresh).
+  const cb = {
+    select: source?.select,
+    min: source?.min,
+    max: source?.max,
+    searchable: source?.searchable,
+    valueField: source?.valueField,
+    labelField: source?.labelField,
+    labelExpr: source?.labelExpr,
+    name: source?.name,
+    placeholder: source?.placeholder,
+    searchPlaceholder: source?.searchPlaceholder,
+  };
+
   function emitSource(next: Partial<ListSource>) {
+    const pres = "presentation" in next ? next.presentation : presentation;
     const src: ListSource = {
       collection: next.collection ?? collection,
       ...(() => {
@@ -3019,6 +3118,27 @@ function ListSettings({
         return l != null ? { limit: l } : {};
       })(),
     };
+    // Persist presentation + combobox config only in combobox mode (keeps plain
+    // Lists byte-identical to before). Each field carries over unless overridden.
+    if (pres === "combobox") {
+      src.presentation = "combobox";
+      const merged = { ...cb, ...next };
+      if (merged.select) src.select = merged.select;
+      if (merged.min != null) src.min = merged.min;
+      if (merged.max != null) src.max = merged.max;
+      if (merged.searchable != null) src.searchable = merged.searchable;
+      if (merged.valueField) src.valueField = merged.valueField;
+      if (merged.labelField) src.labelField = merged.labelField;
+      // Store a bare template-literal body (strip backticks the operator may type
+      // by copying the help-text example); the renderer wraps it. See normalizeLabelExpr.
+      {
+        const le = normalizeLabelExpr(merged.labelExpr);
+        if (le) src.labelExpr = le;
+      }
+      if (merged.name) src.name = merged.name;
+      if (merged.placeholder) src.placeholder = merged.placeholder;
+      if (merged.searchPlaceholder) src.searchPlaceholder = merged.searchPlaceholder;
+    }
     onChange(src.collection ? { listSource: src } : { listSource: undefined });
   }
 
@@ -3101,6 +3221,148 @@ function ListSettings({
             </select>
           </label>
 
+          {templateName && (
+            <label className="flex flex-col gap-1.5 border-t border-border pt-4">
+              <span className={ctlLabel}>Presentation</span>
+              <select
+                className={ctlInput}
+                value={presentation}
+                aria-label="Presentation"
+                onChange={(e) => emitSource({ presentation: e.target.value as "list" | "combobox" })}
+              >
+                <option value="list">List — show all rows</option>
+                <option value="combobox">Combobox — select from rows in a dropdown</option>
+              </select>
+              <span className="text-xs text-foreground-muted">
+                {presentation === "combobox"
+                  ? `Each row renders as ${templateName} inside a selectable dropdown; the combobox owns selection, search and limits.`
+                  : `Repeats ${templateName} once per matching row.`}
+              </span>
+            </label>
+          )}
+
+          {/* Combobox config — rides on this same panel. */}
+          {templateName && presentation === "combobox" && (
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <label className="flex flex-col gap-1.5">
+                <span className={ctlLabel}>Selection</span>
+                <select
+                  className={ctlInput}
+                  value={cb.select ?? "multiple"}
+                  aria-label="Selection mode"
+                  onChange={(e) => emitSource({ select: e.target.value as "single" | "multiple" })}
+                >
+                  <option value="multiple">Multiple</option>
+                  <option value="single">Single</option>
+                </select>
+              </label>
+              <div className="flex gap-2">
+                <label className="flex flex-1 flex-col gap-1.5">
+                  <span className={ctlLabel}>Min</span>
+                  <input
+                    type="number"
+                    min={0}
+                    className={ctlInput}
+                    value={cb.min ?? ""}
+                    placeholder="0"
+                    aria-label="Minimum selectable"
+                    onChange={(e) => emitSource({ min: e.target.value === "" ? undefined : Number(e.target.value) })}
+                  />
+                </label>
+                <label className="flex flex-1 flex-col gap-1.5">
+                  <span className={ctlLabel}>Max (0 = ∞)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    className={ctlInput}
+                    value={cb.max ?? ""}
+                    placeholder="0"
+                    aria-label="Maximum selectable"
+                    onChange={(e) => emitSource({ max: e.target.value === "" ? undefined : Number(e.target.value) })}
+                  />
+                </label>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={cb.searchable !== false}
+                  aria-label="Searchable"
+                  onChange={(e) => emitSource({ searchable: e.target.checked })}
+                />
+                Searchable
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className={ctlLabel}>Value field (option identity)</span>
+                <select
+                  className={ctlInput}
+                  value={cb.valueField ?? ""}
+                  aria-label="Value field"
+                  onChange={(e) => emitSource({ valueField: e.target.value || undefined })}
+                >
+                  <option value="">id (default)</option>
+                  {columns.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className={ctlLabel}>Label field (selected-item chip)</span>
+                <select
+                  className={ctlInput}
+                  value={cb.labelField ?? ""}
+                  aria-label="Label field"
+                  onChange={(e) => emitSource({ labelField: e.target.value || undefined })}
+                >
+                  <option value="">component text (default)</option>
+                  {columns.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className={ctlLabel}>Label expression (advanced)</span>
+                <input
+                  type="text"
+                  className={`${ctlInput} font-mono`}
+                  value={cb.labelExpr ?? ""}
+                  placeholder={"${name} · ★ ${rating}"}
+                  aria-label="Label expression"
+                  onChange={(e) => emitSource({ labelExpr: e.target.value || undefined })}
+                />
+                <span className="text-xs text-foreground-muted">
+                  A template for the chip text — use <code>{"${field}"}</code> for row values, e.g. <code>{"${name} · ${location}"}</code>. No backticks needed. Overrides the label field.
+                </span>
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className={ctlLabel}>Form field name</span>
+                <input
+                  type="text"
+                  className={ctlInput}
+                  value={cb.name ?? ""}
+                  placeholder="selection"
+                  aria-label="Form field name"
+                  onChange={(e) => emitSource({ name: e.target.value || undefined })}
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className={ctlLabel}>Placeholder</span>
+                <input
+                  type="text"
+                  className={ctlInput}
+                  value={cb.placeholder ?? ""}
+                  placeholder="Select…"
+                  aria-label="Placeholder"
+                  onChange={(e) => emitSource({ placeholder: e.target.value || undefined })}
+                />
+              </label>
+            </div>
+          )}
+
+          {/* Field map — the row→item-component binding, used in BOTH presentations. */}
           {templateName && (
             <div className="space-y-2">
               <span className={ctlLabel}>{t("list.map")}</span>

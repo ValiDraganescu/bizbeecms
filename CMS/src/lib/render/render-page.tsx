@@ -35,6 +35,7 @@ import {
   planPage,
 } from "@/lib/render/tree";
 import { renderPlans } from "@/lib/render/react";
+import { ClientScripts } from "@/lib/render/client-scripts";
 import { parseHtml } from "@/lib/render/parse-html";
 import { parsePropsSchema } from "@/lib/pages/page-blocks";
 import { buildCss } from "@/lib/render/tw-compile";
@@ -94,6 +95,7 @@ export async function buildPlanFromPage(
         name: row.name,
         tree,
         script: row.script || undefined,
+        css: row.css || undefined,
         propsSchema: row.propsSchema,
       });
       // Enqueue nested-component tags referenced inside this tree.
@@ -159,6 +161,7 @@ export async function buildPlanFromComponent(
         name: row.name,
         tree,
         script: row.script || undefined,
+        css: row.css || undefined,
         propsSchema: row.propsSchema,
       });
       for (const tag of collectTreeComponentTags(tree)) {
@@ -280,10 +283,16 @@ export async function RenderedPage({ plan }: { plan: RenderPlan }) {
     <>
       <style dangerouslySetInnerHTML={{ __html: utilityCss }} />
       {themeCss && <style dangerouslySetInnerHTML={{ __html: themeCss }} />}
-      {renderPlans(plan.root)}
-      {plan.scripts.map((s, i) => (
-        <script key={i} dangerouslySetInnerHTML={{ __html: s }} />
+      {/* Component-scoped CSS (one per used component) after utilities/theme so it
+          can layer on top. Needed for nodes a client script builds at runtime,
+          whose classes never reach the Tailwind compiler. */}
+      {plan.styles.map((css, i) => (
+        <style key={`c${i}`} dangerouslySetInnerHTML={{ __html: css }} />
       ))}
+      {renderPlans(plan.root)}
+      {/* Author scripts must run via a client effect — a React-rendered inline
+          <script> is inert (never executes). See client-scripts.tsx. */}
+      <ClientScripts scripts={plan.scripts} />
     </>
   );
 }

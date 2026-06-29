@@ -122,6 +122,36 @@ test("validateBlockProps: legacy Set allowlist still works (no coercion)", () =>
   assert.deepEqual(out, { a: "x", c: 3 }); // b undeclared+empty dropped, c untouched
 });
 
+// ── json prop type (structured data for client scripts) ─────────────────────
+
+test("parsePropsSchema: json default normalizes to string + parsed defaultValue", () => {
+  const fromString = parsePropsSchema(
+    JSON.stringify({ opts: { type: "json", default: '[{"id":1}]' } }),
+  )[0];
+  assert.equal(fromString.type, "json");
+  assert.equal(fromString.default, '[{"id":1}]'); // textarea edits the string
+  assert.deepEqual(fromString.defaultValue, [{ id: 1 }]); // parsed for the binder
+
+  // Default authored as a real array → stringified for display, kept parsed.
+  const fromArray = parsePropsSchema(
+    JSON.stringify({ opts: { type: "json", default: [{ id: 2 }] } }),
+  )[0];
+  assert.deepEqual(fromArray.defaultValue, [{ id: 2 }]);
+  assert.equal(fromArray.default, '[{"id":2}]');
+});
+
+test("validateBlockProps: json keeps valid JSON, falls back to default on garbage", () => {
+  const schema = parsePropsSchema(
+    JSON.stringify({ opts: { type: "json", default: "[]" } }),
+  );
+  // A JSON string is kept verbatim (the renderer's slotString passes it through).
+  assert.equal(validateBlockProps({ opts: '["a","b"]' }, schema).opts, '["a","b"]');
+  // An already-parsed array is kept (slotString JSON.stringifies it downstream).
+  assert.deepEqual(validateBlockProps({ opts: [1, 2] }, schema).opts, [1, 2]);
+  // Non-JSON garbage → declared default (so the slot still carries valid JSON).
+  assert.equal(validateBlockProps({ opts: "{not json" }, schema).opts, "[]");
+});
+
 // ── translatable round-trip via setLocalizedProp/localeFieldValue ───────────
 
 test("translatable prop round-trips per locale; non-translatable stays bare", () => {

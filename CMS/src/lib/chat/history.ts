@@ -14,6 +14,8 @@
 export type ThreadRole = "user" | "assistant" | "system";
 /** A stored tool-call card: an opaque plain object (the client's ToolResult). */
 export type StoredTool = Record<string, unknown>;
+/** An inline media item shown in a user bubble ({name, url, mime?}). */
+export type StoredMedia = { name: string; url: string; mime?: string };
 export type ThreadMessage = {
   role: ThreadRole;
   content: string;
@@ -21,9 +23,12 @@ export type ThreadMessage = {
   // Ordered display parts ({kind:"text"|"tool", …}) so reloaded assistant turns
   // interleave text and tool cards exactly as streamed. Sanitized like `tools`.
   parts?: StoredTool[];
+  // Inline images shown in a user bubble (read attachments / referenced URLs).
+  media?: StoredMedia[];
 };
 
 const MAX_TOOLS = 50;
+const MAX_MEDIA = 20;
 // parts = tool cards + interleaved text segments, so a turn can have more parts
 // than tools. Cap generously; the content cap already bounds total size.
 const MAX_PARTS = 120;
@@ -75,6 +80,32 @@ export function sanitizeTools(raw: unknown, cap = MAX_TOOLS): StoredTool[] | und
 }
 
 /**
+ * Bound + sanitize a user turn's inline `media` into `{name, url, mime?}` items,
+ * or undefined. Keeps only entries with a string name + url; the url must be a
+ * relative path, http(s), or a data: URL (no javascript:/other schemes). Caps
+ * the count. Returns undefined when empty.
+ */
+export function sanitizeMedia(raw: unknown, cap = MAX_MEDIA): StoredMedia[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: StoredMedia[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) continue;
+    const m = item as Record<string, unknown>;
+    if (typeof m.name !== "string" || typeof m.url !== "string") continue;
+    const url = m.url;
+    const safe = url.startsWith("/") || /^https?:\/\//i.test(url) || url.startsWith("data:image/");
+    if (!safe) continue;
+    out.push({
+      name: m.name.slice(0, 200),
+      url: url.slice(0, 5000),
+      ...(typeof m.mime === "string" ? { mime: m.mime.slice(0, 100) } : {}),
+    });
+    if (out.length >= cap) break;
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/**
  * Validate + normalize an UNTRUSTED save body into a `ThreadInput`, or return
  * the reason it's rejected. Drops malformed messages, bounds counts/lengths,
  * and auto-derives the title when absent. The id, if absent/garbage, is left to
@@ -99,11 +130,13 @@ export function validateThreadInput(
     if (typeof m.content !== "string") continue;
     const tools = m.role === "assistant" ? sanitizeTools(m.tools) : undefined;
     const parts = m.role === "assistant" ? sanitizeTools(m.parts, MAX_PARTS) : undefined;
+    const media = m.role === "user" ? sanitizeMedia(m.media) : undefined;
     messages.push({
       role: m.role as ThreadRole,
       content: m.content.length > MAX_CONTENT ? m.content.slice(0, MAX_CONTENT) : m.content,
       ...(tools ? { tools } : {}),
       ...(parts ? { parts } : {}),
+      ...(media ? { media } : {}),
     });
     if (messages.length >= MAX_MESSAGES) break;
   }
@@ -142,8 +175,17 @@ export function parseStoredMessages(raw: unknown): ThreadMessage[] {
     const r = (m as Record<string, unknown>).role;
     const c = (m as Record<string, unknown>).content;
     if (typeof r === "string" && ROLES.has(r as ThreadRole) && typeof c === "string") {
-      const tools = r === "assistant" ? sanitizeTools((m as Record<string, unknown>).tools) : undefined;
-      out.push({ role: r as ThreadRole, content: c, ...(tools ? { tools } : {}) });
+      const rec = m as Record<string, unknown>;
+      const tools = r === "assistant" ? sanitizeTools(rec.tools) : undefined;
+      const parts = r === "assistant" ? sanitizeTools(rec.parts, MAX_PARTS) : undefined;
+      const media = r === "user" ? sanitizeMedia(rec.media) : undefined;
+      out.push({
+        role: r as ThreadRole,
+        content: c,
+        ...(tools ? { tools } : {}),
+        ...(parts ? { parts } : {}),
+        ...(media ? { media } : {}),
+      });
     }
   }
   return out;

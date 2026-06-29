@@ -69,7 +69,10 @@
       "overrideActive": "Mukautettu kehote: {label}",
       "overrideActiveUnnamed": "Mukautettu kehote käytössä",
       "overrideTitle": "Tallennettu järjestelmäkehotteen versio on käytössä vain istunnossasi.",
-      "overrideClear": "Käytä oletusta"
+      "overrideClear": "Käytä oletusta",
+      "historyDeleteConfirm": "Poista",
+      "historyDeleteCancel": "Peruuta",
+      "more": "Lisää"
     },
     "debug": {
       "context": "Sivun konteksti",
@@ -144,7 +147,9 @@
       "editTags": "Muokkaa tunnisteita",
       "removeTag": "Poista tunniste {tag}",
       "tagsFailed": "Tunnisteiden tallennus epäonnistui: {message}"
-    }
+    },
+    "retry": "Yritä uudelleen",
+    "mention": { "label": "Sivun osiot" }
   },
   "contentLocales": {
     "title": "Sisältökielet",
@@ -415,6 +420,7 @@
     "categoryLayout": "Asettelu",
     "categoryComponents": "Komponentit",
     "layoutSection": "Osio",
+    "renameSection": { "action": "Nimeä osio uudelleen", "label": "Osion nimi" },
     "layoutList": "Lista (kokoelmasta)",
     "bind": {
       "title": "Sido kokoelmaan",

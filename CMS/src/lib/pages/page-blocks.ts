@@ -127,7 +127,13 @@ export type PropFieldType =
   | "boolean"
   | "select"
   | "date"
-  | "time";
+  | "time"
+  // A structured value (array/object) authored as JSON. Unlike the scalar types
+  // it never binds into a `{{slot}}` as readable text — it is serialized into a
+  // DOM attribute (slotString JSON-stringifies it) so a component's CLIENT script
+  // can JSON.parse it back. This is how list/object data reaches an interactive
+  // component (e.g. Combobox options) in a static-SSR, instance-blind-script model.
+  | "json";
 
 /** A `{value,label}` choice for a `select` field. */
 export interface PropOption {
@@ -161,7 +167,20 @@ const FIELD_TYPES = new Set<PropFieldType>([
   "select",
   "date",
   "time",
+  "json",
 ]);
+
+/** True if `raw` is valid JSON (or already a non-null array/object). PURE. */
+function isJsonValue(raw: unknown): boolean {
+  if (raw && typeof raw === "object") return true; // already parsed (array/object)
+  if (typeof raw !== "string") return false;
+  try {
+    JSON.parse(raw);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // ISO storage formats, locale-agnostic. DISPLAY formatting is the component's job.
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD
@@ -231,6 +250,21 @@ export function parsePropsSchema(propsSchema: string | null | undefined): PropFi
     } else if (type === "boolean") {
       defaultValue = s.default === true || s.default === "true";
       def = defaultValue ? "true" : "false";
+    } else if (type === "json") {
+      // Default may be authored as a JSON string OR as a real array/object;
+      // normalize to a JSON STRING for `default` (the textarea edits text) and
+      // keep the parsed value in `defaultValue` for the renderer/binder.
+      if (typeof s.default === "string") {
+        def = s.default;
+        try {
+          defaultValue = JSON.parse(s.default);
+        } catch {
+          /* leave defaultValue undefined on bad JSON */
+        }
+      } else if (s.default && typeof s.default === "object") {
+        defaultValue = s.default;
+        def = JSON.stringify(s.default);
+      }
     } else {
       def = typeof s.default === "string" ? s.default : "";
     }
@@ -300,6 +334,12 @@ export function validateBlockProps(
       // Keep only well-formed ISO values (YYYY-MM-DD / HH:mm); never per-locale.
       if (isValidDateTime(raw, f.type)) out[f.name] = raw;
       else if (f.required && isValidDateTime(f.default, f.type)) out[f.name] = f.default;
+    } else if (f.type === "json") {
+      // Keep a value only if it's valid JSON (a JSON string) or already a parsed
+      // array/object; otherwise fall back to the declared default (so the slot
+      // still carries well-formed JSON for the client script to parse).
+      if (isJsonValue(raw)) out[f.name] = raw;
+      else if (f.default !== "" && isJsonValue(f.default)) out[f.name] = f.default;
     } else {
       // string / richtext — string or a {loc:text} locale object; "" is dropped
       // unless required (then keep the declared default so it stays present).
@@ -481,6 +521,46 @@ export function isSection(block: Block): boolean {
 /** True if a block is a Section COLUMN (holds dropped components in children). */
 export function isSectionColumn(block: Block): boolean {
   return block.component === SECTION_COLUMN_COMPONENT;
+}
+
+/**
+ * A Section's display NAME (Page Builder + @section mentions). The operator-set
+ * name lives in `props.name`; when unset we fall back to "Section N" using the
+ * section's 1-based position among top-level Sections. `index` is that position
+ * minus 1 (0-based). Kept pure so the composer, Layers, and context block agree.
+ */
+export function sectionName(section: Block, index: number): string {
+  const raw = section.props?.name;
+  const name = typeof raw === "string" ? raw.trim() : "";
+  return name !== "" ? name : `Section ${index + 1}`;
+}
+
+/**
+ * The top-level Sections of a page as `{ id, name }`, in document order. Drives
+ * the @section autocomplete and the model-facing section list. Non-Section
+ * top-level blocks (none today, but defensive) are skipped.
+ */
+export function listSections(blocks: Block[]): { id: string; name: string; block: Block }[] {
+  const out: { id: string; name: string; block: Block }[] = [];
+  let i = 0;
+  for (const b of blocks) {
+    if (!isSection(b)) continue;
+    out.push({ id: b.id, name: sectionName(b, i), block: b });
+    i++;
+  }
+  return out;
+}
+
+/** Rename a top-level Section (writes `props.name`). Blank clears back to the default. */
+export function renameSection(blocks: Block[], id: string, name: string): Block[] {
+  const trimmed = name.trim();
+  return blocks.map((b) => {
+    if (b.id !== id || !isSection(b)) return b;
+    const props = { ...(b.props ?? {}) };
+    if (trimmed === "") delete props.name;
+    else props.name = trimmed;
+    return { ...b, props };
+  });
 }
 
 /**

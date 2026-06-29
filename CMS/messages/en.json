@@ -69,7 +69,10 @@
       "overrideActive": "Custom prompt: {label}",
       "overrideActiveUnnamed": "Custom prompt active",
       "overrideTitle": "A saved system-prompt version is active for your session only.",
-      "overrideClear": "Use default"
+      "overrideClear": "Use default",
+      "historyDeleteConfirm": "Delete",
+      "historyDeleteCancel": "Cancel",
+      "more": "More options"
     },
     "debug": {
       "context": "Page context",
@@ -144,7 +147,9 @@
       "editTags": "Edit tags",
       "removeTag": "Remove tag {tag}",
       "tagsFailed": "Could not save tags: {message}"
-    }
+    },
+    "retry": "Retry",
+    "mention": { "label": "Page sections" }
   },
   "contentLocales": {
     "title": "Content languages",
@@ -415,6 +420,7 @@
     "categoryLayout": "Layout",
     "categoryComponents": "Components",
     "layoutSection": "Section",
+    "renameSection": { "action": "Rename section", "label": "Section name" },
     "layoutList": "List (from collection)",
     "bind": {
       "title": "Bind to collection",
