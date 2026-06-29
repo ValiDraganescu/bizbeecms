@@ -20,12 +20,14 @@ import { ChatConversation, useChat } from "@/components/chat/chat-conversation";
 import { ChatDebugPanel } from "@/components/chat/chat-debug-panel";
 import { detectAdminContext } from "@/lib/chat/tool-scopes";
 import { getActivePageContext } from "@/lib/chat/page-context";
+import { getActiveComponentContext } from "@/lib/chat/component-context";
 import { CHAT_MODELS, DEFAULT_MODEL, type CatalogModel } from "@/lib/chat/models";
 import { coerceCatalog } from "@/lib/chat/catalog-coerce";
 import { ModelPicker } from "@/components/chat/model-picker";
 import { resolveInitialModel, loadModel, saveModel } from "@/lib/chat/selected-model";
 import { formatUsd } from "@/lib/chat/credit";
 import { nextUnread } from "@/lib/chat/unread-badge";
+import { CHAT_OPEN_EVENT } from "@/lib/chat/chat-attach-bus";
 import { nextTabStop } from "@/lib/chat/focus-trap";
 import {
   type PanelPreset,
@@ -44,6 +46,55 @@ type ThreadSummary = { id: string; title: string; updatedAt: number };
 // two tabs don't fight over one thread). sessionStorage is fine — it's just a
 // pointer; the transcript itself lives server-side in chat_thread.
 const THREAD_KEY = "bizbee.chat.threadId";
+
+/** Compact token count: 1234 → "1.2k", 980 → "980". */
+function formatTokens(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(n);
+}
+
+/**
+ * Context-usage indicator (Claude-Code style): how much of the model's context
+ * window the current conversation fills. Shows a thin bar + "used / max tokens"
+ * when the catalog knows the window size; falls back to a bare token count when
+ * it doesn't. The bar turns amber past 75% and red past 90% as a fullness cue.
+ */
+function ContextMeter({
+  used,
+  max,
+  label,
+  ofLabel,
+}: {
+  used: number;
+  max: number | null;
+  label: string;
+  ofLabel: (max: number) => string;
+}) {
+  if (max == null) {
+    // No known window → just the token count, no bar (nothing to fill against).
+    return (
+      <span className="shrink-0 tabular-nums" title={label}>
+        {label}
+      </span>
+    );
+  }
+  const pct = Math.min(100, Math.round((used / max) * 100));
+  const barColor =
+    pct >= 90 ? "bg-danger" : pct >= 75 ? "bg-warning" : "bg-primary";
+  return (
+    <span
+      className="flex shrink-0 items-center gap-1.5 tabular-nums"
+      title={ofLabel(max)}
+    >
+      <span className="h-1.5 w-12 overflow-hidden rounded-full bg-surface-muted">
+        <span
+          className={`block h-full rounded-full ${barColor}`}
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+      <span>{pct}%</span>
+    </span>
+  );
+}
 
 export function ChatWidget() {
   const t = useTranslations("chat.widget");
@@ -103,7 +154,13 @@ export function ChatWidget() {
     () => detectAdminContext(pathname),
     () => model,
     () => promptOverride ?? undefined,
-    () => getActivePageContext() || undefined,
+    // Inline context for the next message: page context (Page Builder) and/or
+    // component context (Develop workbench). Only one is set at a time in practice
+    // (they're different routes), but combine defensively.
+    () =>
+      [getActivePageContext(), getActiveComponentContext()]
+        .filter((s) => s !== "")
+        .join("\n\n") || undefined,
   );
 
   // History (Slice 4 sub-slice 3): the current thread's server id (null = a new,
@@ -112,7 +169,7 @@ export function ChatWidget() {
   // busy→idle EDGE (turn finished), not on every render.
   const threadId = useRef<string | null>(null);
   const busyRef = useRef(false);
-  const { messages, busy } = chat;
+  const { messages, busy, error: chatError } = chat;
 
   async function loadThreads() {
     try {
@@ -171,7 +228,7 @@ export function ChatWidget() {
       id: threadId.current,
       messages: messages.map((m) =>
         m.role === "assistant"
-          ? { role: m.role, content: m.content, tools: m.tools }
+          ? { role: m.role, content: m.content, tools: m.tools, parts: m.parts }
           : { role: m.role, content: m.content },
       ),
     };
@@ -282,6 +339,16 @@ export function ChatWidget() {
   useEffect(() => {
     if (open) setUnread(false);
   }, [open]);
+
+  // The Develop workbench's "Send preview to AI" opens the widget so its composer
+  // mounts and receives the captured screenshots (the bus replays them on mount).
+  useEffect(() => {
+    function onOpen() {
+      setOpen(true);
+    }
+    window.addEventListener(CHAT_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(CHAT_OPEN_EVENT, onOpen);
+  }, []);
 
   // On open, move focus INTO the panel (a11y): the message textarea if present,
   // else the panel container itself (it's `tabIndex={-1}`). A microtask defer
@@ -568,6 +635,7 @@ export function ChatWidget() {
                 messages={messages}
                 model={model}
                 override={promptOverride}
+                lastError={chatError}
                 onOverrideChange={applyOverride}
               />
             ) : (
@@ -606,6 +674,21 @@ export function ChatWidget() {
                             })
                           : t("creditUsage", { usage: formatUsd(credit.usage) })}
                       </span>
+                    )}
+                    {chat.usage && (
+                      <ContextMeter
+                        used={chat.usage.promptTokens}
+                        max={catalog.find((m) => m.id === model)?.contextLength ?? null}
+                        label={t("contextUsage", {
+                          used: formatTokens(chat.usage.promptTokens),
+                        })}
+                        ofLabel={(maxTokens) =>
+                          t("contextOf", {
+                            used: formatTokens(chat.usage!.promptTokens),
+                            max: formatTokens(maxTokens),
+                          })
+                        }
+                      />
                     )}
                   </div>
                 }

@@ -41,6 +41,65 @@ test("parseLine: unparseable JSON → null (no throw)", () => {
   assert.equal(parseLine("data: {not json"), null);
 });
 
+test("parseLine: provider error chunk → error event with the full message", () => {
+  // xAI/Grok streams `data: {"error":{"code":7003,"message":"..."}}` on input
+  // rejection. Before the error branch this returned null and the reason was lost.
+  const line = `data: ${JSON.stringify({
+    error: { code: 7003, message: "User Input Error: image url must be absolute" },
+  })}`;
+  assert.deepEqual(parseLine(line), {
+    type: "error",
+    message: "7003: User Input Error: image url must be absolute",
+  });
+});
+
+test("parseLine: error chunk appends metadata when present", () => {
+  const line = `data: ${JSON.stringify({
+    error: { message: "bad request", metadata: { provider: "xai", raw: "details" } },
+  })}`;
+  const ev = parseLine(line);
+  assert.equal(ev.type, "error");
+  assert.match(ev.message, /^bad request \(.*xai.*\)$/);
+});
+
+test("parseLine: error chunk with no message → generic 'upstream error'", () => {
+  const line = `data: ${JSON.stringify({ error: { code: 500 } })}`;
+  assert.deepEqual(parseLine(line), { type: "error", message: "500: upstream error" });
+});
+
+test("parseLine: a usage chunk → usage event with token counts", () => {
+  // With stream_options.include_usage, the provider emits a final chunk carrying
+  // usage (often with empty choices). It must surface, not be dropped as "no delta".
+  const line = `data: ${JSON.stringify({
+    choices: [],
+    usage: { prompt_tokens: 1200, completion_tokens: 340, total_tokens: 1540 },
+  })}`;
+  assert.deepEqual(parseLine(line), {
+    type: "usage",
+    promptTokens: 1200,
+    completionTokens: 340,
+    totalTokens: 1540,
+  });
+});
+
+test("parseLine: usage with only prompt/completion derives total", () => {
+  const line = `data: ${JSON.stringify({ usage: { prompt_tokens: 10, completion_tokens: 5 } })}`;
+  assert.deepEqual(parseLine(line), {
+    type: "usage",
+    promptTokens: 10,
+    completionTokens: 5,
+    totalTokens: 15,
+  });
+});
+
+test("parseLine: usage:null or all-zero usage → null (nothing to report)", () => {
+  assert.equal(parseLine(`data: ${JSON.stringify({ usage: null })}`), null);
+  assert.equal(
+    parseLine(`data: ${JSON.stringify({ usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } })}`),
+    null,
+  );
+});
+
 test("parseLine: role-only / empty-content delta → null", () => {
   assert.equal(
     parseLine(`data: ${JSON.stringify({ choices: [{ delta: { role: "assistant" } }] })}`),

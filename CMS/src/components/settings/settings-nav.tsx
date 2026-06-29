@@ -18,6 +18,7 @@ const TABS = [
   { key: "users", href: "/admin/settings/users" },
   { key: "google", href: "/admin/settings/google" },
   { key: "openrouterKey", href: "/admin/settings/openrouter-key" },
+  { key: "media", href: "/admin/settings/media" },
 ] as const;
 
 export function SettingsNav() {

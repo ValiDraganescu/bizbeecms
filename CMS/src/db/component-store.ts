@@ -16,6 +16,7 @@ import type { ComponentRow, ImportedComponent } from "@/lib/components/portable"
 // Relative .ts import (not @/) — node --test can't resolve the @/ alias for a
 // RUNTIME import (the @/ imports here are type-only and erased). See CAVEATS.
 import { serializeTags, parseTags } from "../lib/components/tags.ts";
+import { parseHtml, treeToHtml } from "../lib/render/parse-html.ts";
 
 /**
  * List the Site's component names (for the AI system prompt — so the model
@@ -40,14 +41,23 @@ export async function listComponents(): Promise<ComponentRow[]> {
   const rows = await db
     .select({
       name: schema.component.name,
-      tree: schema.component.tree,
+      html: schema.component.html,
       script: schema.component.script,
       css: schema.component.css,
       propsSchema: schema.component.propsSchema,
       tags: schema.component.tags,
     })
     .from(schema.component);
-  return rows.sort((a, b) => a.name.localeCompare(b.name));
+  return rows
+    .map((r) => ({
+      name: r.name,
+      tree: JSON.stringify(parseHtml(r.html)),
+      script: r.script,
+      css: r.css,
+      propsSchema: r.propsSchema,
+      tags: r.tags,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
@@ -105,7 +115,7 @@ export async function getComponentByName(name: string): Promise<ComponentRow | n
   const rows = await db
     .select({
       name: schema.component.name,
-      tree: schema.component.tree,
+      html: schema.component.html,
       script: schema.component.script,
       css: schema.component.css,
       propsSchema: schema.component.propsSchema,
@@ -114,7 +124,16 @@ export async function getComponentByName(name: string): Promise<ComponentRow | n
     .from(schema.component)
     .where(eq(schema.component.name, name))
     .limit(1);
-  return rows[0] ?? null;
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    name: r.name,
+    tree: JSON.stringify(parseHtml(r.html)),
+    script: r.script,
+    css: r.css,
+    propsSchema: r.propsSchema,
+    tags: r.tags,
+  };
 }
 
 /**
@@ -138,7 +157,7 @@ export async function upsertImportedComponent(
     .limit(1);
 
   const cols = {
-    tree: JSON.stringify(c.tree),
+    html: treeToHtml(c.tree),
     script: c.script,
     css: c.css,
     propsSchema: c.propsSchema,
@@ -204,13 +223,19 @@ export async function upsertComponent(
     .where(eq(schema.component.name, artifact.name))
     .limit(1);
 
+  // propsSchema carries the preview PLACEHOLDER data (its `default`s). Only
+  // overwrite when the artifact supplies one, so re-emitting without a schema
+  // (a static iteration) doesn't wipe an existing one. `null` clears it.
+  const propsSchema = artifact.propsSchema ?? null;
+
   if (existing.length > 0) {
     await db
       .update(schema.component)
       .set({
-        tree: JSON.stringify(artifact.tree),
+        html: treeToHtml(artifact.tree),
         script: artifact.script,
         css: artifact.css,
+        ...(artifact.propsSchema !== undefined ? { propsSchema } : {}),
         updatedAt: now,
       })
       .where(eq(schema.component.name, artifact.name));
@@ -220,11 +245,33 @@ export async function upsertComponent(
   await db.insert(schema.component).values({
     id: crypto.randomUUID(),
     name: artifact.name,
-    tree: JSON.stringify(artifact.tree),
+    html: treeToHtml(artifact.tree),
     script: artifact.script,
     css: artifact.css,
+    propsSchema,
     createdAt: now,
     updatedAt: now,
   });
   return { action: "created", name: artifact.name };
+}
+
+/**
+ * Delete one component by unique `name` (admin Develop page). Returns whether a
+ * row matched. ponytail: no soft-delete / cascade — a page block referencing a
+ * now-missing component already renders a visible placeholder (planPage's
+ * unknown-component path), so a dangling reference is self-announcing, not a crash.
+ */
+export async function deleteComponent(
+  name: string,
+  injectedDb?: Db,
+): Promise<{ deleted: boolean }> {
+  const db = injectedDb ?? (await getDb());
+  const existing = await db
+    .select({ id: schema.component.id })
+    .from(schema.component)
+    .where(eq(schema.component.name, name))
+    .limit(1);
+  if (existing.length === 0) return { deleted: false };
+  await db.delete(schema.component).where(eq(schema.component.name, name));
+  return { deleted: true };
 }

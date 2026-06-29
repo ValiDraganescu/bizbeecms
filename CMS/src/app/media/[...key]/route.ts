@@ -35,7 +35,13 @@ export async function GET(
   }
 
   const headers = new Headers();
-  object.writeHttpMetadata(headers);
+  // Read content-type off httpMetadata directly instead of object.writeHttpMetadata():
+  // that method isn't callable across OpenNext's REMOTE R2 binding in `next dev`
+  // (throws DevalueError "Cannot stringify arbitrary non-POJOs"). content-type is
+  // the only field we consume downstream (assetServeHeaders reads it back), so this
+  // is both the local-dev fix and a simplification — identical behavior in prod.
+  const contentType = object.httpMetadata?.contentType;
+  if (contentType) headers.set("content-type", contentType);
   headers.set("etag", object.httpEtag);
   // Assets are content-addressed (key has a timestamp+rand), so cache hard.
   headers.set("cache-control", "public, max-age=31536000, immutable");

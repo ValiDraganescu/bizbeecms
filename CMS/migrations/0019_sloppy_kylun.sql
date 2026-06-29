@@ -1,0 +1,1 @@
+ALTER TABLE `asset` ADD `tags` text DEFAULT '[]' NOT NULL;

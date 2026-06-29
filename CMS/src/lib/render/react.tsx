@@ -11,6 +11,12 @@ import type { ElementPlan } from "./tree";
 
 export function renderPlan(plan: ElementPlan, key?: number): ReactNode {
   if (plan.kind === "text") return plan.text;
+  // Omit children entirely when there are none — React throws if a void element
+  // (img, br, input, …) is given even an empty children array. The HTML parser
+  // emits `children: []` for void tags, so this is the boundary that handles it.
+  if (plan.children.length === 0) {
+    return createElement(plan.tag, { key, ...plan.props });
+  }
   const children = plan.children.map((c, i) => renderPlan(c, i));
   return createElement(plan.tag, { key, ...plan.props }, children);
 }

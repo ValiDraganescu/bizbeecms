@@ -4,3 +4,4 @@
 - The ProjectManager, router and deployer have npm deploy scripts, use them do deploy to cloudflare, it’s fine to do so, we are on dev mode
 - The CMS is deployed by the user from the PM deployment at manager.bizbeecms.com
 - Claudflare wrangle is logged in already, so use it whenever you need to check cloudflare things
+- when you kill terminals or process, you risk killing yourself, so make sure you know exactly what you are doing or ask the user

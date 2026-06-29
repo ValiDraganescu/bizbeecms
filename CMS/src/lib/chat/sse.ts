@@ -18,11 +18,62 @@
  * actual `ReadableStream`/`fetch`; here we own only the parsing + framing.
  */
 
-/** A parsed upstream event: a text delta, a tool-call fragment, or the terminal marker. */
+/** A parsed upstream event: a text delta, a tool-call fragment, the terminal marker, or a provider error. */
 export type UpstreamEvent =
   | { type: "delta"; text: string }
   | { type: "tool_call"; index: number; id?: string; name?: string; argsFragment?: string }
+  | { type: "error"; message: string }
+  | { type: "usage"; promptTokens: number; completionTokens: number; totalTokens: number }
   | { type: "done" };
+
+/**
+ * Pull the token-usage tally out of an OpenAI/OpenRouter streaming chunk. When the
+ * request sets `stream_options.include_usage`, the provider emits a final chunk
+ * carrying `usage: { prompt_tokens, completion_tokens, total_tokens }` (often with
+ * empty `choices`). We surface it so the route can report context usage to the
+ * widget. Returns null for normal chunks (no `usage`).
+ */
+function extractUsage(chunk: unknown): Extract<UpstreamEvent, { type: "usage" }> | null {
+  if (typeof chunk !== "object" || chunk === null) return null;
+  const u = (chunk as { usage?: unknown }).usage;
+  if (typeof u !== "object" || u === null) return null;
+  const o = u as { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown };
+  const prompt = typeof o.prompt_tokens === "number" ? o.prompt_tokens : 0;
+  const completion = typeof o.completion_tokens === "number" ? o.completion_tokens : 0;
+  const total =
+    typeof o.total_tokens === "number" ? o.total_tokens : prompt + completion;
+  if (total === 0) return null; // usage:null or all-zero → nothing to report
+  return { type: "usage", promptTokens: prompt, completionTokens: completion, totalTokens: total };
+}
+
+/**
+ * Pull a provider error out of an OpenAI/OpenRouter streaming chunk. Providers
+ * (xAI/Grok, etc.) stream a terminal `data: {"error":{"code","message","metadata"}}`
+ * instead of a normal delta on input rejection — WITHOUT a non-200 HTTP status, so
+ * the `ai.ts` HTTP-status path never sees it. Before this branch existed, parseLine
+ * returned null and the whole reason was silently dropped (the user saw only a terse
+ * leaked string). We surface the FULL message + code so the failure names itself.
+ */
+function extractError(chunk: unknown): { type: "error"; message: string } | null {
+  if (typeof chunk !== "object" || chunk === null) return null;
+  const err = (chunk as { error?: unknown }).error;
+  if (typeof err !== "object" || err === null) return null;
+  const e = err as { message?: unknown; code?: unknown; metadata?: unknown };
+  const base =
+    typeof e.message === "string" && e.message !== "" ? e.message : "upstream error";
+  const code = e.code !== undefined ? `${String(e.code)}: ` : "";
+  // Append provider metadata (xAI puts the real cause there) when present + compact.
+  let meta = "";
+  if (e.metadata && typeof e.metadata === "object") {
+    try {
+      const s = JSON.stringify(e.metadata);
+      if (s && s !== "{}") meta = ` (${s.slice(0, 300)})`;
+    } catch {
+      /* unserializable metadata → skip */
+    }
+  }
+  return { type: "error", message: `${code}${base}${meta}` };
+}
 
 /**
  * Incremental parser for an upstream OpenAI-style SSE stream.
@@ -80,6 +131,14 @@ export function parseLine(line: string): UpstreamEvent | null {
   } catch {
     return null; // tolerate keep-alives / partial garbage rather than 500
   }
+  // A terminal provider error chunk (e.g. xAI 7003) carries `error`, not `choices`.
+  // Check it FIRST so the failure isn't dropped as "no delta / no tool-call".
+  const err = extractError(chunk);
+  if (err) return err;
+  // The final usage chunk (when include_usage is set) may carry empty choices —
+  // check it before delta/tool extraction so it isn't dropped as "nothing useful".
+  const usage = extractUsage(chunk);
+  if (usage) return usage;
   // A streaming chunk carries EITHER a text delta OR a tool-call fragment (B2),
   // never both in the same delta. Check tool-calls first.
   const tool = extractToolCall(chunk);
@@ -187,7 +246,7 @@ export function extractDelta(chunk: unknown): string | null {
 
 /** Serialize one of our client-protocol events into an SSE frame string. */
 export function frameEvent(
-  event: "token" | "tool" | "done" | "error",
+  event: "token" | "tool" | "usage" | "done" | "error",
   data: Record<string, unknown>,
 ): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;

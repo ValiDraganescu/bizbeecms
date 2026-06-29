@@ -15,7 +15,7 @@
  *   ContactCallout — a closing "get in touch" band
  *
  * AUTHORING CONSTRAINTS (identical to the other kits, enforced by the gate):
- *  - every `className` token must be in `allowedClasses()` (utility-css.ts);
+ *  - className tokens may be ANY Tailwind class (compiled per page at render);
  *    note `rounded-md`/`grid-cols-5` do NOT exist — use `rounded`/grid up to 4.
  *  - one-off values go in inline `style` (the gate does not class-check style).
  *  - declare every page-bound prop in `propsSchema` AND mark it with a

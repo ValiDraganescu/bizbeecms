@@ -14,9 +14,19 @@
 export type ThreadRole = "user" | "assistant" | "system";
 /** A stored tool-call card: an opaque plain object (the client's ToolResult). */
 export type StoredTool = Record<string, unknown>;
-export type ThreadMessage = { role: ThreadRole; content: string; tools?: StoredTool[] };
+export type ThreadMessage = {
+  role: ThreadRole;
+  content: string;
+  tools?: StoredTool[];
+  // Ordered display parts ({kind:"text"|"tool", …}) so reloaded assistant turns
+  // interleave text and tool cards exactly as streamed. Sanitized like `tools`.
+  parts?: StoredTool[];
+};
 
 const MAX_TOOLS = 50;
+// parts = tool cards + interleaved text segments, so a turn can have more parts
+// than tools. Cap generously; the content cap already bounds total size.
+const MAX_PARTS = 120;
 
 export type ThreadInput = {
   id: string;
@@ -49,7 +59,7 @@ export function deriveTitle(
  * count, and JSON-roundtrips each to strip anything non-serializable (functions,
  * cycles) so the column is always clean JSON. Returns undefined when empty.
  */
-export function sanitizeTools(raw: unknown): StoredTool[] | undefined {
+export function sanitizeTools(raw: unknown, cap = MAX_TOOLS): StoredTool[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const out: StoredTool[] = [];
   for (const item of raw) {
@@ -59,7 +69,7 @@ export function sanitizeTools(raw: unknown): StoredTool[] | undefined {
     } catch {
       continue; // non-serializable → drop
     }
-    if (out.length >= MAX_TOOLS) break;
+    if (out.length >= cap) break;
   }
   return out.length > 0 ? out : undefined;
 }
@@ -88,10 +98,12 @@ export function validateThreadInput(
     if (typeof m.role !== "string" || !ROLES.has(m.role as ThreadRole)) continue;
     if (typeof m.content !== "string") continue;
     const tools = m.role === "assistant" ? sanitizeTools(m.tools) : undefined;
+    const parts = m.role === "assistant" ? sanitizeTools(m.parts, MAX_PARTS) : undefined;
     messages.push({
       role: m.role as ThreadRole,
       content: m.content.length > MAX_CONTENT ? m.content.slice(0, MAX_CONTENT) : m.content,
       ...(tools ? { tools } : {}),
+      ...(parts ? { parts } : {}),
     });
     if (messages.length >= MAX_MESSAGES) break;
   }

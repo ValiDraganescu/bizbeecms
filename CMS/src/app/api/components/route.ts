@@ -16,6 +16,7 @@
  * real binding (HITL).
  */
 import {
+  deleteComponent,
   getComponentByName,
   listComponents,
   missingComponentNames,
@@ -56,6 +57,8 @@ export async function GET(request: Request): Promise<Response> {
         name: r.name,
         hasScript: (r.script ?? "") !== "",
         hasCss: (r.css ?? "") !== "",
+        // Has declared props → the standalone preview has placeholder data to bind.
+        hasPreviewData: (r.propsSchema ?? "") !== "",
         tags: normalizeTags(r.tags),
       })),
     );
@@ -92,6 +95,28 @@ export async function PATCH(request: Request): Promise<Response> {
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to update tags" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * DELETE ?name=Foo → remove one component (admin Develop page). 404 if no such
+ * component. A page block that still references it renders a visible placeholder
+ * (planPage's unknown-component path), so a dangling reference is self-announcing.
+ */
+export async function DELETE(request: Request): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+  const name = new URL(request.url).searchParams.get("name")?.trim() ?? "";
+  if (!name) return Response.json({ error: "name is required" }, { status: 400 });
+  try {
+    const res = await deleteComponent(name);
+    if (!res.deleted) return Response.json({ error: "component not found" }, { status: 404 });
+    return Response.json({ name, deleted: true });
+  } catch (err) {
+    return Response.json(
+      { error: (err as Error).message ?? "failed to delete component" },
       { status: 500 },
     );
   }

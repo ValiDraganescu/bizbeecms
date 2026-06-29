@@ -46,7 +46,7 @@ export const GET_COMPONENT_TOOL = {
   function: {
     name: "get_component",
     description:
-      "Fetch one existing component's full artifact (tree, script, css, props " +
+      "Fetch one existing component's full artifact (html, script, css, props " +
       "schema) by its name, so you can inspect or modify it. Use list_components " +
       "first to discover names.",
     parameters: {

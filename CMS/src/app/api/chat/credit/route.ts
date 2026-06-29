@@ -4,13 +4,12 @@
  *
  *   GET /api/chat/credit  → { credit: { usage, limit, remaining } | null }
  *
- * Returns the in-use key's spend-vs-limit ONLY when the in-use key is the
- * env/minted/deployer-global `OPENROUTER_API_KEY` — determined via the SAME
- * precedence as the Ai port (`effectiveOpenrouterKey`: CMS-local user key wins).
- * A CMS-local user key is the customer's OWN OpenRouter balance → out of scope,
- * so we return `{ credit: null }` (the widget hides the line). Source is
- * OpenRouter's per-KEY `/api/v1/key` (no management key needed); we NEVER log the
- * key and NEVER echo it.
+ * Returns the in-use key's spend-vs-limit for whatever key is actually in use —
+ * the env/minted/deployer-global `OPENROUTER_API_KEY` OR a CMS-local user key —
+ * determined via the SAME precedence as the Ai port (`effectiveOpenrouterKey`:
+ * CMS-local user key wins). Source is OpenRouter's per-KEY `/api/v1/key` (no
+ * management key needed), which reports usage/limit for any key; we NEVER log the
+ * key and NEVER echo it. Only `{ credit: null }` when no key is configured.
  *
  * Admin-only (CMS-internal). REST-only (PM directive). Never 500 on a settings/
  * upstream failure — degrade to `{ credit: null }`.
@@ -63,10 +62,10 @@ export async function GET(request: Request): Promise<Response> {
     const envKey = typeof e.OPENROUTER_API_KEY === "string" ? e.OPENROUTER_API_KEY : "";
     const inUse = effectiveOpenrouterKey(userKey, envKey);
 
-    // Only surface credit for the env/minted key — a CMS-local user key is the
-    // customer's own balance (out of scope). No key at all → nothing to show.
-    const usingUserKey = typeof userKey === "string" && userKey.trim() !== "";
-    if (!inUse || usingUserKey) {
+    // Surface credit for whatever key is actually in use — env/minted OR a
+    // CMS-local user key. OpenRouter's per-KEY /api/v1/key reports usage/limit for
+    // any key, so a user-supplied key shows its own balance too. No key → nothing.
+    if (!inUse) {
       return Response.json({ credit: null });
     }
 

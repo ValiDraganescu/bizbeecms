@@ -14,11 +14,11 @@ import assert from "node:assert/strict";
 import { OpenRouterAi, OPENROUTER_CHAT_URL, pickSelection } from "../src/lib/ports/ai.ts";
 
 /** Fake fetch: records the call, returns a controllable response. */
-function fakeFetch({ ok = true, status = 200, body = new ReadableStream() } = {}) {
+function fakeFetch({ ok = true, status = 200, body = new ReadableStream(), text = "" } = {}) {
   const calls = [];
   const fn = async (url, init) => {
     calls.push({ url, init });
-    return { ok, status, body };
+    return { ok, status, body, text: async () => text };
   };
   fn.calls = calls;
   return fn;
@@ -52,6 +52,10 @@ test("chat POSTs to OpenRouter with Bearer auth + OpenAI-compatible streaming bo
   assert.equal(sent.stream, true);
   assert.deepEqual(sent.messages, messages);
   assert.deepEqual(sent.tools, tools);
+  // Token cap + usage reporting are always requested (defaults applied).
+  assert.equal(typeof sent.max_tokens, "number");
+  assert.ok(sent.max_tokens > 0);
+  assert.deepEqual(sent.stream_options, { include_usage: true });
 
   // Upstream stream returned as-is — NOT buffered/consumed.
   assert.equal(stream, sentinel);
@@ -66,6 +70,13 @@ test("chat omits tools when not provided", async () => {
   const sent = JSON.parse(f.calls[0].init.body);
   assert.equal(sent.stream, true);
   assert.ok(!("tools" in sent), "tools must be absent when not requested");
+});
+
+test("chat honors an explicit maxTokens override", async () => {
+  const f = fakeFetch();
+  const ai = new OpenRouterAi("sk-or-test", f);
+  await ai.chat([{ role: "user", content: "x" }], { model: "m", maxTokens: 256 });
+  assert.equal(JSON.parse(f.calls[0].init.body).max_tokens, 256);
 });
 
 test("chat throws on non-ok response (so the route surfaces it, not a silent stream)", async () => {

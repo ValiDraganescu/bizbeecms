@@ -23,6 +23,9 @@ import {
   providerOf,
   pricePerMillion,
   parseInputModalities,
+  outputCapFor,
+  MAX_OUTPUT_CEILING,
+  MIN_OUTPUT_FLOOR,
 } from "../src/lib/chat/models.ts";
 
 const CAT = [
@@ -186,6 +189,26 @@ test("parseInputModalities reads known modalities, defaults to ['text']", () => 
     parseInputModalities({ architecture: { input_modalities: ["file", "junk", "audio"] } }),
     ["file", "audio"],
   );
+});
+
+test("outputCapFor: scales output to a quarter of the window, clamped to the ceiling", () => {
+  // 128k window → quarter is 32k = exactly the ceiling.
+  assert.equal(outputCapFor(128_000), MAX_OUTPUT_CEILING);
+  // 2M window (grok-4.20) → quarter is huge → clamped to the ceiling.
+  assert.equal(outputCapFor(2_000_000), MAX_OUTPUT_CEILING);
+  // 40k window → quarter is 10k, under the ceiling → used as-is.
+  assert.equal(outputCapFor(40_000), 10_000);
+});
+
+test("outputCapFor: a tiny window gets the floor, not a uselessly small cap", () => {
+  assert.equal(outputCapFor(2_000), MIN_OUTPUT_FLOOR); // quarter=500 < floor
+});
+
+test("outputCapFor: unknown/invalid window → undefined (adapter default applies)", () => {
+  assert.equal(outputCapFor(null), undefined);
+  assert.equal(outputCapFor(undefined), undefined);
+  assert.equal(outputCapFor(0), undefined);
+  assert.equal(outputCapFor(-5), undefined);
 });
 
 test("pricePerMillion formats USD/token as USD per 1M tokens, 2dp", () => {

@@ -44,8 +44,12 @@ export async function POST(request: Request): Promise<Response> {
     context?: unknown;
     pathname?: unknown;
     model?: unknown;
+    lastError?: unknown;
   };
   const context = resolveRequestContext(b.context, b.pathname);
+  // The last upstream/request error from the failing conversation (e.g. xAI 7003),
+  // forwarded by the client so a FAILED chat's export carries the real reason.
+  const lastError = typeof b.lastError === "string" && b.lastError !== "" ? b.lastError : null;
 
   // Resolve the model id exactly like the chat route (validate against catalog
   // ids; never throws; falls back to DEFAULT_MODEL).
@@ -77,7 +81,14 @@ export async function POST(request: Request): Promise<Response> {
   const tools = toolSchemasForContext(context);
 
   return Response.json(
-    { context, model, messages, tools, exportedAt: new Date().toISOString() },
+    {
+      context,
+      model,
+      messages,
+      tools,
+      ...(lastError ? { lastError } : {}),
+      exportedAt: new Date().toISOString(),
+    },
     {
       headers: {
         "Content-Disposition": `attachment; filename="chat-payload-${context}.json"`,

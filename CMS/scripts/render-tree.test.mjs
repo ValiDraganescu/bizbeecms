@@ -126,6 +126,16 @@ test("planTree: invalid node throws", () => {
   assert.throws(() => planTree(null), /Invalid tree node/);
 });
 
+test("planTree: a corrupted non-string tag is named explicitly (model degeneration)", () => {
+  // The model sometimes sprays a stray number (e.g. 2222) into the JSON, yielding
+  // {tag:2222, props:2222}. The error must say `tag` must be a string + show the
+  // bad value, so the model regenerates instead of re-reading an opaque dump.
+  assert.throws(
+    () => planTree({ tag: 2222, props: 2222 }),
+    /`tag` must be an HTML tag NAME string.*got 2222/s,
+  );
+});
+
 // ── planPage ────────────────────────────────────────────────────────────────
 
 const card = {
@@ -469,4 +479,29 @@ test("parseJsonColumn: empty / null / bad JSON returns fallback", () => {
   assert.deepEqual(parseJsonColumn(null, []), []);
   assert.deepEqual(parseJsonColumn(undefined, { a: 1 }), { a: 1 });
   assert.deepEqual(parseJsonColumn("{not json", []), []);
+});
+
+// ── collectPlanClasses (feeds the runtime Tailwind compiler) ─────────────────
+
+import { collectPlanClasses } from "../src/lib/render/tree.ts";
+
+test("collectPlanClasses: gathers className tokens across the whole plan, deduped", () => {
+  const root = [
+    {
+      kind: "element",
+      tag: "div",
+      props: { className: "flex p-4" },
+      children: [
+        { kind: "element", tag: "span", props: { className: "p-4 text-xl" }, children: [] },
+        { kind: "text", text: "hi" },
+      ],
+    },
+  ];
+  const classes = collectPlanClasses(root);
+  assert.deepEqual([...classes].sort(), ["flex", "p-4", "text-xl"]);
+});
+
+test("collectPlanClasses: no className anywhere → empty set", () => {
+  const root = [{ kind: "element", tag: "br", props: {}, children: [] }];
+  assert.equal(collectPlanClasses(root).size, 0);
 });

@@ -55,7 +55,7 @@ export const LIST_ASSETS_TOOL = {
     name: "list_assets",
     description:
       "List the media assets (images) already uploaded to this site. Returns " +
-      "each asset's public URL (use it directly in a component tree's <img> " +
+      "each asset's public URL (use it directly in a component's <img> " +
       "src or any image prop), filename and content type. Call this before " +
       "referencing an image so you use a real uploaded asset instead of a " +
       "placeholder URL.",

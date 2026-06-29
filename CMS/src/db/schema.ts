@@ -33,8 +33,10 @@ export const component = sqliteTable(
     id: text("id").primaryKey(),
     // Stable identifier the page block tree references (e.g. "PricingCard").
     name: text("name").notNull(),
-    // JSON element tree the Worker SSRs via React.createElement (a data walk).
-    tree: text("tree").notNull().default("{}"),
+    // Handlebars-style HTML string the Worker parses to an element tree and SSRs
+    // via React.createElement (a data walk — never eval'd). `{{prop}}` /
+    // `{{t prop}}` slots are bound at render time. See lib/render/parse-html.ts.
+    html: text("html").notNull().default(""),
     // AI-authored client JS shipped to the browser as a <script> string. The
     // Worker forwards it as data; the browser executes it. Empty = static.
     script: text("script").notNull().default(""),
@@ -172,6 +174,12 @@ export const asset = sqliteTable(
     filename: text("filename").notNull(),
     contentType: text("content_type").notNull(),
     size: integer("size").notNull().default(0),
+    // AI-generated description of the image (epic: searchable media). Empty for
+    // non-images or when the describe call failed. Matched by media search.
+    description: text("description").notNull().default(""),
+    // Operator-authored tags (JSON array of strings, like `component.tags`).
+    // Also matched by media search.
+    tags: text("tags").notNull().default("[]"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

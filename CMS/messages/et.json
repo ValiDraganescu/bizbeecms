@@ -61,6 +61,8 @@
       "creditOf": "${remaining} / ${limit} alles",
       "creditUsage": "${usage} kasutatud",
       "creditTitle": "Kasutusel oleva OpenRouter-võtme järelejäänud krediit",
+      "contextUsage": "${used} tokenit",
+      "contextOf": "${used} / ${max} kontekstitokenit kasutatud",
       "sizeHalf": "Laienda pool ekraani",
       "sizeCompact": "Vähenda kompaktseks",
       "resize": "Lohista vestluse suuruse muutmiseks",
@@ -123,12 +125,25 @@
       "readTitle": "Vali failid, mida assistent loeb",
       "insertTitle": "Vali lisatav meedia",
       "confirmRead": "Lisa lugemiseks",
-      "confirmInsert": "Lisa URL",
+      "confirmInsert": "Lisa pildid",
       "close": "Sulge",
       "cancel": "Tühista",
       "loading": "Laadimine…",
       "empty": "Meediat pole veel. Lae pildid esmalt meediakogusse.",
-      "selectedCount": "{count, plural, =0 {Midagi pole valitud} one {# valitud} other {# valitud}}"
+      "selectedCount": "{count, plural, =0 {Midagi pole valitud} one {# valitud} other {# valitud}}",
+      "searchPlaceholder": "Otsi meediat kirjelduse või sildi järgi…",
+      "upload": "Lae üles",
+      "uploading": "Laadin üles…",
+      "describing": "Kirjeldan…",
+      "delete": "Kustuta",
+      "deleteConfirm": "Kustutada \"{name}\"? See eemaldab selle kogust jäädavalt.",
+      "noResults": "Ükski meedia ei vasta otsingule.",
+      "uploadFailed": "Üleslaadimine ebaõnnestus: {message}",
+      "deleteFailed": "Kustutamine ebaõnnestus: {message}",
+      "addTag": "Lisa silt",
+      "editTags": "Muuda silte",
+      "removeTag": "Eemalda silt {tag}",
+      "tagsFailed": "Siltide salvestamine ebaõnnestus: {message}"
     }
   },
   "contentLocales": {
@@ -154,7 +169,8 @@
     "apiKeys": "API-võtmed",
     "users": "Kasutajad",
     "google": "Google'i sisselogimine",
-    "openrouterKey": "OpenRouteri võti"
+    "openrouterKey": "OpenRouteri võti",
+    "media": "Meedia"
   },
   "theme": {
     "title": "Teema",
@@ -368,7 +384,9 @@
       "collections": "Defineeri tüübitud andmekogumikke, täida need sisuga ja teosta päringuid."
     },
     "pageBuilder": "Lehe koostaja",
-    "collections": "Kogumikud"
+    "collections": "Kogumikud",
+    "componentsImportExport": "Import / eksport",
+    "componentsDevelop": "Arenda"
   },
   "pageBuilder": {
     "title": "Lehe koostaja",
@@ -835,5 +853,55 @@
     "clear": "Tühjenda",
     "clearConfirm": "Eemaldada salvestatud OpenRouteri võti? AI-assistent kasutab juurutuse võtit.",
     "cancel": "Tühista"
+  },
+  "mediaSettings": {
+    "title": "Meedia",
+    "subtitle": "Vali AI-mudel, mis kirjeldab üleslaaditud pilte, et need oleksid otsitavad.",
+    "forbidden": "Sul pole õigust meediaseadeid hallata."
+  },
+  "imageModel": {
+    "loading": "Laadimine…",
+    "label": "Pildikirjelduse mudel",
+    "hint": "Nägemismudel loeb iga üleslaaditud pildi ja kirjutab lühikese kirjelduse meediaotsingu jaoks.",
+    "save": "Salvesta",
+    "saving": "Salvestamine…",
+    "saved": "Salvestatud"
+  },
+  "develop": {
+    "title": "Arenda komponente",
+    "subtitle": "Vali komponent, et seda kohatäitjaandmetega eelvaadata, või kustuta soovimatud.",
+    "listTitle": "Komponendid",
+    "refresh": "Värskenda",
+    "empty": "Komponente veel pole.",
+    "flagScript": "skript",
+    "flagCss": "css",
+    "flagStatic": "staatiline",
+    "flagNoData": "kohatäitja andmeid pole",
+    "delete": "Kustuta",
+    "deleteFor": "Kustuta {name}",
+    "confirmDelete": "Kas kustutada komponent \"{name}\"? Seda ei saa tagasi võtta.",
+    "previewTitle": "Eelvaade — {name}",
+    "previewNone": "Eelvaade",
+    "reload": "Laadi uuesti",
+    "noPlaceholderData": "Sellel komponendil pole kohatäitja andmeid, seega võib eelvaade olla tühi. Palu assistendil lisada propsSchema vaikeväärtused.",
+    "selectPrompt": "Vali komponent, et seda eelvaadata.",
+    "propsTitle": "Propsid",
+    "propsHint": "Muuda kohatäitja väärtusi, mida eelvaade seob. Salvestatakse komponendi vaikeväärtustena.",
+    "view": { "preview": "Eelvaade", "code": "Kood" },
+    "viewport": { "desktop": "Töölaud", "tablet": "Tahvelarvuti", "mobile": "Mobiil" },
+    "codeTab": { "html": "HTML", "script": "Skript", "css": "CSS" },
+    "capture": {
+      "send": "Saada eelvaade AI-le",
+      "capturing": "Jäädvustan…",
+      "caption": "Siin on \"{name}\" renderdatud töölaua-, tahvelarvuti- ja mobiililaiustel. Vaata, kuidas see igal suurusel välja näeb, ja täienda komponenti nii, et see toimiks kõigil hästi.",
+      "failed": "Eelvaate jäädvustamine ebaõnnestus."
+    },
+    "save": {
+      "saving": "Salvestan…",
+      "saved": "Salvestatud",
+      "unsaved": "Salvestamata muudatused",
+      "failed": "Salvestamine ebaõnnestus",
+      "loading": "Laadin…"
+    }
   }
 }

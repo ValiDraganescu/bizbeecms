@@ -111,14 +111,14 @@ test("parse rejects bad JSON, wrong format, wrong version", () => {
   );
 });
 
-test("parse rejects a disallowed utility class (trust boundary)", () => {
+test("parse accepts any Tailwind class (no allowlist — renderer compiles per page)", () => {
   const bundle = serializeComponent({
     ...goodRow,
-    tree: JSON.stringify({ tag: "div", props: { className: "bg-blue-500" }, children: [] }),
+    tree: JSON.stringify({ tag: "div", props: { className: "bg-blue-500 hover:underline" }, children: [] }),
     css: "",
   });
   const parsed = parsePortableComponent(bundle);
-  assert.equal(parsed.ok, false);
+  assert.equal(parsed.ok, true, JSON.stringify(parsed.errors));
 });
 
 test("parse rejects an unsafe component name", () => {

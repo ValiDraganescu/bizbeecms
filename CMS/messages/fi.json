@@ -61,6 +61,8 @@
       "creditOf": "${remaining} / ${limit} jäljellä",
       "creditUsage": "${usage} käytetty",
       "creditTitle": "Käytössä olevan OpenRouter-avaimen jäljellä oleva saldo",
+      "contextUsage": "${used} tokenia",
+      "contextOf": "${used} / ${max} kontekstitokenia käytetty",
       "sizeHalf": "Laajenna puoleen näyttöön",
       "sizeCompact": "Pienennä kompaktiksi",
       "resize": "Muuta keskustelun kokoa vetämällä",
@@ -123,12 +125,25 @@
       "readTitle": "Valitse avustajan luettavat tiedostot",
       "insertTitle": "Valitse lisättävä media",
       "confirmRead": "Liitä luettavaksi",
-      "confirmInsert": "Lisää URL",
+      "confirmInsert": "Liitä kuvat",
       "close": "Sulje",
       "cancel": "Peruuta",
       "loading": "Ladataan…",
       "empty": "Ei vielä mediaa. Lataa kuvia ensin mediakirjastossa.",
-      "selectedCount": "{count, plural, =0 {Ei valintoja} one {# valittu} other {# valittu}}"
+      "selectedCount": "{count, plural, =0 {Ei valintoja} one {# valittu} other {# valittu}}",
+      "searchPlaceholder": "Hae mediaa kuvauksen tai tunnisteen perusteella…",
+      "upload": "Lataa",
+      "uploading": "Ladataan…",
+      "describing": "Kuvaillaan…",
+      "delete": "Poista",
+      "deleteConfirm": "Poistetaanko \"{name}\"? Tämä poistaa sen kirjastosta pysyvästi.",
+      "noResults": "Mikään media ei vastaa hakuasi.",
+      "uploadFailed": "Lataus epäonnistui: {message}",
+      "deleteFailed": "Poisto epäonnistui: {message}",
+      "addTag": "Lisää tunniste",
+      "editTags": "Muokkaa tunnisteita",
+      "removeTag": "Poista tunniste {tag}",
+      "tagsFailed": "Tunnisteiden tallennus epäonnistui: {message}"
     }
   },
   "contentLocales": {
@@ -154,7 +169,8 @@
     "apiKeys": "API-avaimet",
     "users": "Käyttäjät",
     "google": "Google-kirjautuminen",
-    "openrouterKey": "OpenRouter-avain"
+    "openrouterKey": "OpenRouter-avain",
+    "media": "Media"
   },
   "theme": {
     "title": "Teema",
@@ -368,7 +384,9 @@
       "collections": "Määritä tyypitettyjä tietokokoelmia, täytä ne sisällöllä ja tee kyselyitä."
     },
     "pageBuilder": "Sivurakentaja",
-    "collections": "Kokoelmat"
+    "collections": "Kokoelmat",
+    "componentsImportExport": "Tuonti / vienti",
+    "componentsDevelop": "Kehitä"
   },
   "pageBuilder": {
     "title": "Sivurakentaja",
@@ -835,5 +853,55 @@
     "clear": "Tyhjennä",
     "clearConfirm": "Poistetaanko tallennettu OpenRouter-avain? AI-avustaja käyttää käyttöönoton avainta.",
     "cancel": "Peruuta"
+  },
+  "mediaSettings": {
+    "title": "Media",
+    "subtitle": "Valitse AI-malli, joka kuvailee ladatut kuvat, jotta ne ovat haettavissa.",
+    "forbidden": "Sinulla ei ole oikeutta hallita media-asetuksia."
+  },
+  "imageModel": {
+    "loading": "Ladataan…",
+    "label": "Kuvankuvausmalli",
+    "hint": "Visiomalli lukee jokaisen ladatun kuvan ja kirjoittaa lyhyen kuvauksen mediahakua varten.",
+    "save": "Tallenna",
+    "saving": "Tallennetaan…",
+    "saved": "Tallennettu"
+  },
+  "develop": {
+    "title": "Kehitä komponentteja",
+    "subtitle": "Valitse komponentti esikatsellaksesi sitä paikkamerkkitiedoilla tai poista tarpeettomat.",
+    "listTitle": "Komponentit",
+    "refresh": "Päivitä",
+    "empty": "Ei vielä komponentteja.",
+    "flagScript": "skripti",
+    "flagCss": "css",
+    "flagStatic": "staattinen",
+    "flagNoData": "ei paikkamerkkitietoja",
+    "delete": "Poista",
+    "deleteFor": "Poista {name}",
+    "confirmDelete": "Poistetaanko komponentti \"{name}\"? Tätä ei voi kumota.",
+    "previewTitle": "Esikatselu — {name}",
+    "previewNone": "Esikatselu",
+    "reload": "Lataa uudelleen",
+    "noPlaceholderData": "Tällä komponentilla ei ole paikkamerkkitietoja, joten esikatselu voi olla tyhjä. Pyydä avustajaa lisäämään propsSchema-oletukset.",
+    "selectPrompt": "Valitse komponentti esikatsellaksesi sitä.",
+    "propsTitle": "Propsit",
+    "propsHint": "Muokkaa paikkamerkkiarvoja, jotka esikatselu sitoo. Tallennetaan komponentin oletuksiksi.",
+    "view": { "preview": "Esikatselu", "code": "Koodi" },
+    "viewport": { "desktop": "Työpöytä", "tablet": "Tabletti", "mobile": "Mobiili" },
+    "codeTab": { "html": "HTML", "script": "Skripti", "css": "CSS" },
+    "capture": {
+      "send": "Lähetä esikatselu tekoälylle",
+      "capturing": "Kaapataan…",
+      "caption": "Tässä on \"{name}\" renderöitynä työpöytä-, tabletti- ja mobiilileveyksillä. Tarkista miltä se näyttää kullakin koolla ja paranna komponenttia niin, että se toimii hyvin kaikilla.",
+      "failed": "Esikatselun kaappaus epäonnistui."
+    },
+    "save": {
+      "saving": "Tallennetaan…",
+      "saved": "Tallennettu",
+      "unsaved": "Tallentamattomia muutoksia",
+      "failed": "Tallennus epäonnistui",
+      "loading": "Ladataan…"
+    }
   }
 }

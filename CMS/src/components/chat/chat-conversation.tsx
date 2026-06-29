@@ -34,6 +34,10 @@ import {
   subscribeActivePageContext,
 } from "@/lib/chat/page-context";
 import {
+  getActiveComponentContext,
+  subscribeActiveComponentContext,
+} from "@/lib/chat/component-context";
+import {
   decideSendOnEnter,
   loadEnterMode,
   saveEnterMode,
@@ -50,10 +54,22 @@ import {
 } from "@/lib/chat/attachments";
 import { MAX_ASSET_SIZE } from "@/lib/render/asset";
 import { ChatGalleryPicker, type GalleryAsset } from "@/components/chat/chat-gallery-picker";
+import { subscribeChatAttachments } from "@/lib/chat/chat-attach-bus";
+
+/**
+ * One ordered piece of an assistant turn, for DISPLAY only. The stream
+ * interleaves text and tool calls; `parts` preserves that order so tool cards
+ * render exactly where the model emitted them (not piled after all the text).
+ * `content`/`tools` stay the flat source of truth for model-history + persistence
+ * (which don't care about interleaving) — `parts` is derived alongside them.
+ */
+export type AssistantPart =
+  | { kind: "text"; text: string }
+  | { kind: "tool"; result: ToolResult };
 
 export type ChatMsg =
   | { role: "user"; content: string }
-  | { role: "assistant"; content: string; tools: ToolResult[] };
+  | { role: "assistant"; content: string; tools: ToolResult[]; parts?: AssistantPart[] };
 
 /** Base64-encode a Blob's bytes (browser). Used to inline R2 attachments. */
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -114,6 +130,14 @@ export function useChat(
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Latest token usage from the stream's final usage chunk. `promptTokens` is the
+  // full conversation-context size, so it drives the context-usage meter. Null
+  // until the first turn reports usage. ponytail: keep the latest, not a history.
+  const [usage, setUsage] = useState<{
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  } | null>(null);
   // The in-flight request's aborter, so `stop()` can cancel mid-stream.
   const abortRef = useRef<AbortController | null>(null);
 
@@ -170,16 +194,26 @@ export function useChat(
     setMessages((prev) => [
       ...prev,
       { role: "user", content: bubbleText(trimmed, attachments, references) },
-      { role: "assistant", content: "", tools: [] },
+      { role: "assistant", content: "", tools: [], parts: [] },
     ]);
     setBusy(true);
 
+    // Tokens append to the trailing text part (creating one if the last part is a
+    // tool); tools push a new tool part. `parts` thus mirrors the stream's true
+    // order. `content`/`tools` stay the flat source of truth in parallel.
     const appendToken = (chunk: string) =>
       setMessages((prev) => {
         const next = [...prev];
         const last = next[next.length - 1];
         if (last && last.role === "assistant") {
-          next[next.length - 1] = { ...last, content: last.content + chunk };
+          const parts = [...(last.parts ?? [])];
+          const tail = parts[parts.length - 1];
+          if (tail && tail.kind === "text") {
+            parts[parts.length - 1] = { kind: "text", text: tail.text + chunk };
+          } else {
+            parts.push({ kind: "text", text: chunk });
+          }
+          next[next.length - 1] = { ...last, content: last.content + chunk, parts };
         }
         return next;
       });
@@ -188,7 +222,11 @@ export function useChat(
         const next = [...prev];
         const last = next[next.length - 1];
         if (last && last.role === "assistant") {
-          next[next.length - 1] = { ...last, tools: [...last.tools, result] };
+          next[next.length - 1] = {
+            ...last,
+            tools: [...last.tools, result],
+            parts: [...(last.parts ?? []), { kind: "tool", result }],
+          };
         }
         return next;
       });
@@ -242,6 +280,12 @@ export function useChat(
             if (mutatesRenderedPage(ev.result.name, ev.result.ok)) {
               signalPageMutation(ev.result.name);
             }
+          } else if (ev.type === "usage") {
+            setUsage({
+              promptTokens: ev.promptTokens,
+              completionTokens: ev.completionTokens,
+              totalTokens: ev.totalTokens,
+            });
           } else if (ev.type === "error") streamError = ev.message;
         }
         if (done) break;
@@ -260,26 +304,33 @@ export function useChat(
   // clear it for a new conversation. Tool cards now round-trip (ai-widget-ux):
   // a loaded assistant turn restores its stored `tools` so the cards (incl. the
   // input/output accordion) reappear; a turn that predates persistence has none.
-  function seed(seedMessages: { role: string; content: string; tools?: unknown[] }[]) {
+  function seed(
+    seedMessages: { role: string; content: string; tools?: unknown[]; parts?: unknown[] }[],
+  ) {
     setError(null);
     setMessages(
-      seedMessages.map((m) =>
-        m.role === "user"
-          ? { role: "user", content: m.content }
-          : {
-              role: "assistant",
-              content: m.content,
-              tools: Array.isArray(m.tools) ? (m.tools as ToolResult[]) : [],
-            },
-      ),
+      seedMessages.map((m) => {
+        if (m.role === "user") return { role: "user", content: m.content };
+        const tools = Array.isArray(m.tools) ? (m.tools as ToolResult[]) : [];
+        // Prefer stored interleaved order; older threads (no `parts`) fall back to
+        // text-then-tools, which is what they always displayed anyway.
+        const parts = Array.isArray(m.parts)
+          ? (m.parts as AssistantPart[])
+          : [
+              ...(m.content ? [{ kind: "text", text: m.content } as AssistantPart] : []),
+              ...tools.map((result) => ({ kind: "tool", result }) as AssistantPart),
+            ];
+        return { role: "assistant", content: m.content, tools, parts };
+      }),
     );
   }
   function reset() {
     setError(null);
     setMessages([]);
+    setUsage(null);
   }
 
-  return { messages, busy, error, send, seed, reset, stop };
+  return { messages, busy, error, send, seed, reset, stop, usage };
 }
 
 /**
@@ -290,9 +341,19 @@ export function useChat(
  */
 function ContextChip() {
   const t = useTranslations("chat");
+  // Reflects BOTH inline-context stores (Page Builder + Develop workbench) so the
+  // chip shows on either page. Snapshot is a plain string → useSyncExternalStore's
+  // referential check is just string equality, no memo needed.
   const context = useSyncExternalStore(
-    subscribeActivePageContext,
-    getActivePageContext,
+    (fn) => {
+      const a = subscribeActivePageContext(fn);
+      const b = subscribeActiveComponentContext(fn);
+      return () => {
+        a();
+        b();
+      };
+    },
+    () => [getActivePageContext(), getActiveComponentContext()].filter((s) => s !== "").join("\n\n"),
     () => "", // server snapshot: never attached during SSR
   );
   const [open, setOpen] = useState(false);
@@ -317,7 +378,7 @@ function ContextChip() {
         </svg>
       </button>
       {open && (
-        <pre className="mt-1.5 whitespace-pre-wrap break-words border-t border-border pt-1.5 text-foreground-muted">
+        <pre className="mt-1.5 max-h-64 overflow-y-auto whitespace-pre-wrap break-words border-t border-border pt-1.5 text-foreground-muted">
           {context}
         </pre>
       )}
@@ -492,6 +553,35 @@ export function ChatConversation({
     setEnterMode(loadEnterMode());
   }, []);
 
+  // The Develop workbench's "Send preview to AI" captures the component at each
+  // viewport and pushes the PNGs here. Add them as pending image attachments and
+  // prefill the caption so the operator just hits Send (the vision model then
+  // sees how the component looks across screen sizes). data: URLs fetch fine in
+  // onSend's bytes-read step, so they need no R2 upload.
+  useEffect(() => {
+    return subscribeChatAttachments(({ images, caption }) => {
+      if (images.length === 0) return;
+      // The model must be able to read images, or the screenshots are useless.
+      if (!mods.includes("image")) {
+        setAttachError(t("attach.textOnly"));
+        return;
+      }
+      setAttachments((cur) => [
+        ...cur,
+        ...images.map((img, i) => ({
+          key: `preview-${i}-${img.name}`,
+          url: img.dataUrl,
+          name: img.name,
+          mime: img.mime,
+        })),
+      ]);
+      if (caption) setInput((cur) => (cur.trim() === "" ? caption : cur));
+      setAttachError(null);
+    });
+    // mods is derived from inputModalities; re-subscribe if the selected model changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mods.join(",")]);
+
   // Follow new content only while the reader is parked at the bottom; if they've
   // scrolled up to re-read, leave them be and surface the "jump to latest" pill.
   useEffect(() => {
@@ -557,6 +647,7 @@ export function ChatConversation({
                 key={i}
                 content={m.content}
                 tools={m.tools}
+                parts={m.parts}
                 label={t("assistant")}
                 thinking={busy && i === messages.length - 1 && m.content === ""}
                 t={t}
@@ -604,17 +695,27 @@ export function ChatConversation({
         {attachments.length > 0 && (
           <ul className="flex flex-wrap gap-1.5">
             {attachments.map((a) => (
+              // Square thumbnail: image attachments show the actual image; the
+              // remove button overlays the top-right corner. Non-image files (e.g.
+              // pdf) fall back to a filename label inside the same square.
               <li
                 key={a.key}
-                className="flex max-w-[14rem] items-center gap-1.5 rounded-md border border-border bg-surface-muted px-2 py-1 text-xs text-foreground"
+                className="group relative h-16 w-16 overflow-hidden rounded-md border border-border bg-surface-muted"
+                title={a.name}
               >
-                <span className="truncate" title={a.name}>{a.name}</span>
+                {a.mime.startsWith("image/") ? (
+                  <img src={a.url} alt={a.name} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center px-1 text-center text-[10px] leading-tight text-foreground-muted">
+                    <span className="line-clamp-3 break-all">{a.name}</span>
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => removeAttachment(a.key)}
                   aria-label={t("attach.remove")}
                   title={t("attach.remove")}
-                  className="shrink-0 text-foreground-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-surface/90 text-foreground-muted shadow-sm hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
                     <line x1="6" y1="6" x2="18" y2="18" />
@@ -628,31 +729,60 @@ export function ChatConversation({
 
         {references.length > 0 && (
           <ul className="flex flex-wrap gap-1.5">
-            {references.map((r) => (
-              <li
-                key={r.url}
-                className="flex max-w-[16rem] items-center gap-1.5 rounded-md border border-primary bg-primary-subtle px-2 py-1 text-xs text-foreground"
-                title={t("attach.referenceHint", { url: r.url })}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="shrink-0">
-                  <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                  <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                </svg>
-                <span className="truncate" title={r.name}>{r.name}</span>
-                <button
-                  type="button"
-                  onClick={() => removeReference(r.url)}
-                  aria-label={t("attach.remove")}
-                  title={t("attach.remove")}
-                  className="shrink-0 text-foreground-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            {references.map((r) => {
+              // Gallery picks via "Insert URL" land here as references (url+name).
+              // Image URLs (the /media/... assets) render as a square thumbnail;
+              // a non-image reference URL keeps the link chip.
+              const isImage = /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(r.url);
+              if (isImage) {
+                return (
+                  <li
+                    key={r.url}
+                    className="group relative h-16 w-16 overflow-hidden rounded-md border border-primary"
+                    title={r.name}
+                  >
+                    <img src={r.url} alt={r.name} className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeReference(r.url)}
+                      aria-label={t("attach.remove")}
+                      title={t("attach.remove")}
+                      className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-surface/90 text-foreground-muted shadow-sm hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                      </svg>
+                    </button>
+                  </li>
+                );
+              }
+              return (
+                <li
+                  key={r.url}
+                  className="flex max-w-[16rem] items-center gap-1.5 rounded-md border border-primary bg-primary-subtle px-2 py-1 text-xs text-foreground"
+                  title={t("attach.referenceHint", { url: r.url })}
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                    <line x1="18" y1="6" x2="6" y2="18" />
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="shrink-0">
+                    <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                    <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                   </svg>
-                </button>
-              </li>
-            ))}
+                  <span className="truncate" title={r.name}>{r.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeReference(r.url)}
+                    aria-label={t("attach.remove")}
+                    title={t("attach.remove")}
+                    className="shrink-0 text-foreground-muted hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                    </svg>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
 
@@ -864,7 +994,7 @@ function MarkdownBlock({ block }: { block: Block }) {
       return <p className="whitespace-pre-wrap"><Inlines nodes={block.children} /></p>;
     case "code":
       return (
-        <pre className="overflow-x-auto rounded-md bg-surface px-2 py-1 text-sm">
+        <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md bg-surface px-2 py-1 text-sm">
           <code>{block.value}</code>
         </pre>
       );
@@ -977,36 +1107,85 @@ function UserBubble({ content, label }: { content: string; label: string }) {
 function AssistantBubble({
   content,
   tools,
+  parts,
   label,
   thinking,
   t,
 }: {
   content: string;
   tools: ToolResult[];
+  parts?: AssistantPart[];
   label: string;
   thinking: boolean;
   t: ReturnType<typeof useTranslations>;
 }) {
+  // Ordered parts (streaming + new threads) interleave text and tool cards
+  // exactly as the model emitted them. Older threads with no `parts` fall back to
+  // the flat content-then-tools layout.
+  const ordered: AssistantPart[] =
+    parts ??
+    [
+      ...(content ? [{ kind: "text", text: content } as AssistantPart] : []),
+      ...tools.map((result) => ({ kind: "tool", result }) as AssistantPart),
+    ];
+  const hasText = ordered.some((p) => p.kind === "text" && p.text.trim() !== "");
+
   return (
     <div className="self-start max-w-[80%]">
       <p className="mb-1 text-foreground-muted">{label}</p>
-      <div className="rounded-lg bg-surface-muted px-3 py-2 text-foreground">
-        {content ? (
-          <Markdown source={content} />
-        ) : thinking ? (
+      {/* Thinking placeholder only before any content has streamed in. */}
+      {!hasText && thinking && (
+        <div className="rounded-lg bg-surface-muted px-3 py-2 text-foreground">
           <span className="flex items-center gap-2 text-foreground-muted">
             <Spinner />
             {t("thinking")}
           </span>
-        ) : (
-          ""
-        )}
-      </div>
-      {tools.map((tool, i) => (
-        <ToolCard key={i} tool={tool} t={t} />
-      ))}
+        </div>
+      )}
+      {groupParts(ordered).map((group, gi) =>
+        group.kind === "tools" ? (
+          // Consecutive tool calls flow side by side, wrapping to fit the width.
+          <div key={gi} className="mt-2 flex flex-wrap items-start gap-1.5">
+            {group.tools.map((result, i) => (
+              <ToolCard key={i} tool={result} t={t} />
+            ))}
+          </div>
+        ) : // Skip whitespace-only chunks — models emit `'  '` between tool calls,
+        // which would otherwise render as an empty bubble.
+        group.text.trim() ? (
+          <div
+            key={gi}
+            className="rounded-lg bg-surface-muted px-3 py-2 text-foreground [&:not(:first-child)]:mt-2"
+          >
+            <Markdown source={group.text} />
+          </div>
+        ) : null,
+      )}
     </div>
   );
+}
+
+/**
+ * Collapse an ordered part list into render groups: a text part is its own
+ * group; a run of consecutive tool parts becomes ONE `tools` group so they can
+ * be laid out in a single wrapping flex row.
+ */
+type PartGroup =
+  | { kind: "text"; text: string }
+  | { kind: "tools"; tools: ToolResult[] };
+
+function groupParts(parts: AssistantPart[]): PartGroup[] {
+  const out: PartGroup[] = [];
+  for (const p of parts) {
+    if (p.kind === "tool") {
+      const last = out[out.length - 1];
+      if (last?.kind === "tools") last.tools.push(p.result);
+      else out.push({ kind: "tools", tools: [p.result] });
+    } else {
+      out.push({ kind: "text", text: p.text });
+    }
+  }
+  return out;
 }
 
 function ToolCard({
@@ -1023,14 +1202,27 @@ function ToolCard({
   const inputBlob = blobView(tool.input);
   const outputBlob = blobView(tool.output);
   // ponytail: native <details> is the accordion — collapsed by default, no JS state.
+  // On expand, scroll the card fully into view so a card near the bottom of the
+  // transcript isn't left half-clipped under the fold (the reported bug).
   return (
-    <details className={`group mt-2 rounded-md border px-3 py-2 ${cls}`}>
-      <summary className="flex cursor-pointer list-none items-center gap-2 font-medium">
+    <details
+      // Slim, inline pill — collapsed cards flow side by side (flex-wrap on the
+      // parent), expanding to full width when opened.
+      className={`group rounded border px-2 py-0.5 text-xs open:w-full open:py-1 ${cls}`}
+      onToggle={(e) => {
+        if ((e.currentTarget as HTMLDetailsElement).open) {
+          requestAnimationFrame(() =>
+            e.currentTarget?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
+          );
+        }
+      }}
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-1.5">
         <span aria-hidden className="text-foreground-muted transition-transform group-open:rotate-90">
           ›
         </span>
         <span className="font-mono">{tool.name}</span>
-        {summary && <span className="text-foreground-muted">{summary}</span>}
+        {summary && <span className="truncate text-foreground-muted">{summary}</span>}
         {!tool.ok && <span className="text-danger">{t("tool.failBadge")}</span>}
       </summary>
       {!tool.ok && tool.errors && tool.errors.length > 0 && (
@@ -1060,7 +1252,7 @@ function ToolBlob({
   return (
     <div className="mt-2">
       <p className="mb-1 text-foreground-muted">{label}</p>
-      <pre className="overflow-x-auto rounded-md bg-surface px-2 py-1 text-foreground">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-md bg-surface px-2 py-1 text-foreground">
         {text}
       </pre>
       {blob.truncated && (

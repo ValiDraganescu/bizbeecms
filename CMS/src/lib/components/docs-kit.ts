@@ -15,7 +15,7 @@
  *   ApiParam     — a single API parameter reference row (name + type + desc)
  *
  * AUTHORING CONSTRAINTS (identical to the other kits, enforced by the gate):
- *  - every `className` token must be in `allowedClasses()` (utility-css.ts);
+ *  - className tokens may be ANY Tailwind class (compiled per page at render);
  *    note `rounded-md`/`text-6xl` do NOT exist — use `rounded`/`text-5xl`.
  *  - one-off values go in inline `style` (the gate does not class-check style).
  *  - declare every page-bound prop in `propsSchema` AND mark it with a

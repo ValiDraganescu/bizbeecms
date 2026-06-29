@@ -83,9 +83,23 @@ function ModalityIcon({ modality, label }: { modality: string; label: string }) 
 export function ModelPicker({
   value,
   onChange,
+  requireModalities,
+  direction = "up",
 }: {
   value: string;
   onChange: (id: string) => void;
+  /**
+   * Pre-filter the catalog to models accepting EVERY listed input modality (e.g.
+   * `["image"]` for the media image-describe picker). Applied before search +
+   * the in-picker modality toggles. Omit → the full catalog (chat default).
+   */
+  requireModalities?: string[];
+  /**
+   * Which way the panel opens. "up" (default) suits the chat widget (input at the
+   * bottom of the panel); "down" suits a picker near the top of a page where
+   * there's no room above (e.g. the media settings page).
+   */
+  direction?: "up" | "down";
 }) {
   const t = useTranslations("chat.widget");
   const [catalog, setCatalog] = useState<ReadonlyArray<CatalogModel>>(CHAT_MODELS);
@@ -137,15 +151,31 @@ export function ModelPicker({
     if (open) inputRef.current?.focus();
   }, [open]);
 
+  // Base catalog: optionally pre-filtered to required modalities (e.g. image for
+  // the media describe-model picker), so search + toggles only ever see eligible
+  // models. Omitted → the whole catalog (chat default).
+  const baseCatalog = useMemo(
+    () =>
+      requireModalities && requireModalities.length > 0
+        ? filterByModalities(catalog, requireModalities)
+        : catalog,
+    [catalog, requireModalities],
+  );
+
   // Distinct modalities available in the catalog → the toggle bar (text alone is
   // every model's default, so it's not worth a toggle; only offer the rest).
+  // Drop any modality that's already forced by `requireModalities` (no point
+  // toggling a filter that's always on).
   const modalities = useMemo(
-    () => catalogModalities(catalog).filter((m) => m !== "text"),
-    [catalog],
+    () =>
+      catalogModalities(baseCatalog).filter(
+        (m) => m !== "text" && !(requireModalities ?? []).includes(m),
+      ),
+    [baseCatalog, requireModalities],
   );
   const filtered = useMemo(
-    () => filterByModalities(filterCatalog(catalog, query), modFilter),
-    [catalog, query, modFilter],
+    () => filterByModalities(filterCatalog(baseCatalog, query), modFilter),
+    [baseCatalog, query, modFilter],
   );
   const groups = useMemo(() => groupByProvider(filtered), [filtered]);
   // Flat list of ids in display order, for keyboard nav across groups.
@@ -206,8 +236,15 @@ export function ModelPicker({
         </svg>
       </button>
 
+      {/* Width: at least as wide as the trigger, grows to fit the longest
+          model name, capped so it never runs off-screen. Wider than the old
+          fixed w-72 so names like "Claude Opus 4.6 (Fast)" read in full. */}
       {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-1 max-h-72 w-72 max-w-[90vw] overflow-hidden rounded-md border border-border bg-surface shadow-lg">
+        <div
+          className={`absolute left-0 z-50 max-h-72 w-max min-w-full max-w-md overflow-hidden rounded-md border border-border bg-surface shadow-lg ${
+            direction === "down" ? "top-full mt-1" : "bottom-full mb-1"
+          }`}
+        >
           <div className="border-b border-border p-2">
             <input
               ref={inputRef}

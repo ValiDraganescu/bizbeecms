@@ -114,12 +114,12 @@ test("buildSystemPrompt: folds in identity + components", () => {
   assert.doesNotMatch(p, /Tagline:/);
 });
 
-test("buildSystemPrompt: does NOT dump the class vocabulary; tells the model normal Tailwind works + inline style for one-offs", () => {
+test("buildSystemPrompt: tells the model full Tailwind compiles per page (variants + arbitrary values), prefer purpose tokens", () => {
   const p = buildSystemPrompt({});
-  // The full comma-list is gone; the prompt says the normal scale is supported.
-  assert.doesNotMatch(p, /bg-primary,/);
-  assert.match(p, /standard Tailwind utilities/);
-  assert.match(p, /inline `style`/);
+  assert.match(p, /any standard Tailwind utility/);
+  assert.match(p, /compiled per page at render time/);
+  assert.match(p, /arbitrary values/);
+  assert.match(p, /bg-primary/); // still steers toward purpose color tokens
 });
 
 test("buildSystemPrompt: lists content collections with exact table names + fields", () => {

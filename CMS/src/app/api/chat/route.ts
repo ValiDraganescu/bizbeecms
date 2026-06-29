@@ -20,6 +20,7 @@
  */
 import { getAi, getGatewayId, type ChatMessage as AiChatMessage } from "@/lib/ports/ai";
 import { frameEvent, parseChatBody } from "@/lib/chat/sse";
+import { prematureUpdateIds } from "@/lib/chat/premature-update";
 import {
   streamChatRounds,
   type ChatMessage as TurnMessage,
@@ -32,7 +33,7 @@ import {
 import { runTool, toolSchemasForContext } from "@/lib/chat/tool-dispatch";
 import { assembleSystemPrompt } from "@/lib/chat/assemble-prompt";
 import { effectiveSystemPrompt } from "@/lib/chat/prompt-version";
-import { resolveModel } from "@/lib/chat/models";
+import { resolveModel, outputCapFor } from "@/lib/chat/models";
 import { getModelCatalogCache } from "@/db/settings-store";
 import { requireAdmin, currentUserIsPmSso } from "@/lib/auth/guard";
 
@@ -71,9 +72,13 @@ export async function POST(request: Request): Promise<Response> {
   // `env.AI.run`. The catalog cache is best-effort — a read failure just leaves
   // the static allowlist as the trust set.
   let catalogIds: ReadonlySet<string> | undefined;
+  let catalogModels: ReadonlyArray<{ id: string; contextLength?: number | null }> | undefined;
   try {
     const cache = await getModelCatalogCache();
-    if (cache) catalogIds = new Set(cache.models.map((m) => m.id));
+    if (cache) {
+      catalogIds = new Set(cache.models.map((m) => m.id));
+      catalogModels = cache.models;
+    }
   } catch {
     /* cache read failed — static allowlist still validates */
   }
@@ -83,6 +88,13 @@ export async function POST(request: Request): Promise<Response> {
       : undefined,
     catalogIds,
   );
+
+  // Cap generated tokens off the SELECTED model's own context window, not a fixed
+  // number. The window covers input+output, so reserve most of it for the prompt
+  // and let output use a fraction — bounded by MAX_OUTPUT_CEILING so a huge-window
+  // model can't bill an enormous single completion. Unknown window → adapter default.
+  const contextLength = catalogModels?.find((m) => m.id === model)?.contextLength ?? null;
+  const maxTokens = outputCapFor(contextLength);
 
   const ai = await getAi();
   if (!ai) {
@@ -114,7 +126,7 @@ export async function POST(request: Request): Promise<Response> {
   // the loop re-asks with the SAME model/tool scope/gateway. Tools stay enabled on
   // every round so the model can chain (discover → act → act again).
   const turn = (msgs: TurnMessage[]) =>
-    ai.chat(msgs as AiChatMessage[], { model, tools, gatewayId });
+    ai.chat(msgs as AiChatMessage[], { model, tools, gatewayId, maxTokens });
 
   let upstream: ReadableStream<Uint8Array>;
   try {
@@ -186,9 +198,21 @@ async function runToolsRound(
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
 ): Promise<ToolResult[]> {
+  const premature = prematureUpdateIds(calls);
   const results: ToolResult[] = [];
   for (const call of calls) {
-    const data = await runTool(call.name, call.args);
+    const data = premature.has(call.id)
+      ? {
+          name: call.name,
+          ok: false as const,
+          errors: [
+            "update_component was called in the same batch as get_component for " +
+              "this component, so it had no real html yet and was NOT applied. " +
+              "Use the get_component result (now available), then call " +
+              "update_component once with the COMPLETE updated html.",
+          ],
+        }
+      : await runTool(call.name, call.args);
     // Thread the call id + args onto the frame so the client can (a) show input
     // alongside output in the accordion, and (b) store the id to round-trip the
     // structured tool protocol on the next request (build-history). ai-widget-ux.

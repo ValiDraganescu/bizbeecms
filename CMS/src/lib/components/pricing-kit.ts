@@ -15,7 +15,7 @@
  *   PricingFaqItem — one Q/A row for a pricing FAQ
  *
  * AUTHORING CONSTRAINTS (identical to the other kits, enforced by the gate):
- *  - every `className` token must be in `allowedClasses()` (utility-css.ts);
+ *  - className tokens may be ANY Tailwind class (compiled per page at render);
  *    note `rounded-md`/`grid-cols-5`/`text-6xl`/`line-through` do NOT exist —
  *    use `rounded`/grids up to 4 / `text-5xl` / inline `style` for strike-through.
  *  - one-off values go in inline `style` (the gate does not class-check style).

@@ -22,6 +22,7 @@
 export type ChatEvent =
   | { type: "token"; text: string }
   | { type: "tool"; result: ToolResult }
+  | { type: "usage"; promptTokens: number; completionTokens: number; totalTokens: number }
   | { type: "done" }
   | { type: "error"; message: string };
 
@@ -125,6 +126,15 @@ export function parseFrame(frame: string): ChatEvent | null {
     }
     case "tool":
       return { type: "tool", result: toToolResult(data) };
+    case "usage": {
+      const n = (k: string) => (typeof data[k] === "number" ? (data[k] as number) : 0);
+      return {
+        type: "usage",
+        promptTokens: n("promptTokens"),
+        completionTokens: n("completionTokens"),
+        totalTokens: n("totalTokens"),
+      };
+    }
     case "done":
       return { type: "done" };
     case "error": {

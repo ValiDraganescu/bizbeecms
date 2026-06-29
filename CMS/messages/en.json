@@ -61,6 +61,8 @@
       "creditOf": "${remaining} of ${limit} left",
       "creditUsage": "${usage} used",
       "creditTitle": "Remaining credit on the in-use OpenRouter key",
+      "contextUsage": "${used} tokens",
+      "contextOf": "${used} / ${max} context tokens used",
       "sizeHalf": "Expand to half screen",
       "sizeCompact": "Shrink to compact",
       "resize": "Drag to resize the chat",
@@ -123,12 +125,25 @@
       "readTitle": "Choose files for the assistant to read",
       "insertTitle": "Choose media to insert",
       "confirmRead": "Attach to read",
-      "confirmInsert": "Insert URL",
+      "confirmInsert": "Attach images",
       "close": "Close",
       "cancel": "Cancel",
       "loading": "Loading…",
       "empty": "No media yet. Upload images in the Media library first.",
-      "selectedCount": "{count, plural, =0 {Nothing selected} one {# selected} other {# selected}}"
+      "selectedCount": "{count, plural, =0 {Nothing selected} one {# selected} other {# selected}}",
+      "searchPlaceholder": "Search media by description or tag…",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "describing": "Describing…",
+      "delete": "Delete",
+      "deleteConfirm": "Delete \"{name}\"? This removes it from the library permanently.",
+      "noResults": "No media matches your search.",
+      "uploadFailed": "Upload failed: {message}",
+      "deleteFailed": "Delete failed: {message}",
+      "addTag": "Add tag",
+      "editTags": "Edit tags",
+      "removeTag": "Remove tag {tag}",
+      "tagsFailed": "Could not save tags: {message}"
     }
   },
   "contentLocales": {
@@ -154,7 +169,8 @@
     "apiKeys": "API keys",
     "users": "Users",
     "google": "Google sign-in",
-    "openrouterKey": "OpenRouter key"
+    "openrouterKey": "OpenRouter key",
+    "media": "Media"
   },
   "theme": {
     "title": "Theme",
@@ -368,7 +384,9 @@
       "collections": "Define typed data collections, fill them with content, and query them."
     },
     "pageBuilder": "Page Builder",
-    "collections": "Collections"
+    "collections": "Collections",
+    "componentsImportExport": "Import / Export",
+    "componentsDevelop": "Develop"
   },
   "pageBuilder": {
     "title": "Page Builder",
@@ -835,5 +853,55 @@
     "clear": "Clear",
     "clearConfirm": "Remove the stored OpenRouter key? The AI assistant will use the deployment’s key instead.",
     "cancel": "Cancel"
+  },
+  "mediaSettings": {
+    "title": "Media",
+    "subtitle": "Choose the AI model that describes uploaded images so they’re searchable.",
+    "forbidden": "You don’t have permission to manage media settings."
+  },
+  "imageModel": {
+    "loading": "Loading…",
+    "label": "Image description model",
+    "hint": "A vision model reads each uploaded image and writes a short description used for media search.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved"
+  },
+  "develop": {
+    "title": "Develop components",
+    "subtitle": "Select a component to preview it with its placeholder data, or delete unwanted ones.",
+    "listTitle": "Components",
+    "refresh": "Refresh",
+    "empty": "No components yet.",
+    "flagScript": "script",
+    "flagCss": "css",
+    "flagStatic": "static",
+    "flagNoData": "no placeholder data",
+    "delete": "Delete",
+    "deleteFor": "Delete {name}",
+    "confirmDelete": "Delete component \"{name}\"? This cannot be undone.",
+    "previewTitle": "Preview — {name}",
+    "previewNone": "Preview",
+    "reload": "Reload",
+    "noPlaceholderData": "This component has no placeholder data, so the preview may be empty. Ask the assistant to add propsSchema defaults.",
+    "selectPrompt": "Select a component to preview it.",
+    "propsTitle": "Props",
+    "propsHint": "Edit the placeholder values the preview binds. Saved as the component's defaults.",
+    "view": { "preview": "Preview", "code": "Code" },
+    "viewport": { "desktop": "Desktop", "tablet": "Tablet", "mobile": "Mobile" },
+    "codeTab": { "html": "HTML", "script": "Script", "css": "CSS" },
+    "capture": {
+      "send": "Send preview to AI",
+      "capturing": "Capturing…",
+      "caption": "Here is \"{name}\" rendered at desktop, tablet, and mobile widths. Review how it looks at each size and refine the component so it works well across all of them.",
+      "failed": "Couldn't capture the preview."
+    },
+    "save": {
+      "saving": "Saving…",
+      "saved": "Saved",
+      "unsaved": "Unsaved changes",
+      "failed": "Save failed",
+      "loading": "Loading…"
+    }
   }
 }

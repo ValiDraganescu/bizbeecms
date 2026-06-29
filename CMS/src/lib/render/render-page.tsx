@@ -30,11 +30,18 @@ import {
   LIST_COMPONENT,
   collectComponentNames,
   collectTreeComponentTags,
+  collectPlanClasses,
   parseJsonColumn,
   planPage,
 } from "@/lib/render/tree";
 import { renderPlans } from "@/lib/render/react";
-import { generateUtilityCss } from "@/lib/render/utility-css";
+import { parseHtml } from "@/lib/render/parse-html";
+import { parsePropsSchema } from "@/lib/pages/page-blocks";
+import { buildCss } from "@/lib/render/tw-compile";
+import { viewportHideCss } from "@/lib/render/utility-css";
+
+// The custom non-Tailwind helpers (pb-hide-*), appended to the compiled sheet.
+const VIEWPORT_HIDE_CSS = viewportHideCss();
 import { bindingQuerySpec, hydrateProps } from "@/lib/content/binding";
 import { queryCollection } from "@/db/query-store";
 import type { QuerySpec } from "@/lib/content/query-compiler";
@@ -45,8 +52,6 @@ import {
 } from "@/db/settings-store";
 import { themeOverridesToCss } from "@/lib/render/theme";
 
-// Precompiled once per worker instance — pure, deterministic, bounded vocabulary.
-const UTILITY_CSS = generateUtilityCss();
 
 /**
  * Build the render plan for an already-resolved page row. Shared by the public
@@ -84,7 +89,7 @@ export async function buildPlanFromPage(
       .where(inArray(componentTable.name, want));
     const next = new Set<string>();
     for (const row of rows) {
-      const tree = parseJsonColumn<TreeNode>(row.tree, "");
+      const tree = parseHtml(row.html);
       components.set(row.name, {
         name: row.name,
         tree,
@@ -115,6 +120,74 @@ export async function buildPlanFromPage(
   const hydratedBlocks = await hydrateBlockBindings(blocks);
 
   const plan = planPage(hydratedBlocks, components, locale);
+  return { plan, locale };
+}
+
+/**
+ * Build a render plan for ONE component in isolation — the Develop-page preview.
+ *
+ * There's no page block to feed the component's `{{slots}}`, so we synthesize a
+ * single block whose props are the component's PLACEHOLDER data: each declared
+ * prop's `default` from its `propsSchema` (the AI fills these with realistic
+ * sample values when authoring). Then we reuse the EXACT page renderer
+ * (`planPage`) so the preview is pixel-true to how the component renders on a
+ * real page — nested-component tags, script collection, locale resolution and all.
+ *
+ * Returns null if no such component exists (the route 404s).
+ */
+export async function buildPlanFromComponent(
+  name: string,
+): Promise<{ plan: RenderPlan; locale: LocaleContext } | null> {
+  const db = await getDb();
+
+  const components = new Map<string, ComponentArtifact>();
+  const MAX_FETCH_WAVES = 16;
+  let pending = new Set<string>([name]);
+  let rootRow: { propsSchema: string | null } | null = null;
+  for (let wave = 0; wave < MAX_FETCH_WAVES && pending.size > 0; wave++) {
+    const want = [...pending].filter((n) => !components.has(n));
+    if (want.length === 0) break;
+    const rows = await db
+      .select()
+      .from(componentTable)
+      .where(inArray(componentTable.name, want));
+    const next = new Set<string>();
+    for (const row of rows) {
+      if (row.name === name) rootRow = { propsSchema: row.propsSchema };
+      const tree = parseHtml(row.html);
+      components.set(row.name, {
+        name: row.name,
+        tree,
+        script: row.script || undefined,
+        propsSchema: row.propsSchema,
+      });
+      for (const tag of collectTreeComponentTags(tree)) {
+        if (!components.has(tag)) next.add(tag);
+      }
+    }
+    pending = next;
+  }
+  if (!rootRow) return null;
+
+  const contentLocales = await getContentLocales();
+  const requested = await getLocale();
+  const locale: LocaleContext = {
+    locale: contentLocales.locales.includes(requested)
+      ? requested
+      : contentLocales.default,
+    fallback: contentLocales.default,
+  };
+
+  // Placeholder data: each declared prop's `default` becomes the block prop value
+  // bound into the matching `{{slot}}`. parsePropsSchema carries the typed default
+  // (defaultValue) for number/boolean and the string default for text/select.
+  const props: Record<string, unknown> = {};
+  for (const field of parsePropsSchema(rootRow.propsSchema)) {
+    props[field.name] = field.defaultValue ?? field.default;
+  }
+
+  const block: Block = { id: "preview", component: name, props };
+  const plan = planPage([block], components, locale);
   return { plan, locale };
 }
 
@@ -197,9 +270,15 @@ export async function RenderedPage({ plan }: { plan: RenderPlan }) {
     /* unbound D1 in this env — no per-Site theme */
   }
 
+  // Compile exactly the Tailwind this page uses (cached per class-set). Replaces
+  // the old bounded hand-written sheet — full Tailwind, variants + arbitrary
+  // values, generated in-Worker. Purpose colors resolve to var(--color-*).
+  const utilityCss =
+    (await buildCss(collectPlanClasses(plan.root))) + "\n" + VIEWPORT_HIDE_CSS;
+
   return (
     <>
-      <style dangerouslySetInnerHTML={{ __html: UTILITY_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: utilityCss }} />
       {themeCss && <style dangerouslySetInnerHTML={{ __html: themeCss }} />}
       {renderPlans(plan.root)}
       {plan.scripts.map((s, i) => (

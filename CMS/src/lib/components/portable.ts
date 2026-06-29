@@ -21,6 +21,7 @@
 
 import { validateComponentArtifact } from "../chat/component-tool.ts";
 import type { TreeNode } from "../render/tree.ts";
+import { treeToHtml } from "../render/parse-html.ts";
 import { ASSET_URL_PREFIX, isValidAssetKey } from "../render/asset.ts";
 import { normalizeTags } from "./tags.ts";
 
@@ -589,8 +590,13 @@ export function parsePortableComponent(
   }
 
   // ── the artifact itself: reuse the SAME gate the AI tool uses ──
-  // (renderable tree, allowed utility classes, bounded script, safe name).
-  const v = validateComponentArtifact({ name: c.name, tree, script, css });
+  // (renderable markup, allowed utility classes, bounded script, safe name).
+  // The bundle carries a `tree` (object or JSON string); the gate now takes
+  // Handlebars-HTML, so serialize the tree to HTML first. An unparseable tree
+  // → empty html, which the gate rejects with its read-before-write message.
+  const treeNode = coerceTreeNode(tree);
+  const html = treeNode === null ? "" : treeToHtml(treeNode);
+  const v = validateComponentArtifact({ name: c.name, html, script, css });
   if (!v.ok) errors.push(...v.errors);
 
   if (errors.length > 0 || !v.ok) return { ok: false, errors };

@@ -10,9 +10,9 @@
  *  2. `validateComponentArtifact` — the security/correctness gate. The model's
  *     output is UNTRUSTED structure: we re-validate the `tree` shape (via the
  *     same pure `planTree` the renderer uses — if it can't be planned it can't
- *     render), and we validate every `className` against the BOUNDED utility
- *     vocabulary (`allowedClasses()`), since arbitrary Tailwind has no CSS at
- *     runtime (the A3 scanner gap). A bad artifact is rejected with messages the
+ *     render). We do NOT class-check `className`: the page renderer compiles the
+ *     page's actual Tailwind at request time (tw-compile.ts), so ANY valid
+ *     Tailwind class ships real CSS. A bad artifact is rejected with messages the
  *     route feeds back to the model, never written to D1.
  *
  * The actual D1 write lives in `db/component-store.ts` (needs the binding); the
@@ -29,7 +29,7 @@
 // Relative (not @/) imports so this stays node-testable like its pure peers
 // (the dep-free `node --test` convention can't resolve the @/ alias; see CAVEATS).
 import { planTree, type TreeNode } from "../render/tree.ts";
-import { allowedClasses } from "../render/utility-css.ts";
+import { parseHtml } from "../render/parse-html.ts";
 
 /** The validated, ready-to-persist component artifact. */
 export interface ComponentArtifactInput {
@@ -37,6 +37,11 @@ export interface ComponentArtifactInput {
   tree: TreeNode;
   script: string;
   css: string;
+  // JSON string `{ propName: { type, default } }`. The `default` doubles as the
+  // PLACEHOLDER value the standalone preview binds into the `{{prop}}` slots, so
+  // a component renders with realistic sample data outside any page. Omitted/""
+  // for a fully static component with no slots.
+  propsSchema?: string;
 }
 
 // Bound the script so a confused model can't emit a multi-MB blob into D1.
@@ -55,11 +60,11 @@ export const CREATE_COMPONENT_TOOL = {
   function: {
     name: "create_component",
     description:
-      "Create or update a reusable UI component for this site. The component is " +
-      "stored as a data artifact: a JSON element 'tree' the server renders to " +
-      "HTML, an optional client-side 'script' string the browser runs, and " +
-      "'css' utility classes. Style with standard Tailwind utilities (normal " +
-      "scales supported); for truly one-off values use an inline `style` object.",
+      "Create or update a reusable UI component for this site. Author it as a " +
+      "Handlebars-style HTML string, plus an optional client-side 'script' the " +
+      "browser runs and 'css' utility classes. Style with standard Tailwind " +
+      "utilities (normal scales supported); for truly one-off values use an " +
+      "inline `style` attribute.",
     parameters: {
       type: "object",
       properties: {
@@ -69,11 +74,15 @@ export const CREATE_COMPONENT_TOOL = {
             "PascalCase component name the page references, e.g. 'PricingCard'. " +
             "Re-using an existing name updates that component.",
         },
-        tree: {
-          type: "object",
+        html: {
+          type: "string",
           description:
-            "JSON element tree: { tag, props, children }. props.className uses " +
-            "only allowed utility classes; children is an array of trees or strings.",
+            "The component markup as a Handlebars-style HTML string, e.g. " +
+            '`<div class="p-4"><h2>{{t title}}</h2><p>{{body}}</p></div>`. Use ' +
+            "`{{prop}}` for a plain value and `{{t prop}}` for a translatable " +
+            "value; declare every slot in propsSchema. Use `class` with allowed " +
+            "Tailwind utilities. Reference another component by its PascalCase " +
+            "tag, e.g. `<AuthorCard name=\"{{author}}\"></AuthorCard>`.",
         },
         script: {
           type: "string",
@@ -86,8 +95,19 @@ export const CREATE_COMPONENT_TOOL = {
           description:
             "Optional space-separated extra utility classes applied to the root.",
         },
+        propsSchema: {
+          type: "object",
+          description:
+            "Declares every {{slot}} the tree references, as " +
+            "{ propName: { type, default } }. ALWAYS include this whenever the " +
+            "tree has any {{slots}}: `default` is REQUIRED PLACEHOLDER data — a " +
+            "realistic sample value (e.g. a real-sounding title, paragraph, price, " +
+            "or image URL) so the component renders meaningfully on its own in the " +
+            "preview. type is one of string|richtext|number|boolean|select. Omit " +
+            "only for a fully static component with no slots.",
+        },
       },
-      required: ["name", "tree"],
+      required: ["name", "html"],
     },
   },
 };
@@ -115,25 +135,31 @@ export function validateComponentArtifact(
     );
   }
 
-  // ── tree ── (accept object or JSON string)
-  const tree = coerceTree(a.tree);
-  if (tree === undefined) {
-    errors.push("tree must be an element-tree object (or a JSON string of one)");
+  // ── html ── (Handlebars-HTML string → element tree via the renderer's parser)
+  const html = typeof a.html === "string" ? a.html : "";
+  let tree: TreeNode | undefined;
+  if (html.trim() === "") {
+    // The model sometimes fires update_component with empty html in the SAME batch
+    // as get_component — before the real artifact comes back. update REPLACES, so
+    // empty html would wipe the component. Name the cause + the fix (per the AI
+    // error philosophy) so it self-corrects instead of retrying blind.
+    errors.push(
+      "html is empty — update_component REPLACES the whole component, so empty " +
+        "html would erase it. Call get_component(name) FIRST, wait for its result, " +
+        "then re-pass the COMPLETE html (the existing markup plus your edit).",
+    );
   } else {
+    tree = parseHtml(html);
     // Reuse the renderer's own walker: if it can't be planned, it can't render.
     try {
       planTree(tree);
     } catch (err) {
-      errors.push(`tree is not renderable: ${(err as Error).message}`);
+      errors.push(`html is not renderable: ${(err as Error).message}`);
     }
-    // Bound the styling vocabulary. Per the AI error philosophy: name ONLY the
-    // rejected classes and the concrete fix (inline style) — do NOT flood the
-    // model with the whole accepted list (it covers the full sane Tailwind scale,
-    // so a rejection means a truly one-off value that belongs in `style`).
-    const bad = collectBadClasses(tree);
-    if (bad.length > 0) {
-      errors.push(badClassMessage(bad));
-    }
+    // No className allowlist: the page renderer compiles the page's actual
+    // Tailwind classes at request time (see tw-compile.ts), so ANY valid
+    // Tailwind class — variants (hover:, md:), arbitrary values (h-[37px]) —
+    // ships real CSS. Nothing to reject here.
   }
 
   // ── script ── (optional, bounded)
@@ -142,69 +168,46 @@ export function validateComponentArtifact(
     errors.push(`script exceeds ${MAX_SCRIPT_BYTES} bytes`);
   }
 
-  // ── css ── (optional extra root classes, must also be allowed)
+  // ── css ── (optional extra root classes; any valid Tailwind class is fine,
+  // the renderer compiles them at request time — see html note above).
   const css = typeof a.css === "string" ? a.css.trim() : "";
-  const badCss = css
-    .split(/\s+/)
-    .filter((c) => c !== "" && !allowedClasses().has(c));
-  if (badCss.length > 0) {
-    errors.push(badClassMessage(badCss));
+
+  // ── propsSchema ── (optional; object or JSON string of one). Stored verbatim
+  // as a JSON string; `{prop:{type,default}}` whose `default`s are the preview
+  // placeholders. Reject only if present-but-not-an-object so a typo surfaces;
+  // an empty `{}` is valid but stored as nothing (no point).
+  const propsSchema = coercePropsSchema(a.propsSchema);
+  if (propsSchema === "invalid") {
+    errors.push("propsSchema must be an object { propName: { type, default } } (or a JSON string of one)");
   }
 
   if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, artifact: { name, tree: tree as TreeNode, script, css } };
+  const schemaStr = typeof propsSchema === "string" && propsSchema !== "invalid" ? propsSchema : undefined;
+  return {
+    ok: true,
+    artifact: { name, tree: tree as TreeNode, script, css, ...(schemaStr ? { propsSchema: schemaStr } : {}) },
+  };
 }
 
-/** Accept a tree object, or a JSON string of one; undefined if neither. */
-function coerceTree(raw: unknown): TreeNode | undefined {
+/**
+ * Normalize a propsSchema value into a canonical JSON string. Returns `undefined`
+ * when absent or empty (valid, nothing to store), the literal `"invalid"` when
+ * present but not an object (a typo to surface), else the JSON string.
+ */
+function coercePropsSchema(raw: unknown): string | undefined {
+  if (raw == null) return undefined;
+  let obj: unknown = raw;
   if (typeof raw === "string") {
+    if (raw.trim() === "") return undefined;
     try {
-      return JSON.parse(raw) as TreeNode;
+      obj = JSON.parse(raw);
     } catch {
-      return undefined;
+      return "invalid";
     }
   }
-  if (typeof raw === "object" && raw !== null) return raw as TreeNode;
-  return undefined;
-}
-
-/**
- * Walk a tree collecting every `className` token that isn't in the allowed
- * utility vocabulary. (Class names live in `props.className`, space-separated.)
- */
-/**
- * The actionable rejection message: name the exact bad classes and tell the
- * model the fix. The accepted vocabulary already covers the full sane Tailwind
- * scale, so a rejection means a one-off value → use inline `style`. We do NOT
- * dump the whole allowed list (that floods the context; see the error philosophy).
- */
-function badClassMessage(bad: string[]): string {
-  return (
-    `These className utility classes are not supported: ${bad.join(", ")}. ` +
-    `The accepted set already covers the normal Tailwind scale (e.g. w-32, h-48, ` +
-    `top-2, object-cover, p-4, text-xl); these specific ones are outside it. ` +
-    `For one-off values, put them in an inline \`style\` object instead of a class ` +
-    `(e.g. style:{"height":"12.5rem"} rather than h-50). Remove or replace the ` +
-    `classes above and retry.`
-  );
-}
-
-function collectBadClasses(node: TreeNode): string[] {
-  const allowed = allowedClasses();
-  const bad = new Set<string>();
-  walk(node);
-  return [...bad];
-
-  function walk(n: TreeNode): void {
-    if (typeof n !== "object" || n === null) return;
-    const cn = n.props?.className;
-    if (typeof cn === "string") {
-      for (const c of cn.split(/\s+/)) {
-        if (c !== "" && !allowed.has(c)) bad.add(c);
-      }
-    }
-    for (const child of n.children ?? []) walk(child);
-  }
+  if (obj == null || typeof obj !== "object" || Array.isArray(obj)) return "invalid";
+  if (Object.keys(obj as Record<string, unknown>).length === 0) return undefined;
+  return JSON.stringify(obj);
 }
 
 function byteLength(s: string): number {

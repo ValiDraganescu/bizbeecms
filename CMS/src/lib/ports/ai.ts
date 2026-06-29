@@ -52,7 +52,17 @@ export interface ChatOptions {
   tools?: unknown[];
   /** AI Gateway slug — caching / per-Site spend caps / analytics / fallback. */
   gatewayId?: string;
+  /** Hard cap on tokens GENERATED per turn. Bounds cost + runaway output. */
+  maxTokens?: number;
 }
+
+/**
+ * Default cap on generated tokens per turn. Generous enough for a full component
+ * artifact (tree+script+css can be a few KB ≈ a couple thousand tokens) with head-
+ * room, but bounded so a runaway turn can't bill unbounded output. Override per
+ * call via ChatOptions.maxTokens. ponytail: one constant, not a per-Site setting.
+ */
+export const DEFAULT_MAX_TOKENS = 8000;
 
 /**
  * AI as the CMS uses it: a single OpenAI-compatible streaming chat completion.
@@ -88,7 +98,11 @@ export class CfAi implements Ai {
     messages: ChatMessage[],
     options: ChatOptions,
   ): Promise<ReadableStream<Uint8Array>> {
-    const inputs: Record<string, unknown> = { messages, stream: true };
+    const inputs: Record<string, unknown> = {
+      messages,
+      stream: true,
+      max_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
+    };
     if (options.tools) inputs.tools = options.tools;
     const runOptions = options.gatewayId
       ? { gateway: { id: options.gatewayId } }
@@ -113,7 +127,12 @@ type FetchLike = (
     headers: Record<string, string>;
     body: string;
   },
-) => Promise<{ ok: boolean; status: number; body: ReadableStream<Uint8Array> | null }>;
+) => Promise<{
+  ok: boolean;
+  status: number;
+  body: ReadableStream<Uint8Array> | null;
+  text(): Promise<string>;
+}>;
 
 /**
  * OpenRouter adapter — same streaming OpenAI-compatible `Ai` contract as `CfAi`,
@@ -143,6 +162,10 @@ export class OpenRouterAi implements Ai {
       model: options.model,
       messages,
       stream: true,
+      // Ask OpenRouter to emit a final usage chunk (prompt/completion/total
+      // tokens) so the route can surface context usage to the widget.
+      stream_options: { include_usage: true },
+      max_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
     };
     if (options.tools) body.tools = options.tools;
 
@@ -156,8 +179,17 @@ export class OpenRouterAi implements Ai {
     });
 
     if (!res.ok || !res.body) {
+      // Surface OpenRouter's error body (credits/402, bad-key/401, model errors)
+      // instead of swallowing it — "HTTP 402" alone tells you nothing. Bounded so
+      // a huge body can't blow up the log line.
+      let detail = "";
+      try {
+        detail = (await res.text()).slice(0, 500);
+      } catch {
+        /* body unavailable */
+      }
       throw new Error(
-        `OpenRouter chat failed: HTTP ${res.status}${res.body ? "" : " (no body)"}`,
+        `OpenRouter chat failed: HTTP ${res.status}${detail ? ` — ${detail}` : res.body ? "" : " (no body)"}`,
       );
     }
     return res.body;

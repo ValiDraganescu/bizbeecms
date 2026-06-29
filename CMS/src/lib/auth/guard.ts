@@ -19,13 +19,32 @@ import type { CmsRole } from "@/db/schema";
 import { SESSION_COOKIE, readSessionCookie, type GuardDecision } from "./guard-core";
 import { canManageUsers, canManageApiKeys } from "./roles";
 import { isPmSsoUser } from "./pm-sso";
+import "./build-failsafe"; // throws if the dev backdoor flag leaks into a prod build
 
 /**
  * Resolve the current session cookie (read via `next/headers`, so it works for
  * both page/layout renders AND /api/* route handlers in the App Router) to a CMS
  * user. Both entry points below funnel through here.
  */
+// ponytail: DEV-ONLY backdoor — auto-auths every request as a SuperAdmin PM-SSO
+// operator so you can develop against a real Site's data without logging in.
+//
+// Two INDEPENDENT conditions, both required, so this can never activate in a
+// deployed build:
+//   1. NODE_ENV === "development"  — false in the OpenNext/Workers production build.
+//   2. CMS_DEV_SUPERADMIN === "1"  — read ONLY from .env.local, which is gitignored
+//      (see .gitignore) and never bundled into the deployed Worker. The committed
+//      tree contains the flag NAME but never a value, so checkout alone is inert.
+// Belt-and-suspenders: build-failsafe.ts throws at module load if this flag is
+// ever truthy under NODE_ENV==="production", so a misconfigured build crashes loud
+// instead of silently shipping the bypass.
+const DEV_IS_ON =
+  process.env.NODE_ENV === "development" &&
+  process.env.CMS_DEV_SUPERADMIN === "1";
+
 async function decide(): Promise<GuardDecision> {
+  if (DEV_IS_ON) return { allow: true, userId: "dev-superadmin", role: "SuperAdmin" };
+
   const session = await getSession();
   if (!session) return { allow: false, reason: "noSession" };
 
@@ -100,6 +119,7 @@ export async function requireRole(
  * (chat export, system-prompt editor) to decide whether to even show the control.
  */
 export async function currentUserIsPmSso(): Promise<boolean> {
+  if (DEV_IS_ON) return true; // dev SuperAdmin is treated as a PM-SSO operator
   const session = await getSession();
   if (!session) return false;
   const user = await findUserById(session.userId);

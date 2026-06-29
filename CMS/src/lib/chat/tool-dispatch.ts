@@ -93,7 +93,8 @@ import {
   isSection,
   LIST_COMPONENT,
 } from "@/lib/pages/page-blocks";
-import type { Block } from "@/lib/render/tree";
+import type { Block, TreeNode } from "@/lib/render/tree";
+import { treeToHtml } from "@/lib/render/parse-html";
 import { effectiveTheme } from "@/lib/render/theme";
 import {
   validateBinding,
@@ -276,7 +277,25 @@ async function handleGetComponent(args: unknown): Promise<Record<string, unknown
   try {
     const row = await getComponentByName(compName);
     if (!row) return { ok: false, errors: [`no component named "${compName}"`] };
-    return { ok: true, component: row };
+    // The model authors in Handlebars-HTML; show it the markup as `html`, not the
+    // internal JSON tree (the row carries `tree` as a JSON string for storage).
+    let html = "";
+    try {
+      html = treeToHtml(JSON.parse(row.tree as string) as TreeNode);
+    } catch {
+      /* corrupt stored markup → empty; update_component will re-author it */
+    }
+    return {
+      ok: true,
+      component: {
+        name: row.name,
+        html,
+        script: row.script,
+        css: row.css,
+        propsSchema: row.propsSchema,
+        tags: row.tags,
+      },
+    };
   } catch (err) {
     return { ok: false, errors: [`failed to get component: ${(err as Error).message}`] };
   }
@@ -796,17 +815,18 @@ async function handleEditText(args: unknown): Promise<Record<string, unknown>> {
       const edit = applyEdit(current, oldString, newString, replaceAll);
       if (!edit.ok) return { ok: false, errors: [edit.error] };
 
-      // Re-pass the FULL artifact through the same validate gate as create/update
-      // (tree comes back as a JSON string from D1 → parse to the object shape).
-      let tree: unknown;
+      // Re-pass the FULL artifact through the same validate gate as create/update.
+      // This edit only touches script/css; the markup is unchanged — re-serialize
+      // the stored tree back to html (the gate's input shape) so it round-trips.
+      let tree: TreeNode;
       try {
-        tree = JSON.parse(row.tree as string);
+        tree = JSON.parse(row.tree as string) as TreeNode;
       } catch {
-        return { ok: false, errors: ["stored component tree is not valid JSON; use update_component"] };
+        return { ok: false, errors: ["stored component markup is not valid; use update_component"] };
       }
       const artifact = {
         name: row.name,
-        tree,
+        html: treeToHtml(tree),
         script: field === "script" ? edit.content : ((row.script as string) ?? ""),
         css: field === "css" ? edit.content : ((row.css as string) ?? ""),
       };

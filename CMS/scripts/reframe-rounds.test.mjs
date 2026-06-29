@@ -139,6 +139,48 @@ test("maxRounds caps a runaway loop: tools run each round but no infinite follow
   assert.equal(asks, 2);
 });
 
+test("after a FAILED tool the model goes silent → loop nudges it once to retry", async () => {
+  // Round 1: model calls update_component; it FAILS. Round 2: model says nothing
+  // (the Grok stop-on-error). The loop must inject a retry nudge and ask round 3,
+  // where the model finally succeeds — instead of ending on the error.
+  const failingTools = async (calls, controller, encoder) =>
+    calls.map((c) => {
+      const data = { name: c.name, ok: false, errors: ["tree is empty"] };
+      controller.enqueue(encoder.encode(`event: tool\ndata: ${JSON.stringify(data)}\n\n`));
+      return { name: c.name, data };
+    });
+
+  const round1 = turnStream([toolLine(0, "update_component", '{"name":"Hero","tree":{}}'), "data: [DONE]\n"]);
+  const round2silent = turnStream(["data: [DONE]\n"]); // empty turn, no text/tools
+  const round3 = turnStream([deltaLine("Fixed it."), "data: [DONE]\n"]);
+
+  const turns = [round2silent, round3];
+  const fed = [];
+  const nextTurn = async (messages) => {
+    fed.push([...messages]);
+    return turns.shift();
+  };
+
+  const events = await drain(streamChatRounds(round1, [], nextTurn, failingTools));
+  // The final answer arrives — the loop did NOT stop on the silent error turn.
+  assert.ok(events.some((e) => e.event === "token" && e.data.text === "Fixed it."));
+  assert.equal(events.at(-1).event, "done");
+  // A user-role nudge referencing the failure was injected before round 3.
+  const lastTranscript = fed.at(-1);
+  const nudge = lastTranscript.find((m) => m.role === "user" && /tool call just failed/i.test(m.content));
+  assert.ok(nudge, "a retry nudge was appended after the silent failure");
+});
+
+test("a SUCCESSFUL tool then a silent turn ends normally (no spurious nudge)", async () => {
+  const round1 = turnStream([toolLine(0, "list_pages", "{}"), "data: [DONE]\n"]);
+  const round2silent = turnStream(["data: [DONE]\n"]);
+  const nextTurn = async () => round2silent;
+  const events = await drain(streamChatRounds(round1, [], nextTurn, runToolsRound));
+  // runToolsRound returns ok:true → no failure → silent turn is a legit end.
+  assert.equal(events.at(-1).event, "done");
+  assert.equal(events.filter((e) => e.event === "token").length, 0);
+});
+
 test("a mid-stream upstream error frames an error event, not done", async () => {
   const boom = new ReadableStream({ pull() { throw new Error("upstream exploded"); } });
   const nextTurn = async () => boom;

@@ -17,6 +17,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { ALLOWED_ASSET_TYPES, MAX_ASSET_SIZE, validateAsset } from "@/lib/render/asset";
+import { makeDescribeThumb } from "@/lib/chat/image-thumb";
 
 type Asset = {
   key: string;
@@ -49,6 +50,9 @@ export function MediaGallery({ initial }: { initial: Asset[] }) {
     try {
       const form = new FormData();
       form.append("file", file);
+      // Small ≤512px JPEG for the AI describe call (full file still uploads).
+      const thumb = await makeDescribeThumb(file);
+      if (thumb) form.append("describeThumb", thumb);
       const res = await fetch("/api/assets", { method: "POST", body: form });
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };

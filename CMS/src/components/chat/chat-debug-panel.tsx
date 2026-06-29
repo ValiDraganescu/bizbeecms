@@ -32,6 +32,13 @@ type ChatDebugPanelProps = {
   /** Active per-request system-prompt override (PM-SSO editor), or null. */
   override?: string | null;
   /**
+   * The last upstream/request error from this conversation (e.g. an xAI 7003), or
+   * null. Included in the export so a FAILED chat is self-diagnosing — the route
+   * only reassembles the request, so without this the downloaded JSON shows no
+   * sign of why it failed.
+   */
+  lastError?: string | null;
+  /**
    * Set/clear the override that the widget threads into the chat POST. `label`
    * is the selected version's label (for the inline "off-default" banner near
    * the input), null when clearing back to the assembled default.
@@ -43,6 +50,7 @@ export function ChatDebugPanel({
   messages = [],
   model,
   override = null,
+  lastError = null,
   onOverrideChange,
 }: ChatDebugPanelProps) {
   const t = useTranslations("chat.debug");
@@ -205,6 +213,7 @@ export function ChatDebugPanel({
           context,
           model,
           messages: buildModelHistory(messages, ""),
+          lastError: lastError ?? undefined,
         }),
       });
       if (!res.ok) {

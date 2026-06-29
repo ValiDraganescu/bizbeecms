@@ -43,7 +43,7 @@ test("each write tool schema is a well-formed function tool with a unique name",
 });
 
 test("required args match the documented contract", () => {
-  assert.deepEqual(UPDATE_COMPONENT_TOOL.function.parameters.required, ["name", "tree"]);
+  assert.deepEqual(UPDATE_COMPONENT_TOOL.function.parameters.required, ["name", "html"]);
   assert.deepEqual(UPDATE_PAGE_BLOCKS_TOOL.function.parameters.required, ["id", "blocks"]);
   assert.deepEqual(UPDATE_BRAND_IDENTITY_TOOL.function.parameters.required, ["identity"]);
   // update_theme: both light/dark optional (handler enforces "at least one").

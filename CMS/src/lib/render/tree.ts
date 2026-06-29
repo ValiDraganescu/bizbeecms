@@ -180,6 +180,23 @@ export type RenderPlan = {
 };
 
 /**
+ * Collect every Tailwind class token used across a render plan (so the runtime
+ * Tailwind compiler can build exactly the CSS this page needs). Walks the
+ * resolved `ElementPlan` tree reading `props.className`. Pure — no compile here.
+ */
+export function collectPlanClasses(root: ElementPlan[]): Set<string> {
+  const out = new Set<string>();
+  const walk = (n: ElementPlan): void => {
+    if (n.kind !== "element") return;
+    const cn = n.props.className;
+    if (typeof cn === "string") for (const c of cn.split(/\s+/)) if (c) out.add(c);
+    for (const child of n.children) walk(child);
+  };
+  for (const n of root) walk(n);
+  return out;
+}
+
+/**
  * Optional content-locale context (epic C1). When present, every prop value
  * that is a "locale object" ({ en: "...", fi: "..." }, at any depth) is
  * resolved to the active locale (fallback → default → first present) as the
@@ -237,8 +254,19 @@ export function planTree(
   compose?: ComposeContext,
 ): ElementPlan {
   if (typeof node === "string") return { kind: "text", text: node };
-  if (node == null || typeof node !== "object" || typeof node.tag !== "string") {
-    throw new Error(`Invalid tree node: ${JSON.stringify(node)}`);
+  if (node == null || typeof node !== "object") {
+    throw new Error(`Invalid tree node: ${JSON.stringify(node)} — each node must be a string (text) or an object { tag, props?, children? }`);
+  }
+  if (typeof node.tag !== "string") {
+    // Name the actual defect. The model sometimes corrupts the JSON mid-generation
+    // (e.g. tag/props become a stray repeated number like 2222) — say so plainly so
+    // it regenerates a clean node instead of re-reading an opaque `{"tag":2222}` dump.
+    throw new Error(
+      `Invalid tree node: \`tag\` must be an HTML tag NAME string (e.g. "div", "section", "img"), ` +
+        `got ${JSON.stringify((node as { tag?: unknown }).tag)}. The node looks corrupted ` +
+        `(${JSON.stringify(node).slice(0, 120)}) — regenerate this node with a real string tag, ` +
+        `an object \`props\`, and an array \`children\`.`,
+    );
   }
 
   // Composition-by-tag: a PascalCase tag that resolves to a known component.
@@ -332,8 +360,14 @@ function planComponentTag(
 //   - Non-string block values are coerced to a string for substitution (objects/
 //     functions never reach the tree); locale objects are resolved first.
 
-/** Slot syntax: `{{ propName }}` — identifier only, optional inner whitespace. */
-const SLOT_RE = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
+/**
+ * Slot syntax: `{{ propName }}` (plain) or `{{ t propName }}` (translatable).
+ * The optional `t ` prefix is metadata for the editor/propsSchema (it marks the
+ * prop's value as a locale-object); the renderer binds both identically because
+ * locale objects are already resolved to the active locale upstream (localize.ts)
+ * before binding. Identifier only, optional inner whitespace.
+ */
+const SLOT_RE = /\{\{\s*(?:t\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
 
 /** Parse a component's propsSchema JSON into the set of declared prop names. */
 function declaredProps(propsSchema: string | null | undefined): Set<string> {

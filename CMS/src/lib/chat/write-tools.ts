@@ -41,20 +41,22 @@ export const UPDATE_COMPONENT_TOOL = {
     description:
       "Update an EXISTING component by re-authoring its full artifact. Use " +
       "get_component first to read the current artifact, then pass the complete " +
-      "new { name, tree, script, css } (keep the same name to update in place — a " +
+      "new { name, html, script, css } (keep the same name to update in place — a " +
       "new name creates a new component). The whole artifact is replaced, not merged.",
     parameters: {
       type: "object",
       properties: {
         name: { type: "string", description: "The component's exact existing name." },
-        tree: {
-          type: "object",
-          description: "The component's element tree (JSON) the renderer walks server-side.",
+        html: {
+          type: "string",
+          description:
+            "The component's full Handlebars-HTML markup. Use `{{prop}}` / " +
+            "`{{t prop}}` for slots and `class` with allowed Tailwind utilities.",
         },
         script: { type: "string", description: "Client JS for interactivity (or empty string)." },
         css: { type: "string", description: "Tailwind utility classes / custom CSS (or empty)." },
       },
-      required: ["name", "tree"],
+      required: ["name", "html"],
     },
   },
 } as const;

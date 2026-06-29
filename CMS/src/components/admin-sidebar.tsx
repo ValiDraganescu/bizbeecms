@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { LocaleSwitcher } from "@/components/locale-switcher";
-import { ADMIN_SECTIONS } from "@/components/admin-sections";
+import { ADMIN_SECTIONS, type AdminSection } from "@/components/admin-sections";
 import { ChatWidget } from "@/components/chat/chat-widget";
 
 /**
@@ -273,18 +273,80 @@ function LogoutButton({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+/** Disclosure chevron for parent items with sub-menus; rotates down when open. */
+const ChevronIcon = ({ open }: { open: boolean }) => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    className={"transition-transform duration-200 " + (open ? "rotate-90" : "")}
+  >
+    <path d="M9 6l6 6-6 6" />
+  </svg>
+);
+
+const OPEN_SECTIONS_KEY = "cms-sidebar-open-sections";
+
 export function SidebarShell({ children }: { children: React.ReactNode }) {
   const t = useTranslations("adminNav");
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  // Manually-toggled open sub-menus, persisted across refresh. The active section
+  // is always shown open regardless (see `isOpen`), so this only governs sections
+  // you're NOT currently inside.
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
 
-  const links: { key: IconKey; href: string }[] = [
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(OPEN_SECTIONS_KEY);
+      if (saved) setOpenSections(new Set(JSON.parse(saved) as string[]));
+    } catch {
+      /* corrupt/absent → start closed */
+    }
+  }, []);
+
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      localStorage.setItem(OPEN_SECTIONS_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const links: (AdminSection & { key: IconKey })[] = [
     { key: "home", href: "/admin" },
-    ...(ADMIN_SECTIONS as readonly { key: IconKey; href: string }[]),
+    ...(ADMIN_SECTIONS as (AdminSection & { key: IconKey })[]),
   ];
 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+
+  // When you visit a section with sub-menus, record it as open so it STAYS open
+  // after you navigate away (otherwise a section that was only expanded by being
+  // active silently collapses on the next page). Toggling the chevron can still
+  // close it later. Runs on pathname change.
+  useEffect(() => {
+    const activeParent = (ADMIN_SECTIONS as AdminSection[]).find(
+      (s) =>
+        s.children?.length &&
+        (s.href === "/admin" ? pathname === "/admin" : pathname.startsWith(s.href)),
+    );
+    if (!activeParent) return;
+    setOpenSections((prev) => {
+      if (prev.has(activeParent.key)) return prev;
+      const next = new Set(prev).add(activeParent.key);
+      localStorage.setItem(OPEN_SECTIONS_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, [pathname]);
+  // A child link is exact-match (so the parent's Import/Export and its Develop
+  // child don't both light up on /admin/components/develop).
+  const isExact = (href: string) => pathname === href;
 
   return (
     <div className="fixed inset-0 flex bg-surface">
@@ -354,28 +416,73 @@ export function SidebarShell({ children }: { children: React.ReactNode }) {
             {!collapsed && t("viewSite")}
           </a>
 
-          {links.map(({ key, href }) => {
+          {links.map(({ key, href, children }) => {
             const active = isActive(href);
+            const hasChildren = Boolean(children?.length);
+            // Children render when the section is the current route OR the user has
+            // manually expanded it. Active wins so you can always reach sibling
+            // sub-pages of the page you're on, even if you'd collapsed the section.
+            const open = active || openSections.has(key);
             return (
-              <Link
-                key={href}
-                href={href}
-                title={collapsed ? t(key) : undefined}
-                aria-current={active ? "page" : undefined}
-                className={
-                  "flex items-center rounded-md text-sm transition-colors " +
-                  (collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5") +
-                  " " +
-                  (active
-                    ? "bg-primary-subtle font-medium text-primary"
-                    : "text-foreground-muted hover:bg-surface-muted hover:text-foreground")
-                }
-              >
-                <span className="shrink-0">
-                  <NavIcon name={key} />
-                </span>
-                {!collapsed && t(key)}
-              </Link>
+              <div key={href}>
+                <div className="flex items-center">
+                  <Link
+                    href={href}
+                    title={collapsed ? t(key) : undefined}
+                    aria-current={active ? "page" : undefined}
+                    className={
+                      "flex flex-1 items-center rounded-md text-sm transition-colors " +
+                      (collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5") +
+                      " " +
+                      (active
+                        ? "bg-primary-subtle font-medium text-primary"
+                        : "text-foreground-muted hover:bg-surface-muted hover:text-foreground")
+                    }
+                  >
+                    <span className="shrink-0">
+                      <NavIcon name={key} />
+                    </span>
+                    {!collapsed && t(key)}
+                  </Link>
+                  {/* Disclosure toggle — only for parents with sub-menus, expanded
+                      sidebar only. Separate from the Link so the parent still
+                      navigates while the chevron toggles open/close. */}
+                  {!collapsed && hasChildren && (
+                    <button
+                      type="button"
+                      onClick={() => toggleSection(key)}
+                      aria-expanded={open}
+                      aria-label={open ? t("collapse") : t("expand")}
+                      className="ml-0.5 flex shrink-0 items-center justify-center rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+                    >
+                      <ChevronIcon open={open} />
+                    </button>
+                  )}
+                </div>
+                {/* Sub-pages, shown when the section is open (expanded sidebar only). */}
+                {!collapsed && children && open && (
+                  <div className="mt-1 ml-4 flex flex-col gap-1 border-l border-border pl-3">
+                    {children.map((child) => {
+                      const childActive = isExact(child.href);
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          aria-current={childActive ? "page" : undefined}
+                          className={
+                            "rounded-md px-3 py-1.5 text-sm transition-colors " +
+                            (childActive
+                              ? "bg-primary-subtle font-medium text-primary"
+                              : "text-foreground-muted hover:bg-surface-muted hover:text-foreground")
+                          }
+                        >
+                          {t(child.key)}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>

@@ -69,6 +69,7 @@ test("a fully-formed modern row round-trips unchanged", () => {
     inputPrice: 0.00000015,
     outputPrice: 0.0000006,
     inputModalities: ["text", "image"],
+    contextLength: 1000000,
   };
   assert.deepEqual(coerceCatalog([modern])[0], modern);
 });

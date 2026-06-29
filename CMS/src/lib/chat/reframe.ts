@@ -76,6 +76,10 @@ export function reframe(
               emitted = true;
             } else if (ev.type === "tool_call") {
               tools.add(ev);
+            } else if (ev.type === "error") {
+              // Upstream provider error streamed mid-body — throw with the full
+              // message so the outer catch frames a single `error` event.
+              throw new Error(ev.message);
             } else {
               sawDone = true;
             }
@@ -177,6 +181,24 @@ async function consumeTurn(
           controller.enqueue(encoder.encode(frameEvent("token", { text: ev.text })));
         } else if (ev.type === "tool_call") {
           tools.add(ev);
+        } else if (ev.type === "error") {
+          // Upstream provider error (e.g. xAI 7003) streamed mid-body. Throw with the
+          // full message so the loop frames a single `error` event carrying the real
+          // reason — instead of the line being dropped and the turn ending silently.
+          throw new Error(ev.message);
+        } else if (ev.type === "usage") {
+          // Forward token usage to the client (context-usage meter). promptTokens of
+          // the LAST round is the full conversation-context size; the client keeps the
+          // latest. Does NOT end the turn — [DONE] still follows.
+          controller.enqueue(
+            encoder.encode(
+              frameEvent("usage", {
+                promptTokens: ev.promptTokens,
+                completionTokens: ev.completionTokens,
+                totalTokens: ev.totalTokens,
+              }),
+            ),
+          );
         } else {
           sawDone = true;
         }
@@ -234,13 +256,32 @@ export function streamChatRounds(
       if (started) return;
       started = true;
       try {
+        // True when the round we just fed back contained a FAILED tool result. If
+        // the model then goes silent (empty turn) we nudge it once to retry instead
+        // of ending on the error — Grok tends to stop after a tool error rather than
+        // fixing it. ponytail: one nudge, not a retry budget; a second silence ends.
+        let pendingFailure = false;
         for (let round = 0; round < maxRounds; round++) {
           const turn = upstream;
           upstream = null;
           if (!turn) break;
           const { text, calls } = await consumeTurn(turn, controller, encoder);
 
-          if (calls.length === 0) break; // final answer — no tools requested
+          if (calls.length === 0) {
+            // Empty turn right after a failed tool → nudge once, don't end on the error.
+            if (pendingFailure && round < maxRounds - 1) {
+              pendingFailure = false;
+              transcript.push({
+                role: "user",
+                content:
+                  "A tool call just failed with the error above. Read it, fix the " +
+                  "exact problem it names, and call the tool again to finish the task.",
+              });
+              upstream = await nextTurn(transcript);
+              continue;
+            }
+            break; // final answer — no tools requested
+          }
 
           const results = await runTools(calls, controller, encoder);
 
@@ -258,6 +299,11 @@ export function streamChatRounds(
               content: JSON.stringify(r.data),
             });
           });
+          // Did any tool in this round fail? (`{ok:false}` is the tool-handler's
+          // failure shape.) Drives the nudge if the next turn comes back empty.
+          pendingFailure = results.some(
+            (r) => (r.data as { ok?: unknown } | null)?.ok === false,
+          );
           upstream = await nextTurn(transcript);
         }
         controller.enqueue(encoder.encode(frameEvent("done", {})));

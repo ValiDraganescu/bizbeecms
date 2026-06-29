@@ -54,9 +54,26 @@ test("sanitizeTools drops non-object entries and non-arrays", () => {
   assert.deepEqual(sanitizeTools([tool, 1, null, "x", [tool]]), [tool], "only plain objects kept");
 });
 
-test("sanitizeTools caps the count at 50", () => {
-  const many = Array.from({ length: 80 }, (_, i) => ({ name: "t", i }));
+test("sanitizeTools caps the count at 50 (default) and honors a custom cap", () => {
+  const many = Array.from({ length: 200 }, (_, i) => ({ name: "t", i }));
   assert.equal(sanitizeTools(many)?.length, 50);
+  assert.equal(sanitizeTools(many, 120)?.length, 120);
+});
+
+test("parts (interleaved display order) persist on assistant turns, dropped on user turns", () => {
+  const parts = [
+    { kind: "text", text: "Created the Hero." },
+    { kind: "tool", result: { name: "create_component", ok: true } },
+  ];
+  const v = validateThreadInput({
+    messages: [
+      { role: "assistant", content: "Created the Hero.", tools: [tool], parts },
+      { role: "user", content: "thanks", parts },
+    ],
+  });
+  assert.ok(v.ok);
+  assert.deepEqual(v.input.messages[0].parts, parts, "assistant parts kept in order");
+  assert.equal(v.input.messages[1].parts, undefined, "user-turn parts dropped");
 });
 
 test("parseStoredMessages tolerates a turn with garbage tools (drops them, keeps text)", () => {

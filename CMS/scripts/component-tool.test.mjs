@@ -24,19 +24,15 @@ test("CREATE_COMPONENT_TOOL: well-formed OpenAI function schema", () => {
   assert.equal(CREATE_COMPONENT_TOOL.function.name, "create_component");
   assert.deepEqual(CREATE_COMPONENT_TOOL.function.parameters.required, [
     "name",
-    "tree",
+    "html",
   ]);
 });
 
 // ── validateComponentArtifact: happy path ────────────────────────────────────
-test("validate: accepts a valid artifact (tree object + allowed classes)", () => {
+test("validate: accepts a valid artifact (html + allowed classes)", () => {
   const res = validateComponentArtifact({
     name: "PricingCard",
-    tree: {
-      tag: "div",
-      props: { className: "flex flex-col p-4" },
-      children: ["Hello"],
-    },
+    html: '<div class="flex flex-col p-4">Hello</div>',
     script: "console.log('hi')",
     css: "block",
   });
@@ -44,69 +40,118 @@ test("validate: accepts a valid artifact (tree object + allowed classes)", () =>
   assert.equal(res.artifact.name, "PricingCard");
 });
 
-test("validate: accepts tree given as a JSON STRING (open models do this)", () => {
+test("validate: html-only artifact defaults script/css to empty", () => {
   const res = validateComponentArtifact({
     name: "Box",
-    tree: JSON.stringify({ tag: "span", children: ["x"] }),
+    html: "<span>x</span>",
   });
   assert.equal(res.ok, true);
   assert.equal(res.artifact.script, "");
   assert.equal(res.artifact.css, "");
 });
 
-// ── validateComponentArtifact: rejections ────────────────────────────────────
-test("validate: rejects a bad name", () => {
-  const res = validateComponentArtifact({ name: "1bad name", tree: { tag: "p" } });
-  assert.equal(res.ok, false);
-  assert.ok(res.errors.some((e) => e.includes("name must match")));
-});
-
-test("validate: rejects a non-renderable tree", () => {
-  const res = validateComponentArtifact({ name: "X", tree: { notag: true } });
-  assert.equal(res.ok, false);
-  assert.ok(res.errors.some((e) => /tree/.test(e)));
-});
-
-test("validate: rejects unknown class, names it, points to inline style, does NOT dump the whole list", () => {
+// ── propsSchema (preview placeholder data) ───────────────────────────────────
+test("validate: keeps a propsSchema object as a canonical JSON string", () => {
   const res = validateComponentArtifact({
-    name: "X",
-    tree: { tag: "div", props: { className: "flex made-up-class p-4" } },
+    name: "Hero",
+    html: "<h1>{{title}}</h1>",
+    propsSchema: { title: { type: "string", default: "Launch faster" } },
   });
-  assert.equal(res.ok, false);
-  const err = res.errors.find((e) => e.includes("made-up-class"));
-  assert.ok(err, "error names the offending class");
-  // Philosophy: name the bad class + the fix (inline style) — NOT the 700-class list.
-  assert.match(err, /not supported/i);
-  assert.match(err, /inline `?style`?/i, "tells the model to use inline style");
-  assert.ok(!err.includes("flex, flex-col, flex-row"), "must NOT dump the full vocabulary");
+  assert.equal(res.ok, true);
+  assert.equal(
+    res.artifact.propsSchema,
+    JSON.stringify({ title: { type: "string", default: "Launch faster" } }),
+  );
 });
 
-test("validate: the normal Tailwind scale (h-48, top-2, object-cover, w-32) is now accepted", () => {
+test("validate: accepts propsSchema given as a JSON STRING", () => {
   const res = validateComponentArtifact({
-    name: "Card",
-    tree: {
-      tag: "div",
-      props: { className: "relative w-32 h-48 overflow-hidden" },
-      children: [{ tag: "img", props: { className: "w-full h-full object-cover" } }],
-    },
+    name: "Hero",
+    html: "<h1>{{title}}</h1>",
+    propsSchema: JSON.stringify({ title: { type: "string", default: "Hi" } }),
+  });
+  assert.equal(res.ok, true);
+  assert.ok(res.artifact.propsSchema.includes("Hi"));
+});
+
+test("validate: a translatable slot {{t title}} is accepted in html", () => {
+  const res = validateComponentArtifact({
+    name: "Hero",
+    html: "<h1>{{t title}}</h1>",
+    propsSchema: { title: { type: "string", default: "Hi", translatable: true } },
   });
   assert.equal(res.ok, true, JSON.stringify(res.errors));
 });
 
-test("validate: rejects unknown css classes", () => {
+test("validate: an empty propsSchema is dropped (no point storing it)", () => {
+  const res = validateComponentArtifact({
+    name: "Static",
+    html: "<p>x</p>",
+    propsSchema: {},
+  });
+  assert.equal(res.ok, true);
+  assert.equal(res.artifact.propsSchema, undefined);
+});
+
+test("validate: a present-but-non-object propsSchema is rejected", () => {
   const res = validateComponentArtifact({
     name: "X",
-    tree: { tag: "div" },
-    css: "not-a-real-class",
+    html: "<p>x</p>",
+    propsSchema: 42,
   });
   assert.equal(res.ok, false);
-  assert.ok(res.errors.some((e) => e.includes("not-a-real-class")));
+  assert.ok(res.errors.some((e) => /propsSchema/.test(e)));
+});
+
+// ── validateComponentArtifact: rejections ────────────────────────────────────
+test("validate: rejects a bad name", () => {
+  const res = validateComponentArtifact({ name: "1bad name", html: "<p>x</p>" });
+  assert.equal(res.ok, false);
+  assert.ok(res.errors.some((e) => e.includes("name must match")));
+});
+
+test("validate: empty html gets a read-before-write directive (not an opaque error)", () => {
+  // The model sometimes fires update_component with empty html in the same batch as
+  // get_component — before the artifact comes back. update REPLACES, so empty html
+  // would wipe the component. The error must tell it to get_component first, then
+  // re-pass the COMPLETE html, so it self-corrects instead of retrying blind.
+  const res = validateComponentArtifact({ name: "Hero", html: "   " });
+  assert.equal(res.ok, false);
+  const err = res.errors.find((e) => /empty/.test(e));
+  assert.ok(err, "names the empty-html cause");
+  assert.match(err, /get_component/, "points back to reading first");
+  assert.match(err, /REPLACES|erase|wipe/i, "warns the update is destructive");
+});
+
+test("validate: missing html is treated as empty (read-before-write)", () => {
+  const res = validateComponentArtifact({ name: "Hero" });
+  assert.equal(res.ok, false);
+  assert.ok(res.errors.some((e) => /empty/.test(e)));
+});
+
+test("validate: any Tailwind class is accepted — no allowlist (renderer compiles per page)", () => {
+  // Variants, arbitrary values, raw palette — all valid now; the page renderer
+  // compiles the page's actual classes at request time (see tw-compile.ts).
+  const res = validateComponentArtifact({
+    name: "X",
+    html: '<div class="flex p-4 hover:bg-red-500 md:grid-cols-3 h-[37px] bg-[#abc123]"></div>',
+  });
+  assert.equal(res.ok, true, JSON.stringify(res.errors));
+});
+
+test("validate: arbitrary css root classes are accepted (no allowlist)", () => {
+  const res = validateComponentArtifact({
+    name: "X",
+    html: "<div></div>",
+    css: "shadow-2xl ring-4",
+  });
+  assert.equal(res.ok, true, JSON.stringify(res.errors));
 });
 
 test("validate: rejects an oversized script", () => {
   const res = validateComponentArtifact({
     name: "X",
-    tree: { tag: "div" },
+    html: "<div></div>",
     script: "x".repeat(64 * 1024 + 1),
   });
   assert.equal(res.ok, false);
@@ -118,17 +163,12 @@ test("validate: rejects non-object args", () => {
   assert.equal(validateComponentArtifact(null).ok, false);
 });
 
-test("validate: checks classes in NESTED children, not just the root", () => {
+test("validate: nested children with arbitrary classes are accepted (no allowlist)", () => {
   const res = validateComponentArtifact({
     name: "X",
-    tree: {
-      tag: "div",
-      props: { className: "flex" },
-      children: [{ tag: "span", props: { className: "bogus-nested" } }],
-    },
+    html: '<div class="flex"><span class="bg-[#123] hover:underline"></span></div>',
   });
-  assert.equal(res.ok, false);
-  assert.ok(res.errors.some((e) => e.includes("bogus-nested")));
+  assert.equal(res.ok, true, JSON.stringify(res.errors));
 });
 
 // ── extractToolCall ──────────────────────────────────────────────────────────

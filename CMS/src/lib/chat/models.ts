@@ -25,6 +25,13 @@
 /** Default OpenRouter model — the route's fallback. Must be in CHAT_MODELS. */
 export const DEFAULT_MODEL = "openai/gpt-4o-mini";
 
+/**
+ * Default model for AI image description (searchable media). A cheap multimodal
+ * model that accepts `image` input. Operator-overridable in CMS settings; this
+ * is the fallback when unset or when the saved id isn't image-capable.
+ */
+export const DEFAULT_IMAGE_MODEL = "openai/gpt-4o-mini";
+
 /** A catalog entry as the UI + route consume it (the clean boundary shape). */
 export interface CatalogModel {
   /** Exact OpenRouter model id, e.g. `openai/gpt-4o-mini`. */
@@ -41,6 +48,8 @@ export interface CatalogModel {
   outputPrice: number | null;
   /** Accepted input modalities (`architecture.input_modalities`); defaults to `["text"]`. */
   inputModalities: string[];
+  /** Context window in tokens (`context_length`); null/absent when the API exposes none. */
+  contextLength?: number | null;
 }
 
 /**
@@ -115,6 +124,8 @@ interface RawModel {
   supported_parameters?: unknown;
   /** OpenRouter's modality metadata; `input_modalities` lists accepted inputs (text/image/file/…). */
   architecture?: { input_modalities?: unknown } | null;
+  /** Context window size in tokens. */
+  context_length?: unknown;
 }
 
 /** Known input modalities OpenRouter advertises — anything else is dropped as junk. */
@@ -159,6 +170,22 @@ function outputPriceOf(m: RawModel): number | null {
   return toPrice((p as { completion?: unknown }).completion);
 }
 
+/**
+ * Per-turn output-token cap derived from the SELECTED model's context window.
+ * The window covers input+output, so we let output use a QUARTER of it (leaving
+ * the bulk for the prompt + tool results) and clamp to MAX_OUTPUT_CEILING so a
+ * giant-window model (e.g. 2M) can't bill one enormous completion. Returns
+ * `undefined` when the window is unknown — the adapter then applies its own
+ * default. A floor keeps tiny-window models from getting a uselessly small cap.
+ */
+export const MAX_OUTPUT_CEILING = 32_000;
+export const MIN_OUTPUT_FLOOR = 1_000;
+export function outputCapFor(contextLength: number | null | undefined): number | undefined {
+  if (typeof contextLength !== "number" || contextLength <= 0) return undefined;
+  const quarter = Math.floor(contextLength / 4);
+  return Math.max(MIN_OUTPUT_FLOOR, Math.min(MAX_OUTPUT_CEILING, quarter));
+}
+
 /** Format a USD-per-token price as USD per 1M tokens, 2 decimals (`null` → null). */
 export function pricePerMillion(usdPerToken: number | null): string | null {
   if (usdPerToken == null) return null;
@@ -192,6 +219,10 @@ export function parseModelCatalog(apiJson: unknown): CatalogModel[] {
       inputPrice: input,
       outputPrice: outputPriceOf(m),
       inputModalities: parseInputModalities(m),
+      contextLength:
+        typeof m.context_length === "number" && m.context_length > 0
+          ? m.context_length
+          : null,
     });
   }
   return out;
@@ -284,4 +315,16 @@ export function isKnownModel(id: unknown, allowed?: ReadonlySet<string>): id is 
  */
 export function resolveModel(value: unknown, allowed?: ReadonlySet<string>): string {
   return isKnownModel(value, allowed) ? value : DEFAULT_MODEL;
+}
+
+/**
+ * Resolve an UNTRUSTED image-model value: the value if it's in the supplied
+ * image-capable allowlist, else `DEFAULT_IMAGE_MODEL`. The caller builds the
+ * allowlist from the catalog filtered to `image` input. Never throws.
+ */
+export function resolveImageModel(value: unknown, imageAllowed?: ReadonlySet<string>): string {
+  if (typeof value === "string" && value.length > 0 && imageAllowed?.has(value)) {
+    return value;
+  }
+  return DEFAULT_IMAGE_MODEL;
 }

@@ -1,0 +1,699 @@
+"use client";
+
+/**
+ * Component "Develop" workbench (admin Develop page). Two columns:
+ *   left  — the Site's components, each selectable + deletable
+ *   right — a live preview of the selected component, rendered in an iframe via
+ *           the real renderer (`/preview/component/<name>`) so its CSS + client
+ *           script stay isolated from the admin chrome.
+ *
+ * The preview binds each component's PLACEHOLDER data (its propsSchema `default`s,
+ * authored by the AI) into the `{{slots}}`, so a component renders meaningfully on
+ * its own. A component with no declared props shows a hint to add placeholder data.
+ *
+ * REST-only (no server actions). Copy via next-intl. Purpose Tailwind tokens only.
+ *
+ * ponytail: native <iframe src> + a single DELETE fetch. No preview lib, no modal
+ * framework — window.confirm gates the destructive delete.
+ */
+
+import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { setActiveComponentContext } from "@/lib/chat/component-context";
+import { CodeEditor, type CodeLanguage } from "@/components/components/code-editor";
+import { PropFields } from "@/components/components/prop-fields";
+import { formatHtml } from "@/lib/render/parse-html";
+import { parsePropsSchema } from "@/lib/pages/page-blocks";
+import { applyDefaults } from "@/lib/chat/props-defaults";
+import { PAGE_MUTATION_EVENT } from "@/lib/chat/page-mutation-signal";
+import { capturePreviews } from "@/lib/chat/capture-preview";
+import { emitChatAttachments, requestChatOpen } from "@/lib/chat/chat-attach-bus";
+
+type RightView = "preview" | "code";
+type CodeTab = "html" | "script" | "css";
+type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
+type Draft = { html: string; script: string; css: string };
+type Viewport = "desktop" | "tablet" | "mobile";
+
+// Preview frame widths per viewport — same scales as the Page Builder.
+const VIEWPORT_WIDTH: Record<Viewport, string> = {
+  desktop: "100%",
+  tablet: "768px",
+  mobile: "375px",
+};
+
+const RIGHT_VIEW_KEY = "bizbee.develop.rightView";
+function loadRightView(): RightView {
+  try {
+    return localStorage.getItem(RIGHT_VIEW_KEY) === "code" ? "code" : "preview";
+  } catch {
+    return "preview";
+  }
+}
+function saveRightView(v: RightView): void {
+  try {
+    localStorage.setItem(RIGHT_VIEW_KEY, v);
+  } catch {
+    /* private mode → in-memory only */
+  }
+}
+
+const CODE_TAB_LANG: Record<CodeTab, CodeLanguage> = {
+  html: "html",
+  script: "javascript",
+  css: "css",
+};
+
+type ComponentSummary = {
+  name: string;
+  hasScript: boolean;
+  hasCss: boolean;
+  hasPreviewData: boolean;
+  tags: string[];
+};
+
+export function ComponentDevelop({
+  initialComponents,
+}: {
+  initialComponents: ComponentSummary[];
+}) {
+  const t = useTranslations("develop");
+  const [components, setComponents] = useState<ComponentSummary[]>(initialComponents);
+  const [selected, setSelected] = useState<string | null>(
+    initialComponents[0]?.name ?? null,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Bust the iframe cache on demand (after the AI iterates on a component).
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Right-pane view + which code tab is showing. View persists across reloads.
+  // Start at the server default ("preview") and adopt the stored value AFTER mount
+  // — reading localStorage during render would mismatch SSR and break hydration.
+  const [view, setView] = useState<RightView>("preview");
+  useEffect(() => setView(loadRightView()), []);
+  const [codeTab, setCodeTab] = useState<CodeTab>("html");
+  // Preview viewport (desktop/tablet/mobile), mirrors the Page Builder.
+  const [viewport, setViewport] = useState<Viewport>("desktop");
+  // "Send preview to AI": capturing the 3 viewport screenshots → chat composer.
+  const [capturing, setCapturing] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  // The editor drafts for the selected component (seeded from the fetched artifact;
+  // edited locally; autosaved). null = not loaded yet for the current selection.
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // The selected component's declared props + the edited PLACEHOLDER values (its
+  // propsSchema `default`s). Null = not loaded / no declared props.
+  const [propsSchemaStr, setPropsSchemaStr] = useState<string | null>(null);
+  const [propValues, setPropValues] = useState<Record<string, unknown>>({});
+  const [propsDirty, setPropsDirty] = useState(false);
+
+  const current = components.find((c) => c.name === selected) ?? null;
+  const propFields = parsePropsSchema(propsSchemaStr);
+
+  // Publish the selected component's FULL artifact as inline chat context so the
+  // assistant's next message knows which component is open AND has its whole code
+  // (mirrors the Page Builder's setActivePageContext). GET ?name= returns the
+  // portable bundle ({ component: {name, tree, script, css, propsSchema} }).
+  // `reloadKey` is a dep so re-publishing picks up the AI's own edits after Reload.
+  useEffect(() => {
+    if (!selected) {
+      setActiveComponentContext(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/components?name=${encodeURIComponent(selected)}`);
+        if (!res.ok) return;
+        const bundle = (await res.json()) as {
+          component?: {
+            name: string;
+            tree: unknown;
+            script: string;
+            css: string;
+            propsSchema: string | null;
+          };
+        };
+        if (!cancelled && bundle.component) {
+          setActiveComponentContext(bundle.component);
+          // Seed the editor drafts from the same fetch. The bundle carries the
+          // parsed tree; pretty-print it to Handlebars-HTML for the editor.
+          const c = bundle.component;
+          setDraft({
+            html:
+              typeof c.tree === "string"
+                ? c.tree
+                : formatHtml(c.tree as Parameters<typeof formatHtml>[0]),
+            script: c.script ?? "",
+            css: c.css ?? "",
+          });
+          setSaveState("idle");
+          setSaveError(null);
+          // Seed the props sidebar: its declared props + each one's current
+          // `default` as the editable placeholder value.
+          setPropsSchemaStr(c.propsSchema ?? null);
+          const fields = parsePropsSchema(c.propsSchema ?? null);
+          const vals: Record<string, unknown> = {};
+          for (const f of fields) vals[f.name] = f.defaultValue ?? f.default;
+          setPropValues(vals);
+          setPropsDirty(false);
+        }
+      } catch {
+        /* network hiccup → leave prior context; not worth surfacing */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, reloadKey]);
+
+  // Debounced autosave: ~800ms after the last edit, PUT the draft. The route
+  // re-validates (malformed markup / disallowed class / unplannable tree → 400
+  // shown inline). Pattern mirrors the Page Builder's setTimeout-in-useEffect autosave.
+  useEffect(() => {
+    if (!selected || !draft || saveState !== "dirty") return;
+    const tid = setTimeout(() => void saveDraft(selected, draft), 800);
+    return () => clearTimeout(tid);
+    // saveDraft is stable enough for this debounce; deps are the trigger inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, saveState, selected]);
+
+  async function saveDraft(name: string, d: Draft) {
+    setSaveState("saving");
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/components/${encodeURIComponent(name)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ html: d.html, script: d.script, css: d.css }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as
+          | { error?: string; errors?: string[] }
+          | null;
+        setSaveState("error");
+        setSaveError(body?.errors?.join("; ") || body?.error || `HTTP ${res.status}`);
+        return;
+      }
+      setSaveState("saved");
+      // Refresh the preview iframe (and re-publish chat context) with the saved code.
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setSaveState("error");
+      setSaveError((err as Error).message);
+    }
+  }
+
+  // Edit one field of the draft and mark it dirty (triggers the debounce above).
+  function editField(field: CodeTab, next: string) {
+    setDraft((d) => (d ? { ...d, [field]: next } : d));
+    setSaveState("dirty");
+  }
+
+  // Edit one prop's placeholder value → mark the props sidebar dirty.
+  function editProp(name: string, value: unknown) {
+    setPropValues((v) => ({ ...v, [name]: value }));
+    setPropsDirty(true);
+  }
+
+  // Debounced persist of edited placeholder defaults: rewrite the propsSchema's
+  // `default`s and PUT the full artifact (html/script/css unchanged) so the gate
+  // re-validates, then reload the preview to show the new defaults bound in.
+  useEffect(() => {
+    if (!selected || !draft || !propsDirty) return;
+    const tid = setTimeout(() => {
+      const nextSchema = applyDefaults(propsSchemaStr, propValues);
+      void (async () => {
+        setSaveState("saving");
+        setSaveError(null);
+        try {
+          const res = await fetch(`/api/components/${encodeURIComponent(selected)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              html: draft.html,
+              script: draft.script,
+              css: draft.css,
+              propsSchema: nextSchema,
+            }),
+          });
+          if (!res.ok) {
+            const body = (await res.json().catch(() => null)) as
+              | { error?: string; errors?: string[] }
+              | null;
+            setSaveState("error");
+            setSaveError(body?.errors?.join("; ") || body?.error || `HTTP ${res.status}`);
+            return;
+          }
+          setPropsSchemaStr(nextSchema);
+          setPropsDirty(false);
+          setSaveState("saved");
+          setReloadKey((k) => k + 1);
+        } catch (err) {
+          setSaveState("error");
+          setSaveError((err as Error).message);
+        }
+      })();
+    }, 800);
+    return () => clearTimeout(tid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propValues, propsDirty, selected]);
+
+  // Clear the context when leaving the workbench so a stale component doesn't
+  // ride along into chats on other admin pages.
+  useEffect(() => () => setActiveComponentContext(null), []);
+
+  // When the AI assistant creates/edits a component (it writes the SAME store this
+  // workbench reads), refresh so the list shows new components and the preview
+  // isn't stale — mirrors the Page Builder's mutation listener. Always refetch the
+  // list + bust the preview iframe; reload the selected draft too UNLESS the
+  // operator has unsaved edits (don't clobber in-progress manual work).
+  useEffect(() => {
+    function onMutated() {
+      void refresh(); // always: new components must appear in the list
+      // Bumping reloadKey re-seeds the draft from the store (seed effect dep), so
+      // skip it while the operator has unsaved edits — don't clobber their work.
+      if (saveState !== "dirty" && !propsDirty) setReloadKey((k) => k + 1);
+    }
+    window.addEventListener(PAGE_MUTATION_EVENT, onMutated);
+    return () => window.removeEventListener(PAGE_MUTATION_EVENT, onMutated);
+    // refresh is stable across renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveState, propsDirty]);
+
+  async function refresh() {
+    const res = await fetch("/api/components");
+    if (res.ok) setComponents((await res.json()) as ComponentSummary[]);
+  }
+
+  async function remove(name: string) {
+    if (!window.confirm(t("confirmDelete", { name }))) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/components?name=${encodeURIComponent(name)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        setError(await errorOf(res));
+        return;
+      }
+      setComponents((cs) => cs.filter((c) => c.name !== name));
+      if (selected === name) setSelected(null);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Capture the selected component at desktop/tablet/mobile and hand the PNGs to
+  // the chat composer so the AI (a vision model) can see how it looks at each
+  // size and iterate. Fully client-side (offscreen iframes + modern-screenshot).
+  async function sendPreviewToAI() {
+    if (!current || capturing) return;
+    setCaptureError(null);
+    setCapturing(true);
+    try {
+      const { captures, errors } = await capturePreviews(current.name);
+      if (captures.length === 0) {
+        setCaptureError(errors[0] ?? t("capture.failed"));
+        return;
+      }
+      // Open the widget FIRST so its composer mounts and subscribes; the bus
+      // buffers the batch and replays it to the fresh subscriber either way.
+      requestChatOpen();
+      emitChatAttachments({
+        images: captures.map((c) => ({ dataUrl: c.dataUrl, name: c.name, mime: "image/png" })),
+        caption: t("capture.caption", { name: current.name }),
+      });
+    } catch (err) {
+      setCaptureError((err as Error).message);
+    } finally {
+      setCapturing(false);
+    }
+  }
+
+  const showProps = !!current && propFields.length > 0;
+
+  return (
+    <div
+      className={
+        "grid min-h-0 flex-1 grid-cols-1 gap-6 " +
+        (showProps ? "lg:grid-cols-[18rem_1fr_18rem]" : "lg:grid-cols-[20rem_1fr]")
+      }
+    >
+      {/* Left: component list */}
+      <section className="flex min-h-0 flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-foreground">{t("listTitle")}</h2>
+          <button
+            type="button"
+            className="text-sm text-foreground-muted hover:text-foreground disabled:opacity-40"
+            disabled={busy}
+            onClick={() => void refresh()}
+          >
+            {t("refresh")}
+          </button>
+        </div>
+        {error && (
+          <p
+            role="alert"
+            className="rounded-md border border-danger bg-danger-subtle px-3 py-2 text-sm text-danger"
+          >
+            {error}
+          </p>
+        )}
+        {components.length === 0 ? (
+          <p className="text-foreground-muted">{t("empty")}</p>
+        ) : (
+          <ul className="flex flex-col gap-1 overflow-y-auto">
+            {components.map((c) => {
+              const active = c.name === selected;
+              return (
+                <li key={c.name}>
+                  <div
+                    className={
+                      "flex items-center gap-2 rounded-md border px-3 py-2 transition-colors " +
+                      (active
+                        ? "border-primary bg-primary-subtle"
+                        : "border-border bg-surface-raised hover:bg-surface-muted")
+                    }
+                  >
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 flex-col items-start text-left"
+                      onClick={() => setSelected(c.name)}
+                    >
+                      <span
+                        className={
+                          "truncate font-mono " +
+                          (active ? "text-primary" : "text-foreground")
+                        }
+                      >
+                        {c.name}
+                      </span>
+                      <span className="truncate text-xs text-foreground-muted">
+                        {[
+                          c.hasScript ? t("flagScript") : null,
+                          c.hasCss ? t("flagCss") : null,
+                          c.hasPreviewData ? null : t("flagNoData"),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ") || t("flagStatic")}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded border border-border px-2 py-1 text-xs text-foreground-muted hover:border-danger hover:text-danger disabled:opacity-40"
+                      disabled={busy}
+                      aria-label={t("deleteFor", { name: c.name })}
+                      onClick={() => void remove(c.name)}
+                    >
+                      {t("delete")}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* Right: preview / code */}
+      <section className="flex min-h-0 flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-foreground">
+            {current ? t("previewTitle", { name: current.name }) : t("previewNone")}
+          </h2>
+          <div className="flex items-center gap-2">
+            {/* Viewport selector — desktop/tablet/mobile preview widths, mirrors
+                the Page Builder. Only meaningful in Preview; hidden in Code view. */}
+            {current && view === "preview" && (
+              <div className="flex overflow-hidden rounded-md border border-border">
+                {(["desktop", "tablet", "mobile"] as Viewport[]).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setViewport(v)}
+                    aria-pressed={viewport === v}
+                    title={t(`viewport.${v}`)}
+                    className={
+                      "flex items-center gap-1.5 px-2.5 py-1.5 text-xs transition-colors " +
+                      (viewport === v
+                        ? "bg-surface font-medium text-foreground"
+                        : "bg-surface-muted text-foreground-muted hover:text-foreground")
+                    }
+                  >
+                    <ViewportIcon kind={v} />
+                    <span className="hidden lg:inline">{t(`viewport.${v}`)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* Send the rendered component at all 3 sizes to the AI (vision) so it
+                can nail the look across screen sizes. Preview view only. */}
+            {current && view === "preview" && (
+              <button
+                type="button"
+                onClick={() => void sendPreviewToAI()}
+                disabled={capturing}
+                title={t("capture.send")}
+                className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-foreground-muted transition-colors hover:text-foreground disabled:opacity-50"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="9" cy="9" r="2" />
+                  <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                </svg>
+                <span className="hidden lg:inline">
+                  {capturing ? t("capture.capturing") : t("capture.send")}
+                </span>
+              </button>
+            )}
+            {/* Reload sits BEFORE the toggle and always occupies its slot — only
+                meaningful in Preview (busts the iframe), so it's hidden (not
+                removed) in Code view to avoid shifting the toggle. */}
+            {current && (
+              <button
+                type="button"
+                className={
+                  "text-sm text-foreground-muted hover:text-foreground" +
+                  (view === "preview" ? "" : " invisible")
+                }
+                aria-hidden={view !== "preview"}
+                tabIndex={view === "preview" ? 0 : -1}
+                onClick={() => setReloadKey((k) => k + 1)}
+              >
+                {t("reload")}
+              </button>
+            )}
+            {/* Preview / Code toggle — mirrors the Page Builder's center tabs. */}
+            {current && (
+              <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                {(["preview", "code"] as RightView[]).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => {
+                      setView(v);
+                      saveRightView(v);
+                    }}
+                    aria-pressed={view === v}
+                    className={
+                      "rounded px-3 py-1 text-sm transition-colors " +
+                      (view === v
+                        ? "bg-surface-muted font-medium text-foreground"
+                        : "text-foreground-muted hover:text-foreground")
+                    }
+                  >
+                    {t(`view.${v}`)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {captureError && (
+          <p
+            role="alert"
+            className="rounded-md border border-danger bg-danger-subtle px-3 py-2 text-sm text-danger"
+          >
+            {captureError}
+          </p>
+        )}
+
+        {current && view === "preview" && !current.hasPreviewData && (
+          <p
+            role="status"
+            className="rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-foreground-muted"
+          >
+            {t("noPlaceholderData")}
+          </p>
+        )}
+
+        {/* Code view: sub-tabs (html / script / css) + save status. */}
+        {current && view === "code" && (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1">
+              {(["html", "script", "css"] as CodeTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setCodeTab(tab)}
+                  aria-pressed={codeTab === tab}
+                  className={
+                    "rounded-md px-3 py-1 text-sm transition-colors " +
+                    (codeTab === tab
+                      ? "bg-surface-muted font-medium text-foreground"
+                      : "text-foreground-muted hover:text-foreground")
+                  }
+                >
+                  {t(`codeTab.${tab}`)}
+                </button>
+              ))}
+            </div>
+            <span
+              className={
+                "text-xs " +
+                (saveState === "error" ? "text-danger" : "text-foreground-muted")
+              }
+            >
+              {saveState === "saving"
+                ? t("save.saving")
+                : saveState === "saved"
+                  ? t("save.saved")
+                  : saveState === "dirty"
+                    ? t("save.unsaved")
+                    : saveState === "error"
+                      ? t("save.failed")
+                      : ""}
+            </span>
+          </div>
+        )}
+        {current && view === "code" && saveState === "error" && saveError && (
+          <p
+            role="alert"
+            className="rounded-md border border-danger bg-danger-subtle px-3 py-2 text-xs text-danger"
+          >
+            {saveError}
+          </p>
+        )}
+
+        <div className="min-h-0 flex-1 overflow-hidden rounded-md border border-border bg-surface">
+          {!current ? (
+            <div className="flex h-full min-h-[60vh] items-center justify-center text-foreground-muted">
+              {t("selectPrompt")}
+            </div>
+          ) : view === "preview" ? (
+            // Centered, width-constrained frame so tablet/mobile widths show the
+            // component's responsive layout (desktop = full width).
+            <div className="flex h-full min-h-[60vh] justify-center overflow-auto bg-surface-muted p-4">
+              <div
+                className="h-full overflow-hidden rounded-md border border-border bg-white shadow-sm"
+                style={{ width: VIEWPORT_WIDTH[viewport], maxWidth: "100%" }}
+              >
+                <iframe
+                  key={`${current.name}-${reloadKey}-${viewport}`}
+                  title={t("previewTitle", { name: current.name })}
+                  className="h-full min-h-[60vh] w-full border-0 bg-white"
+                  src={`/preview/component/${encodeURIComponent(current.name)}`}
+                />
+              </div>
+            </div>
+          ) : draft ? (
+            <div className="h-full min-h-[60vh]">
+              <CodeEditor
+                key={`${current.name}-${codeTab}`}
+                value={draft[codeTab]}
+                language={CODE_TAB_LANG[codeTab]}
+                onChange={(next) => editField(codeTab, next)}
+              />
+            </div>
+          ) : (
+            <div className="flex h-full min-h-[60vh] items-center justify-center text-foreground-muted">
+              {t("save.loading")}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Right sidebar: edit the component's PLACEHOLDER prop values (its
+          propsSchema defaults). Only shown when the component declares props. */}
+      {showProps && (
+        <section className="flex min-h-0 flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-foreground">{t("propsTitle")}</h2>
+            <span
+              className={
+                "text-xs " +
+                (saveState === "error" ? "text-danger" : "text-foreground-muted")
+              }
+            >
+              {propsDirty || saveState === "saving"
+                ? t("save.saving")
+                : saveState === "saved"
+                  ? t("save.saved")
+                  : ""}
+            </span>
+          </div>
+          <p className="text-xs text-foreground-muted">{t("propsHint")}</p>
+          <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border bg-surface-raised p-3">
+            <PropFields schema={propFields} values={propValues} onChange={editProp} />
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+// Viewport glyphs (same shapes as the Page Builder's selector).
+function ViewportIcon({ kind }: { kind: Viewport }) {
+  const p = {
+    width: 14,
+    height: 14,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  switch (kind) {
+    case "desktop":
+      return (
+        <svg {...p}>
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      );
+    case "tablet":
+      return (
+        <svg {...p}>
+          <rect x="4" y="2" width="16" height="20" rx="2" />
+          <line x1="12" y1="18" x2="12" y2="18" />
+        </svg>
+      );
+    case "mobile":
+      return (
+        <svg {...p}>
+          <rect x="7" y="2" width="10" height="20" rx="2" />
+          <line x1="11" y1="18" x2="13" y2="18" />
+        </svg>
+      );
+  }
+}
+
+async function errorOf(res: Response): Promise<string> {
+  try {
+    const j = (await res.json()) as { error?: string };
+    if (j.error) return j.error;
+  } catch {
+    /* non-JSON body */
+  }
+  return `HTTP ${res.status}`;
+}

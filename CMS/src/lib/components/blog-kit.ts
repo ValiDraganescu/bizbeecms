@@ -13,9 +13,7 @@
  * PostList" instead of authoring every component from scratch.
  *
  * AUTHORING CONSTRAINTS (each bundle must pass the import gate):
- *  - Every `className` token must be in `allowedClasses()` (utility-css.ts). No
- *    arbitrary Tailwind — one-off values go in inline `style` (which the gate
- *    does not class-check), not classes.
+ *  - className tokens may be ANY Tailwind class (compiled per page at render).
  *  - `name` must match /^[A-Za-z][A-Za-z0-9_-]{0,63}$/ (PascalCase identifiers).
  *  - `tree` must be plannable by `planTree` (tag/props/children data walk).
  *  - `script` is optional client JS, bounded; the browser runs it, never the
