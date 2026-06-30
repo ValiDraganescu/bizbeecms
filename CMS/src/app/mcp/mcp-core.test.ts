@@ -17,6 +17,7 @@ import {
   RPC_METHOD_NOT_FOUND,
   RPC_INVALID_REQUEST,
   MCP_PROTOCOL_VERSION,
+  AUTHORING_PROMPT_NAME,
   type McpTool,
 } from "./mcp-core.ts";
 
@@ -30,6 +31,9 @@ const FAKE_SCHEMAS = [
 const listTools = (): McpTool[] => toMcpTools(FAKE_SCHEMAS);
 // Echo dispatcher: returns the structured {name, ok, …} shape runTool would.
 const runTool = async (name: string, args: unknown) => ({ name, ok: true, echo: args });
+// Echo the requested context so prompts/get coverage can assert it's threaded.
+const getPrompt = async (context: string | undefined) => `PROMPT[${context ?? "general"}]`;
+const deps = { listTools, runTool, getPrompt };
 
 test("toMcpTools maps function schemas to MCP {name,description,inputSchema}, skips junk", () => {
   const tools = toMcpTools(FAKE_SCHEMAS);
@@ -51,15 +55,53 @@ test("parseJsonRpc accepts valid, rejects wrong version / missing method / bad i
 });
 
 test("initialize returns protocol version + tools capability + serverInfo", async () => {
-  const res = await handleRpc({ jsonrpc: "2.0", id: 1, method: "initialize" }, { listTools, runTool });
+  const res = await handleRpc({ jsonrpc: "2.0", id: 1, method: "initialize" }, deps);
   assert.ok(res && "result" in res);
   const r = (res as { result: Record<string, unknown> }).result;
   assert.equal(r.protocolVersion, MCP_PROTOCOL_VERSION);
-  assert.deepEqual(r.capabilities, { tools: {} });
+  assert.deepEqual(r.capabilities, { tools: {}, prompts: {} });
+});
+
+test("prompts/list advertises the authoring guide with an optional context arg", async () => {
+  const res = await handleRpc({ jsonrpc: "2.0", id: 7, method: "prompts/list" }, deps);
+  assert.ok(res && "result" in res);
+  const prompts = (res as { result: { prompts: Array<{ name: string; arguments: Array<{ name: string; required?: boolean }> }> } }).result.prompts;
+  assert.deepEqual(prompts.map((p) => p.name), [AUTHORING_PROMPT_NAME]);
+  assert.equal(prompts[0].arguments[0].name, "context");
+  assert.equal(prompts[0].arguments[0].required, false);
+});
+
+test("prompts/get threads the context arg to getPrompt and wraps it as a user message", async () => {
+  const res = await handleRpc(
+    { jsonrpc: "2.0", id: 8, method: "prompts/get", params: { name: AUTHORING_PROMPT_NAME, arguments: { context: "components" } } },
+    deps,
+  );
+  assert.ok(res && "result" in res);
+  const r = (res as { result: { messages: Array<{ role: string; content: { type: string; text: string } }> } }).result;
+  assert.equal(r.messages[0].role, "user");
+  assert.equal(r.messages[0].content.text, "PROMPT[components]");
+});
+
+test("prompts/get with no arguments defaults context to general", async () => {
+  const res = await handleRpc(
+    { jsonrpc: "2.0", id: 9, method: "prompts/get", params: { name: AUTHORING_PROMPT_NAME } },
+    deps,
+  );
+  const text = (res as { result: { messages: Array<{ content: { text: string } }> } }).result.messages[0].content.text;
+  assert.equal(text, "PROMPT[general]");
+});
+
+test("prompts/get rejects an unknown prompt name", async () => {
+  const res = await handleRpc(
+    { jsonrpc: "2.0", id: 10, method: "prompts/get", params: { name: "nope" } },
+    deps,
+  );
+  assert.ok(res && "error" in res);
+  assert.equal((res as { error: { code: number } }).error.code, RPC_INVALID_REQUEST);
 });
 
 test("tools/list returns the mapped registry", async () => {
-  const res = await handleRpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, { listTools, runTool });
+  const res = await handleRpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, deps);
   assert.ok(res && "result" in res);
   const tools = (res as { result: { tools: McpTool[] } }).result.tools;
   assert.deepEqual(tools.map((t) => t.name), ["list_pages", "create_page", "no_params"]);
@@ -68,7 +110,7 @@ test("tools/list returns the mapped registry", async () => {
 test("tools/call routes name+arguments to the shared dispatch and wraps the result", async () => {
   const res = await handleRpc(
     { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "create_page", arguments: { slug: "home" } } },
-    { listTools, runTool },
+    deps,
   );
   assert.ok(res && "result" in res);
   const r = (res as { result: { content: Array<{ text: string }>; isError: boolean } }).result;
@@ -81,13 +123,13 @@ test("tools/call routes name+arguments to the shared dispatch and wraps the resu
 test("tools/call defaults missing arguments to {} and rejects a missing name", async () => {
   const ok = await handleRpc(
     { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "list_pages" } },
-    { listTools, runTool },
+    deps,
   );
   assert.deepEqual(JSON.parse((ok as { result: { content: Array<{ text: string }> } }).result.content[0].text).echo, {});
 
   const bad = await handleRpc(
     { jsonrpc: "2.0", id: 5, method: "tools/call", params: {} },
-    { listTools, runTool },
+    deps,
   );
   assert.ok(bad && "error" in bad);
   assert.equal((bad as { error: { code: number } }).error.code, RPC_INVALID_REQUEST);
@@ -100,12 +142,12 @@ test("a failing tool result is marked isError:true so the agent can react", () =
 });
 
 test("notifications/initialized returns no response body (null)", async () => {
-  const res = await handleRpc({ jsonrpc: "2.0", method: "notifications/initialized" }, { listTools, runTool });
+  const res = await handleRpc({ jsonrpc: "2.0", method: "notifications/initialized" }, deps);
   assert.equal(res, null);
 });
 
 test("unknown method → method-not-found error", async () => {
-  const res = await handleRpc({ jsonrpc: "2.0", id: 6, method: "tools/banana" }, { listTools, runTool });
+  const res = await handleRpc({ jsonrpc: "2.0", id: 6, method: "tools/banana" }, deps);
   assert.ok(res && "error" in res);
   assert.equal((res as { error: { code: number } }).error.code, RPC_METHOD_NOT_FOUND);
 });

@@ -50,6 +50,7 @@ export function coerceCatalogModel(raw: unknown): CatalogModel | null {
     inputPrice,
     outputPrice: coercePrice(m.outputPrice),
     inputModalities: coerceModalities(m.inputModalities),
+    outputModalities: coerceModalities(m.outputModalities),
     contextLength:
       typeof m.contextLength === "number" && m.contextLength > 0 ? m.contextLength : null,
   };

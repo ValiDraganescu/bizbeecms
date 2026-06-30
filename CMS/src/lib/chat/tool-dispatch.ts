@@ -34,10 +34,22 @@ import {
   LIST_LOCALES_TOOL,
   GET_BRAND_IDENTITY_TOOL,
   GET_THEME_TOOL,
+  GET_AUTHORING_GUIDE_TOOL,
   coerceIdArg,
+  coerceGuideArg,
   formatComponentList,
   formatPageList,
 } from "./read-tools";
+import { assembleSystemPrompt } from "./assemble-prompt";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { putAsset, setAssetTags } from "@/db/asset-store";
+import { buildAssetKey, assetUrl } from "@/lib/render/asset";
+import { effectiveOpenrouterKey } from "@/lib/settings/openrouter-key";
+import { getDecryptedOpenrouterUserKey } from "@/db/openrouter-key-store";
+import {
+  DEFAULT_IMAGE_MODEL,
+  DEFAULT_IMAGE_GEN_MODEL,
+} from "@/lib/chat/models";
 import {
   UPDATE_COMPONENT_TOOL,
   UPDATE_PAGE_BLOCKS_TOOL,
@@ -83,6 +95,9 @@ import {
   coercePromptId,
 } from "./prompt-tools";
 import { EDIT_TEXT_TOOL, validateEditText } from "./edit-text-tool";
+import { GENERATE_IMAGE_TOOL, validateGenerateImage } from "./generate-image-tool";
+import { generateImage } from "./generate-image";
+import { describeImage } from "./describe-image";
 import { applyEdit } from "./apply-edit";
 import {
   validateBlocks,
@@ -139,6 +154,8 @@ import {
   setSiteIdentity,
   setThemeOverrides,
   setThemeOverridesDark,
+  getImageModel,
+  getImageGenModel,
 } from "@/db/settings-store";
 import { listAssets } from "@/db/asset-store";
 import { createCollection } from "@/db/collection-store";
@@ -196,6 +213,8 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   update_prompt: UPDATE_PROMPT_TOOL,
   delete_prompt: DELETE_PROMPT_TOOL,
   edit_text: EDIT_TEXT_TOOL,
+  get_authoring_guide: GET_AUTHORING_GUIDE_TOOL,
+  generate_image: GENERATE_IMAGE_TOOL,
 };
 
 /** The tool SCHEMAS the assistant may use in this admin-page context (chat route). */
@@ -369,6 +388,129 @@ async function handleGetTheme(): Promise<Record<string, unknown>> {
 
 async function handleListBuiltinTypes(): Promise<Record<string, unknown>> {
   return { ok: true, builtins: builtinBlockTypes() };
+}
+
+/** Return the built-in authoring guide (full system prompt) for the chosen context. */
+async function handleGetAuthoringGuide(args: unknown): Promise<Record<string, unknown>> {
+  const guide = coerceGuideArg(args);
+  try {
+    return { ok: true, guide, prompt: await assembleSystemPrompt(guide) };
+  } catch (err) {
+    return { ok: false, errors: [`failed to assemble authoring guide: ${(err as Error).message}`] };
+  }
+}
+
+/**
+ * Resolve the effective OpenRouter key the SAME way the chat + describe routes do
+ * (CMS-local user key beats the deployer env key), reading the Worker env via the
+ * CF context. Returns "" when no key/context — callers treat that as "AI disabled".
+ */
+async function resolveOpenrouterKey(): Promise<string> {
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    const e = env as unknown as { OPENROUTER_API_KEY?: string; CMS_AUTH_SECRET?: string };
+    let userKey: string | null = null;
+    if (typeof e.CMS_AUTH_SECRET === "string" && e.CMS_AUTH_SECRET) {
+      try {
+        userKey = await getDecryptedOpenrouterUserKey(e.CMS_AUTH_SECRET);
+      } catch {
+        userKey = null;
+      }
+    }
+    return effectiveOpenrouterKey(userKey, e.OPENROUTER_API_KEY);
+  } catch {
+    return "";
+  }
+}
+
+/** Base64-encode an ArrayBuffer (Worker-safe; chunked to avoid arg-count limits). */
+function bufferToBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Generate an image from a text prompt and run it through the SAME pipeline an
+ * upload uses: write bytes to R2 + a D1 asset row, describe it for search (vision
+ * model), and apply the model's tags. Returns the new asset's public `/media/<key>`
+ * URL so the assistant can drop it straight into a component/page.
+ *
+ * Each external step degrades gracefully: a describe failure still yields a usable
+ * asset (empty description, like upload); only a generation failure or R2 write
+ * error is a hard error the model can recover from.
+ */
+async function handleGenerateImage(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateGenerateImage(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+
+  const key = await resolveOpenrouterKey();
+  if (!key) {
+    return { ok: false, errors: ["no OpenRouter key configured — set one in Settings → OpenRouter key"] };
+  }
+
+  // The image-GENERATION model (operator-selected; falls back to the default).
+  const genModel = (await getImageGenModel()) || DEFAULT_IMAGE_GEN_MODEL;
+  let image;
+  try {
+    image = await generateImage(valid.prompt, genModel, key);
+  } catch (err) {
+    return { ok: false, errors: [`image generation failed: ${(err as Error).message}`] };
+  }
+  if (!image) {
+    return {
+      ok: false,
+      errors: [
+        `the model "${genModel}" returned no image. Check the image-generation model in ` +
+          `Settings → Media (it must support image output).`,
+      ],
+    };
+  }
+
+  // Same describe step as upload (vision model on the generated bytes, for search).
+  // A failure returns "" and never blocks the asset, mirroring the upload path.
+  const dataUrl = `data:${image.contentType};base64,${bufferToBase64(image.bytes)}`;
+  let description = "";
+  try {
+    const describeModel = (await getImageModel()) || DEFAULT_IMAGE_MODEL;
+    description = await describeImage(dataUrl, describeModel, key);
+  } catch {
+    description = "";
+  }
+
+  try {
+    const assetKey = buildAssetKey(`generated-${valid.prompt.slice(0, 40)}`, image.contentType, crypto.randomUUID().slice(0, 8));
+    const row = await putAsset({
+      key: assetKey,
+      filename: `generated.${image.contentType.split("/")[1] ?? "png"}`,
+      contentType: image.contentType,
+      bytes: image.bytes,
+      description,
+    });
+    // Apply the model's tags (best-effort; the asset already exists either way).
+    if (valid.tags.length > 0) {
+      try {
+        await setAssetTags(row.key, valid.tags);
+      } catch {
+        /* tag write is best-effort */
+      }
+    }
+    return {
+      ok: true,
+      action: "generated",
+      url: assetUrl(row.key),
+      key: row.key,
+      description,
+      tags: valid.tags,
+      model: genModel,
+    };
+  } catch (err) {
+    return { ok: false, errors: [`failed to save generated image: ${(err as Error).message}`] };
+  }
 }
 
 /** Update an existing component (same untrusted-artifact gate as create_component). */
@@ -1018,6 +1160,8 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   update_prompt: handleUpdatePrompt,
   delete_prompt: handleDeletePrompt,
   edit_text: handleEditText,
+  get_authoring_guide: handleGetAuthoringGuide,
+  generate_image: handleGenerateImage,
 };
 
 /**

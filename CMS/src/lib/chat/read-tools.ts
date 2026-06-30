@@ -128,6 +128,59 @@ export const GET_THEME_TOOL = {
   },
 } as const;
 
+/** The admin-page contexts the authoring-guide tool exposes. */
+export const GUIDE_CONTEXTS = [
+  "page-builder",
+  "components",
+  "pages",
+  "settings",
+  "media",
+  "collections",
+  "general",
+] as const;
+export type GuideContext = (typeof GUIDE_CONTEXTS)[number];
+
+export const GET_AUTHORING_GUIDE_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "get_authoring_guide",
+    description:
+      "Fetch this Site's built-in authoring guide — the SAME system prompt the " +
+      "in-CMS assistant runs on, assembled with the live Site identity, existing " +
+      "components, collections, and locales. Pick the guide for the task: " +
+      "`page-builder` (compose components into pages), `components` (develop " +
+      "reusable components), `pages` (manage/translate the pages list), " +
+      "`settings` (brand identity + theme), `media` (uploaded assets), " +
+      "`collections` (structured data), or `general`. Call this BEFORE authoring " +
+      "so you follow the Site's exact rules (plain HTML attrs, " +
+      "components-before-pages, every locale, real table names) instead of guessing.",
+    parameters: {
+      type: "object",
+      properties: {
+        guide: {
+          type: "string",
+          enum: GUIDE_CONTEXTS as unknown as string[],
+          description:
+            "Which guide: page-builder | components | pages | settings | media | " +
+            "collections | general. Defaults to 'page-builder'.",
+        },
+      },
+      required: [],
+    },
+  },
+} as const;
+
+/** Map the tool's `guide` arg to a valid context; default page-builder. */
+export function coerceGuideArg(args: unknown): GuideContext {
+  const raw =
+    typeof args === "object" && args !== null
+      ? (args as Record<string, unknown>).guide
+      : undefined;
+  return (GUIDE_CONTEXTS as readonly string[]).includes(raw as string)
+    ? (raw as GuideContext)
+    : "page-builder";
+}
+
 // ── Pure arg coercion ─────────────────────────────────────────────────────────
 
 /**

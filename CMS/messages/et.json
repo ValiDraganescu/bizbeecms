@@ -883,6 +883,7 @@
     "subtitle": "Vali AI-mudel, mis kirjeldab üleslaaditud pilte, et need oleksid otsitavad.",
     "forbidden": "Sul pole õigust meediaseadeid hallata.",
     "imageModelHeading": "Pildi kirjeldus",
+    "imageGenModelHeading": "Pildi loomine",
     "translateModelHeading": "Tõlge"
   },
   "imageModel": {
@@ -891,6 +892,12 @@
     "hint": "Nägemismudel loeb iga üleslaaditud pildi ja kirjutab lühikese kirjelduse meediaotsingu jaoks.",
     "save": "Salvesta",
     "saving": "Salvestamine…",
+    "saved": "Salvestatud"
+  },
+  "imageGenModel": {
+    "loading": "Laadimine…",
+    "label": "Pildigenereerimise mudel",
+    "hint": "AI-assistent loob selle mudeliga pilte nõudmisel; loodud pildid jõuavad galeriisse ning neid kirjeldatakse ja sildistatakse automaatselt.",
     "saved": "Salvestatud"
   },
   "develop": {

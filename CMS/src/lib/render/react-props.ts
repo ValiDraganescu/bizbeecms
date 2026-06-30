@@ -13,10 +13,11 @@
  *  - Inline event handlers (`onclick`, `onsubmit`, …) are STRING values from JSON,
  *    never functions; React can't use them and warns. We DROP them — interactivity
  *    comes from the component's client `script`, not inline handlers.
- *  - Static-form value attrs that React treats as "controlled": `selected` on an
- *    <option>, `checked` on an input, and `value` on a form control become their
- *    uncontrolled `default*` form (defaultSelected/defaultChecked/defaultValue) so
- *    SSR shows the authored state without a controlled-without-onChange warning.
+ *  - Static-form value attrs that React treats as "controlled": `checked` on an
+ *    input and `value` on a form control become their uncontrolled `default*`
+ *    form (defaultChecked/defaultValue) so SSR shows the authored state without a
+ *    controlled-without-onChange warning. `selected` on an <option> is dropped —
+ *    React has no per-option prop (defaultSelected isn't real and leaks to the DOM).
  *
  * `data-*` and `aria-*` are left verbatim (React passes those through as-is).
  * Already-camelCased keys (strokeWidth, className) pass through unchanged.
@@ -64,8 +65,10 @@ export function htmlPropsToReact(
     const key = attrToReactName(rawKey);
 
     // Uncontrolled static form state → React's default* props (no onChange needed).
+    // <option selected> has NO React equivalent — selection is controlled by the
+    // parent <select>'s defaultValue, not a per-option prop. Drop it so it doesn't
+    // leak to the DOM (defaultSelected is not a real prop and warns).
     if (key === "selected" && tag === "option") {
-      out.defaultSelected = value;
       continue;
     }
     if (key === "checked" && tag === "input") {

@@ -52,6 +52,33 @@ export type McpTool = {
   inputSchema: Record<string, unknown>;
 };
 
+// ── MCP prompts ───────────────────────────────────────────────────────────────
+// We expose the assistant's built-in authoring guide (buildSystemPrompt + context)
+// as a single MCP prompt so an external client authors components by the SAME
+// contract the in-CMS chat assistant follows — one source of truth, no drift.
+
+/** The one prompt we advertise. `context` selects the admin-page slant. */
+export const AUTHORING_PROMPT_NAME = "cms-authoring-guide";
+
+const PROMPT_LIST = [
+  {
+    name: AUTHORING_PROMPT_NAME,
+    description:
+      "The CMS assistant's built-in system prompt: how to author components, " +
+      "pages, and translations correctly for this Site (Site identity, existing " +
+      "components, collections, locales). Fetch this before calling the build tools.",
+    arguments: [
+      {
+        name: "context",
+        description:
+          "Admin-page slant: page-builder | components | pages | settings | " +
+          "media | collections | general. Defaults to general.",
+        required: false,
+      },
+    ],
+  },
+] as const;
+
 const EMPTY_SCHEMA = { type: "object", properties: {} } as const;
 
 /**
@@ -140,6 +167,8 @@ export async function handleRpc(
   deps: {
     listTools: () => McpTool[];
     runTool: (name: string, args: unknown) => Promise<Record<string, unknown>>;
+    /** Render the authoring guide for a given admin-page context (default general). */
+    getPrompt: (context: string | undefined) => Promise<string>;
   },
 ): Promise<JsonRpcResponse | null> {
   const isNotification = req.id === undefined;
@@ -149,7 +178,7 @@ export async function handleRpc(
     case "initialize":
       return rpcResult(id, {
         protocolVersion: MCP_PROTOCOL_VERSION,
-        capabilities: { tools: {} },
+        capabilities: { tools: {}, prompts: {} },
         serverInfo: SERVER_INFO,
       });
 
@@ -162,6 +191,22 @@ export async function handleRpc(
 
     case "tools/list":
       return rpcResult(id, { tools: deps.listTools() });
+
+    case "prompts/list":
+      return rpcResult(id, { prompts: PROMPT_LIST });
+
+    case "prompts/get": {
+      const p = (req.params ?? {}) as Record<string, unknown>;
+      if (p.name !== AUTHORING_PROMPT_NAME) {
+        return rpcError(id, RPC_INVALID_REQUEST, `unknown prompt: ${String(p.name)}`);
+      }
+      const ctx = (p.arguments as Record<string, unknown> | undefined)?.context;
+      const text = await deps.getPrompt(typeof ctx === "string" ? ctx : undefined);
+      return rpcResult(id, {
+        description: PROMPT_LIST[0].description,
+        messages: [{ role: "user", content: { type: "text", text } }],
+      });
+    }
 
     case "tools/call": {
       const call = parseToolCall(req.params);

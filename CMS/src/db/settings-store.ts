@@ -33,6 +33,7 @@ const SITE_IDENTITY_KEY = "site_identity";
 const MODEL_CATALOG_KEY = "model_catalog";
 const IMAGE_MODEL_KEY = "image_model";
 const TRANSLATE_MODEL_KEY = "translate_model";
+const IMAGE_GEN_MODEL_KEY = "image_gen_model";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
 async function upsertSetting(
@@ -251,4 +252,24 @@ export async function getTranslateModel(injectedDb?: Db): Promise<string> {
 /** Store the selected translation model id. */
 export async function setTranslateModel(id: string, injectedDb?: Db): Promise<void> {
   await upsertSetting(TRANSLATE_MODEL_KEY, id, injectedDb);
+}
+
+/**
+ * Read the operator-selected image-GENERATION model id, or "" if unset (the caller
+ * falls back to DEFAULT_IMAGE_GEN_MODEL and re-validates against the image-output
+ * catalog). Mirrors getImageModel — used by the generate_image tool. Plain string.
+ */
+export async function getImageGenModel(injectedDb?: Db): Promise<string> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, IMAGE_GEN_MODEL_KEY))
+    .limit(1);
+  return rows[0]?.value ?? "";
+}
+
+/** Store the selected image-generation model id. */
+export async function setImageGenModel(id: string, injectedDb?: Db): Promise<void> {
+  await upsertSetting(IMAGE_GEN_MODEL_KEY, id, injectedDb);
 }

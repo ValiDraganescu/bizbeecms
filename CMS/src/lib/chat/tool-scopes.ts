@@ -77,6 +77,11 @@ export const KNOWN_TOOL_NAMES = [
   "edit_text",
   // Targeted per-block prop patch (safe content edit; can't drop the rest of the tree).
   "set_block_props",
+  // Returns the built-in authoring guide (page-builder/components) — for external
+  // MCP clients that surface tools but not MCP prompts.
+  "get_authoring_guide",
+  // Generate an image from a text prompt into the gallery (text→image).
+  "generate_image",
 ] as const;
 export type ToolName = (typeof KNOWN_TOOL_NAMES)[number];
 
@@ -159,6 +164,7 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "create_list",
     "bind_list",
     "edit_text",
+    "generate_image",
   ],
   // Component playground: discover + author/UPDATE components, see brand/theme + media.
   components: [
@@ -170,6 +176,7 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "get_brand_identity",
     "get_theme",
     "edit_text",
+    "generate_image",
   ],
   // Pages list: discover pages, compose/UPDATE + translate them, reference media.
   pages: [
@@ -187,6 +194,7 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "bind_component",
     "create_list",
     "bind_list",
+    "generate_image",
   ],
   // Settings: read + UPDATE brand/theme, read locales, translate into site locales.
   settings: [
@@ -197,8 +205,8 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "update_brand_identity",
     "update_theme",
   ],
-  // Media library: list assets (upload/serve UI is separate).
-  media: ["list_assets"],
+  // Media library: list assets + generate new ones into the gallery.
+  media: ["list_assets", "generate_image"],
   // Collections: define collections + CRUD/query their items (structured only).
   collections: [
     "create_collection",
@@ -221,7 +229,7 @@ export function toolsForContext(context: AdminPageContext): readonly ToolName[] 
 // ── Per-context system-prompt addition ────────────────────────────────────────
 
 const CONTEXT_PROMPTS: Record<AdminPageContext, string> = {
-  "page-builder": `You are in the Page Builder. Act only on a clear request — never redesign or edit the current page off a greeting or an unclear message. The page being edited (its id), the Site's existing components with their props, and the built-in block types are ALREADY in this prompt — use them; do NOT call list_pages, get_page, list_components, get_component, or list_builtin_types just to rediscover what's already here. Match the brand/palette (get_brand_identity, get_theme). Author reusable components (create_component) and compose them into pages (create_page); to EDIT, call update_component or update_page_blocks with the FULL new artifact/block tree (they REPLACE — re-pass everything). To change the current page's layout, update_page_blocks with the page id from the context above. Always create the components a page needs BEFORE referencing them. Use 'Section' for layout. Reference real uploaded media via list_assets. To show real collection DATA: bind one block to a single item (bind_component — first match of a query fills its props) or repeat a template component per item with a built-in List (create_list into a Section, bind_list to reconfigure one). Discover collection table names + fields with query_collection first.`,
+  "page-builder": `You are in the Page Builder. Act only on a clear request — never redesign or edit the current page off a greeting or an unclear message. The page being edited (its id), the Site's existing components with their props, and the built-in block types are ALREADY in this prompt — use them; do NOT call list_pages, get_page, list_components, get_component, or list_builtin_types just to rediscover what's already here. Match the brand/palette (get_brand_identity, get_theme). Author reusable components (create_component) and compose them into pages (create_page); to EDIT, call update_component or update_page_blocks with the FULL new artifact/block tree (they REPLACE — re-pass everything). To change the current page's layout, update_page_blocks with the page id from the context above. Always create the components a page needs BEFORE referencing them. To edit an existing component, call get_component and WAIT for its result, THEN update_component with the FULL new artifact (existing html + your change) — update REPLACES, not merges, so never send partial/empty html, and never call update_component in the same batch as get_component (you won't have the html yet). Use 'Section' for layout. Reference real uploaded media via list_assets. To show real collection DATA: bind one block to a single item (bind_component — first match of a query fills its props) or repeat a template component per item with a built-in List (create_list into a Section, bind_list to reconfigure one). Discover collection table names + fields with query_collection first.`,
 
   components: `You are in the Component library. Act only on a clear request — never inspect or redesign anything off a greeting or an unclear message. When the operator DOES ask for work: discover existing components first (list_components, get_component) so you reuse/update instead of duplicating. To edit one: call get_component and WAIT for its result, THEN update_component with the FULL new artifact (existing html + your change). update REPLACES, not merges — never send partial or empty html, and never call update_component in the same batch as get_component (you won't have the html yet). Match the brand/palette (get_brand_identity, get_theme). Create new components with create_component. Reference real uploaded media via list_assets.`,
 

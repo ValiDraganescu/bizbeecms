@@ -39,6 +39,13 @@ export const DEFAULT_IMAGE_MODEL = "openai/gpt-4o-mini";
  */
 export const DEFAULT_TRANSLATE_MODEL = "openai/gpt-4o-mini";
 
+/**
+ * Default model for AI image GENERATION (text→image, on demand into the gallery).
+ * An OpenRouter model that OUTPUTS the `image` modality. Operator-overridable in
+ * CMS settings; the fallback when unset or when the saved id can't output images.
+ */
+export const DEFAULT_IMAGE_GEN_MODEL = "google/gemini-2.5-flash-image-preview";
+
 /** A catalog entry as the UI + route consume it (the clean boundary shape). */
 export interface CatalogModel {
   /** Exact OpenRouter model id, e.g. `openai/gpt-4o-mini`. */
@@ -55,6 +62,8 @@ export interface CatalogModel {
   outputPrice: number | null;
   /** Accepted input modalities (`architecture.input_modalities`); defaults to `["text"]`. */
   inputModalities: string[];
+  /** Produced output modalities (`architecture.output_modalities`); defaults to `["text"]`. */
+  outputModalities: string[];
   /** Context window in tokens (`context_length`); null/absent when the API exposes none. */
   contextLength?: number | null;
 }
@@ -73,6 +82,7 @@ export const CHAT_MODELS: ReadonlyArray<CatalogModel> = [
     inputPrice: null,
     outputPrice: null,
     inputModalities: ["text"],
+    outputModalities: ["text"],
   },
   {
     id: "openai/gpt-4o",
@@ -82,6 +92,7 @@ export const CHAT_MODELS: ReadonlyArray<CatalogModel> = [
     inputPrice: null,
     outputPrice: null,
     inputModalities: ["text"],
+    outputModalities: ["text"],
   },
   {
     id: "anthropic/claude-3.5-sonnet",
@@ -91,6 +102,7 @@ export const CHAT_MODELS: ReadonlyArray<CatalogModel> = [
     inputPrice: null,
     outputPrice: null,
     inputModalities: ["text"],
+    outputModalities: ["text"],
   },
   {
     id: "google/gemini-flash-1.5",
@@ -100,6 +112,7 @@ export const CHAT_MODELS: ReadonlyArray<CatalogModel> = [
     inputPrice: null,
     outputPrice: null,
     inputModalities: ["text"],
+    outputModalities: ["text"],
   },
 ];
 
@@ -129,8 +142,8 @@ interface RawModel {
   pricing?: { prompt?: unknown; completion?: unknown } | null;
   /** OpenRouter exposes supported request params; includes "tools" when the model can tool-call. */
   supported_parameters?: unknown;
-  /** OpenRouter's modality metadata; `input_modalities` lists accepted inputs (text/image/file/…). */
-  architecture?: { input_modalities?: unknown } | null;
+  /** OpenRouter's modality metadata; `input_modalities` = accepted inputs, `output_modalities` = produced outputs. */
+  architecture?: { input_modalities?: unknown; output_modalities?: unknown } | null;
   /** Context window size in tokens. */
   context_length?: unknown;
 }
@@ -146,6 +159,20 @@ const KNOWN_MODALITIES = new Set(["text", "image", "file", "audio", "video"]);
 export function parseInputModalities(raw: unknown): string[] {
   const arch = raw && typeof raw === "object" ? (raw as RawModel).architecture : null;
   const mods = arch && typeof arch === "object" ? arch.input_modalities : undefined;
+  if (!Array.isArray(mods)) return ["text"];
+  const out = mods.filter((m): m is string => typeof m === "string" && KNOWN_MODALITIES.has(m));
+  return out.length > 0 ? out : ["text"];
+}
+
+/**
+ * Produced output modalities from `architecture.output_modalities`. Same shape as
+ * inputs; defaults to `["text"]` when absent/empty/junk. A model with `image` here
+ * can GENERATE images (text→image) — that's how the image-gen picker finds models.
+ * Pure — node-tested.
+ */
+export function parseOutputModalities(raw: unknown): string[] {
+  const arch = raw && typeof raw === "object" ? (raw as RawModel).architecture : null;
+  const mods = arch && typeof arch === "object" ? arch.output_modalities : undefined;
   if (!Array.isArray(mods)) return ["text"];
   const out = mods.filter((m): m is string => typeof m === "string" && KNOWN_MODALITIES.has(m));
   return out.length > 0 ? out : ["text"];
@@ -215,8 +242,12 @@ export function parseModelCatalog(apiJson: unknown): CatalogModel[] {
   const out: CatalogModel[] = [];
   for (const m of list) {
     if (!m || typeof m.id !== "string" || m.id.length === 0) continue;
-    // The assistant is tool-driven; models without tool-calling are useless in the picker.
-    if (!supportsTools(m)) continue;
+    const outputModalities = parseOutputModalities(m);
+    const generatesImages = outputModalities.includes("image");
+    // The chat assistant is tool-driven; non-tool models are useless THERE — but
+    // image-GENERATION models don't tool-call yet are exactly what the image-gen
+    // picker needs. Keep a model if it tool-calls OR it can output images.
+    if (!supportsTools(m) && !generatesImages) continue;
     const input = priceOf(m);
     out.push({
       id: m.id,
@@ -226,6 +257,7 @@ export function parseModelCatalog(apiJson: unknown): CatalogModel[] {
       inputPrice: input,
       outputPrice: outputPriceOf(m),
       inputModalities: parseInputModalities(m),
+      outputModalities,
       contextLength:
         typeof m.context_length === "number" && m.context_length > 0
           ? m.context_length
@@ -291,6 +323,22 @@ export function filterByModalities(
   });
 }
 
+/**
+ * Keep only models that PRODUCE every required output modality (AND). An empty
+ * `required` keeps the whole catalog. A model with no declared outputs is treated
+ * as text-only. Used to find image-GENERATION models (`["image"]`).
+ */
+export function filterByOutputModalities(
+  catalog: ReadonlyArray<CatalogModel>,
+  required: ReadonlyArray<string>,
+): CatalogModel[] {
+  if (required.length === 0) return [...catalog];
+  return catalog.filter((m) => {
+    const have = new Set(m.outputModalities ?? ["text"]);
+    return required.every((r) => have.has(r));
+  });
+}
+
 /** All distinct input modalities present in the catalog, in a stable order. */
 export function catalogModalities(catalog: ReadonlyArray<CatalogModel>): string[] {
   const ORDER = ["text", "image", "file", "audio", "video"];
@@ -346,4 +394,16 @@ export function resolveTranslateModel(value: unknown, allowed?: ReadonlySet<stri
     return value;
   }
   return DEFAULT_TRANSLATE_MODEL;
+}
+
+/**
+ * Resolve an UNTRUSTED image-GENERATION model value: the value if it's in the
+ * supplied image-output allowlist, else `DEFAULT_IMAGE_GEN_MODEL`. The caller
+ * builds the allowlist from the catalog filtered to `image` OUTPUT. Never throws.
+ */
+export function resolveImageGenModel(value: unknown, genAllowed?: ReadonlySet<string>): string {
+  if (typeof value === "string" && value.length > 0 && genAllowed?.has(value)) {
+    return value;
+  }
+  return DEFAULT_IMAGE_GEN_MODEL;
 }

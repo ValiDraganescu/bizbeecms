@@ -17,6 +17,8 @@
  */
 import { requireApiKey } from "@/lib/auth/api-key-guard";
 import { allToolSchemas, runTool } from "@/lib/chat/tool-dispatch";
+import { assembleSystemPrompt } from "@/lib/chat/assemble-prompt";
+import { isAdminContext, type AdminPageContext } from "@/lib/chat/tool-scopes";
 import {
   handleRpc,
   parseJsonRpc,
@@ -31,6 +33,14 @@ import {
 export const dynamic = "force-dynamic";
 
 const listTools = (): McpTool[] => toMcpTools(allToolSchemas());
+
+// Render the built-in authoring guide for a client-supplied context (unknown or
+// missing → general), so an external MCP client gets the SAME system prompt the
+// in-CMS chat assistant runs on.
+const getPrompt = (context: string | undefined): Promise<string> => {
+  const ctx: AdminPageContext = isAdminContext(context) ? context : "general";
+  return assembleSystemPrompt(ctx);
+};
 
 export async function POST(request: Request): Promise<Response> {
   const denied = await requireApiKey(request);
@@ -52,7 +62,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let response;
   try {
-    response = await handleRpc(req, { listTools, runTool });
+    response = await handleRpc(req, { listTools, runTool, getPrompt });
   } catch (err) {
     return Response.json(
       rpcError(req.id ?? null, RPC_INTERNAL_ERROR, (err as Error).message),

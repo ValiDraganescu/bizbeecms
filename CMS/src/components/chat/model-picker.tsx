@@ -17,6 +17,7 @@ import {
   CHAT_MODELS,
   filterCatalog,
   filterByModalities,
+  filterByOutputModalities,
   catalogModalities,
   groupByProvider,
   pricePerMillion,
@@ -84,6 +85,7 @@ export function ModelPicker({
   value,
   onChange,
   requireModalities,
+  requireOutputModalities,
   direction = "up",
 }: {
   value: string;
@@ -94,6 +96,11 @@ export function ModelPicker({
    * the in-picker modality toggles. Omit → the full catalog (chat default).
    */
   requireModalities?: string[];
+  /**
+   * Pre-filter to models that PRODUCE every listed output modality (e.g.
+   * `["image"]` for the image-GENERATION picker). Composes with requireModalities.
+   */
+  requireOutputModalities?: string[];
   /**
    * Which way the panel opens. "up" (default) suits the chat widget (input at the
    * bottom of the panel); "down" suits a picker near the top of a page where
@@ -154,13 +161,16 @@ export function ModelPicker({
   // Base catalog: optionally pre-filtered to required modalities (e.g. image for
   // the media describe-model picker), so search + toggles only ever see eligible
   // models. Omitted → the whole catalog (chat default).
-  const baseCatalog = useMemo(
-    () =>
-      requireModalities && requireModalities.length > 0
-        ? filterByModalities(catalog, requireModalities)
-        : catalog,
-    [catalog, requireModalities],
-  );
+  const baseCatalog = useMemo(() => {
+    let c: ReadonlyArray<CatalogModel> = catalog;
+    if (requireModalities && requireModalities.length > 0) {
+      c = filterByModalities(c, requireModalities);
+    }
+    if (requireOutputModalities && requireOutputModalities.length > 0) {
+      c = filterByOutputModalities(c, requireOutputModalities);
+    }
+    return c;
+  }, [catalog, requireModalities, requireOutputModalities]);
 
   // Distinct modalities available in the catalog → the toggle bar (text alone is
   // every model's default, so it's not worth a toggle; only offer the rest).

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { SettingsNav } from "@/components/settings/settings-nav";
 import { ImageModelManager } from "@/components/settings/image-model-manager";
+import { ImageGenModelManager } from "@/components/settings/image-gen-model-manager";
 import { TranslateModelManager } from "@/components/settings/translate-model-manager";
 import { checkRoleFromHeaders, canManageUsers } from "@/lib/auth/guard";
 
@@ -35,6 +36,12 @@ export default async function MediaSettingsPage() {
               {t("imageModelHeading")}
             </h2>
             <ImageModelManager />
+          </section>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">
+              {t("imageGenModelHeading")}
+            </h2>
+            <ImageGenModelManager />
           </section>
           <section className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground-muted">

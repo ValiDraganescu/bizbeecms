@@ -883,6 +883,7 @@
     "subtitle": "Valitse AI-malli, joka kuvailee ladatut kuvat, jotta ne ovat haettavissa.",
     "forbidden": "Sinulla ei ole oikeutta hallita media-asetuksia.",
     "imageModelHeading": "Kuvan kuvaus",
+    "imageGenModelHeading": "Kuvan luonti",
     "translateModelHeading": "Käännös"
   },
   "imageModel": {
@@ -891,6 +892,12 @@
     "hint": "Visiomalli lukee jokaisen ladatun kuvan ja kirjoittaa lyhyen kuvauksen mediahakua varten.",
     "save": "Tallenna",
     "saving": "Tallennetaan…",
+    "saved": "Tallennettu"
+  },
+  "imageGenModel": {
+    "loading": "Ladataan…",
+    "label": "Kuvangenerointimalli",
+    "hint": "AI-avustaja luo tällä mallilla kuvia pyynnöstä; luodut kuvat tallentuvat galleriaan ja kuvaillaan ja merkitään automaattisesti.",
     "saved": "Tallennettu"
   },
   "develop": {

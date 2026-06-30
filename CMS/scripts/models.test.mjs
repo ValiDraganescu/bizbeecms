@@ -23,11 +23,15 @@ import {
   providerOf,
   pricePerMillion,
   parseInputModalities,
+  parseOutputModalities,
+  filterByOutputModalities,
   outputCapFor,
   MAX_OUTPUT_CEILING,
   MIN_OUTPUT_FLOOR,
   DEFAULT_TRANSLATE_MODEL,
   resolveTranslateModel,
+  DEFAULT_IMAGE_GEN_MODEL,
+  resolveImageGenModel,
 } from "../src/lib/chat/models.ts";
 
 test("resolveTranslateModel: allowlisted id kept; untrusted/unknown → default", () => {
@@ -146,11 +150,19 @@ const SAMPLE = {
       supported_parameters: ["tools"],
     },
     {
-      // not tool-capable → filtered out of the catalog
+      // not tool-capable AND text-output → filtered out of the catalog
       id: "meta/no-tools-model",
       name: "No Tools Model",
       pricing: { prompt: "0.0000001" },
       supported_parameters: ["temperature"],
+    },
+    {
+      // not tool-capable, but OUTPUTS images → KEPT (the image-gen picker needs it)
+      id: "google/gemini-2.5-flash-image-preview",
+      name: "Gemini 2.5 Flash Image",
+      pricing: { prompt: "0.0000003" },
+      supported_parameters: ["temperature"],
+      architecture: { input_modalities: ["text"], output_modalities: ["text", "image"] },
     },
     {
       // junk entry: no id → dropped
@@ -167,8 +179,10 @@ test("parseModelCatalog extracts id/name/provider/price from the OpenRouter shap
   assert.ok(ids.includes("anthropic/claude-3.5-sonnet"));
   assert.ok(ids.includes("openai/gpt-4o-mini"));
   assert.ok(ids.includes("google/gemini-flash-1.5"));
-  assert.equal(cat.length, 3); // junk (no id) + no-tools model dropped
-  assert.ok(!ids.includes("meta/no-tools-model")); // filtered: no "tools" support
+  assert.equal(cat.length, 4); // junk (no id) + text-only no-tools model dropped
+  assert.ok(!ids.includes("meta/no-tools-model")); // filtered: no "tools", text output
+  // A non-tool model that OUTPUTS images is KEPT (the image-gen picker needs it).
+  assert.ok(ids.includes("google/gemini-2.5-flash-image-preview"));
   const small = cat.find((m) => m.id === "openai/gpt-4o-mini");
   assert.equal(small.provider, "openai");
   assert.equal(small.label, "OpenAI: GPT-4o-mini");
@@ -201,6 +215,31 @@ test("parseInputModalities reads known modalities, defaults to ['text']", () => 
     parseInputModalities({ architecture: { input_modalities: ["file", "junk", "audio"] } }),
     ["file", "audio"],
   );
+});
+
+test("parseOutputModalities reads known modalities, defaults to ['text']", () => {
+  assert.deepEqual(
+    parseOutputModalities({ architecture: { output_modalities: ["text", "image"] } }),
+    ["text", "image"],
+  );
+  assert.deepEqual(parseOutputModalities({}), ["text"]); // absent → default
+  assert.deepEqual(parseOutputModalities({ architecture: { output_modalities: [] } }), ["text"]);
+  assert.deepEqual(parseOutputModalities({ architecture: { output_modalities: "image" } }), ["text"]);
+});
+
+test("filterByOutputModalities keeps only image-OUTPUT models", () => {
+  const cat = parseModelCatalog(SAMPLE);
+  const gen = filterByOutputModalities(cat, ["image"]);
+  assert.deepEqual(gen.map((m) => m.id), ["google/gemini-2.5-flash-image-preview"]);
+  assert.deepEqual(filterByOutputModalities(cat, []), cat); // empty required → all
+});
+
+test("resolveImageGenModel: allowlisted id kept; untrusted/unknown → default", () => {
+  const allowed = new Set(["google/gemini-2.5-flash-image-preview"]);
+  assert.equal(resolveImageGenModel("google/gemini-2.5-flash-image-preview", allowed), "google/gemini-2.5-flash-image-preview");
+  assert.equal(resolveImageGenModel("openai/gpt-4o-mini", allowed), DEFAULT_IMAGE_GEN_MODEL); // not image-output
+  assert.equal(resolveImageGenModel(undefined, allowed), DEFAULT_IMAGE_GEN_MODEL);
+  assert.equal(resolveImageGenModel("anything", undefined), DEFAULT_IMAGE_GEN_MODEL);
 });
 
 test("outputCapFor: scales output to a quarter of the window, clamped to the ceiling", () => {
@@ -258,8 +297,9 @@ test("sortByPrice orders LOW→HIGH; null price last", () => {
   const cat = parseModelCatalog(SAMPLE);
   const sorted = sortByPrice(cat);
   assert.equal(sorted[0].price, 0.00000015); // gpt-4o-mini cheapest
-  assert.equal(sorted[1].price, 0.000003); // claude
-  assert.equal(sorted[sorted.length - 1].price, null); // gemini (no price) last
+  assert.equal(sorted[1].price, 0.0000003); // gemini image (next cheapest)
+  assert.equal(sorted[2].price, 0.000003); // claude
+  assert.equal(sorted[sorted.length - 1].price, null); // gemini-flash (no price) last
 });
 
 test("groupByProvider groups + sorts within group + sorts providers", () => {

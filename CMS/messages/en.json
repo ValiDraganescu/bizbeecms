@@ -883,6 +883,7 @@
     "subtitle": "Choose the AI model that describes uploaded images so they’re searchable.",
     "forbidden": "You don’t have permission to manage media settings.",
     "imageModelHeading": "Image description",
+    "imageGenModelHeading": "Image generation",
     "translateModelHeading": "Translation"
   },
   "imageModel": {
@@ -891,6 +892,12 @@
     "hint": "A vision model reads each uploaded image and writes a short description used for media search.",
     "save": "Save",
     "saving": "Saving…",
+    "saved": "Saved"
+  },
+  "imageGenModel": {
+    "loading": "Loading…",
+    "label": "Image generation model",
+    "hint": "The AI assistant uses this model to generate images on demand; generated images land in the gallery and are described and tagged automatically.",
     "saved": "Saved"
   },
   "develop": {

@@ -51,10 +51,10 @@ test("inline event handlers are dropped (string values React can't bind)", () =>
 });
 
 test("static form state → uncontrolled default* props", () => {
-  // `selected` on <option> → defaultSelected; `value` on <option> is a normal
-  // attribute (not a controlled-input value), so it stays as `value`.
+  // `selected` on <option> is DROPPED — React has no per-option prop (selection
+  // is the parent <select>'s defaultValue), and defaultSelected would leak to the
+  // DOM. `value` on <option> is a normal attribute, so it stays as `value`.
   assert.deepEqual(htmlPropsToReact("option", { selected: true, value: "a" }), {
-    defaultSelected: true,
     value: "a",
   });
   assert.deepEqual(htmlPropsToReact("input", { checked: true, value: "x" }), {
