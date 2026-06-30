@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.16.0",
+      "tag": "r-1.16.0",
+      "markdown": "# CMS v1.16.0\n\n_2026-06-30 · changes since r-1.15.0_\n\n## Features\n- Chat: the assistant can generate images via a new generate-image tool, saving results into your media library.\n- A configurable per-site image-generation model setting, with a manager in admin settings.\n- Model picker and MCP improvements supporting the new image-gen flow.\n"
+    },
+    {
       "version": "1.15.0",
       "tag": "r-1.15.0",
       "markdown": "# CMS v1.15.0\n\n_2026-06-29 · changes since r-1.14.0_\n\n## Features\n- Page builder: per-field translation in the SEO/settings forms, so individual fields can be translated independently.\n- Page builder: a gallery image picker for selecting media-library assets into fields.\n- A configurable translation model setting (per-site translate-model), feeding the translate flow.\n\n## Other\n- Internal refactor: the page-builder shell and the render pipeline were split into smaller per-component / per-concern files (plan-tree, plan-section, plan-list, etc.), plus render hardening. No user-facing change from the refactor itself.\n"
@@ -19,11 +24,6 @@
       "version": "1.12.3",
       "tag": "r-1.12.3",
       "markdown": "# CMS v1.12.3\n\n_2026-06-26 · changes since r-1.12.2_\n\n## Other\n- No CMS-facing changes. This release accompanies deployer-side updates; the CMS bundle is unchanged from r-1.12.2.\n"
-    },
-    {
-      "version": "1.11.0",
-      "tag": "r-1.11.0",
-      "markdown": "# CMS v1.11.0\n\n_2026-06-26 · changes since r-1.10.5_\n\n## Features\n- Chat: a gallery picker lets you attach existing media-library assets to a chat message, alongside upload and drag-and-drop.\n"
     },
     {
       "version": "0.11.0",
