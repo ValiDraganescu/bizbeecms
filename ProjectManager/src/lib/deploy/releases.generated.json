@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.17.0",
+      "tag": "r-1.17.0",
+      "markdown": "# CMS v1.17.0\n\n_2026-07-02 · changes since r-1.16.0_\n\n## Features\n- Icon sets: a per-site icon library with an editor in settings and an icon picker in the page builder, so pages can drop in named icons that render on the published site.\n- Components: a \"used-by\" view — see which pages and components consume a given component before you edit it, so the blast radius of a change is visible up front.\n- A built-in Language Switcher block you can place on a page; it renders the site's available content locales for visitors.\n- Chat can produce transparent image cut-outs (background removed) alongside generated images, saved to your media library.\n"
+    },
+    {
       "version": "1.16.0",
       "tag": "r-1.16.0",
       "markdown": "# CMS v1.16.0\n\n_2026-06-30 · changes since r-1.15.0_\n\n## Features\n- Chat: the assistant can generate images via a new generate-image tool, saving results into your media library.\n- A configurable per-site image-generation model setting, with a manager in admin settings.\n- Model picker and MCP improvements supporting the new image-gen flow.\n"
@@ -19,11 +24,6 @@
       "version": "1.13.1",
       "tag": "r-1.13.1",
       "markdown": "# CMS v1.13.1\n\n_2026-06-26 · changes since r-1.13.0_\n\n## Fixes\n- Chat panel no longer grows off the top of the screen when resized — its max height now fits the space above the bottom anchor, so the input and latest messages stay visible.\n"
-    },
-    {
-      "version": "1.12.3",
-      "tag": "r-1.12.3",
-      "markdown": "# CMS v1.12.3\n\n_2026-06-26 · changes since r-1.12.2_\n\n## Other\n- No CMS-facing changes. This release accompanies deployer-side updates; the CMS bundle is unchanged from r-1.12.2.\n"
     },
     {
       "version": "0.11.0",
