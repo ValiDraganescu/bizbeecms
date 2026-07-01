@@ -12,6 +12,17 @@ an external API (e.g. a weather API) and configure the authentication method
 picking a collection and render the output — with mapping (the user checks the API
 docs, or the AI assistant does it for them)."
 
+USER DIRECTIVE (2026-07-02): revision pass — the goal must also cover:
+- **Retries**: up to 2 retries per outbound request (so max 3 attempts).
+- **Caching + purging**: caching is CONFIGURABLE PER REQUEST (TTL etc.), with
+  per-request cache purge AND a global "purge all API cache" action.
+- **Centralized API request management**: one central place where all external API
+  requests/sources are defined and managed; it appears as a data source pickable
+  BESIDES the collections (same picker).
+- **All methods**: support POST, PUT, DELETE — not only GET.
+- **Param passing**: pass params from a component / component input into an API
+  data-source request (interpolated into path / query / body).
+
 ## The settled architecture (decided with user 2026-06-22)
 - **A data source is the ABSTRACTION; binding is source-agnostic.** A `BindingRef`
   (from content-collections Phase-2 binding) names a SOURCE — `collection` OR
@@ -34,6 +45,29 @@ docs, or the AI assistant does it for them)."
 - **Mapping**: response JSON → component props via a field-path map (e.g.
   `temp <- main.temp`). The operator reads the API docs; OR the AI assistant can
   fetch/inspect a sample response and propose the map (a tool).
+- **Centralized request layer** (2026-07-02): ALL outbound API calls go through ONE
+  module (e.g. `CMS/src/lib/data-sources/fetch.ts`) — auth injection, retries,
+  caching, and purging live there, nowhere else. Sources + their saved requests are
+  managed centrally (Data Sources UI) and surface in the SAME source picker as
+  collections.
+- **Retries** (2026-07-02): up to 2 retries (3 attempts total) on network error /
+  5xx / 429, small backoff. NEVER retry on 4xx (other than 429). Retries only for
+  idempotent-safe cases by default (GET / explicitly-marked requests) — a POST that
+  creates things must not silently double-fire.
+- **Caching + purge** (2026-07-02): cache config is PER REQUEST (enable/disable +
+  TTL; sensible default e.g. 60s), stored on the saved request. Cache key =
+  source + method + resolved URL/params/body hash. UI: purge button per request +
+  global "purge all API cache". Only cache GETs (or requests explicitly marked
+  cacheable).
+- **HTTP methods** (2026-07-02): GET, POST, PUT, DELETE. Render-time BINDING
+  defaults to GET, but POST-to-query APIs (GraphQL, search endpoints) are
+  first-class: a bound request may be POST with a JSON body template. Mutating
+  semantics (create/update/delete) are for explicit triggers (forms/actions), not
+  render — but the central request layer supports all four uniformly.
+- **Param passing** (2026-07-02): a saved request's path / query params / body may
+  contain `{placeholders}` filled at bind time from component props / inputs (e.g.
+  a `city` prop → `?q={city}`). Values are URL-encoded / JSON-escaped on insert —
+  component input is untrusted; never string-splice it raw into a URL or body.
 
 ## What "good" looks like
 - Operator: CMS → Data Sources → add an API source (name, base URL, method,
@@ -44,8 +78,15 @@ docs, or the AI assistant does it for them)."
   request (path/params) + map response fields → the component's declared props.
 - A `List` bound to an API that returns an array stamps the item template per
   element; a single-item bind maps one object's fields.
-- At render the Worker fetches (cached), maps, SSRs — key never exposed; failures
-  degrade gracefully (empty/placeholder, never 500), mirroring collection binding.
+- At render the Worker fetches (cached, ≤2 retries), maps, SSRs — key never
+  exposed; failures degrade gracefully (empty/placeholder, never 500), mirroring
+  collection binding.
+- Each saved request has cache settings (on/off + TTL) and a purge button; Data
+  Sources has a global "purge all API cache" action.
+- A bound request can take params from the binding component's props/inputs via
+  `{placeholder}` substitution, safely encoded.
+- POST/PUT/DELETE requests can be defined and tested in the manager; POST-to-query
+  works in render-time binds.
 - The AI can create an API source + propose a field map from a sample response.
 - Gate every slice: CMS `tsc` + `opennextjs-cloudflare build` green; regen PM
   `cms-bundle`; EN/FI/ET for new UI strings.
