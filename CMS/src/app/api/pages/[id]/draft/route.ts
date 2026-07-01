@@ -14,7 +14,7 @@
  */
 import { getDraft, saveDraftBlocks } from "@/db/page-version-store";
 import { missingComponents } from "@/db/page-store";
-import { validateBlocks } from "@/lib/pages/page-blocks";
+import { validateBlocks, topLevelBlockIds } from "@/lib/pages/page-blocks";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +52,13 @@ export async function PUT(
     return Response.json({ error: "invalid JSON body" }, { status: 400 });
   }
 
-  const v = validateBlocks(body.blocks);
+  // Grandfather top-level blocks already saved on this page (the "top level is
+  // Sections only" rule only rejects NEW strays).
+  const current = await getDraft(id);
+  if (!current) return Response.json({ error: "page not found" }, { status: 404 });
+  const v = validateBlocks(body.blocks, {
+    grandfatheredTopLevelIds: topLevelBlockIds(current.blocks),
+  });
   if (!v.ok) return Response.json({ error: v.errors.join("; ") }, { status: 400 });
 
   try {
@@ -64,11 +70,9 @@ export async function PUT(
       );
     }
     // meta unchanged by the blocks editor — preserve the draft's current meta.
-    const draft = await getDraft(id);
-    if (!draft) return Response.json({ error: "page not found" }, { status: 404 });
     const saved = await saveDraftBlocks(id, {
       blocks: JSON.stringify(v.blocks),
-      meta: draft.meta,
+      meta: current.meta,
     });
     if (!saved) return Response.json({ error: "page not found" }, { status: 404 });
     return Response.json({ ok: true });

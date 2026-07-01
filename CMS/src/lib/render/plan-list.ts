@@ -18,6 +18,49 @@
 
 import { type Block, type ElementPlan, type ListSource } from "./plan-types.ts";
 
+/** Stable asset key + client script for the optional seamless auto-scroll. */
+export const LIST_AUTOSCROLL_ASSET_KEY = "__builtin_list_autoscroll__";
+
+// px/sec for each speed tier — the client advances scroll by (px/sec × dt).
+const AUTOSCROLL_PXPS: Record<string, number> = { slow: 20, normal: 45, fast: 90 };
+
+/**
+ * Seamless auto-scroll for `[data-list-autoscroll]` containers. The renderer
+ * DUPLICATES the row content (a second `[data-list-track]` clone marked
+ * aria-hidden), so scrolling past the first copy's end lands on the identical
+ * start of the second — reset to 0 there for an unbroken loop. Pauses on hover.
+ * rAF-driven; respects prefers-reduced-motion (no motion → static scroll box).
+ */
+export const LIST_AUTOSCROLL_SCRIPT = `
+(function () {
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var speeds = ${JSON.stringify(AUTOSCROLL_PXPS)};
+  document.querySelectorAll('[data-list-autoscroll]').forEach(function (el) {
+    if (el.__bbScroll) return;
+    el.__bbScroll = true;
+    var horizontal = el.getAttribute('data-list-dir') === 'horizontal';
+    var pps = speeds[el.getAttribute('data-list-speed')] || speeds.normal;
+    var paused = false;
+    el.addEventListener('mouseenter', function () { paused = true; });
+    el.addEventListener('mouseleave', function () { paused = false; });
+    var last = null;
+    function step(now) {
+      if (last == null) last = now;
+      var dt = (now - last) / 1000; last = now;
+      if (!paused) {
+        // Half the scrollable span is one full copy of the content (we cloned it).
+        var half = (horizontal ? el.scrollWidth : el.scrollHeight) / 2;
+        var pos = (horizontal ? el.scrollLeft : el.scrollTop) + pps * dt;
+        if (half > 0 && pos >= half) pos -= half;
+        if (horizontal) el.scrollLeft = pos; else el.scrollTop = pos;
+      }
+      requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+})();
+`.trim();
+
 /**
  * Canonicalize a combobox `labelExpr` to a bare TEMPLATE-LITERAL BODY: trimmed,
  * with a single pair of surrounding backticks stripped if present. The field IS a
@@ -67,6 +110,7 @@ export function planList(
   block: Block,
   planBlock: (b: Block) => ElementPlan,
   useComboboxAssets?: () => void,
+  useAutoscrollAssets?: () => void,
 ): ElementPlan {
   const children = block.children ?? [];
   const template = children.filter((c) => c.listRole !== "empty");
@@ -77,7 +121,7 @@ export function planList(
   // Empty / dead / un-hydrated result → the empty-state slot if authored, else
   // nothing (an empty container). NEVER a throw — mirrors Section's graceful path.
   if (rows.length === 0) {
-    return listWrapper(block, emptySlot.map(planBlock));
+    return listWrapper(block, emptySlot.map(planBlock), useAutoscrollAssets);
   }
 
   // Stamp the item component once PER ROW (the row's mapped fields bind into the
@@ -95,17 +139,125 @@ export function planList(
   }
 
   // Default: a flat list of stamped rows.
-  return listWrapper(block, rows.flatMap(stampPlan));
+  return listWrapper(block, rows.flatMap(stampPlan), useAutoscrollAssets);
 }
 
-/** The plain List wrapper — a stable, style-free hook (mirrors Section). */
-function listWrapper(block: Block, children: ElementPlan[]): ElementPlan {
+/**
+ * The plain List wrapper — applies the optional direction / max-size scroll box
+ * and seamless auto-scroll (`listSource` layout fields). Defaults to a bare
+ * `<div data-list>` (byte-identical to before) when no layout is configured.
+ */
+function listWrapper(
+  block: Block,
+  children: ElementPlan[],
+  useAutoscrollAssets?: () => void,
+): ElementPlan {
+  const src = block.listSource ?? ({} as ListSource);
+  const horizontal = src.direction === "horizontal";
+  const grid = src.direction === "grid";
+  const style: Record<string, string | number> = {};
+  // Only shape the box when the operator asked for a non-default layout, a size
+  // cap, or auto-scroll — otherwise stay a plain, unstyled container.
+  const shaped =
+    horizontal || grid || src.maxSize != null || src.autoscroll === true || src.gap != null;
+  if (shaped) Object.assign(style, layoutStyle(src));
+
+  if (horizontal) {
+    // Horizontal scrolls on X (the row can exceed its container width); maxSize
+    // caps the visible width in px.
+    style.overflowX = "auto";
+    if (src.maxSize != null) style.maxWidth = `${src.maxSize}px`;
+  } else if (src.maxSize != null) {
+    // Vertical / grid: maxSize caps height; content past it scrolls on Y.
+    style.maxHeight = `${src.maxSize}px`;
+    style.overflowY = "auto";
+  }
+
+  // A responsive grid (tablet/mobile column overrides) needs the global @media
+  // rules keyed off this class; harmless when no overrides are set.
+  const gridClass = grid ? LIST_GRID_CLASS : undefined;
+
+  const props: Record<string, unknown> = { "data-list": block.id };
+  if (shaped) props.style = style;
+
+  // Auto-scroll: duplicate the content into a second aria-hidden track so the
+  // loop is seamless (see LIST_AUTOSCROLL_SCRIPT), and hand the client the axis
+  // + speed. Each track mirrors the container's own layout (row / column / grid),
+  // so the grid class + variables ride on the TRACK (the element that is display:grid).
+  if (src.autoscroll === true && children.length > 0) {
+    useAutoscrollAssets?.();
+    props["data-list-autoscroll"] = "";
+    props["data-list-dir"] = horizontal ? "horizontal" : "vertical";
+    props["data-list-speed"] = src.autoscrollSpeed ?? "normal";
+    const track = (hidden: boolean): ElementPlan => ({
+      kind: "element",
+      tag: "div",
+      props: {
+        "data-list-track": "",
+        ...(gridClass ? { className: gridClass } : {}),
+        ...(hidden ? { "aria-hidden": "true" } : {}),
+        style: { ...layoutStyle(src), flexShrink: 0 },
+      },
+      children,
+    });
+    return { kind: "element", tag: "div", props, children: [track(false), track(true)] };
+  }
+
+  if (gridClass) props.className = gridClass;
+  return { kind: "element", tag: "div", props, children };
+}
+
+/** Class marking a responsive grid List so the global @media rules apply. */
+export const LIST_GRID_CLASS = "pb-list-grid";
+
+/**
+ * The display/flow style for a list layout mode (shared by box + auto-scroll
+ * track). Grid emits per-breakpoint column counts as CSS variables
+ * (`--pb-cols`/`--pb-cols-tablet`/`--pb-cols-mobile`); the global rules in
+ * `listGridCss()` read them at each breakpoint (inline styles can't do @media).
+ */
+function layoutStyle(src: ListSource): Record<string, string | number> {
+  const gap: Record<string, string> = src.gap != null ? { gap: `${Math.max(0, src.gap)}px` } : {};
+  if (src.direction === "grid") {
+    const clamp = (n: number | undefined, fallback: number) =>
+      Math.max(1, Math.floor(n ?? fallback));
+    const cols = clamp(src.columns, 2);
+    const style: Record<string, string | number> = {
+      display: "grid",
+      // Only the column-count VARIABLES are inline; `grid-template-columns` itself
+      // lives in `.pb-list-grid` (listGridCss) so the @media rules can override it.
+      // (An inline grid-template-columns would beat any stylesheet rule, media or
+      // not — that's why the responsive breakpoints must NOT set it here.)
+      "--pb-cols": cols,
+      ...gap,
+    };
+    if (src.columnsTablet != null) style["--pb-cols-tablet"] = clamp(src.columnsTablet, cols);
+    if (src.columnsMobile != null) style["--pb-cols-mobile"] = clamp(src.columnsMobile, cols);
+    return style;
+  }
+  const horizontal = src.direction === "horizontal";
   return {
-    kind: "element",
-    tag: "div",
-    props: { "data-list": block.id },
-    children,
+    display: "flex",
+    flexDirection: horizontal ? "row" : "column",
+    ...(horizontal ? { flexWrap: "nowrap" } : {}),
+    ...gap,
   };
+}
+
+/**
+ * Global (non-Tailwind) CSS for responsive grid Lists: at tablet/mobile widths,
+ * a `.pb-list-grid` re-reads `--pb-cols-tablet`/`--pb-cols-mobile` (each falling
+ * back to `--pb-cols`) for its column count. Appended once per page that has a
+ * grid List. Breakpoints match the page-builder viewport toggle + viewportHideCss.
+ */
+export function listGridCss(): string {
+  return [
+    // Base (desktop): read --pb-cols. Kept in a rule (NOT inline) so the media
+    // rules below can override it — inline grid-template-columns beats @media.
+    `.${LIST_GRID_CLASS}{grid-template-columns:repeat(var(--pb-cols,2),minmax(0,1fr))}`,
+    `@media (max-width:767px){.${LIST_GRID_CLASS}{grid-template-columns:repeat(var(--pb-cols-mobile,var(--pb-cols,2)),minmax(0,1fr))}}`,
+    `@media (min-width:768px) and (max-width:1023px){.${LIST_GRID_CLASS}{grid-template-columns:repeat(var(--pb-cols-tablet,var(--pb-cols,2)),minmax(0,1fr))}}`,
+  ].join("\n");
 }
 
 /**

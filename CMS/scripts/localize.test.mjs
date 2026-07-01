@@ -133,6 +133,8 @@ test("planPage: resolves component tree props to active locale", () => {
     locale: "fi",
     fallback: "en",
   });
-  assert.equal(plan.root[0].kind, "element");
-  assert.deepEqual(plan.root[0].props, { text: "Moi" });
+  // top-level non-Section blocks are wrapped in an id-only overlay div now
+  const hero = plan.root[0].children[0];
+  assert.equal(hero.kind, "element");
+  assert.deepEqual(hero.props, { text: "Moi" });
 });

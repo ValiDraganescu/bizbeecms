@@ -40,6 +40,10 @@ function listBlock(rows, extra = {}) {
   };
 }
 
+// planPage wraps each top-level non-Section block in an id-only overlay div
+// (data-block-wrap) — unwrap to the List container for assertions.
+const top = (root, i = 0) => root[i].children[0];
+
 // Collect all text nodes in a plan subtree (for asserting stamped content).
 function texts(plan) {
   const out = [];
@@ -64,7 +68,7 @@ test("N rows → N stamped template subtrees with mapped fields bound", () => {
   const { root } = planPage([listBlock(rows)], components);
   // The List renders one container with 3 stamped Cards.
   assert.equal(root.length, 1);
-  const container = root[0];
+  const container = top(root);
   assert.equal(container.props["data-list"], "list1");
   assert.equal(container.children.length, 3);
   assert.deepEqual(texts(container), ["Alpha", "Beta", "Gamma"]);
@@ -72,7 +76,7 @@ test("N rows → N stamped template subtrees with mapped fields bound", () => {
 
 test("empty rows → renders nothing (no empty-state authored)", () => {
   const { root } = planPage([listBlock([])], components);
-  assert.equal(root[0].children.length, 0);
+  assert.equal(top(root).children.length, 0);
 });
 
 test("empty rows → renders the empty-state slot when authored", () => {
@@ -117,9 +121,9 @@ test("listMap respects the component's declared-prop allowlist", () => {
 });
 
 test("missing field on a row → template prop stays unbound (graceful blank)", () => {
-  // Row lacks `name`; the {{title}} slot has no value → resolves to "".
+  // Row lacks `name`; the {{title}} slot has no value → empty text is pruned.
   const { root } = planPage([listBlock([{ other: "x" }])], components);
-  assert.deepEqual(texts(root[0]), [""]);
+  assert.deepEqual(texts(root[0]), []);
 });
 
 test("un-hydrated List (no listRows) → empty container, never throws", () => {
@@ -131,7 +135,7 @@ test("un-hydrated List (no listRows) → empty container, never throws", () => {
     children: [{ id: "tpl", component: "Card" }],
   };
   const { root } = planPage([block], components);
-  assert.equal(root[0].children.length, 0);
+  assert.equal(top(root).children.length, 0);
 });
 
 test("List requires NO D1 component row (built-in) — unknown template still hides gracefully", () => {
@@ -141,6 +145,6 @@ test("List requires NO D1 component row (built-in) — unknown template still hi
     children: [{ id: "tpl", component: "Missing" }],
   });
   const { root } = planPage([block], components);
-  assert.equal(root[0].children.length, 1);
-  assert.equal(root[0].children[0].props["data-render-error"], 'unknown component "Missing"');
+  assert.equal(top(root).children.length, 1);
+  assert.equal(top(root).children[0].props["data-render-error"], 'unknown component "Missing"');
 });

@@ -103,6 +103,35 @@ export const LIST_LOCALES_TOOL = {
   },
 } as const;
 
+export const SEARCH_ICONS_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "search_icons",
+    description:
+      "Search the site's SELECTED icon set for icons matching a query, so you can " +
+      "reference them in a component with an `{{icon \"name\"}}` slot (or set an " +
+      "icon-typed prop). Returns matching icon NAMES (e.g. \"calendar\", " +
+      "\"arrow-right\") in the active set. Use the returned name verbatim in the " +
+      "slot — names are resolved against whatever set the operator chose in " +
+      "Settings, so don't include a set prefix.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description:
+            "What to look for, e.g. \"calendar\", \"arrow\", \"shopping cart\".",
+        },
+        limit: {
+          type: "number",
+          description: "Max results to return (default 48, max 100).",
+        },
+      },
+      required: ["query"],
+    },
+  },
+} as const;
+
 export const GET_BRAND_IDENTITY_TOOL = {
   type: "function" as const,
   function: {

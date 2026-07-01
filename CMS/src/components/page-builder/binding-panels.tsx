@@ -325,6 +325,17 @@ export function ListSettings({
   const componentNames = Object.keys(propsSchemas).sort();
 
   const presentation = source?.presentation ?? "list";
+  // Carry the plain-list LAYOUT config through edits (rebuilt fresh in emitSource).
+  const layout = {
+    direction: source?.direction,
+    columns: source?.columns,
+    columnsTablet: source?.columnsTablet,
+    columnsMobile: source?.columnsMobile,
+    gap: source?.gap,
+    maxSize: source?.maxSize,
+    autoscroll: source?.autoscroll,
+    autoscrollSpeed: source?.autoscrollSpeed,
+  };
   // Carry the combobox config through edits (emitSource rebuilds `src` fresh).
   const cb = {
     select: source?.select,
@@ -356,6 +367,22 @@ export function ListSettings({
         return l != null ? { limit: l } : {};
       })(),
     };
+    // Plain-list LAYOUT (direction/scroll/auto-scroll) — persisted only OUTSIDE
+    // combobox mode (a combobox is a dropdown; scroll options don't apply). Each
+    // field carries over unless this edit overrides it.
+    if (pres !== "combobox") {
+      const l = { ...layout, ...next };
+      if (l.direction && l.direction !== "vertical") src.direction = l.direction;
+      if (l.direction === "grid") {
+        if (l.columns != null) src.columns = l.columns;
+        if (l.columnsTablet != null) src.columnsTablet = l.columnsTablet;
+        if (l.columnsMobile != null) src.columnsMobile = l.columnsMobile;
+      }
+      if (l.gap != null) src.gap = l.gap;
+      if (l.maxSize != null) src.maxSize = l.maxSize;
+      if (l.autoscroll) src.autoscroll = true;
+      if (l.autoscrollSpeed && l.autoscrollSpeed !== "normal") src.autoscrollSpeed = l.autoscrollSpeed;
+    }
     // Persist presentation + combobox config only in combobox mode (keeps plain
     // Lists byte-identical to before). Each field carries over unless overridden.
     if (pres === "combobox") {
@@ -477,6 +504,123 @@ export function ListSettings({
                   : `Repeats ${templateName} once per matching row.`}
               </span>
             </label>
+          )}
+
+          {/* Plain-list LAYOUT — direction, scroll cap, seamless auto-scroll. */}
+          {templateName && presentation === "list" && (
+            <div className="space-y-3 rounded-md border border-border p-3">
+              <label className="flex flex-col gap-1.5">
+                <span className={ctlLabel}>{t("list.direction")}</span>
+                <select
+                  className={ctlInput}
+                  value={layout.direction ?? "vertical"}
+                  aria-label={t("list.direction")}
+                  onChange={(e) =>
+                    emitSource({
+                      direction: e.target.value as "vertical" | "horizontal" | "grid",
+                    })
+                  }
+                >
+                  <option value="vertical">{t("list.directionVertical")}</option>
+                  <option value="horizontal">{t("list.directionHorizontal")}</option>
+                  <option value="grid">{t("list.directionGrid")}</option>
+                </select>
+              </label>
+
+              {layout.direction === "grid" && (
+                <div className="flex flex-col gap-1.5">
+                  <span className={ctlLabel}>{t("list.columns")}</span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        ["columns", "list.screenDesktop", 2],
+                        ["columnsTablet", "list.screenTablet", undefined],
+                        ["columnsMobile", "list.screenMobile", undefined],
+                      ] as const
+                    ).map(([key, labelKey, fallback]) => (
+                      <label key={key} className="flex flex-col gap-1">
+                        <span className="text-[11px] text-foreground-muted">{t(labelKey)}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          className={ctlInput}
+                          value={layout[key] ?? (fallback ?? layout.columns ?? 2)}
+                          aria-label={t(labelKey)}
+                          onChange={(e) =>
+                            emitSource({
+                              [key]:
+                                e.target.value === "" ? undefined : Math.max(1, Number(e.target.value)),
+                            })
+                          }
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <span className="text-xs text-foreground-muted">{t("list.columnsHint")}</span>
+                </div>
+              )}
+
+              <label className="flex flex-col gap-1.5">
+                <span className={ctlLabel}>{t("list.gap")}</span>
+                <input
+                  type="number"
+                  min={0}
+                  className={ctlInput}
+                  value={layout.gap ?? ""}
+                  placeholder="0"
+                  aria-label={t("list.gap")}
+                  onChange={(e) =>
+                    emitSource({ gap: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)) })
+                  }
+                />
+              </label>
+
+              <label className="flex flex-col gap-1.5">
+                <span className={ctlLabel}>
+                  {layout.direction === "horizontal" ? t("list.maxWidth") : t("list.maxHeight")}
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  className={ctlInput}
+                  value={layout.maxSize ?? ""}
+                  placeholder={t("list.maxSizePlaceholder")}
+                  aria-label={t("list.maxSize")}
+                  onChange={(e) =>
+                    emitSource({ maxSize: e.target.value === "" ? undefined : Number(e.target.value) })
+                  }
+                />
+                <span className="text-xs text-foreground-muted">{t("list.maxSizeHint")}</span>
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={layout.autoscroll === true}
+                  aria-label={t("list.autoscroll")}
+                  onChange={(e) => emitSource({ autoscroll: e.target.checked || undefined })}
+                />
+                <span className={ctlLabel}>{t("list.autoscroll")}</span>
+              </label>
+
+              {layout.autoscroll === true && (
+                <label className="flex flex-col gap-1.5">
+                  <span className={ctlLabel}>{t("list.autoscrollSpeed")}</span>
+                  <select
+                    className={ctlInput}
+                    value={layout.autoscrollSpeed ?? "normal"}
+                    aria-label={t("list.autoscrollSpeed")}
+                    onChange={(e) =>
+                      emitSource({ autoscrollSpeed: e.target.value as "slow" | "normal" | "fast" })
+                    }
+                  >
+                    <option value="slow">{t("list.speedSlow")}</option>
+                    <option value="normal">{t("list.speedNormal")}</option>
+                    <option value="fast">{t("list.speedFast")}</option>
+                  </select>
+                </label>
+              )}
+            </div>
           )}
 
           {/* Combobox config — rides on this same panel. */}

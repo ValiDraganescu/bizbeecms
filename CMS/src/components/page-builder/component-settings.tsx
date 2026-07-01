@@ -3,25 +3,25 @@
 import { useTranslations } from "next-intl";
 import {
   validateBlockProps,
-  isImageProp,
+  linkNewTabProp,
   type PropField,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
-import { ImagePicker } from "./image-picker";
+import { PropFieldInput } from "./prop-field-input";
 import { TranslatableField } from "./translatable-field";
 
 /**
  * Right-rail Block tab when a COMPONENT block is selected — a settings form
  * auto-generated from the component's `propsSchema` (parsed via `parsePropsSchema`).
  *
- * One control per declared prop: text/textarea(richtext)/number/checkbox/select.
- * TRANSLATABLE string/richtext props (`translatable:true` in the schema) render
- * one input PER content locale (mirrors the SEO tab) and write a `{loc:text}`
- * object via `setLocalizedProp`; non-translatable / scalar props render a single
- * control. Every edit re-validates the full props through `validateBlockProps`
- * (the schema overload — type coercion + required-prop retention) and hands the
- * parent the persistable props; the existing top-bar Save writes them. All PURE
- * prop-merge logic lives in `page-blocks.ts` — never duplicated here.
+ * Each prop renders through the SHARED `PropFieldInput` (the same type→widget
+ * mapping the Develop workbench uses), except TRANSLATABLE string/richtext props
+ * (`translatable:true`), which render one input PER content locale (mirrors the
+ * SEO tab) and write a `{loc:text}` object via `setLocalizedProp`. Every edit
+ * re-validates the full props through `validateBlockProps` (the schema overload —
+ * type coercion + required-prop retention) and hands the parent the persistable
+ * props; the existing top-bar Save writes them. All PURE prop-merge logic lives
+ * in `page-blocks.ts` — never duplicated here.
  */
 export function ComponentSettings({
   block,
@@ -37,9 +37,6 @@ export function ComponentSettings({
   const t = useTranslations("pageBuilder");
   const props = (block.props ?? {}) as Record<string, unknown>;
 
-  const label = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
-  const input =
-    "w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-foreground-muted";
   const segLabel = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
   const seg = "flex-1 rounded-md border px-2 py-1 text-sm transition-colors";
   const segOn = "border-primary bg-primary-subtle text-foreground font-medium";
@@ -92,9 +89,6 @@ export function ComponentSettings({
       <p className="font-mono text-sm text-foreground">{block.component}</p>
       {widthControl}
       {schema.map((f) => {
-        const raw = props[f.name];
-        const labelText = f.label || f.name;
-
         // Translatable text → its own per-locale field (lang tabs + AI translate).
         if (f.translatable) {
           return (
@@ -110,99 +104,14 @@ export function ComponentSettings({
         }
 
         return (
-          <fieldset key={f.name} className="flex flex-col gap-1.5">
-            <span className={label}>
-              {labelText}
-              {f.required && <span className="text-danger"> *</span>}
-            </span>
-            {f.description && (
-              <span className="text-xs text-foreground-muted">{f.description}</span>
-            )}
-
-            {isImageProp(f) ? (
-              // Image prop (declared type:"image" or an image-ish name) → gallery
-              // picker instead of a raw URL field. Stores the chosen /media URL.
-              <ImagePicker
-                value={typeof raw === "string" ? raw : ""}
-                onChange={(url) => setField(f.name, url)}
-              />
-            ) : f.type === "select" ? (
-              <select
-                className={input}
-                value={typeof raw === "string" ? raw : f.default}
-                aria-label={labelText}
-                onChange={(e) => setField(f.name, e.target.value)}
-              >
-                {(f.options ?? []).map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            ) : f.type === "boolean" ? (
-              <label className="flex items-center gap-2 text-sm text-foreground">
-                <input
-                  type="checkbox"
-                  checked={raw === true || raw === "true"}
-                  aria-label={labelText}
-                  onChange={(e) => setField(f.name, e.target.checked)}
-                />
-                {labelText}
-              </label>
-            ) : f.type === "date" || f.type === "time" ? (
-              <input
-                type={f.type}
-                className={input}
-                value={typeof raw === "string" ? raw : f.default}
-                aria-label={labelText}
-                onChange={(e) => setField(f.name, e.target.value)}
-              />
-            ) : f.type === "number" ? (
-              <input
-                type="number"
-                className={input}
-                value={typeof raw === "number" ? raw : f.default}
-                placeholder={f.default}
-                aria-label={labelText}
-                onChange={(e) =>
-                  setField(f.name, e.target.value === "" ? "" : Number(e.target.value))
-                }
-              />
-            ) : f.type === "richtext" ? (
-              <textarea
-                className={`${input} min-h-16`}
-                value={typeof raw === "string" ? raw : ""}
-                placeholder={f.default}
-                aria-label={labelText}
-                onChange={(e) => setField(f.name, e.target.value)}
-              />
-            ) : f.type === "json" ? (
-              // Structured prop edited as JSON text; renderer serializes it into a
-              // data-attribute for the component's client script to JSON.parse.
-              <textarea
-                className={`${input} min-h-24 font-mono`}
-                value={
-                  typeof raw === "string"
-                    ? raw
-                    : raw != null
-                      ? JSON.stringify(raw, null, 2)
-                      : f.default
-                }
-                placeholder={f.default}
-                aria-label={labelText}
-                onChange={(e) => setField(f.name, e.target.value)}
-              />
-            ) : (
-              <input
-                type="text"
-                className={input}
-                value={typeof raw === "string" ? raw : ""}
-                placeholder={f.default}
-                aria-label={labelText}
-                onChange={(e) => setField(f.name, e.target.value)}
-              />
-            )}
-          </fieldset>
+          <PropFieldInput
+            key={f.name}
+            field={f}
+            value={props[f.name]}
+            newTabValue={props[linkNewTabProp(f.name)]}
+            onValue={(v) => setField(f.name, v)}
+            onNewTab={(on) => setField(linkNewTabProp(f.name), on)}
+          />
         );
       })}
     </div>

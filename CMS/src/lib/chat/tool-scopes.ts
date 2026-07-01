@@ -47,6 +47,7 @@ export const KNOWN_TOOL_NAMES = [
   "list_pages",
   "get_page",
   "list_locales",
+  "search_icons",
   "get_brand_identity",
   "get_theme",
   "list_builtin_types",
@@ -61,7 +62,8 @@ export const KNOWN_TOOL_NAMES = [
   "update_collection_item",
   "archive_collection_item",
   "query_collection",
-  // content-collections Phase-2: drop/rename a field (system-generated rebuild).
+  // content-collections Phase-2: add/drop/rename a field.
+  "add_collection_field",
   "drop_collection_field",
   "rename_collection_field",
   // Slice D (content-collections P2-bind): component↔collection binding tools.
@@ -165,6 +167,7 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "bind_list",
     "edit_text",
     "generate_image",
+    "search_icons",
   ],
   // Component playground: discover + author/UPDATE components, see brand/theme + media.
   components: [
@@ -177,6 +180,7 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "get_theme",
     "edit_text",
     "generate_image",
+    "search_icons",
   ],
   // Pages list: discover pages, compose/UPDATE + translate them, reference media.
   pages: [
@@ -214,6 +218,7 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "update_collection_item",
     "archive_collection_item",
     "query_collection",
+    "add_collection_field",
     "drop_collection_field",
     "rename_collection_field",
   ],
@@ -239,7 +244,7 @@ const CONTEXT_PROMPTS: Record<AdminPageContext, string> = {
 
   media: `You are in the Media library. Help the operator find and reference uploaded assets (list_assets) by their /media/<key> URLs.`,
 
-  collections: `You are in Collections — the site's structured data. You can define a new typed collection (create_collection: name + typed fields; each collection gets system fields id/slug/status/created_at/updated_at automatically). You can add, update, archive/unarchive/delete items (add_collection_item / update_collection_item / archive_collection_item), and find items with structured filters/sort/search (query_collection — collections are addressed by their content_<slug> table name). You can also evolve a collection's schema: drop a user field (drop_collection_field — permanent, data lost) or rename one keeping its data (rename_collection_field). System fields can't be dropped or renamed. Prefer query_collection to discover a collection's table name and item ids before editing. Prefer archiving over deleting.`,
+  collections: `You are in Collections — the site's structured data. You can define a new typed collection (create_collection: name + typed fields; each collection gets system fields id/slug/status/created_at/updated_at automatically). You can add, update, archive/unarchive/delete items (add_collection_item / update_collection_item / archive_collection_item), and find items with structured filters/sort/search (query_collection — collections are addressed by their content_<slug> table name). You can also evolve a collection's schema: add a new field (add_collection_field — one call per field; this is how you add a property to an EXISTING collection, never create_collection again), drop a user field (drop_collection_field — permanent, data lost), or rename one keeping its data (rename_collection_field). System fields can't be dropped or renamed. Prefer query_collection to discover a collection's table name and item ids before editing. Prefer archiving over deleting.`,
 
   general: `You are the site's AI assistant. You can author components, compose pages, translate content, and reference uploaded media. Help the operator with whatever they need.`,
 };

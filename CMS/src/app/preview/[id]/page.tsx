@@ -74,7 +74,9 @@ export default async function PreviewPage({
     const published = await getVersion(pageRow.publishedVersionId, db);
     blocks = pickRenderBlocks(draft, published, pageRow.blocks);
   }
-  const { plan } = await buildPlanFromPage(pageRow, blocks);
+  // preferDraft: the page-builder Preview shows component DRAFTS too (unpublished
+  // component edits render here, but never on the public route).
+  const { plan } = await buildPlanFromPage(pageRow, blocks, true);
   const rendered = <RenderedPage plan={plan} />;
   // `data-theme` on a wrapper re-scopes the token cascade for the forced mode.
   // The wrapper must PAINT the surface itself: `body{background:var(--color-surface)}`

@@ -20,6 +20,7 @@
  */
 
 import type { CollectionField } from "@/lib/content/collection-schema";
+import { ImagePicker } from "@/components/page-builder/image-picker";
 
 const INPUT =
   "rounded-md border border-border bg-surface px-3 py-2 text-foreground";
@@ -155,8 +156,22 @@ export function FieldInput({
         </Labelled>
       );
 
+    case "asset":
+      // An asset URL → the SAME gallery picker the page builder uses (thumbnail
+      // + Remove + modal gallery), so item images match placing a block image.
+      // Not wrapped in <label htmlFor> — the picker is a button, not a form input.
+      return (
+        <div className="flex flex-col gap-1">
+          <span className="text-sm text-foreground-muted">
+            {labelText}
+            {field.required ? " *" : ""}
+          </span>
+          <ImagePicker value={asStr(value)} onChange={(url) => onChange(url)} />
+        </div>
+      );
+
     default:
-      // string / ref / asset → plain text
+      // string / ref → plain text
       return (
         <Labelled id={id} label={labelText} required={field.required}>
           <input id={id} type="text" className={INPUT} value={asStr(value)} onChange={(e) => onChange(e.target.value)} />

@@ -30,7 +30,7 @@
  */
 
 // Relative (not @/) import so this stays node-testable — only the reserved names.
-import { SECTION_COMPONENT } from "../render/tree.ts";
+import { SECTION_COMPONENT, LANGUAGE_SWITCHER_COMPONENT } from "../render/tree.ts";
 
 // ── Tool schemas (OpenAI/Workers-AI function-calling shape) ───────────────────
 
@@ -55,6 +55,19 @@ export const UPDATE_COMPONENT_TOOL = {
         },
         script: { type: "string", description: "Client JS for interactivity (or empty string)." },
         css: { type: "string", description: "Tailwind utility classes / custom CSS (or empty)." },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Optional short operator labels for grouping (e.g. ['BasicRestaurant']). " +
+            "Replaces this component's tags. Omit to leave existing tags unchanged.",
+        },
+        label: {
+          type: "string",
+          description:
+            "Optional human display label shown in the UI (can contain spaces; the " +
+            "`name` cannot). Omit to leave unchanged; '' clears it.",
+        },
       },
       required: ["name", "html"],
     },
@@ -82,7 +95,10 @@ export const UPDATE_PAGE_BLOCKS_TOOL = {
           type: "array",
           description:
             "JSON array of blocks: { id, component, props?, children? }. FULL replacement — " +
-            "anything omitted is deleted. Re-pass the entire current tree plus your change.",
+            "anything omitted is deleted. Re-pass the entire current tree plus your change. " +
+            "TOP LEVEL IS SECTIONS ONLY: every top-level block must be a Section; never place " +
+            "a component directly at the top level — wrap it in a Section " +
+            "(Section → __section_column__ → YourComponent). A bare top-level component is rejected.",
         },
       },
       required: ["id", "blocks"],
@@ -199,12 +215,32 @@ export function builtinBlockTypes(): { name: string; description: string }[] {
     {
       name: SECTION_COMPONENT,
       description:
-        "A layout container. Set props.columns (1-4). Its DIRECT children must be " +
-        "column blocks named '__section_column__' (one per column); your actual " +
-        "components go inside a column's `children` — NEVER directly under the " +
-        "Section (a component placed straight under a Section is not rendered). " +
-        "Shape: { component:'Section', props:{columns:1}, children:[ " +
-        "{ component:'__section_column__', children:[ { component:'Hero', props:{…} } ] } ] }.",
+        "A layout container, and the ONLY block allowed at a page's top level — every " +
+        "component must live inside a Section (a bare top-level component is rejected). " +
+        "REQUIRED: set props.name to a short, descriptive label for the section (e.g. " +
+        "\"Hero\", \"Featured restaurants\", \"Footer CTA\") — the operator sees these in " +
+        "the Layers tree and @section mentions, and an unnamed section is rejected. " +
+        "A Section holds one or more ROWS ('__section_row__'); each row holds 1+ COLUMNS " +
+        "('__section_column__') and sets its OWN props.columns (1-4) + optional " +
+        "columnBehavior. Different rows may have different column counts. Your actual " +
+        "components go inside a COLUMN's `children` — never directly under a Section or a " +
+        "row. Shape: { component:'Section', props:{name:'Hero'}, children:[ " +
+        "{ component:'__section_row__', props:{columns:2}, children:[ " +
+        "{ component:'__section_column__', children:[ { component:'Hero', props:{…} } ] }, " +
+        "{ component:'__section_column__', children:[ { component:'Img', props:{…} } ] } ] } ] }. " +
+        "(A single-row section may also be written the legacy way — columns directly under " +
+        "the Section — and is auto-wrapped into one row; prefer the explicit row shape.)",
+    },
+    {
+      name: LANGUAGE_SWITCHER_COMPONENT,
+      description:
+        "A built-in language switcher: renders a <select> of the Site's configured " +
+        "content locales, the active one selected; choosing one switches the page's " +
+        "language and persists across refreshes. It takes NO props and has no children. " +
+        "Use it inside a column like any component (e.g. in a header/nav Section), OR " +
+        "embed it INSIDE a component's tree by writing the tag `<LanguageSwitcher/>` " +
+        "(composition-by-tag) — e.g. put it in a NavBar component. It renders nothing on " +
+        "single-locale Sites. Shape as a block: { component:'LanguageSwitcher' }.",
     },
   ];
 }

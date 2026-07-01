@@ -210,6 +210,8 @@ export interface ComponentRow {
   propsSchema: string | null;
   /** JSON-string array of operator tags in D1; normalized on serialize. */
   tags?: string | null;
+  /** Optional human display label (UI only; not part of the portable bundle). */
+  label?: string | null;
 }
 
 /**

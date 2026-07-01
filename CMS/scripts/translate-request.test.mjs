@@ -31,6 +31,19 @@ test("parseTranslateRequest: valid body", () => {
   assert.equal(r.request.kind, "page");
   assert.deepEqual(r.request.toLocales, ["fi", "et"]);
   assert.deepEqual(r.request.fields, { metaTitle: "Pricing" });
+  assert.equal(r.request.persist, true, "persist defaults to true");
+});
+
+test("parseTranslateRequest: persist:false is parsed (block field merges itself)", () => {
+  const r = parseTranslateRequest({
+    kind: "component",
+    target: "HeroRamenSplit",
+    fromLocale: "en",
+    fields: { kana: "ラーメン" },
+    persist: false,
+  });
+  assert.ok(r.ok);
+  assert.equal(r.request.persist, false);
 });
 
 test("parseTranslateRequest: rejects bad kind / empty fields / bad locale", () => {

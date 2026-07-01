@@ -301,7 +301,15 @@ export function treeToHtml(node: TreeNode): string {
  */
 export function formatHtml(node: TreeNode, indent = 0): string {
   const pad = "  ".repeat(indent);
-  if (typeof node === "string") return node.trim() === "" ? "" : pad + escapeText(node);
+  // Trim a text node's surrounding whitespace: formatHtml re-adds its own
+  // newlines+indent around every child, and treeToHtml (the save path) preserves
+  // whatever whitespace lives inside the text. Without trimming, each
+  // load→edit→save cycle accretes more leading/trailing newlines into mixed-content
+  // text nodes (e.g. a `{{t slot}}` beside a sibling element) — growing unbounded.
+  if (typeof node === "string") {
+    const t = node.trim();
+    return t === "" ? "" : pad + escapeText(t);
+  }
   if (node == null || typeof node !== "object" || typeof node.tag !== "string") {
     return "";
   }

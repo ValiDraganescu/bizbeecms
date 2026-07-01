@@ -9,6 +9,7 @@
  */
 
 import { resolveLocalized } from "./localize.ts";
+import { resolveDynamicIconSlots, splitIconText } from "./icons.ts";
 import {
   type TreeNode,
   type ElementPlan,
@@ -16,6 +17,16 @@ import {
   type ComponentArtifact,
   placeholder,
 } from "./plan-types.ts";
+
+/**
+ * Resolved icons for an `{{icon "name"}}` slot → the parsed SVG TreeNode to inline
+ * (a real `<svg>` element subtree, NOT a string — a raw-SVG string in a text node
+ * would be escaped and show as literal markup). The async render host
+ * (buildPlanFromPage) fetches + caches + parses each referenced icon into this map
+ * BEFORE the pure walk; the walk just looks names up. A name absent from the map
+ * (unresolved / wrong set) renders as nothing. Pure data — no I/O in the walk.
+ */
+export type IconMap = Map<string, TreeNode>;
 
 /**
  * A `tag` that names ANOTHER component (composition-by-tag): a PascalCase
@@ -47,6 +58,20 @@ export type ComposeContext = {
    * components ship their script just like top-level block components do.
    */
   collectScript?: (artifact: ComponentArtifact) => void;
+  /**
+   * Resolved icons (name → parsed `<svg>` TreeNode) for `{{icon "name"}}` slots.
+   * Supplied by the async render host. Absent = no icon support (slots render as
+   * empty); present = a text node's icon slots expand into inline SVG elements.
+   */
+  icons?: IconMap;
+  /**
+   * Resolve a PascalCase tag that names a RENDERER BUILT-IN (e.g. LanguageSwitcher)
+   * rather than a D1 component — returns its ElementPlan, or null if the tag isn't
+   * a built-in. Supplied by `planPage` so a component tree can embed a built-in by
+   * tag (`<LanguageSwitcher/>`); tried before the "unknown component" fallback.
+   * Kept as a callback so this pure module doesn't import the built-in planners.
+   */
+  resolveBuiltinTag?: (tag: string) => ElementPlan | null;
 };
 
 /**
@@ -61,12 +86,68 @@ export type ComposeContext = {
  * AuthorCard component instead of an `<authorcard>` literal. Unknown component
  * tags / over-deep recursion fall back to a hidden placeholder.
  */
+/**
+ * Expand a text node into ordered plans, turning each `{{icon "name"}}` slot into
+ * an inline `<svg>` element (from `icons`) and keeping the surrounding text as
+ * text nodes. No icons / no map → a single text node (the original fast path).
+ * Returned as an array because one text string can yield text + svg + text.
+ */
+function planTextNode(text: string, icons?: IconMap): ElementPlan[] {
+  if (!icons || icons.size === 0 || text.indexOf("{{") === -1) {
+    return [{ kind: "text", text }];
+  }
+  const parts = splitIconText(text);
+  if (parts.length === 1 && parts[0].kind === "text") {
+    return [{ kind: "text", text: parts[0].text }];
+  }
+  const out: ElementPlan[] = [];
+  for (const part of parts) {
+    if (part.kind === "text") {
+      if (part.text !== "") out.push({ kind: "text", text: part.text });
+    } else {
+      const svg = icons.get(part.name);
+      // Unresolved icon → render nothing (the slot disappears). Resolved → walk
+      // the parsed <svg> TreeNode into an element plan like any other node.
+      if (svg != null) out.push(planTree(svg, undefined, undefined));
+    }
+  }
+  return out.length > 0 ? out : [{ kind: "text", text: "" }];
+}
+
+/** Plan a node's children, flat-mapping text nodes that expand into icon SVGs.
+ *  Empty text nodes are dropped — a slot that bound to "" (unset prop, dropped
+ *  icon) leaves no DOM text rather than an empty node. */
+function planChildren(
+  children: TreeNode[] | undefined,
+  locale: LocaleContext | undefined,
+  compose: ComposeContext | undefined,
+): ElementPlan[] {
+  const out: ElementPlan[] = [];
+  for (const c of children ?? []) {
+    if (typeof c === "string") {
+      for (const p of planTextNode(c, compose?.icons)) {
+        if (p.kind === "text" && p.text === "") continue;
+        out.push(p);
+      }
+    } else {
+      out.push(planTree(c, locale, compose));
+    }
+  }
+  return out;
+}
+
 export function planTree(
   node: TreeNode,
   locale?: LocaleContext,
   compose?: ComposeContext,
 ): ElementPlan {
-  if (typeof node === "string") return { kind: "text", text: node };
+  if (typeof node === "string") {
+    // A bare string node at the top level: expand icons but return a single plan.
+    // Multi-part expansion only matters as a CHILD (handled by planChildren); a
+    // lone string root collapses to its first part (rare — roots are elements).
+    const parts = planTextNode(node, compose?.icons);
+    return parts[0] ?? { kind: "text", text: "" };
+  }
   if (node == null || typeof node !== "object") {
     throw new Error(`Invalid tree node: ${JSON.stringify(node)} — each node must be a string (text) or an object { tag, props?, children? }`);
   }
@@ -97,7 +178,7 @@ export function planTree(
           unknown
         >)
       : props,
-    children: (node.children ?? []).map((c) => planTree(c, locale, compose)),
+    children: planChildren(node.children, locale, compose),
   };
 }
 
@@ -117,6 +198,10 @@ function planComponentTag(
   if (compose.depth >= MAX_COMPONENT_DEPTH) {
     return placeholder(`component "${node.tag}" nested too deeply`);
   }
+  // A built-in tag (e.g. LanguageSwitcher) resolves to its own planner, not a D1
+  // component — try that first so a nav component can embed `<LanguageSwitcher/>`.
+  const builtin = compose.resolveBuiltinTag?.(node.tag);
+  if (builtin) return builtin;
   const artifact = compose.components.get(node.tag);
   if (!artifact) {
     // Not a known component — render the tag literally (e.g. an HTML-ish custom
@@ -147,9 +232,11 @@ function planComponentTag(
     components: compose.components,
     depth: compose.depth + 1,
     collectScript: compose.collectScript,
+    icons: compose.icons,
+    resolveBuiltinTag: compose.resolveBuiltinTag,
   };
   const el = planTree(tree, locale, childCompose);
-  const childPlans = (node.children ?? []).map((c) => planTree(c, locale, compose));
+  const childPlans = planChildren(node.children, locale, compose);
   if (childPlans.length === 0) return el;
   if (el.kind !== "element") {
     return placeholder(`component "${node.tag}" cannot host children`);
@@ -196,6 +283,36 @@ export function declaredProps(propsSchema: string | null | undefined): Set<strin
   }
 }
 
+/**
+ * Each declared prop's `default` from the propsSchema, keyed by prop name. Used as
+ * the fallback when a page block hasn't set a value for a slot — so an unbound
+ * slot renders its authored placeholder instead of an empty string (or, worse,
+ * the literal `{{slot}}`). Props without a `default` are omitted.
+ */
+export function schemaDefaults(
+  propsSchema: string | null | undefined,
+): Record<string, unknown> {
+  if (!propsSchema) return {};
+  try {
+    const parsed = JSON.parse(propsSchema);
+    if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const out: Record<string, unknown> = {};
+    for (const [name, spec] of Object.entries(parsed as Record<string, unknown>)) {
+      if (spec && typeof spec === "object" && "default" in spec) {
+        out[name] = (spec as { default: unknown }).default;
+      }
+      // A link prop's stored new-tab default (Develop toggle) cascades as the
+      // companion `<name>NewTab` flag applyNewTab reads; block props overlay it.
+      if (spec && typeof spec === "object" && (spec as { newTab?: unknown }).newTab === true) {
+        out[`${name}NewTab`] = true;
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 /** Coerce a bound value to the string that replaces a slot. */
 function slotString(value: unknown): string {
   if (value == null) return "";
@@ -226,9 +343,45 @@ function bindSlots(
   values: Record<string, unknown>,
   declared: Set<string>,
 ): string {
-  return text.replace(SLOT_RE, (_m, name: string) =>
+  // First fold any DYNAMIC `{{icon propName}}` into the LITERAL `{{icon "name"}}`
+  // form (using the prop's bound value), so the downstream icon walk only sees
+  // literals. Then bind the ordinary `{{prop}}` / `{{t prop}}` slots. The icon
+  // literal is left untouched by SLOT_RE (it requires quotes / a space), so it
+  // survives to planTextNode where it becomes an inline <svg>.
+  const withIcons = resolveDynamicIconSlots(text, values, declared);
+  return withIcons.replace(SLOT_RE, (_m, name: string) =>
     declared.has(name) ? slotString(values[name]) : "",
   );
+}
+
+/** Which prop name does a raw href value reference as its sole slot, if any?
+ *  `"{{ctaHref}}"` / `"{{t ctaHref}}"` → "ctaHref"; anything else (static, mixed
+ *  text, multiple slots) → null. Only a lone slot is a clean binding to augment. */
+function loneSlotProp(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const m = raw.match(/^\{\{\s*(?:t\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*\}\}$/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Auto-apply "open in new tab" to an anchor. If `node` is an `<a>` whose `href`
+ * binds to a lone link prop `X` and the block set the companion `XNewTab` truthy,
+ * return the anchor's props with `target="_blank" rel="noopener noreferrer"`
+ * added. Otherwise return the props unchanged. This is what makes the editor's
+ * new-tab toggle work on EXISTING components with no re-authoring: the component
+ * just writes `<a href="{{X}}">` and the renderer adds target/rel from the flag.
+ */
+function applyNewTab(
+  tag: string,
+  props: Record<string, unknown>,
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  if (tag !== "a" || props.target != null) return props; // author-set target wins
+  const hrefProp = loneSlotProp(props.href);
+  if (!hrefProp) return props;
+  const flag = values[`${hrefProp}NewTab`];
+  if (flag !== true && flag !== "true") return props;
+  return { ...props, target: "_blank", rel: "noopener noreferrer" };
 }
 
 /** Recursively bind block props into one component tree node (returns a new node). */
@@ -241,7 +394,9 @@ export function bindTree(
   if (node == null || typeof node !== "object" || typeof node.tag !== "string") {
     return node;
   }
-  const props = node.props;
+  // Add target/rel from a new-tab link flag BEFORE binding, while href still holds
+  // the raw `{{prop}}` slot we match on (binding replaces it with the URL).
+  const props = node.props ? applyNewTab(node.tag, node.props, values) : node.props;
   let boundProps = props;
   if (props && typeof props === "object") {
     boundProps = {};

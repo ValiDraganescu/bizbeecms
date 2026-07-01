@@ -36,13 +36,20 @@ import {
   type LocaleContext,
   type RenderPlan,
   SECTION_COMPONENT,
+  SECTION_ROW_COMPONENT,
   SECTION_COLUMN_COMPONENT,
   LIST_COMPONENT,
+  LANGUAGE_SWITCHER_COMPONENT,
   placeholder,
 } from "./plan-types.ts";
-import { planTree, declaredProps, bindTree } from "./plan-tree.ts";
-import { planSection, planColumn } from "./plan-section.ts";
-import { planList } from "./plan-list.ts";
+import { planTree, declaredProps, schemaDefaults, bindTree, type IconMap } from "./plan-tree.ts";
+import { planSection, planColumn, planRow } from "./plan-section.ts";
+import { planList, LIST_AUTOSCROLL_ASSET_KEY, LIST_AUTOSCROLL_SCRIPT } from "./plan-list.ts";
+import {
+  planLanguageSwitcher,
+  LANGUAGE_SWITCHER_SCRIPT,
+  LANGUAGE_SWITCHER_ASSET_KEY,
+} from "./plan-language-switcher.ts";
 import { resolveLocalized } from "./localize.ts";
 
 // Re-export the full public surface so `@/lib/render/tree` stays the one import
@@ -58,22 +65,29 @@ export {
   type RenderPlan,
   type LocaleContext,
   SECTION_COMPONENT,
+  SECTION_ROW_COMPONENT,
   SECTION_COLUMN_COMPONENT,
   LIST_COMPONENT,
+  LANGUAGE_SWITCHER_COMPONENT,
   BUILTIN_COMPONENTS,
   isBuiltinComponent,
   placeholder,
 } from "./plan-types.ts";
-export { planTree } from "./plan-tree.ts";
+export { planTree, type IconMap } from "./plan-tree.ts";
 export {
   columnStyle,
   columnVisibilityClass,
   wrapBlockWidth,
   planSection,
   planColumn,
+  planRow,
   MIN_COLUMN_WIDTH,
 } from "./plan-section.ts";
 export { normalizeLabelExpr } from "./plan-list.ts";
+export {
+  planLanguageSwitcher,
+  CONTENT_LOCALE_COOKIE,
+} from "./plan-language-switcher.ts";
 
 /**
  * Collect every Tailwind class token used across a render plan (so the runtime
@@ -146,6 +160,7 @@ export function planPage(
   blocks: Block[],
   components: Map<string, ComponentArtifact>,
   locale?: LocaleContext,
+  icons?: IconMap,
 ): RenderPlan {
   const scripts: string[] = [];
   const styles: string[] = [];
@@ -170,6 +185,31 @@ export function planPage(
     styles.push(COMBOBOX_LIST_CSS);
   }
 
+  // Ship the List auto-scroll client script once, only if an auto-scrolling List
+  // renders (needs no CSS — the wrapper carries inline layout styles).
+  function useListAutoscrollAssets(): void {
+    if (seenAssets.has(LIST_AUTOSCROLL_ASSET_KEY)) return;
+    seenAssets.add(LIST_AUTOSCROLL_ASSET_KEY);
+    scripts.push(LIST_AUTOSCROLL_SCRIPT);
+  }
+
+  // Ship the LanguageSwitcher client script once, only if a switcher renders.
+  function useLanguageSwitcherAssets(): void {
+    if (seenAssets.has(LANGUAGE_SWITCHER_ASSET_KEY)) return;
+    seenAssets.add(LANGUAGE_SWITCHER_ASSET_KEY);
+    scripts.push(LANGUAGE_SWITCHER_SCRIPT);
+  }
+
+  // Resolve a PascalCase tag naming a renderer built-in (used inside component
+  // trees via composition-by-tag). Only LanguageSwitcher is embeddable this way;
+  // Section/Row/Column/List are page-block layout primitives, not tags.
+  function resolveBuiltinTag(tag: string): ElementPlan | null {
+    if (tag === LANGUAGE_SWITCHER_COMPONENT) {
+      return planLanguageSwitcher(locale, useLanguageSwitcherAssets);
+    }
+    return null;
+  }
+
   function planBlock(block: Block): ElementPlan {
     // A Section is a built-in layout container rendered as a CSS grid of
     // COLUMN children (the aicms Section→Columns model). No D1 lookup — it's a
@@ -177,8 +217,14 @@ export function planPage(
     if (block.component === SECTION_COMPONENT) {
       return planSection(block, planBlock);
     }
-    // A column is the Section's grid cell — render as a flex column of its
-    // children. Standalone (outside a Section) it degrades to the same div.
+    // A row is the Section's horizontal band — its own grid of columns. Rendered
+    // via planSection's row path; a standalone row (outside a Section) degrades to
+    // a single-row grid of whatever columns it holds.
+    if (block.component === SECTION_ROW_COMPONENT) {
+      return planRow(block, planBlock);
+    }
+    // A column is a row's grid cell — render as a flex column of its children.
+    // Standalone (outside a row) it degrades to the same div.
     if (block.component === SECTION_COLUMN_COMPONENT) {
       return planColumn(block, planBlock, "flex-start", "flex-start");
     }
@@ -186,7 +232,14 @@ export function planPage(
     // rows were hydrated into `block.listRows` by buildPlanFromPage; planList
     // stamps + binds per row and delegates each stamped block back to planBlock.
     if (block.component === LIST_COMPONENT) {
-      return planList(block, planBlock, useBuiltinComboboxAssets);
+      return planList(block, planBlock, useBuiltinComboboxAssets, useListAutoscrollAssets);
+    }
+    // The built-in LanguageSwitcher renders a <select> of the Site's content
+    // locales (from `locale.available`); its one client script sets the locale
+    // cookie + reloads. Also reachable inside a component tree via composition-
+    // by-tag (`<LanguageSwitcher/>`) — handled in planTree, which shares this host.
+    if (block.component === LANGUAGE_SWITCHER_COMPONENT) {
+      return planLanguageSwitcher(locale, useLanguageSwitcherAssets);
     }
     const artifact = components.get(block.component);
     if (!artifact) {
@@ -198,24 +251,34 @@ export function planPage(
     // Bind the block's DECLARED props into the component tree's `{{prop}}` slots
     // before planning. Only props in the component's propsSchema bind; locale
     // objects in the supplied values resolve to the active locale first.
+    // Always bind so an unset prop falls back to its schema `default` (the
+    // authored placeholder) rather than rendering the raw `{{slot}}`. Block
+    // values overlay the defaults; locale objects resolve to the active locale.
     let tree = artifact.tree;
-    if (block.props && typeof block.props === "object") {
-      const declared = declaredProps(artifact.propsSchema);
-      if (declared.size > 0) {
-        const values = locale
-          ? (resolveLocalized(block.props, locale.locale, locale.fallback) as Record<
-              string,
-              unknown
-            >)
-          : block.props;
-        tree = bindTree(tree, values, declared);
-      }
+    const declared = declaredProps(artifact.propsSchema);
+    if (declared.size > 0) {
+      const blockProps =
+        block.props && typeof block.props === "object" ? block.props : {};
+      const merged = { ...schemaDefaults(artifact.propsSchema), ...blockProps };
+      const values = locale
+        ? (resolveLocalized(merged, locale.locale, locale.fallback) as Record<
+            string,
+            unknown
+          >)
+        : merged;
+      tree = bindTree(tree, values, declared);
     }
 
     // Pass the component map so a PascalCase tag inside this component's tree
     // resolves to another component (composition-by-tag), depth-guarded; nested
     // components ship their script via the shared collector.
-    const el = planTree(tree, locale, { components, depth: 0, collectScript });
+    const el = planTree(tree, locale, {
+      components,
+      depth: 0,
+      collectScript,
+      icons,
+      resolveBuiltinTag,
+    });
     const childPlans = (block.children ?? []).map(planBlock);
     if (childPlans.length === 0) return el;
     if (el.kind !== "element") {
@@ -225,7 +288,25 @@ export function planPage(
     return { ...el, children: [...el.children, ...childPlans] };
   }
 
-  return { root: blocks.map(planBlock), scripts, styles };
+  // Tag each TOP-LEVEL block so the Page Builder's preview overlay can outline +
+  // click-select it. Sections already self-tag (`data-section` inside planSection);
+  // every other top-level block (SectionHeading, a standalone component, a List)
+  // gets a thin id-only wrapper. Column children are tagged separately by
+  // `wrapBlockWidth`. A plain block-flow div (not `display:contents`) so the
+  // overlay's hover/selected OUTLINE has a real box to paint — these blocks lay
+  // out the same wrapped (they're already block-level in the page's vertical flow).
+  function planTopBlock(block: Block): ElementPlan {
+    const el = planBlock(block);
+    if (block.component === SECTION_COMPONENT) return el; // already data-section
+    return {
+      kind: "element",
+      tag: "div",
+      props: { "data-block-wrap": block.id },
+      children: [el],
+    };
+  }
+
+  return { root: blocks.map(planTopBlock), scripts, styles };
 }
 
 /** Parse a JSON column defensively; returns `fallback` on bad/empty JSON. */

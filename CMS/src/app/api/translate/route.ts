@@ -121,6 +121,20 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ errors: valid.errors, missing }, { status: 422 });
   }
 
+  // Non-persisting caller (the page-builder per-block field) only wants the
+  // produced maps — it merges them into the BLOCK's props and autosaves itself.
+  // Skip the artifact write (a component target has nowhere to persist anyway).
+  if (!req.persist) {
+    return Response.json({
+      ok: true,
+      action: "translated",
+      target: req.target,
+      fieldsWritten: 0,
+      translations: valid.input.fields,
+      missing,
+    });
+  }
+
   // Persist via the EXISTING merge/write path.
   try {
     const res = await applyTranslation(valid.input);

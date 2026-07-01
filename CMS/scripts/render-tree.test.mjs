@@ -86,7 +86,7 @@ test("planPage: a hidden column carries the className on its cell", () => {
   ];
   const plan = planPage(blocks, new Map());
   const section = plan.root[0]; // outer data-section div
-  const grid = section.children[0]; // <section> grid
+  const grid = section.children[0].children[0]; // content wrapper > <section> row grid
   const col = grid.children[0]; // the column cell
   assert.equal(col.props.className, "pb-hide-mobile");
 });
@@ -153,14 +153,18 @@ function mapOf(...arts) {
   return new Map(arts.map((a) => [a.name, a]));
 }
 
+// planPage wraps each top-level non-Section block in an id-only overlay div
+// (data-block-wrap) — unwrap to the component root for assertions.
+const top = (root, i = 0) => root[i].children[0];
+
 test("planPage: resolves a block to its component tree", () => {
   const { root, scripts } = planPage(
     [{ id: "1", component: "Card" }],
     mapOf(card),
   );
   assert.equal(root.length, 1);
-  assert.equal(root[0].tag, "div");
-  assert.deepEqual(root[0].props, { className: "card" });
+  assert.equal(top(root).tag, "div");
+  assert.deepEqual(top(root).props, { className: "card" });
   assert.deepEqual(scripts, ["/*card*/"]);
 });
 
@@ -169,8 +173,8 @@ test("planPage: unknown component renders a hidden placeholder, no throw", () =>
     [{ id: "1", component: "Nope" }],
     mapOf(card),
   );
-  assert.equal(root[0].tag, "div");
-  assert.match(root[0].props["data-render-error"], /unknown component "Nope"/);
+  assert.equal(top(root).tag, "div");
+  assert.match(top(root).props["data-render-error"], /unknown component "Nope"/);
   assert.deepEqual(scripts, []);
 });
 
@@ -198,9 +202,9 @@ test("planPage: block children nest inside the resolved component root", () => {
     mapOf(card, slot),
   );
   // Slot's tree had no children; Card is appended.
-  assert.equal(root[0].tag, "section");
-  assert.equal(root[0].children.length, 1);
-  assert.equal(root[0].children[0].tag, "div"); // the Card
+  assert.equal(top(root).tag, "section");
+  assert.equal(top(root).children.length, 1);
+  assert.equal(top(root).children[0].tag, "div"); // the Card
 });
 
 test("planPage: children of a text-root component surface a placeholder", () => {
@@ -209,7 +213,7 @@ test("planPage: children of a text-root component surface a placeholder", () => 
     [{ id: "1", component: "Txt", children: [{ id: "2", component: "Card" }] }],
     mapOf(textComp, card),
   );
-  assert.match(root[0].props["data-render-error"], /cannot host children/);
+  assert.match(top(root).props["data-render-error"], /cannot host children/);
 });
 
 // ── block-prop → component-prop binding (G1 follow-on) ───────────────────────
@@ -250,8 +254,8 @@ test("planPage binding: a declared prop binds into its slot (text + prop value)"
     ],
     mapOf(bindable),
   );
-  assert.equal(root[0].props.href, "/post/1");
-  assert.deepEqual(texts(root[0]), ["Hello", "World"]);
+  assert.equal(top(root).props.href, "/post/1");
+  assert.deepEqual(texts(top(root)), ["Hello", "World"]);
 });
 
 test("planPage binding: an UNDECLARED block prop is dropped (never reaches the tree)", () => {
@@ -262,7 +266,7 @@ test("planPage binding: an UNDECLARED block prop is dropped (never reaches the t
   );
   const all = JSON.stringify(root[0]);
   assert.ok(!all.includes("PWNED"), "undeclared prop must not appear anywhere");
-  assert.deepEqual(texts(root[0]), ["Hi", ""]); // subtitle unbound → ""
+  assert.deepEqual(texts(top(root)), ["Hi"]); // subtitle unbound → empty text pruned
 });
 
 test("planPage binding: an undeclared {{slot}} resolves to empty, not the literal", () => {
@@ -276,7 +280,7 @@ test("planPage binding: an undeclared {{slot}} resolves to empty, not the litera
     [{ id: "1", component: "Leaky", props: { secret: "x" } }],
     mapOf(comp),
   );
-  assert.deepEqual(texts(root[0]), [""]);
+  assert.deepEqual(texts(top(root)), []); // empty slot text is pruned entirely
 });
 
 test("planPage binding: an unsafe value stays plain text (no HTML injection)", () => {
@@ -293,8 +297,8 @@ test("planPage binding: an unsafe value stays plain text (no HTML injection)", (
     ],
     mapOf(bindable),
   );
-  assert.deepEqual(texts(root[0])[0], "<script>alert(1)</script>");
-  assert.equal(root[0].props.href, "javascript:1"); // verbatim data, React-escaped on render
+  assert.deepEqual(texts(top(root))[0], "<script>alert(1)</script>");
+  assert.equal(top(root).props.href, "javascript:1"); // verbatim data, React-escaped on render
 });
 
 test("planPage binding: no propsSchema → nothing binds, slots pass through verbatim", () => {
@@ -341,10 +345,10 @@ test("planPage: a PascalCase tag resolves to the referenced component's tree", (
     mapOf(wrapper, author),
   );
   // header → AuthorCard's div, with the bound name text inside.
-  assert.equal(root[0].tag, "header");
-  assert.equal(root[0].children[0].tag, "div");
-  assert.equal(root[0].children[0].props.className, "author");
-  assert.deepEqual(texts(root[0].children[0]), ["Ada"]);
+  assert.equal(top(root).tag, "header");
+  assert.equal(top(root).children[0].tag, "div");
+  assert.equal(top(root).children[0].props.className, "author");
+  assert.deepEqual(texts(top(root).children[0]), ["Ada"]);
 });
 
 test("planPage: an unknown PascalCase tag becomes a hidden placeholder, no throw", () => {
@@ -353,7 +357,7 @@ test("planPage: an unknown PascalCase tag becomes a hidden placeholder, no throw
     mapOf(wrapper), // AuthorCard missing
   );
   assert.match(
-    root[0].children[0].props["data-render-error"],
+    top(root).children[0].props["data-render-error"],
     /unknown component "AuthorCard"/,
   );
 });
@@ -412,10 +416,11 @@ function section(props, n) {
   return { id: "s", component: "Section", props, children: cols };
 }
 
-// The inner <section> grid style for a planned Section block.
+// The inner <section> grid style for a planned Section block. Rows sit inside
+// the content wrapper now: div[data-section] > div(flex) > section[data-section-row].
 function gridOf(block) {
   const { root } = planPage([block], mapOf(card));
-  return root[0].children[0].props.style.gridTemplateColumns;
+  return root[0].children[0].children[0].props.style.gridTemplateColumns;
 }
 
 test("planSection: multi-column 'equal' uses responsive auto-fit (stacks when narrow)", () => {

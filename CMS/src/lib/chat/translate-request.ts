@@ -34,6 +34,13 @@ export interface TranslateRequest {
   toLocales?: string[];
   /** field path → source-locale text to translate, e.g. `{ metaTitle: "Pricing" }`. */
   fields: Record<string, string>;
+  /**
+   * Whether the route should WRITE the translations into the target artifact.
+   * Default true. The page-builder per-block field sets `false`: it only needs
+   * the produced `{loc:text}` maps to merge into the BLOCK's props itself (a
+   * component target has no place to persist to — see translate-store).
+   */
+  persist: boolean;
 }
 
 const MAX_FIELD_TEXT_BYTES = 16 * 1024;
@@ -99,8 +106,11 @@ export function parseTranslateRequest(
     }
   }
 
+  // Default to persisting; only an explicit `false` opts out.
+  const persist = b.persist !== false;
+
   if (errors.length > 0) return { ok: false, errors };
-  return { ok: true, request: { kind: kind!, target, fromLocale, toLocales, fields } };
+  return { ok: true, request: { kind: kind!, target, fromLocale, toLocales, fields, persist } };
 }
 
 /**

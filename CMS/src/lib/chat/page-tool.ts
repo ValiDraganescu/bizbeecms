@@ -21,7 +21,12 @@
  */
 
 // Relative (not @/) imports so this stays node-testable (see CAVEATS).
-import { planPage, type Block } from "../render/tree.ts";
+import {
+  planPage,
+  SECTION_COMPONENT,
+  isBuiltinComponent,
+  type Block,
+} from "../render/tree.ts";
 
 export type PublishStatus = "draft" | "published";
 
@@ -220,6 +225,34 @@ function validateBlockTree(
   const errors: string[] = [];
   const names = new Set<string>();
   blocks.forEach((b, i) => walk(b, `blocks[${i}]`));
+  // TOP-LEVEL RULE: only Sections at the top level (a new page has no grandfathered
+  // blocks). A bare component here renders outside any section layout.
+  blocks.forEach((b, i) => {
+    const comp = (b as { component?: unknown })?.component;
+    if (typeof comp === "string" && comp.trim() !== "" && comp.trim() !== SECTION_COMPONENT) {
+      errors.push(
+        `blocks[${i}] is a "${comp.trim()}", but only Sections are allowed at the top level. ` +
+          `Wrap it in a Section (Section → __section_row__ → __section_column__ → ${comp.trim()}).`,
+      );
+      return;
+    }
+    // NAMING RULE (AI path): every Section the model authors must carry a
+    // human-readable props.name (e.g. "Hero", "Featured restaurants") — the
+    // operator sees these in the Layers tree and @section mentions, so an
+    // unnamed "Section 3" is not acceptable from the AI.
+    if (comp === SECTION_COMPONENT) {
+      const name = (b as { props?: Record<string, unknown> })?.props?.name;
+      if (typeof name !== "string" || name.trim() === "") {
+        errors.push(
+          `blocks[${i}] is a Section with no name — set props.name to a short, ` +
+            `descriptive label (e.g. "Hero", "Menu highlights", "Footer CTA").`,
+        );
+      }
+    }
+  });
+  // Drop renderer built-ins (Section/row/column/List/LanguageSwitcher) — they
+  // have no D1 component row, so the caller's existence check must not see them.
+  for (const n of [...names]) if (isBuiltinComponent(n)) names.delete(n);
   return { errors, componentNames: [...names] };
 
   function walk(block: unknown, path: string): void {

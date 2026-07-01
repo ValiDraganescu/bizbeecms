@@ -106,7 +106,7 @@
       "newline": "↵ Reavahetus",
       "aria": "Lülita Enter-klahvi käitumist: saada sõnum või lisa reavahetus"
     },
-    "contextAttached": "Lehe kontekst lisatud",
+    "contextAttached": "Kontekst lisatud",
     "attach": {
       "add": "Lisa",
       "remove": "Eemalda manus",
@@ -177,7 +177,8 @@
     "users": "Kasutajad",
     "google": "Google'i sisselogimine",
     "openrouterKey": "OpenRouteri võti",
-    "media": "Meedia"
+    "media": "Meedia",
+    "iconSet": "Ikoonid"
   },
   "theme": {
     "title": "Teema",
@@ -426,6 +427,10 @@
       "action": "Nimeta sektsioon ümber",
       "label": "Sektsiooni nimi"
     },
+    "section": {
+      "collapse": "Ahenda sektsioon",
+      "expand": "Laienda sektsioon"
+    },
     "layoutList": "Loend (kogumikust)",
     "bind": {
       "title": "Seo kogumikuga",
@@ -457,7 +462,27 @@
       "limitPlaceholder": "Vaikimisi",
       "template": "Üksuse komponent",
       "pickTemplate": "— vali komponent —",
-      "map": "Seo väljad üksuse atribuutidega"
+      "map": "Seo väljad üksuse atribuutidega",
+      "direction": "Suund",
+      "directionVertical": "Vertikaalne",
+      "directionHorizontal": "Horisontaalne",
+      "maxHeight": "Maksimkõrgus (px)",
+      "maxWidth": "Maksimlaius (px)",
+      "maxSize": "Maksimsuurus",
+      "maxSizePlaceholder": "Piiranguta",
+      "maxSizeHint": "Sellest suurem sisu keritakse.",
+      "autoscroll": "Automaatkerimine",
+      "autoscrollSpeed": "Kiirus",
+      "speedSlow": "Aeglane",
+      "speedNormal": "Tavaline",
+      "speedFast": "Kiire",
+      "directionGrid": "Ruudustik",
+      "columns": "Veerud",
+      "gap": "Vahe (px)",
+      "columnsHint": "Veerud ekraani suuruse järgi.",
+      "screenDesktop": "Töölaud",
+      "screenTablet": "Tahvel",
+      "screenMobile": "Mobiil"
     },
     "componentsEmpty": "Komponente pole veel — impordi komplekt või komponent.",
     "componentsNoMatch": "Ükski komponent ei vasta otsingule.",
@@ -585,6 +610,22 @@
       "bgForeground": "Esiplaan"
     },
     "column": "Veerg",
+    "row": "Rida",
+    "addRow": "Lisa rida",
+    "deleteRow": {
+      "action": "Kustuta rida"
+    },
+    "dragSection": "Lohista sektsiooni ümberjärjestamiseks",
+    "dragRow": "Lohista rea ümberjärjestamiseks",
+    "sectionRowsHint": "Selle sektsiooni ridu ja veerge hallatakse tasandipuus.",
+    "rowSettings": "Rida",
+    "rowVerticalAlign": "Joonda veerud",
+    "rowVAlign": {
+      "top": "Üles",
+      "center": "Keskele",
+      "bottom": "Alla"
+    },
+    "rowBackground": "Rea taust",
     "columnSettings": "Veerg",
     "colVisibility": {
       "label": "Nähtavus",
@@ -635,6 +676,10 @@
       "one": "Tõlgi: {locale}",
       "emptyHint": "{locale} teksti veel pole — kasuta Tõlgi või kirjuta ise.",
       "emptyHintShort": "{locale} teksti veel pole."
+    },
+    "link": {
+      "newTab": "Ava uuel vahelehel",
+      "pickPage": "Vali leht…"
     }
   },
   "collections": {
@@ -927,7 +972,8 @@
     "viewport": {
       "desktop": "Töölaud",
       "tablet": "Tahvelarvuti",
-      "mobile": "Mobiil"
+      "mobile": "Mobiil",
+      "deviceLabel": "Seadme suurus"
     },
     "codeTab": {
       "html": "HTML",
@@ -946,6 +992,13 @@
       "unsaved": "Salvestamata muudatused",
       "failed": "Salvestamine ebaõnnestus",
       "loading": "Laadin…"
+    },
+    "draft": {
+      "pending": "Avaldamata muudatused",
+      "usageNone": "Pole veel ühelgi avaldatud lehel kasutusel.",
+      "usageCount": "Avaldamine uuendab {count, plural, one {# avaldatud lehte} other {# avaldatud lehte}}: {pages}.",
+      "publish": "Avalda",
+      "discard": "Loobu"
     }
   },
   "translateModel": {

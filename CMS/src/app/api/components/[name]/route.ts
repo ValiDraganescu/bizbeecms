@@ -16,7 +16,11 @@
  */
 import { requireAdmin } from "@/lib/auth/guard";
 import { validateComponentArtifact } from "@/lib/chat/component-tool";
-import { upsertComponent } from "@/db/component-store";
+import {
+  upsertComponent,
+  publishComponentDraft,
+  discardComponentDraft,
+} from "@/db/component-store";
 
 export async function PUT(
   request: Request,
@@ -60,6 +64,48 @@ export async function PUT(
   } catch (err) {
     return Response.json(
       { error: `failed to save: ${(err as Error).message}` },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Publish or discard a component's pending draft.
+ *   POST /api/components/<name>  body { action: "publish" | "discard" }
+ *
+ * publish → draft artifact becomes live (public pages re-render); discard →
+ * draft cleared, live untouched. Both are no-ops (published/discarded:false) when
+ * there's no pending draft.
+ */
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ name: string }> },
+): Promise<Response> {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+
+  const { name } = await params;
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+  const action = (body as { action?: unknown })?.action;
+  if (action !== "publish" && action !== "discard") {
+    return Response.json({ error: 'action must be "publish" or "discard"' }, { status: 400 });
+  }
+
+  try {
+    if (action === "publish") {
+      const res = await publishComponentDraft(name);
+      return Response.json({ action: "publish", published: res.published, name });
+    }
+    const res = await discardComponentDraft(name);
+    return Response.json({ action: "discard", discarded: res.discarded, name });
+  } catch (err) {
+    return Response.json(
+      { error: `failed to ${action}: ${(err as Error).message}` },
       { status: 500 },
     );
   }

@@ -20,7 +20,7 @@
  * later slice actually has shared editor state to manage.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   type InspectorPreset,
@@ -42,8 +42,12 @@ import type { ComponentGroup } from "@/lib/components/grouped";
 import {
   addSection,
   addComponentToColumn,
+  addRow,
+  deleteRow,
+  setSectionColumns,
   isSection,
   isSectionColumn,
+  isSectionRow,
   mergeSectionProps,
   deleteColumn,
   removeNode,
@@ -55,7 +59,9 @@ import {
   setBlockChildren,
   isList,
   addListToSection,
+  addListBlock,
   listSections,
+  sectionName,
   renameSection,
   parsePropsSchema,
 } from "@/lib/pages/page-blocks";
@@ -63,6 +69,7 @@ import type { Block } from "@/lib/render/tree";
 import { declaredPropNames } from "@/lib/content/binding";
 import type { Viewport, CenterTab, RightTab, CollectionMeta } from "@/lib/page-builder/types";
 import { readDragPayload } from "@/lib/page-builder/dnd";
+import { wirePreviewOverlay, markSelectedInPreview } from "@/lib/page-builder/preview-overlay";
 import { ViewportIcon, PreviewThemeIcon, CollapseToggle, ICON } from "./shared";
 import { ComponentsRail } from "./components-rail";
 import { PagePicker } from "./page-picker";
@@ -70,6 +77,7 @@ import { LayersTree } from "./layers-tree";
 import { SeoForm } from "./seo-form";
 import { ColumnSettings } from "./column-settings";
 import { SectionSettings } from "./section-settings";
+import { RowSettings } from "./row-settings";
 import { ComponentSettings } from "./component-settings";
 import { BindingPanel, ListSettings } from "./binding-panels";
 import { PageSettings } from "./page-settings";
@@ -122,6 +130,11 @@ export function PageBuilderShell({
   const [inspectorPreset, setInspectorPreset] = useState<InspectorPreset>("default");
   const [editorW, setEditorW] = useState(0);
   const columnsRef = useRef<HTMLDivElement>(null);
+  // Preview iframe (same-origin) — the selection overlay reaches into its DOM to
+  // outline blocks + report click-to-select. Bumped on every (re)load so the
+  // wiring effect re-attaches to the fresh document.
+  const previewRef = useRef<HTMLIFrameElement>(null);
+  const [previewLoaded, setPreviewLoaded] = useState(0);
   // page-builder-ux: each side rail collapses entirely to widen the canvas;
   // collapsed state persists per side (localStorage). Default-expanded.
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -273,15 +286,88 @@ export function PageBuilderShell({
     return () => window.removeEventListener(PAGE_MUTATION_EVENT, onMutated);
   }, [dirty]);
 
+  // Names for the Preview hover label: section id → its display name, component
+  // leaf id → its component name. Only the blocks the overlay OUTLINES need an
+  // entry (sections + component leaves; rows/columns aren't outlined). Rebuilt
+  // when the tree changes.
+  const previewLabels = useMemo(() => {
+    const map = new Map<string, string>();
+    listSections(blocks).forEach((s, i) => map.set(s.id, sectionName(s.block, i)));
+    const walk = (list: typeof blocks) => {
+      for (const b of list) {
+        // A component leaf (not a Section/row/column/List primitive) is outlined
+        // as `data-block-wrap` → label it by its component name.
+        if (!isSection(b) && !isSectionColumn(b) && b.component) {
+          if (b.component !== "__section_row__") map.set(b.id, b.component);
+        }
+        if (b.children) walk(b.children);
+      }
+    };
+    walk(blocks);
+    return map;
+  }, [blocks]);
+
+  // Click-to-select inside the Preview iframe: wire the overlay on each iframe
+  // load; a click reports a block id → select it AND show its Block details
+  // (same as a Layers click). Re-runs when the iframe reloads (previewLoaded).
+  useEffect(() => {
+    if (centerTab !== "preview") return;
+    return wirePreviewOverlay(
+      previewRef.current,
+      (id) => {
+        setSelectedBlockId(id);
+        setRightTab("block");
+      },
+      (id) => previewLabels.get(id) ?? null,
+    );
+  }, [previewLoaded, centerTab, previewLabels]);
+
+  // Keep the iframe's selected outline in sync with the editor selection (from a
+  // Preview click OR a Layers click), and after each (re)load.
+  useEffect(() => {
+    if (centerTab !== "preview") return;
+    markSelectedInPreview(previewRef.current, selectedBlockId);
+  }, [selectedBlockId, previewLoaded, centerTab]);
+
   function onAddSection() {
     setBlocks((b) => addSection(b));
     setDirty(true);
   }
 
-  // Drop a rail component into a specific Section COLUMN (DnD slice 2). No-op if
-  // the target isn't a valid section/column (the pure helper guards range).
-  function onDropComponentToColumn(sectionId: string, colIndex: number, component: string) {
-    setBlocks((b) => addComponentToColumn(b, sectionId, colIndex, component));
+  // Drop a rail component into a specific ROW's COLUMN. No-op if the target isn't a
+  // valid section/row/column (the pure helper guards range).
+  function onDropComponentToColumn(
+    sectionId: string,
+    colIndex: number,
+    component: string,
+    rowId: string,
+  ) {
+    setBlocks((b) => addComponentToColumn(b, sectionId, colIndex, component, rowId));
+    setDirty(true);
+  }
+
+  // Drop the built-in `List` primitive into a specific Section column (DnD).
+  function onDropListToColumn(sectionId: string, colIndex: number, rowId: string) {
+    setBlocks((b) => addListBlock(b, sectionId, colIndex, rowId));
+    setDirty(true);
+  }
+
+  // Add a row to a Section (migrates a grandfathered section to explicit rows).
+  function onAddRow(sectionId: string) {
+    setBlocks((b) => addRow(b, sectionId));
+    setDirty(true);
+  }
+
+  // Delete a row (and its columns/components); keeps ≥1 row per section.
+  function onDeleteRow(rowId: string) {
+    setBlocks((b) => deleteRow(b, rowId));
+    if (selectedBlockId === rowId) setSelectedBlockId(null);
+    setDirty(true);
+  }
+
+  // Set a specific row's column count (grandfather-safe via rowId).
+  function onSetRowColumns(sectionId: string, n: number, rowId: string) {
+    setBlocks((b) => setSectionColumns(b, sectionId, n, rowId));
     setDirty(true);
   }
 
@@ -361,6 +447,21 @@ export function PageBuilderShell({
         else next[k] = v;
       }
       return mergeBlockProps(b, columnId, next);
+    });
+    setDirty(true);
+  }
+
+  // Patch-merge a ROW's own props (behavior, gap, align, background, padding).
+  // Only `undefined` deletes a key (a row's `false`/0 values are legitimate).
+  function onUpdateRowProps(rowId: string, patch: Record<string, unknown>) {
+    setBlocks((b) => {
+      const row = findBlock(b, rowId);
+      const next: Record<string, unknown> = { ...(row?.props ?? {}) };
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined) delete next[k];
+        else next[k] = v;
+      }
+      return mergeBlockProps(b, rowId, next);
     });
     setDirty(true);
   }
@@ -742,10 +843,14 @@ export function PageBuilderShell({
                   selectedId={selectedBlockId}
                   onSelect={setSelectedBlockId}
                   onDropComponent={onDropComponentToColumn}
+                  onDropList={onDropListToColumn}
                   onMoveNode={onMoveNode}
                   onDeleteColumn={onDeleteColumn}
                   onDeleteNode={onDeleteNode}
                   onRenameSection={onRenameSection}
+                  onAddRow={onAddRow}
+                  onDeleteRow={onDeleteRow}
+                  onSetRowColumns={onSetRowColumns}
                 />
               )}
               {/* Drop indicator: a blue line where the new Section appends. */}
@@ -816,6 +921,8 @@ export function PageBuilderShell({
                 >
                   {selected ? (
                     <iframe
+                      ref={previewRef}
+                      onLoad={() => setPreviewLoaded((n) => n + 1)}
                       key={`${selected.id}-${previewNonce}-${previewTheme}-${previewVersionId ?? ""}`}
                       src={previewSrc(selected.id, previewTheme, previewVersionId)}
                       title={t("previewIframeTitle")}
@@ -936,7 +1043,18 @@ export function PageBuilderShell({
                     />
                   );
                 }
-                // A component block (not a Section or a column shell): show its
+                // A ROW shell: its own settings (behavior, gap, align, background,
+                // padding). Column COUNT stays inline on the row in the Layers tree.
+                if (sel && isSectionRow(sel)) {
+                  return (
+                    <RowSettings
+                      key={sel.id}
+                      row={sel}
+                      onChange={(patch) => onUpdateRowProps(sel.id, patch)}
+                    />
+                  );
+                }
+                // A component block (not a Section, row, or column shell): show its
                 // schema-driven settings form + the single-item binding panel.
                 if (sel && !isSectionColumn(sel)) {
                   return (

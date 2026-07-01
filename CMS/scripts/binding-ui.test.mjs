@@ -16,6 +16,7 @@ import { dirname, join } from "node:path";
 
 import {
   addSection,
+  sectionColumns,
   addListBlock,
   addListToSection,
   setBlockField,
@@ -33,7 +34,7 @@ test("addListToSection inserts a built-in List into the section's first column",
   let blocks = addSection([]); // one Section, one column
   const sectionId = blocks[0].id;
   blocks = addListToSection(blocks, sectionId);
-  const col = blocks[0].children.find((c) => c.component === "__section_column__");
+  const col = sectionColumns(blocks[0])[0];
   const list = col.children[0];
   assert.equal(list.component, LIST_COMPONENT);
   assert.ok(isList(list));
@@ -55,7 +56,7 @@ test("addListBlock is a no-op for a non-Section / out-of-range column", () => {
 test("setBlockField sets binding/list fields and deletes on undefined", () => {
   let blocks = addSection([]);
   blocks = addListToSection(blocks, blocks[0].id);
-  const col = blocks[0].children.find((c) => c.component === "__section_column__");
+  const col = sectionColumns(blocks[0])[0];
   const listId = col.children[0].id;
 
   const source = { collection: "content_posts", filter: [{ field: "status", op: "eq", value: "published" }] };
@@ -77,7 +78,7 @@ test("setBlockField on a NESTED component sets single-item bindings (tree-walk)"
   const sectionId = blocks[0].id;
   // Reuse addListToSection to get a nested block id, then treat it as a component.
   blocks = addListToSection(blocks, sectionId);
-  const col = blocks[0].children.find((c) => c.component === "__section_column__");
+  const col = sectionColumns(blocks[0])[0];
   const id = col.children[0].id;
   const bindings = { item: { source: { collection: "content_posts" }, map: { title: "name" } } };
   blocks = setBlockField(blocks, id, { bindings });
@@ -87,7 +88,7 @@ test("setBlockField on a NESTED component sets single-item bindings (tree-walk)"
 test("setBlockChildren replaces a List's template child and drops on empty", () => {
   let blocks = addSection([]);
   blocks = addListToSection(blocks, blocks[0].id);
-  const col = blocks[0].children.find((c) => c.component === "__section_column__");
+  const col = sectionColumns(blocks[0])[0];
   const listId = col.children[0].id;
 
   const tpl = [{ id: `${listId}-tpl`, component: "Card", listRole: "template" }];

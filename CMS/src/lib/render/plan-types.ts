@@ -26,6 +26,21 @@ export const SECTION_COMPONENT = "Section";
 export const SECTION_COLUMN_COMPONENT = "__section_column__";
 
 /**
+ * Reserved component name for a Section ROW — the layer BETWEEN a Section and its
+ * columns (multi-row sections epic). A Section's children are `__section_row__`
+ * blocks; each row's children are `__section_column__` blocks (1+); components
+ * live inside a column. Each row carries its OWN `props.columns` / `columnBehavior`
+ * so different rows can have different column counts.
+ *
+ * GRANDFATHERED: a legacy Section whose direct children are columns (no row layer)
+ * is treated as ONE implicit row by the renderer + pure builders (`sectionRows`),
+ * so old pages render unchanged and upgrade to explicit rows only when edited.
+ * Like Section/column, a renderer primitive (no D1 row) — excluded from the
+ * component-existence check.
+ */
+export const SECTION_ROW_COMPONENT = "__section_row__";
+
+/**
  * Reserved component name for a List — a BUILT-IN data-binding block (Phase 2,
  * Slice B), modeled EXACTLY on the Section primitive: special-cased in this
  * renderer (`planList`), NOT an AI-authored D1 component. A List carries a
@@ -40,11 +55,26 @@ export const SECTION_COLUMN_COMPONENT = "__section_column__";
  */
 export const LIST_COMPONENT = "List";
 
+/**
+ * Reserved component name for the built-in LanguageSwitcher — a renderer
+ * primitive (like Section/List, no D1 row) that renders a `<select>` of the
+ * Site's configured content locales, current one selected. Choosing a locale
+ * writes the `bb_content_locale` cookie and reloads, so the published page
+ * re-renders in that locale AND the choice survives a refresh. It resolves BY
+ * REFERENCE like a component, so an AI-authored nav-bar component can embed it
+ * with a `<LanguageSwitcher />` tag (composition-by-tag). The available locale
+ * set + active locale come from `LocaleContext.available` — the pure renderer
+ * never queries settings itself.
+ */
+export const LANGUAGE_SWITCHER_COMPONENT = "LanguageSwitcher";
+
 /** The reserved built-in block component names (not D1 component rows). */
 export const BUILTIN_COMPONENTS = [
   SECTION_COMPONENT,
+  SECTION_ROW_COMPONENT,
   SECTION_COLUMN_COMPONENT,
   LIST_COMPONENT,
+  LANGUAGE_SWITCHER_COMPONENT,
 ] as const;
 
 /** Is this block component a built-in renderer primitive (no D1 row needed)? */
@@ -107,6 +137,31 @@ export type ListSource = {
    *    item component is purely visual. Config below rides on the SAME List panel.
    */
   presentation?: "list" | "combobox";
+  // ── "list" presentation layout (ignored for "combobox") ───────────────────
+  /**
+   * How the rows lay out. Default "vertical".
+   *  - "vertical"   → a column; maxSize caps HEIGHT, overflow scrolls on Y.
+   *  - "horizontal" → a row;    maxSize caps WIDTH,  overflow scrolls on X.
+   *  - "grid"       → an N-column grid (see `columns`); maxSize caps HEIGHT.
+   */
+  direction?: "vertical" | "horizontal" | "grid";
+  /** Grid column count at DESKTOP width (direction "grid" only). Default 2, min 1. */
+  columns?: number;
+  /** Grid columns at TABLET width (768–1023px). Unset = same as `columns`. */
+  columnsTablet?: number;
+  /** Grid columns at MOBILE width (≤767px). Unset = same as `columns`. */
+  columnsMobile?: number;
+  /** Gap between items, in px (all directions). Default 0. */
+  gap?: number;
+  /**
+   * Max size along the scroll axis, in px — max-height for vertical/grid,
+   * max-width for horizontal. Content past it SCROLLS. Unset = grows to fit.
+   */
+  maxSize?: number;
+  /** Auto-scroll the overflowing content in a seamless loop. Default off. */
+  autoscroll?: boolean;
+  /** Auto-scroll speed. Default "normal". */
+  autoscrollSpeed?: "slow" | "normal" | "fast";
   // ── "combobox" presentation config (ignored for "list") ───────────────────
   /** single = pick one (closes on select); multiple = pick many. Default multiple. */
   select?: "single" | "multiple";
@@ -223,7 +278,16 @@ export type RenderPlan = {
  * resolved to the active locale (fallback → default → first present) as the
  * tree is walked. Absent = no resolution (props pass through verbatim).
  */
-export type LocaleContext = { locale: string; fallback: string };
+export type LocaleContext = {
+  locale: string;
+  fallback: string;
+  /**
+   * The Site's full content-locale set (code + human label), for the built-in
+   * LanguageSwitcher to render its options. Absent on paths that don't need it
+   * (the switcher then renders nothing). Ordered as configured; the default leads.
+   */
+  available?: Array<{ code: string; label: string }>;
+};
 
 /** Make a hidden placeholder element carrying a render-error message. Shared by
  *  every planner so one bad node degrades to an invisible div, never a throw. */

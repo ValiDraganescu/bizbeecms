@@ -119,7 +119,8 @@ test("buildSystemPrompt: tells the model full Tailwind compiles per page (varian
   assert.match(p, /any standard Tailwind utility/);
   assert.match(p, /compiled per page at render time/);
   assert.match(p, /arbitrary values/);
-  assert.match(p, /bg-primary/); // still steers toward purpose color tokens
+  assert.match(p, /ONLY the Site's theme tokens/); // still steers toward purpose color tokens
+  assert.match(p, /text-primary/);
 });
 
 test("buildSystemPrompt: lists content collections with exact table names + fields", () => {

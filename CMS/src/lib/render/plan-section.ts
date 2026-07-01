@@ -9,6 +9,7 @@
 import {
   type Block,
   type ElementPlan,
+  SECTION_ROW_COMPONENT,
   SECTION_COLUMN_COMPONENT,
   num,
   str,
@@ -102,13 +103,96 @@ export function columnStyle(
   };
 }
 
+/**
+ * The `grid-template-columns` value for one ROW's columns. `collapse` shrinks
+ * empty columns to 0fr (fixed N tracks, no wrap); `equal` is responsive
+ * (auto-fit ≥MIN-wide tracks capped at 100% so a narrow viewport stacks columns).
+ * A 1-column row keeps a single full-width track either way. PURE.
+ */
+export function rowGridCols(cols: Block[], columns: number, columnBehavior: string): string {
+  if (columnBehavior === "collapse") {
+    return (
+      cols.map((c) => ((c.children?.length ?? 0) > 0 ? "1fr" : "0fr")).join(" ") || "1fr"
+    );
+  }
+  return columns <= 1
+    ? "1fr"
+    : `repeat(auto-fit, minmax(min(100%, ${MIN_COLUMN_WIDTH}), 1fr))`;
+}
+
+/**
+ * Plan ONE row: the inner `<section>` grid of columns. `alignItems`/`justify` are
+ * the Section's content-alignment defaults; a ROW may override `verticalAlign`
+ * (align its columns) and a column may override in turn. The row's OWN
+ * `props.columns`/`columnBehavior`/`gap` drive its grid (so rows differ); a row
+ * may also carry `backgroundColor` (a theme token, paints the row band) and
+ * per-side `padding` (with per-side `*Unit`, rem default). All optional → a bare
+ * row renders exactly as before.
+ */
+function planRowGrid(
+  row: Block,
+  planBlock: (b: Block) => ElementPlan,
+  alignItems: string,
+  justify: string,
+  sectionGap: number,
+): ElementPlan {
+  const rp = (row.props ?? {}) as Record<string, unknown>;
+  const cols = (row.children ?? []).filter(
+    (c) => c.component === SECTION_COLUMN_COMPONENT,
+  );
+  const columns = num(rp.columns, cols.length || 1);
+  const columnBehavior = str(rp.columnBehavior, "equal");
+  const gap = num(rp.gap, sectionGap);
+  // Row overrides the Section's vertical alignment for its own columns (absent →
+  // inherit the passed-in section default).
+  const rowAlign = rp.verticalAlign != null ? (ALIGN_ITEMS[str(rp.verticalAlign, "top")] ?? alignItems) : alignItems;
+  const bg = str(rp.backgroundColor, "transparent");
+  const style: Record<string, string | number> = {
+    display: "grid",
+    gridTemplateColumns: rowGridCols(cols, columns, columnBehavior),
+    gap: `${gap}px`,
+    overflow: "hidden",
+    paddingTop: pad(rp, "Top"),
+    paddingRight: pad(rp, "Right"),
+    paddingBottom: pad(rp, "Bottom"),
+    paddingLeft: pad(rp, "Left"),
+  };
+  if (bg !== "transparent") style.backgroundColor = bg;
+  return {
+    kind: "element",
+    tag: "section",
+    props: { "data-section-row": row.id, style },
+    children: cols.map((c) => planColumn(c, planBlock, rowAlign, justify)),
+  };
+}
+
+/**
+ * A standalone ROW (a `__section_row__` reached directly by planBlock, e.g. one
+ * dragged loose) — render its grid with default alignment/gap.
+ */
+export function planRow(row: Block, planBlock: (b: Block) => ElementPlan): ElementPlan {
+  return planRowGrid(row, planBlock, "flex-start", "flex-start", 16);
+}
+
+/**
+ * The ROWS of a Section, GRANDFATHER-AWARE: explicit `__section_row__` children if
+ * present, otherwise the whole Section treated as ONE implicit row (its direct
+ * `__section_column__` children). Mirrors the pure `sectionRows` in page-blocks so
+ * renderer + editor agree. Legacy column-direct sections render exactly as before.
+ */
+function sectionRowBlocks(block: Block): Block[] {
+  const children = block.children ?? [];
+  const rows = children.filter((c) => c.component === SECTION_ROW_COMPONENT);
+  if (rows.length > 0) return rows;
+  // Grandfather: no explicit rows → the section itself is one row of its columns.
+  return [block];
+}
+
 export function planSection(
   block: Block,
   planBlock: (b: Block) => ElementPlan,
 ): ElementPlan {
   const p = (block.props ?? {}) as Record<string, unknown>;
-  const columns = num(p.columns, 1);
-  const columnBehavior = str(p.columnBehavior, "equal");
   const gap = num(p.gap, 16);
   const maxWidth = str(p.maxWidth, "1280px");
   // ONE shared padding unit for all four sides (user decision 2026-06-19). MIGRATE
@@ -119,20 +203,14 @@ export function planSection(
   const colJustify = JUSTIFY[str(p.horizontalAlign, "left")] ?? "flex-start";
   const colAlignItems = ALIGN_ITEMS[str(p.verticalAlign, "top")] ?? "flex-start";
 
-  const cols = (block.children ?? []).filter(
-    (c) => c.component === SECTION_COLUMN_COMPONENT,
+  const rows = sectionRowBlocks(block);
+  const rowGrids = rows.map((row) =>
+    planRowGrid(row, planBlock, colAlignItems, colJustify, gap),
   );
-  // collapse → empty columns shrink to 0fr (explicit fixed N tracks, no wrap);
-  // equal → responsive: auto-fit tracks that are ≥MIN wide but cap at 100% so a
-  // narrow viewport drops columns one-below-the-other instead of overflowing.
-  // A 1-column Section keeps a single full-width track either way.
-  const gridCols =
-    columnBehavior === "collapse"
-      ? cols.map((c) => ((c.children?.length ?? 0) > 0 ? "1fr" : "0fr")).join(" ")
-      : columns <= 1
-        ? "1fr"
-        : `repeat(auto-fit, minmax(min(100%, ${MIN_COLUMN_WIDTH}), 1fr))`;
 
+  // The centered content wrapper carries the Section padding + max-width; inside
+  // it, rows stack vertically (a flex column, `gap` between rows). One grandfathered
+  // row lays out identically to the pre-rows single-grid section.
   return {
     kind: "element",
     tag: "div",
@@ -140,11 +218,11 @@ export function planSection(
     children: [
       {
         kind: "element",
-        tag: "section",
+        tag: "div",
         props: {
           style: {
-            display: "grid",
-            gridTemplateColumns: gridCols,
+            display: "flex",
+            flexDirection: "column",
             gap: `${gap}px`,
             paddingTop: pad(p, "Top", paddingUnit),
             paddingRight: pad(p, "Right", paddingUnit),
@@ -152,10 +230,9 @@ export function planSection(
             paddingLeft: pad(p, "Left", paddingUnit),
             maxWidth: maxWidth === "full" ? "100%" : maxWidth,
             margin: "0 auto",
-            overflow: "hidden",
           },
         },
-        children: cols.map((c) => planColumn(c, planBlock, colAlignItems, colJustify)),
+        children: rowGrids,
       },
     ],
   };

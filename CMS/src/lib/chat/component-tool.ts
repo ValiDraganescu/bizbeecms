@@ -30,6 +30,7 @@
 // (the dep-free `node --test` convention can't resolve the @/ alias; see CAVEATS).
 import { planTree, type TreeNode } from "../render/tree.ts";
 import { parseHtml } from "../render/parse-html.ts";
+import { normalizeTags } from "../components/tags.ts";
 
 /** The validated, ready-to-persist component artifact. */
 export interface ComponentArtifactInput {
@@ -42,7 +43,16 @@ export interface ComponentArtifactInput {
   // a component renders with realistic sample data outside any page. Omitted/""
   // for a fully static component with no slots.
   propsSchema?: string;
+  // Operator/kit labels (component-kits). Normalized array; omitted leaves any
+  // existing tags untouched on update. Drives the page-builder rail's by-tag view.
+  tags?: string[];
+  // Human display label shown in the UI (the `name` can't hold spaces). Omitted
+  // leaves an existing label untouched; "" clears it (UI falls back to `name`).
+  label?: string;
 }
+
+// A display label is free-form but bounded so a confused model can't store a blob.
+const MAX_LABEL_LEN = 100;
 
 // Bound the script so a confused model can't emit a multi-MB blob into D1.
 const MAX_SCRIPT_BYTES = 64 * 1024;
@@ -103,8 +113,28 @@ export const CREATE_COMPONENT_TOOL = {
             "tree has any {{slots}}: `default` is REQUIRED PLACEHOLDER data — a " +
             "realistic sample value (e.g. a real-sounding title, paragraph, price, " +
             "or image URL) so the component renders meaningfully on its own in the " +
-            "preview. type is one of string|richtext|number|boolean|select. Omit " +
+            "preview. type is one of string|richtext|number|boolean|select|image|icon. Use " +
+            "`richtext` for any prose/long-text/multi-line slot (body copy, " +
+            "descriptions, paragraphs) so the editor gives it a textarea; reserve " +
+            "`string` for short single-line labels (titles, button text, hrefs); use " +
+            "`icon` for an editable icon name referenced by an `{{icon prop}}` slot " +
+            "(call search_icons for valid names). Omit " +
             "only for a fully static component with no slots.",
+        },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Optional short operator labels for grouping this component (e.g. " +
+            "['BasicRestaurant', 'Hero']). Used to build/export UI kits and the " +
+            "page-builder's by-tag view. Omit to leave existing tags unchanged.",
+        },
+        label: {
+          type: "string",
+          description:
+            "Optional human display label shown in the UI, e.g. 'Hero — Emozione'. " +
+            "Can contain spaces (the `name` cannot). Omit to leave an existing label " +
+            "unchanged; pass '' to clear it (the UI then shows the name).",
         },
       },
       required: ["name", "html"],
@@ -181,11 +211,29 @@ export function validateComponentArtifact(
     errors.push("propsSchema must be an object { propName: { type, default } } (or a JSON string of one)");
   }
 
+  // ── tags ── (optional; array of short labels). Absent → undefined (update
+  // leaves existing tags alone); present-but-not-array → ignored as []. normalizeTags
+  // drops junk/over-long/dupes, so an untrusted list is safe.
+  const tags = a.tags === undefined ? undefined : normalizeTags(a.tags);
+
+  // ── label ── (optional free-form display string). Absent → undefined (leave
+  // existing); "" → cleared. Trimmed + length-bounded. Non-string ignored.
+  const label =
+    a.label === undefined ? undefined : typeof a.label === "string" ? a.label.trim().slice(0, MAX_LABEL_LEN) : undefined;
+
   if (errors.length > 0) return { ok: false, errors };
   const schemaStr = typeof propsSchema === "string" && propsSchema !== "invalid" ? propsSchema : undefined;
   return {
     ok: true,
-    artifact: { name, tree: tree as TreeNode, script, css, ...(schemaStr ? { propsSchema: schemaStr } : {}) },
+    artifact: {
+      name,
+      tree: tree as TreeNode,
+      script,
+      css,
+      ...(schemaStr ? { propsSchema: schemaStr } : {}),
+      ...(tags !== undefined ? { tags } : {}),
+      ...(label !== undefined ? { label } : {}),
+    },
   };
 }
 

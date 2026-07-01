@@ -23,6 +23,7 @@ type ComponentSummary = {
   hasScript: boolean;
   hasCss: boolean;
   tags: string[];
+  label?: string | null;
 };
 
 // Preview shape returned by POST /api/components/preview (mirrors KitPreview in
@@ -768,7 +769,9 @@ export function ComponentsManager({
                       onChange={() => toggleSelected(c.name)}
                     />
                     <div className="flex min-w-0 flex-col">
-                      <span className="truncate font-mono text-foreground">{c.name}</span>
+                      <span className={"truncate text-foreground " + (c.label ? "font-medium" : "font-mono")}>
+                        {c.label || c.name}
+                      </span>
                       <span className="text-sm text-foreground-muted">
                         {[c.hasScript ? t("flagScript") : null, c.hasCss ? t("flagCss") : null]
                           .filter(Boolean)

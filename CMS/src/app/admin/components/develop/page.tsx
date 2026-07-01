@@ -26,6 +26,7 @@ export default async function ComponentDevelopPage() {
     hasCss: boolean;
     hasPreviewData: boolean;
     tags: string[];
+    label?: string | null;
   }[] = [];
   try {
     const rows = await listComponents();
@@ -35,6 +36,7 @@ export default async function ComponentDevelopPage() {
       hasCss: (r.css ?? "") !== "",
       hasPreviewData: (r.propsSchema ?? "") !== "",
       tags: normalizeTags(r.tags),
+      label: r.label ?? null,
     }));
   } catch {
     /* unbound D1 in this env — render empty */

@@ -37,10 +37,14 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);
   if (denied) return denied;
-  const name = new URL(request.url).searchParams.get("name");
+  const url = new URL(request.url);
+  const name = url.searchParams.get("name");
+  // draft=1: return the pending DRAFT artifact (Develop workbench edits the
+  // draft; without it the post-save refetch reseeds from live and clobbers).
+  const preferDraft = url.searchParams.get("draft") === "1";
   try {
     if (name) {
-      const row = await getComponentByName(name);
+      const row = await getComponentByName(name, preferDraft);
       if (!row) return Response.json({ error: "component not found" }, { status: 404 });
       const bundle = serializeComponent(row, { exportedAt: new Date().toISOString() });
       return new Response(JSON.stringify(bundle, null, 2), {
@@ -60,6 +64,7 @@ export async function GET(request: Request): Promise<Response> {
         // Has declared props → the standalone preview has placeholder data to bind.
         hasPreviewData: (r.propsSchema ?? "") !== "",
         tags: normalizeTags(r.tags),
+        label: r.label ?? null,
       })),
     );
   } catch (err) {

@@ -14,9 +14,10 @@
  * read-only; you append new ones. Drop/rename is a later phase.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { setActiveCollectionContext } from "@/lib/chat/collection-context";
 import {
   COLLECTION_FIELD_TYPES,
   type CollectionField,
@@ -62,6 +63,16 @@ export function CollectionsManager({ initial }: { initial: CollectionView[] }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<CollectionView | null>(null);
+
+  // Publish the site's collection list to the AI assistant (no collection is
+  // "open" on the index → current: null). Re-runs as collections are created/deleted.
+  useEffect(() => {
+    setActiveCollectionContext({
+      collections: list.map((c) => ({ name: c.name, tableName: c.tableName })),
+      current: null,
+    });
+    return () => setActiveCollectionContext(null);
+  }, [list]);
 
   async function refresh() {
     const res = await fetch("/api/collections");

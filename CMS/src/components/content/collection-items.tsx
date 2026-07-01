@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { useTranslations } from "next-intl";
 import type { CollectionView } from "@/db/collection-store";
+import { setActiveCollectionContext } from "@/lib/chat/collection-context";
 import { COLLECTION_FIELD_TYPES, type CollectionField } from "@/lib/content/collection-schema";
 import { ITEM_STATUSES } from "@/lib/content/item-write";
 import { blankValueFor, FieldInput, type FieldValue } from "./field-input";
@@ -29,10 +30,28 @@ const INPUT = "rounded-md border border-border bg-surface px-3 py-2 text-foregro
 type Item = Record<string, unknown>;
 type ArchivedFilter = "live" | "archived" | "all";
 
-export function CollectionItems({ collection: initialCollection }: { collection: CollectionView }) {
+export function CollectionItems({
+  collection: initialCollection,
+  allCollections = [],
+}: {
+  collection: CollectionView;
+  /** Every collection in the site — for the assistant's cross-collection context. */
+  allCollections?: CollectionView[];
+}) {
   const t = useTranslations("collections");
   const [collection, setCollection] = useState(initialCollection);
   const tableName = collection.tableName;
+
+  // Publish this open collection (name + fields) + the site's collection list to
+  // the AI assistant, so a chat message carries which collection is open and what
+  // fields it has. Re-runs when the schema changes (Add field / manage schema).
+  useEffect(() => {
+    setActiveCollectionContext({
+      collections: allCollections.map((c) => ({ name: c.name, tableName: c.tableName })),
+      current: { name: collection.name, tableName: collection.tableName, fields: collection.fields },
+    });
+    return () => setActiveCollectionContext(null);
+  }, [collection, allCollections]);
 
   const [items, setItems] = useState<Item[]>([]);
   const [total, setTotal] = useState(0);

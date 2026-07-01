@@ -19,6 +19,9 @@ import {
   mergeBlockProps,
   patchBlockProps,
   isImageProp,
+  isLinkProp,
+  linkNewTabProp,
+  isLongText,
   translatableSlotNames,
   applyTranslatableFromSlots,
   setLocalizedProp,
@@ -79,6 +82,28 @@ test("parsePropsSchema: each new field type round-trips", () => {
   assert.equal(by.weird.type, "string"); // unknown type degrades
 });
 
+test("parsePropsSchema: translatable text default as a per-locale object is kept", () => {
+  const [f] = parsePropsSchema(
+    JSON.stringify({
+      title: {
+        type: "string",
+        translatable: true,
+        default: { en: "Our restaurants", fi: "Ravintolamme" },
+      },
+    }),
+  );
+  // The object reaches the renderer (resolveLocalized picks the active locale)…
+  assert.deepEqual(f.defaultValue, { en: "Our restaurants", fi: "Ravintolamme" });
+  // …and a display string (first locale) feeds the editor textarea.
+  assert.equal(f.default, "Our restaurants");
+  // A NON-translatable text prop with an object default is ignored (single value only).
+  const [g] = parsePropsSchema(
+    JSON.stringify({ title: { type: "string", default: { en: "x" } } }),
+  );
+  assert.equal(g.defaultValue, undefined);
+  assert.equal(g.default, "");
+});
+
 test("isImageProp: type image, or string prop with an image-ish name → picker", () => {
   // Explicit type wins.
   assert.equal(isImageProp({ type: "image", name: "whatever" }), true);
@@ -94,6 +119,38 @@ test("isImageProp: type image, or string prop with an image-ish name → picker"
   assert.equal(isImageProp({ type: "number", name: "imageCount" }), false);
   // A translatable text prop is per-locale text, never an image.
   assert.equal(isImageProp({ type: "string", name: "image", translatable: true }), false);
+});
+
+test("isLinkProp: type link, or string prop with an href/url/link-ish name", () => {
+  assert.equal(isLinkProp({ type: "link", name: "whatever" }), true);
+  assert.equal(isLinkProp({ type: "string", name: "ctaHref" }), true);
+  assert.equal(isLinkProp({ type: "string", name: "link1Href" }), true);
+  assert.equal(isLinkProp({ type: "string", name: "profileUrl" }), true);
+  // Plain text stays text.
+  assert.equal(isLinkProp({ type: "string", name: "title" }), false);
+  // Translatable = per-locale text, never a link.
+  assert.equal(isLinkProp({ type: "string", name: "ctaHref", translatable: true }), false);
+  // An image-ish name wins (imageUrl is an image, not a link).
+  assert.equal(isLinkProp({ type: "string", name: "imageUrl" }), false);
+  // Non-string scalar types aren't links via the heuristic.
+  assert.equal(isLinkProp({ type: "number", name: "linkCount" }), false);
+});
+
+test("linkNewTabProp: companion boolean name is <href>NewTab", () => {
+  assert.equal(linkNewTabProp("ctaHref"), "ctaHrefNewTab");
+});
+
+test("validateBlockProps preserves a boolean <link>NewTab flag (not a declared prop)", () => {
+  const schema = parsePropsSchema('{"ctaHref":{"type":"link","default":"/x"}}');
+  // Flag on → kept; the renderer reads it for target/rel.
+  const on = validateBlockProps({ ctaHref: "/go", ctaHrefNewTab: true }, schema);
+  assert.equal(on.ctaHrefNewTab, true);
+  // Explicit false → kept: it overrides a schema-level `newTab` default.
+  const off = validateBlockProps({ ctaHref: "/go", ctaHrefNewTab: false }, schema);
+  assert.equal(off.ctaHrefNewTab, false);
+  // Absent → dropped (inherit the schema default, else same-tab).
+  const none = validateBlockProps({ ctaHref: "/go" }, schema);
+  assert.equal("ctaHrefNewTab" in none, false);
 });
 
 test("parsePropsSchema/validateBlockProps: image type round-trips as a string URL", () => {
@@ -294,4 +351,13 @@ test("mergeBlockProps: replaces a nested block's props immutably; {} drops props
   // missing id → no-op (returns mapped tree, hero unchanged)
   const noop = mergeBlockProps(t, "ghost", { x: 1 });
   assert.deepEqual(findBlock(noop, "hero-1")!.props, { title: "old" });
+});
+
+test("isLongText — multiline or past one-line length → textarea", () => {
+  assert.equal(isLongText("Order Now"), false); // short label → input
+  assert.equal(isLongText("line one\nline two"), true); // any newline → textarea
+  assert.equal(isLongText("x".repeat(61)), true); // past length cutoff
+  assert.equal(isLongText("x".repeat(60)), false); // at cutoff stays input
+  assert.equal(isLongText(123), false); // non-string never long
+  assert.equal(isLongText(undefined), false);
 });

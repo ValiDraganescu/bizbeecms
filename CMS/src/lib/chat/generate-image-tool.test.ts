@@ -33,3 +33,13 @@ test("validateGenerateImage defaults missing tags to []", () => {
   assert.equal(v.ok, true);
   if (v.ok) assert.deepEqual(v.tags, []);
 });
+
+test("transparentBackground defaults false and only true when literally true", () => {
+  const a = validateGenerateImage({ prompt: "a logo" });
+  assert.equal(a.ok && a.transparentBackground, false);
+  const b = validateGenerateImage({ prompt: "a logo", transparentBackground: true });
+  assert.equal(b.ok && b.transparentBackground, true);
+  // A truthy-but-not-true value (e.g. "yes") does NOT enable it.
+  const c = validateGenerateImage({ prompt: "a logo", transparentBackground: "yes" });
+  assert.equal(c.ok && c.transparentBackground, false);
+});

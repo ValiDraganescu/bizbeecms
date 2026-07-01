@@ -80,12 +80,16 @@ test("json prop as an already-parsed array is JSON-stringified into the attribut
   assert.equal(el.props["data-options"], '[{"id":2,"label":"B"}]');
 });
 
-test("missing json prop → empty attribute (script sees '' and defaults safely)", () => {
+test("missing json prop → falls back to the schema default (placeholder)", () => {
+  // With the schema-defaults merge, an unset prop renders its propsSchema
+  // `default` (the authored placeholder) instead of the raw `{{slot}}` / "".
+  // Here that default is "[]", which the client script still JSON.parses safely.
   const blocks: Block[] = [{ id: "b1", component: "Combobox", props: {} }];
   const { root } = planPage(blocks, components);
   const el = findByProp(root[0], "data-options");
   assert.ok(el && el.kind === "element");
-  assert.equal(el.props["data-options"], "");
+  assert.equal(el.props["data-options"], "[]");
+  assert.deepEqual(JSON.parse(el.props["data-options"] as string), []);
 });
 
 // ── List "combobox" presentation: component-per-row inside a select dropdown ──

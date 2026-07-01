@@ -20,10 +20,24 @@ test("CREATE_PAGE_TOOL: well-formed OpenAI function schema", () => {
 });
 
 // ── happy path ───────────────────────────────────────────────────────────────
+// Top level must be NAMED Sections now (Section → row → column → components).
+const section = (id, name, children) => ({
+  id,
+  component: "Section",
+  props: { name },
+  children: [
+    {
+      id: `${id}-r`,
+      component: "__section_row__",
+      props: { columns: 1 },
+      children: [{ id: `${id}-c`, component: "__section_column__", children }],
+    },
+  ],
+});
 test("validate: accepts a minimal valid page", () => {
   const res = validatePageInput({
     slug: "home",
-    blocks: [{ id: "b1", component: "Hero" }],
+    blocks: [section("s1", "Hero", [{ id: "b1", component: "Hero" }])],
   });
   assert.equal(res.ok, true);
   assert.equal(res.page.slug, "home");
@@ -37,26 +51,23 @@ test("validate: collects distinct component names across nested blocks", () => {
     slug: "pricing",
     publishStatus: "published",
     blocks: [
-      {
-        id: "wrap",
-        component: "Section",
-        children: [
-          { id: "a", component: "PricingCard" },
-          { id: "b", component: "PricingCard" },
-          { id: "c", component: "CtaButton" },
-        ],
-      },
+      section("wrap", "Pricing", [
+        { id: "a", component: "PricingCard" },
+        { id: "b", component: "PricingCard" },
+        { id: "c", component: "CtaButton" },
+      ]),
     ],
   });
   assert.equal(res.ok, true);
   assert.equal(res.page.publishStatus, "published");
-  assert.deepEqual(res.componentNames.sort(), ["CtaButton", "PricingCard", "Section"]);
+  // built-in Section/row/column wrappers are not component names
+  assert.deepEqual(res.componentNames.sort(), ["CtaButton", "PricingCard"]);
 });
 
 test("validate: accepts blocks as a JSON string (open-model shape)", () => {
   const res = validatePageInput({
     slug: "about",
-    blocks: JSON.stringify([{ id: "b1", component: "Hero" }]),
+    blocks: JSON.stringify([section("s1", "Hero", [{ id: "b1", component: "Hero" }])]),
   });
   assert.equal(res.ok, true);
   assert.deepEqual(res.componentNames, ["Hero"]);
@@ -66,7 +77,7 @@ test("validate: accepts a parentSlug and per-locale meta", () => {
   const res = validatePageInput({
     slug: "hello-world",
     parentSlug: "blog",
-    blocks: [{ id: "b1", component: "PostBody" }],
+    blocks: [section("s1", "Post", [{ id: "b1", component: "PostBody" }])],
     metaTitle: { en: "Hello", fi: "Hei" },
     metaDescription: { en: "A post" },
   });
@@ -159,7 +170,10 @@ test("validate: rejects a non-string meta value", () => {
 });
 
 test("validate: defaults missing meta to empty maps", () => {
-  const res = validatePageInput({ slug: "x", blocks: [{ id: "b", component: "X" }] });
+  const res = validatePageInput({
+    slug: "x",
+    blocks: [section("s1", "X", [{ id: "b", component: "X" }])],
+  });
   assert.equal(res.ok, true);
   assert.deepEqual(res.page.metaTitle, {});
   assert.deepEqual(res.page.metaDescription, {});

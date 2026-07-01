@@ -61,3 +61,56 @@ test("bind_list: still requires page + block", () => {
   assert.equal(validateBindList({ block: "b" }).ok, false);
   assert.equal(validateBindList({ page: "p" }).ok, false);
 });
+
+test("bind_list: plain-list layout (grid + scroll + autoscroll) parses through", () => {
+  const r = validateBindList({
+    page: "p1",
+    block: "b1",
+    direction: "grid",
+    columns: 3,
+    maxSize: 480,
+    autoscroll: true,
+    autoscrollSpeed: "fast",
+  });
+  assert.ok(r.ok);
+  assert.equal(r.value.direction, "grid");
+  assert.equal(r.value.columns, 3);
+  assert.equal(r.value.maxSize, 480);
+  assert.equal(r.value.autoscroll, true);
+  assert.equal(r.value.autoscrollSpeed, "fast");
+});
+
+test("bind_list: columns clamps to >= 1", () => {
+  const r = validateBindList({ page: "p", block: "b", direction: "grid", columns: 0 });
+  assert.ok(r.ok);
+  assert.equal(r.value.columns, 1);
+});
+
+test("bind_list: per-screen columns + gap parse through", () => {
+  const r = validateBindList({
+    page: "p",
+    block: "b",
+    direction: "grid",
+    columns: 4,
+    columnsTablet: 2,
+    columnsMobile: 1,
+    gap: 16,
+  });
+  assert.ok(r.ok);
+  assert.equal(r.value.columns, 4);
+  assert.equal(r.value.columnsTablet, 2);
+  assert.equal(r.value.columnsMobile, 1);
+  assert.equal(r.value.gap, 16);
+});
+
+test("bind_list: gap clamps to >= 0, per-screen columns to >= 1", () => {
+  const r = validateBindList({ page: "p", block: "b", gap: -5, columnsMobile: 0 });
+  assert.ok(r.ok);
+  assert.equal(r.value.gap, 0);
+  assert.equal(r.value.columnsMobile, 1);
+});
+
+test("bind_list: bad direction / autoscrollSpeed enums are rejected", () => {
+  assert.equal(validateBindList({ page: "p", block: "b", direction: "diagonal" }).ok, false);
+  assert.equal(validateBindList({ page: "p", block: "b", autoscrollSpeed: "warp" }).ok, false);
+});

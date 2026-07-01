@@ -4,9 +4,11 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { setDragPayload, readDragPayload } from "@/lib/page-builder/dnd";
 import {
-  sectionColumns,
-  sectionGridCols,
+  sectionRows,
+  rowColumns,
+  rowGridCols,
   isSection,
+  isSectionRow,
   sectionName,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
@@ -104,19 +106,27 @@ export function LayersTree({
   selectedId,
   onSelect,
   onDropComponent,
+  onDropList,
   onMoveNode,
   onDeleteColumn,
   onDeleteNode,
   onRenameSection,
+  onAddRow,
+  onDeleteRow,
+  onSetRowColumns,
 }: {
   blocks: Block[];
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onDropComponent: (sectionId: string, colIndex: number, name: string) => void;
+  onDropComponent: (sectionId: string, colIndex: number, name: string, rowId: string) => void;
+  onDropList: (sectionId: string, colIndex: number, rowId: string) => void;
   onMoveNode: (dragId: string, targetId: string, position: "before" | "after" | "into") => void;
   onDeleteColumn: (columnId: string) => void;
   onDeleteNode: (nodeId: string) => void;
   onRenameSection: (sectionId: string, name: string) => void;
+  onAddRow: (sectionId: string) => void;
+  onDeleteRow: (rowId: string) => void;
+  onSetRowColumns: (sectionId: string, n: number, rowId: string) => void;
 }) {
   const t = useTranslations("pageBuilder");
   // Which Section's name is being edited inline (null = none). The input seeds
@@ -126,6 +136,29 @@ export function LayersTree({
   const [hoverSlot, setHoverSlot] = useState<string | null>(null);
   // Reorder hover: which node + which half (before/after) the cursor is over.
   const [hoverEdge, setHoverEdge] = useState<{ id: string; pos: "before" | "after" } | null>(null);
+  // Id of the node currently being dragged (null = none). Set on dragstart so a
+  // column drop zone can tell a SECTION drag (which must NOT nest into a column)
+  // from a component drag — the payload is unreadable during dragover.
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  // Is the in-flight drag a top-level Section? Then column slots must ignore it.
+  const draggingSection =
+    draggingId != null && blocks.some((b) => b.id === draggingId && isSection(b));
+  // Is the in-flight drag a ROW? (rows live one level under a section). Only row
+  // drop zones react to it.
+  const draggingRow =
+    draggingId != null &&
+    blocks.some((s) => (s.children ?? []).some((r) => r.id === draggingId && isSectionRow(r)));
+  // Collapsed Sections (ids). Purely a Layers-tree VIEW state — never persisted
+  // (collapse is per-operator UI noise, not page content). Default expanded.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  function toggleCollapsed(id: string) {
+    setCollapsed((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   // Which column's delete is awaiting in-app confirm (NOT native window.confirm).
   const [confirmDeleteCol, setConfirmDeleteCol] = useState<string | null>(null);
   // Which node (Section or component leaf) is awaiting in-app delete confirm.
@@ -153,8 +186,41 @@ export function LayersTree({
       draggable: true,
       onDragStart: (e: React.DragEvent) => {
         setDragPayload(e, { kind: "move", id });
+        setDraggingId(id);
         e.stopPropagation();
       },
+      onDragEnd: () => setDraggingId(null),
+      onDragOver: (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const pos = edgeOf(e);
+        setHoverEdge((h) => (h?.id === id && h.pos === pos ? h : { id, pos }));
+      },
+      onDragLeave: (e: React.DragEvent) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setHoverEdge((h) => (h?.id === id ? null : h));
+        }
+      },
+      onDrop: (e: React.DragEvent) => {
+        const pos = edgeOf(e);
+        setHoverEdge(null);
+        const payload = readDragPayload(e);
+        if (payload?.kind !== "move") return;
+        e.preventDefault();
+        e.stopPropagation();
+        onMoveNode(payload.id, id, pos);
+      },
+    };
+  }
+
+  // A SECTION row's whole `<li>` (title + body) is a reorder drop target, but
+  // ONLY while a section is being dragged — otherwise it would swallow component
+  // drops meant for the columns inside it. The thin title button alone was too
+  // small to hit reliably (dropping on the body nested the section into a column
+  // and it fell to the bottom); covering the full row fixes that.
+  function sectionRowProps(id: string) {
+    if (!draggingSection) return {};
+    return {
       onDragOver: (e: React.DragEvent) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
@@ -185,11 +251,104 @@ export function LayersTree({
       : " ring-2 ring-primary ring-offset-1 [box-shadow:0_2px_0_var(--color-primary)]";
   }
 
+  // A grip button that is the drag SOURCE for `id` (section or row). Carries the
+  // draggable + dragstart/end so the rest of the node stays a normal click target.
+  function DragHandle({ id, title }: { id: string; title: string }) {
+    return (
+      <button
+        type="button"
+        title={title}
+        aria-label={title}
+        draggable
+        onDragStart={(e) => {
+          setDragPayload(e, { kind: "move", id });
+          setDraggingId(id);
+          e.stopPropagation();
+        }}
+        onDragEnd={() => setDraggingId(null)}
+        className="cursor-grab rounded p-1 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground active:cursor-grabbing"
+      >
+        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+          <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
+          <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+          <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
+        </svg>
+      </button>
+    );
+  }
+
+  // Drop-zone props for reordering a ROW before/after a sibling row (same section).
+  // Mirrors reorderProps but scoped so it only engages while a row is dragging.
+  function rowDropProps(rowId: string) {
+    if (!draggingRow) return {};
+    return {
+      onDragOver: (e: React.DragEvent) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const pos = edgeOf(e);
+        setHoverEdge((h) => (h?.id === rowId && h.pos === pos ? h : { id: rowId, pos }));
+      },
+      onDragLeave: (e: React.DragEvent) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setHoverEdge((h) => (h?.id === rowId ? null : h));
+        }
+      },
+      onDrop: (e: React.DragEvent) => {
+        const pos = edgeOf(e);
+        setHoverEdge(null);
+        const payload = readDragPayload(e);
+        if (payload?.kind !== "move") return;
+        e.preventDefault();
+        e.stopPropagation();
+        onMoveNode(payload.id, rowId, pos);
+      },
+    };
+  }
+
   return (
     <ul className="space-y-2">
       {blocks.map((b, i) => (
-        <li key={b.id}>
+        <li
+          key={b.id}
+          className={isSection(b) ? "rounded-md" + edgeClass(b.id) : undefined}
+          {...(isSection(b) ? sectionRowProps(b.id) : {})}
+        >
           <div className="flex items-start gap-1">
+            {isSection(b) && renamingId !== b.id && (
+              <span className="mt-1">
+                <DragHandle id={b.id} title={t("dragSection")} />
+              </span>
+            )}
+            {isSection(b) && renamingId !== b.id && (
+              // Collapse/expand the section's columns in the tree (view-only).
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleCollapsed(b.id);
+                }}
+                aria-expanded={!collapsed.has(b.id)}
+                aria-label={t(collapsed.has(b.id) ? "section.expand" : "section.collapse")}
+                title={t(collapsed.has(b.id) ? "section.expand" : "section.collapse")}
+                className="mt-1.5 rounded p-1 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className={
+                    "h-3.5 w-3.5 transition-transform " +
+                    (collapsed.has(b.id) ? "-rotate-90" : "")
+                  }
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+            )}
             {isSection(b) && renamingId === b.id ? (
               // Inline rename: commit on Enter/blur, cancel on Esc. Blank resets
               // to the "Section N" default (handled by renameSection).
@@ -217,7 +376,9 @@ export function LayersTree({
                 type="button"
                 onClick={() => onSelect(b.id)}
                 onDoubleClick={() => isSection(b) && setRenamingId(b.id)}
-                className={nodeClass(b.id) + edgeClass(b.id)}
+                // Section rows show the reorder edge on the whole `<li>` (see
+                // sectionRowProps); the button keeps it only for component leaves.
+                className={nodeClass(b.id) + (isSection(b) ? "" : edgeClass(b.id))}
                 {...reorderProps(b.id)}
               >
                 {isSection(b) ? sectionName(b, i) : b.component}
@@ -248,147 +409,223 @@ export function LayersTree({
               onDelete={onDeleteNode}
             />
           </div>
-          {isSection(b) && (
-            // Lay columns as a ROW (grid), mirroring the real render in
-            // tree.ts planSection: N equal tracks, or collapse → empty cols 0fr.
-            <ul
-              className="mt-2 grid gap-2 border-l border-border pl-4"
-              style={{ gridTemplateColumns: sectionGridCols(b) }}
-            >
-              {sectionColumns(b).map((col, ci) => {
-                const slotKey = `${b.id}:${ci}`;
-                const active = hoverSlot === slotKey;
+          {isSection(b) && !collapsed.has(b.id) && (
+            <div className="mt-2 flex flex-col gap-2 border-l border-border pl-4">
+              {sectionRows(b).map((row, ri) => {
+                // A grandfathered (row-less) section acts as its own single row —
+                // then `rowId` is the SECTION id (resolveRowHolder handles it).
+                const rowId = isSectionRow(row) ? row.id : b.id;
+                const explicitRows = b.children?.some(isSectionRow) ?? false;
+                const cols = rowColumns(row);
                 return (
-                  <li
-                    key={col.id}
-                    // Each COLUMN is its own drop target → addComponentToColumn.
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "copy";
-                      if (hoverSlot !== slotKey) setHoverSlot(slotKey);
-                    }}
-                    onDragLeave={(e) => {
-                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                        setHoverSlot((s) => (s === slotKey ? null : s));
-                      }
-                    }}
-                    onDrop={(e) => {
-                      setHoverSlot(null);
-                      const payload = readDragPayload(e);
-                      e.stopPropagation();
-                      // A rail component → new block in this column. A `move` of an
-                      // existing component → drop INTO this column (cross-column).
-                      if (payload?.kind === "component") {
-                        e.preventDefault();
-                        onDropComponent(b.id, ci, payload.name);
-                      } else if (payload?.kind === "move") {
-                        e.preventDefault();
-                        onMoveNode(payload.id, col.id, "into");
-                      }
-                    }}
-                    className={
-                      "rounded-md border border-dashed p-2 transition-colors " +
-                      (active
-                        ? "border-primary bg-primary-subtle"
-                        : "border-border bg-surface-muted")
-                    }
-                  >
-                    <div className="flex items-center gap-1 pb-1">
-                      <button
-                        type="button"
-                        onClick={() => onSelect(col.id)}
-                        aria-pressed={selectedId === col.id}
-                        className={
-                          "flex-1 rounded px-1 text-left font-mono text-[11px] uppercase tracking-wide transition-colors " +
-                          (selectedId === col.id
-                            ? "text-primary"
-                            : "text-foreground-muted hover:text-foreground")
-                        }
-                      >
-                        {t("column")} {ci + 1}
-                      </button>
-                      {sectionColumns(b).length > 1 && (
+                  <div key={rowId} className="flex flex-col gap-1">
+                    <div
+                      className={"flex items-center gap-1 rounded" + (explicitRows ? edgeClass(rowId) : "")}
+                      {...(explicitRows ? rowDropProps(rowId) : {})}
+                    >
+                      {/* Drag handle — only explicit rows can reorder (a lone
+                          grandfathered row has nowhere to move). */}
+                      {explicitRows && <DragHandle id={rowId} title={t("dragRow")} />}
+                      {/* Row label = select button → opens the Row settings panel.
+                          A grandfathered row IS the section, already selectable via
+                          the section header, so it stays a plain label. */}
+                      {explicitRows ? (
                         <button
                           type="button"
-                          onClick={() => setConfirmDeleteCol(col.id)}
-                          title={t("deleteColumn.action")}
-                          aria-label={t("deleteColumn.action")}
-                          className="rounded p-0.5 text-foreground-muted transition-colors hover:text-foreground"
+                          onClick={() => onSelect(rowId)}
+                          aria-pressed={selectedId === rowId}
+                          className={
+                            "rounded px-1 font-mono text-[10px] uppercase tracking-wide transition-colors " +
+                            (selectedId === rowId
+                              ? "text-primary"
+                              : "text-foreground-muted hover:text-foreground")
+                          }
                         >
-                          <svg
-                            viewBox="0 0 24 24"
-                            className="h-3.5 w-3.5"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
+                          {t("row")} {ri + 1}
+                        </button>
+                      ) : (
+                        <span className="px-1 font-mono text-[10px] uppercase tracking-wide text-foreground-muted">
+                          {t("row")} {ri + 1}
+                        </span>
+                      )}
+                      {/* Per-row column count */}
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => onSetRowColumns(b.id, n, rowId)}
+                            aria-pressed={cols.length === n}
+                            className={
+                              "h-5 w-5 rounded border text-[11px] transition-colors " +
+                              (cols.length === n
+                                ? "border-primary bg-primary-subtle text-foreground"
+                                : "border-border text-foreground-muted hover:text-foreground")
+                            }
                           >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                      {explicitRows && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteRow(rowId)}
+                          title={t("deleteRow.action")}
+                          aria-label={t("deleteRow.action")}
+                          className="ml-auto rounded p-0.5 text-foreground-muted transition-colors hover:text-danger"
+                        >
+                          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="M3 6h18M8 6V4h8v2m-9 0v14a2 2 0 002 2h6a2 2 0 002-2V6" />
                           </svg>
                         </button>
                       )}
                     </div>
-                    {confirmDeleteCol === col.id && (
-                      <div className="mb-1.5 rounded-md border border-border bg-surface p-2">
-                        <p className="mb-1.5 text-xs text-foreground">
-                          {t("deleteColumn.confirm")}
-                        </p>
-                        <div className="flex gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onDeleteColumn(col.id);
-                              setConfirmDeleteCol(null);
+                    <ul
+                      className="grid gap-2"
+                      style={{ gridTemplateColumns: rowGridCols(row) }}
+                    >
+                      {cols.map((col, ci) => {
+                        const slotKey = `${rowId}:${ci}`;
+                        const active = hoverSlot === slotKey;
+                        return (
+                          <li
+                            key={col.id}
+                            // Each COLUMN is its own drop target. A SECTION drag is
+                            // not a valid column drop — ignore so it bubbles to the
+                            // section reorder zone instead of nesting/vanishing.
+                            onDragOver={(e) => {
+                              if (draggingSection) return;
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "copy";
+                              if (hoverSlot !== slotKey) setHoverSlot(slotKey);
                             }}
-                            className="rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground"
+                            onDragLeave={(e) => {
+                              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                                setHoverSlot((s) => (s === slotKey ? null : s));
+                              }
+                            }}
+                            onDrop={(e) => {
+                              if (draggingSection) return;
+                              setHoverSlot(null);
+                              const payload = readDragPayload(e);
+                              e.stopPropagation();
+                              if (payload?.kind === "component") {
+                                e.preventDefault();
+                                onDropComponent(b.id, ci, payload.name, rowId);
+                              } else if (payload?.kind === "list") {
+                                e.preventDefault();
+                                onDropList(b.id, ci, rowId);
+                              } else if (payload?.kind === "move") {
+                                e.preventDefault();
+                                onMoveNode(payload.id, col.id, "into");
+                              }
+                            }}
+                            className={
+                              "rounded-md border border-dashed p-2 transition-colors " +
+                              (active
+                                ? "border-primary bg-primary-subtle"
+                                : "border-border bg-surface-muted")
+                            }
                           >
-                            {t("deleteColumn.action")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteCol(null)}
-                            className="rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-surface-muted"
-                          >
-                            {t("deleteColumn.cancel")}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {(col.children?.length ?? 0) > 0 ? (
-                      <ul className="space-y-1.5">
-                        {col.children!.map((c) => (
-                          <li key={c.id}>
-                            <div className="flex items-start gap-1">
+                            <div className="flex items-center gap-1 pb-1">
                               <button
                                 type="button"
-                                onClick={() => onSelect(c.id)}
-                                className={nodeClass(c.id) + edgeClass(c.id)}
-                                {...reorderProps(c.id)}
+                                onClick={() => onSelect(col.id)}
+                                aria-pressed={selectedId === col.id}
+                                className={
+                                  "flex-1 rounded px-1 text-left font-mono text-[11px] uppercase tracking-wide transition-colors " +
+                                  (selectedId === col.id
+                                    ? "text-primary"
+                                    : "text-foreground-muted hover:text-foreground")
+                                }
                               >
-                                {c.component}
+                                {t("column")} {ci + 1}
                               </button>
-                              <DeleteNodeControl
-                                id={c.id}
-                                kind="component"
-                                confirmId={confirmDeleteNode}
-                                setConfirmId={setConfirmDeleteNode}
-                                onDelete={onDeleteNode}
-                              />
+                              {cols.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteCol(col.id)}
+                                  title={t("deleteColumn.action")}
+                                  aria-label={t("deleteColumn.action")}
+                                  className="rounded p-0.5 text-foreground-muted transition-colors hover:text-foreground"
+                                >
+                                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <path d="M3 6h18M8 6V4h8v2m-9 0v14a2 2 0 002 2h6a2 2 0 002-2V6" />
+                                  </svg>
+                                </button>
+                              )}
                             </div>
+                            {confirmDeleteCol === col.id && (
+                              <div className="mb-1.5 rounded-md border border-border bg-surface p-2">
+                                <p className="mb-1.5 text-xs text-foreground">
+                                  {t("deleteColumn.confirm")}
+                                </p>
+                                <div className="flex gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onDeleteColumn(col.id);
+                                      setConfirmDeleteCol(null);
+                                    }}
+                                    className="rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground"
+                                  >
+                                    {t("deleteColumn.action")}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeleteCol(null)}
+                                    className="rounded border border-border px-2 py-1 text-[11px] text-foreground hover:bg-surface-muted"
+                                  >
+                                    {t("deleteColumn.cancel")}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            {(col.children?.length ?? 0) > 0 ? (
+                              <ul className="space-y-1.5">
+                                {col.children!.map((c) => (
+                                  <li key={c.id}>
+                                    <div className="flex items-start gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => onSelect(c.id)}
+                                        className={nodeClass(c.id) + edgeClass(c.id)}
+                                        {...reorderProps(c.id)}
+                                      >
+                                        {c.component}
+                                      </button>
+                                      <DeleteNodeControl
+                                        id={c.id}
+                                        kind="component"
+                                        confirmId={confirmDeleteNode}
+                                        setConfirmId={setConfirmDeleteNode}
+                                        onDelete={onDeleteNode}
+                                      />
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="px-1 py-1 text-xs text-foreground-muted">
+                                {t("dropComponentHint")}
+                              </p>
+                            )}
                           </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="px-1 py-1 text-xs text-foreground-muted">
-                        {t("dropComponentHint")}
-                      </p>
-                    )}
-                  </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
                 );
               })}
-            </ul>
+              <button
+                type="button"
+                onClick={() => onAddRow(b.id)}
+                className="self-start rounded-md border border-dashed border-border px-2 py-1 text-xs text-foreground-muted transition-colors hover:border-primary hover:text-foreground"
+              >
+                + {t("addRow")}
+              </button>
+            </div>
           )}
         </li>
       ))}

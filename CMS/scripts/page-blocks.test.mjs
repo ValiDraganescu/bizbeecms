@@ -20,7 +20,9 @@ import {
   setSectionColumns,
   addComponentToColumn,
   deleteColumn,
-  sectionGridCols,
+  rowGridCols,
+  sectionColumns,
+  sectionRows,
   localeFieldValue,
   moveBlock,
   parsePropsSchema,
@@ -150,16 +152,25 @@ test("moveBlock reorders and clamps to bounds", () => {
 });
 
 test("validateBlocks accepts a clean array and collects component names", () => {
-  const r = validateBlocks([
-    { id: "hero-1", component: "Hero" },
-    { id: "grid-1", component: "Grid", children: [{ id: "card-1", component: "Card" }] },
-  ]);
+  // Top level must be Sections now — author through the section helpers.
+  let blocks = addSection([]);
+  blocks = addComponentToColumn(blocks, blocks[0].id, 0, "Hero");
+  blocks = addComponentToColumn(blocks, blocks[0].id, 0, "Grid");
+  // nest a Card inside the Grid so nested names are collected too
+  blocks = JSON.parse(JSON.stringify(blocks));
+  const col = blocks[0].children[0].children[0];
+  col.children.find((c) => c.component === "Grid").children = [
+    { id: "card-1", component: "Card" },
+  ];
+  const r = validateBlocks(blocks);
   assert.ok(r.ok);
   assert.deepEqual(r.componentNames.sort(), ["Card", "Grid", "Hero"]);
 });
 
 test("validateBlocks accepts a JSON string of an array", () => {
-  const r = validateBlocks(JSON.stringify([{ id: "a", component: "Hero" }]));
+  let blocks = addSection([]);
+  blocks = addComponentToColumn(blocks, blocks[0].id, 0, "Hero");
+  const r = validateBlocks(JSON.stringify(blocks));
   assert.ok(r.ok);
 });
 
@@ -227,16 +238,16 @@ test("setLocalizedProp output round-trips through validateBlockProps + resolves"
   assert.deepEqual(emptied, {}, "emptied prop dropped");
 });
 
-test("sectionGridCols mirrors the render: N equal tracks (Layers row, not stacked)", () => {
-  // A 2-column Section must produce a 2-track grid so the Layers tree lays its
+test("rowGridCols mirrors the render: N equal tracks (Layers row, not stacked)", () => {
+  // A 2-column row must produce a 2-track grid so the Layers tree lays its
   // columns side-by-side as a ROW (regression: was stacked vertically).
   let blocks = addSection([]);
   const sectionId = blocks[0].id;
   blocks = setSectionColumns(blocks, sectionId, 2);
-  assert.equal(sectionGridCols(blocks[0]), "repeat(2, 1fr)");
+  assert.equal(rowGridCols(sectionRows(blocks[0])[0]), "repeat(2, 1fr)");
 
   blocks = setSectionColumns(blocks, sectionId, 3);
-  assert.equal(sectionGridCols(blocks[0]), "repeat(3, 1fr)");
+  assert.equal(rowGridCols(sectionRows(blocks[0])[0]), "repeat(3, 1fr)");
 });
 
 test("deleteColumn drops a specific column + its components, decrements columns", () => {
@@ -247,13 +258,13 @@ test("deleteColumn drops a specific column + its components, decrements columns"
   blocks = setSectionColumns(blocks, sectionId, 2);
   blocks = addComponentToColumn(blocks, sectionId, 0, "Hero");
   blocks = addComponentToColumn(blocks, sectionId, 1, "Cta");
-  const cols = blocks[0].children.filter((c) => c.component === "__section_column__");
-  const col0Id = cols[0].id;
+  const col0Id = sectionColumns(blocks[0])[0].id;
 
   blocks = deleteColumn(blocks, col0Id);
-  const after = blocks[0].children.filter((c) => c.component === "__section_column__");
+  const after = sectionColumns(blocks[0]);
   assert.equal(after.length, 1, "one column remains");
-  assert.equal(blocks[0].props.columns, 1, "columns prop decremented");
+  // columns live on the ROW now (each row owns its column layout)
+  assert.equal(sectionRows(blocks[0])[0].props.columns, 1, "columns prop decremented");
   // The surviving column is the old col 1 (its Cta is intact); the Hero is gone.
   assert.equal(after[0].children[0].component, "Cta");
   const allComponents = JSON.stringify(blocks);
@@ -264,10 +275,10 @@ test("deleteColumn refuses to delete the only column (no-op)", () => {
   let blocks = addSection([]); // 1 column by default
   const sectionId = blocks[0].id;
   blocks = addComponentToColumn(blocks, sectionId, 0, "Hero");
-  const onlyCol = blocks[0].children.find((c) => c.component === "__section_column__");
+  const onlyCol = sectionColumns(blocks[0])[0];
 
   const after = deleteColumn(blocks, onlyCol.id);
-  const cols = after[0].children.filter((c) => c.component === "__section_column__");
+  const cols = sectionColumns(after[0]);
   assert.equal(cols.length, 1, "last column is NOT deleted");
   assert.equal(cols[0].children[0].component, "Hero", "content untouched");
 });
@@ -297,11 +308,11 @@ test("removeNode deletes a single nested component leaf, leaving the rest", () =
   const s1 = blocks[0].id;
   blocks = addComponentToColumn(blocks, s1, 0, "Hero");
   blocks = addComponentToColumn(blocks, s1, 0, "Cta");
-  const col = blocks[0].children.find((c) => c.component === "__section_column__");
+  const col = sectionColumns(blocks[0])[0];
   const heroId = col.children[0].id;
 
   const after = removeNode(blocks, heroId);
-  const colAfter = after[0].children.find((c) => c.component === "__section_column__");
+  const colAfter = sectionColumns(after[0])[0];
   assert.equal(colAfter.children.length, 1, "one component removed, one left");
   assert.equal(colAfter.children[0].component, "Cta", "the right leaf survived");
 });
@@ -331,16 +342,25 @@ test("pageBuilder.deleteNode keys parity + non-empty across EN/FI/ET", () => {
   }
 });
 
-test("sectionGridCols collapse behavior shrinks empty columns to 0fr", () => {
+test("rowGridCols collapse behavior shrinks empty columns to 0fr", () => {
   let blocks = addSection([]);
   const sectionId = blocks[0].id;
   blocks = setSectionColumns(blocks, sectionId, 2);
+  // columnBehavior lives on the ROW now (each row owns its column layout).
+  const rowId = sectionRows(blocks[0])[0].id;
   blocks = blocks.map((b) =>
-    b.id === sectionId ? { ...b, props: { ...b.props, columnBehavior: "collapse" } } : b,
+    b.id === sectionId
+      ? {
+          ...b,
+          children: (b.children ?? []).map((r) =>
+            r.id === rowId ? { ...r, props: { ...r.props, columnBehavior: "collapse" } } : r,
+          ),
+        }
+      : b,
   );
   // col 0 gets a component, col 1 stays empty → "1fr 0fr".
   blocks = addComponentToColumn(blocks, sectionId, 0, "Hero");
-  assert.equal(sectionGridCols(blocks[0]), "1fr 0fr");
+  assert.equal(rowGridCols(sectionRows(blocks[0])[0]), "1fr 0fr");
 });
 
 // ── AI-translate helpers (collect source + merge results) ───────────────────

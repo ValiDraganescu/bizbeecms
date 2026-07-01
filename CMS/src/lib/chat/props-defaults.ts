@@ -14,6 +14,8 @@
  * Booleans/numbers are stored as-is so parsePropsSchema round-trips their type.
  * Returns the original string unchanged if it can't be parsed as an object.
  */
+import { linkNewTabProp } from "../pages/page-blocks.ts";
+
 export function applyDefaults(
   propsSchema: string | null | undefined,
   values: Record<string, unknown>,
@@ -36,6 +38,14 @@ export function applyDefaults(
         : {};
     if (Object.prototype.hasOwnProperty.call(values, name)) {
       spec.default = values[name];
+    }
+    // A link prop's "open in new tab" toggle edits the companion `<name>NewTab`
+    // value (not a declared prop) — persist it on the link prop's spec itself so
+    // the schema allowlist doesn't drop it (parsePropsSchema reads it back).
+    const flagKey = linkNewTabProp(name);
+    if (Object.prototype.hasOwnProperty.call(values, flagKey)) {
+      if (values[flagKey] === true) spec.newTab = true;
+      else delete spec.newTab;
     }
     out[name] = spec;
   }

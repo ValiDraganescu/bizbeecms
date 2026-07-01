@@ -17,17 +17,27 @@
  * framework — window.confirm gates the destructive delete.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { setActiveComponentContext } from "@/lib/chat/component-context";
 import { CodeEditor, type CodeLanguage } from "@/components/components/code-editor";
 import { PropFields } from "@/components/components/prop-fields";
+import { CollapseToggle } from "@/components/page-builder/shared";
+import {
+  type InspectorPreset,
+  inspectorWidth,
+  resolvePreset,
+} from "@/lib/page-builder/inspector-width";
 import { formatHtml } from "@/lib/render/parse-html";
-import { parsePropsSchema } from "@/lib/pages/page-blocks";
+import { linkNewTabProp, parsePropsSchema } from "@/lib/pages/page-blocks";
 import { applyDefaults } from "@/lib/chat/props-defaults";
 import { PAGE_MUTATION_EVENT } from "@/lib/chat/page-mutation-signal";
 import { capturePreviews } from "@/lib/chat/capture-preview";
 import { emitChatAttachments, requestChatOpen } from "@/lib/chat/chat-attach-bus";
+
+// localStorage keys for the Props panel width/collapse (Develop-specific).
+const PROPS_PRESET_KEY = "bizbee.develop.propsWidth";
+const PROPS_COLLAPSED_KEY = "bizbee.develop.propsCollapsed";
 
 type RightView = "preview" | "code";
 type CodeTab = "html" | "script" | "css";
@@ -36,11 +46,30 @@ type Draft = { html: string; script: string; css: string };
 type Viewport = "desktop" | "tablet" | "mobile";
 
 // Preview frame widths per viewport — same scales as the Page Builder.
+// (mobile width comes from the chosen device below, not this map.)
 const VIEWPORT_WIDTH: Record<Viewport, string> = {
   desktop: "100%",
   tablet: "768px",
-  mobile: "375px",
+  mobile: "390px",
 };
+
+// The 10 most common mobile screen sizes (CSS px, portrait). Selecting one in
+// Mobile view sizes the preview frame to that EXACT device viewport — width AND
+// height — so a `min-h-screen` hero is judged against a real phone, not an
+// infinitely-tall pane. Index 0 is the default.
+type Device = { label: string; w: number; h: number };
+const MOBILE_DEVICES: Device[] = [
+  { label: "iPhone 15 / 16 (390×844)", w: 390, h: 844 },
+  { label: "iPhone 15/16 Pro (393×852)", w: 393, h: 852 },
+  { label: "iPhone 13/14 / mini (375×812)", w: 375, h: 812 },
+  { label: "iPhone 11 / XR (414×896)", w: 414, h: 896 },
+  { label: "iPhone Pro Max (393×873)", w: 393, h: 873 },
+  { label: "Android flagship (412×915)", w: 412, h: 915 },
+  { label: "Android mid-range (360×800)", w: 360, h: 800 },
+  { label: "Android mid-range (384×832)", w: 384, h: 832 },
+  { label: "Android compact (360×780)", w: 360, h: 780 },
+  { label: "Compact / older (320×568)", w: 320, h: 568 },
+];
 
 const RIGHT_VIEW_KEY = "bizbee.develop.rightView";
 function loadRightView(): RightView {
@@ -70,6 +99,7 @@ type ComponentSummary = {
   hasCss: boolean;
   hasPreviewData: boolean;
   tags: string[];
+  label?: string | null;
 };
 
 export function ComponentDevelop({
@@ -78,6 +108,8 @@ export function ComponentDevelop({
   initialComponents: ComponentSummary[];
 }) {
   const t = useTranslations("develop");
+  // Reuse the Page Builder's inspector-width + collapse strings (same controls).
+  const tPb = useTranslations("pageBuilder");
   const [components, setComponents] = useState<ComponentSummary[]>(initialComponents);
   const [selected, setSelected] = useState<string | null>(
     initialComponents[0]?.name ?? null,
@@ -95,6 +127,9 @@ export function ComponentDevelop({
   const [codeTab, setCodeTab] = useState<CodeTab>("html");
   // Preview viewport (desktop/tablet/mobile), mirrors the Page Builder.
   const [viewport, setViewport] = useState<Viewport>("desktop");
+  // Which mobile device size the frame mimics (index into MOBILE_DEVICES).
+  const [deviceIdx, setDeviceIdx] = useState(0);
+  const device = MOBILE_DEVICES[deviceIdx];
   // "Send preview to AI": capturing the 3 viewport screenshots → chat composer.
   const [capturing, setCapturing] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
@@ -103,11 +138,59 @@ export function ComponentDevelop({
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
+  // COMPONENT DRAFT/PUBLISH: editing writes an unpublished draft (live pages keep
+  // rendering the published artifact). `hasDraft` drives the publish bar; `usage`
+  // is the live-page blast radius shown before publishing; `publishBusy` guards
+  // the publish/discard buttons.
+  const [hasDraft, setHasDraft] = useState(false);
+  const [usage, setUsage] = useState<Array<{ slug: string; direct: boolean }>>([]);
+  const [publishBusy, setPublishBusy] = useState(false);
   // The selected component's declared props + the edited PLACEHOLDER values (its
   // propsSchema `default`s). Null = not loaded / no declared props.
   const [propsSchemaStr, setPropsSchemaStr] = useState<string | null>(null);
   const [propValues, setPropValues] = useState<Record<string, unknown>>({});
   const [propsDirty, setPropsDirty] = useState(false);
+
+  // Props panel sizing — same presets + collapse as the Page Builder inspector.
+  // Persisted under Develop-specific keys so it's independent of the builder's.
+  const [propsPreset, setPropsPreset] = useState<InspectorPreset>("default");
+  const [propsCollapsed, setPropsCollapsed] = useState(false);
+  const [layoutW, setLayoutW] = useState(0);
+  const layoutRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    try {
+      setPropsPreset(resolvePreset(localStorage.getItem(PROPS_PRESET_KEY)));
+      setPropsCollapsed(localStorage.getItem(PROPS_COLLAPSED_KEY) === "1");
+    } catch {
+      /* no storage — defaults */
+    }
+  }, []);
+  useEffect(() => {
+    const el = layoutRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setLayoutW(entry.contentRect.width));
+    ro.observe(el);
+    setLayoutW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+  function pickPropsPreset(p: InspectorPreset) {
+    setPropsPreset(p);
+    try {
+      localStorage.setItem(PROPS_PRESET_KEY, p);
+    } catch {
+      /* no storage */
+    }
+  }
+  function togglePropsCollapsed() {
+    setPropsCollapsed((c) => {
+      try {
+        localStorage.setItem(PROPS_COLLAPSED_KEY, !c ? "1" : "0");
+      } catch {
+        /* no storage */
+      }
+      return !c;
+    });
+  }
 
   const current = components.find((c) => c.name === selected) ?? null;
   const propFields = parsePropsSchema(propsSchemaStr);
@@ -125,7 +208,9 @@ export function ComponentDevelop({
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/components?name=${encodeURIComponent(selected)}`);
+        // draft=1 → edit the pending draft (saves write the draft; reseeding
+        // from live after each autosave would clobber unpublished edits).
+        const res = await fetch(`/api/components?name=${encodeURIComponent(selected)}&draft=1`);
         if (!res.ok) return;
         const bundle = (await res.json()) as {
           component?: {
@@ -156,9 +241,15 @@ export function ComponentDevelop({
           setPropsSchemaStr(c.propsSchema ?? null);
           const fields = parsePropsSchema(c.propsSchema ?? null);
           const vals: Record<string, unknown> = {};
-          for (const f of fields) vals[f.name] = f.defaultValue ?? f.default;
+          for (const f of fields) {
+            vals[f.name] = f.defaultValue ?? f.default;
+            // Link props: seed the companion "open in new tab" flag the toggle edits.
+            if (f.newTab) vals[linkNewTabProp(f.name)] = true;
+          }
           setPropValues(vals);
           setPropsDirty(false);
+          // Load this component's draft state + live-page blast radius.
+          void loadUsage(selected);
         }
       } catch {
         /* network hiccup → leave prior context; not worth surfacing */
@@ -198,11 +289,56 @@ export function ComponentDevelop({
         return;
       }
       setSaveState("saved");
+      // A successful save created/updated the unpublished DRAFT — surface the
+      // publish bar and (re)load the live-page blast radius.
+      setHasDraft(true);
+      void loadUsage(name);
       // Refresh the preview iframe (and re-publish chat context) with the saved code.
       setReloadKey((k) => k + 1);
     } catch (err) {
       setSaveState("error");
       setSaveError((err as Error).message);
+    }
+  }
+
+  /** Load the draft state + live pages that reference `name` (blast radius). */
+  async function loadUsage(name: string) {
+    try {
+      const res = await fetch(`/api/components/${encodeURIComponent(name)}/usage`);
+      if (!res.ok) return;
+      const body = (await res.json()) as {
+        usage?: Array<{ slug: string; direct: boolean }>;
+        hasDraft?: boolean;
+      };
+      setUsage(body.usage ?? []);
+      setHasDraft(body.hasDraft ?? false);
+    } catch {
+      /* non-fatal — the publish bar just omits the usage line */
+    }
+  }
+
+  /** Publish or discard the selected component's pending draft. */
+  async function publishOrDiscard(name: string, action: "publish" | "discard") {
+    setPublishBusy(true);
+    try {
+      const res = await fetch(`/api/components/${encodeURIComponent(name)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        setSaveError(body?.error || `HTTP ${res.status}`);
+        return;
+      }
+      // Draft consumed either way — clear the bar and refresh the preview.
+      setHasDraft(false);
+      setUsage([]);
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setPublishBusy(false);
     }
   }
 
@@ -338,12 +474,22 @@ export function ComponentDevelop({
 
   const showProps = !!current && propFields.length > 0;
 
+  // The Props track width: collapsed → a thin re-expand strip; else the chosen
+  // preset resolved against the measured layout width (clamped, like the builder).
+  // The width rides on a CSS var (--props-w) so the STATIC Tailwind class below
+  // compiles; a runtime-interpolated arbitrary class would never be generated.
+  const propsTrack = propsCollapsed
+    ? "2.25rem"
+    : `${inspectorWidth(propsPreset, layoutW)}px`;
+  const gridCols = showProps
+    ? "lg:grid-cols-[18rem_1fr_var(--props-w)]"
+    : "lg:grid-cols-[20rem_1fr]";
+
   return (
     <div
-      className={
-        "grid min-h-0 flex-1 grid-cols-1 gap-6 " +
-        (showProps ? "lg:grid-cols-[18rem_1fr_18rem]" : "lg:grid-cols-[20rem_1fr]")
-      }
+      ref={layoutRef}
+      style={{ ["--props-w" as string]: propsTrack }}
+      className={"grid min-h-0 flex-1 grid-cols-1 gap-6 " + gridCols}
     >
       {/* Left: component list */}
       <section className="flex min-h-0 flex-col gap-3">
@@ -389,11 +535,12 @@ export function ComponentDevelop({
                     >
                       <span
                         className={
-                          "truncate font-mono " +
+                          "truncate " +
+                          (c.label ? "font-medium " : "font-mono ") +
                           (active ? "text-primary" : "text-foreground")
                         }
                       >
-                        {c.name}
+                        {c.label || c.name}
                       </span>
                       <span className="truncate text-xs text-foreground-muted">
                         {[
@@ -452,6 +599,23 @@ export function ComponentDevelop({
                   </button>
                 ))}
               </div>
+            )}
+            {/* Device-size picker — only in Mobile view. Sizes the frame to a
+                real phone viewport (width AND height) so a tall hero is judged
+                against an actual screen, not an unbounded pane. */}
+            {current && view === "preview" && viewport === "mobile" && (
+              <select
+                value={deviceIdx}
+                onChange={(e) => setDeviceIdx(Number(e.target.value))}
+                title={t("viewport.deviceLabel")}
+                className="rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-foreground"
+              >
+                {MOBILE_DEVICES.map((d, i) => (
+                  <option key={d.label} value={i}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
             )}
             {/* Send the rendered component at all 3 sizes to the AI (vision) so it
                 can nail the look across screen sizes. Preview view only. */}
@@ -574,6 +738,41 @@ export function ComponentDevelop({
             </span>
           </div>
         )}
+        {/* Publish bar: appears when the selected component has an unpublished
+            draft. Names the live-page blast radius so publishing is informed. */}
+        {current && hasDraft && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning bg-warning-subtle px-3 py-2">
+            <div className="min-w-0 text-xs text-foreground">
+              <span className="font-medium">{t("draft.pending")}</span>{" "}
+              <span className="text-foreground-muted">
+                {usage.length === 0
+                  ? t("draft.usageNone")
+                  : t("draft.usageCount", {
+                      count: usage.length,
+                      pages: usage.map((u) => u.slug).join(", "),
+                    })}
+              </span>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                disabled={publishBusy}
+                onClick={() => selected && void publishOrDiscard(selected, "discard")}
+                className="rounded-md border border-border px-3 py-1 text-sm text-foreground-muted hover:text-foreground disabled:opacity-50"
+              >
+                {t("draft.discard")}
+              </button>
+              <button
+                type="button"
+                disabled={publishBusy}
+                onClick={() => selected && void publishOrDiscard(selected, "publish")}
+                className="rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-50"
+              >
+                {t("draft.publish")}
+              </button>
+            </div>
+          </div>
+        )}
         {current && view === "code" && saveState === "error" && saveError && (
           <p
             role="alert"
@@ -591,15 +790,26 @@ export function ComponentDevelop({
           ) : view === "preview" ? (
             // Centered, width-constrained frame so tablet/mobile widths show the
             // component's responsive layout (desktop = full width).
-            <div className="flex h-full min-h-[60vh] justify-center overflow-auto bg-surface-muted p-4">
+            <div
+              className={
+                "flex h-full min-h-[60vh] justify-center overflow-auto bg-surface-muted p-4 " +
+                (viewport === "mobile" ? "items-start" : "")
+              }
+            >
               <div
-                className="h-full overflow-hidden rounded-md border border-border bg-white shadow-sm"
-                style={{ width: VIEWPORT_WIDTH[viewport], maxWidth: "100%" }}
+                className="overflow-hidden rounded-md border border-border bg-white shadow-sm"
+                style={
+                  viewport === "mobile"
+                    ? // Fixed device viewport: exact px width × height; content
+                      // scrolls inside, so a tall hero is bounded to the phone.
+                      { width: `${device.w}px`, height: `${device.h}px`, maxWidth: "100%", flex: "none" }
+                    : { width: VIEWPORT_WIDTH[viewport], maxWidth: "100%", height: "100%" }
+                }
               >
                 <iframe
-                  key={`${current.name}-${reloadKey}-${viewport}`}
+                  key={`${current.name}-${reloadKey}-${viewport}-${viewport === "mobile" ? deviceIdx : ""}`}
                   title={t("previewTitle", { name: current.name })}
-                  className="h-full min-h-[60vh] w-full border-0 bg-white"
+                  className="h-full w-full border-0 bg-white"
                   src={`/preview/component/${encodeURIComponent(current.name)}`}
                 />
               </div>
@@ -623,9 +833,19 @@ export function ComponentDevelop({
 
       {/* Right sidebar: edit the component's PLACEHOLDER prop values (its
           propsSchema defaults). Only shown when the component declares props. */}
-      {showProps && (
+      {showProps && propsCollapsed && (
+        <aside className="hidden min-h-0 shrink-0 flex-col items-center rounded-md border border-border bg-surface-raised py-2 lg:flex">
+          <CollapseToggle
+            side="right"
+            collapsed
+            onClick={togglePropsCollapsed}
+            label={tPb("panel.expandRight")}
+          />
+        </aside>
+      )}
+      {showProps && !propsCollapsed && (
         <section className="flex min-h-0 flex-col gap-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
             <h2 className="text-lg font-semibold text-foreground">{t("propsTitle")}</h2>
             <span
               className={
@@ -639,6 +859,37 @@ export function ComponentDevelop({
                   ? t("save.saved")
                   : ""}
             </span>
+            {/* Width presets + collapse — mirrors the Page Builder inspector. */}
+            <div className="ml-auto hidden items-center gap-1 lg:flex">
+              <div
+                className="flex rounded-md border border-border"
+                role="group"
+                aria-label={tPb("inspectorWidth.label")}
+              >
+                {(["default", "quarter", "half"] as InspectorPreset[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => pickPropsPreset(p)}
+                    aria-pressed={propsPreset === p}
+                    title={tPb(`inspectorWidth.${p}`)}
+                    className={`px-2 py-0.5 text-[11px] first:rounded-l-md last:rounded-r-md ${
+                      propsPreset === p
+                        ? "bg-surface-muted font-medium text-foreground"
+                        : "text-foreground-muted hover:bg-surface-muted"
+                    }`}
+                  >
+                    {tPb(`inspectorWidth.${p}`)}
+                  </button>
+                ))}
+              </div>
+              <CollapseToggle
+                side="right"
+                collapsed={false}
+                onClick={togglePropsCollapsed}
+                label={tPb("panel.collapseRight")}
+              />
+            </div>
           </div>
           <p className="text-xs text-foreground-muted">{t("propsHint")}</p>
           <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border bg-surface-raised p-3">

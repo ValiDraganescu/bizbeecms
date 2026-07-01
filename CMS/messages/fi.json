@@ -106,7 +106,7 @@
       "newline": "↵ Rivinvaihto",
       "aria": "Vaihda Enter-näppäimen toiminto: lähetä viesti tai lisää rivinvaihto"
     },
-    "contextAttached": "Sivun konteksti liitetty",
+    "contextAttached": "Konteksti liitetty",
     "attach": {
       "add": "Liitä",
       "remove": "Poista liite",
@@ -177,7 +177,8 @@
     "users": "Käyttäjät",
     "google": "Google-kirjautuminen",
     "openrouterKey": "OpenRouter-avain",
-    "media": "Media"
+    "media": "Media",
+    "iconSet": "Kuvakkeet"
   },
   "theme": {
     "title": "Teema",
@@ -426,6 +427,10 @@
       "action": "Nimeä osio uudelleen",
       "label": "Osion nimi"
     },
+    "section": {
+      "collapse": "Tiivistä osio",
+      "expand": "Laajenna osio"
+    },
     "layoutList": "Lista (kokoelmasta)",
     "bind": {
       "title": "Sido kokoelmaan",
@@ -457,7 +462,27 @@
       "limitPlaceholder": "Oletus",
       "template": "Kohdekomponentti",
       "pickTemplate": "— valitse komponentti —",
-      "map": "Yhdistä kentät kohteen ominaisuuksiin"
+      "map": "Yhdistä kentät kohteen ominaisuuksiin",
+      "direction": "Suunta",
+      "directionVertical": "Pysty",
+      "directionHorizontal": "Vaaka",
+      "maxHeight": "Enimmäiskorkeus (px)",
+      "maxWidth": "Enimmäisleveys (px)",
+      "maxSize": "Enimmäiskoko",
+      "maxSizePlaceholder": "Ei rajaa",
+      "maxSizeHint": "Tämän ylittävä sisältö vierii.",
+      "autoscroll": "Automaattivieritys",
+      "autoscrollSpeed": "Nopeus",
+      "speedSlow": "Hidas",
+      "speedNormal": "Normaali",
+      "speedFast": "Nopea",
+      "directionGrid": "Ruudukko",
+      "columns": "Sarakkeet",
+      "gap": "Väli (px)",
+      "columnsHint": "Sarakkeet näytön koon mukaan.",
+      "screenDesktop": "Työpöytä",
+      "screenTablet": "Tabletti",
+      "screenMobile": "Mobiili"
     },
     "componentsEmpty": "Ei vielä komponentteja — tuo paketti tai komponentti.",
     "componentsNoMatch": "Mikään komponentti ei vastaa hakuasi.",
@@ -585,6 +610,22 @@
       "bgForeground": "Etuala"
     },
     "column": "Sarake",
+    "row": "Rivi",
+    "addRow": "Lisää rivi",
+    "deleteRow": {
+      "action": "Poista rivi"
+    },
+    "dragSection": "Vedä järjestääksesi osion uudelleen",
+    "dragRow": "Vedä järjestääksesi rivin uudelleen",
+    "sectionRowsHint": "Tämän osion rivejä ja sarakkeita hallitaan tasopuussa.",
+    "rowSettings": "Rivi",
+    "rowVerticalAlign": "Tasaa sarakkeet",
+    "rowVAlign": {
+      "top": "Ylös",
+      "center": "Keskelle",
+      "bottom": "Alas"
+    },
+    "rowBackground": "Rivin tausta",
     "columnSettings": "Sarake",
     "colVisibility": {
       "label": "Näkyvyys",
@@ -635,6 +676,10 @@
       "one": "Käännä: {locale}",
       "emptyHint": "Ei {locale}-tekstiä vielä — käytä Käännä tai kirjoita se.",
       "emptyHintShort": "Ei {locale}-tekstiä vielä."
+    },
+    "link": {
+      "newTab": "Avaa uuteen välilehteen",
+      "pickPage": "Valitse sivu…"
     }
   },
   "collections": {
@@ -927,7 +972,8 @@
     "viewport": {
       "desktop": "Työpöytä",
       "tablet": "Tabletti",
-      "mobile": "Mobiili"
+      "mobile": "Mobiili",
+      "deviceLabel": "Laitekoko"
     },
     "codeTab": {
       "html": "HTML",
@@ -946,6 +992,13 @@
       "unsaved": "Tallentamattomia muutoksia",
       "failed": "Tallennus epäonnistui",
       "loading": "Ladataan…"
+    },
+    "draft": {
+      "pending": "Julkaisemattomia muutoksia",
+      "usageNone": "Ei vielä käytössä yhdelläkään julkaistulla sivulla.",
+      "usageCount": "Julkaiseminen päivittää {count, plural, one {# julkaistun sivun} other {# julkaistua sivua}}: {pages}.",
+      "publish": "Julkaise",
+      "discard": "Hylkää"
     }
   },
   "translateModel": {

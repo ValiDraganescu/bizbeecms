@@ -32,6 +32,7 @@ import {
   LIST_PAGES_TOOL,
   GET_PAGE_TOOL,
   LIST_LOCALES_TOOL,
+  SEARCH_ICONS_TOOL,
   GET_BRAND_IDENTITY_TOOL,
   GET_THEME_TOOL,
   GET_AUTHORING_GUIDE_TOOL,
@@ -67,6 +68,7 @@ import {
   UPDATE_COLLECTION_ITEM_TOOL,
   ARCHIVE_COLLECTION_ITEM_TOOL,
   QUERY_COLLECTION_TOOL,
+  ADD_COLLECTION_FIELD_TOOL,
   DROP_COLLECTION_FIELD_TOOL,
   RENAME_COLLECTION_FIELD_TOOL,
   validateCreateCollection,
@@ -74,6 +76,7 @@ import {
   validateUpdateItem,
   validateArchiveItem,
   validateQuery,
+  validateAddField,
   validateDropField,
   validateRenameField,
 } from "./collection-tools";
@@ -97,10 +100,13 @@ import {
 import { EDIT_TEXT_TOOL, validateEditText } from "./edit-text-tool";
 import { GENERATE_IMAGE_TOOL, validateGenerateImage } from "./generate-image-tool";
 import { generateImage } from "./generate-image";
+import { withWhiteBackgroundInstruction } from "./cutout";
+import { removeBackgroundFromPng } from "./png-cutout";
 import { describeImage } from "./describe-image";
 import { applyEdit } from "./apply-edit";
 import {
   validateBlocks,
+  topLevelBlockIds,
   findBlock,
   mergeBlockProps,
   patchBlockProps,
@@ -156,9 +162,11 @@ import {
   setThemeOverridesDark,
   getImageModel,
   getImageGenModel,
+  getIconSet,
 } from "@/db/settings-store";
+import { searchIcons } from "@/db/icon-store";
 import { listAssets } from "@/db/asset-store";
-import { createCollection } from "@/db/collection-store";
+import { createCollection, addCollectionField } from "@/db/collection-store";
 import {
   createItem,
   updateItem,
@@ -190,6 +198,7 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   list_pages: LIST_PAGES_TOOL,
   get_page: GET_PAGE_TOOL,
   list_locales: LIST_LOCALES_TOOL,
+  search_icons: SEARCH_ICONS_TOOL,
   get_brand_identity: GET_BRAND_IDENTITY_TOOL,
   get_theme: GET_THEME_TOOL,
   list_builtin_types: LIST_BUILTIN_TYPES_TOOL,
@@ -203,6 +212,7 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   update_collection_item: UPDATE_COLLECTION_ITEM_TOOL,
   archive_collection_item: ARCHIVE_COLLECTION_ITEM_TOOL,
   query_collection: QUERY_COLLECTION_TOOL,
+  add_collection_field: ADD_COLLECTION_FIELD_TOOL,
   drop_collection_field: DROP_COLLECTION_FIELD_TOOL,
   rename_collection_field: RENAME_COLLECTION_FIELD_TOOL,
   bind_component: BIND_COMPONENT_TOOL,
@@ -300,7 +310,9 @@ async function handleGetComponent(args: unknown): Promise<Record<string, unknown
   const compName = coerceIdArg(args, "name");
   if (!compName) return { ok: false, errors: ["name is required"] };
   try {
-    const row = await getComponentByName(compName);
+    // preferDraft: the model reads (and then re-edits) the pending DRAFT so
+    // iterating doesn't clobber an unpublished edit with a live-based rewrite.
+    const row = await getComponentByName(compName, true);
     if (!row) return { ok: false, errors: [`no component named "${compName}"`] };
     // The model authors in Handlebars-HTML; show it the markup as `html`, not the
     // internal JSON tree (the row carries `tree` as a JSON string for storage).
@@ -363,6 +375,24 @@ async function handleGetBrandIdentity(): Promise<Record<string, unknown>> {
     return { ok: true, identity: await getSiteIdentity() };
   } catch (err) {
     return { ok: false, errors: [`failed to get brand identity: ${(err as Error).message}`] };
+  }
+}
+
+async function handleSearchIcons(args: unknown): Promise<Record<string, unknown>> {
+  const query = coerceIdArg(args, "query");
+  if (!query) return { ok: false, errors: ["search_icons needs a non-empty `query`"] };
+  const rawLimit =
+    typeof args === "object" && args !== null
+      ? (args as Record<string, unknown>).limit
+      : undefined;
+  const limit = typeof rawLimit === "number" && rawLimit > 0 ? Math.min(100, rawLimit) : 48;
+  try {
+    const set = await getIconSet();
+    const names = await searchIcons(set, query, limit);
+    // Return the set so the model knows which library these names resolve against.
+    return { ok: true, set, icons: names };
+  } catch (err) {
+    return { ok: false, errors: [`failed to search icons: ${(err as Error).message}`] };
   }
 }
 
@@ -455,9 +485,14 @@ async function handleGenerateImage(args: unknown): Promise<Record<string, unknow
 
   // The image-GENERATION model (operator-selected; falls back to the default).
   const genModel = (await getImageGenModel()) || DEFAULT_IMAGE_GEN_MODEL;
+  // For a transparent cut-out: tell the model to render on a flat white background
+  // (so the flood-fill has a clean key), then strip it after generation below.
+  const genPrompt = valid.transparentBackground
+    ? withWhiteBackgroundInstruction(valid.prompt)
+    : valid.prompt;
   let image;
   try {
-    image = await generateImage(valid.prompt, genModel, key);
+    image = await generateImage(genPrompt, genModel, key);
   } catch (err) {
     return { ok: false, errors: [`image generation failed: ${(err as Error).message}`] };
   }
@@ -469,6 +504,13 @@ async function handleGenerateImage(args: unknown): Promise<Record<string, unknow
           `Settings → Media (it must support image output).`,
       ],
     };
+  }
+
+  // Background removal (transparent cut-out). Only meaningful for PNG (the alpha
+  // channel + our pure-JS codec); the gen model returns PNG. Degrades to the
+  // original bytes on any failure — a cut-out miss shouldn't fail the whole call.
+  if (valid.transparentBackground && image.contentType === "image/png") {
+    image = { bytes: removeBackgroundFromPng(image.bytes), contentType: "image/png" };
   }
 
   // Same describe step as upload (vision model on the generated bytes, for search).
@@ -581,15 +623,19 @@ async function handleUpdatePageBlocks(args: unknown): Promise<Record<string, unk
     typeof args === "object" && args !== null
       ? (args as Record<string, unknown>).blocks
       : undefined;
-  const valid = validateBlocks(blocksArg);
+  const draft = await getDraftBlocks(id);
+  if (!draft) return { ok: false, errors: ["page not found"] };
+  // Grandfather the page's already-saved top-level blocks (top-level = Sections
+  // only rejects NEW non-Section strays).
+  const valid = validateBlocks(blocksArg, {
+    grandfatheredTopLevelIds: topLevelBlockIds(draft.blocks),
+  });
   if (!valid.ok) return { ok: false, errors: valid.errors };
   try {
     const missing = await missingComponents(valid.componentNames);
     if (missing.length > 0) {
       return { ok: false, errors: [await unknownComponentMessage(missing)] };
     }
-    const draft = await getDraftBlocks(id);
-    if (!draft) return { ok: false, errors: ["page not found"] };
     const res = await setDraftBlocks(id, valid.blocks, draft.meta);
     if (!res.ok) return { ok: false, errors: res.errors };
     return { ok: true, action: "updated", page: id };
@@ -826,6 +872,18 @@ async function unknownCollectionMessage(requested: string): Promise<string> {
 // generated table rebuild (rebuildCollectionSchema → contentDdlBatch). The planner
 // rejects system columns / unknown fields / name collisions; we just shape args.
 
+async function handleAddCollectionField(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateAddField(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  try {
+    const res = await addCollectionField(valid.value.collection, valid.value.field);
+    if (!res.ok) return { ok: false, errors: [res.error] };
+    return { ok: true, action: "added_field", collection: res.plan.tableName, field: valid.value.field.name, fields: res.plan.fields };
+  } catch (err) {
+    return { ok: false, errors: [`failed to add field: ${(err as Error).message}`] };
+  }
+}
+
 async function handleDropCollectionField(args: unknown): Promise<Record<string, unknown>> {
   const valid = validateDropField(args);
   if (!valid.ok) return { ok: false, errors: [valid.error] };
@@ -934,7 +992,11 @@ async function handleCreateList(args: unknown): Promise<Record<string, unknown>>
     next = setBlockChildren(next, listId, [tpl]);
 
     // Renderable check (mirror the page-blocks editor / setPageBlocks contract).
-    const shape = validateBlocks(next);
+    // Grandfather the page's existing top-level blocks — this mutation only edits
+    // inside a section, so it never introduces a new top-level stray.
+    const shape = validateBlocks(next, {
+      grandfatheredTopLevelIds: topLevelBlockIds(loaded.blocks),
+    });
     if (!shape.ok) return { ok: false, errors: shape.errors };
 
     const res = await setDraftBlocks(page, shape.blocks, loaded.meta);
@@ -968,6 +1030,14 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
     if (v.sort !== undefined) patch.sort = v.sort;
     if (v.limit !== undefined) patch.limit = v.limit;
     if (v.presentation !== undefined) patch.presentation = v.presentation;
+    if (v.direction !== undefined) patch.direction = v.direction;
+    if (v.columns !== undefined) patch.columns = v.columns;
+    if (v.columnsTablet !== undefined) patch.columnsTablet = v.columnsTablet;
+    if (v.columnsMobile !== undefined) patch.columnsMobile = v.columnsMobile;
+    if (v.gap !== undefined) patch.gap = v.gap;
+    if (v.maxSize !== undefined) patch.maxSize = v.maxSize;
+    if (v.autoscroll !== undefined) patch.autoscroll = v.autoscroll;
+    if (v.autoscrollSpeed !== undefined) patch.autoscrollSpeed = v.autoscrollSpeed;
     if (v.select !== undefined) patch.select = v.select;
     if (v.min !== undefined) patch.min = v.min;
     if (v.max !== undefined) patch.max = v.max;
@@ -1000,7 +1070,9 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
       next = setBlockChildren(next, block, emptyChild ? [tpl, emptyChild] : [tpl]);
     }
 
-    const shape = validateBlocks(next);
+    const shape = validateBlocks(next, {
+      grandfatheredTopLevelIds: topLevelBlockIds(loaded.blocks),
+    });
     if (!shape.ok) return { ok: false, errors: shape.errors };
     const res = await setDraftBlocks(page, shape.blocks, loaded.meta);
     if (!res.ok) return { ok: false, errors: res.errors };
@@ -1069,7 +1141,9 @@ async function handleEditText(args: unknown): Promise<Record<string, unknown>> {
 
   try {
     if (target === "component.script" || target === "component.css") {
-      const row = await getComponentByName(selector);
+      // Edit the DRAFT base (preferDraft) so a script/css tweak stacks on the
+      // pending draft instead of reverting to live; upsertComponent re-drafts it.
+      const row = await getComponentByName(selector, true);
       if (!row) return { ok: false, errors: [`no component named "${selector}"`] };
       const field = target === "component.script" ? "script" : "css";
       const current = (row[field] as string) ?? "";
@@ -1137,6 +1211,7 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   list_pages: () => handleListPages(),
   get_page: handleGetPage,
   list_locales: () => handleListLocales(),
+  search_icons: (args) => handleSearchIcons(args),
   get_brand_identity: () => handleGetBrandIdentity(),
   get_theme: () => handleGetTheme(),
   list_builtin_types: () => handleListBuiltinTypes(),
@@ -1150,6 +1225,7 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   update_collection_item: handleUpdateCollectionItem,
   archive_collection_item: handleArchiveCollectionItem,
   query_collection: handleQueryCollection,
+  add_collection_field: handleAddCollectionField,
   drop_collection_field: handleDropCollectionField,
   rename_collection_field: handleRenameCollectionField,
   bind_component: handleBindComponent,

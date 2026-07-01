@@ -39,6 +39,14 @@ export const GENERATE_IMAGE_TOOL = {
           items: { type: "string" },
           description: "Optional gallery tags to categorize the image, e.g. [\"hero\", \"team\"].",
         },
+        transparentBackground: {
+          type: "boolean",
+          description:
+            "When true, generate the subject on a plain white background and " +
+            "algorithmically remove that background so the saved PNG is " +
+            "transparent (a cut-out). Use for logos, icons, product/food shots, or " +
+            "any subject meant to sit over a colored section. Default false.",
+        },
       },
       required: ["prompt"],
     },
@@ -46,7 +54,7 @@ export const GENERATE_IMAGE_TOOL = {
 } as const;
 
 export type GenerateImageInput =
-  | { ok: true; prompt: string; tags: string[] }
+  | { ok: true; prompt: string; tags: string[]; transparentBackground: boolean }
   | { ok: false; error: string };
 
 /**
@@ -63,5 +71,10 @@ export function validateGenerateImage(args: unknown): GenerateImageInput {
   }
   const prompt =
     rawPrompt.length > MAX_GEN_PROMPT_CHARS ? rawPrompt.slice(0, MAX_GEN_PROMPT_CHARS) : rawPrompt;
-  return { ok: true, prompt, tags: normalizeTags(a.tags) };
+  return {
+    ok: true,
+    prompt,
+    tags: normalizeTags(a.tags),
+    transparentBackground: a.transparentBackground === true,
+  };
 }

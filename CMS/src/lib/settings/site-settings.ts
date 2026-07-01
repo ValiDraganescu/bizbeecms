@@ -170,7 +170,11 @@ export function buildSystemPrompt(opts: {
       "skip 'nice to meet you' and 'how can I help'. To a greeting or small " +
       "talk, just reply warmly in a sentence and stay ready — don't recite a " +
       "menu of what you can do or list example tasks unless the operator asks " +
-      "what's possible.",
+      "what's possible. Keep it professional and plain: these are designers " +
+      "and marketing people, not engineers. NEVER mention the tools you " +
+      "called or any technical/implementation detail (artifacts, props, " +
+      "slots, Tailwind, the render pipeline) — the operator already sees " +
+      "which tools ran. Describe what changed on the site in their terms.",
   );
 
   parts.push(
@@ -184,7 +188,10 @@ export function buildSystemPrompt(opts: {
       "selecting elements (e.g. data-* hooks) — do NOT use inline event-handler " +
       "attributes like onclick/onsubmit in the html; they are stripped at render. " +
       "Reference another component by its PascalCase tag, e.g. " +
-      "`<AuthorCard name=\"{{author}}\"></AuthorCard>`.",
+      "`<AuthorCard name=\"{{author}}\"></AuthorCard>`. " +
+      "Write text content as REAL Unicode characters, NOT HTML entities: the parser " +
+      "does NOT decode entities, so `&rarr;` or `&#9788;` render as literal text. " +
+      "Use the actual glyph (→, ☽, —, ·, ©) directly in the markup.",
   );
 
   parts.push(
@@ -196,21 +203,63 @@ export function buildSystemPrompt(opts: {
       "REALISTIC PLACEHOLDER DATA (a real-sounding title, a full sentence of body " +
       "copy, an actual price like \"$29\", a sample image URL), not the prop name " +
       "or 'TODO'. This placeholder data is what renders in the component preview, " +
-      "so a component must look complete on its own. type is one of " +
-      "string|richtext|number|boolean|select|image. Use type:\"image\" for any prop " +
+      "so a component must look complete on its own. " +
+      "For a TRANSLATABLE prop (translatable:true), the `default` MUST itself be a " +
+      "per-locale OBJECT with the text written in EVERY Site locale, e.g. " +
+      "default:{ \"en\":\"Our restaurants\", \"fi\":\"Ravintolamme\" } — translate the " +
+      "placeholder copy yourself into each language; a single bare string leaves the " +
+      "other locales blank in the preview and on any page that doesn't override the " +
+      "prop. (The exact locale list is given below for multi-language Sites.) " +
+      "type is one of " +
+      "string|richtext|number|boolean|select|image|link|icon. Use type:\"image\" for any prop " +
       "that holds an asset/image URL (e.g. a background or photo) — the editor then " +
       "shows a media-gallery picker instead of a text box, and the default should be " +
-      "a real /media asset URL from list_assets. Omit propsSchema only for a fully " +
-      "static component with no slots.",
+      "a real /media asset URL from list_assets. Use type:\"link\" for any prop that holds " +
+      "a URL used as an anchor href (e.g. ctaHref, link1Href) — the editor then offers a " +
+      "page picker + free text + an \"open in new tab\" toggle. Author the anchor plainly " +
+      "as <a href=\"{{ctaHref}}\">…</a>; the renderer AUTOMATICALLY adds target=\"_blank\" " +
+      "rel=\"noopener noreferrer\" when the operator enables new-tab (via a companion " +
+      "flag) — do NOT add target/rel yourself and do NOT declare a *NewTab prop. Omit " +
+      "propsSchema only for a fully static component with no slots. " +
+      "When you need a NEW image, call generate_image (it saves to the gallery and " +
+      "returns a /media URL). For a subject meant to sit directly ON a section " +
+      "background (a logo, icon, product or food illustration) — not a full-bleed " +
+      "photo backdrop — pass transparentBackground:true so it's a clean cut-out with " +
+      "no white box around it.",
+  );
+
+  parts.push(
+    "ICONS: to place a vector icon, use an `{{icon \"name\"}}` slot — a SEPARATE " +
+      "slot from `{{prop}}` (the icon name is QUOTED, e.g. " +
+      "`<span class=\"inline-flex h-5 w-5\">{{icon \"calendar\"}}</span>`). The name " +
+      "resolves to an inline SVG from the SITE'S SELECTED ICON SET (chosen in " +
+      "Settings — do NOT include a set prefix). Icons are monochrome and inherit the " +
+      "parent's text color (a theme token), so size them on the WRAPPER with Tailwind " +
+      "(h-5 w-5, text-primary, etc.). To make the icon EDITABLE by the operator, " +
+      "declare an `icon`-typed prop and reference it UNQUOTED: " +
+      "`{{icon glyph}}` with propsSchema { glyph: { type: \"icon\", default: \"calendar\" } } " +
+      "— the editor then shows an icon picker. ALWAYS call `search_icons` to confirm a " +
+      "name exists in the current set before using it; use the returned name verbatim. " +
+      "An unknown icon simply renders nothing.",
   );
 
   parts.push(
     "For `className` use any standard Tailwind utility — the full Tailwind is " +
       "compiled per page at render time, so variants (hover:, focus:, md:, " +
-      "dark:), the complete scales, and arbitrary values (h-[37px], bg-[#0af], " +
-      "grid-cols-[1fr_2fr]) all work. Prefer the purpose color tokens " +
-      "(bg-primary, text-foreground, border-border) so the Site theme drives " +
-      "light/dark — avoid raw palette names (blue-500) for themed surfaces.",
+      "dark:), the complete scales, and arbitrary values (h-[37px], " +
+      "grid-cols-[1fr_2fr]) all work for LAYOUT. " +
+      "COLORS: use ONLY the Site's theme tokens — NEVER a raw palette name " +
+      "(zinc-950, green-700, amber-200) or a hex/oklch literal (bg-[#0af]). The " +
+      "tokens are: surface, surface-muted, surface-raised, foreground, " +
+      "foreground-muted, border, primary, primary-hover, primary-foreground, " +
+      "primary-subtle, danger, success, warning, info (each with its -foreground / " +
+      "-subtle variants), and ring. Use them as bg-/text-/border-/from-/to-/via- " +
+      "utilities (bg-surface, text-foreground, text-primary, border-border, " +
+      "from-foreground). Opacity modifiers on a token are fine (text-surface/80, " +
+      "bg-foreground/60). For a DARK panel (e.g. a hero over a photo), build it from " +
+      "tokens: bg-foreground as the dark base, from-foreground gradients to darken " +
+      "the image, text-surface for the light text on top, text-primary for accents " +
+      "— so it stays correct in both light and dark mode and follows the brand.",
   );
 
   const builtins = opts.builtins ?? [];
@@ -254,7 +303,10 @@ export function buildSystemPrompt(opts: {
         `Do NOT set just the ${def} string on a block translatable prop and expect a ` +
         `later step to fill the rest: a one-language value renders the raw text for the ` +
         `missing locales. You must SUPPLY every translation yourself (translate the copy ` +
-        `into ${locales.join(", ")}). Non-translatable props (no \`(t)\`) take a single ` +
+        `into ${locales.join(", ")}). This applies EQUALLY to a translatable prop's ` +
+        `\`default\` in a component's propsSchema — author it as the same locale object ` +
+        `${example} so the component preview and any page using it render in all ` +
+        `${locales.length} languages. Non-translatable props (no \`(t)\`) take a single ` +
         `plain value, not a locale object.`,
     );
   }
@@ -304,6 +356,18 @@ export function buildSystemPrompt(opts: {
       "(a template over the row using ${field}, e.g. \"${name} · ${location}\" — " +
       "plain text, no backticks); a single field is `labelField`. Pass only the " +
       "fields you're changing.",
+  );
+
+  parts.push(
+    "A plain List (presentation:\"list\", the default) also has LAYOUT options on " +
+      "bind_list: `direction` = \"vertical\" (default), \"horizontal\", or \"grid\"; " +
+      "`gap` px spaces the items. For grid, `columns` is the DESKTOP count (default 2) " +
+      "and `columnsTablet`/`columnsMobile` optionally override it at tablet (768–1023px) " +
+      "and mobile (≤767px) — omit them to keep the same count everywhere. `maxSize` px " +
+      "caps the scroll axis (height for vertical/grid, width for horizontal) so overflow " +
+      "scrolls; `autoscroll:true` loops the content seamlessly with `autoscrollSpeed` " +
+      "\"slow\"|\"normal\"|\"fast\". Set these via bind_list — do NOT bake scroll/grid CSS " +
+      "into the item component.",
   );
 
   const id = opts.identity;

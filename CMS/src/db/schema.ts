@@ -42,8 +42,27 @@ export const component = sqliteTable(
     script: text("script").notNull().default(""),
     // Tailwind classes / rare custom CSS resolved against the precompiled sheet.
     css: text("css").notNull().default(""),
+    // Optional human display label shown in the admin/page-builder UI (the `name`
+    // is a spaceless PascalCase identifier used as a composition tag, so it can't
+    // hold spaces; the label can — "Hero — Emozione"). NULL falls back to `name`.
+    label: text("label"),
     // Optional JSON describing expected props (used by the AI + import validation).
     propsSchema: text("props_schema"),
+    // COMPONENT DRAFT/PUBLISH (mirrors page draft/publish, but as draft_* columns
+    // on the row rather than a separate version table — a component needs only
+    // "editable draft vs live", not deep history). The columns ABOVE (html/script/
+    // css/label/props_schema) are the LIVE artifact the PUBLIC renderer reads. An
+    // edit writes the draft_* columns and sets has_draft=1; PUBLISH copies draft_*
+    // → live and clears has_draft; DISCARD clears draft_*. Preview routes read
+    // draft_* when has_draft=1 (else live). NULL draft columns = "no pending draft".
+    draftHtml: text("draft_html"),
+    draftScript: text("draft_script"),
+    draftCss: text("draft_css"),
+    draftLabel: text("draft_label"),
+    draftPropsSchema: text("draft_props_schema"),
+    // 1 = a pending draft differs from live (drives the "unpublished changes" badge
+    // + which artifact preview reads). Cleared on publish/discard.
+    hasDraft: integer("has_draft", { mode: "boolean" }).notNull().default(false),
     // Source kit id ("blog"/"landing"/"docs") when this component was installed
     // as part of a premade kit; NULL for individually-imported / AI-authored
     // components. Lets the page-builder rail group components by their kit.
@@ -151,6 +170,26 @@ export const siteSettings = sqliteTable("site_settings", {
   key: text("key").primaryKey(),
   // JSON string. Parse defensively at read time (see settings-store).
   value: text("value").notNull().default("{}"),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+/**
+ * Icon cache (icon-sets epic) — one row per resolved `{set}/{name}` icon. The
+ * value is the NORMALIZED inline SVG (currentColor, 1em, aria-hidden) that the
+ * renderer inlines for an `{{icon "name"}}` slot. Sites pick an icon set in
+ * Settings; the first render of each icon fetches it from the Iconify API and
+ * caches it here so steady-state rendering is D1-local with no network. PK is
+ * the composite `{set}/{name}` string (built by `db/icon-store.ts`). Misses on
+ * the Iconify side cache an empty string so we don't re-fetch a known-absent
+ * icon every render.
+ */
+export const iconCache = sqliteTable("icon_cache", {
+  // "{set}/{name}", e.g. "lucide/arrow-right".
+  key: text("key").primaryKey(),
+  // Normalized inline SVG, or "" for a confirmed miss (negative cache).
+  svg: text("svg").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

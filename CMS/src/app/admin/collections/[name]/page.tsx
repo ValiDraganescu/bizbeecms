@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { CollectionItems } from "@/components/content/collection-items";
-import { getCollection, type CollectionView } from "@/db/collection-store";
+import { getCollection, listCollections, type CollectionView } from "@/db/collection-store";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +33,11 @@ export default async function CollectionDetailPage({
   const t = await getTranslations("collections");
 
   let collection: CollectionView | null = null;
+  let all: CollectionView[] = [];
   let bound = true;
   try {
     collection = await getCollection(name);
+    all = await listCollections();
   } catch {
     bound = false; // unbound D1 in this env
   }
@@ -56,7 +58,7 @@ export default async function CollectionDetailPage({
       </header>
 
       {collection ? (
-        <CollectionItems collection={collection} />
+        <CollectionItems collection={collection} allCollections={all} />
       ) : (
         <p className="rounded-md border border-border bg-surface-raised p-4 text-foreground-muted">
           {t("offline")}

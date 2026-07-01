@@ -23,6 +23,7 @@ import {
   localeFieldValue,
   setLocalizedProp,
   mergeTranslations,
+  isLongText,
   type PropField,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
@@ -53,8 +54,17 @@ export function TranslatableField({
   const [error, setError] = useState<string | null>(null);
 
   const raw = props[field.name];
-  const value = localeFieldValue(raw, loc, defaultLocale);
-  const sourceText = localeFieldValue(raw, defaultLocale, defaultLocale).trim();
+  const stored = localeFieldValue(raw, loc, defaultLocale);
+  // Pre-fill the DEFAULT-locale field with the prop's authored `default` when the
+  // block hasn't set it yet, so it's editable real text (not a greyed placeholder)
+  // — matching what the page renders. Other locales stay empty (author the default
+  // language, then translate out from it).
+  const hasStored = typeof raw === "string" ? raw !== "" : raw != null && stored !== "";
+  const value =
+    !hasStored && loc === defaultLocale && typeof field.default === "string"
+      ? field.default
+      : stored;
+  const sourceText = (loc === defaultLocale ? value : localeFieldValue(raw, defaultLocale, defaultLocale)).trim();
   const labelText = field.label || field.name;
   const otherLocales = locales.filter((l) => l !== defaultLocale);
 
@@ -81,6 +91,9 @@ export function TranslatableField({
           fields: { [field.name]: sourceText },
           fromLocale: defaultLocale,
           toLocales: targets,
+          // Don't persist at the component — we merge the returned maps into THIS
+          // block's props and autosave (component artifacts can't hold per-use text).
+          persist: false,
         }),
       });
       const j = (await res.json().catch(() => ({}))) as {
@@ -200,7 +213,9 @@ export function TranslatableField({
         <span className="text-xs text-foreground-muted">{field.description}</span>
       )}
 
-      {field.type === "richtext" ? (
+      {/* Textarea for richtext, or any string prop whose authored default / current
+          value is long — so `string`-declared body copy isn't cramped in one line. */}
+      {field.type === "richtext" || isLongText(field.default) || isLongText(value) ? (
         <textarea
           className={`${inputCls} min-h-16`}
           value={value}

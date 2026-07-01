@@ -25,6 +25,7 @@ import {
   emptySiteIdentity,
   normalizeSiteIdentity,
 } from "../lib/settings/site-settings.ts";
+import { DEFAULT_ICON_SET, isValidIconSet } from "../lib/render/icons.ts";
 
 const CONTENT_LOCALES_KEY = "content_locales";
 const THEME_OVERRIDES_KEY = "theme_overrides";
@@ -34,6 +35,7 @@ const MODEL_CATALOG_KEY = "model_catalog";
 const IMAGE_MODEL_KEY = "image_model";
 const TRANSLATE_MODEL_KEY = "translate_model";
 const IMAGE_GEN_MODEL_KEY = "image_gen_model";
+const ICON_SET_KEY = "icon_set";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
 async function upsertSetting(
@@ -252,6 +254,28 @@ export async function getTranslateModel(injectedDb?: Db): Promise<string> {
 /** Store the selected translation model id. */
 export async function setTranslateModel(id: string, injectedDb?: Db): Promise<void> {
   await upsertSetting(TRANSLATE_MODEL_KEY, id, injectedDb);
+}
+
+/**
+ * Read the per-Site icon SET id (Iconify prefix, e.g. "lucide", "tabler"), or the
+ * default DEFAULT_ICON_SET when unset/invalid. Components reference icons by name
+ * via `{{icon "name"}}`; the set chosen here decides which library those names
+ * resolve against. Plain string id (icon-sets epic).
+ */
+export async function getIconSet(injectedDb?: Db): Promise<string> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, ICON_SET_KEY))
+    .limit(1);
+  const raw = rows[0]?.value;
+  return raw && isValidIconSet(raw) ? raw : DEFAULT_ICON_SET;
+}
+
+/** Store the selected icon set id (validated by the route before it gets here). */
+export async function setIconSet(set: string, injectedDb?: Db): Promise<void> {
+  await upsertSetting(ICON_SET_KEY, set, injectedDb);
 }
 
 /**

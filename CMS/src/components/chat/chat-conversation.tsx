@@ -46,6 +46,10 @@ import {
   subscribeActiveComponentContext,
 } from "@/lib/chat/component-context";
 import {
+  getActiveCollectionContext,
+  subscribeActiveCollectionContext,
+} from "@/lib/chat/collection-context";
+import {
   decideSendOnEnter,
   loadEnterMode,
   saveEnterMode,
@@ -404,12 +408,17 @@ function ContextChip() {
     (fn) => {
       const a = subscribeActivePageContext(fn);
       const b = subscribeActiveComponentContext(fn);
+      const c = subscribeActiveCollectionContext(fn);
       return () => {
         a();
         b();
+        c();
       };
     },
-    () => [getActivePageContext(), getActiveComponentContext()].filter((s) => s !== "").join("\n\n"),
+    () =>
+      [getActivePageContext(), getActiveComponentContext(), getActiveCollectionContext()]
+        .filter((s) => s !== "")
+        .join("\n\n"),
     () => "", // server snapshot: never attached during SSR
   );
   const [open, setOpen] = useState(false);

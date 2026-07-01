@@ -242,7 +242,26 @@ export const BIND_LIST_TOOL = {
         presentation: {
           type: "string",
           enum: ["list", "combobox"],
-          description: "How rows are shown: 'list' (flat) or 'combobox' (a selectable dropdown). The fields below apply only to 'combobox'.",
+          description: "How rows are shown: 'list' (flat) or 'combobox' (a selectable dropdown). The combobox-* fields below apply only to 'combobox'; the layout fields (direction/columns/maxSize/autoscroll) apply only to 'list'.",
+        },
+        direction: {
+          type: "string",
+          enum: ["vertical", "horizontal", "grid"],
+          description: "list layout: 'vertical' (default, a column), 'horizontal' (a row), or 'grid' (N columns, see `columns`).",
+        },
+        columns: { type: "number", description: "list+grid: grid columns at DESKTOP width (default 2, min 1)." },
+        columnsTablet: { type: "number", description: "list+grid: grid columns at TABLET width (768–1023px). Omit = same as `columns`." },
+        columnsMobile: { type: "number", description: "list+grid: grid columns at MOBILE width (≤767px). Omit = same as `columns`." },
+        gap: { type: "number", description: "list: gap between items in px (all directions, default 0)." },
+        maxSize: {
+          type: "number",
+          description: "list: max size in px along the scroll axis — height for vertical/grid, width for horizontal. Content past it scrolls. Omit = grows to fit.",
+        },
+        autoscroll: { type: "boolean", description: "list: seamlessly auto-scroll the overflowing content in a loop (pauses on hover)." },
+        autoscrollSpeed: {
+          type: "string",
+          enum: ["slow", "normal", "fast"],
+          description: "list: auto-scroll speed (default 'normal').",
         },
         select: {
           type: "string",
@@ -365,6 +384,15 @@ export interface BindListArgs {
   map?: Record<string, string>;
   // Presentation + combobox config (all optional, PATCH-like).
   presentation?: "list" | "combobox";
+  // Plain-list layout.
+  direction?: "vertical" | "horizontal" | "grid";
+  columns?: number;
+  columnsTablet?: number;
+  columnsMobile?: number;
+  gap?: number;
+  maxSize?: number;
+  autoscroll?: boolean;
+  autoscrollSpeed?: "slow" | "normal" | "fast";
   select?: "single" | "multiple";
   min?: number;
   max?: number;
@@ -413,6 +441,19 @@ export function validateBindList(args: unknown): ArgResult<BindListArgs> {
   const presentation = str(rec, "presentation");
   if (presentation === "list" || presentation === "combobox") out.presentation = presentation;
   else if (presentation) return { ok: false, error: 'presentation must be "list" or "combobox"' };
+  // Plain-list layout (each independently optional).
+  const direction = str(rec, "direction");
+  if (direction === "vertical" || direction === "horizontal" || direction === "grid") out.direction = direction;
+  else if (direction) return { ok: false, error: 'direction must be "vertical", "horizontal", or "grid"' };
+  if (typeof rec.columns === "number" && Number.isFinite(rec.columns)) out.columns = Math.max(1, Math.floor(rec.columns));
+  if (typeof rec.columnsTablet === "number" && Number.isFinite(rec.columnsTablet)) out.columnsTablet = Math.max(1, Math.floor(rec.columnsTablet));
+  if (typeof rec.columnsMobile === "number" && Number.isFinite(rec.columnsMobile)) out.columnsMobile = Math.max(1, Math.floor(rec.columnsMobile));
+  if (typeof rec.gap === "number" && Number.isFinite(rec.gap)) out.gap = Math.max(0, rec.gap);
+  if (typeof rec.maxSize === "number" && Number.isFinite(rec.maxSize)) out.maxSize = rec.maxSize;
+  if (typeof rec.autoscroll === "boolean") out.autoscroll = rec.autoscroll;
+  const autoscrollSpeed = str(rec, "autoscrollSpeed");
+  if (autoscrollSpeed === "slow" || autoscrollSpeed === "normal" || autoscrollSpeed === "fast") out.autoscrollSpeed = autoscrollSpeed;
+  else if (autoscrollSpeed) return { ok: false, error: 'autoscrollSpeed must be "slow", "normal", or "fast"' };
   const select = str(rec, "select");
   if (select === "single" || select === "multiple") out.select = select;
   else if (select) return { ok: false, error: 'select must be "single" or "multiple"' };

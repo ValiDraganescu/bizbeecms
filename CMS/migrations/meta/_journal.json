@@ -141,6 +141,41 @@
       "when": 1782655882842,
       "tag": "0019_sloppy_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1782807898206,
+      "tag": "0020_lethal_moondragon",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1782833888147,
+      "tag": "0021_rich_lockjaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1782850365161,
+      "tag": "0022_low_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1782854368832,
+      "tag": "0023_same_harry_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1782908403204,
+      "tag": "0024_secret_junta",
+      "breakpoints": true
     }
   ]
 }

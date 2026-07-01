@@ -222,6 +222,32 @@ export const RENAME_COLLECTION_FIELD_TOOL = {
   },
 } as const;
 
+export const ADD_COLLECTION_FIELD_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "add_collection_field",
+    description:
+      "Add ONE new field (column) to an existing collection's schema, keeping all " +
+      "existing data. Identify the collection by its table name (content_<slug>). " +
+      "This is how you extend a collection — do NOT call create_collection for a " +
+      "collection that already exists, and do NOT use rename_collection_field to " +
+      "add a field. Field types: string, text, richtext, number, int, bool, date, " +
+      "datetime, time, select, multiselect, ref, asset. For select/multiselect, " +
+      "supply `options`. Call once per field to add several.",
+    parameters: {
+      type: "object",
+      properties: {
+        collection: { type: "string", description: "The collection's table name (content_<slug>)." },
+        name: { type: "string", description: "New field name (lowercase letters, digits, underscores; must start with a letter)." },
+        type: { type: "string", description: "One of: string, text, richtext, number, int, bool, date, datetime, time, select, multiselect, ref, asset." },
+        required: { type: "boolean", description: "Whether the field must be set on every item." },
+        options: { type: "array", items: { type: "string" }, description: "Allowed values for select/multiselect." },
+      },
+      required: ["collection", "name", "type"],
+    },
+  },
+} as const;
+
 // ── Pure arg validation/coercion (no store, no CF — node-testable) ────────────
 
 /** Result of validating a tool's args: a clean payload, or an error message. */
@@ -333,6 +359,28 @@ export function validateRenameField(
   const to = str(rec, "to");
   if (!to) return { ok: false, error: "to (the new field name) is required" };
   return { ok: true, value: { collection, field, to } };
+}
+
+/** add_collection_field: { collection, name, type, required?, options? }. The
+ *  store/planner enforce name shape, type validity, and collision rules; here we
+ *  require collection+name+type and shape the field into a RawCollectionFieldArg. */
+export function validateAddField(
+  args: unknown,
+): ArgResult<{ collection: string; field: RawCollectionFieldArg }> {
+  const rec = asRecord(args);
+  if (!rec) return { ok: false, error: "expected an object with collection, name and type" };
+  const collection = str(rec, "collection");
+  if (!collection) return { ok: false, error: "collection (table name) is required" };
+  const name = str(rec, "name");
+  if (!name) return { ok: false, error: "name (the new field name) is required" };
+  const type = str(rec, "type");
+  if (!type) return { ok: false, error: "type is required" };
+  const field: RawCollectionFieldArg = { name, type };
+  if (typeof rec.required === "boolean") field.required = rec.required;
+  if (Array.isArray(rec.options)) {
+    field.options = rec.options.filter((o): o is string => typeof o === "string");
+  }
+  return { ok: true, value: { collection, field } };
 }
 
 export type ArchiveOp = "archive" | "unarchive" | "delete";

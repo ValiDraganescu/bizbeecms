@@ -19,6 +19,9 @@ import { getDb } from "@/db";
 import { component as componentTable } from "@/db/schema";
 import { inArray } from "drizzle-orm";
 import { getLocale } from "next-intl/server";
+import { cookies } from "next/headers";
+import { CONTENT_LOCALE_COOKIE } from "@/lib/render/plan-language-switcher";
+import type { ContentLocales } from "@/lib/render/localize";
 import {
   type Block,
   type ComponentArtifact,
@@ -26,6 +29,7 @@ import {
   type RenderPlan,
   type TreeNode,
   SECTION_COMPONENT,
+  SECTION_ROW_COMPONENT,
   SECTION_COLUMN_COMPONENT,
   LIST_COMPONENT,
   collectComponentNames,
@@ -33,16 +37,23 @@ import {
   collectPlanClasses,
   parseJsonColumn,
   planPage,
+  type IconMap,
 } from "@/lib/render/tree";
+import { resolveLocalized } from "@/lib/render/localize";
+import { scanIconSlots } from "@/lib/render/icons";
+import { resolveIcons } from "@/db/icon-store";
+import { getIconSet } from "@/db/settings-store";
 import { renderPlans } from "@/lib/render/react";
 import { ClientScripts } from "@/lib/render/client-scripts";
 import { parseHtml } from "@/lib/render/parse-html";
-import { parsePropsSchema } from "@/lib/pages/page-blocks";
+import { linkNewTabProp, parsePropsSchema } from "@/lib/pages/page-blocks";
 import { buildCss } from "@/lib/render/tw-compile";
 import { viewportHideCss } from "@/lib/render/utility-css";
+import { listGridCss } from "@/lib/render/plan-list";
 
-// The custom non-Tailwind helpers (pb-hide-*), appended to the compiled sheet.
-const VIEWPORT_HIDE_CSS = viewportHideCss();
+// The custom non-Tailwind helpers, appended to the compiled sheet: per-viewport
+// hide classes (pb-hide-*) + responsive grid-List column overrides (pb-list-grid).
+const VIEWPORT_HIDE_CSS = viewportHideCss() + "\n" + listGridCss();
 import { bindingQuerySpec, hydrateProps } from "@/lib/content/binding";
 import { queryCollection } from "@/db/query-store";
 import type { QuerySpec } from "@/lib/content/query-compiler";
@@ -53,16 +64,109 @@ import {
 } from "@/db/settings-store";
 import { themeOverridesToCss } from "@/lib/render/theme";
 
+/**
+ * Resolve the active content locale + the switchable set for a page render.
+ *
+ * The active locale comes from the `bb_content_locale` cookie (written by the
+ * built-in LanguageSwitcher) — NOT next-intl's `getLocale`, which only knows the
+ * fixed admin set (EN/FI/ET) and would reject arbitrary content codes like
+ * `ro-ro`. Falls back to the admin locale (if it happens to be a content locale),
+ * then the Site default. `available` carries each code + its endonym label (via
+ * `Intl.DisplayNames` in the locale's own language) for the switcher's options.
+ */
+async function resolveContentLocaleContext(): Promise<LocaleContext> {
+  const contentLocales = await getContentLocales();
+  const cookieValue = (await cookies()).get(CONTENT_LOCALE_COOKIE)?.value;
+  const adminLocale = await getLocale();
+
+  const active = contentLocales.locales.includes(cookieValue ?? "")
+    ? (cookieValue as string)
+    : contentLocales.locales.includes(adminLocale)
+      ? adminLocale
+      : contentLocales.default;
+
+  return {
+    locale: active,
+    fallback: contentLocales.default,
+    available: buildAvailableLocales(contentLocales),
+  };
+}
+
+/** Each content locale → `{ code, label }`, label = endonym via Intl.DisplayNames. */
+function buildAvailableLocales(
+  contentLocales: ContentLocales,
+): Array<{ code: string; label: string }> {
+  return contentLocales.locales.map((code) => ({ code, label: localeLabel(code) }));
+}
+
+/** A locale code's human label in its OWN language (endonym), e.g. ro-ro → "Română".
+ *  Names the LANGUAGE subtag only (drops the region, so "ro-ro" reads "Română",
+ *  not "Română (România)"). Falls back to the uppercased code if Intl.DisplayNames
+ *  can't name it (missing runtime / unknown code). */
+function localeLabel(code: string): string {
+  const lang = code.split("-")[0];
+  try {
+    const name = new Intl.DisplayNames([lang], { type: "language" }).of(lang);
+    if (name && name.toLowerCase() !== lang.toLowerCase()) {
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+  } catch {
+    // Intl.DisplayNames missing/unknown code → fall through to the raw code.
+  }
+  return code.toUpperCase();
+}
+
+/**
+ * A component D1 row's artifact fields — LIVE columns plus the pending-draft
+ * copy. `pickArtifactCols` chooses which set to render.
+ */
+type ComponentArtifactRow = {
+  html: string;
+  script: string;
+  css: string;
+  propsSchema: string | null;
+  hasDraft: boolean;
+  draftHtml: string | null;
+  draftScript: string | null;
+  draftCss: string | null;
+  draftPropsSchema: string | null;
+};
+
+/**
+ * Pick which artifact (LIVE vs pending DRAFT) a render should use for one
+ * component row. Public renders pass `preferDraft=false` (always live); preview
+ * renders pass `true` so a component with `has_draft` shows its unpublished edit.
+ * A row with no pending draft always yields the live artifact.
+ */
+function pickArtifactCols(
+  row: ComponentArtifactRow,
+  preferDraft: boolean,
+): { html: string; script: string; css: string; propsSchema: string | null } {
+  if (preferDraft && row.hasDraft) {
+    return {
+      html: row.draftHtml ?? "",
+      script: row.draftScript ?? "",
+      css: row.draftCss ?? "",
+      propsSchema: row.draftPropsSchema,
+    };
+  }
+  return { html: row.html, script: row.script, css: row.css, propsSchema: row.propsSchema };
+}
 
 /**
  * Build the render plan for an already-resolved page row. Shared by the public
- * route and the admin preview route — the caller decides which row (and whether
- * to enforce publish status); this does the identical block→plan walk.
+ * route (live artifacts) and the admin preview route (draft artifacts, via
+ * `preferDraft`) — the caller decides which row + whether to prefer component
+ * drafts; this does the identical block→plan walk.
  */
 export async function buildPlanFromPage(
   pageRow: Page,
   blocksOverride?: string,
-): Promise<{ plan: RenderPlan; locale: LocaleContext }> {
+  preferDraft = false,
+): Promise<{
+  plan: RenderPlan;
+  locale: LocaleContext;
+}> {
   const db = await getDb();
   // Versioning slice 2: the route resolves WHICH version's blocks to render
   // (published for public, draft-else-published for preview) and passes the
@@ -79,6 +183,7 @@ export async function buildPlanFromPage(
   const MAX_FETCH_WAVES = 16;
   let pending = collectComponentNames(blocks);
   pending.delete(SECTION_COMPONENT);
+  pending.delete(SECTION_ROW_COMPONENT);
   pending.delete(SECTION_COLUMN_COMPONENT);
   pending.delete(LIST_COMPONENT);
   for (let wave = 0; wave < MAX_FETCH_WAVES && pending.size > 0; wave++) {
@@ -90,13 +195,14 @@ export async function buildPlanFromPage(
       .where(inArray(componentTable.name, want));
     const next = new Set<string>();
     for (const row of rows) {
-      const tree = parseHtml(row.html);
+      const art = pickArtifactCols(row, preferDraft);
+      const tree = parseHtml(art.html);
       components.set(row.name, {
         name: row.name,
         tree,
-        script: row.script || undefined,
-        css: row.css || undefined,
-        propsSchema: row.propsSchema,
+        script: art.script || undefined,
+        css: art.css || undefined,
+        propsSchema: art.propsSchema,
       });
       // Enqueue nested-component tags referenced inside this tree.
       for (const tag of collectTreeComponentTags(tree)) {
@@ -106,14 +212,7 @@ export async function buildPlanFromPage(
     pending = next;
   }
 
-  const contentLocales = await getContentLocales();
-  const requested = await getLocale();
-  const locale: LocaleContext = {
-    locale: contentLocales.locales.includes(requested)
-      ? requested
-      : contentLocales.default,
-    fallback: contentLocales.default,
-  };
+  const locale = await resolveContentLocaleContext();
 
   // Phase-2 binding (Slice A): hydrate single-item collection bindings INTO the
   // blocks' props BEFORE the pure walk. `planPage`/`planTree` stay pure+sync; all
@@ -121,8 +220,86 @@ export async function buildPlanFromPage(
   // any failed/empty query leaves the bound props blank (never throws / 500s).
   const hydratedBlocks = await hydrateBlockBindings(blocks);
 
-  const plan = planPage(hydratedBlocks, components, locale);
+  // Icon-sets epic: resolve every `{{icon "name"}}` / `{{icon prop}}` referenced
+  // on this page into inline SVG BEFORE the pure walk (same hydrate-before-walk
+  // seam as collection bindings). The walk then inlines the cached SVG; a network
+  // hit happens only on an icon's first-ever render. Failures are non-fatal — an
+  // unresolved icon simply renders nothing.
+  const icons = await resolvePageIcons(hydratedBlocks, components, locale);
+
+  const plan = planPage(hydratedBlocks, components, locale, icons);
+
   return { plan, locale };
+}
+
+/**
+ * Build the page's icon map (name → parsed `<svg>` TreeNode). Scans every used
+ * component tree for literal `{{icon "x"}}` slots and dynamic `{{icon prop}}`
+ * slots; for the dynamic ones, gathers the icon-name values from the blocks'
+ * props (locale-resolved). Resolves the union against the Site's selected set via
+ * the cached `resolveIcons`, then parses each SVG string into a TreeNode the pure
+ * walk can inline. Never throws — returns an empty map on any failure.
+ */
+async function resolvePageIcons(
+  blocks: Block[],
+  components: Map<string, ComponentArtifact>,
+  locale: LocaleContext,
+): Promise<IconMap> {
+  const empty: IconMap = new Map();
+  try {
+    const names = new Set<string>();
+    // Per component: literal names + which props are icon-dynamic.
+    const dynamicPropsByComponent = new Map<string, Set<string>>();
+    for (const [name, artifact] of components) {
+      const dyn = new Set<string>();
+      walkTreeText(artifact.tree, (t) => scanIconSlots(t, names, dyn));
+      if (dyn.size > 0) dynamicPropsByComponent.set(name, dyn);
+    }
+    // Per block: the value of each icon-dynamic prop is a candidate icon name.
+    const walkBlocks = (bs: Block[]): void => {
+      for (const b of bs) {
+        const dyn = dynamicPropsByComponent.get(b.component);
+        if (dyn && b.props && typeof b.props === "object") {
+          for (const prop of dyn) {
+            const resolved = resolveLocalized(
+              (b.props as Record<string, unknown>)[prop],
+              locale.locale,
+              locale.fallback,
+            );
+            if (typeof resolved === "string" && resolved !== "") names.add(resolved);
+          }
+        }
+        if (b.children) walkBlocks(b.children);
+      }
+    };
+    walkBlocks(blocks);
+
+    if (names.size === 0) return empty;
+
+    const set = await getIconSet();
+    const svgByName = await resolveIcons(set, names);
+    const map: IconMap = new Map();
+    for (const [iconName, svg] of svgByName) {
+      if (svg) map.set(iconName, parseHtml(svg));
+    }
+    return map;
+  } catch {
+    return empty;
+  }
+}
+
+/** Walk every text-node string in a component tree, invoking `fn` on each. */
+function walkTreeText(node: TreeNode, fn: (text: string) => void): void {
+  if (typeof node === "string") {
+    fn(node);
+    return;
+  }
+  if (node == null || typeof node !== "object") return;
+  // Slots can also live inside string PROP values (e.g. aria-label="{{icon x}}").
+  if (node.props && typeof node.props === "object") {
+    for (const v of Object.values(node.props)) if (typeof v === "string") fn(v);
+  }
+  for (const c of node.children ?? []) walkTreeText(c, fn);
 }
 
 /**
@@ -155,14 +332,18 @@ export async function buildPlanFromComponent(
       .where(inArray(componentTable.name, want));
     const next = new Set<string>();
     for (const row of rows) {
-      if (row.name === name) rootRow = { propsSchema: row.propsSchema };
-      const tree = parseHtml(row.html);
+      // Develop preview shows the DRAFT artifact (that's what you're editing) —
+      // prefer draft columns when the row has a pending draft. The placeholder
+      // props also come from the DRAFT propsSchema so the preview matches.
+      const art = pickArtifactCols(row, true);
+      if (row.name === name) rootRow = { propsSchema: art.propsSchema };
+      const tree = parseHtml(art.html);
       components.set(row.name, {
         name: row.name,
         tree,
-        script: row.script || undefined,
-        css: row.css || undefined,
-        propsSchema: row.propsSchema,
+        script: art.script || undefined,
+        css: art.css || undefined,
+        propsSchema: art.propsSchema,
       });
       for (const tag of collectTreeComponentTags(tree)) {
         if (!components.has(tag)) next.add(tag);
@@ -172,14 +353,7 @@ export async function buildPlanFromComponent(
   }
   if (!rootRow) return null;
 
-  const contentLocales = await getContentLocales();
-  const requested = await getLocale();
-  const locale: LocaleContext = {
-    locale: contentLocales.locales.includes(requested)
-      ? requested
-      : contentLocales.default,
-    fallback: contentLocales.default,
-  };
+  const locale = await resolveContentLocaleContext();
 
   // Placeholder data: each declared prop's `default` becomes the block prop value
   // bound into the matching `{{slot}}`. parsePropsSchema carries the typed default
@@ -187,10 +361,16 @@ export async function buildPlanFromComponent(
   const props: Record<string, unknown> = {};
   for (const field of parsePropsSchema(rootRow.propsSchema)) {
     props[field.name] = field.defaultValue ?? field.default;
+    // Link props: expand the stored new-tab default into the companion
+    // `<name>NewTab` prop the renderer's {{target}} helper reads.
+    if (field.newTab) props[linkNewTabProp(field.name)] = true;
   }
 
   const block: Block = { id: "preview", component: name, props };
-  const plan = planPage([block], components, locale);
+  // Resolve any {{icon}} slots this component (or its nested deps) references, so
+  // the Develop preview shows real glyphs just like the live page.
+  const icons = await resolvePageIcons([block], components, locale);
+  const plan = planPage([block], components, locale, icons);
   return { plan, locale };
 }
 
@@ -276,8 +456,8 @@ export async function RenderedPage({ plan }: { plan: RenderPlan }) {
   // Compile exactly the Tailwind this page uses (cached per class-set). Replaces
   // the old bounded hand-written sheet — full Tailwind, variants + arbitrary
   // values, generated in-Worker. Purpose colors resolve to var(--color-*).
-  const utilityCss =
-    (await buildCss(collectPlanClasses(plan.root))) + "\n" + VIEWPORT_HIDE_CSS;
+  const classes = collectPlanClasses(plan.root);
+  const utilityCss = (await buildCss(classes)) + "\n" + VIEWPORT_HIDE_CSS;
 
   return (
     <>

@@ -106,7 +106,7 @@
       "newline": "↵ Newline",
       "aria": "Toggle Enter key behaviour: send message or insert newline"
     },
-    "contextAttached": "Page context attached",
+    "contextAttached": "Context attached",
     "attach": {
       "add": "Attach",
       "remove": "Remove attachment",
@@ -177,7 +177,8 @@
     "users": "Users",
     "google": "Google sign-in",
     "openrouterKey": "OpenRouter key",
-    "media": "Media"
+    "media": "Media",
+    "iconSet": "Icons"
   },
   "theme": {
     "title": "Theme",
@@ -426,6 +427,10 @@
       "action": "Rename section",
       "label": "Section name"
     },
+    "section": {
+      "collapse": "Collapse section",
+      "expand": "Expand section"
+    },
     "layoutList": "List (from collection)",
     "bind": {
       "title": "Bind to collection",
@@ -457,7 +462,27 @@
       "limitPlaceholder": "Default",
       "template": "Item component",
       "pickTemplate": "— pick a component —",
-      "map": "Map fields to item props"
+      "map": "Map fields to item props",
+      "direction": "Direction",
+      "directionVertical": "Vertical",
+      "directionHorizontal": "Horizontal",
+      "maxHeight": "Max height (px)",
+      "maxWidth": "Max width (px)",
+      "maxSize": "Max size",
+      "maxSizePlaceholder": "No limit",
+      "maxSizeHint": "Content past this scrolls.",
+      "autoscroll": "Auto-scroll",
+      "autoscrollSpeed": "Speed",
+      "speedSlow": "Slow",
+      "speedNormal": "Normal",
+      "speedFast": "Fast",
+      "directionGrid": "Grid",
+      "columns": "Columns",
+      "gap": "Gap (px)",
+      "columnsHint": "Columns per screen size.",
+      "screenDesktop": "Desktop",
+      "screenTablet": "Tablet",
+      "screenMobile": "Mobile"
     },
     "componentsEmpty": "No components yet — import a kit or component.",
     "componentsNoMatch": "No components match your search.",
@@ -585,6 +610,22 @@
       "bgForeground": "Foreground"
     },
     "column": "Column",
+    "row": "Row",
+    "addRow": "Add row",
+    "deleteRow": {
+      "action": "Delete row"
+    },
+    "dragSection": "Drag to reorder section",
+    "dragRow": "Drag to reorder row",
+    "sectionRowsHint": "This section's rows and their columns are managed in the Layers tree.",
+    "rowSettings": "Row",
+    "rowVerticalAlign": "Align columns",
+    "rowVAlign": {
+      "top": "Top",
+      "center": "Center",
+      "bottom": "Bottom"
+    },
+    "rowBackground": "Row background",
     "columnSettings": "Column",
     "colVisibility": {
       "label": "Visibility",
@@ -635,6 +676,10 @@
       "one": "Translate to {locale}",
       "emptyHint": "No {locale} text yet — use Translate, or type it in.",
       "emptyHintShort": "No {locale} text yet."
+    },
+    "link": {
+      "newTab": "Open in new tab",
+      "pickPage": "Pick a page…"
     }
   },
   "collections": {
@@ -927,7 +972,8 @@
     "viewport": {
       "desktop": "Desktop",
       "tablet": "Tablet",
-      "mobile": "Mobile"
+      "mobile": "Mobile",
+      "deviceLabel": "Device size"
     },
     "codeTab": {
       "html": "HTML",
@@ -946,6 +992,13 @@
       "unsaved": "Unsaved changes",
       "failed": "Save failed",
       "loading": "Loading…"
+    },
+    "draft": {
+      "pending": "Unpublished changes",
+      "usageNone": "Not used on any live page yet.",
+      "usageCount": "Publishing updates {count, plural, one {# live page} other {# live pages}}: {pages}.",
+      "publish": "Publish",
+      "discard": "Discard"
     }
   },
   "translateModel": {

@@ -44,7 +44,9 @@ export const DEFAULT_TRANSLATE_MODEL = "openai/gpt-4o-mini";
  * An OpenRouter model that OUTPUTS the `image` modality. Operator-overridable in
  * CMS settings; the fallback when unset or when the saved id can't output images.
  */
-export const DEFAULT_IMAGE_GEN_MODEL = "google/gemini-2.5-flash-image-preview";
+// Google's "Nano Banana". The `-preview` id was retired and now returns an empty
+// (no-image) response on OpenRouter — use the GA id, which actually emits images.
+export const DEFAULT_IMAGE_GEN_MODEL = "google/gemini-2.5-flash-image";
 
 /** A catalog entry as the UI + route consume it (the clean boundary shape). */
 export interface CatalogModel {

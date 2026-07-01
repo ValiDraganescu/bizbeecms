@@ -25,8 +25,6 @@ export function SectionSettings({
   const num = (v: unknown, d: number) => (typeof v === "number" ? v : d);
   const s = (v: unknown, d: string) => (typeof v === "string" && v ? v : d);
 
-  const columns = num(p.columns, 1);
-  const behavior = s(p.columnBehavior, "equal");
   const vAlign = s(p.verticalAlign, "top");
   const hAlign = s(p.horizontalAlign, "left");
   const maxWidth = s(p.maxWidth, "1280px");
@@ -63,41 +61,7 @@ export function SectionSettings({
     <div className="flex flex-col gap-5">
       <h3 className="text-sm font-medium text-foreground">{t("sectionSettings")}</h3>
 
-      {/* Columns */}
-      <div className="flex flex-col gap-1.5">
-        <span className={label}>{t("sectionColumnsLabel")}</span>
-        <div className="flex gap-1">
-          {[1, 2, 3, 4].map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => onChange({ columns: n })}
-              aria-pressed={columns === n}
-              className={`${seg} ${columns === n ? segOn : segOff}`}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Empty columns behavior */}
-      <div className="flex flex-col gap-1.5">
-        <span className={label}>{t("sectionEmptyCols")}</span>
-        <div className="flex gap-1">
-          {(["equal", "collapse"] as const).map((b) => (
-            <button
-              key={b}
-              type="button"
-              onClick={() => onChange({ columnBehavior: b })}
-              aria-pressed={behavior === b}
-              className={`${seg} ${behavior === b ? segOn : segOff}`}
-            >
-              {t(`sectionBehavior.${b}`)}
-            </button>
-          ))}
-        </div>
-      </div>
+      <p className="text-xs text-foreground-muted">{t("sectionRowsHint")}</p>
 
       {/* Content alignment (vertical × horizontal) */}
       <div className="flex flex-col gap-1.5">
