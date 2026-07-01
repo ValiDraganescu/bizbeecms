@@ -9,7 +9,19 @@ Build order: source schema + encrypted secret first, then the fetch+map engine,
 then the source-agnostic binding, then UI, then AI tools. Each slice gates on CMS
 tsc + opennext build green + node tests + EN/FI/ET for new strings.
 
-- TODO: **Slice 1 — `data_source` schema + write-only encrypted secret.** Add a
+> REVISED 2026-07-02 (user directive — see GOAL.md): scope now also includes up to
+> 2 retries, per-request cache config + per-request purge + GLOBAL cache purge, a
+> CENTRALIZED request layer (one module, one management UI, appears beside
+> collections in the picker), POST/PUT/DELETE (not only GET), and `{placeholder}`
+> params filled from component props/inputs. Slices below carry (REVISED) notes;
+> Slice 7 is new. Re-check DONE slices against the revised notes before building on
+> them.
+
+- DONE (2026-07-02): **Slice 1 — `data_source` schema + write-only encrypted secret.**
+  Shipped WITH the revised saved-request notion as a separate `data_source_request`
+  table (per-request method/path/query/body/cache/retryable) — see JOURNAL.
+  Crypto = existing `lib/crypto/secret-box.ts` reused (no new helpers needed).
+  Opennext build gate deferred (dev server was running) — next run verifies. Add a
   `data_source` table (per-Site D1): id, name, kind ("api"), baseUrl, method,
   defaultQuery (JSON), authType ("header"|"query"|"basic"|"none"), authParam
   (header name / query key / —), secretEnc (encrypted, NEVER returned), cacheTtlSec,
@@ -18,6 +30,10 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   round-trip. `GET/POST/PATCH/DELETE /api/data-sources` (Admin-gated; GET never
   returns secretEnc — shows whether a secret is set). URL validation (http(s)
   absolute; block obvious internal hosts). NO fetch/render yet.
+  (REVISED 2026-07-02) `method` covers GET|POST|PUT|DELETE; add a SAVED-REQUEST
+  notion per source (path, query, optional JSON body template, method override,
+  cache on/off + TTL per request) — either a `data_source_request` table or a
+  requests JSON column; path/query/body may contain `{placeholder}` tokens.
 
 - TODO: **Slice 2 — fetch + map engine (server-side, cached, graceful).** A pure-ish
   `fetchSource(source, request)`: build the URL (baseUrl + path + merged query),
@@ -28,6 +44,16 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   placeholder). Node tests: URL+auth building per authType (mock fetch), map dot-
   paths, array vs object, failure → null. NO live API in tests. Secret stays
   server-side.
+  (REVISED 2026-07-02) This IS the centralized request layer — ALL outbound API
+  calls go through this one module. Add: up to 2 RETRIES (3 attempts) on network
+  error/5xx/429 with small backoff, never on other 4xx, and only for GET /
+  explicitly-marked-idempotent requests (no double-firing mutations); POST/PUT/
+  DELETE support incl. JSON body (POST-to-query is render-legal); `{placeholder}`
+  substitution into path/query/body from a params object, URL-encoded /
+  JSON-escaped (component input is untrusted — never raw-splice); cache respects
+  the per-request config (only cache GET / explicitly-cacheable), key = source +
+  method + resolved URL/params/body hash. Node tests: retry counts per status,
+  no-retry on POST, placeholder encoding, cache-key stability.
 
 - TODO: **Slice 3 — source-agnostic binding (generalize content-collections'
   BindingRef).** Extend `BindingRef` with `source: { kind: "collection" | "api", id,
@@ -45,12 +71,19 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   cache TTL. A "Test" button runs `fetchSource` and shows a sample response so the
   operator can see the shape to map. Admin-gated (cms-auth roles). Reuse design-
   system + purpose tokens. EN/FI/ET. Pure form validation tested. Gate.
+  (REVISED 2026-07-02) This is the CENTRAL management UI: manage each source's
+  saved requests too (method GET/POST/PUT/DELETE, path/query/body template with
+  `{placeholders}`, per-request cache on/off + TTL). Test button works for all
+  methods (test params for placeholders).
 
 - TODO: **Slice 5 — bind UI picks Collection OR API source.** In the page-builder
   bind panel (content-collections Phase-2 UI), the source picker lists Collections
   AND API data sources. For an API source: choose the request (path/params) and map
   response fields (dot-path) → the component's declared props, with the Slice-4 test
   response as a guide. EN/FI/ET. Gate.
+  (REVISED 2026-07-02) Also wire PARAM PASSING: for each `{placeholder}` in the
+  chosen request, pick a component prop/input (or a literal) as its value; the bind
+  stores that param map and Slice-3 hydration resolves it at render.
 
 - TODO: **Slice 6 — AI tools for data sources.** Tools so the assistant can:
   `create_data_source` (config + secret), `test_data_source` (fetch a sample so the
@@ -59,4 +92,13 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   Reuse the Slice-2/3 engine; register in the existing tool pipeline (shared
   dispatch). Validate against propsSchema. Node tests per tool (mock fetch/store).
   Gate.
+
+- TODO: **Slice 7 — cache purging (NEW 2026-07-02).** Per-request purge: a button on
+  each saved request (Data Sources UI) + `POST /api/data-sources/:id/purge`
+  (optionally scoped to one request) that evicts its cache entries. Global purge:
+  "purge all API cache" action + endpoint. Requires the Slice-2 cache to key/
+  namespace entries so both scopes are cheap to evict (e.g. per-source prefix or
+  version counter — bumping the version beats enumerating KV keys). Admin-gated,
+  in-app confirm for global. EN/FI/ET. Node tests: purge invalidates the right
+  scope, untouched sources keep serving cached. Gate.
 

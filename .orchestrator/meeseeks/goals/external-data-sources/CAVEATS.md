@@ -48,3 +48,25 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **Gate:** CMS `tsc` + `npx opennextjs-cloudflare build` green (NEVER while
   `npm run dev` runs). Regen PM `cms-bundle`. EN/FI/ET for new UI strings. No native
   confirm()/alert() — in-app modal for delete-source.
+
+- **Secret crypto EXISTS — reuse `CMS/src/lib/crypto/secret-box.ts`** (AES-GCM,
+  KEK = `CMS_AUTH_SECRET`, round-trip already tested via google-client.test.mjs).
+  Do NOT write new encrypt/decrypt helpers; follow the google-client-store /
+  settings/google route pattern (route reads the KEK from the Worker env).
+
+- **The "regen PM cms-bundle" gate line is STALE** — `cms-bundle.generated.js` no
+  longer exists; Site deploys build the release tag fresh in a container (see
+  MEMORY `cms-deploy-builds-from-git-tag`). Skip that step.
+
+- **A dev server may be live on :3602 (CMS) — check `lsof -nP -i :3602` BEFORE the
+  opennext build gate.** It may belong to the user or a CONCURRENT Meeseeks; don't
+  kill it. If it's running, defer the build gate, note it, and let a later run
+  verify (tsc + node tests still gate).
+
+- **Don't brace-check JSON body templates.** `hasValidPlaceholderSyntax` is for
+  path/query values only — a JSON `bodyTemplate`'s structural `{}` are legal; the
+  Slice-2 engine substitutes only well-formed `{name}` tokens and JSON-escapes.
+
+- **Migrations: drizzle-kit ONLY** (CMS/CLAUDE.md): edit schema.ts →
+  `npm run db:generate` → `wrangler d1 migrations apply bizbeecms-cms --local`.
+  Never hand-write SQL or raw ALTER TABLE.

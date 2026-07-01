@@ -485,6 +485,77 @@ export const loginAttempt = sqliteTable(
   (t) => [index("login_attempt_email_kind_idx").on(t.email, t.kind)],
 );
 
+/**
+ * Data source — an external API an operator (or the AI) registers so components
+ * can bind to it like a collection (external-data-sources Slice 1). Holds the
+ * CONNECTION: base URL + auth. The secret is AES-GCM-encrypted at rest via
+ * `lib/crypto/secret-box` (KEK = CMS_AUTH_SECRET) and is WRITE-ONLY — the API
+ * never returns `secretEnc` after save (USER DECISION 2026-06-22). Fetches
+ * happen SERVER-SIDE at render; the key never reaches the browser.
+ */
+export const dataSource = sqliteTable("data_source", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  // Absolute http(s) URL. Validated against obvious internal hosts (SSRF) —
+  // see lib/data-sources/validate.ts.
+  baseUrl: text("base_url").notNull(),
+  // "header" | "query" | "basic" | "none". OAuth2 deferred (GOAL).
+  authType: text("auth_type").notNull().default("none"),
+  // Header name (e.g. "X-API-Key") or query key (e.g. "appid"); null for
+  // basic/none. For basic, secret is "user:pass".
+  authParam: text("auth_param"),
+  // base64(iv‖ct+tag) from secret-box. NEVER serialized to the client.
+  secretEnc: text("secret_enc"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+/**
+ * Saved request on a data source (2026-07-02 revision: centralized request
+ * management). Holds WHAT to call: method (GET|POST|PUT|DELETE), path, query,
+ * optional JSON body template — all of which may contain `{placeholder}` tokens
+ * filled at bind time from component props (encoded on insert, never spliced
+ * raw). Per-request cache config (Slice-2 engine only caches GETs or requests
+ * explicitly marked cacheable) and a `retryable` flag (non-GETs are only
+ * retried when explicitly marked — a creating POST must not double-fire).
+ */
+export const dataSourceRequest = sqliteTable(
+  "data_source_request",
+  {
+    id: text("id").primaryKey(),
+    sourceId: text("source_id")
+      .notNull()
+      .references(() => dataSource.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // "GET" | "POST" | "PUT" | "DELETE".
+    method: text("method").notNull().default("GET"),
+    // Joined onto the source's baseUrl; may contain {placeholders}.
+    path: text("path").notNull().default(""),
+    // JSON object of string values merged into the URL query; values may
+    // contain {placeholders}.
+    query: text("query").notNull().default("{}"),
+    // JSON body template for POST/PUT/DELETE; may contain {placeholders}.
+    bodyTemplate: text("body_template"),
+    cacheEnabled: integer("cache_enabled", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    cacheTtlSec: integer("cache_ttl_sec").notNull().default(60),
+    // Opt-in retry for non-GET methods (GETs always follow the retry policy).
+    retryable: integer("retryable", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [index("data_source_request_source_idx").on(t.sourceId)],
+);
+
 export type Component = typeof component.$inferSelect;
 export type NewComponent = typeof component.$inferInsert;
 export type Page = typeof page.$inferSelect;
@@ -512,3 +583,7 @@ export type PasswordReset = typeof passwordReset.$inferSelect;
 export type NewPasswordReset = typeof passwordReset.$inferInsert;
 export type LoginAttempt = typeof loginAttempt.$inferSelect;
 export type NewLoginAttempt = typeof loginAttempt.$inferInsert;
+export type DataSource = typeof dataSource.$inferSelect;
+export type NewDataSource = typeof dataSource.$inferInsert;
+export type DataSourceRequest = typeof dataSourceRequest.$inferSelect;
+export type NewDataSourceRequest = typeof dataSourceRequest.$inferInsert;
