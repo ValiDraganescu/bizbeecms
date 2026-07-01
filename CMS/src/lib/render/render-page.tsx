@@ -55,6 +55,7 @@ import { listGridCss } from "@/lib/render/plan-list";
 // hide classes (pb-hide-*) + responsive grid-List column overrides (pb-list-grid).
 const VIEWPORT_HIDE_CSS = viewportHideCss() + "\n" + listGridCss();
 import { bindingQuerySpec, hydrateProps } from "@/lib/content/binding";
+import { fetchApiBindingRow, fetchApiListRows } from "@/lib/data-sources/hydrate";
 import { queryCollection } from "@/db/query-store";
 import type { QuerySpec } from "@/lib/content/query-compiler";
 import {
@@ -218,7 +219,9 @@ export async function buildPlanFromPage(
   // blocks' props BEFORE the pure walk. `planPage`/`planTree` stay pure+sync; all
   // the async D1 work (first-match query per binding) happens right here. Graceful:
   // any failed/empty query leaves the bound props blank (never throws / 500s).
-  const hydratedBlocks = await hydrateBlockBindings(blocks);
+  // external-data-sources Slice 3: api-kind bindings hydrate at the SAME seam
+  // (locale is passed so `{placeholder}` params can read localized block props).
+  const hydratedBlocks = await hydrateBlockBindings(blocks, locale);
 
   // Icon-sets epic: resolve every `{{icon "name"}}` / `{{icon prop}}` referenced
   // on this page into inline SVG BEFORE the pure walk (same hydrate-before-walk
@@ -381,13 +384,35 @@ export async function buildPlanFromComponent(
  * `hydrateProps` does the field→prop copy; this async shell only fetches the rows.
  * Returns a NEW block tree (the originals are untouched). GRACEFUL: a query error
  * or empty result → that binding resolves to no row → the prop stays blank.
+ *
+ * external-data-sources Slice 3: bindings are SOURCE-AGNOSTIC — an api-kind
+ * source (`kind === "api"`) hydrates via the central fetch engine instead of a
+ * collection query. Api rows arrive pre-flattened by their dot-paths, so the
+ * SAME `hydrateProps`/`planList` stamping consumes either kind unchanged.
  */
-async function hydrateBlockBindings(blocks: Block[]): Promise<Block[]> {
+async function hydrateBlockBindings(
+  blocks: Block[],
+  locale: LocaleContext,
+): Promise<Block[]> {
   return Promise.all(
     blocks.map(async (block): Promise<Block> => {
       const children = block.children
-        ? await hydrateBlockBindings(block.children)
+        ? await hydrateBlockBindings(block.children, locale)
         : block.children;
+
+      // api-kind List: fetch + map via the central engine (cached, retried,
+      // graceful). Rows are flattened by dot-path so planList stamps them with
+      // the ordinary `listMap` lookup.
+      if (block.component === LIST_COMPONENT && block.listSource?.kind === "api") {
+        const listRows = await fetchApiListRows(
+          block.listSource,
+          block.listMap,
+          block.props,
+          locale.locale,
+          locale.fallback,
+        );
+        return { ...block, children, listRows };
+      }
 
       // List block (Slice B): fetch the per-row query and stash the rows onto
       // `listRows` for the pure `planList` to stamp. Same hydrate-before-walk
@@ -395,9 +420,10 @@ async function hydrateBlockBindings(blocks: Block[]): Promise<Block[]> {
       // missing source → no rows → the List's empty-state slot (or nothing).
       if (block.component === LIST_COMPONENT && block.listSource?.collection) {
         const src = block.listSource;
+        const collection = block.listSource.collection;
         let listRows: Array<Record<string, unknown>> = [];
         try {
-          const res = await queryCollection(src.collection, {
+          const res = await queryCollection(collection, {
             filters: src.filter,
             sort: src.sort,
             limit: src.limit,
@@ -416,6 +442,21 @@ async function hydrateBlockBindings(blocks: Block[]): Promise<Block[]> {
       const rows: Record<string, Record<string, unknown> | null> = {};
       await Promise.all(
         Object.entries(block.bindings).map(async ([key, binding]) => {
+          // api-kind binding: central fetch → first item → flat dot-path row.
+          if (binding.source?.kind === "api") {
+            rows[key] = await fetchApiBindingRow(
+              binding.source,
+              binding.map,
+              block.props,
+              locale.locale,
+              locale.fallback,
+            );
+            return;
+          }
+          if (!binding.source?.collection) {
+            rows[key] = null; // graceful: malformed binding → blank
+            return;
+          }
           try {
             // The binding's filter `op` is loosely typed (string); the query
             // compiler whitelists ops at runtime (unknown op → 400 → graceful

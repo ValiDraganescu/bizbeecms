@@ -58,6 +58,7 @@ export {
   // types + reserved names + helpers
   type TreeNode,
   type BindingRef,
+  type ApiBindingParams,
   type ListSource,
   type Block,
   type ComponentArtifact,

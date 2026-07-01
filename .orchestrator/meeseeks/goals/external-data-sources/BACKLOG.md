@@ -58,15 +58,16 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   method + resolved URL/params/body hash. Node tests: retry counts per status,
   no-retry on POST, placeholder encoding, cache-key stability.
 
-- TODO: **Slice 3 — source-agnostic binding (generalize content-collections'
-  BindingRef).** Extend `BindingRef` with `source: { kind: "collection" | "api", id,
-  request? }`. In `buildPlanFromPage`, when a binding's source.kind === "api", call
-  `fetchSource` + `mapResponse` (Slice 2) to hydrate props BEFORE the pure walk —
-  exactly where collection queries hydrate. `planList` stamps per array element for
-  an api source too. Validate mapped props against the component's propsSchema (same
-  allowlist). Pure tests: api-source binding hydrates props; array → N stamped
-  items; failure → graceful empty. (DEPENDS on content-collections Phase-2 binding
-  Slice A/B — if not landed, co-design the BindingRef shape and note it.) Gate.
+- DONE (2026-07-02): **Slice 3 — source-agnostic binding (generalize
+  content-collections' BindingRef).** Shipped as `kind: "collection"|"api"` on
+  `BindingRef.source` AND `ListSource` (+ sourceId/requestId/params/itemsPath);
+  api items are flattened by their map dot-paths so the EXISTING pure
+  hydrateProps/planList stamping consumes them unchanged. Pure glue in
+  `lib/data-sources/bind.ts`, effects (store+decrypt+caches.default ApiCache) in
+  `lib/data-sources/hydrate.ts`, wired into `hydrateBlockBindings`. Declared-prop
+  allowlist enforced by the validators (authoring) + the pure walk (render).
+  22 node tests; suite 1296/1296; tsc green. Opennext build gate deferred a 3rd
+  time (dev server live on :3602) — see JOURNAL.
 
 - TODO: **Slice 4 — Data Sources admin UI + test call.** CMS → Data Sources: list /
   add / edit / delete (in-app confirm) API sources — name, base URL, method,

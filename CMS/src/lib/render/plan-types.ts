@@ -99,15 +99,33 @@ export type TreeNode =
 // BEFORE the pure walk (hydrate-before-walk — see render-page.tsx). The binding
 // is data only (no SQL); the live query is compiled + run by the renderer host.
 // Validation (collection/field/prop exist) is in `lib/content/binding.ts`.
+//
+// external-data-sources Slice 3: the source is SOURCE-AGNOSTIC — `kind` picks
+// "collection" (default, legacy bindings carry no kind) or "api" (an external
+// data source + saved request; see lib/data-sources). For an api source the
+// `map` values are DOT-PATHS into the JSON response ("main.temp"), and `params`
+// feeds the saved request's `{placeholder}` tokens from block props / literals.
+
+/** `{placeholder}` → a literal string, or `{ prop }` read from the block's props. */
+export type ApiBindingParams = Record<string, string | { prop: string }>;
+
 export type BindingRef = {
   source: {
-    /** The collection's `content_<slug>` table name (registry `table_name`). */
-    collection: string;
+    /** Source kind; absent = "collection" (legacy stored bindings). */
+    kind?: "collection" | "api";
+    /** collection kind: the collection's `content_<slug>` table name. */
+    collection?: string;
     /** Structured filter/sort clauses (query-compiler `QuerySpec` shape). */
     filter?: Array<{ field: string; op: string; value?: unknown }>;
     sort?: Array<{ field: string; dir?: "asc" | "desc" }>;
+    /** api kind: the `data_source` row id. */
+    sourceId?: string;
+    /** api kind: the saved `data_source_request` row id. */
+    requestId?: string;
+    /** api kind: values for the request's `{placeholder}` tokens. */
+    params?: ApiBindingParams;
   };
-  /** `{ blockPropName: collectionFieldName }` — which row field fills which prop. */
+  /** `{ blockPropName: fieldName }` — collection field, or api response dot-path. */
   map: Record<string, string>;
 };
 
@@ -121,10 +139,20 @@ export type BindingRef = {
 // themselves are fetched in the async `buildPlanFromPage` (NOT in the pure walk)
 // and stashed onto `Block.listRows`, mirroring Slice A's hydrate-before-walk seam.
 export type ListSource = {
-  /** The collection's `content_<slug>` table name (registry `table_name`). */
-  collection: string;
+  /** Source kind; absent = "collection" (legacy stored lists). */
+  kind?: "collection" | "api";
+  /** collection kind: the collection's `content_<slug>` table name. */
+  collection?: string;
   filter?: Array<{ field: string; op: string; value?: unknown }>;
   sort?: Array<{ field: string; dir?: "asc" | "desc" }>;
+  /** api kind (external-data-sources Slice 3): the `data_source` row id. */
+  sourceId?: string;
+  /** api kind: the saved `data_source_request` row id. */
+  requestId?: string;
+  /** api kind: values for the request's `{placeholder}` tokens. */
+  params?: ApiBindingParams;
+  /** api kind: dot-path to the rows array when nested (e.g. OpenWeather "list"). */
+  itemsPath?: string;
   /** Max rows to stamp. Clamped by the query store; default = the store default. */
   limit?: number;
   /**

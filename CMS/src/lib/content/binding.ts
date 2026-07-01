@@ -85,6 +85,22 @@ export function validateBinding(
   if (!binding || typeof binding !== "object" || !binding.source || !binding.map) {
     return { ok: false, errors: ["binding must have a source and a map"] };
   }
+
+  // external-data-sources Slice 3: an api-kind binding has no collection fields
+  // to check (map values are dot-paths into an arbitrary JSON response) — only
+  // the source/request ids and the declared-prop allowlist are validatable here.
+  if (binding.source.kind === "api") {
+    if (!binding.source.sourceId || !binding.source.requestId) {
+      errors.push("api binding must name a sourceId and a requestId");
+    }
+    for (const propName of Object.keys(binding.map)) {
+      if (!declared.has(propName)) {
+        errors.push(`prop "${propName}" is not declared on the target component`);
+      }
+    }
+    return errors.length === 0 ? { ok: true } : { ok: false, errors };
+  }
+
   if (fields == null) {
     return { ok: false, errors: [`unknown collection "${binding.source.collection}"`] };
   }
@@ -132,6 +148,20 @@ export function validateListBinding(
   declared: Set<string>,
 ): { ok: true } | { ok: false; errors: string[] } {
   const errors: string[] = [];
+
+  // external-data-sources Slice 3: an api-kind List validates like an api
+  // binding — ids present + template props declared; dot-paths are unchecked.
+  if (listSource && typeof listSource === "object" && listSource.kind === "api") {
+    if (!listSource.sourceId || !listSource.requestId) {
+      errors.push("api list must name a sourceId and a requestId");
+    }
+    for (const propName of Object.keys(listMap ?? {})) {
+      if (!declared.has(propName)) {
+        errors.push(`prop "${propName}" is not declared on the template component`);
+      }
+    }
+    return errors.length === 0 ? { ok: true } : { ok: false, errors };
+  }
 
   if (!listSource || typeof listSource !== "object" || !listSource.collection) {
     return { ok: false, errors: ["list must have a source collection"] };

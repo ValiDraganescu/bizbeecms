@@ -76,6 +76,23 @@ Read every line before working. Each entry was learned the hard way by a previou
   && (GET || retryable)). Slice-4 UI should label it "safe to retry/cache
   (idempotent)" — don't split it into two flags without a user directive.
 
+- **Api rows are FLATTENED by dot-path** (Slice 3): `flattenByPaths` keys each
+  row by the exact `map`/`listMap` VALUES ("main.temp"), so pure
+  `hydrateProps`/`stampRow` work unchanged. Slice-5 UI must store api map values
+  as dot-paths; combobox `valueField`/`labelField` on an api List are dot-paths
+  too. Do NOT switch to nested rows — that forks the stamping machinery.
+
+- **The ApiCache impl lives in `hydrate.ts`, NOT fetch.ts**: `caches.default`
+  keyed by a synthetic `https://bizbee-api-cache.internal/<key>` URL, TTL via
+  Cache-Control; `next dev` (no caches global) falls back to a module-level
+  memory cache. Slice-7 purge: the Cache-API impl has no enumerate/delete-all —
+  purge MUST go through the fetch engine's `cacheVersion` (persist a version
+  counter, e.g. in the settings store, and pass it as `deps.cacheVersion`).
+
+- **api-kind validators check only ids + declared props** — response dot-paths
+  can't be validated without a sample response (that's the Slice-4 Test button's
+  job). Don't add speculative path validation.
+
 - **The fetch engine is PURE — callers own the effects.** `fetchSource` takes a
   decrypted secret on `source.secret` (use `decryptSourceSecret` + KEK from
   Worker env) and an injected `ApiCache`. No Workers cache impl exists yet;
