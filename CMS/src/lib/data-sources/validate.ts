@@ -104,6 +104,24 @@ export function hasValidPlaceholderSyntax(template: string): boolean {
   return !template.replace(PLACEHOLDER_RE, "").match(/[{}]/);
 }
 
+/**
+ * Distinct `{placeholder}` names across a saved request's path, query values,
+ * and body template, in first-seen order — the Slice-4 Test UI renders one
+ * test-param input per name. A JSON body's structural `{}` never matches (the
+ * regex only accepts identifier-ish names right after `{`).
+ */
+export function requestPlaceholders(request: {
+  path: string;
+  query: Record<string, string>;
+  bodyTemplate: string | null;
+}): string[] {
+  const seen = new Set<string>();
+  for (const tpl of [request.path, ...Object.values(request.query), request.bodyTemplate ?? ""]) {
+    for (const name of extractPlaceholders(tpl)) seen.add(name);
+  }
+  return [...seen];
+}
+
 /* --------------------------------------------------------------- source */
 
 export function validateSourceInput(input: unknown): Validated<SourceInput> {

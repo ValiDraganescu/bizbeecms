@@ -87,3 +87,32 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/content/binding.ts, CMS/src/lib/data-sources/bind.ts,
   CMS/src/lib/data-sources/hydrate.ts, CMS/src/lib/render/render-page.tsx,
   CMS/scripts/data-source-bind.test.mjs
+
+## 2026-07-02 02:57 — Slice 4: Data Sources admin UI + test-call endpoint
+- **Status:** DONE
+- **What I did:** New admin section CMS → Data Sources (`/admin/data-sources`,
+  nav entry in admin-sections.ts + adminNav strings). `DataSourcesManager`
+  (components/content/data-sources-manager.tsx): sources list/add/edit/delete
+  (in-app ConfirmModal), authType select w/ conditional authParam, WRITE-ONLY
+  secret (password field; blank-on-edit = keep, switching to authType none
+  clears via `secret:""`); per-source expandable SAVED REQUESTS panel
+  (method/path/query-as-key=value-lines/body template for non-GET, cacheEnabled
+  + TTL, retryable labeled "safe to retry/cache (idempotent)" per caveat), and
+  an inline TEST panel: one input per `{placeholder}` (new pure
+  `requestPlaceholders()` in validate.ts) → POST
+  `/api/data-sources/:id/requests/:requestId/test` (new route: admin-gated,
+  decrypts secret server-side, runs central `fetchSource` with cache BYPASSED,
+  returns FetchSourceResult only — secret never in response). EN/FI/ET (48-key
+  `dataSources` namespace ×3, brace-free help copy — ICU braces).
+- **Verified:** tsc green; npm test 1298/1298 (2 new requestPlaceholders
+  tests); LIVE end-to-end via dev server (:3602, dev-superadmin backdoor):
+  created an Open-Meteo source + `{lat}/{lon}` request via the REST API, test
+  endpoint returned real 200 JSON, missing param → graceful
+  `{ok:false,"missing param"}`, deleted after. Page renders 200. Opennext
+  build gate deferred a 4TH time (dev pid 79854 still on :3602 at 02:57).
+  Could not run `npx eslint` directly (flat-config migration — next lint owns it).
+- **Files:** CMS/src/app/admin/data-sources/page.tsx,
+  CMS/src/components/content/data-sources-manager.tsx,
+  CMS/src/app/api/data-sources/[id]/requests/[requestId]/test/route.ts,
+  CMS/src/lib/data-sources/validate.ts, CMS/src/components/admin-sections.ts,
+  CMS/messages/{en,fi,et}.json, CMS/scripts/data-source-validate.test.mjs

@@ -69,7 +69,13 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   22 node tests; suite 1296/1296; tsc green. Opennext build gate deferred a 3rd
   time (dev server live on :3602) — see JOURNAL.
 
-- TODO: **Slice 4 — Data Sources admin UI + test call.** CMS → Data Sources: list /
+- DONE (2026-07-02): **Slice 4 — Data Sources admin UI + test call.** Shipped:
+  /admin/data-sources (nav + page + DataSourcesManager), saved-request
+  management incl. per-request cache config + retryable, write-only secret,
+  in-app confirms, inline Test panel w/ per-placeholder inputs, test endpoint
+  POST /api/data-sources/:id/requests/:requestId/test (cache bypassed, secret
+  server-side). EN/FI/ET. Verified live against Open-Meteo — see JOURNAL.
+  Original spec: CMS → Data Sources: list /
   add / edit / delete (in-app confirm) API sources — name, base URL, method,
   default query, auth type + secret (write-only `••••` field, replace-only),
   cache TTL. A "Test" button runs `fetchSource` and shows a sample response so the

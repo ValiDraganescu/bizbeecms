@@ -11,6 +11,7 @@ import {
   validateRequestInput,
   extractPlaceholders,
   hasValidPlaceholderSyntax,
+  requestPlaceholders,
   DEFAULT_CACHE_TTL_SEC,
 } from "../src/lib/data-sources/validate.ts";
 
@@ -154,4 +155,24 @@ test("request: cacheTtlSec bounds; retryable opt-in only when === true", () => {
   assert.equal(validateRequestInput({ ...goodRequest, cacheTtlSec: 300 }).value.cacheTtlSec, 300);
   assert.equal(validateRequestInput({ ...goodRequest, retryable: "yes" }).value.retryable, false);
   assert.equal(validateRequestInput({ ...goodRequest, retryable: true }).value.retryable, true);
+});
+
+test("requestPlaceholders: distinct names across path + query + body, first-seen order", () => {
+  const names = requestPlaceholders({
+    path: "/weather/{city}",
+    query: { units: "{units}", q: "{city}" },
+    bodyTemplate: '{"region": "{region}", "n": 5}',
+  });
+  assert.deepEqual(names, ["city", "units", "region"]);
+});
+
+test("requestPlaceholders: JSON structural braces don't count; null body ok", () => {
+  assert.deepEqual(
+    requestPlaceholders({ path: "/static", query: {}, bodyTemplate: null }),
+    [],
+  );
+  assert.deepEqual(
+    requestPlaceholders({ path: "/x", query: {}, bodyTemplate: '{"a": {"b": 1}}' }),
+    [],
+  );
 });

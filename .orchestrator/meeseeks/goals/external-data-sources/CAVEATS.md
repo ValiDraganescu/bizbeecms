@@ -98,3 +98,20 @@ Read every line before working. Each entry was learned the hard way by a previou
   Worker env) and an injected `ApiCache`. No Workers cache impl exists yet;
   Slice 3 must build one (KV binding or `caches.default`) — don't add CF
   bindings INTO fetch.ts, it would break the node tests.
+
+- **Local dev auto-auths as SuperAdmin**: `.env.local` sets `CMS_DEV_SUPERADMIN=1`,
+  so curl against :3602 passes `requireAdmin` without a cookie — great for live
+  API smoke tests; prod builds fail-safe (build-failsafe.ts). Don't mistake a
+  local 200 for "auth is broken".
+
+- **next-intl ICU: literal `{braces}` in message strings are ICU arguments** and
+  crash at format time if unfilled. Write brace-free help copy; show
+  `{placeholder}` syntax via input `placeholder=` attrs (not translated) or
+  interpolate them as values, as data-sources-manager does.
+
+- **`npx eslint <file>` fails (eslint v9 flat-config migration)** — `next lint`
+  owns linting here; don't chase the eslint config, gate with tsc + node tests.
+
+- **The Test endpoint must BYPASS the cache** (`cacheEnabled:false` + `cache:null`):
+  a test shows the live response and must not pollute the render cache. Keep it
+  that way when touching the route.
