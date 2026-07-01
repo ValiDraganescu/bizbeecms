@@ -70,3 +70,14 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **Migrations: drizzle-kit ONLY** (CMS/CLAUDE.md): edit schema.ts →
   `npm run db:generate` → `wrangler d1 migrations apply bizbeecms-cms --local`.
   Never hand-write SQL or raw ALTER TABLE.
+
+- **`retryable` doubles as the "idempotent-safe" marker** in the Slice-2 engine:
+  it gates BOTH retries AND cacheability for non-GET (cacheable = cacheEnabled
+  && (GET || retryable)). Slice-4 UI should label it "safe to retry/cache
+  (idempotent)" — don't split it into two flags without a user directive.
+
+- **The fetch engine is PURE — callers own the effects.** `fetchSource` takes a
+  decrypted secret on `source.secret` (use `decryptSourceSecret` + KEK from
+  Worker env) and an injected `ApiCache`. No Workers cache impl exists yet;
+  Slice 3 must build one (KV binding or `caches.default`) — don't add CF
+  bindings INTO fetch.ts, it would break the node tests.

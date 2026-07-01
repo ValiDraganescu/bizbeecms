@@ -35,7 +35,10 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   cache on/off + TTL per request) — either a `data_source_request` table or a
   requests JSON column; path/query/body may contain `{placeholder}` tokens.
 
-- TODO: **Slice 2 — fetch + map engine (server-side, cached, graceful).** A pure-ish
+- DONE (2026-07-02): **Slice 2 — fetch + map engine (server-side, cached, graceful).**
+  Shipped as pure `lib/data-sources/fetch.ts` (buildRequest / fetchSource /
+  buildCacheKey / createMemoryCache / getPath / mapResponse), 23 node tests —
+  see JOURNAL. Opennext build gate deferred again (dev server live). A pure-ish
   `fetchSource(source, request)`: build the URL (baseUrl + path + merged query),
   apply auth (header/query/basic/none) with the DECRYPTED secret, fetch with a
   TIMEOUT, cache by (sourceId, request) for `cacheTtlSec` (KV or Cache API). Pure

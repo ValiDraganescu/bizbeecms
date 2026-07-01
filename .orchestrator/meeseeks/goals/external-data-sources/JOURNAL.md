@@ -28,3 +28,30 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/data-sources/validate.ts, CMS/src/db/data-source-store.ts,
   CMS/src/app/api/data-sources/** (4 routes),
   CMS/scripts/data-source-validate.test.mjs
+
+## 2026-07-02 02:37 — Slice 2: central fetch + map engine (retries, cache, placeholders)
+- **Status:** DONE
+- **What I did:** `CMS/src/lib/data-sources/fetch.ts` — THE centralized request
+  layer (pure module, all effects injected: fetch/sleep/cache). `buildRequest`
+  resolves source+request+params → concrete HTTP request: baseUrl+path join,
+  path placeholders URL-encoded, query placeholders raw→URLSearchParams-encoded,
+  body placeholders JSON-escaped (breakout-proof), auth injection
+  (header/query/basic/none — the ONLY place a secret touches a request).
+  `fetchSource`: cache-check → fetch with AbortSignal.timeout (10s default) →
+  ≤2 retries (3 attempts) on network error/5xx/429 with linear backoff, never
+  other 4xx, only GET or `retryable===true` (mutations never double-fire) →
+  JSON parse → cache-put. GRACEFUL: never throws, failures = `{ok:false}`.
+  Cacheability = cacheEnabled && (GET || retryable); key =
+  `ds:<version>:<sourceId>:<method>:<fnv(url)>-<fnv(body)>` — per-source prefix
+  + injectable `cacheVersion` stage Slice-7 purge. `createMemoryCache` (TTL,
+  injectable clock). `getPath` dot-paths (incl. array indices) + `mapResponse`
+  (array→List stamping, object→one, else null).
+- **Verified:** 23 new node tests in `scripts/data-source-fetch.test.mjs`
+  (URL/auth building per authType, JSON-body breakout attempt, missing-param,
+  cache-key stability, retry counts per status, no-retry-on-POST,
+  retryable-POST cacheable, TTL expiry via fake clock, param-varying cache
+  entries, mapping). Full suite 1274/1274 green; `npx tsc --noEmit` green.
+  COULD NOT run `npx opennextjs-cloudflare build` — dev server pid 79854 STILL
+  live on :3602 with an active browser (2nd deferral); tsc+tests gate.
+- **Files:** CMS/src/lib/data-sources/fetch.ts,
+  CMS/scripts/data-source-fetch.test.mjs
