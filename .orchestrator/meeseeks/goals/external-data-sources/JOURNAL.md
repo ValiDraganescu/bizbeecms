@@ -340,3 +340,19 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   scratch removed. No code changes this run. Opennext build gate DEFERRED again
   (13th) — dev server pid 79854 still on :3602 with active browser connections.
 - **Files:** goal memory only.
+
+## 2026-07-02 04:56 — Data Sources UI help/docs pass
+- **Status:** DONE
+- **What I did:** Audited all existing help copy first (queryHelp/bodyHelp/secretHelp
+  in the manager; apiMapHelp/itemsPathHint/pathPlaceholder/sample loader in
+  binding-panels — those were already covered). Filled the two real gaps:
+  `dataSources.pathHelp` (path field had zero help; explains base-URL append +
+  placeholder tokens, with the literal `{city}` example ICU-interpolated as a
+  VALUE per the brace caveat) and `dataSources.testHelp` (Test panel intro:
+  live/no-cache, fill placeholders, use response to pick dot-paths like
+  main.temp for field maps). EN/FI/ET. Wired both into data-sources-manager.tsx.
+- **Verified:** JSON parse ok ×3 locales; tsc green; node suite 1337/1337;
+  live smoke on :3602 — EN + FI copy present in the served page. Opennext build
+  gate deferred AGAIN (14th) — dev pid 79854 still holds :3602 with active
+  browser connections.
+- **Files:** CMS/messages/{en,fi,et}.json, CMS/src/components/content/data-sources-manager.tsx

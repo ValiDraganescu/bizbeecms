@@ -20,6 +20,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **Data Sources UI help/docs pass** — audited existing copy
+  (binding-panels already covers maps/itemsPath/samples); added the two missing
+  pieces: `pathHelp` (path field, `{city}` example ICU-interpolated as a value)
+  and `testHelp` (Test panel purpose: live no-cache call → dot-paths for maps).
+  EN/FI/ET; tsc + 1337 tests green; live-smoked on :3602. Opennext gate
+  deferred (14th).
+
 - DONE (2026-07-02): **Renderer-side e2e render smoke** — api-bound List on a
   PUBLISHED page SSRs real API data via the public route (fresh insurance after
   purge/oauth2/dispatch-fix landed on top of Slice-3/5). Live on :3602:

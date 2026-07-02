@@ -767,6 +767,10 @@ function RequestForm({
           maxLength={2000}
           onChange={(e) => setPath(e.target.value)}
         />
+        {/* ICU-brace gotcha: the literal {city} example is interpolated as a VALUE. */}
+        <span className="text-xs text-foreground-muted">
+          {t("pathHelp", { example: "{city}" })}
+        </span>
       </label>
       <label className="flex flex-col gap-1">
         <span className={labelCls}>{t("query")}</span>
@@ -875,6 +879,7 @@ function TestPanel({ sourceId, request }: { sourceId: string; request: SavedRequ
 
   return (
     <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+      <p className="text-xs text-foreground-muted">{t("testHelp")}</p>
       {placeholders.length > 0 && (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {placeholders.map((p) => (
