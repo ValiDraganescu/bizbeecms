@@ -20,6 +20,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **Discharged the owed opennext build gate in an ISOLATED git
+  worktree** (dev on :3602 live, so built HEAD 38f8b4d in a /tmp detached
+  worktree: npm ci + `npx opennextjs-cloudflare build` → GREEN, worker.js
+  saved; worktree removed, dev server untouched). The 17-deferral debt is paid.
+
 - DONE (2026-07-02): **A11y pass on the page-builder binding panels** —
   role="status"/role="alert" live regions on SampleLoader results; row-scoped
   concat aria-labels on QueryBuilder filter/sort controls + remove buttons.

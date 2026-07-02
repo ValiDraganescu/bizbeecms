@@ -212,3 +212,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   (2026-07-02) = live regions on SampleLoader + row-scoped concat labels in
   QueryBuilder. Row-scoped labels reuse existing i18n keys via concat — no
   new message strings needed.
+
+- **The opennext gate CAN run while dev owns :3602 — use an isolated worktree**:
+  `git worktree add --detach /tmp/cms-gate-worktree HEAD` → `npm ci` in its
+  CMS/ → `npx opennextjs-cloudflare build` → `git worktree remove --force`.
+  Own `.next`/node_modules, zero contact with the live dev server (verified
+  2026-07-02, gate GREEN on 38f8b4d). Never build in the repo while dev runs;
+  never kill pid on :3602 — worktree instead. Note: it builds committed HEAD,
+  so commit first if you want YOUR changes gated.

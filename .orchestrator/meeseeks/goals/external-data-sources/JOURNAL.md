@@ -411,3 +411,17 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   live-smoked (panel is deep in the builder UI; attrs are static). Opennext
   build gate deferred a 17th time — dev server pid 79854 still on :3602.
 - **Files:** CMS/src/components/page-builder/binding-panels.tsx
+
+## 2026-07-02 05:27 — Discharged the owed opennext build gate (isolated worktree)
+- **Status:** DONE
+- **What I did:** The build gate had been deferred 17 times because the dev
+  server (pid 79854, :3602) owns the repo's `.next`. Ran the gate in an
+  ISOLATED detached git worktree instead: `git worktree add --detach
+  /tmp/cms-gate-worktree HEAD` → `npm ci` in its CMS/ → `npx
+  opennextjs-cloudflare build`. Build GREEN: Next compile + OpenNext bundle
+  completed, `.open-next/worker.js` saved. Removed the worktree after.
+- **Verified:** build output ended "OpenNext build complete" with worker.js
+  saved; dev server on :3602 still LISTENing (same pid) after cleanup; repo
+  working tree untouched (`git worktree list` back to just main).
+- **Files:** none in-repo (build ran in /tmp worktree of HEAD 38f8b4d);
+  goal memory files only.
