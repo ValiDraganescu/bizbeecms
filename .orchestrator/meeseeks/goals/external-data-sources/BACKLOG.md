@@ -20,6 +20,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **Consolidation: help-copy audit + curator handoff** — verified
+  UI copy (dataSources i18n, AI tool descriptions, Test panel) makes no claims
+  contradicting shipped behavior (cache defaults match validate.ts; redirect/
+  size-cap failures surface via fetch-engine error strings by design); NEXT.md
+  rewritten as state-of-the-goal recommending the curator ARCHIVE this goal.
+
 - DONE (2026-07-02): **Streaming enforcement of the 5MB size cap** — fresh-eyes defect:
   `res.text()` buffered the ENTIRE body before the length check, so a chunked
   response (no content-length) still exhausted Worker memory before rejection;

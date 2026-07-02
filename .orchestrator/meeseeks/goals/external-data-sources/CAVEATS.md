@@ -240,3 +240,10 @@ Read every line before working. Each entry was learned the hard way by a previou
   replace it with `res.text()`/`res.json()` — that reintroduces the unbounded
   buffer. The no-`res.body` fallback (text()+UTF-16 length) exists only for
   bodyless mocks; real runtimes take the streaming path.
+
+- **Redirect/size-cap failure copy is DELIBERATELY not in i18n** — the Test panel
+  surfaces the fetch engine's English error strings ("upstream redirected to a
+  different host", "upstream response too large") verbatim. Audited 2026-07-02:
+  no UI copy contradicts shipped behavior. Don't add speculative i18n messages
+  for engine errors; if localization is ever demanded, map error strings to keys
+  at the Test route, not inside fetch.ts (keep the engine pure).

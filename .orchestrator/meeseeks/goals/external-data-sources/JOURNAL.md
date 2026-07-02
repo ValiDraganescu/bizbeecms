@@ -487,3 +487,21 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   :3602, untouched).
 - **Files:** CMS/src/lib/data-sources/fetch.ts,
   CMS/scripts/data-source-fetch.test.mjs
+
+## 2026-07-02 05:56 — Consolidation: help-copy audit + state-of-the-goal curator handoff
+- **Status:** DONE
+- **What I did:** Audited all operator-facing copy against shipped fetch-engine
+  behavior: dataSources i18n namespace (en/fi/et), AI tool schema descriptions
+  (data-source-tools.ts), Test-panel error surfacing. No claim contradicts the
+  code — cache defaults in copy (on, 60s) match validate.ts defaults; the
+  retryable label matches its dual retry/cache semantics; redirect + size-cap
+  failures surface as the fetch engine's self-describing error strings
+  ("upstream redirected to a different host", "upstream response too large"),
+  so no i18n copy is owed. Overwrote NEXT.md as a crisp state-of-the-goal +
+  curator handoff (slices 1–8 shipped, revision directive satisfied, 2 security
+  passes, gates green) recommending ARCHIVE.
+- **Verified:** grepped copy sources for redirect/size/retry/cache claims;
+  checked cacheEnabled/cacheTtlSec defaults in validate.ts (true / 60);
+  confirmed no open bugs/TODOs in BACKLOG. Memory-only run — no code touched,
+  no build gate owed.
+- **Files:** goal memory only (NEXT.md, JOURNAL.md, BACKLOG.md, CAVEATS.md).
