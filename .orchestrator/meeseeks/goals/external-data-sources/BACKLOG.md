@@ -4,7 +4,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
 
-- BUG [P1]: Inspector bind panel shows DATA SOURCE "— none —" for ALL api-bound
+- DOING BUG [P1]: Inspector bind panel shows DATA SOURCE "— none —" for ALL api-bound
   ApiProbe blocks on api-fixture-httpbingo, even though the published page SSRs
   the API values (bindings exist + hydrate; render path fine). The panel fails to
   REFLECT an existing kind:"api" binding — operators can't see or edit api binds
@@ -76,7 +76,16 @@ Task states: TODO | DOING | DONE | BLOCKED.
 >   messages + optional redirect; publicSubmissions toggle in the Collections UI.
 >   EN/FI/ET. (Messages are authored strings on formTarget — localize via locale
 >   objects here if demanded.)
-> - TODO: **(c) httpbingo live test**: add a Form card to the api-fixture-httpbingo
+> - DONE (2026-07-02): **(c) httpbingo live test.** Shipped as the `fx-forms`
+>   section on api-fixture-httpbingo (local D1, no repo code): FormProbeApi +
+>   FormProbeContact components, api-target Form (POST /post echo, request
+>   deec059d-…) + collection-target Form against NEW collection
+>   content_form_fixture_enquiries (publicSubmissions ON via PATCH toggle).
+>   Live-verified all 4 paths (native → 303 ?bb_form=ok, fetch/JSON → {ok:true},
+>   both targets), items land status=draft w/ rogue `status`/unknown fields
+>   dropped, gate-off → 403 round-trip. Cards self-document what they prove.
+>   Ids + recipe in JOURNAL 2026-07-02 10:01. Original slice spec:
+>   add a Form card to the api-fixture-httpbingo
 >   page (POST /post echo, saved request deec059d-…) + a collection-target
 >   contact-form card against an opted-in test collection; verify native +
 >   fetch modes live on :3602; document what each proves.

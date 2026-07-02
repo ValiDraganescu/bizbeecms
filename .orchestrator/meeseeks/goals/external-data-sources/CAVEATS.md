@@ -297,3 +297,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   "httpbingo fixture — …" + 12 requests. A DB reset wipes it — rebuild from the
   recipe/ids in JOURNAL 2026-07-02 09:36. Don't delete it during cleanup passes;
   it's a deliberate permanent fixture (per user).
+
+- **The httpbingo fixture now ALSO includes the Form cards** (slice c, 2026-07-02
+  10:01): section `fx-forms`, components FormProbeApi/FormProbeContact, collection
+  `content_form_fixture_enquiries` (publicSubmissions ON). Part of the permanent
+  fixture — don't delete; its draft enquiry items accumulate from live tests
+  (that's fine, they're the proof). Rebuild ids in JOURNAL 2026-07-02 10:01.
+
+- **PUT /api/components/:name takes `html` (a string), NOT a tree** — the route
+  parses/validates it via validateComponentArtifact. A fresh create lands LIVE
+  directly (POST action:"publish" returns published:false — no pending draft);
+  only EDITS write draft_* columns.
+
+- **Grep-counting SSR output for `type="submit"` / `__bbForm` overcounts** — the
+  inline FORM_ENHANCE_SCRIPT itself contains both strings. Count
+  `<button type="submit"` / `form[data-form]` instead.

@@ -638,3 +638,39 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/collections/[name]/route.ts; CMS/src/db/{schema.ts,
   collection-store.ts,login-attempt-store.ts}; CMS/migrations/0026_*.sql
   (+meta).
+
+## 2026-07-02 10:01 — Form slice (c): live Form test cards on the httpbingo fixture page
+- **Status:** DONE
+- **What I did:** Extended the living fixture (local D1 only, NO repo code) with a
+  new `fx-forms` Section (2 cols) on page api-fixture-httpbingo
+  (29acc0c0-4295-4ac5-bb6e-5d73d0ae492b), published (version 3):
+  - Component `FormProbeApi` (PUT /api/components — body is `html` string, NOT a
+    tree): heading/proves props + one `<input name="msg">` + native
+    `type="submit"` button.
+  - Component `FormProbeContact`: heading/proves + name/email/message inputs
+    (required) + submit button.
+  - Collection "Form fixture enquiries" → `content_form_fixture_enquiries`
+    (id 2e068309-03b2-4939-a505-abfd848bb825), fields name/email/message all
+    required string, publicSubmissions ON via PATCH _op:set_public_submissions.
+  - Block `fx-form-api`: Form w/ formTarget kind=api,
+    sourceId 4cf4fb2a-cc5a-4cff-9d78-f0995e88f22b (public httpbingo source),
+    requestId deec059d-72da-419d-8162-2081a64e5e71 (POST /post, {msg} body
+    placeholder), authored success/error messages; child FormProbeApi.
+  - Block `fx-form-coll`: Form w/ formTarget kind=collection,
+    collection=content_form_fixture_enquiries; child FormProbeContact.
+  - Both cards' `proves` prop documents on-page exactly what they prove
+    (identity-input security model, placeholder fill, no-retry/no-cache,
+    opt-in gate, forced draft, dual modes).
+- **Verified (all live on :3602):** SSR: exactly 2 `<form data-form
+  action="/api/forms/submit">` w/ hidden __bb_page/__bb_block identity inputs
+  (page id stamped by stampFormPageId), 2 submit buttons, 2 status regions,
+  enhancement script shipped ONCE. Submits (5 total, under the 20/10min IP
+  limit): api native → 303 `?bb_form=ok`; api fetch/Accept:json → `{ok:true}`;
+  collection native → 303 ok; collection fetch → `{ok:true}`; both items landed
+  `status:"draft"` with the submitted rogue `status=published` +
+  `rogue_field` DROPPED; publicSubmissions toggled OFF → 403 "this form does
+  not accept submissions", toggled back ON (restored), item count unchanged.
+  No repo code touched → no tsc/opennext gate owed.
+- **Files:** goal memory only; fixture state lives in the local D1
+  (.wrangler/state, gitignored) — rebuild from the ids above + JOURNAL
+  2026-07-02 09:36 recipe.
