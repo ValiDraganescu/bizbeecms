@@ -13,6 +13,7 @@ import {
   resolveRouteValue,
   resolveRouteFilters,
   resolveRouteProps,
+  hasResolvedRouteFilter,
 } from "../src/lib/content/route-params.ts";
 import { isParamSlug, paramName, resolveSlugPath } from "../src/lib/render/slug.ts";
 
@@ -144,6 +145,47 @@ test("resolveRouteFilters: mixed literal + param + dropped in one call", () => {
     { field: "a", op: "eq", value: "lit" },
     { field: "b", op: "eq", value: "helsinki" },
   ]);
+});
+
+// ── hasResolvedRouteFilter ────────────────────────────────────────────────────
+// Regression coverage for "unmatched wildcard slugs render WRONG content"
+// (/login rendering the Helsinki city page, /collections/recommends-estonia
+// rendering an arbitrary restaurant): a single-item binding's filter keyed
+// off a route param/query that RESOLVES this request but matches zero rows
+// must be distinguishable from an ordinary static filter, so the renderer can
+// 404 instead of silently falling back to the component's static defaults.
+
+test("hasResolvedRouteFilter: true when a param ref resolves this request", () => {
+  const filters = [{ field: "slug", op: "eq", value: { param: "city-slug" } }];
+  assert.equal(hasResolvedRouteFilter(filters, ctx), true);
+});
+
+test("hasResolvedRouteFilter: true when a query ref resolves this request", () => {
+  const filters = [{ field: "name", op: "eq", value: { query: "q" } }];
+  assert.equal(hasResolvedRouteFilter(filters, ctx), true);
+});
+
+test("hasResolvedRouteFilter: false when the only route ref is absent (dropped, not a route-bound miss)", () => {
+  const filters = [{ field: "slug", op: "eq", value: { param: "missing" } }];
+  assert.equal(hasResolvedRouteFilter(filters, ctx), false);
+});
+
+test("hasResolvedRouteFilter: false for an ordinary literal-only filter set", () => {
+  const filters = [{ field: "status", op: "eq", value: "published" }];
+  assert.equal(hasResolvedRouteFilter(filters, ctx), false);
+});
+
+test("hasResolvedRouteFilter: false for undefined/empty filters", () => {
+  assert.equal(hasResolvedRouteFilter(undefined, ctx), false);
+  assert.equal(hasResolvedRouteFilter([], ctx), false);
+});
+
+test("hasResolvedRouteFilter: true if AT LEAST ONE clause resolves, even if others don't", () => {
+  const filters = [
+    { field: "status", op: "eq", value: "published" },
+    { field: "slug", op: "eq", value: { param: "city-slug" } },
+  ];
+  assert.equal(hasResolvedRouteFilter(filters, ctx), true);
 });
 
 // ── resolveRouteProps ─────────────────────────────────────────────────────────

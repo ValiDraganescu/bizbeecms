@@ -64,6 +64,7 @@ import {
   resolveRouteFilters,
   resolveRouteValue,
   resolveRouteProps,
+  hasResolvedRouteFilter,
   EMPTY_ROUTE_CONTEXT,
   type RouteContext,
 } from "@/lib/content/route-params";
@@ -177,6 +178,14 @@ export async function buildPlanFromPage(
 ): Promise<{
   plan: RenderPlan;
   locale: LocaleContext;
+  /**
+   * True when a binding keyed off THIS request's route param/query (e.g. a
+   * `:city-slug` page's hero doing `slug eq {param:"city-slug"}`) matched zero
+   * rows — the route segment names something that doesn't exist. The public
+   * route treats this as a 404; the preview route (no live route to validate
+   * against) ignores it.
+   */
+  routeNotFound: boolean;
 }> {
   const db = await getDb();
   // Versioning slice 2: the route resolves WHICH version's blocks to render
@@ -235,10 +244,12 @@ export async function buildPlanFromPage(
   // Form slice: stamp the hosting page's id onto Form blocks so planForm can
   // emit the hidden identity input the submit endpoint resolves the target from.
   // No-op (same array back) on pages without a Form.
+  const routeMiss = { hit: false };
   const hydratedBlocks = await hydrateBlockBindings(
     stampFormPageId(blocks, pageRow.id),
     locale,
     routeContext,
+    routeMiss,
   );
 
   // Icon-sets epic: resolve every `{{icon "name"}}` / `{{icon prop}}` referenced
@@ -250,7 +261,7 @@ export async function buildPlanFromPage(
 
   const plan = planPage(hydratedBlocks, components, locale, icons);
 
-  return { plan, locale };
+  return { plan, locale, routeNotFound: routeMiss.hit };
 }
 
 /**
@@ -412,11 +423,12 @@ async function hydrateBlockBindings(
   blocks: Block[],
   locale: LocaleContext,
   routeContext: RouteContext = EMPTY_ROUTE_CONTEXT,
+  routeMiss?: { hit: boolean },
 ): Promise<Block[]> {
   return Promise.all(
     blocks.map(async (block): Promise<Block> => {
       const children = block.children
-        ? await hydrateBlockBindings(block.children, locale, routeContext)
+        ? await hydrateBlockBindings(block.children, locale, routeContext, routeMiss)
         : block.children;
 
       // api-kind List: fetch + map via the central engine (cached, retried,
@@ -489,7 +501,19 @@ async function hydrateBlockBindings(
               ...spec,
               filters: resolveRouteFilters(spec.filters, routeContext),
             } as QuerySpec);
-            rows[key] = res.ok ? (res.plan.items[0] ?? null) : null;
+            const row = res.ok ? (res.plan.items[0] ?? null) : null;
+            rows[key] = row;
+            // A binding keyed off the CURRENT route (e.g. `:city-slug`'s hero
+            // looking up `slug eq {param:"city-slug"}`) that matches ZERO rows
+            // means the route segment itself doesn't exist (a bad city/offer/
+            // restaurant slug) — the page must 404, not silently render the
+            // component's static defaults (which looks like real, wrong
+            // content; see BACKLOG "unmatched wildcard slugs render WRONG
+            // content"). An ordinary author-set filter with no route ref still
+            // gets the old graceful blank-prop behavior.
+            if (row == null && routeMiss && hasResolvedRouteFilter(spec.filters, routeContext)) {
+              routeMiss.hit = true;
+            }
           } catch {
             rows[key] = null; // graceful: dead collection / runtime error → blank
           }

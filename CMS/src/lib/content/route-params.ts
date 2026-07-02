@@ -86,16 +86,24 @@ export function resolveRouteFilters<T extends RouteFilterClause>(
 }
 
 /**
- * Resolve any TOP-LEVEL block prop values that are route-value refs (e.g. a
- * page-builder-authored `{"query":"q"}` on a plain string prop, so a component
- * like a search results heading can echo the current `?q=` / wildcard segment).
- * Only values matching `isRouteValueRef` are touched — every other prop
- * (string, number, array, a `json`-typed object, etc.) passes through
- * unchanged, so this can't clobber a legitimately object-shaped prop. Missing
- * refs resolve to "" (an unset heading param reads as empty text, not
- * "[object Object]" or a crash) — unlike `resolveRouteFilters`, there's no
- * clause to drop, only a value to render.
+ * True if any filter clause's `value` is a route-value ref (`{param}`/`{query}`)
+ * that ACTUALLY RESOLVES this request (present, not dropped). Used to tell a
+ * "this binding is keyed off the current route" filter (e.g. a `:city-slug`
+ * page's hero looking up `slug eq {param:"city-slug"}`) apart from an ordinary
+ * static/author-set filter — only the former should turn "zero rows matched"
+ * into a not-found page instead of a silent default-prop fallback (see
+ * `render-page.tsx`'s `hydrateBlockBindings`).
  */
+export function hasResolvedRouteFilter<T extends RouteFilterClause>(
+  filters: T[] | undefined,
+  ctx: RouteContext,
+): boolean {
+  if (!filters || filters.length === 0) return false;
+  return filters.some(
+    (f) => isRouteValueRef(f.value) && resolveRouteValue(f.value, ctx) !== undefined,
+  );
+}
+
 export function resolveRouteProps(
   props: Record<string, unknown> | undefined,
   ctx: RouteContext,

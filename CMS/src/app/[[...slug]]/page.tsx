@@ -74,7 +74,13 @@ async function loadPlan(params: RouteParams, query: Record<string, string>) {
   const published = await getVersion(pageRow.publishedVersionId);
   const blocks = pickRenderBlocks(published, null, pageRow.blocks);
   const routeContext: RouteContext = { params: routeParams, query };
-  const { plan, locale } = await buildPlanFromPage(pageRow, blocks, false, routeContext);
+  const { plan, locale, routeNotFound } = await buildPlanFromPage(pageRow, blocks, false, routeContext);
+  // A route-driven binding (e.g. `:city-slug`'s hero) matched zero rows: the
+  // segment names something that doesn't exist (bad city/offer/restaurant
+  // slug) — 404 instead of silently rendering the component's static
+  // defaults, which reads as real (wrong) content. See BACKLOG "unmatched
+  // wildcard slugs render WRONG content".
+  if (routeNotFound) return null;
   return { page: pageRow, plan, locale };
 }
 
