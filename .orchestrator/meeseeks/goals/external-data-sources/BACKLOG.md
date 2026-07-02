@@ -4,7 +4,26 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
 
+- TODO [P2] (found by live AI smoke 2026-07-02): **Tool name shadowed in dispatch
+  results.** `makeDispatcher` (lib/chat/tool-dispatch-core.ts) builds
+  `{ name, ...(await handler(args)) }`, so any handler payload with its own
+  `name` field overwrites the TOOL name — create_data_source spreads
+  `formatSource(...)` (source name) and its SSE `tool` frame + round-tripped
+  ToolResult carried name "Smoke Posts" instead of "create_data_source".
+  Fix: make the tool name win (e.g. `{ ...(await handler(args)), name }`) and
+  keep the created source's data under a non-colliding field (it already sits
+  in `input`/`requests`; or nest as `source:`). Regression test: dispatcher
+  returns the TOOL name even when the handler payload has `name`. Check other
+  handlers that return a top-level `name` (get_component?) for the same
+  collision. Suite + tsc gate.
+
 ## Tasks
+- DONE (2026-07-02): **Live AI e2e smoke** — real /api/chat model round-trip
+  (gpt-4o-mini) chained create_data_source → test_data_source → create_list
+  (incl. one model self-correction on a bad section id); api-bound List landed
+  in the page draft; full cleanup. Found the dispatch name-shadow bug above.
+  Opennext gate deferred (11th).
+
 - DONE (2026-07-02): **Prune stale purge counters** in the `api_cache_versions`
   settings row on source/request delete — pure `pruneCounters` + best-effort
   `pruneApiCacheVersions` wired into both DELETE handlers; source delete captures

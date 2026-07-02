@@ -179,3 +179,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   `pruneApiCacheVersions` deliberately swallows errors — don't "fix" that, a
   completed delete must never 500 over counter housekeeping. Source delete
   must read its request ids BEFORE deleting (FK cascade wipes them).
+
+- **Page mutations land in the DRAFT `page_version` row, NOT `page.blocks`** —
+  the two trees can differ completely (about's blocks column has sections the
+  draft doesn't). When live-verifying/cleaning up an AI bind, read/patch the row
+  `page_version WHERE id = page.draft_version_id`; checking `page.blocks` will
+  say "nothing happened".
+
+- **Dispatch results: handler payload `name` shadows the tool name**
+  (`{ name, ...handler(args) }` in tool-dispatch-core). Until the BACKLOG bug is
+  fixed, don't trust `tool` frame `name` for tools whose payload carries a
+  `name` (create_data_source). Never add a top-level `name` to a new handler's
+  payload.

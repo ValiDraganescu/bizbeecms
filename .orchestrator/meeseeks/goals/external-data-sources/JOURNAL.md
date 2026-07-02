@@ -278,3 +278,30 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/data-sources/[id]/route.ts,
   CMS/src/app/api/data-sources/[id]/requests/[requestId]/route.ts,
   CMS/scripts/data-source-purge.test.mjs
+
+## 2026-07-02 04:25 — Live AI e2e smoke: real /api/chat model round-trip over the data-source tools
+- **Status:** DONE
+- **What I did:** Drove POST /api/chat (context page-builder, DEFAULT_MODEL
+  openai/gpt-4o-mini via the remote AI binding + gateway) on :3602 with one user
+  message instructing the 3-step flow. The model chained:
+  create_data_source ("Smoke Posts", jsonplaceholder.typicode.com, authType none,
+  saved request GET /posts) → test_data_source (live fetch, status 200, `paths`
+  incl. 0.title/0.body) → create_list (page about, template SectionHeading,
+  map {title,subtitle}). First create_list failed ("no block with id Section-2")
+  and the model SELF-CORRECTED to Section-1 and succeeded — multi-round tool
+  loop + error philosophy proven live. Verified in D1: data_source row + the
+  api-bound List-1 ({kind:"api",sourceId,requestId,limit:3} + listMap) persisted
+  into the page DRAFT version. Cleaned up fully: stripped List-1 from the draft
+  tree (page_version UPDATE), DELETE /api/data-sources/:id (200, prune path
+  exercised) — ds/req counts back to 0, draft List gone.
+- **Found a BUG (recorded in BACKLOG ## Bugs):** tool-dispatch-core's
+  makeDispatcher returns `{ name, ...handler(args) }` — a handler payload with
+  its own `name` (create_data_source spreads formatSource → source name) SHADOWS
+  the tool name in the SSE `tool` frame and the round-tripped ToolResult (frame
+  showed name "Smoke Posts" instead of "create_data_source"). Model coped, but
+  the client tool card + structured history get the wrong tool name.
+- **Verified:** full live model round-trip (2 rounds, ~15k prompt tokens); DB
+  state before/after; cleanup confirmed. No source files changed this run.
+  Opennext build gate DEFERRED again (11th) — dev server pid 79854 on :3602
+  with active browser connections.
+- **Files:** goal memory only (+ /tmp/meeseeks-smoke scratch, not committed).
