@@ -12,6 +12,18 @@ export type CollectionFieldMeta = { name: string; type: string };
 /** A collection registry view as the binding panels need it (`/api/collections`). */
 export type CollectionMeta = { name: string; tableName: string; fields: CollectionFieldMeta[] };
 
+/** A saved request as the bind panels need it (`/api/data-sources/:id/requests`). */
+export type ApiRequestMeta = {
+  id: string;
+  name: string;
+  method: string;
+  path: string;
+  query: Record<string, string>;
+  bodyTemplate: string | null;
+};
+/** An external data source + its saved requests (external-data-sources Slice 5). */
+export type ApiSourceMeta = { id: string; name: string; requests: ApiRequestMeta[] };
+
 /** A binding/list filter clause; matched against the Slice-4 query compiler ops. */
 export type FilterClause = { field: string; op: string; value?: unknown };
 /** A binding/list sort clause. */

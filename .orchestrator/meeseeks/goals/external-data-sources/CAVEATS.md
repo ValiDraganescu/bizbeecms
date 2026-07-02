@@ -115,3 +115,18 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **The Test endpoint must BYPASS the cache** (`cacheEnabled:false` + `cache:null`):
   a test shows the live response and must not pollute the render cache. Keep it
   that way when touching the route.
+
+- **ListSettings `emitSource` is KIND-AWARE** (Slice 5): collection lists persist
+  NO `kind` field (legacy stored lists stay byte-identical); only api sources
+  carry `kind:"api"` + sourceId/requestId/params/itemsPath. Don't start writing
+  `kind:"collection"` into stored sources — it would dirty every legacy page diff.
+
+- **List api params are LITERAL-ONLY in the UI** (`propNames={[]}`) because the
+  built-in List block declares no props — but Slice-3 hydration DOES resolve
+  `{prop}` specs from `block.props` for lists too; if Lists ever get prop inputs,
+  just pass real propNames to `ApiParamsEditor`.
+
+- **The combobox config section in binding-panels.tsx is hardcoded English**
+  (pre-existing debt from the combobox slice, NOT Slice 5). New Slice-5 strings
+  all live under `pageBuilder.bind.*` EN/FI/ET; localizing the combobox labels is
+  a separate small task.

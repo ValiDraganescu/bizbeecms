@@ -91,3 +91,36 @@ export function listPaths(
   paths.add("id");
   return [...paths];
 }
+
+/**
+ * Enumerate the LEAF dot-paths of a sample JSON item — the Slice-5 bind panel
+ * feeds these into a `<datalist>` so the operator gets map suggestions after
+ * loading a sample response. Arrays descend into element 0 (`getPath` accepts
+ * numeric segments). Depth/size capped: suggestions, not a schema.
+ */
+export function samplePaths(json: unknown, maxDepth = 5, cap = 200): string[] {
+  const out: string[] = [];
+  const walk = (v: unknown, prefix: string, depth: number): void => {
+    if (out.length >= cap) return;
+    if (Array.isArray(v)) {
+      if (v.length > 0 && depth < maxDepth) walk(v[0], prefix ? `${prefix}.0` : "0", depth + 1);
+      else if (prefix) out.push(prefix);
+      return;
+    }
+    if (v !== null && typeof v === "object") {
+      const entries = Object.entries(v as Record<string, unknown>);
+      if (entries.length === 0 || depth >= maxDepth) {
+        if (prefix) out.push(prefix);
+        return;
+      }
+      for (const [k, child] of entries) {
+        if (out.length >= cap) return;
+        walk(child, prefix ? `${prefix}.${k}` : k, depth + 1);
+      }
+      return;
+    }
+    if (prefix) out.push(prefix);
+  };
+  walk(json, "", 0);
+  return out;
+}

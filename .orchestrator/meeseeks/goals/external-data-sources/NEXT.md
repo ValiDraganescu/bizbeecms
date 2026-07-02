@@ -1,29 +1,27 @@
 # Note to the next Meeseeks (external-data-sources)
 
-Slice 4 is DONE (2026-07-02): CMS → Data Sources admin UI is live at
-/admin/data-sources (nav entry in admin-sections.ts). Sources CRUD (write-only
-secret, in-app confirms) + per-source saved-requests CRUD (method/path/query/
-body templates, per-request cache on/off + TTL, retryable flag) + inline Test
-panel: one input per `{placeholder}` (pure `requestPlaceholders()` in
-validate.ts) → POST /api/data-sources/:id/requests/:requestId/test (admin-
-gated, cache bypassed, secret stays server-side). Verified LIVE against
-Open-Meteo via the dev server. 1298/1298 node tests, tsc green.
+Slice 5 is DONE (2026-07-02): the page-builder bind panels (BindingPanel +
+ListSettings in src/components/page-builder/binding-panels.tsx) now offer a
+combined Collections + API-sources picker. API path: saved-request select →
+`{placeholder}` params (literal or `{prop}` for single-item binds; literal-only
+for Lists) → itemsPath (List) → dot-path field maps with a `<datalist>` of
+suggestions from a live sample (pure `samplePaths()` in lib/data-sources/
+bind.ts; "Load sample" hits the Slice-4 test endpoint). Shell fetches
+/api/data-sources + per-source requests into `apiSources`. EN/FI/ET under
+`pageBuilder.bind.*`. tsc green, 1303/1303 tests, verified live vs Open-Meteo.
 
-STILL OWED: the opennext build gate — deferred FOUR times (dev server pid
+STILL OWED: the opennext build gate — deferred FIVE times (dev server pid
 79854 on :3602 every run; `lsof -nP -i :3602`, NEVER build while dev runs).
 If :3602 is free, run `npx opennextjs-cloudflare build` in CMS/ FIRST.
 
-PICK NEXT: **Slice 5 — bind UI picks Collection OR API source.** In the
-page-builder bind panel (src/components/page-builder/binding-panels.tsx —
-content-collections Phase-2 UI), the source picker must list Collections AND
-API sources; picking an API source → choose one of its saved requests, map
-response fields → declared props (map values are DOT-PATHS — see caveat), and
-wire PARAM PASSING: for each `{placeholder}` in the chosen request
-(reuse `requestPlaceholders()`), pick a block prop or literal; store as
-`params` on the source ref ({placeholder} → literal | "{prop}") — Slice-3
-hydration already resolves it. Use the Slice-4 Test endpoint to fetch a sample
-response inside the bind panel as a mapping guide (dot-path suggestions from
-the sample's keys would be a nice touch). EN/FI/ET. Gate.
-
-After Slice 5: Slice 6 (AI tools) and Slice 7 (cache purging — use the fetch
-engine's cacheVersion, see caveat; per-request purge + global purge action).
+PICK NEXT: **Slice 7 — cache purging** (arguably higher user value than the AI
+tools now that the whole authoring loop works): per-request purge button +
+`POST /api/data-sources/:id/purge` (optionally scoped to one request) + global
+"purge all API cache" action (in-app confirm). The Cache-API impl in
+hydrate.ts CANNOT enumerate/delete — purge MUST bump the fetch engine's
+`cacheVersion` (persist a version counter, e.g. settings store or a tiny
+table; pass as `deps.cacheVersion` in hydrate.ts's fetchSource call; the
+Slice-2 cache key already embeds `ds:<version>:<sourceId>:…`). Per-source
+purge can key a PER-SOURCE version if you want scoped eviction cheap.
+EN/FI/ET. Node tests: purge invalidates the right scope. Then Slice 6 (AI
+tools: create_data_source / test_data_source / propose field map).

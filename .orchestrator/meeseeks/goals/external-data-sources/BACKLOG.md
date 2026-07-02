@@ -86,7 +86,14 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   `{placeholders}`, per-request cache on/off + TTL). Test button works for all
   methods (test params for placeholders).
 
-- TODO: **Slice 5 — bind UI picks Collection OR API source.** In the page-builder
+- DONE (2026-07-02): **Slice 5 — bind UI picks Collection OR API source.** Shipped:
+  combined source picker (optgroups) in BOTH BindingPanel and ListSettings,
+  saved-request select, `{placeholder}` param passing (literal | `{prop}` for
+  single-item; literal-only for List), itemsPath, dot-path maps with
+  sample-driven `<datalist>` suggestions (pure `samplePaths()`), "Load sample"
+  via the Slice-4 test endpoint. EN/FI/ET. Verified live against Open-Meteo —
+  see JOURNAL. Opennext build gate deferred (dev server on :3602, 5th time).
+  Original spec: In the page-builder
   bind panel (content-collections Phase-2 UI), the source picker lists Collections
   AND API data sources. For an API source: choose the request (path/params) and map
   response fields (dot-path) → the component's declared props, with the Slice-4 test

@@ -11,6 +11,7 @@ import {
   flattenByPaths,
   apiListElements,
   listPaths,
+  samplePaths,
 } from "../src/lib/data-sources/bind.ts";
 import {
   validateBinding,
@@ -197,4 +198,35 @@ test("failed api fetch (null row) leaves static props untouched", () => {
   const binding = { source: apiSource, map: { temp: "main.temp" } };
   const props = hydrateProps({ temp: "—" }, { w: binding }, { w: null });
   assert.deepEqual(props, { temp: "—" });
+});
+
+/* ---------------------------------------------------- samplePaths (Slice 5) */
+
+test("samplePaths: leaf dot-paths of a nested object", () => {
+  const paths = samplePaths({ main: { temp: 21, humidity: 40 }, name: "Turku" });
+  assert.deepEqual(paths, ["main.temp", "main.humidity", "name"]);
+});
+
+test("samplePaths: arrays descend into element 0", () => {
+  const paths = samplePaths({ weather: [{ description: "clear", id: 800 }] });
+  assert.deepEqual(paths, ["weather.0.description", "weather.0.id"]);
+});
+
+test("samplePaths: empty containers and primitives are graceful", () => {
+  assert.deepEqual(samplePaths({ a: {}, b: [], c: null }), ["a", "b", "c"]);
+  assert.deepEqual(samplePaths(42), []);
+  assert.deepEqual(samplePaths(undefined), []);
+});
+
+test("samplePaths: depth and size caps hold", () => {
+  const deep = { a: { b: { c: { d: { e: { f: { g: 1 } } } } } } };
+  assert.deepEqual(samplePaths(deep, 3), ["a.b.c"]);
+  const wide = Object.fromEntries(Array.from({ length: 300 }, (_, i) => [`k${i}`, i]));
+  assert.equal(samplePaths(wide, 5, 200).length, 200);
+});
+
+test("samplePaths output resolves back through flattenByPaths", () => {
+  const sample = { main: { temp: 21.4 }, weather: [{ description: "clear" }] };
+  const row = flattenByPaths(sample, samplePaths(sample));
+  assert.deepEqual(row, { "main.temp": 21.4, "weather.0.description": "clear" });
 });

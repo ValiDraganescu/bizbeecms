@@ -116,3 +116,34 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/data-sources/[id]/requests/[requestId]/test/route.ts,
   CMS/src/lib/data-sources/validate.ts, CMS/src/components/admin-sections.ts,
   CMS/messages/{en,fi,et}.json, CMS/scripts/data-source-validate.test.mjs
+
+## 2026-07-02 03:09 — Slice 5: bind UI picks Collection OR API source (params, dot-path maps, sample-driven suggestions)
+- **Status:** DONE
+- **What I did:** The page-builder bind panels now offer a COMBINED source
+  picker (one select, two optgroups: Collections / API sources; option values
+  `c:<table>` / `a:<sourceId>`). BOTH panels: picking an API source → saved-
+  request select → `{placeholder}` PARAM editor (single-item bindings: literal
+  OR `{prop}` from the block's declared props — Slice-3 hydration resolves;
+  List: literal-only, the built-in List declares no props) → "Load sample
+  response" button (Slice-4 test endpoint, `{prop}` params resolved best-effort
+  from current block props) → dot-path FIELD MAP as free-text inputs backed by
+  a `<datalist>` of the sample's leaf paths (new pure `samplePaths()` in
+  bind.ts, depth/size-capped). ListSettings extras: `itemsPath` input;
+  QueryBuilder/limit stay collection-only; api combobox valueField/labelField
+  become dot-path text inputs with the same datalist; emitSource is kind-aware
+  and collection lists stay byte-identical (no `kind` persisted). Shell fetches
+  `/api/data-sources` + per-source requests (graceful [] on 403/offline) and
+  passes `apiSources` down. New `ApiSourceMeta`/`ApiRequestMeta` in
+  page-builder/types.ts. 21 new `bind.*` strings EN/FI/ET (ICU-safe:
+  `{count}` filled, help copy brace-free).
+- **Verified:** tsc green; npm test 1303/1303 (5 new samplePaths tests incl.
+  flattenByPaths round-trip); LIVE via dev :3602 — builder page 200 with the
+  new panels; created an Open-Meteo source + `{lat}/{lon}` request via REST,
+  test endpoint returned real 200 JSON, `samplePaths()` on the live response
+  yielded correct suggestions ("current_weather_units.temperature", …);
+  deleted after. Opennext build gate deferred a 5TH time (dev pid 79854 still
+  on :3602 with an active browser at 03:09 — not mine to kill).
+- **Files:** CMS/src/components/page-builder/binding-panels.tsx,
+  CMS/src/components/page-builder/page-builder-shell.tsx,
+  CMS/src/lib/data-sources/bind.ts, CMS/src/lib/page-builder/types.ts,
+  CMS/messages/{en,fi,et}.json, CMS/scripts/data-source-bind.test.mjs

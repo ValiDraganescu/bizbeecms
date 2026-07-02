@@ -67,7 +67,14 @@ import {
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
 import { declaredPropNames } from "@/lib/content/binding";
-import type { Viewport, CenterTab, RightTab, CollectionMeta } from "@/lib/page-builder/types";
+import type {
+  Viewport,
+  CenterTab,
+  RightTab,
+  CollectionMeta,
+  ApiRequestMeta,
+  ApiSourceMeta,
+} from "@/lib/page-builder/types";
 import { readDragPayload } from "@/lib/page-builder/dnd";
 import { wirePreviewOverlay, markSelectedInPreview } from "@/lib/page-builder/preview-overlay";
 import { ViewportIcon, PreviewThemeIcon, CollapseToggle, ICON } from "./shared";
@@ -185,6 +192,9 @@ export function PageBuilderShell({
   // Phase-2 binding (Slice C): the Site's collections (registry views) for the
   // "Bind to collection" + List query panels. tableName is the stable handle.
   const [collections, setCollections] = useState<CollectionMeta[]>([]);
+  // external-data-sources Slice 5: API data sources (+ saved requests) for the
+  // combined source picker in the binding panels. Graceful: 403/offline → [].
+  const [apiSources, setApiSources] = useState<ApiSourceMeta[]>([]);
 
   // The selected page's block tree (sections + their dropped components) and the
   // currently-selected node id (drives which section a rail click drops into and,
@@ -594,6 +604,22 @@ export function PageBuilderShell({
         const body = (await res.json().catch(() => [])) as CollectionMeta[];
         if (Array.isArray(body)) setCollections(body);
       }
+    })();
+    void (async () => {
+      // external-data-sources Slice 5: API sources + their saved requests for
+      // the combined source picker. Same graceful degradation as collections.
+      const res = await fetch("/api/data-sources");
+      if (!res.ok) return;
+      const sources = (await res.json().catch(() => [])) as { id: string; name: string }[];
+      if (!Array.isArray(sources)) return;
+      const withRequests = await Promise.all(
+        sources.map(async (s) => {
+          const r = await fetch(`/api/data-sources/${s.id}/requests`);
+          const reqs = r.ok ? ((await r.json().catch(() => [])) as ApiRequestMeta[]) : [];
+          return { id: s.id, name: s.name, requests: Array.isArray(reqs) ? reqs : [] };
+        }),
+      );
+      if (live) setApiSources(withRequests);
     })();
     return () => {
       live = false;
@@ -1038,6 +1064,7 @@ export function PageBuilderShell({
                       key={sel.id}
                       block={sel}
                       collections={collections}
+                      apiSources={apiSources}
                       propsSchemas={propsSchemas}
                       onChange={(patch) => onUpdateList(sel.id, patch)}
                     />
@@ -1070,6 +1097,7 @@ export function PageBuilderShell({
                         key={`bind-${sel.id}`}
                         block={sel}
                         collections={collections}
+                        apiSources={apiSources}
                         declared={[...declaredPropNames(propsSchemas[sel.component])]}
                         onChange={(bindings) => onUpdateBlockField(sel.id, { bindings })}
                       />
