@@ -117,7 +117,11 @@ export const SET_BLOCK_PROPS_TOOL = {
       "label'. The given props are MERGED into the block's existing props (other props " +
       "are kept); an empty-string value clears that one prop. Find the page id and the " +
       "block id with get_page (every block has an `id`). For a select/combobox List's " +
-      "config use bind_list, not this.",
+      "config use bind_list, not this. Platform feature — dynamic/param-driven pages: " +
+      "a STRING prop's value may be { \"param\": \"city-slug\" } (this page's wildcard " +
+      "route segment) or { \"query\": \"q\" } (a URL query param, e.g. ?q=) instead of a " +
+      "literal, to echo the current request into text (e.g. a search page's heading " +
+      "\"Results for '{{query}}'\"). Resolved per-request; absent this request → \"\".",
     parameters: {
       type: "object",
       properties: {

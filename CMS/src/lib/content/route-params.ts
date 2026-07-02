@@ -84,3 +84,29 @@ export function resolveRouteFilters<T extends RouteFilterClause>(
   }
   return out;
 }
+
+/**
+ * Resolve any TOP-LEVEL block prop values that are route-value refs (e.g. a
+ * page-builder-authored `{"query":"q"}` on a plain string prop, so a component
+ * like a search results heading can echo the current `?q=` / wildcard segment).
+ * Only values matching `isRouteValueRef` are touched — every other prop
+ * (string, number, array, a `json`-typed object, etc.) passes through
+ * unchanged, so this can't clobber a legitimately object-shaped prop. Missing
+ * refs resolve to "" (an unset heading param reads as empty text, not
+ * "[object Object]" or a crash) — unlike `resolveRouteFilters`, there's no
+ * clause to drop, only a value to render.
+ */
+export function resolveRouteProps(
+  props: Record<string, unknown> | undefined,
+  ctx: RouteContext,
+): Record<string, unknown> | undefined {
+  if (!props) return props;
+  let changed = false;
+  const out: Record<string, unknown> = { ...props };
+  for (const [key, value] of Object.entries(props)) {
+    if (!isRouteValueRef(value)) continue;
+    out[key] = resolveRouteValue(value, ctx) ?? "";
+    changed = true;
+  }
+  return changed ? out : props;
+}

@@ -104,6 +104,40 @@ test("create_list defaults filter/sort to empty arrays and parses a string limit
   assert.equal(r.value.limit, 5);
 });
 
+test("create_list shapes a literal string search", () => {
+  const r = validateCreateList({
+    page: "p", section: "s", collection: "content_restaurants", template: "Row",
+    search: "sushi", map: { a: "b" },
+  });
+  assert.ok(r.ok);
+  assert.equal(r.value.search, "sushi");
+});
+
+test("create_list shapes a route-value-ref search ({query}/{param})", () => {
+  const q = validateCreateList({
+    page: "p", section: "s", collection: "c", template: "t",
+    search: { query: "q" }, map: { a: "b" },
+  });
+  assert.ok(q.ok);
+  assert.deepEqual(q.value.search, { query: "q" });
+
+  const p = validateCreateList({
+    page: "p", section: "s", collection: "c", template: "t",
+    search: { param: "city-slug" }, map: { a: "b" },
+  });
+  assert.ok(p.ok);
+  assert.deepEqual(p.value.search, { param: "city-slug" });
+});
+
+test("create_list rejects a malformed search", () => {
+  const r = validateCreateList({
+    page: "p", section: "s", collection: "c", template: "t",
+    search: { nope: "x" }, map: { a: "b" },
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /search must be/);
+});
+
 test("create_list rejects a bad sort entry", () => {
   const r = validateCreateList({
     page: "p", section: "s", collection: "c", template: "t",
@@ -126,8 +160,22 @@ test("bind_list is PATCH-like: only the supplied fields appear", () => {
   assert.equal(r.value.template, "NewCard");
   assert.equal(r.value.collection, undefined);
   assert.equal(r.value.filter, undefined);
+  assert.equal(r.value.search, undefined);
   assert.equal(r.value.sort, undefined);
   assert.equal(r.value.map, undefined);
+});
+
+test("bind_list shapes a search patch (literal or route-value ref)", () => {
+  const lit = validateBindList({ page: "p", block: "l", search: "ramen" });
+  assert.ok(lit.ok);
+  assert.equal(lit.value.search, "ramen");
+
+  const ref = validateBindList({ page: "p", block: "l", search: { query: "q" } });
+  assert.ok(ref.ok);
+  assert.deepEqual(ref.value.search, { query: "q" });
+
+  const bad = validateBindList({ page: "p", block: "l", search: 42 });
+  assert.equal(bad.ok, false);
 });
 
 test("bind_list shapes filter/sort/map/limit when supplied", () => {

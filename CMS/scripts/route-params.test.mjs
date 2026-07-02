@@ -12,6 +12,7 @@ import {
   isRouteValueRef,
   resolveRouteValue,
   resolveRouteFilters,
+  resolveRouteProps,
 } from "../src/lib/content/route-params.ts";
 import { isParamSlug, paramName, resolveSlugPath } from "../src/lib/render/slug.ts";
 
@@ -143,4 +144,35 @@ test("resolveRouteFilters: mixed literal + param + dropped in one call", () => {
     { field: "a", op: "eq", value: "lit" },
     { field: "b", op: "eq", value: "helsinki" },
   ]);
+});
+
+// ── resolveRouteProps ─────────────────────────────────────────────────────────
+
+test("resolveRouteProps: resolves a {query} ref prop to the query value", () => {
+  const props = { title: "Static", query: { query: "q" } };
+  assert.deepEqual(resolveRouteProps(props, ctx), { title: "Static", query: "sushi" });
+});
+
+test("resolveRouteProps: resolves a {param} ref prop to the route param value", () => {
+  const props = { citySlug: { param: "city-slug" } };
+  assert.deepEqual(resolveRouteProps(props, ctx), { citySlug: "helsinki" });
+});
+
+test("resolveRouteProps: an absent param/query resolves to empty string, not a crash", () => {
+  const props = { query: { query: "missing" } };
+  assert.deepEqual(resolveRouteProps(props, ctx), { query: "" });
+});
+
+test("resolveRouteProps: non-ref values (string/number/array/plain object) pass through untouched", () => {
+  const props = { title: "Static", count: 3, tags: ["a", "b"], options: { foo: "bar" } };
+  assert.deepEqual(resolveRouteProps(props, ctx), props);
+});
+
+test("resolveRouteProps: no ref props → same object reference (no needless copy)", () => {
+  const props = { title: "Static" };
+  assert.equal(resolveRouteProps(props, ctx), props);
+});
+
+test("resolveRouteProps: undefined props is a no-op", () => {
+  assert.equal(resolveRouteProps(undefined, ctx), undefined);
 });

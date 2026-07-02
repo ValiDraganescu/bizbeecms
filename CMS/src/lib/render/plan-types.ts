@@ -162,6 +162,14 @@ export type ListSource = {
   collection?: string;
   filter?: Array<{ field: string; op: string; value?: unknown }>;
   sort?: Array<{ field: string; dir?: "asc" | "desc" }>;
+  /**
+   * collection kind: free-text search across the collection's text-typed fields
+   * (query-compiler's `search` — a simple case-insensitive `LIKE`, OR'd across
+   * columns; NOT possible via `filter` since filter clauses AND together). May
+   * be a literal string OR a route-value ref (`{"query":"q"}` / `{"param":"x"}`,
+   * see `lib/content/route-params.ts`) resolved per-request like `filter` values.
+   */
+  search?: unknown;
   /** api kind (external-data-sources Slice 3): the `data_source` row id. */
   sourceId?: string;
   /** api kind: the saved `data_source_request` row id. */

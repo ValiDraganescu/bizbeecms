@@ -1177,7 +1177,7 @@ async function handleBindComponent(args: unknown): Promise<Record<string, unknow
 async function handleCreateList(args: unknown): Promise<Record<string, unknown>> {
   const valid = validateCreateList(args);
   if (!valid.ok) return { ok: false, errors: [valid.error] };
-  const { page, section, collection, template, filter, sort, limit, map } = valid.value;
+  const { page, section, collection, template, filter, search, sort, limit, map } = valid.value;
   try {
     const loaded = await getDraftBlocks(page);
     if (!loaded) return { ok: false, errors: [`no page with id "${page}"`] };
@@ -1204,7 +1204,7 @@ async function handleCreateList(args: unknown): Promise<Record<string, unknown>>
       const check = validateListBinding(listSource, map, null, declared);
       if (!check.ok) return { ok: false, errors: check.errors };
     } else {
-      listSource = { collection: collection!, filter, sort, limit };
+      listSource = { collection: collection!, filter, search, sort, limit };
       rowsFrom = collection!;
       const fields = await collectionFields(collection!);
       if (fields === null) return { ok: false, errors: [await unknownCollectionMessage(collection!)] };
@@ -1289,6 +1289,7 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
       const { kind: _k, sourceId: _si, requestId: _ri, params: _p, itemsPath: _ip, ...keep } = prevSource;
       base = { ...keep, collection };
       if (v.filter !== undefined) base.filter = v.filter;
+      if (v.search !== undefined) base.search = v.search;
       if (v.sort !== undefined) base.sort = v.sort;
       rowsFrom = collection;
     }

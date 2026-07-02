@@ -62,6 +62,8 @@ import { queryCollection } from "@/db/query-store";
 import type { QuerySpec } from "@/lib/content/query-compiler";
 import {
   resolveRouteFilters,
+  resolveRouteValue,
+  resolveRouteProps,
   EMPTY_ROUTE_CONTEXT,
   type RouteContext,
 } from "@/lib/content/route-params";
@@ -440,10 +442,12 @@ async function hydrateBlockBindings(
         const collection = block.listSource.collection;
         let listRows: Array<Record<string, unknown>> = [];
         try {
+          const search = resolveRouteValue(src.search, routeContext);
           const res = await queryCollection(collection, {
             filters: resolveRouteFilters(src.filter, routeContext),
             sort: src.sort,
             limit: src.limit,
+            search: typeof search === "string" ? search : undefined,
           } as QuerySpec);
           if (res.ok) listRows = res.plan.items;
         } catch {
@@ -453,7 +457,9 @@ async function hydrateBlockBindings(
       }
 
       if (!block.bindings || Object.keys(block.bindings).length === 0) {
-        return children === block.children ? block : { ...block, children };
+        const routedProps = resolveRouteProps(block.props, routeContext);
+        if (children === block.children && routedProps === block.props) return block;
+        return { ...block, children, ...(routedProps ? { props: routedProps } : {}) };
       }
 
       const rows: Record<string, Record<string, unknown> | null> = {};
@@ -490,7 +496,7 @@ async function hydrateBlockBindings(
         }),
       );
 
-      const props = hydrateProps(block.props, block.bindings, rows);
+      const props = resolveRouteProps(hydrateProps(block.props, block.bindings, rows), routeContext);
       return { ...block, props, children };
     }),
   );

@@ -79,6 +79,24 @@ function shapeFilters(rec: Record<string, unknown>): ArgResult<FilterClause[]> {
   return { ok: true, value: out };
 }
 
+/**
+ * Shape `rec.search` (collection List free-text search) — a literal string, a
+ * route-value ref (`{"query":"q"}`/`{"param":"x"}`), or undefined. No FTS/AND
+ * semantics here; the query-compiler ORs it across the collection's text
+ * fields (see query-compiler.ts `search`), unlike `filter` which ANDs.
+ */
+function shapeSearch(rec: Record<string, unknown>): ArgResult<unknown> {
+  const raw = rec.search;
+  if (raw === undefined) return { ok: true, value: undefined };
+  if (typeof raw === "string") return { ok: true, value: raw };
+  const obj = asRecord(raw);
+  const hasRef = obj && (typeof obj.param === "string" || typeof obj.query === "string");
+  if (!hasRef) {
+    return { ok: false, error: 'search must be a string or { "param": "name" } / { "query": "name" }' };
+  }
+  return { ok: true, value: raw };
+}
+
 /** Shape `rec.sort` into SortClause[], or an error. */
 function shapeSort(rec: Record<string, unknown>): ArgResult<SortClause[]> {
   const raw = rec.sort;
@@ -170,6 +188,17 @@ const FILTER_SCHEMA = {
     },
     required: ["field", "op"],
   },
+} as const;
+
+const SEARCH_SCHEMA = {
+  description:
+    "create_list/bind_list ONLY (collection rows): free-text search, OR'd " +
+    "across the collection's text-typed fields (e.g. name/location) — case-" +
+    "insensitive contains. Use this, not `filter`, when the same needle should " +
+    "match ANY of several fields (filter clauses AND together, this doesn't). " +
+    'Pass a literal string, or { "param": "city-slug" } / { "query": "q" } to ' +
+    "read it from the page's route (same param/query-ref shape as filter " +
+    "values) — dropped (no search) if absent this request.",
 } as const;
 
 const SORT_SCHEMA = {
@@ -273,6 +302,7 @@ export const CREATE_LIST_TOOL = {
         collection: { type: "string", description: "Collection rows: the content_<slug> table name." },
         template: { type: "string", description: "The component name to stamp per row." },
         filter: FILTER_SCHEMA,
+        search: SEARCH_SCHEMA,
         sort: SORT_SCHEMA,
         source: API_SOURCE_SCHEMA,
         request: API_REQUEST_SCHEMA,
@@ -310,6 +340,7 @@ export const BIND_LIST_TOOL = {
         collection: { type: "string", description: "Collection rows: the content_<slug> table name (switches the List to collection rows)." },
         template: { type: "string", description: "The component name to stamp per row (replaces the current template)." },
         filter: FILTER_SCHEMA,
+        search: SEARCH_SCHEMA,
         sort: SORT_SCHEMA,
         source: API_SOURCE_SCHEMA,
         request: API_REQUEST_SCHEMA,
@@ -446,6 +477,8 @@ export interface CreateListArgs {
   collection?: string;
   template: string;
   filter: FilterClause[];
+  /** collection rows: free-text search (literal or route-value ref). See SEARCH_SCHEMA. */
+  search?: unknown;
   sort: SortClause[];
   /** api rows: the data source id or name (resolved in the dispatch handler). */
   source?: string;
@@ -500,12 +533,17 @@ export function validateCreateList(args: unknown): ArgResult<CreateListArgs> {
 
   const filters = shapeFilters(rec);
   if (!filters.ok) return filters;
+  const search = shapeSearch(rec);
+  if (!search.ok) return search;
   const sort = shapeSort(rec);
   if (!sort.ok) return sort;
 
   return {
     ok: true,
-    value: { page, section, collection, template, filter: filters.value, sort: sort.value, limit: shapeLimit(rec), map: map.value },
+    value: {
+      page, section, collection, template, filter: filters.value, search: search.value,
+      sort: sort.value, limit: shapeLimit(rec), map: map.value,
+    },
   };
 }
 
@@ -519,6 +557,8 @@ export interface BindListArgs {
   collection?: string;
   template?: string;
   filter?: FilterClause[];
+  /** collection rows: free-text search (literal or route-value ref). See SEARCH_SCHEMA. */
+  search?: unknown;
   sort?: SortClause[];
   /** api rows: the data source id or name (resolved in the dispatch handler). */
   source?: string;
@@ -592,6 +632,11 @@ export function validateBindList(args: unknown): ArgResult<BindListArgs> {
     const filters = shapeFilters(rec);
     if (!filters.ok) return filters;
     out.filter = filters.value;
+  }
+  if (rec.search !== undefined) {
+    const search = shapeSearch(rec);
+    if (!search.ok) return search;
+    out.search = search.value;
   }
   if (rec.sort !== undefined) {
     const sort = shapeSort(rec);
