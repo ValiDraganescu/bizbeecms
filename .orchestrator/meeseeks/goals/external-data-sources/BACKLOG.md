@@ -4,8 +4,10 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
 
-- TODO [P2] (found by live AI smoke 2026-07-02): **Tool name shadowed in dispatch
-  results.** `makeDispatcher` (lib/chat/tool-dispatch-core.ts) builds
+- DONE (2026-07-02) [P2] (found by live AI smoke 2026-07-02): **Tool name shadowed in dispatch
+  results.** FIXED: `{ ...payload, name }` ordering in makeDispatcher + regression
+  test; create_data_source now nests `source:`, create_collection renamed its
+  field to `collectionName`. Suite 1337 + tsc green. Original report: `makeDispatcher` (lib/chat/tool-dispatch-core.ts) builds
   `{ name, ...(await handler(args)) }`, so any handler payload with its own
   `name` field overwrites the TOOL name — create_data_source spreads
   `formatSource(...)` (source name) and its SSE `tool` frame + round-tripped

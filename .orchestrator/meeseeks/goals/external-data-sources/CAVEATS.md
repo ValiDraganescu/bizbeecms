@@ -186,8 +186,7 @@ Read every line before working. Each entry was learned the hard way by a previou
   `page_version WHERE id = page.draft_version_id`; checking `page.blocks` will
   say "nothing happened".
 
-- **Dispatch results: handler payload `name` shadows the tool name**
-  (`{ name, ...handler(args) }` in tool-dispatch-core). Until the BACKLOG bug is
-  fixed, don't trust `tool` frame `name` for tools whose payload carries a
-  `name` (create_data_source). Never add a top-level `name` to a new handler's
-  payload.
+- **Top-level `name` in a handler payload is RESERVED for the tool name.**
+  makeDispatcher now sets `name` LAST (`{ ...payload, name }`, fixed 2026-07-02)
+  so a payload `name` is silently OVERWRITTEN — your domain name would be lost,
+  not leaked. Nest it (`source:`) or rename it (`collectionName`).

@@ -795,7 +795,8 @@ async function handleCreateCollection(args: unknown): Promise<Record<string, unk
   try {
     const res = await createCollection(valid.value.name, valid.value.fields);
     if (!res.ok) return { ok: false, errors: [res.error] };
-    return { ok: true, action: "created", collection: res.plan.tableName, name: res.plan.name, fields: res.plan.fields };
+    // `collectionName`, not `name` — top-level `name` is reserved for the tool name.
+    return { ok: true, action: "created", collection: res.plan.tableName, collectionName: res.plan.name, fields: res.plan.fields };
   } catch (err) {
     return { ok: false, errors: [`failed to create collection: ${(err as Error).message}`] };
   }
@@ -1012,7 +1013,9 @@ async function handleCreateDataSource(args: unknown): Promise<Record<string, unk
       const created = await createDataSourceRequest(source.id, r);
       if (created) requests.push(created);
     }
-    return { ok: true, action: "created", ...formatSource(source, requests) };
+    // Nest under `source:` — a spread top-level `name` would collide with the
+    // dispatcher's tool name (and now be overwritten, losing the source name).
+    return { ok: true, action: "created", source: formatSource(source, requests) };
   } catch (err) {
     return { ok: false, errors: [`failed to create data source: ${(err as Error).message}`] };
   }

@@ -45,11 +45,20 @@ test("a throwing handler is caught → ok:false with the message", async () => {
 });
 
 test("handler result cannot drop the name (name always set last)", async () => {
-  // Even if a handler returns its own `name`, the dispatcher's tag wins is NOT
-  // the contract — name comes from the call. Spread puts handler keys first.
   const run = makeDispatcher({ t: async () => ({ ok: true }) });
   const res = await run("t", undefined);
   assert.equal(res.name, "t");
+});
+
+test("REGRESSION: a handler payload `name` never shadows the tool name", async () => {
+  // Bug 2026-07-02: create_data_source spread formatSource() whose top-level
+  // `name` (the SOURCE name) overwrote the tool name in SSE frames.
+  const run = makeDispatcher({
+    create_data_source: async () => ({ ok: true, name: "Smoke Posts" }),
+  });
+  const res = await run("create_data_source", {});
+  assert.equal(res.name, "create_data_source");
+  assert.equal(res.ok, true);
 });
 
 // ── selectToolSchemas ─────────────────────────────────────────────────────────

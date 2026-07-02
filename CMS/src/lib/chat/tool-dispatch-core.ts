@@ -41,7 +41,11 @@ export function makeDispatcher(
       return { name, ok: false, errors: [`unknown tool: ${name}`] };
     }
     try {
-      return { name, ...(await handler(args)) };
+      // Tool name LAST so a handler payload's own `name` field can never shadow
+      // the tool name in SSE frames / round-tripped ToolResults (bug 2026-07-02:
+      // create_data_source spread formatSource and the frame carried the SOURCE
+      // name). Payloads must keep domain names under non-colliding keys.
+      return { ...(await handler(args)), name };
     } catch (err) {
       return { name, ok: false, errors: [(err as Error).message] };
     }

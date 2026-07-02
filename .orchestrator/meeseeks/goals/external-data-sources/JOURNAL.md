@@ -305,3 +305,20 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   Opennext build gate DEFERRED again (11th) — dev server pid 79854 on :3602
   with active browser connections.
 - **Files:** goal memory only (+ /tmp/meeseeks-smoke scratch, not committed).
+
+## 2026-07-02 04:33 — BUG FIX: tool name shadowed in dispatch results
+- **Status:** DONE
+- **What I did:** makeDispatcher (tool-dispatch-core.ts) built
+  `{ name, ...handler(args) }`, so a handler payload's own `name` shadowed the
+  TOOL name in SSE `tool` frames + round-tripped ToolResults. Reordered to
+  `{ ...payload, name }` (tool name always wins). Audited every handler return
+  in tool-dispatch.ts for top-level `name`: two offenders — create_data_source
+  (spread formatSource → source name; now nested as `source:` so the source
+  name survives the overwrite) and create_collection (`name: res.plan.name` →
+  renamed `collectionName`). All other `name:` fields are nested (component.*,
+  sources[]). Regression test added: dispatcher returns the tool name even when
+  the payload carries `name` (fails on the old ordering — proven via node -e).
+- **Verified:** tsc green; node suite 1337/1337. Opennext build gate DEFERRED
+  again (12th) — dev server pid 79854 still on :3602 with browser connections.
+- **Files:** CMS/src/lib/chat/tool-dispatch-core.ts,
+  CMS/src/lib/chat/tool-dispatch.ts, CMS/scripts/tool-dispatch.test.mjs
