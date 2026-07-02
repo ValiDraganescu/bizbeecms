@@ -186,6 +186,25 @@ test("validateBlocks rejects bad shape, dup ids, and non-array", () => {
   assert.equal(dup.ok, false, "duplicate ids rejected");
 });
 
+test("validateBlocks id errors are self-correcting: absent vs malformed", () => {
+  // ABSENT id: the model must be told the field is MISSING + shown the fix
+  // (live, gpt-4o-mini retried a byte-identical payload on the old message).
+  const missing = validateBlocks([{ component: "Hero" }]);
+  assert.equal(missing.ok, false);
+  assert.match(missing.errors[0], /\.id is missing/);
+  assert.match(missing.errors[0], /give the block a short unique id/);
+  assert.match(missing.errors[0], /e\.g\. "contact-form-child"/);
+  // empty string counts as missing too
+  assert.match(validateBlocks([{ id: "", component: "Hero" }]).errors[0], /\.id is missing/);
+  // MALFORMED id: names the exact bad token + the rule
+  const bad = validateBlocks([{ id: "has spaces!", component: "Hero" }]);
+  assert.equal(bad.ok, false);
+  assert.match(bad.errors[0], /"has spaces!"/);
+  assert.match(bad.errors[0], /must be a short identifier/);
+  // non-string id is malformed, not missing
+  assert.match(validateBlocks([{ id: 42, component: "Hero" }]).errors[0], /42 must be a short identifier/);
+});
+
 test("localeFieldValue reads the right per-locale string", () => {
   // locale object → exactly that locale's entry (no cross-locale fallback in the editor)
   const obj = { en: "Hello", fi: "Moi" };

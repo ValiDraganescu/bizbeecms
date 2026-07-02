@@ -855,3 +855,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/content/collections-manager.tsx,
   CMS/src/lib/page-builder/{types,dnd}.ts, CMS/messages/{en,fi,et}.json,
   CMS/scripts/form-copy.test.mjs (new), CMS/scripts/ssr-bind-panel-check.mjs.
+
+## 2026-07-02 11:05 — Self-correcting missing-block-id error (AI-smoke finding 1)
+- **Status:** DONE
+- **What I did:** validateBlocks' `walk` (lib/pages/page-blocks.ts) collapsed
+  ABSENT and MALFORMED ids into one message ("…id must be a short identifier"),
+  which the live AI smoke proved non-self-correcting: gpt-4o-mini retried a
+  byte-identical payload (still no id) twice and gave up. Split the check:
+  (1) `b.id == null || b.id === ""` → "`${path}.id` is missing — give the
+  block a short unique id (letters, digits, -, _), e.g. \"contact-form-child\"";
+  (2) malformed → names the exact bad token (`JSON.stringify(b.id)` capped at
+  80 chars) before the rule, per the error-philosophy memory (name the bad
+  token + the fix). Empty string deliberately counts as missing; non-string
+  ids (e.g. 42) are malformed-not-missing.
+- **Regression:** new test in scripts/page-blocks.test.mjs — proved
+  failing-first by swapping in the HEAD copy of page-blocks.ts (old message ✗
+  /\.id is missing/), restored fix → 31/31. Asserts absent, empty-string,
+  bad-token naming ("has spaces!"), and 42-is-malformed.
+- **Verified:** tsc clean; full suite 1399/1399; opennext gate GREEN in an
+  isolated worktree off HEAD 9b6f219 (slice (b) now committed) with my two
+  files copied in (npm ci → cf-typegen → tsc → tests → build); worktree
+  removed, dev on :3602 untouched. No UI strings → no i18n.
+- **Files:** CMS/src/lib/pages/page-blocks.ts,
+  CMS/scripts/page-blocks.test.mjs.

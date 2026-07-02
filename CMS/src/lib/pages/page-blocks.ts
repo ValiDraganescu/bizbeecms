@@ -118,8 +118,17 @@ export function validateBlocks(
       return;
     }
     const b = block as Record<string, unknown>;
-    if (typeof b.id !== "string" || !ID_RE.test(b.id)) {
-      errors.push(`${path}.id must be a short identifier (letters, digits, -, _)`);
+    if (b.id == null || b.id === "") {
+      // Absent vs malformed matters to the AI: an un-nudged model retries a
+      // byte-identical payload on "must be a short identifier" — tell it the
+      // field is MISSING and show the fix.
+      errors.push(
+        `${path}.id is missing — give the block a short unique id (letters, digits, -, _), e.g. "contact-form-child"`,
+      );
+    } else if (typeof b.id !== "string" || !ID_RE.test(b.id)) {
+      errors.push(
+        `${path}.id ${JSON.stringify(b.id).slice(0, 80)} must be a short identifier (letters, digits, -, _)`,
+      );
     } else if (ids.has(b.id)) {
       errors.push(`${path}.id "${b.id}" is duplicated (block ids must be unique)`);
     } else {

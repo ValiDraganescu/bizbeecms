@@ -382,6 +382,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   schema fields) as read-only chips. Don't "complete" it with a map UI —
   that would imply a mapping the endpoint doesn't do.
 
+- **validateBlocks id errors are now TWO messages** (fixed 2026-07-02): absent/
+  empty id → "…id is missing — give the block a short unique id…, e.g.
+  \"contact-form-child\""; malformed → the exact bad token (JSON.stringify,
+  80-char cap) + "must be a short identifier". Anything matching the old
+  single ambiguous string (prompts, tests) must account for both; don't merge
+  them back — the split IS the self-correction (gpt-4o-mini gave up on the
+  merged message).
+
 - **The Form content select only writes when `children.length <= 1`** — a
   multi-child (AI-authored) form renders its children read-only in the panel
   so the single-select can't clobber them. Keep that guard if you touch the

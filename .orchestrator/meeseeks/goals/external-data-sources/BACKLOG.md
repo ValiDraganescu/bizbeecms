@@ -64,13 +64,18 @@ Task states: TODO | DOING | DONE | BLOCKED.
   page/collection/components gone; fixture untouched). Two findings → TODOs
   below. JOURNAL 2026-07-02 10:29.
 
-- TODO (from AI smoke 2026-07-02): **Self-correcting error for MISSING block
-  ids in page-blocks validation.** `blocks[…].id must be a short identifier
-  (letters, digits, -, _)` doesn't distinguish ABSENT from malformed; live,
-  gpt-4o-mini retried a byte-identical payload twice and gave up (another run
-  recovered by inventing an id). Say "missing — give the block a short unique
-  id, e.g. \"contact-form-child\"" when the field is absent. Failing-first
-  test on the validator; error-philosophy memory applies.
+- DONE (2026-07-02): **Self-correcting error for MISSING block ids in
+  page-blocks validation.** validateBlocks' walk now splits the id check:
+  absent/empty id → "blocks[…].id is missing — give the block a short unique
+  id (letters, digits, -, _), e.g. \"contact-form-child\""; malformed id →
+  names the exact bad token (JSON.stringify, 80-char cap) + the rule.
+  Failing-first regression test (old validator emits the ambiguous message →
+  /\.id is missing/ match fails; passes after) covering absent, empty-string,
+  bad-token naming, and non-string-is-malformed-not-missing. tsc + 1399 suite
+  + opennext isolated-worktree gate GREEN. Original report: `blocks[…].id must
+  be a short identifier (letters, digits, -, _)` doesn't distinguish ABSENT
+  from malformed; live, gpt-4o-mini retried a byte-identical payload twice and
+  gave up (another run recovered by inventing an id).
 
 - TODO (from AI smoke 2026-07-02): **create_form: optional `child` component
   arg.** Placing an input component inside a fresh Form needs get_page +
