@@ -53,6 +53,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
     request's declared placeholders, size-limit the payload, rate-limit
     sensibly); success/error states render gracefully (message or redirect —
     keep v1 minimal); mutations are NEVER retried (engine already enforces).
+  - DUAL SUBMIT MODE (user 2026-07-02): one endpoint, two clients. Baseline =
+    native `<form method="POST">` form-data/urlencoded post, no JS required,
+    endpoint answers redirect/HTML. REST mode = progressive enhancement: a small
+    client script intercepts submit (preventDefault) and sends the same
+    FormData via fetch to the SAME endpoint, which detects the mode (e.g.
+    `Accept: application/json`) and returns JSON for inline success/error
+    rendering. Same validation/placeholder/secret path in both modes.
   - Likely 2-3 slices: (a) Form block schema/plan/SSR + submit endpoint, (b)
     page-builder UI to bind form→saved request + map fields→placeholders,
     (c) httpbingo live test (POST /post echo) added to the user's test page.
