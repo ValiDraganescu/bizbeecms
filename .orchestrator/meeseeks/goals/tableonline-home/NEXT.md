@@ -1,68 +1,65 @@
 # Note to the next Meeseeks (tableonline-home)
 
-**Book-a-table page `/book?restaurant={slug}` is DONE and live.** New
-top-level page `book` (SiteHeader / Form-in-Section / SiteFooter), new
-`BookingForm` component, new `bookings` collection (`content_bookings`,
-`publicSubmissions:true`). Every existing "Book"/"Book a table" CTA across the
-site (offer page, restaurant cards, search rows, city page) already pointed
-at `/book?restaurant=...` and now resolves for real instead of 404ing — no
-link updates needed anywhere else. Full round-trip verified: rendered form →
-POST `/api/forms/submit` → `303` success redirect → row landed in
-`content_bookings` as a draft with every field intact. See JOURNAL
-2026-07-02 16:57 for the full build sequence and CAVEATS' 6 newest entries
-for `create_form`/`set_block_props`-on-query-param mechanics (read those
-before touching forms again — auto-generated block ids, no `map` arg on
-forms, the operator-only `publicSubmissions` REST PATCH, etc).
+**Restaurant detail page `/{city-slug}/{restaurant-slug}` is DONE and live** —
+the first wildcard-under-wildcard page this goal built (`:restaurant-slug`
+nested under `:city-slug`), and it worked with **zero new platform code**.
+New `RestaurantHero` component (breadcrumb, h1+location+cuisine pill, image,
+description, Overall-rating badge + review count, "Book a table" CTA). Added
+`content_restaurants.cuisine`/`.description` fields (didn't exist before),
+backfilled all 26 rows with a guessed cuisine + templated one-line
+description (ponytail: good enough, not hand-authored prose — upgrade later
+if ever prioritized). Also repointed restaurant-NAME links (not the Book
+pill) on `RestaurantRow`/`RestaurantCard` (home + city page) and
+`SearchResultRow` (search page) from `/book?restaurant=...` to
+`/{citySlug}/{slug}` — all 3 components `update_component`'d + published,
+all 5 Lists using them (home×2, city×2, search×1) re-`bind_list`'d with
+`citySlug`+`slug` added to `map`, all 3 affected pages republished. See
+JOURNAL 2026-07-02 17:08 for the full sequence + verification.
 
-**Simplification noted:** shipped ONE single-step form, not tableonline's
-two-step party-size→date→time-slot-grid→contact-details flow. Acceptable per
-GOAL.md ("keep the two-step look only if cheap" — it wasn't, given the CMS's
-form machinery is single-submit). Not a gap to silently backfill unless a
-future task specifically asks for the two-step UX.
+**Important self-caught bug (read CAVEATS' 2 newest entries before touching
+ANY new page):** my first live smoke test looked like a wildcard-under-
+wildcard platform bug (every restaurant/city combo rendered the same
+default) — it was actually just a missed `POST /api/pages/<id>/publish`
+call after `bind_component` on the brand-new page (the public route silently
+falls back to the pre-binding legacy `page.blocks` column when
+`published_version_id` is still NULL). Publish IMMEDIATELY after the first
+bind on any new page, before smoke-testing. Also hit (and documented) a
+separate red herring: `query_collection`'s filter arg is `filters` (plural),
+not `filter` (singular) like the bind_* tools — passing the wrong name is
+silently accepted and returns unfiltered rows.
 
 ## Recommended next task (per BACKLOG.md order)
-**Restaurant detail page `/{city-slug}/{restaurant-slug}`** (two nested
-wildcards under NO static parent this time — city-slug is itself a wildcard,
-not a static page like `offers` was). High confidence this still works:
-`resolvePage`'s walk is fully generic per-level regardless of whether a
-parent segment is static or itself a wildcard, but this IS the first
-wildcard-under-wildcard case this goal has tried — do one careful live smoke
-test rather than assuming. `content_restaurants` already has `slug` +
-`city_slug` fields ready to filter on (`{"param":"city-slug"}` +
-`{"param":"restaurant-slug"}`). tableonline reference: breadcrumb, h1 +
-address + cuisine tag, image, description, rating badge (Overall + review
-count — we only have one `rating` field, skip the 4-badge sub-score row),
-tag pills, "Book a table" CTA → `/book?restaurant={slug}` (now a real,
-working target). Keep it one page, no tabs.
+**Home page visual replica pass 1** (header/hero): dark top utility bar
+(`#14151a`, currently light/inverted-contrast) with "For restaurants" +
+language switcher, transparent nav over a full-bleed photo hero with 50%
+dark overlay + white serif headline, and a promotions strip riding up over
+the hero bottom (`margin-top:-4rem`) — one large 16/9 main promo
+(`content_offers.is_main=1`, field exists/unused today, set it on 1-2 seeded
+offers) + a secondary promo column. This is pure component/CSS/theme work,
+no platform feature needed. Leave the existing 2 bottom PromoBanner blocks
+alone (tableonline has the same near-footer Avios/newsletter tiles).
 
-Then, once the restaurant detail page exists: update `detailHref`/name-link
-mappings on `SearchResultRow`, `RestaurantRow`, `RestaurantCard` (currently
-all point straight at `/book?restaurant=...` since there was nowhere else to
-send them) to point at the new `/{city-slug}/{restaurant-slug}` page instead,
-keeping ONLY the actual "Book" pill/button pointed at `/book`.
+After that: **Home page visual replica pass 2** (registration teaser
+callout, app-download badges, footer gradient/social row/copyright bar, dead
+`href="#"` footer links) — also pure component work.
 
-After that: the two "Home page visual replica" passes (dark header
-bar/promo strip riding over the hero; footer gradient/registration-teaser/
-app-download section) are pure component/CSS work, no platform feature
-needed — slot in anytime a landing-page task isn't ready.
+Then: **Static/footer pages** (Terms/Privacy/Contact/"For restaurants") so
+no footer link 404s — lowest priority, do last.
 
 ## Known gaps (not blockers, just noted)
-- Two-step booking UX (party-size/date/time-slot-grid → contact-details) not
-  built — see "Simplification noted" above.
-- `/offers` (index page) has no locale-specific offer content beyond the
-  heading/subtitle (same single-locale-collection-field limitation as every
-  other collection-driven list this goal) — acceptable per GOAL.md.
-- Offer restaurant names ("LOBO", "Kustavin Kipinä", etc.) don't correspond to
-  any `content_restaurants` row — the offer page's Book CTA and the new
-  booking page's `restaurant_slug`/`restaurant_name` hidden fields both use
-  the free-text name/slug directly, not a real restaurant relation. A future
-  pass reseeding offers/events against real restaurant names would need to
-  update `restaurant`/`restaurant_slug` on all 6 offers (and events) to match.
-- City strip "Show all" links still go to `/search` (no city pre-filter) —
-  unchanged, still an open nice-to-have.
-- Search-result rows' name-link and the city page's restaurant cards still
-  point at `/book?restaurant=...` (no restaurant detail page exists yet) —
-  see "Recommended next task" above, this is exactly what unblocks fixing it.
+- Two-step booking UX not built (single-step form shipped instead) — see
+  earlier JOURNAL entries, acceptable simplification per GOAL.md.
+- Offer/event `restaurant` fields are free-text names that don't match any
+  real `content_restaurants` row (5 names: LOBO, Kustavin Kipinä, Wohls
+  Gård, Ravintola Siuntio, White Lady) — `content_offers.restaurant_slug`
+  was backfilled by slugifying the free-text name so its Book CTA still
+  works, but it won't resolve to a real restaurant detail page (no
+  `content_restaurants` row exists for these 5 names) — a future task
+  reseeding offers/events against real restaurant names would fix this.
+- Restaurant `cuisine`/`description` are templated/guessed, not authored —
+  fine for now, could be revisited for realism later.
+- City strip "Show all" links still go to plain `/search` (no city
+  pre-filter) — still an open nice-to-have.
 
 Nothing blocked. No new bugs reported. Dev server was already running on
 :3602 all run; MCP token still valid (`.mcp.json` → `local-site`). No repo
