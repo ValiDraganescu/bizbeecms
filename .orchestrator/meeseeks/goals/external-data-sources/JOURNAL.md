@@ -376,3 +376,20 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   Opennext build gate STILL deferred (15th) — dev server pid 79854 holds :3602.
 - **Files:** CMS/src/components/content/data-sources-manager.tsx,
   CMS/src/components/content/confirm-modal.tsx
+
+## 2026-07-02 05:13 — Query-lines helpers extracted + edge-case node tests
+- **Status:** DONE
+- **What I did:** Extracted the pure `parseQueryLines`/`serializeQuery`
+  helpers out of data-sources-manager.tsx into
+  `CMS/src/lib/data-sources/query-lines.ts` (unchanged logic) and added
+  `CMS/scripts/query-lines.test.mjs` — 11 tests: blanks/whitespace lines,
+  no-`=` → empty value, first-`=` split (value keeps later `=`), trim,
+  dup-key last-wins, empty key/value, `{placeholder}` pass-through, CRLF,
+  serialize + round-trip. Checked first: `requestPlaceholders` already
+  covered in data-source-validate.test.mjs — did NOT duplicate.
+- **Verified:** CMS tsc green; node suite 1348/1348 (+11); live :3602
+  /admin/data-sources 200 (dev hot-reloaded the import change).
+  Opennext build gate STILL deferred (16th) — dev server pid 79854 on :3602.
+- **Files:** CMS/src/lib/data-sources/query-lines.ts (new),
+  CMS/scripts/query-lines.test.mjs (new),
+  CMS/src/components/content/data-sources-manager.tsx (import swap)

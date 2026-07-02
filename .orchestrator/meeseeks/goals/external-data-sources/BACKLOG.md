@@ -20,6 +20,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **Query-lines edge-case tests** — extract pure
+  `parseQueryLines`/`serializeQuery` from data-sources-manager.tsx into
+  `lib/data-sources/query-lines.ts`, node tests for edge cases (no `=`,
+  value with `=`, trim, blanks, dup keys, round-trip). requestPlaceholders
+  already covered in data-source-validate.test.mjs — verified, skipped.
+
 - DONE (2026-07-02): **A11y pass on the Data Sources forms** — aria-expanded/controls
   on the Requests/Test toggles, role="status" on success/loading announcements,
   required on mandatory inputs, per-row button labels disambiguated

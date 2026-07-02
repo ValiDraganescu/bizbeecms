@@ -31,6 +31,7 @@ import {
   type AuthType,
   type HttpMethod,
 } from "@/lib/data-sources/validate";
+import { parseQueryLines, serializeQuery } from "@/lib/data-sources/query-lines";
 
 type Source = {
   id: string;
@@ -66,25 +67,6 @@ async function readError(res: Response): Promise<string> {
     /* non-JSON */
   }
   return `HTTP ${res.status}`;
-}
-
-/** key=value lines → query object (first "=" splits; value may contain "="). */
-function parseQueryLines(text: string): Record<string, string> {
-  const query: Record<string, string> = {};
-  for (const raw of text.split("\n")) {
-    const line = raw.trim();
-    if (!line) continue;
-    const idx = line.indexOf("=");
-    if (idx === -1) query[line] = "";
-    else query[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
-  }
-  return query;
-}
-
-function serializeQuery(query: Record<string, string>): string {
-  return Object.entries(query)
-    .map(([k, v]) => `${k}=${v}`)
-    .join("\n");
 }
 
 const inputCls =
