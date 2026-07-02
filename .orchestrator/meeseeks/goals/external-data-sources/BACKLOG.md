@@ -20,6 +20,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **Query-auth secret re-applied on same-host redirect hops** —
+  hunt #3 edge: buildRequest put query auth on the initial URL only; the manual
+  redirect loop took Location verbatim, so a same-host hop dropped the secret
+  (header auth survived, query auth didn't). Fixed post-resolveSafeRedirect
+  (query sources only, never cross-origin). Failing-first regression test;
+  tsc + 1361 green; opennext gate GREEN (worktree, change copied in).
+
 - DONE (2026-07-02): **Fresh-eyes defect hunt #3 (fetch/auth/cache/purge/binding/AI
   tools)** — reviewed the whole surface; NO provable defect. tsc clean, data-source
   suite 102/102. Two candidates weighed + dismissed as accepted-scope (numeric-form

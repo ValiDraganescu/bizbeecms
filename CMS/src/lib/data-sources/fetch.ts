@@ -479,7 +479,16 @@ export async function fetchSource(
           currentMethod = "GET";
           currentBody = null;
         }
-        currentUrl = next.value;
+        // The hop is same-host (verified above), but Location rarely carries
+        // the auth query param — re-apply it so query auth survives hops the
+        // way header auth does. Never done cross-origin: rejected above.
+        if (source.authType === "query" && source.authParam && source.secret) {
+          const u = new URL(next.value);
+          u.searchParams.set(source.authParam, source.secret);
+          currentUrl = u.toString();
+        } else {
+          currentUrl = next.value;
+        }
       }
     } catch (e) {
       lastError = e instanceof Error ? e.message : "network error";

@@ -247,3 +247,10 @@ Read every line before working. Each entry was learned the hard way by a previou
   no UI copy contradicts shipped behavior. Don't add speculative i18n messages
   for engine errors; if localization is ever demanded, map error strings to keys
   at the Test route, not inside fetch.ts (keep the engine pure).
+
+- **Query auth is re-applied on every same-host redirect hop** (fixed 2026-07-02):
+  the redirect loop re-sets `authParam=secret` on the hop URL after
+  `resolveSafeRedirect` approves it — Location rarely carries the auth query
+  param. Don't "simplify" the loop to `currentUrl = next.value` for query-auth
+  sources, and never re-apply before the same-host check (that would leak the
+  secret cross-origin).

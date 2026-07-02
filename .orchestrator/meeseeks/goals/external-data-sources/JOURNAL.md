@@ -535,3 +535,17 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (dev live on :3602 anyway, per caveat). Full-suite 1360 green stands from the
   prior run (no code changed since).
 - **Files:** goal memory only (JOURNAL.md, BACKLOG.md, NEXT.md).
+
+## 2026-07-02 06:07 — Query-auth secret re-applied on same-host redirect hops
+- **Status:** DONE
+- **What I did:** Fixed the last open functional edge from defect hunt #3: `buildRequest`
+  sets query auth on the initial URL only, and the manual redirect loop took the
+  Location target verbatim — so a same-host hop silently dropped the query secret
+  (header auth survived hops; query auth didn't). Fix: after `resolveSafeRedirect`
+  approves the hop, re-set `source.authParam=secret` on the next URL (query-auth
+  sources only; never cross-origin — those are rejected before this point).
+- **Verified:** Failing-first regression test (hop URL must carry `?key=sek`) —
+  fails on old code (secret dropped → route miss), passes with fix. tsc clean;
+  full suite 1361/1361 green (+1). opennext gate GREEN via isolated worktree with
+  fetch.ts copied in; worktree removed. Dev on :3602 untouched.
+- **Files:** CMS/src/lib/data-sources/fetch.ts, CMS/scripts/data-source-fetch.test.mjs

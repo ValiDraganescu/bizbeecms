@@ -375,6 +375,24 @@ test("redirect: 302 on POST re-issues as GET without body (same origin)", async 
   assert.equal(f.calls[1].init.body, null);
 });
 
+test("redirect: query-auth secret is re-applied on a same-host hop", async () => {
+  // Location rarely carries the auth query param; a same-host hop must not
+  // drop the secret (header auth survives hops — query auth must too).
+  const f = redirectFetch({
+    "https://api.example.com/v2/weather?key=sek": { status: 301, location: "/v3/weather" },
+    "https://api.example.com/v3/weather?key=sek": { status: 200, body: { n: 1 } },
+  });
+  const r = await fetchSource(
+    src({ authType: "query", authParam: "key", secret: "sek" }),
+    req(),
+    {},
+    { fetch: f, sleep: noSleep },
+  );
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.data, { n: 1 });
+  assert.equal(f.calls[1].url, "https://api.example.com/v3/weather?key=sek");
+});
+
 test("redirect: missing Location is graceful", async () => {
   const f = redirectFetch({
     "https://api.example.com/v2/weather": { status: 302 },
