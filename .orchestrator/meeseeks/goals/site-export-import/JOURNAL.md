@@ -126,3 +126,76 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   redirect behavior, not a route bug).
 - **Files:** `CMS/src/app/api/site-export/asset/[...key]/route.ts` (new),
   `BACKLOG.md` (flipped "Export assets" TODO to DONE), `JOURNAL.md`, `NEXT.md`.
+
+## 2026-07-02 19:17 — Import validate + dry-run: POST /api/site-import/validate
+- **Status:** DONE
+- **What I did:** Implemented FORMAT.md §6 Steps A + B, split into a PURE
+  validator/report-builder + a thin route (same discipline as Export core):
+  - `CMS/src/lib/site-export/site-import-validate.ts` — `validateSiteImport(artifact,
+    getWillDestroy)`, zero D1/CF/`@/` imports. Step A: `format`/`version` gate
+    (hard-fail, names the exact bad value), every `tables.*` key present +
+    array (hard-fail, names the exact bad key — e.g. `"tables.component must be
+    an array"`), `tables.collection.length <= 100` cap (checked but NOT a
+    hard-fail — see below). Step B: builds the dry-run report — `willCreate`
+    computed from the artifact's own `tables.*`/`collectionData` array lengths
+    (never trusts the artifact's `counts` block for this), `counts` vs actual
+    length mismatch appended as a WARNING string (not hard-fail, per FORMAT.md
+    §6 Step A's explicit "informational/HITL-sanity" framing), collection cap
+    over 100 is ALSO a warning not hard-fail (FORMAT.md's own dry-run report
+    shape has `collectionCapOk` as a boolean field the UI surfaces, not a
+    reason to refuse rendering the report at all — a hard-fail there would
+    prevent the operator from ever SEEING why via the dry-run UI), and
+    `secretsToReenter` filters `tables.dataSource` for `hasSecret === true`.
+    `willDestroy` comes from an **injected count-provider** callback (FORMAT.md
+    §7's own instruction), called only on the non-hard-fail path (an invalid
+    artifact never triggers a live D1 count) — this is what keeps the whole
+    report-builder pure/synchronous-shaped and unit-testable without D1.
+  - `CMS/src/app/api/site-import/validate/route.ts` — `POST`,
+    `requireAdmin`-gated (same guard as every other admin route incl. the
+    sibling export routes). Parses the posted JSON body (malformed JSON → 400
+    `{ok:false,error:"request body must be valid JSON"}` before ever touching
+    the validator), then supplies the count-provider closure: counts CURRENT
+    target rows for `page`/`component`/`collection`/`dataSource`/
+    `promptVersion`/`asset` via the `Db` port (one `Promise.all`, matching
+    Export core's read pattern) plus a per-collection `contentSelect("SELECT *
+    FROM content_x")` loop for `collectionRows` (same `MAX_READ_ROWS`-capped
+    fenced read path Export core already uses — an existing, accepted
+    platform limit, not something this task changes). Zero writes anywhere in
+    this route — purely read-only counts + the pure validator call. Returns
+    the report as JSON, HTTP 200 if `ok:true`, HTTP 400 if `ok:false`
+    (hard-fail).
+  - `CMS/src/lib/site-export/site-import-validate.test.ts` — 13 unit tests:
+    non-object artifact, wrong format (names the bad value), wrong version,
+    missing `tables` object entirely, a `tables.*` key present-but-wrong-typed
+    (names the exact key), a `tables.*` key missing entirely (names the exact
+    key), collection cap OK under 100 (no warnings), collection cap exceeded
+    is a WARNING not hard-fail, `counts` mismatch is a WARNING not hard-fail,
+    `willCreate` reflects the artifact's own array lengths (not the `counts`
+    block), `secretsToReenter` only lists `hasSecret:true` rows, `willDestroy`
+    passes through the injected provider's return value unmodified, and a
+    hard-fail path NEVER calls the count-provider (asserted via a
+    call-tracking closure) — proving the "no writes / no D1 touch on invalid
+    input" contract at the unit level, not just by inspection.
+- **Verified:** `node --test src/lib/site-export/site-import-validate.test.ts`
+  — 13/13 pass. `npx tsc --noEmit` — clean, zero errors. `npm test` (full
+  suite) — 1489/1489 pass, 0 fail (1476 prior + 13 new). Live smoke-tested
+  against the running `:3602` dev server (already up, did NOT run
+  `opennextjs-cloudflare build`): (1) a deliberately wrong-format body →
+  `HTTP 400`, `{"ok":false,"error":"unsupported format \"bizbeecms.kit\" —
+  expected \"bizbeecms.site\""}`; (2) malformed (non-JSON) body → `HTTP 400`,
+  `"request body must be valid JSON"`; (3) **real round-trip**: `curl
+  GET /api/site-export` (the live tableonline site's actual export, 1.5MB)
+  piped straight into `POST /api/site-import/validate` → `HTTP 200`,
+  `ok:true`, `willDestroy` exactly equal to `willCreate` for every key
+  (expected: same instance, so "what's there now" == "what the export
+  contains") — `pages:13, components:41, collections:7, collectionRows:73,
+  assets:61, dataSources:6, promptVersions:2`, `collectionCapOk:true`,
+  `warnings:[]`, and `secretsToReenter` correctly listed the 4 real
+  httpbingo-fixture data sources that have `hasSecret:true` (basic/header/
+  header/query auth types) — confirms the count-provider's live D1 counts,
+  the validator's array-length `willCreate`, and the secrets filter all agree
+  end-to-end against real data, not just fixtures.
+- **Files:** `CMS/src/lib/site-export/site-import-validate.ts` (new),
+  `CMS/src/lib/site-export/site-import-validate.test.ts` (new),
+  `CMS/src/app/api/site-import/validate/route.ts` (new), `BACKLOG.md` (flipped
+  "Import validate + dry-run" TODO to DONE), `JOURNAL.md`, `NEXT.md`.

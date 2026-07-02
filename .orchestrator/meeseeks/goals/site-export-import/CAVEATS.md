@@ -24,6 +24,20 @@ Read every line before working. Each entry was learned the hard way by a previou
   already exposes it as `process.env.NEXT_PUBLIC_CMS_VERSION` (build-time env,
   used by the admin sidebar's version badge) — reuse that everywhere a route
   needs "the CMS version", including the export envelope's `meta.cmsVersion`.
+- **FORMAT.md §6 Step A says "`tables.collection.length <= 100` (hard-fail
+  otherwise, checked here so the dry-run can show it before commit)" but its
+  OWN §6 Step B report shape has `collectionCapOk` as a plain boolean field —
+  those two read as contradictory** (a hard-fail can't also render a report
+  with a boolean field about the thing that failed). Resolved it as: cap
+  violation is a WARNING/boolean-false in the dry-run report, NOT a
+  request-level hard-fail — matches the `counts`-mismatch precedent
+  immediately above it in the same doc ("informational/HITL-sanity, not
+  itself validated data") and lets the operator actually SEE the dry-run
+  report explaining why the cap failed, instead of getting an opaque 400
+  before ever seeing `collectionCapOk`. If Import EXECUTE (the next task)
+  needs a HARD block on cap-exceeded before any writes, that's the right
+  place to add it (refuse to execute if `collectionCapOk===false`), not here
+  in validate/dry-run.
 
 - Content/theme/page work goes through the HTTP MCP at `http://localhost:3602/mcp` (bearer token in repo-root `.mcp.json`, key `local-site`), NOT direct DB edits. Call `get_authoring_guide` before block-tree edits — `update_page_blocks` expects the FULL current tree back, so `get_page` first or you wipe sections.
 - The dev server must be running for MCP calls (`npm run dev` in `CMS/`, port 3602). If :3602 is down, start it; don't switch to build mode. NEVER run `npx opennextjs-cloudflare build` while dev is running — it corrupts .next.
