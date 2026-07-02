@@ -60,9 +60,20 @@ Task states: TODO | DOING | DONE | BLOCKED.
     FormData via fetch to the SAME endpoint, which detects the mode (e.g.
     `Accept: application/json`) and returns JSON for inline success/error
     rendering. Same validation/placeholder/secret path in both modes.
-  - Likely 2-3 slices: (a) Form block schema/plan/SSR + submit endpoint, (b)
-    page-builder UI to bind form→saved request + map fields→placeholders,
-    (c) httpbingo live test (POST /post echo) added to the user's test page.
+  - COLLECTION TARGET (user 2026-07-02): the form target is SOURCE-AGNOSTIC like
+    binds — `kind: "api"` submits via the central fetch engine to a saved
+    request; `kind: "collection"` writes a collection item (contact form,
+    enquiry, etc. land as content). Guardrails for the collection kind: a
+    collection must EXPLICITLY OPT IN to public submissions (per-collection
+    flag, default OFF); submitted fields validated against the collection
+    schema, unknown fields dropped; rate-limit; new items land as
+    DRAFT/pending (never auto-published) so an operator reviews before they
+    can render anywhere.
+  - Likely 3-4 slices: (a) Form block schema/plan/SSR + submit endpoint (both
+    target kinds), (b) page-builder UI to bind form→saved request OR
+    opted-in collection + map fields→placeholders/schema fields, (c) httpbingo
+    live test (POST /post echo) + a collection-target test (contact-form style)
+    added to the user's test page.
   Decompose as needed; EN/FI/ET; all the usual gates.
   redirect loop took Location verbatim, so a same-host hop dropped the secret
   (header auth survived, query auth didn't). Fixed post-resolveSafeRedirect

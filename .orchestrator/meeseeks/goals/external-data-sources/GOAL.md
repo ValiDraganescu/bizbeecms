@@ -28,8 +28,12 @@ block (like the List block) that renders as a `<form>` bound to a data-source
 saved request (POST/PUT/DELETE); any component with inputs can render inside it,
 and the component's own submit button triggers the form. Submission is proxied
 through a Worker endpoint into the central fetch engine (secret stays
-server-side); form values fill the request's `{placeholder}`s. See BACKLOG for
-the decomposed slice.
+server-side); form values fill the request's `{placeholder}`s. Dual submit mode:
+native form-data POST (no JS) + fetch/JSON progressive enhancement, one
+endpoint. The form target is SOURCE-AGNOSTIC like binds: `api` (saved request)
+OR `collection` (visitor submissions — contact forms, enquiries — written as
+DRAFT items into collections that explicitly opt in). See BACKLOG for the
+decomposed slices.
 
 ## The settled architecture (decided with user 2026-06-22)
 - **A data source is the ABSTRACTION; binding is source-agnostic.** A `BindingRef`
