@@ -1,42 +1,41 @@
 # Note to the next Meeseeks (tableonline-home)
 
-**Static/footer pages are DONE.** Built 4 new top-level pages: `/terms`,
-`/privacy`, `/contact` (all via a new `LegalContent` component — title +
-richtext body, real EN/FI/RO/ES copy authored for each, `whitespace-pre-line`
-paragraphs) and `/for-restaurants` (reuses the existing `RestaurateurJoin`
-component as-is, its pre-existing content). Repointed `SiteFooter`'s
-`col2Link1Href` (Contact us)→`/contact`, `col3Link1Href` (Terms)→`/terms`,
-`col3Link2Href` (Gift card terms)→`/terms` (folded in, no separate content),
-`col3Link3Href` (Privacy policy)→`/privacy`, `col4Link1Href` (For
-restaurants)→`/for-restaurants`. Home page republished. See JOURNAL "this
-run" entry for full detail + verification.
-
-**Left on `/about` deliberately (not missed):** `col2Link2Href` (Restaurant
-backoffice — no CMS-content target, presumably external SaaS login),
-`col4Link2Href` (For affiliate partners — no content asked for),
-`RegistrationTeaser.ctaHref`, both `AppDownload` badge hrefs, and the 3
-social-icon hrefs (Facebook/Instagram/X — no real profiles to link).
+**Fixed the manager's hinted task this run**: the 6 broken site-wide links
+(acceptance audit #2 item #1). All were component-default or block-prop hrefs
+resolving to `/restaurateurs` (never existed), `/about` (unpublished/wrong
+target), `/avios`/`/newsletter` (tableonline's own dead ends, not ours to
+keep), or `/login`/`/signup` (no visitor auth route exists). Fixed via
+`update_component` (RestaurateurJoin, SiteHeader, RegistrationTeaser,
+SiteFooter) + `set_block_props` (home page's 2 PromoBanner blocks), published
+everything, verified live via curl grep — zero occurrences of any of the 6
+old dead hrefs remain on the home page. Full detail in JOURNAL "2026-07-02
+17:52" entry. Pure MCP/content work, no repo files touched.
 
 ## Backlog status
-Every item in BACKLOG.md's `## Tasks` section is now DONE. No open bugs.
-This was explicitly flagged as the LAST known dead-end class on the home
-page in the prior NEXT.md — that's now closed too.
+4 acceptance-audit #2 TODOs remain, all pure MCP/D1 content work:
+1. `/book?restaurant={slug}` should resolve slug → display name (currently
+   echoes the raw slug in the H1/saved record, e.g. "Book a table at
+   atelje-finne" instead of "Ateljé Finne").
+2. Remove or fix the orphaned HandpickedSelection section on home
+   ("Restovista recommends 2026" — dead `/collections/*` links; those now
+   404 cleanly instead of mis-rendering thanks to an earlier run's platform
+   fix, but they're still dead ends worth removing/repointing).
+3. Backfill restaurants for 8 nearly-empty city pages (only Helsinki/
+   Tallinn/Tartu have real listings; Espoo/Turku/Tampere/Oulu/Jyväskylä/
+   Kuopio/Porvoo/Pärnu are empty).
+4. `/for-restaurants` polish: missing `<title>`/`<h1>` (bare RestaurateurJoin
+   dump); also swap home section order so registration-teaser comes BEFORE
+   the restaurateur section per GOAL.md (PromoBanners stay near footer).
 
-## Recommended next task
-GOAL.md's home-page spec is essentially fully delivered. Per the prior run's
-own recommendation (never acted on since footer pages took priority):
-1. **Full click-through regression pass**: re-read `GOAL.md`, then manually
-   walk every nav link, every card (restaurant/offer/event/city), every
-   footer link, the search form, and the booking flow end-to-end on :3602 to
-   confirm nothing regressed across the many runs that touched shared
-   components (`SiteHeader`, `SiteFooter`, `RestaurantCard`, etc.).
-2. If that's clean, look for polish from the "Known gaps" list below, or
-   consider the goal "steady state" pending user/design review — there is no
-   more scaffolding work queued in BACKLOG.md, so the next Meeseeks should
-   either do a real regression pass or pick ONE polish item and log it as a
-   new BACKLOG TODO before starting (don't invent silently).
+Pick the next highest-value one — probably #1 (quick, closes a visible
+booking-flow rough edge) or #3 (biggest visible content gap: most city pages
+on the site are currently empty).
 
 ## Known gaps (carried over, unchanged this run)
+- No visitor-facing login/signup route exists — SiteHeader's Login/Create
+  account buttons + RegistrationTeaser CTA all point at `/contact` as the
+  smallest sane non-dead target. Building real visitor auth would be a
+  much bigger feature; flag to the curator if this deserves its own subgoal.
 - Two-step booking UX not built (single-step form shipped instead).
 - Offer/event `restaurant` fields are free-text names not matching any real
   `content_restaurants` row for 5 names (LOBO, Kustavin Kipinä, Wohls Gård,
@@ -44,13 +43,13 @@ own recommendation (never acted on since footer pages took priority):
 - Restaurant `cuisine`/`description` are templated/guessed, not authored.
 - City strip "Show all" links still go to plain `/search` (no city filter).
 - Only 1 offer has `is_main=1`.
-- `RestaurateurJoin` (reused for `/for-restaurants`) still only has EN copy
-  for its translatable props — a pre-existing gap from the run that first
-  created it, not introduced here. Low priority: fill in FI/RO/ES if a
-  future pass wants full locale parity on that page.
+- `RestaurateurJoin` still only has EN copy for its translatable props.
+- `AppDownload`'s 2 badge hrefs still point at `/about` (unpublished) — not
+  one of the 6 links in this run's task scope, left as-is.
+- Social hrefs now point at bare `facebook.com`/`instagram.com`/`x.com`
+  roots (no real Restovista social profiles exist) — fine for now, revisit
+  if real profile URLs ever get provided.
 
 Nothing blocked. No new bugs reported. Dev server was already running on
-:3602 all run; MCP token still valid (`.mcp.json` → `local-site`). No repo
-files touched this run — content/components live entirely in D1 via
-MCP/REST, so no tsc/build/test gate applies to this commit (goal-memory
-files only).
+:3602 all run; MCP token still valid (`.mcp.json` → `local-site`). This run
+did NOT touch repo files — no tsc/build/test gate applies.
