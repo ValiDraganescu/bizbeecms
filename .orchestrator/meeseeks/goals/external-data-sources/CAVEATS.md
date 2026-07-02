@@ -232,8 +232,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   legitimately redirects cross-origin, the fix is updating the source baseUrl,
   not loosening the redirect policy.
 
-- **fetchSource caps upstream bodies at MAX_RESPONSE_BYTES (5 MB)** —
-  content-length precheck + buffered text-length check; too-large →
-  `{ok:false}`, never retried, never cached. Don't add a second buffer of the
-  raw body elsewhere; the length check counts UTF-16 units (≤2× off on
-  non-ASCII — deliberate, it's a safety cap).
+- **fetchSource caps upstream bodies at MAX_RESPONSE_BYTES (5 MB) via
+  `readBodyCapped` — STREAMING, byte-counted, reader-cancelling** (fixed
+  2026-07-02: the old buffered `res.text()`+length check let a chunked body
+  fully buffer before rejection). Applies to the main fetch AND the oauth2
+  token fetch. Too-large → `{ok:false}`, never retried, never cached. Never
+  replace it with `res.text()`/`res.json()` — that reintroduces the unbounded
+  buffer. The no-`res.body` fallback (text()+UTF-16 length) exists only for
+  bodyless mocks; real runtimes take the streaming path.

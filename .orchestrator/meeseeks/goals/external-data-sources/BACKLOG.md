@@ -20,6 +20,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **Streaming enforcement of the 5MB size cap** — fresh-eyes defect:
+  `res.text()` buffered the ENTIRE body before the length check, so a chunked
+  response (no content-length) still exhausted Worker memory before rejection;
+  oauth2 token fetch (`res.json()`) had no cap at all. Fixed: `readBodyCapped`
+  byte-counted streaming read that cancels the reader when the cap is exceeded;
+  shared by the main fetch + token fetch. Regression test proves early abort
+  (pull counter: 20/20 chunks on old code → ~6 with fix) + oauth2 oversized-token
+  test. tsc + 1360 green; opennext gate GREEN (worktree, change copied in).
+
 - DONE (2026-07-02): **Redirect hardening in the central fetch engine** — default
   `redirect:"follow"` let a malicious upstream 302 past the save-time SSRF
   check (to 169.254.x / .internal) AND forwarded custom auth headers

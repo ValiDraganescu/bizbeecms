@@ -82,10 +82,8 @@ const DEFAULT_TIMEOUT_MS = 10_000;
  * Hard cap on the upstream response body. Without it, `res.json()` buffers an
  * unbounded body into Worker memory (128 MB isolate limit) AND the parsed blob
  * gets re-stringified into the cache. Checked twice: content-length header
- * (cheap pre-read reject) and the buffered text length (header may be absent).
- * ponytail: text .length counts UTF-16 units, not bytes — off by ≤2× on
- * non-ASCII; fine for a safety cap, use a streaming byte counter if exactness
- * ever matters.
+ * (cheap pre-read reject) and a STREAMING byte count (header may be absent —
+ * a chunked body must be aborted mid-stream, not buffered then measured).
  */
 const MAX_RESPONSE_BYTES = 5_000_000;
 const MAX_REDIRECTS = 3;
@@ -290,9 +288,18 @@ async function fetchOauth2Token(
   }
   if (!res.ok) return { ok: false, error: `oauth2 token endpoint responded ${res.status}` };
 
+  // Same streaming size cap as the main fetch — a token endpoint is the same
+  // trust level as the upstream API, and res.json() would buffer unbounded.
+  let read: Awaited<ReturnType<typeof readBodyCapped>>;
+  try {
+    read = await readBodyCapped(res);
+  } catch {
+    return { ok: false, error: "could not read oauth2 token response" };
+  }
+  if (!read.ok) return { ok: false, error: "oauth2 token response too large" };
   let data: unknown;
   try {
-    data = await res.json();
+    data = JSON.parse(read.text);
   } catch {
     return { ok: false, error: "oauth2 token response is not valid JSON" };
   }
@@ -318,6 +325,47 @@ async function fetchOauth2Token(
 }
 
 /* ------------------------------------------------------------- fetching */
+
+/**
+ * Read a response body with the size cap ENFORCED WHILE STREAMING: count raw
+ * bytes per chunk and cancel the reader the moment the cap is exceeded, so a
+ * chunked upstream (no content-length header) can never buffer unbounded data
+ * into Worker memory. `res.text()` would buffer everything FIRST — the cap
+ * must abort mid-stream to actually protect the isolate.
+ * Falls back to `res.text()` + length check when there is no body stream
+ * (some test mocks / exotic runtimes). Throws only on read errors — callers
+ * wrap it like any network read.
+ */
+async function readBodyCapped(
+  res: Response,
+): Promise<{ ok: true; text: string } | { ok: false }> {
+  const body = res.body;
+  if (!body) {
+    const text = await res.text();
+    // ponytail: fallback counts UTF-16 units, not bytes — fine for a cap.
+    return text.length > MAX_RESPONSE_BYTES ? { ok: false } : { ok: true, text };
+  }
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > MAX_RESPONSE_BYTES) {
+      try {
+        await reader.cancel();
+      } catch {
+        // best-effort abort
+      }
+      return { ok: false };
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  text += decoder.decode();
+  return { ok: true, text };
+}
 
 function isIdempotentSafe(request: FetchRequestConfig): boolean {
   return request.method === "GET" || request.retryable === true;
@@ -466,15 +514,16 @@ export async function fetchSource(
     if (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES) {
       return { ok: false, status: res.status, error: "upstream response too large" };
     }
-    let text: string;
+    let read: Awaited<ReturnType<typeof readBodyCapped>>;
     try {
-      text = await res.text();
+      read = await readBodyCapped(res);
     } catch {
       return { ok: false, status: res.status, error: "could not read upstream response" };
     }
-    if (text.length > MAX_RESPONSE_BYTES) {
+    if (!read.ok) {
       return { ok: false, status: res.status, error: "upstream response too large" };
     }
+    const text = read.text;
     let data: unknown;
     try {
       data = JSON.parse(text);

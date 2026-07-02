@@ -239,6 +239,45 @@ test("fetch: body under the cap still parses fine", async () => {
   assert.deepEqual(r.data, { n: 42 });
 });
 
+test("fetch: chunked oversized body aborts MID-STREAM, never fully buffered", async () => {
+  // 20 chunks × 1MB = 20MB offered with NO content-length header — the cap
+  // must cancel the reader at ~5MB, not buffer everything then measure.
+  const chunk = new TextEncoder().encode("x".repeat(1_000_000));
+  const totalChunks = 20;
+  let pulled = 0;
+  const stream = new ReadableStream({
+    pull(controller) {
+      if (pulled >= totalChunks) {
+        controller.close();
+        return;
+      }
+      pulled++;
+      controller.enqueue(chunk);
+    },
+  });
+  const f = async () => new Response(stream, { status: 200 });
+  const r = await fetchSource(src(), req(), {}, { fetch: f, sleep: noSleep });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /too large/);
+  assert.ok(
+    pulled < totalChunks,
+    `pulled ${pulled}/${totalChunks} chunks — body was fully buffered, no early abort`,
+  );
+});
+
+test("oauth2: oversized token response rejects gracefully", async () => {
+  const big = `{"access_token":"${"x".repeat(6_000_000)}"}`;
+  const f = async () => new Response(big, { status: 200 });
+  const r = await fetchSource(
+    src({ authType: "oauth2", authParam: "https://auth.example.com/token", secret: "id:sec" }),
+    req(),
+    {},
+    { fetch: f, sleep: noSleep },
+  );
+  assert.equal(r.ok, false);
+  assert.match(r.error, /token response too large/);
+});
+
 /* ------------------------------------------------------------- redirects */
 
 /** Fetch that maps url → {status, body?, location?} and records calls. */

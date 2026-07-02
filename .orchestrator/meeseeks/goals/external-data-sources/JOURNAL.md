@@ -467,3 +467,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   after (no leftovers).
 - **Files:** CMS/src/lib/data-sources/fetch.ts,
   CMS/scripts/data-source-fetch.test.mjs
+
+## 2026-07-02 05:52 — Streaming enforcement of the 5MB size cap (fresh-eyes defect)
+- **Status:** DONE
+- **What I did:** Manager asked for (a) provable defect or (b) consolidation —
+  found (a). The 5MB cap in `fetch.ts` measured `text.length` AFTER
+  `res.text()` had already buffered the whole body, so a chunked upstream
+  (no content-length header) could still stream 100MB+ into Worker memory
+  before rejection; the oauth2 token fetch (`res.json()`) had NO cap at all.
+  Fix: new `readBodyCapped(res)` — streams `res.body` via getReader(), counts
+  raw bytes per chunk, cancels the reader the moment the cap is exceeded
+  (TextDecoder streaming decode; no-body fallback to text()+length for mocks).
+  Wired into both the main fetch path and `fetchOauth2Token`.
+- **Verified:** Regression test proves EARLY ABORT: 20×1MB chunked stream with
+  a pull counter — old code pulls 20/20 (test FAILS on HEAD~), fixed code
+  pulls ~6 and errors "too large". +oauth2 oversized-token test (also fails on
+  old code). tsc green; full suite 1360/1360 (was 1358). Opennext gate run in
+  the isolated /tmp worktree with the changed fetch.ts copied in (dev live on
+  :3602, untouched).
+- **Files:** CMS/src/lib/data-sources/fetch.ts,
+  CMS/scripts/data-source-fetch.test.mjs
