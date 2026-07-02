@@ -176,6 +176,24 @@ additionally flagged stuck in the UI (a warning + "redeploy" label). If the work
 status='deploying'` via `wrangler d1 execute bizbeecms --remote`. Fixing the callback origin (trap #5)
 prevents future stuck rows.
 
+### ⚠️ Build-timeout kills used to wedge Sites in `deploying` forever (fixed 2026-07-02)
+The whole container run is capped by `timeout --kill-after=10s $BUILD_TIMEOUT_SEC` (default 720s;
+actual value = PM setting `app_settings.build_timeout_min`, per-Site override raises it — **NOT** the
+code default; a 7-min setting silently killed every ~7.5-min cold-build run in its FINAL step, twice,
+looking like "stuck on secret" / "stuck on deploy"). Two compounding bugs, both fixed:
+1. **The TERM-trap report never fired on a real kill** — bash defers traps while a foreground command
+   runs, so a wrangler that outlives `--kill-after=10s` gets the whole group SIGKILLed before the trap
+   can `report failed`; PM never heard, row wedged. Fix: a **watchdog subshell** in the build script
+   reports `failed` 15s BEFORE the cap (report() is once-only via a flag file; a clean finish kills
+   the watchdog).
+2. **PM had no reaper** — a lost callback meant `deploying` forever. Fix: the polled
+   `/api/sites/[id]/deploy-events` route now **auto-fails** a `deploying` row older than its own
+   effective timeout + 2min grace (`shouldReapDeploy`, `deploy-state.ts`) and records a terminal
+   `callback` event saying so.
+Diagnosing a "stuck at step X" deploy: compare the step timestamps against `deploy_started_at` +
+the effective timeout — if the wall clock crossed the cap, the container was killed there; the step
+didn't hang. Cold builds (no `.next/cache` in R2) run ~7.5min end-to-end; keep the global timeout ≥15min.
+
 ---
 
 ## The actors

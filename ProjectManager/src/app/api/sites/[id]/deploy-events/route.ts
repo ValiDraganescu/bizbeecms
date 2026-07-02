@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canManageSiteByCountry } from "@/lib/site/authz";
-import { findSiteById, isUserAssignedToSite } from "@/lib/site/site";
-import { listDeployEventsPaged } from "@/lib/deploy/deploy-events";
+import {
+  findSiteById,
+  isUserAssignedToSite,
+  setSiteDeployStatus,
+} from "@/lib/site/site";
+import {
+  listDeployEventsPaged,
+  insertDeployEvent,
+  buildFailedCallbackEvent,
+} from "@/lib/deploy/deploy-events";
+import { shouldReapDeploy } from "@/lib/deploy/deploy-state";
+import { effectiveBuildTimeoutMin } from "@/lib/deploy/build-timeout";
+import { getGlobalBuildTimeoutMin } from "@/lib/deploy/settings";
 
 /**
  * Read the per-Site deploy-events trail (deploy-audit-trail subgoal).
@@ -51,17 +62,50 @@ export async function GET(
     limit,
     before: Number.isFinite(before) ? before : null,
   });
+
+  // Deploy-timeout reaper: a `deploying` row whose container blew past its own
+  // hard timeout (+ grace) can never resolve itself — the timeout SIGKILL can
+  // drop the container's failed-callback and nothing retries it (verified live
+  // 2026-07-02). The UI polls this endpoint every 5s while `deploying`, so it
+  // doubles as the reaper: flip the row to failed and leave a terminal event
+  // saying why. Runs after the reach check, so only users who could see the
+  // Site anyway can trigger it.
+  let status = site.status;
+  if (site.status === "deploying") {
+    const timeoutMin = effectiveBuildTimeoutMin(
+      await getGlobalBuildTimeoutMin(),
+      site.buildTimeoutMin,
+    );
+    if (shouldReapDeploy(site, timeoutMin)) {
+      await setSiteDeployStatus(site.id, "failed");
+      status = "failed";
+      try {
+        await insertDeployEvent(
+          buildFailedCallbackEvent(
+            site.id,
+            `deploy timed out: no callback from the build container within ${timeoutMin}min + grace — run presumed killed`,
+            null,
+            Date.now(),
+            latestDeployId(events),
+          ),
+        );
+      } catch {
+        // best-effort: the status flip above is what unwedges the Site
+      }
+    }
+  }
+
   // status is sourced from the Site row so the client knows when to stop polling.
   if (latestOnly) {
     // The Sites-list badge shows live state only — no console — so strip the
     // (bulky, numerous) streamed log rows; it just needs the step events.
     return NextResponse.json({
-      status: site.status,
+      status,
       events: latestRunEvents(events).filter((e) => e.status !== "log"),
       nextCursor: null,
     });
   }
-  return NextResponse.json({ status: site.status, events, nextCursor });
+  return NextResponse.json({ status, events, nextCursor });
 }
 
 /**
@@ -74,8 +118,16 @@ function latestRunEvents<T extends { deployId: string | null; startedAt: Date }>
   events: readonly T[],
 ): T[] {
   if (events.length === 0) return [];
-  let latestId = events[0].deployId;
-  let latestAt = events[0].startedAt.getTime();
+  const latestId = latestDeployId(events);
+  return events.filter((e) => e.deployId === latestId);
+}
+
+/** The `deployId` of the newest event (greatest `startedAt`), or null when none. */
+function latestDeployId(
+  events: readonly { deployId: string | null; startedAt: Date }[],
+): string | null {
+  let latestId: string | null = null;
+  let latestAt = -Infinity;
   for (const e of events) {
     const at = e.startedAt.getTime();
     if (at >= latestAt) {
@@ -83,5 +135,5 @@ function latestRunEvents<T extends { deployId: string | null; startedAt: Date }>
       latestId = e.deployId;
     }
   }
-  return events.filter((e) => e.deployId === latestId);
+  return latestId;
 }

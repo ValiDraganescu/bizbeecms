@@ -5,8 +5,10 @@ import { test } from "node:test";
 // for node's resolver, not the `@/` alias).
 import {
   STUCK_AFTER_MS,
+  REAP_GRACE_MS,
   isDeployStuck,
   canStartDeploy,
+  shouldReapDeploy,
 } from "./deploy-state.ts";
 
 const NOW = 1_000_000_000_000;
@@ -32,6 +34,28 @@ test("a fresh deploy is not stuck; a too-old one is", () => {
 
 test("a deploying site with no start stamp is treated as stuck (recoverable)", () => {
   assert.equal(isDeployStuck(site("deploying") as never, NOW), true);
+});
+
+test("shouldReapDeploy fires only past timeout+grace, on deploying rows with a start stamp", () => {
+  const TIMEOUT_MIN = 15;
+  const capMs = TIMEOUT_MIN * 60_000 + REAP_GRACE_MS;
+  // within the window → not reaped
+  assert.equal(
+    shouldReapDeploy(site("deploying", capMs - 1) as never, TIMEOUT_MIN, NOW),
+    false,
+  );
+  // past timeout + grace → reaped
+  assert.equal(
+    shouldReapDeploy(site("deploying", capMs + 1) as never, TIMEOUT_MIN, NOW),
+    true,
+  );
+  // non-deploying rows are never reaped, however old
+  assert.equal(
+    shouldReapDeploy(site("failed", capMs + 1) as never, TIMEOUT_MIN, NOW),
+    false,
+  );
+  // unknown age (no start stamp) is NOT auto-failed — manual restart covers it
+  assert.equal(shouldReapDeploy(site("deploying") as never, TIMEOUT_MIN, NOW), false);
 });
 
 test("canStartDeploy allows clean states and stale deploys, blocks a live one", () => {

@@ -537,6 +537,12 @@ report() {
   # landed inside the 2s poll gap (e.g. the actual error of a failing step).
   # Stop the mem sampler FIRST so its last [mem] line is in build.log before the
   # final flush (a timed-out build dies via this path with the sampler running).
+  # Once-only: the timeout watchdog, the TERM trap, and the normal exit paths
+  # can race to report; the first one wins (the flag file is shared with the
+  # watchdog subshell), the rest no-op.
+  [ -f /workspace/.reported ] && return
+  touch /workspace/.reported
+  [ -n "\${WATCHDOG_PID:-}" ] && kill "$WATCHDOG_PID" 2>/dev/null || true
   stop_mem_sampler
   flush_log_stream
   stop_log_stream
@@ -776,6 +782,26 @@ exec > >(tee /workspace/build.log) 2>&1
 # (or hang) in ANY step shows its real output in the console. Started once here,
 # stopped right before the terminal callback below.
 start_log_stream
+
+# --- Timeout watchdog (report-before-kill) -----------------------------------
+# The TERM trap above is BEST-EFFORT ONLY: bash defers traps while a foreground
+# command runs, so when the hard \`timeout\` fires mid-step and the hung child
+# (e.g. wrangler wedged in its own shutdown hooks) outlives --kill-after=10s,
+# the SIGKILL takes this shell down before the trap can report — PM never hears
+# and the Site wedges in \`deploying\` (verified live 2026-07-02: two runs killed
+# at the cap, zero callbacks). So report the failure 15s BEFORE the cap, while
+# the network is still ours. report() is once-only: a run that finishes cleanly
+# kills this watchdog inside its own report(); a run that finishes in the last
+# 15s races it and the first report wins (a lost last-second success reads as
+# failed — acceptable vs. wedging forever).
+(
+  WD_AT=$(( \${BUILD_TIMEOUT_SEC:-720} - 15 ))
+  [ "$WD_AT" -lt 45 ] && WD_AT=45
+  sleep "$WD_AT"
+  report failed "run exceeded \${BUILD_TIMEOUT_SEC:-720}s build timeout (killed)"
+) &
+WATCHDOG_PID=$!
+# -----------------------------------------------------------------------------
 
 rm -rf /workspace/src
 

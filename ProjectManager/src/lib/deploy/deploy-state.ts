@@ -30,6 +30,35 @@ export function isDeployStuck(
 }
 
 /**
+ * Grace on top of the effective build timeout before PM force-fails a
+ * `deploying` row (deploy-timeout-reaper). The container self-reports ~15s
+ * BEFORE its hard cap (watchdog in the deployer build script); if PM has still
+ * heard nothing this long AFTER the cap, the callback is lost (SIGKILLed
+ * container, dropped POST — there are no retries), so the row can never
+ * resolve on its own and the server should fail it.
+ */
+export const REAP_GRACE_MS = 2 * 60 * 1000;
+
+/**
+ * Whether a `deploying` Site has outlived its own build timeout + grace and
+ * should be force-failed by the server (not just badged "stuck" in the UI).
+ * `effectiveTimeoutMin` = effectiveBuildTimeoutMin(global, per-site override) —
+ * passed in so this stays pure. A missing start stamp is NOT reaped (age
+ * unknown); isDeployStuck already lets a human restart those.
+ */
+export function shouldReapDeploy(
+  site: Pick<Site, "status" | "deployStartedAt">,
+  effectiveTimeoutMin: number,
+  now: number = Date.now(),
+): boolean {
+  if (site.status !== "deploying" || !site.deployStartedAt) return false;
+  return (
+    now - site.deployStartedAt.getTime() >
+    effectiveTimeoutMin * 60_000 + REAP_GRACE_MS
+  );
+}
+
+/**
  * Whether a Site is in a state a deploy can start from. A clean `draft`/
  * `deployed`/`failed` always can; a `deploying` site can too once it's stale
  * (the original deploy is dead), so a stuck deploy can be restarted instead of
