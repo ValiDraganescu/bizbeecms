@@ -1,67 +1,56 @@
 # Note to the next Meeseeks (tableonline-home)
 
-**Restaurant detail page `/{city-slug}/{restaurant-slug}` is DONE and live** —
-the first wildcard-under-wildcard page this goal built (`:restaurant-slug`
-nested under `:city-slug`), and it worked with **zero new platform code**.
-New `RestaurantHero` component (breadcrumb, h1+location+cuisine pill, image,
-description, Overall-rating badge + review count, "Book a table" CTA). Added
-`content_restaurants.cuisine`/`.description` fields (didn't exist before),
-backfilled all 26 rows with a guessed cuisine + templated one-line
-description (ponytail: good enough, not hand-authored prose — upgrade later
-if ever prioritized). Also repointed restaurant-NAME links (not the Book
-pill) on `RestaurantRow`/`RestaurantCard` (home + city page) and
-`SearchResultRow` (search page) from `/book?restaurant=...` to
-`/{citySlug}/{slug}` — all 3 components `update_component`'d + published,
-all 5 Lists using them (home×2, city×2, search×1) re-`bind_list`'d with
-`citySlug`+`slug` added to `map`, all 3 affected pages republished. See
-JOURNAL 2026-07-02 17:08 for the full sequence + verification.
+**Home page visual replica pass 1 (header/hero) is DONE and live** — dark
+`#14151a` top utility bar (was light/inverted-contrast), transparent nav
+absolutely-positioned over the full-bleed hero photo (50% flat dark overlay,
+serif headline), and a new promotions strip riding up `-4rem` over the hero
+bottom: one large 16/9 `PromoMain` card (`content_offers.is_main=1`) + a
+`PromoSecondary` column (3 non-main offers). The 2 bottom `PromoBanner`
+blocks were left untouched as instructed. See JOURNAL 2026-07-02 17:16 for
+the full build sequence.
 
-**Important self-caught bug (read CAVEATS' 2 newest entries before touching
-ANY new page):** my first live smoke test looked like a wildcard-under-
-wildcard platform bug (every restaurant/city combo rendered the same
-default) — it was actually just a missed `POST /api/pages/<id>/publish`
-call after `bind_component` on the brand-new page (the public route silently
-falls back to the pre-binding legacy `page.blocks` column when
-`published_version_id` is still NULL). Publish IMMEDIATELY after the first
-bind on any new page, before smoke-testing. Also hit (and documented) a
-separate red herring: `query_collection`'s filter arg is `filters` (plural),
-not `filter` (singular) like the bind_* tools — passing the wrong name is
-silently accepted and returns unfiltered rows.
+**Key technique for next time you need to overlay one block on another:**
+there's NO `position` support in the Section/row/column layout system at
+all — bake `position:absolute` classes into the COMPONENT's own root tag via
+a plain `wrapClass`-style string prop, only override it via `set_block_props`
+on the ONE block instance that needs it (kept `SiteHeader` a single shared
+component used on every page — only home's instance got the transparent/
+absolute override; every other page still renders the old opaque nav,
+verified zero regression on /helsinki, /search, /book, /offers,
+/offers/lobo-brunch-19). For "ride content up over the section above it",
+use column-level `marginTop` (negative, with `marginTopUnit`) — that's the
+ONLY margin knob that exists in this layout system (Section/row have none).
 
 ## Recommended next task (per BACKLOG.md order)
-**Home page visual replica pass 1** (header/hero): dark top utility bar
-(`#14151a`, currently light/inverted-contrast) with "For restaurants" +
-language switcher, transparent nav over a full-bleed photo hero with 50%
-dark overlay + white serif headline, and a promotions strip riding up over
-the hero bottom (`margin-top:-4rem`) — one large 16/9 main promo
-(`content_offers.is_main=1`, field exists/unused today, set it on 1-2 seeded
-offers) + a secondary promo column. This is pure component/CSS/theme work,
-no platform feature needed. Leave the existing 2 bottom PromoBanner blocks
-alone (tableonline has the same near-footer Avios/newsletter tiles).
+**Home page visual replica pass 2** (below the fold): registration teaser
+callout (`1px solid #124142` border, faint teal-tint bg, perks list + CTA —
+absent today), app-download section (App Store / Google Play badges —
+absent today), footer upgrade (vertical gradient `#001414→#073535` instead
+of flat `bg-foreground`, "Follow us" social icon row, copyright bar, and
+replace the 9 dead `href="#"` footer links with real targets — point
+not-yet-built legal pages at `/about` for now and note it, per the BACKLOG
+entry's own guidance). Pure component/content work, same pattern as this
+run and every run before it.
 
-After that: **Home page visual replica pass 2** (registration teaser
-callout, app-download badges, footer gradient/social row/copyright bar, dead
-`href="#"` footer links) — also pure component work.
+Then: **Static/footer pages** (Terms/Privacy/Contact/"For restaurants") —
+lowest priority, do last, so no footer link 404s once pass 2 wires them up.
 
-Then: **Static/footer pages** (Terms/Privacy/Contact/"For restaurants") so
-no footer link 404s — lowest priority, do last.
-
-## Known gaps (not blockers, just noted)
-- Two-step booking UX not built (single-step form shipped instead) — see
-  earlier JOURNAL entries, acceptable simplification per GOAL.md.
-- Offer/event `restaurant` fields are free-text names that don't match any
-  real `content_restaurants` row (5 names: LOBO, Kustavin Kipinä, Wohls
-  Gård, Ravintola Siuntio, White Lady) — `content_offers.restaurant_slug`
-  was backfilled by slugifying the free-text name so its Book CTA still
-  works, but it won't resolve to a real restaurant detail page (no
-  `content_restaurants` row exists for these 5 names) — a future task
-  reseeding offers/events against real restaurant names would fix this.
-- Restaurant `cuisine`/`description` are templated/guessed, not authored —
-  fine for now, could be revisited for realism later.
-- City strip "Show all" links still go to plain `/search` (no city
-  pre-filter) — still an open nice-to-have.
+## Known gaps (not blockers, carried over + unchanged this run)
+- Two-step booking UX not built (single-step form shipped instead).
+- Offer/event `restaurant` fields are free-text names not matching any real
+  `content_restaurants` row for 5 names (LOBO, Kustavin Kipinä, Wohls Gård,
+  Ravintola Siuntio, White Lady) — `restaurant_slug` backfilled so Book CTAs
+  still work, just don't resolve to a real restaurant detail page.
+- Restaurant `cuisine`/`description` are templated/guessed, not authored.
+- City strip "Show all" links still go to plain `/search` (no city filter).
+- Only 1 offer has `is_main=1` (spec allowed "1-2"; one was visually
+  sufficient for a single large promo card — a future run could flip a 2nd
+  offer's `is_main` if a design ever calls for rotating/multiple mains, but
+  the current component only renders the FIRST match via `bind_component`
+  so a 2nd `is_main=1` wouldn't currently show anywhere without more work).
 
 Nothing blocked. No new bugs reported. Dev server was already running on
 :3602 all run; MCP token still valid (`.mcp.json` → `local-site`). No repo
-files touched this run — content lives entirely in D1 via MCP/REST, so no
-tsc/build/test gate applies to this commit (goal-memory files only).
+files touched this run — content/components live entirely in D1 via
+MCP/REST, so no tsc/build/test gate applies to this commit (goal-memory
+files only).
