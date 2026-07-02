@@ -65,6 +65,7 @@ import {
   resolveRouteValue,
   resolveRouteProps,
   hasResolvedRouteFilter,
+  isUnresolvedSingleRouteFilter,
   EMPTY_ROUTE_CONTEXT,
   type RouteContext,
 } from "@/lib/content/route-params";
@@ -497,6 +498,19 @@ async function hydrateBlockBindings(
             // compiler whitelists ops at runtime (unknown op → 400 → graceful
             // blank here), so this cast is safe.
             const spec = bindingQuerySpec(binding);
+            // A single-item binding whose ONLY filter is a route ref that
+            // didn't resolve this request (e.g. `/book` with no
+            // `?restaurant=`) must NOT run unfiltered — that would return
+            // whatever row sorts first and render it as if it were selected.
+            // Skip the query entirely so the component keeps its static
+            // schema default (see `hydrateProps`: `row == null` → prop stays
+            // untouched). Distinct from `hasResolvedRouteFilter`, which
+            // detects the OPPOSITE case (a ref that DID resolve but matched
+            // zero rows → 404).
+            if (isUnresolvedSingleRouteFilter(spec.filters, routeContext)) {
+              rows[key] = null;
+              return;
+            }
             const res = await queryCollection(binding.source.collection, {
               ...spec,
               filters: resolveRouteFilters(spec.filters, routeContext),

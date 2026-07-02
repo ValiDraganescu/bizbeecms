@@ -104,6 +104,39 @@ export function hasResolvedRouteFilter<T extends RouteFilterClause>(
   );
 }
 
+/**
+ * True when a filter set is a SINGLE clause whose value is a route-value ref
+ * that did NOT resolve this request (e.g. a static page's single-item binding
+ * `slug eq {query:"restaurant"}` when `?restaurant=` is absent, like `/book`
+ * with no query string). `resolveRouteFilters` DROPS such a clause (correct
+ * for an optional filter among several), which leaves a single-item binding
+ * with NO filters at all — the query then runs unfiltered and returns
+ * whatever row sorts first, which reads as a real (wrong) answer instead of
+ * "nothing selected". The caller uses this to short-circuit the query and
+ * keep the component's static prop defaults instead. Multi-clause filters are
+ * intentionally excluded — dropping ONE optional clause while keeping others
+ * is still correct there.
+ */
+export function isUnresolvedSingleRouteFilter<T extends RouteFilterClause>(
+  filters: T[] | undefined,
+  ctx: RouteContext,
+): boolean {
+  if (!filters || filters.length !== 1) return false;
+  const [f] = filters;
+  return isRouteValueRef(f.value) && resolveRouteValue(f.value, ctx) === undefined;
+}
+
+/**
+ * Resolve any TOP-LEVEL block prop values that are route-value refs (e.g. a
+ * page-builder-authored `{"query":"q"}` on a plain string prop, so a component
+ * like a search results heading can echo the current `?q=` / wildcard segment).
+ * Only values matching `isRouteValueRef` are touched — every other prop
+ * (string, number, array, a `json`-typed object, etc.) passes through
+ * unchanged, so this can't clobber a legitimately object-shaped prop. Missing
+ * refs resolve to "" (an unset heading param reads as empty text, not
+ * "[object Object]" or a crash) — unlike `resolveRouteFilters`, there's no
+ * clause to drop, only a value to render.
+ */
 export function resolveRouteProps(
   props: Record<string, unknown> | undefined,
   ctx: RouteContext,

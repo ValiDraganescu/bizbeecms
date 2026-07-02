@@ -14,6 +14,7 @@ import {
   resolveRouteFilters,
   resolveRouteProps,
   hasResolvedRouteFilter,
+  isUnresolvedSingleRouteFilter,
 } from "../src/lib/content/route-params.ts";
 import { isParamSlug, paramName, resolveSlugPath } from "../src/lib/render/slug.ts";
 
@@ -186,6 +187,45 @@ test("hasResolvedRouteFilter: true if AT LEAST ONE clause resolves, even if othe
     { field: "slug", op: "eq", value: { param: "city-slug" } },
   ];
   assert.equal(hasResolvedRouteFilter(filters, ctx), true);
+});
+
+// ── isUnresolvedSingleRouteFilter ────────────────────────────────────────────
+// Regression coverage for "/book with no ?restaurant= shows a REAL restaurant's
+// name instead of a neutral placeholder": a single-item binding whose ONLY
+// filter is a route ref that didn't resolve must be treated as "skip the
+// query, keep the static default" — not "drop the filter and run unfiltered".
+
+test("isUnresolvedSingleRouteFilter: true for a single clause whose query ref is absent", () => {
+  const filters = [{ field: "slug", op: "eq", value: { query: "restaurant" } }];
+  assert.equal(isUnresolvedSingleRouteFilter(filters, ctx), true);
+});
+
+test("isUnresolvedSingleRouteFilter: true for a single clause whose param ref is absent", () => {
+  const filters = [{ field: "slug", op: "eq", value: { param: "missing" } }];
+  assert.equal(isUnresolvedSingleRouteFilter(filters, ctx), true);
+});
+
+test("isUnresolvedSingleRouteFilter: false when the single ref DOES resolve", () => {
+  const filters = [{ field: "slug", op: "eq", value: { param: "city-slug" } }];
+  assert.equal(isUnresolvedSingleRouteFilter(filters, ctx), false);
+});
+
+test("isUnresolvedSingleRouteFilter: false for an ordinary literal-only filter", () => {
+  const filters = [{ field: "status", op: "eq", value: "published" }];
+  assert.equal(isUnresolvedSingleRouteFilter(filters, ctx), false);
+});
+
+test("isUnresolvedSingleRouteFilter: false with MULTIPLE clauses even if one ref is unresolved (dropping one is still correct there)", () => {
+  const filters = [
+    { field: "status", op: "eq", value: "published" },
+    { field: "slug", op: "eq", value: { query: "missing" } },
+  ];
+  assert.equal(isUnresolvedSingleRouteFilter(filters, ctx), false);
+});
+
+test("isUnresolvedSingleRouteFilter: false for undefined/empty filters", () => {
+  assert.equal(isUnresolvedSingleRouteFilter(undefined, ctx), false);
+  assert.equal(isUnresolvedSingleRouteFilter([], ctx), false);
 });
 
 // ── resolveRouteProps ─────────────────────────────────────────────────────────
