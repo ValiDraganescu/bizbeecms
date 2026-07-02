@@ -34,3 +34,56 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   own scope.
 - **Files:** `goals/site-export-import/FORMAT.md` (new), `BACKLOG.md` (flipped
   first TODO to DONE), `JOURNAL.md`, `NEXT.md`.
+
+## 2026-07-02 19:08 — Export core: GET /api/site-export (tracer, no asset bytes)
+- **Status:** DONE
+- **What I did:** Built the `bizbeecms.site` v1 envelope per FORMAT.md §3/§7,
+  split into a PURE serializer + a thin route:
+  - `CMS/src/lib/site-export/site-export.ts` — `buildSiteExport(input)`, zero
+    D1/CF/`@/` imports (node-testable). Takes already-fetched rows (Drizzle
+    `$inferSelect` shapes, locally re-declared as structural interfaces so the
+    file has no runtime deps) and returns the envelope: `format`/`version`/
+    `meta` (`exportedAt`/`cmsVersion`/best-effort `siteName` from the
+    `site_identity` settings row)/`counts`/`tables.*`/`collectionData`. Every
+    `timestamp_ms` column normalizes to epoch-ms via `toEpochMs` (accepts both
+    `Date` and already-numeric, so fixtures don't need real `Date` objects).
+    `data_source` rows drop `secretEnc` entirely and add a derived `hasSecret`
+    boolean (mirrors `data-source-store.ts`'s existing `toSafeSource` pattern —
+    same trust rule, re-expressed here since this module can't import that
+    store without pulling in D1-coupled code). `asset` rows are metadata only,
+    no bytes field (that's the next BACKLOG task).
+  - `CMS/src/app/api/site-export/route.ts` — `GET`, `requireAdmin`-gated
+    (same guard every other admin REST route uses). Reads `page`, `pageVersion`
+    (ALL rows, not just current draft/live — full history per FORMAT.md §2),
+    `component`, `collection`, `siteSettings`, `promptVersion`, `dataSource`,
+    `dataSourceRequest`, `asset` via the `Db` port (Drizzle, one
+    `Promise.all([...])` batch), then one `contentSelect("SELECT * FROM " +
+    tableName)` per registered collection (the existing fenced read path —
+    `MAX_READ_ROWS` cap of 1000/table is an existing, accepted platform limit,
+    not something this task changes). Hands everything to `buildSiteExport`,
+    returns the envelope as a downloadable `site-export.json` JSON response.
+    `cmsVersion` sourced from `process.env.NEXT_PUBLIC_CMS_VERSION` (already
+    wired build-time from `package.json` in `next.config.ts` for the sidebar
+    version badge — reused rather than adding a new `package.json` import,
+    which risks breaking under OpenNext/Workers bundling).
+  - `CMS/src/lib/site-export/site-export.test.ts` — 8 unit tests: envelope
+    format/version, `siteName` extraction (present/absent/malformed JSON),
+    epoch-ms normalization for both `Date` and numeric inputs, `secretEnc`
+    NEVER present + `hasSecret` derived correctly (both with and without a
+    secret), `counts` (array lengths + summed `collectionData` rows across
+    multiple collections), a collection with no matching `collectionData` key
+    exports empty rows instead of crashing, and asset rows have no bytes field.
+- **Verified:** `node --test src/lib/site-export/site-export.test.ts` — 8/8
+  pass. `npx tsc --noEmit` — clean, zero errors. `npm test` (full suite) —
+  1476/1476 pass, 0 fail (includes the 8 new tests). Live smoke-tested against
+  the running `:3602` dev server (dev was already up, could NOT run
+  `opennextjs-cloudflare build` per CLAUDE.md — would've corrupted `.next`):
+  `curl http://localhost:3602/api/site-export` → HTTP 200, real envelope with
+  `format:"bizbeecms.site"`, `version:1`, `counts:{pages:13,pageVersions:136,
+  components:41,collections:7,collectionRows:73,assets:61,dataSources:6,
+  dataSourceRequests:12,promptVersions:2}` against the actual local tableonline
+  site data, confirmed via a small Python check that NO `dataSource` row in the
+  live response contains a `secretEnc` key.
+- **Files:** `CMS/src/lib/site-export/site-export.ts` (new), `CMS/src/lib/site-export/site-export.test.ts`
+  (new), `CMS/src/app/api/site-export/route.ts` (new), `BACKLOG.md` (flipped
+  "Export core" TODO to DONE), `JOURNAL.md`, `NEXT.md`.

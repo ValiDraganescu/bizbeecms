@@ -1,5 +1,29 @@
-# Caveats — tableonline-home
+# Caveats — site-export-import
 Read every line before working. Each entry was learned the hard way by a previous Meeseeks.
+
+- **HOUSEKEEPING (2026-07-02): this file's body below (and its old header) was
+  copy-pasted wholesale from the `tableonline-home` goal** — every entry from
+  here down is about MCP content-authoring (page/component draft-publish, List
+  bindings, route params, etc.), NOT about this goal's actual work (export/import
+  REST routes + D1 reads over the `Db`/content-db ports). None of it is wrong,
+  just irrelevant noise for THIS goal — skim past it; it won't help you build
+  export/import code. Only the header is fixed here; a full re-scope/prune is
+  out of scope for a one-task run.
+- `contentSelect` caps any single read at `MAX_READ_ROWS` (1000 rows, see
+  `lib/content/content-db.ts`) — a `SELECT * FROM content_x` export for a
+  collection with >1000 rows silently truncates to 1000, no error/warning. Not
+  fixed in Export core (FORMAT.md doesn't call this out either); flag as a real
+  gap if a later task needs whole-collection fidelity beyond 1000 rows (either
+  raise the cap for the export path specifically, or paginate).
+- `site_settings.value` for `site_identity` may not exist at all on a fresh
+  site (no row) — `buildSiteExport`'s `siteName` extraction handles this (falls
+  back to `""`), don't assume every settings key is always present when reading
+  `site_settings` generically.
+- Don't add a new `package.json` import for the CMS version string — Workers/
+  OpenNext bundling makes raw `package.json` reads risky. `next.config.ts`
+  already exposes it as `process.env.NEXT_PUBLIC_CMS_VERSION` (build-time env,
+  used by the admin sidebar's version badge) — reuse that everywhere a route
+  needs "the CMS version", including the export envelope's `meta.cmsVersion`.
 
 - Content/theme/page work goes through the HTTP MCP at `http://localhost:3602/mcp` (bearer token in repo-root `.mcp.json`, key `local-site`), NOT direct DB edits. Call `get_authoring_guide` before block-tree edits — `update_page_blocks` expects the FULL current tree back, so `get_page` first or you wipe sections.
 - The dev server must be running for MCP calls (`npm run dev` in `CMS/`, port 3602). If :3602 is down, start it; don't switch to build mode. NEVER run `npx opennextjs-cloudflare build` while dev is running — it corrupts .next.
