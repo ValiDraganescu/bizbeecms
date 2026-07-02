@@ -23,6 +23,14 @@ USER DIRECTIVE (2026-07-02): revision pass — the goal must also cover:
 - **Param passing**: pass params from a component / component input into an API
   data-source request (interpolated into path / query / body).
 
+USER DIRECTIVE (2026-07-02, later in session): **Form block** — an implicit form
+block (like the List block) that renders as a `<form>` bound to a data-source
+saved request (POST/PUT/DELETE); any component with inputs can render inside it,
+and the component's own submit button triggers the form. Submission is proxied
+through a Worker endpoint into the central fetch engine (secret stays
+server-side); form values fill the request's `{placeholder}`s. See BACKLOG for
+the decomposed slice.
+
 ## The settled architecture (decided with user 2026-06-22)
 - **A data source is the ABSTRACTION; binding is source-agnostic.** A `BindingRef`
   (from content-collections Phase-2 binding) names a SOURCE — `collection` OR

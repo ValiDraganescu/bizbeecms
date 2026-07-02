@@ -20,8 +20,43 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
-- DONE (2026-07-02): **Query-auth secret re-applied on same-host redirect hops** —
-  hunt #3 edge: buildRequest put query auth on the initial URL only; the manual
+- DOING (USER 2026-07-02): **httpbingo test page + test components.** In the local
+  CMS site, build a dedicated test page with test components purpose-made to
+  exercise this feature end-to-end against https://httpbingo.org: a GET bind
+  (e.g. /get or /json), POST/PUT/DELETE saved requests (httpbingo echoes on
+  /post /put /delete — POST-to-query render bind is legal), {placeholder} param
+  passing from component props, per-request caching made visible (e.g. /uuid
+  with TTL on vs off), and its auth endpoints (/basic-auth/{user}/{pass},
+  /bearer, header/query key echo via /headers or /get) to prove each auth mode.
+  Leave the page + sources in place as a living test fixture and document on the
+  page what each block proves. NOTE: no visitor form-submission capability
+  exists (render fetch only) — do NOT fake one; a form block is a separate
+  not-yet-approved slice.
+
+- TODO (USER 2026-07-02, approved): **Form block — visitor form submission to a
+  data-source saved request.** User's design intent (their words, distilled): "an
+  implicit form block like the List block that renders as a `<form>` and takes
+  care of the options. Inside it we could render any component with inputs; the
+  component can have its own submit button that triggers the form."
+  - An implicit Form block (mirroring how List wraps an item template) renders as
+    `<form>`; it's bound to a data-source SAVED REQUEST (POST/PUT/DELETE — the
+    central fetch engine already supports them).
+  - Any component can be placed inside; its declared inputs (name/email/message
+    fields etc.) become the form's fields; a submit button inside the child
+    component triggers the wrapping form (native `<form>` semantics — a
+    `type="submit"` button inside the form just works, no JS wiring).
+  - Submission goes to a CMS endpoint on the Worker which resolves the saved
+    request and calls the central fetch engine server-side — the secret NEVER
+    reaches the browser; form field values fill the request's `{placeholder}`s
+    (body/query/path) with the existing safe encoding.
+  - Untrusted-input rules apply at the submit endpoint (validate against the
+    request's declared placeholders, size-limit the payload, rate-limit
+    sensibly); success/error states render gracefully (message or redirect —
+    keep v1 minimal); mutations are NEVER retried (engine already enforces).
+  - Likely 2-3 slices: (a) Form block schema/plan/SSR + submit endpoint, (b)
+    page-builder UI to bind form→saved request + map fields→placeholders,
+    (c) httpbingo live test (POST /post echo) added to the user's test page.
+  Decompose as needed; EN/FI/ET; all the usual gates.
   redirect loop took Location verbatim, so a same-host hop dropped the secret
   (header auth survived, query auth didn't). Fixed post-resolveSafeRedirect
   (query sources only, never cross-origin). Failing-first regression test;
