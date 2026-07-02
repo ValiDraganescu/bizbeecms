@@ -87,3 +87,42 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** `CMS/src/lib/site-export/site-export.ts` (new), `CMS/src/lib/site-export/site-export.test.ts`
   (new), `CMS/src/app/api/site-export/route.ts` (new), `BACKLOG.md` (flipped
   "Export core" TODO to DONE), `JOURNAL.md`, `NEXT.md`.
+
+## 2026-07-02 19:13 — Export assets: GET /api/site-export/asset/<key> streaming route
+- **Status:** DONE
+- **What I did:** Added `CMS/src/app/api/site-export/asset/[...key]/route.ts` per
+  FORMAT.md §4's settled manifest+per-asset protocol. `requireAdmin`-gated
+  (same guard as every other admin REST route + the sibling `GET /api/site-export`).
+  Mirrors the public `/media/[...key]/route.ts` streaming pattern (catch-all
+  segment since asset keys contain `/`, e.g. `assets/foo_123_abc.png`) but two
+  deliberate differences: (1) content-type is read from the `asset` D1 row
+  (`schema.asset`, looked up by `key` via the `Db` port), not R2 `httpMetadata`
+  — keeps this route's only I/O dependency the same `Db`+`Storage` port pair
+  `GET /api/site-export` already uses, and matches what the envelope's
+  `tables.asset[].contentType` already claims for that key; (2) no
+  cache-control/etag/SVG-sandbox headers — this endpoint is an operator-only
+  export leg, not the public image-serving path, so those headers don't apply
+  (added `content-disposition: attachment` instead, for a sane filename on
+  direct download). Reused `isValidAssetKey` (traversal guard) unchanged. 404s
+  on invalid key shape, missing D1 row, or missing R2 object (three distinct
+  early-outs, all same 404 response — no need to leak which case).
+  No changes to `GET /api/site-export` itself (`tables.asset` already lists
+  every key, per Export core's explicit metadata-only scoping).
+- **Verified:** `npx tsc --noEmit` — clean. `npm test` — 1476/1476 pass (route is
+  a thin I/O wrapper — guard + one D1 lookup + one `Storage.get` — no pure logic
+  to unit-test per this repo's "test business logic only" discipline; no
+  colocated `route.test.ts` exists for any other `api/*/route.ts` either, so this
+  matches convention). Live round-trip check against the running `:3602` dev
+  server (already up, did NOT run `opennextjs-cloudflare build`): picked a real
+  1.5MB gallery PNG from `GET /api/assets`, fetched it via the NEW
+  `GET /api/site-export/asset/<key>` route AND via the existing public
+  `GET /media/<key>` route, compared both downloads — identical byte size
+  (1,540,277 bytes) and identical `sha256` checksum
+  (`3f3c5c3...b3512d`), confirming byte-identical round-trip through the
+  `Storage` port. Also curl-verified the guard rails: a traversal-shaped key
+  (`../../etc/passwd`, URL-encoded) → 404 (rejected by `isValidAssetKey` before
+  any D1/R2 call), a validly-shaped but nonexistent key → 404 (D1 row miss),
+  bare `/api/site-export/asset/` (no key segment) → 308 (Next's own catch-all
+  redirect behavior, not a route bug).
+- **Files:** `CMS/src/app/api/site-export/asset/[...key]/route.ts` (new),
+  `BACKLOG.md` (flipped "Export assets" TODO to DONE), `JOURNAL.md`, `NEXT.md`.
