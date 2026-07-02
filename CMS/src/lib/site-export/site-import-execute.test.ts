@@ -98,7 +98,7 @@ test("planImport: exactly at the cap is allowed", () => {
   assert.equal(r.ok, true);
 });
 
-test("planImport: dropContentTables lists every registry table name, restore plan mirrors tables verbatim", () => {
+test("planImport: dropContentTables comes from the TARGET's existing registry (3rd arg), restore plan mirrors artifact tables verbatim", () => {
   const artifact = baseArtifact();
   (artifact.tables as Record<string, unknown>).collection = [
     { id: "c1", name: "Offers", tableName: "content_offers", schema: '[{"name":"title","type":"string"}]', publicSubmissions: false, createdAt: 1, updatedAt: 1 },
@@ -111,16 +111,32 @@ test("planImport: dropContentTables lists every registry table name, restore pla
     { id: "d1", name: "Weather", authType: "query", hasSecret: true, secretEnc: "should-never-survive" },
   ];
 
-  const r = planImport(artifact, "Test Site");
+  // Target happens to already have a DIFFERENT collection than the source —
+  // dropContentTables must reflect the TARGET's own table, not the source's.
+  const r = planImport(artifact, "Test Site", ["content_legacy_stuff"]);
   assert.equal(r.ok, true);
   if (!r.ok) return;
-  assert.deepEqual(r.plan.dropContentTables, ["content_offers"]);
+  assert.deepEqual(r.plan.dropContentTables, ["content_legacy_stuff"]);
   assert.equal(r.plan.restoreCollections.length, 1);
   assert.equal(r.plan.restoreCollections[0].tableName, "content_offers");
   assert.deepEqual(r.plan.restoreCollections[0].rows, [{ id: "o1", title: "Sale" }]);
   assert.equal(r.plan.restorePages.length, 1);
   // secretEnc is ALWAYS nulled — never trust an artifact-supplied ciphertext.
   assert.equal(r.plan.restoreDataSources[0].secretEnc, null);
+});
+
+test("planImport: dropContentTables defaults to [] (nothing to drop) when the 3rd arg is omitted — a fresh/empty TARGET must never try to DROP the SOURCE's tables", () => {
+  const artifact = baseArtifact();
+  (artifact.tables as Record<string, unknown>).collection = [
+    { id: "c1", name: "Offers", tableName: "content_offers", schema: '[{"name":"title","type":"string"}]', publicSubmissions: false, createdAt: 1, updatedAt: 1 },
+  ];
+  const r = planImport(artifact, "Test Site");
+  assert.equal(r.ok, true);
+  if (!r.ok) return;
+  // Regression: this used to be `["content_offers"]` (the SOURCE's table),
+  // which 500s with "no such table" on a genuinely empty/different target —
+  // only invisible on same-instance round-trip tests where source===target.
+  assert.deepEqual(r.plan.dropContentTables, []);
 });
 
 test("planImport: falls back to parsing collection.schema when collectionData is missing that table", () => {

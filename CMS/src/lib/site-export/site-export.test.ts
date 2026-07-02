@@ -40,7 +40,7 @@ test("buildSiteExport: siteName pulled from site_identity settings row", () => {
   const env = buildSiteExport(
     baseInput({
       siteSettings: [
-        { key: "site_identity", value: JSON.stringify({ name: "Tableonline" }), updatedAt: 1000 },
+        { key: "site_identity", value: JSON.stringify({ brandName: "Tableonline" }), updatedAt: 1000 },
         { key: "icon_set", value: JSON.stringify("lucide"), updatedAt: 2000 },
       ],
     }),

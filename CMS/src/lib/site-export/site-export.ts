@@ -184,13 +184,17 @@ export interface SiteEnvelope {
   collectionData: Record<string, { schema: unknown[]; rows: CollectionDataRow[] }>;
 }
 
-/** Best-effort site name from a `site_identity` settings row — never throws. */
+/**
+ * Best-effort site name from a `site_identity` settings row — never throws.
+ * The stored shape (`SiteIdentity`, see `lib/settings/site-settings.ts`) keys
+ * the name as `brandName`, not `name` — read that field.
+ */
 function readSiteName(settings: SiteSettingRow[]): string {
   const row = settings.find((s) => s.key === "site_identity");
   if (!row) return "";
   try {
     const parsed = JSON.parse(row.value);
-    return typeof parsed?.name === "string" ? parsed.name : "";
+    return typeof parsed?.brandName === "string" ? parsed.brandName : "";
   } catch {
     return "";
   }

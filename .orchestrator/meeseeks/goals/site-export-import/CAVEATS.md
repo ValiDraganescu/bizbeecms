@@ -9,6 +9,41 @@ Read every line before working. Each entry was learned the hard way by a previou
   just irrelevant noise for THIS goal — skim past it; it won't help you build
   export/import code. Only the header is fixed here; a full re-scope/prune is
   out of scope for a one-task run.
+- **Same-instance export→import round-trip tests CANNOT catch "target has
+  different/no existing state than source" bugs** — the E2E cross-instance
+  task (2026-07-02) found 2 real bugs invisible to every prior same-instance
+  smoke test: (1) `readSiteName` read the wrong JSON key (`name` instead of
+  the real `SiteIdentity.brandName`), silently exporting `meta.siteName:""`
+  for every real site regardless of its actual brand name, making import
+  permanently unconfirmable; (2) `planImport`'s `dropContentTables` was built
+  from the SOURCE artifact's own collection list, not the TARGET's actual
+  existing tables — on a genuinely empty/different target this tries to
+  `DROP TABLE` something that was never created there and 500s the entire
+  import before writing anything. Both fixed in
+  `CMS/src/lib/site-export/{site-export,site-import-execute}.ts` +
+  `CMS/src/app/api/site-import/route.ts` (now queries the target's live
+  `collection` registry before planning). **Lesson: any future export/import
+  (or similarly cross-instance) work MUST test against a genuinely different
+  target state, not just re-import into the same instance it came from** —
+  a same-instance round-trip only proves internal consistency, not real
+  portability.
+- **`next dev` (Turbopack) refuses ANY symlinked path outside its own project
+  root** — tried symlinking `node_modules`, `src`, `messages` etc. into a
+  scratch dir to stand up a second local CMS instance cheaply; every one
+  hard-errors (`"Symlink […] is invalid, it points out of the filesystem
+  root"` / `"app_dir must be a directory"` after a mid-flight `rm -rf` of a
+  symlink crashed the watcher). The only working approach for a genuinely
+  second local instance is a real sibling directory with `node_modules`/
+  `src`/etc. PHYSICALLY COPIED (not symlinked), its own `wrangler.jsonc` +
+  `.dev.vars`, run via `npx next dev --port <other>` from that directory —
+  `initOpenNextCloudflareForDev()`'s Miniflare persist dir
+  (`.wrangler/state/v3`) resolves relative to CWD, so a different CWD alone
+  is enough to get a fully independent local D1 + R2. `npx wrangler d1
+  migrations apply bizbeecms-cms --local` run from that same scratch CWD
+  applies all migrations to ONLY that scratch D1 (confirmed the primary's
+  dev server / D1 stayed untouched throughout). Remember to re-copy `src`
+  (and re-run migrations if schema changed) if you edit source mid-session —
+  the copy does NOT hot-reload from the original.
 - `contentSelect` caps any single read at `MAX_READ_ROWS` (1000 rows, see
   `lib/content/content-db.ts`) — a `SELECT * FROM content_x` export for a
   collection with >1000 rows silently truncates to 1000, no error/warning. Not

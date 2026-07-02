@@ -74,14 +74,22 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const b = (body ?? {}) as { artifact?: unknown; confirm?: unknown };
-  const planned = planImport(b.artifact, b.confirm);
+
+  const db = await getDb();
+  // The TARGET's own currently-existing content_* tables (not the artifact's/
+  // source's) — see planImport's doc comment: dropping a table the target
+  // never created 500s the import, and on a genuinely different instance the
+  // target's collection set may differ from (or be empty vs) the source's.
+  const existingContentTableNames = (await db.select().from(schema.collection)).map(
+    (c) => c.tableName,
+  );
+
+  const planned = planImport(b.artifact, b.confirm, existingContentTableNames);
   if (!planned.ok) {
     return Response.json({ ok: false, error: planned.error }, { status: planned.status });
   }
   const plan = planned.plan;
   const artifact = b.artifact as SiteArtifact;
-
-  const db = await getDb();
 
   // --- WIPE (§6 Step C, exact order) ---
   // 1. DROP every content_* table currently in the registry (fenced).

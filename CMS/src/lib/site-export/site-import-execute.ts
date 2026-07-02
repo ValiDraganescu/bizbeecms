@@ -145,8 +145,26 @@ function parseSchema(schema: string): unknown[] {
  * a route skipped validate) and additionally HARD-BLOCKS on the 100-table cap
  * (unlike validate's dry-run, which only warns — FORMAT.md §5 point 5 wants a
  * real block here since this path actually writes).
+ *
+ * `existingContentTableNames` — the TARGET instance's own `collection`
+ * registry table names (what actually exists in ITS D1 right now), supplied
+ * by the caller (the route reads its live `collection` table before wiping).
+ * `dropContentTables` MUST come from here, not from the artifact's own
+ * `tables.collection` — those are the SOURCE site's collections, which on a
+ * genuinely different target instance may not exist at all (a fresh/empty
+ * target has none) or may differ from the source's set (extra tables the
+ * source never had). Dropping a table that was never created 500s the whole
+ * import; the two only happen to be identical on a same-instance round-trip,
+ * which is why this bug was invisible until a real cross-instance import
+ * (empty target) was tried. Defaults to `[]` (safe: nothing to drop) rather
+ * than silently falling back to the artifact's list, so a caller that forgets
+ * to pass it gets a working "nothing existed yet" plan instead of the old bug.
  */
-export function planImport(artifact: unknown, confirm: unknown): PlanResult {
+export function planImport(
+  artifact: unknown,
+  confirm: unknown,
+  existingContentTableNames: string[] = [],
+): PlanResult {
   if (artifact === null || typeof artifact !== "object") {
     return fail(400, "artifact must be a JSON object");
   }
@@ -200,7 +218,7 @@ export function planImport(artifact: unknown, confirm: unknown): PlanResult {
   return {
     ok: true,
     plan: {
-      dropContentTables: t.collection.map((c) => c.tableName),
+      dropContentTables: existingContentTableNames,
       wipeBuiltinTables: WIPE_BUILTIN_TABLES,
       restoreCollections,
       restoreComponents: t.component,

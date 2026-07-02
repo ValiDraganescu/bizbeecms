@@ -418,3 +418,134 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `CMS/src/components/settings/settings-nav.tsx`, `CMS/messages/en.json`,
   `CMS/messages/fi.json`, `CMS/messages/et.json`, `BACKLOG.md` (flipped
   "Admin UI" TODO to DONE), `JOURNAL.md`, `NEXT.md`.
+
+## 2026-07-02 19:50 — E2E/HITL slice: real cross-instance export→import, found + fixed 2 bugs
+- **Status:** DONE
+- **What I did:** Stood up a genuinely SEPARATE second CMS instance and ran the
+  full export→import→click-through against it (never touched the primary
+  :3602 dev DB except one legitimate content write — see below).
+  - **Second instance setup**: `next dev`'s Turbopack refuses ANY symlinked
+    path outside its own project root (`node_modules`, `src` — tried both,
+    both hard-error `"Symlink … points out of the filesystem root"` /
+    `"app_dir must be a directory"`), so a symlink-based scratch dir doesn't
+    work. Instead: a real sibling directory
+    `~/git/dev/bizbeecms-scratch2/` (OUTSIDE the bizbeecms repo, never
+    committed) with `node_modules`/`src`/`messages`/`migrations`/`scripts`/
+    `public` **physically copied** (not symlinked) from `CMS/`, its own
+    `wrangler.jsonc` (renamed `name` to `bizbeecms-cms-scratch2`, cosmetic
+    only), its own `.dev.vars` (`SITE_ID=test-2-scratch`,
+    `APP_ORIGIN=http://localhost:3603`), run via `npx next dev --port 3603`
+    from that directory — `initOpenNextCloudflareForDev()` resolves its
+    `.wrangler/state/v3` persist dir relative to CWD, so a different CWD =
+    a fully independent local D1 + R2, zero shared state with :3602's.
+    Applied all 27 migrations via `npx wrangler d1 migrations apply
+    bizbeecms-cms --local` from the scratch dir (this is a DIFFERENT
+    on-disk D1 than the primary's — the command's `--local` scope is CWD-
+    relative, confirmed by the primary's dev server staying up/unaffected
+    throughout). Scratch dir + process fully torn down at the end of this
+    run (`pkill` the :3603 process, `rm -rf` the scratch dir) — nothing
+    left running or on disk outside the repo.
+  - **One legitimate primary-instance write**: the real tableonline site had
+    NO `site_identity` row (brandName blank), which — correctly, by design —
+    makes the artifact's `meta.siteName` blank and import unconfirmable
+    (`checkConfirmation` hard-refuses a blank expected name). This is real
+    operator-facing behavior, not a test artifact, so the right move is what
+    a real operator would do: set a brand name. `PUT
+    /api/settings/brand {"brandName":"Restovista", ...}` (there was already
+    a brandName+tagline in fact — see the bug below, the EXPORT was reading
+    the wrong JSON key) — this is legitimate content authoring on :3602, not
+    a destructive/test action, and doesn't touch pages/components/collections/
+    assets at all.
+  - **Bug #1 FOUND + FIXED — `readSiteName` read the wrong JSON key.**
+    `CMS/src/lib/site-export/site-export.ts`'s `readSiteName` parsed the
+    `site_identity` settings row and read `parsed?.name`, but the actual
+    stored shape (`SiteIdentity` in `lib/settings/site-settings.ts`) keys the
+    field as `brandName`. Every real site with a brand name set (the
+    tableonline site DOES have one — brandName "Restovista") was exporting
+    `meta.siteName: ""` regardless, making the artifact PERMANENTLY
+    unconfirmable for import (a blank expected name can never be typed to
+    match) — this was a **hard blocker for the entire import flow on any
+    real site**, invisible until this run because every prior task's
+    verification checked "does exporting/validating/executing work" in
+    isolation, never "does the export's siteName actually reflect the site's
+    real brand name end-to-end". Fixed the field name; fixed the matching
+    unit test's fixture (`site-export.test.ts` was asserting against `{name:
+    "Tableonline"}`, i.e. the test itself encoded the same wrong key —
+    confirmed it FAILS against the corrected source with the old fixture,
+    proving the bug was real, then fixed the fixture to `{brandName:
+    "Tableonline"}` and it passes).
+  - **Bug #2 FOUND + FIXED — `planImport`'s `dropContentTables` used the
+    SOURCE artifact's collection list instead of the TARGET's.** The
+    destructive import route (`POST /api/site-import`) DROPs every
+    `content_*` table in `plan.dropContentTables` before recreating them from
+    the artifact. `planImport` (pure, `site-import-execute.ts`) built that
+    list from `t.collection.map(c => c.tableName)` — i.e. the ARTIFACT's
+    (source site's) own collections. On a real second instance with ZERO
+    collections yet, this tries `DROP TABLE content_authors` (etc.) on a
+    table that was never created on the target → `D1_ERROR: no such table:
+    content_authors` → the whole import 500s immediately, before writing
+    ANYTHING. 100% invisible on every prior same-instance round-trip test
+    (source===target, so the source's collection list always happened to
+    equal what already existed) — this is the textbook case the E2E task
+    exists to catch. Fixed: `planImport` now takes a 3rd optional param
+    `existingContentTableNames: string[]` (defaults to `[]`, i.e. "nothing to
+    drop" — safe default, not "fall back to the old buggy behavior"); the
+    route now queries the TARGET's live `collection` registry
+    (`db.select().from(schema.collection)`) BEFORE calling `planImport` and
+    passes those table names through. Added a regression test proving the
+    default is `[]` (would have failed pre-fix, since the old code path had
+    no 3rd param and used the artifact's list unconditionally) and updated
+    the existing "dropContentTables" test to pass a target list explicitly
+    and assert it — not the source's — table name comes back.
+  - **Full E2E click-through, both bugs fixed, against the real second
+    instance**: exported :3602 (`GET /api/site-export`, 13 pages / 136 page
+    versions / 41 components / 7 collections / 73 collection rows / 61
+    assets / 6 data sources / 12 data-source requests / 2 prompt versions —
+    matches the task hint's expected counts exactly) → `POST
+    /api/site-import/validate` on :3603 (empty target) → dry-run report
+    `willCreate` matched the export counts exactly, `willDestroy` all
+    zeroes, `collectionCapOk:true` → `POST /api/site-import` with
+    `{artifact, confirm:"Restovista"}` → `200 {"ok":true,"restored":{...all
+    9 counts match...},"assetKeysToUpload":[...61 keys...]}` → uploaded all
+    61 assets via `POST /api/site-import/asset/<key>` (61/61 succeeded, 0
+    failures) → `GET /` on :3603 → `200`, same `<title>`, same nav links,
+    byte-identical Tailwind-utility-sheet diff aside (per-request compiled
+    sheet, expected to vary slightly by cache warm state per CAVEATS, not a
+    content bug) → `GET /helsinki` (a real city page) → `200` on both
+    instances, identical `<title>Restaurants | Restovista</title>` → `GET
+    /restaurants/kogu-resto` (a real restaurant detail page) → `200` on both,
+    byte-identical page size (175243 bytes both) → fetched the `book` page,
+    extracted the real Form-1 block's field set + `__bb_page`/`__bb_block`
+    hidden identity (preserved identically across import, as expected — page
+    IDs are artifact-preserved, not regenerated) → `POST
+    /api/forms/submit` on :3603 with a real booking payload → `{"ok":true}`
+    → verified via `wrangler d1 execute --local` that the row actually
+    landed in `content_bookings` on the TARGET (4 rows total: 3 imported +
+    1 new submission, the new one's `customer_name`/`email` match exactly
+    what was posted) → spot-checked a gallery image referenced INLINE on
+    the restaurant page (`/media/assets/…fcd337ae.png`) renders `200
+    image/png` on :3603, and separately verified one asset is BYTE-IDENTICAL
+    sha256 between source and target (`ea1f574f…28a2`).
+  - Recorded 3 new lower-priority TODOs surfaced by this pass into
+    `BACKLOG.md`'s "New TODOs found by the E2E slice" section (UI copy nit,
+    wipe-loop atomicity gap, and a note on lack of a first-class way to spin
+    up a second local instance if this becomes a recurring need).
+- **Verified:** `npm test` in `CMS/` — 1501/1501 pass (1499 prior + 2 new:
+  the corrected dropContentTables-default regression test and the corrected
+  siteName-fixture test already existed and now assert the RIGHT thing).
+  `npx tsc --noEmit -p CMS` clean. Full live HTTP click-through against a
+  genuinely separate second instance as detailed above — this is the FIRST
+  run in this goal that exercised source≠target, and it caught 2 real bugs
+  same-instance testing structurally could not have caught. Primary :3602
+  confirmed unaffected throughout (counts identical before/after: 13 pages /
+  41 components / 7 collections / 61 assets), and the scratch instance +
+  process were fully torn down at the end (nothing left running, nothing
+  left on disk outside the repo).
+- **Files:** `CMS/src/lib/site-export/site-export.ts` (readSiteName field-name
+  fix), `CMS/src/lib/site-export/site-export.test.ts` (fixture fix),
+  `CMS/src/lib/site-export/site-import-execute.ts` (dropContentTables now
+  target-registry-sourced via new 3rd param), `CMS/src/lib/site-export/
+  site-import-execute.test.ts` (updated + new regression test),
+  `CMS/src/app/api/site-import/route.ts` (queries target's live collection
+  registry before planning), `BACKLOG.md` (flipped E2E TODO to DONE, added 3
+  new lower-priority TODOs), `JOURNAL.md`, `NEXT.md`.
