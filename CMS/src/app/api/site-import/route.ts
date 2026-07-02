@@ -19,7 +19,7 @@
  */
 import { requireAdmin } from "@/lib/auth/guard";
 import { getDb, schema } from "@/lib/ports/db";
-import { contentDdl, contentWrite } from "@/lib/content/content-db";
+import { contentDdl, contentDdlBatch, contentWrite } from "@/lib/content/content-db";
 import { buildCreateTableSql, type CollectionField } from "@/lib/content/collection-schema";
 import { planImport, type SiteArtifact } from "@/lib/site-export/site-import-execute";
 
@@ -92,9 +92,14 @@ export async function POST(request: Request): Promise<Response> {
   const artifact = b.artifact as SiteArtifact;
 
   // --- WIPE (§6 Step C, exact order) ---
-  // 1. DROP every content_* table currently in the registry (fenced).
-  for (const tableName of plan.dropContentTables) {
-    await contentDdl(`DROP TABLE ${tableName}`);
+  // 1. DROP every content_* table currently in the registry (fenced), as ONE
+  // atomic batch — a transient D1 error mid-loop used to leave a partial
+  // DROPPED/not-DROPPED state (some tables gone, some not) with no way to
+  // tell which; contentDdlBatch wraps the whole set in D1's implicit
+  // batch transaction so it's all-or-nothing, same guarantee the schema-
+  // rebuild path already relies on (see content-db.ts's contentDdlBatch doc).
+  if (plan.dropContentTables.length > 0) {
+    await contentDdlBatch(plan.dropContentTables.map((tableName) => `DROP TABLE ${tableName}`));
   }
   // 2 + 3. Delete all rows from every builtin table the wipe touches, in order.
   // Never touches user/session/invite/password_reset/login_attempt/api_key/

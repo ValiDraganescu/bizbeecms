@@ -549,3 +549,40 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `CMS/src/app/api/site-import/route.ts` (queries target's live collection
   registry before planning), `BACKLOG.md` (flipped E2E TODO to DONE, added 3
   new lower-priority TODOs), `JOURNAL.md`, `NEXT.md`.
+
+## 2026-07-02 19:55 — Wipe-loop atomicity: batch the DROP TABLE loop
+- **Status:** DONE
+- **What I did:** Took the "wipe-loop atomicity" TODO from BACKLOG.md's
+  E2E-slice list (manager hint named it as one of 3 candidates). `POST
+  /api/site-import`'s WIPE step 1 looped `await contentDdl(\`DROP TABLE
+  ${tableName}\`)` once per content_* table — a transient D1 error partway
+  through left some tables dropped and some not, with no way to tell which
+  from the outside, and RESTORE step 4 would then try to recreate a table
+  that might still exist (or skip one it assumed was gone). Fixed by
+  replacing the per-table loop with ONE call to `contentDdlBatch` (already
+  existed in `content-db.ts`, built for the schema-rebuild path — D1's
+  `batch()` wraps an ordered statement list in one implicit transaction, so
+  the whole DROP set now lands atomically or not at all). No new primitive,
+  no new trust surface — same fence (`assertStatement`), same statement
+  shape, just batched instead of sequential. Also skip the call entirely
+  when `dropContentTables` is empty (was already effectively a no-op loop,
+  now an explicit early-out).
+- **Verified:** `npm test` in `CMS/` — 1501/1501 pass (planner tests
+  untouched, this was a route-level change with no route-level test infra
+  per this repo's "test business logic only" — routes aren't unit-tested,
+  they use real D1). `npx tsc --noEmit` clean. Live-verified against the
+  REAL dev D1 (:3602, dev server already running): exported the current
+  site (`GET /api/site-export` → 13 pages/136 versions/41 components/7
+  collections/73 rows/61 assets/6 data sources/12 requests/2 prompt
+  versions), then re-imported the SAME artifact back into the SAME instance
+  (`POST /api/site-import` with `confirm:"Restovista"`) — 200 OK, `restored`
+  counts matched exactly, `assetKeysToUpload` listed all 61 keys as
+  expected (asset bytes untouched by this change, D1-only wipe/restore).
+  Confirmed `/` and `/helsinki` both still render 200 after the round-trip.
+  This exercises the NEW `contentDdlBatch` path end-to-end (7 real
+  collections DROPped + recreated in one batch) — the pure-planner unit
+  tests can't reach the route's actual D1 call, so this live check is the
+  real coverage for this change.
+- **Files:** `CMS/src/app/api/site-import/route.ts` (import `contentDdlBatch`,
+  batch the DROP loop), `BACKLOG.md` (flipped the wipe-loop-atomicity TODO to
+  DONE), `JOURNAL.md`, `NEXT.md`.
