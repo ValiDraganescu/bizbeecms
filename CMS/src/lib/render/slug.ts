@@ -42,3 +42,45 @@ function safeDecode(s: string): string {
     return s;
   }
 }
+
+/**
+ * Platform feature — dynamic/param-driven pages. A page slug prefixed with ":"
+ * (e.g. ":city-slug") is a WILDCARD segment: it matches ANY concrete path
+ * segment at that tree position, and the matched value is captured under the
+ * name after the colon so blocks can read it as a route param (mirrors the
+ * existing `{ prop }` api-param pattern — see lib/content/route-params.ts).
+ * Kept here (not page-meta.ts) so the route walker + slug utilities share one
+ * pure source with no D1/React import.
+ */
+export function isParamSlug(slug: string): boolean {
+  return slug.startsWith(":") && slug.length > 1;
+}
+
+/** The captured param name for a wildcard slug (":city-slug" → "city-slug"). */
+export function paramName(slug: string): string {
+  return slug.slice(1);
+}
+
+/** A page row shape the pure matcher needs (real `Page` rows satisfy this). */
+export interface SlugCandidate {
+  slug: string;
+}
+
+/**
+ * Pick which SIBLING page matches one path segment: an EXACT slug match wins;
+ * otherwise the first sibling whose slug is a WILDCARD (":name") matches, and
+ * the concrete segment is the captured param value. Returns `null` if neither
+ * matches. PURE — the D1 fetch of `siblings` stays in the route (`resolvePage`
+ * in `[[...slug]]/page.tsx`); this is just the per-level decision, unit-tested
+ * in isolation from D1.
+ */
+export function matchSlugSegment<T extends SlugCandidate>(
+  siblings: T[],
+  segment: string,
+): { page: T; param?: { name: string; value: string } } | null {
+  const exact = siblings.find((p) => p.slug === segment);
+  if (exact) return { page: exact };
+  const wildcard = siblings.find((p) => isParamSlug(p.slug));
+  if (!wildcard) return null;
+  return { page: wildcard, param: { name: paramName(wildcard.slug), value: segment } };
+}

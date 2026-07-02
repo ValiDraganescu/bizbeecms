@@ -61,6 +61,11 @@ import { fetchApiBindingRow, fetchApiListRows } from "@/lib/data-sources/hydrate
 import { queryCollection } from "@/db/query-store";
 import type { QuerySpec } from "@/lib/content/query-compiler";
 import {
+  resolveRouteFilters,
+  EMPTY_ROUTE_CONTEXT,
+  type RouteContext,
+} from "@/lib/content/route-params";
+import {
   getContentLocales,
   getThemeOverrides,
   getThemeOverridesDark,
@@ -166,6 +171,7 @@ export async function buildPlanFromPage(
   pageRow: Page,
   blocksOverride?: string,
   preferDraft = false,
+  routeContext: RouteContext = EMPTY_ROUTE_CONTEXT,
 ): Promise<{
   plan: RenderPlan;
   locale: LocaleContext;
@@ -230,6 +236,7 @@ export async function buildPlanFromPage(
   const hydratedBlocks = await hydrateBlockBindings(
     stampFormPageId(blocks, pageRow.id),
     locale,
+    routeContext,
   );
 
   // Icon-sets epic: resolve every `{{icon "name"}}` / `{{icon prop}}` referenced
@@ -402,11 +409,12 @@ export async function buildPlanFromComponent(
 async function hydrateBlockBindings(
   blocks: Block[],
   locale: LocaleContext,
+  routeContext: RouteContext = EMPTY_ROUTE_CONTEXT,
 ): Promise<Block[]> {
   return Promise.all(
     blocks.map(async (block): Promise<Block> => {
       const children = block.children
-        ? await hydrateBlockBindings(block.children, locale)
+        ? await hydrateBlockBindings(block.children, locale, routeContext)
         : block.children;
 
       // api-kind List: fetch + map via the central engine (cached, retried,
@@ -433,7 +441,7 @@ async function hydrateBlockBindings(
         let listRows: Array<Record<string, unknown>> = [];
         try {
           const res = await queryCollection(collection, {
-            filters: src.filter,
+            filters: resolveRouteFilters(src.filter, routeContext),
             sort: src.sort,
             limit: src.limit,
           } as QuerySpec);
@@ -470,10 +478,11 @@ async function hydrateBlockBindings(
             // The binding's filter `op` is loosely typed (string); the query
             // compiler whitelists ops at runtime (unknown op → 400 → graceful
             // blank here), so this cast is safe.
-            const res = await queryCollection(
-              binding.source.collection,
-              bindingQuerySpec(binding) as QuerySpec,
-            );
+            const spec = bindingQuerySpec(binding);
+            const res = await queryCollection(binding.source.collection, {
+              ...spec,
+              filters: resolveRouteFilters(spec.filters, routeContext),
+            } as QuerySpec);
             rows[key] = res.ok ? (res.plan.items[0] ?? null) : null;
           } catch {
             rows[key] = null; // graceful: dead collection / runtime error → blank

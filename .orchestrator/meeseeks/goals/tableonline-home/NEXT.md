@@ -1,11 +1,44 @@
 # Note to the next Meeseeks (tableonline-home)
 
-`content_restaurants` data-fix (task 5) is DONE. All 26 restaurants now have: unique kebab-case `slug` (accent-transliterated, e.g. "Ateljé Finne"→`atelje-finne`, "Skörd"→`skord`); a new `city_slug` field mapped from `location` onto `content_cities` slugs (Helsinki→helsinki, Tallinn→tallinn, "Voru"→`tartu` as a fallback since no Võru city was seeded — flag this if a future run adds more EE cities); every item has a real `image` (21 were null — 4 filled by reusing already-generated-but-unused gallery photos, 17 by fresh `generate_image` calls); every `book_href` now points internally to `/book?restaurant={slug}` (previously leaked to `tableonline.fi`/`example.com`). Verified via `query_collection`: 0 empty slugs, 0 null images, 0 external book_href, 0 missing city_slug. Home page HTML re-checked clean.
+**The platform-feature blocker is GONE.** Dynamic/param-driven pages now work:
+a page slug prefixed with `:` (e.g. `:city-slug`) is a wildcard route segment;
+its matched value + any URL query params are available to List/binding filter
+`value`s as `{"param":"name"}` / `{"query":"name"}` (resolved per-request,
+dropped gracefully when absent). Live-verified end-to-end via MCP `bind_component`
++ `create_list` (see JOURNAL 2026-07-02 16:15). tsc clean, 1446/1446 tests green.
 
-**This closes the last data-quality gap on `content_restaurants`.** Everything else left in BACKLOG.md is routing/landing-page platform work.
+**Read `CAVEATS.md`'s two newest entries before touching pages/bindings** —
+especially: `create_page` alone does NOT populate the draft version, so
+`bind_component`/`create_list`/`get_page` right after it will fail with
+"no block with id X". Always call `update_page_blocks` with the same tree
+right after `create_page`, THEN bind.
 
-Next up per BACKLOG.md (in order — this is the real next big lift):
-1. **Platform feature — dynamic/param-driven pages** (actual repo-code work in `CMS/src/app/`, not MCP/D1 content work like the last 5 runs): wildcard page segments (e.g. `/{city-slug}`) with the param available to blocks as a binding/filter value, AND query params (`?q=`) available the same way. READ `goals/archive/content-collections/` FIRST — its deferred "Phase 3 route-driven detail pages" is this exact feature; don't reinvent from scratch. This is required before ANY of: search page, city landing page, offer detail page, book page, restaurant detail page — all of which are now blocked on it (their data is ready: cities/offers/events/restaurants collections are all populated with slugs and city_slug/city fields to filter on).
-2. Once wildcard/query-param routing exists, the fastest wins are (per BACKLOG.md): search page (`/search?q=`, also wire up the currently-fake HomeHero search `<input>` — it has no `name`/`<form>` yet), then city landing page (`/{city-slug}`), then offer detail, book, restaurant detail.
+## Recommended order for the remaining landing pages (all now unblocked)
+Per BACKLOG.md, in the order that unlocks the most home-page links fastest:
+1. **Search page** (`/search?q=`) — top-level page (NOT wildcard), List/whatever
+   filters `content_restaurants` by `name`/`location` LIKE `{"query":"q"}`.
+   ALSO fix the HomeHero search `<input>` (no `name`, no `<form>` today) so it
+   actually submits `GET /search?q=...`.
+2. **City landing page** (`/:city-slug`) — the wildcard pattern smoke-tested
+   this run. Filter `content_restaurants`/`content_offers`/`content_events` by
+   `city_slug`/`city eq {"param":"city-slug"}`. Wire the home CityCards
+   (already link `/{slug}`) to it — they'll just start resolving.
+3. **Offer detail** (`/offers/:slug`) — filter `content_offers` by
+   `slug eq {"param":"slug"}`. Home OfferCards already link here.
+4. **Book-a-table** (`/book?restaurant=...`) — query-param, not wildcard (the
+   query IS the restaurant id already, per the data-fix run). Use the CMS form
+   machinery (`create_form`/`bind_form`) into a bookings collection.
+5. **Restaurant detail** (`/:city-slug/:restaurant-slug` — TWO nested wildcard
+   levels, both work with this feature: each tree level independently falls
+   back to its wildcard sibling). Link restaurant names here from
+   home/city/search cards instead of straight to book.
 
-Nothing blocked. No new bugs reported. Dev server was already running on :3602 all run; MCP token still valid (`.mcp.json` → `local-site`).
+Then the two "Home page visual replica" passes (header/hero dark bar +
+promo strip; footer/registration-teaser/app-download) are pure component/CSS
+work, no platform feature needed — can be done anytime.
+
+Nothing blocked. No new bugs reported. Dev server was already running on :3602
+all run; MCP token still valid (`.mcp.json` → `local-site`). The scratch test
+page (`:city-slug`, id `426cf071-...`) created during smoke-testing was
+DELETED before finishing — don't be confused if you see it in an old MCP
+response cached somewhere; `list_pages` no longer shows it.

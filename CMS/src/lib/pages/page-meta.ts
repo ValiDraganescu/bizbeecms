@@ -24,8 +24,15 @@ export interface PageMetaInput {
   metaImage: Record<string, string>;
 }
 
-// Same slug grammar as the create_page tool: a lowercase URL segment.
-export const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+// Same slug grammar as the create_page tool: a lowercase URL segment. A leading
+// ":" marks a WILDCARD param segment (e.g. ":city") — see lib/render/slug.ts —
+// matching any path segment; its value is exposed to blocks as a route param.
+export const SLUG_RE = /^:?[a-z0-9][a-z0-9-]{0,63}$/;
+
+/** True if a (non-colon-stripped) slug is a wildcard param segment (":city"). */
+export function isParamSlug(slug: string): boolean {
+  return slug.startsWith(":");
+}
 
 /** True if `s` is a valid page slug. Exposed so the client can pre-validate. */
 export function isValidSlug(s: unknown): s is string {

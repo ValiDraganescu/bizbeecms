@@ -157,7 +157,16 @@ const FILTER_SCHEMA = {
     properties: {
       field: { type: "string", description: "A field (or system column) on the collection." },
       op: { type: "string", enum: [...FILTER_OPS] },
-      value: { description: "The comparison value (array for `in`; omit for is_null/not_null)." },
+      value: {
+        description:
+          "The comparison value (array for `in`; omit for is_null/not_null). " +
+          "Platform feature — dynamic/param-driven pages: instead of a literal, " +
+          "pass { \"param\": \"city-slug\" } to filter by this page's WILDCARD " +
+          "route param (a slug segment authored as \":city-slug\" via create_page), " +
+          "or { \"query\": \"q\" } to filter by the request's URL query param " +
+          "(e.g. ?q=). Resolved per-request; a clause whose param/query is absent " +
+          "is dropped (no filter), never errors.",
+      },
     },
     required: ["field", "op"],
   },

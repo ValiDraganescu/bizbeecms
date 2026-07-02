@@ -41,8 +41,11 @@ export interface PageInput {
 }
 
 // Slug: lowercase URL segment (the public route resolves these against the page
-// tree). Allow letters/digits/hyphens; the reserved "home" serves "/" (A2).
-const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+// tree). Allow letters/digits/hyphens; the reserved "home" serves "/" (A2). A
+// leading ":" marks a WILDCARD param segment (e.g. ":city-slug") — matches any
+// path segment at that position; its value is exposed to blocks as a route
+// param (platform feature: dynamic/param-driven pages).
+const SLUG_RE = /^:?[a-z0-9][a-z0-9-]{0,63}$/;
 
 /**
  * The tool schema handed to the model. OpenAI/Workers-AI function-calling shape.
@@ -65,7 +68,10 @@ export const CREATE_PAGE_TOOL = {
           type: "string",
           description:
             "URL path segment, lowercase, e.g. 'pricing' or 'home' (the site " +
-            "root). Unique under its parent.",
+            "root). Unique under its parent. Prefix with ':' for a WILDCARD " +
+            "param segment (e.g. ':city-slug') that matches any path segment " +
+            "there — its value is exposed to this page's blocks as route " +
+            "param 'city-slug' for filter/binding values ({\"param\":\"city-slug\"}).",
         },
         parentSlug: {
           type: "string",

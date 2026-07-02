@@ -6,7 +6,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isValidSlug, validatePageMeta } from "../src/lib/pages/page-meta.ts";
+import { isValidSlug, isParamSlug, validatePageMeta } from "../src/lib/pages/page-meta.ts";
 
 test("validatePageMeta: accepts a well-formed page", () => {
   const r = validatePageMeta({
@@ -50,4 +50,22 @@ test("isValidSlug guards the form input", () => {
   assert.equal(isValidSlug("Home"), false);
   assert.equal(isValidSlug(""), false);
   assert.equal(isValidSlug(42), false);
+});
+
+// Platform feature — dynamic/param-driven pages: a leading ":" marks a
+// wildcard route-param segment (e.g. ":city-slug").
+test("isValidSlug accepts a wildcard param slug", () => {
+  assert.ok(isValidSlug(":city-slug"));
+  assert.ok(isValidSlug(":q"));
+});
+
+test("validatePageMeta accepts a wildcard param slug", () => {
+  const r = validatePageMeta({ slug: ":city-slug" });
+  assert.ok(r.ok);
+  assert.equal(r.meta.slug, ":city-slug");
+});
+
+test("isParamSlug identifies wildcard vs ordinary slugs", () => {
+  assert.equal(isParamSlug(":city-slug"), true);
+  assert.equal(isParamSlug("city-slug"), false);
 });

@@ -39,3 +39,14 @@ test("create_page rejects a whitespace-only section name", () => {
   const v = validatePageInput(args([section("s1", "   ")]));
   assert.equal(v.ok, false, "a blank name doesn't satisfy the rule");
 });
+
+// Platform feature — dynamic/param-driven pages: a leading ":" marks a
+// wildcard route-param segment (e.g. ":city-slug").
+test("create_page accepts a wildcard param slug", () => {
+  const v = validatePageInput({
+    ...args([section("s1", "Hero")]),
+    slug: ":city-slug",
+  });
+  assert.ok(v.ok, v.ok ? "" : v.errors.join("; "));
+  if (v.ok) assert.equal(v.page.slug, ":city-slug");
+});
