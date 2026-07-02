@@ -505,3 +505,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   confirmed no open bugs/TODOs in BACKLOG. Memory-only run — no code touched,
   no build gate owed.
 - **Files:** goal memory only (NEXT.md, JOURNAL.md, BACKLOG.md, CAVEATS.md).
+
+## 2026-07-02 06:03 — Fresh-eyes defect hunt #3 (CLEAN PASS)
+- **Status:** DONE
+- **What I did:** Manager asked for ONE more independent defect hunt across the
+  whole data-sources surface (fetch/auth/cache/purge/binding/AI tools) —
+  provable defects only with a failing-first test, else a clean-pass entry and
+  NO code changes. Read every module: fetch.ts (substitution/encoding, auth
+  injection, manual redirects, streaming 5MB cap, oauth2 grant + 401 refresh,
+  retry budget, cache-key/versioning), bind.ts (param resolution, flat-by-path
+  row keys — no proto-write vector), hydrate.ts (graceful effects wrapper,
+  Cache-API impl), purge.ts (version counters), validate.ts (URL/SSRF +
+  placeholders), data-source-store.ts (write-only secrets, request→source
+  scoping), and all 7 routes (every one Admin-gated; secretEnc never returned).
+  Found NO provable defect. Two candidates weighed and dismissed as
+  accepted-scope, not defects:
+  (1) numeric-form IP SSRF bypass — `validateBaseUrl("http://2130706433")`
+  (=127.0.0.1), octal/hex/IPv4-mapped-IPv6 similarly slip the internal-host
+  blocklist. Real gap in the check's stated intent, BUT explicitly accepted
+  "light v1" (GOAL + user directive + caveat), NOT exploitable on Cloudflare
+  Workers (fetch can't reach 127.0.0.1/169.254; no metadata service), and the
+  redirect resolver already blocks cross-host hops. Not provably exploitable
+  here → not touched (would be scope creep past the user's light-v1 decision).
+  (2) query-auth secret dropped when following a same-host redirect (the
+  Location URL rarely carries the auth query param) — functional edge only,
+  same-host, query-param APIs rarely 3xx. Low-value, not a defect.
+- **Verified:** `tsc --noEmit` exit 0 (clean); `node --test data-source-*.test.mjs`
+  102/102 green. Memory-only run — no code touched, so no opennext gate owed
+  (dev live on :3602 anyway, per caveat). Full-suite 1360 green stands from the
+  prior run (no code changed since).
+- **Files:** goal memory only (JOURNAL.md, BACKLOG.md, NEXT.md).

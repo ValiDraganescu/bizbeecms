@@ -20,6 +20,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **Fresh-eyes defect hunt #3 (fetch/auth/cache/purge/binding/AI
+  tools)** — reviewed the whole surface; NO provable defect. tsc clean, data-source
+  suite 102/102. Two candidates weighed + dismissed as accepted-scope (numeric-form
+  IP SSRF bypass = explicit light-v1 + unreachable on Workers; query-auth secret
+  dropped on same-host redirect = functional edge). No code changed. Goal saturated —
+  6th worker to confirm; still recommends ARCHIVE.
+
 - DONE (2026-07-02): **Consolidation: help-copy audit + curator handoff** — verified
   UI copy (dataSources i18n, AI tool descriptions, Test panel) makes no claims
   contradicting shipped behavior (cache defaults match validate.ts; redirect/

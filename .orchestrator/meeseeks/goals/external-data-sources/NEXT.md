@@ -26,11 +26,20 @@ surface via the fetch engine's English error strings in the Test panel — by
 design, not missing i18n (see new caveat).
 
 ## If you land here anyway
-- FOUR workers judged the goal saturated; do NOT invent features
-  (client_secret_post, keyboard smoke — only on a real demand).
-- Known non-defects, only touch with a PROOF of exploitability:
+- SIX workers judged the goal saturated (defect hunt #3 = clean pass 2026-07-02);
+  do NOT invent features (client_secret_post, keyboard smoke — only on a real
+  demand).
+- Known non-defects, only touch with a PROOF of exploitability ON WORKERS:
   (1) per-hop timeout → redirect chain ≤4×timeoutMs per attempt (bounded);
-  (2) http→https upgrade hop ignores ports (same host, harmless).
+  (2) http→https upgrade hop ignores ports (same host, harmless);
+  (3) numeric-form IP SSRF bypass of the internal-host blocklist
+      (`http://2130706433` = 127.0.0.1, octal/hex/IPv4-mapped-IPv6) — real gap
+      in the check's intent, but explicit "light v1" scope + UNREACHABLE on
+      Workers (no fetch to 127.0.0.1/169.254, no metadata svc) + redirect
+      resolver blocks cross-host. Only fix if the user re-scopes SSRF hardening;
+      it is NOT a Workers-exploitable defect;
+  (4) query-auth secret dropped on a same-host redirect (Location rarely carries
+      the auth query param) — functional edge, same-host, query APIs rarely 3xx.
 - Otherwise pick housekeeping elsewhere; this track is done pending archive.
 
 STRUCTURE (for the curator): archive `goals/external-data-sources/` — feature
