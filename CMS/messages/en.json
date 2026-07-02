@@ -835,7 +835,12 @@
     "runTest": "Run test",
     "testing": "Testing…",
     "testStatus": "HTTP {status}",
-    "testFailed": "Test failed (HTTP {status})."
+    "testFailed": "Test failed (HTTP {status}).",
+    "purge": "Purge cache",
+    "purged": "Cache purged",
+    "purgeAll": "Purge all API cache",
+    "purgeAllAction": "Purge all",
+    "purgeAllConfirm": "Purge every cached API response? Pages will fetch fresh data from the external APIs on their next render."
   },
   "apiKeys": {
     "title": "API keys",

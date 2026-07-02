@@ -26,6 +26,10 @@ import {
   normalizeSiteIdentity,
 } from "../lib/settings/site-settings.ts";
 import { DEFAULT_ICON_SET, isValidIconSet } from "../lib/render/icons.ts";
+import {
+  type ApiCacheVersions,
+  normalizeCacheVersions,
+} from "../lib/data-sources/purge.ts";
 
 const CONTENT_LOCALES_KEY = "content_locales";
 const THEME_OVERRIDES_KEY = "theme_overrides";
@@ -36,6 +40,7 @@ const IMAGE_MODEL_KEY = "image_model";
 const TRANSLATE_MODEL_KEY = "translate_model";
 const IMAGE_GEN_MODEL_KEY = "image_gen_model";
 const ICON_SET_KEY = "icon_set";
+const API_CACHE_VERSIONS_KEY = "api_cache_versions";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
 async function upsertSetting(
@@ -296,4 +301,40 @@ export async function getImageGenModel(injectedDb?: Db): Promise<string> {
 /** Store the selected image-generation model id. */
 export async function setImageGenModel(id: string, injectedDb?: Db): Promise<void> {
   await upsertSetting(IMAGE_GEN_MODEL_KEY, id, injectedDb);
+}
+
+/**
+ * API-cache purge version counters (external-data-sources Slice 7). One JSON
+ * row (`api_cache_versions`) holding `{ global, sources, requests }` — see
+ * `lib/data-sources/purge.ts` for the composition/bump semantics. Reads are
+ * defensive: missing/garbage → zeroed counters (= nothing ever purged).
+ */
+export async function getApiCacheVersions(
+  injectedDb?: Db,
+): Promise<ApiCacheVersions> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, API_CACHE_VERSIONS_KEY))
+    .limit(1);
+  const raw = rows[0]?.value;
+  if (!raw) return normalizeCacheVersions(null);
+  try {
+    return normalizeCacheVersions(JSON.parse(raw));
+  } catch {
+    return normalizeCacheVersions(null);
+  }
+}
+
+/** Upsert the purge version counters (normalized before write). */
+export async function setApiCacheVersions(
+  versions: ApiCacheVersions,
+  injectedDb?: Db,
+): Promise<void> {
+  await upsertSetting(
+    API_CACHE_VERSIONS_KEY,
+    JSON.stringify(normalizeCacheVersions(versions)),
+    injectedDb,
+  );
 }

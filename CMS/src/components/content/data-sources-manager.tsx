@@ -106,6 +106,8 @@ export function DataSourcesManager() {
   const [deleting, setDeleting] = useState<Source | null>(null);
   const [busy, setBusy] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [purgeAllOpen, setPurgeAllOpen] = useState(false);
+  const [purgedAll, setPurgedAll] = useState(false);
 
   async function load() {
     setError(null);
@@ -132,6 +134,23 @@ export function DataSourcesManager() {
       if (!res.ok) throw new Error(await readError(res));
       setDeleting(null);
       await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Global purge = bump the global cache-version counter (in-app confirm —
+  // it invalidates EVERY cached API response, so it gets the modal).
+  async function confirmPurgeAll() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/data-sources/purge", { method: "POST" });
+      if (!res.ok) throw new Error(await readError(res));
+      setPurgeAllOpen(false);
+      setPurgedAll(true);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -232,11 +251,37 @@ export function DataSourcesManager() {
           />
         </div>
       ) : (
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           <button type="button" className={primaryBtn} onClick={() => setAdding(true)}>
             {t("addSource")}
           </button>
+          {sources.length > 0 && (
+            <button
+              type="button"
+              className={dangerBtn}
+              disabled={busy}
+              onClick={() => {
+                setPurgedAll(false);
+                setPurgeAllOpen(true);
+              }}
+            >
+              {t("purgeAll")}
+            </button>
+          )}
+          {purgedAll && <span className="text-sm text-success">{t("purged")}</span>}
         </div>
+      )}
+
+      {purgeAllOpen && (
+        <ConfirmModal
+          message={t("purgeAllConfirm")}
+          confirmLabel={t("purgeAllAction")}
+          cancelLabel={t("cancel")}
+          danger
+          busy={busy}
+          onConfirm={() => void confirmPurgeAll()}
+          onCancel={() => setPurgeAllOpen(false)}
+        />
       )}
 
       {deleting && (
@@ -418,6 +463,7 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
   const [deleting, setDeleting] = useState<SavedRequest | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [purgedId, setPurgedId] = useState<string | null>(null);
 
   async function load() {
     setError(null);
@@ -450,6 +496,23 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
       setError((err as Error).message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Per-request purge = bump that request's cache-version counter.
+  async function purge(req: SavedRequest) {
+    setError(null);
+    setPurgedId(null);
+    try {
+      const res = await fetch(`/api/data-sources/${sourceId}/purge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: req.id }),
+      });
+      if (!res.ok) throw new Error(await readError(res));
+      setPurgedId(req.id);
+    } catch (err) {
+      setError((err as Error).message);
     }
   }
 
@@ -490,9 +553,21 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
                           ? t("cacheSummary", { ttl: req.cacheTtlSec })
                           : t("cacheOff")}
                         {req.retryable ? ` · ${t("retryableBadge")}` : ""}
+                        {purgedId === req.id && (
+                          <span className="text-success">{` · ${t("purged")}`}</span>
+                        )}
                       </p>
                     </div>
                     <div className="flex shrink-0 gap-2">
+                      {req.cacheEnabled && (
+                        <button
+                          type="button"
+                          className={ghostBtn}
+                          onClick={() => void purge(req)}
+                        >
+                          {t("purge")}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className={ghostBtn}

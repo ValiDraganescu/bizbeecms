@@ -835,7 +835,12 @@
     "runTest": "Suorita testi",
     "testing": "Testataan…",
     "testStatus": "HTTP {status}",
-    "testFailed": "Testi epäonnistui (HTTP {status})."
+    "testFailed": "Testi epäonnistui (HTTP {status}).",
+    "purge": "Tyhjennä välimuisti",
+    "purged": "Välimuisti tyhjennetty",
+    "purgeAll": "Tyhjennä koko API-välimuisti",
+    "purgeAllAction": "Tyhjennä kaikki",
+    "purgeAllConfirm": "Tyhjennetäänkö kaikki välimuistiin tallennetut API-vastaukset? Sivut hakevat tuoreet tiedot ulkoisista rajapinnoista seuraavalla latauksella."
   },
   "apiKeys": {
     "title": "API-avaimet",

@@ -110,7 +110,13 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   dispatch). Validate against propsSchema. Node tests per tool (mock fetch/store).
   Gate.
 
-- TODO: **Slice 7 — cache purging (NEW 2026-07-02).** Per-request purge: a button on
+- DONE (2026-07-02): **Slice 7 — cache purging (NEW 2026-07-02).** Shipped via
+  VERSION COUNTERS (pure `lib/data-sources/purge.ts`, one `api_cache_versions`
+  settings row; `cacheVersionFor()` → fetch engine's `deps.cacheVersion`).
+  Endpoints: global `POST /api/data-sources/purge` + per-source/per-request
+  `POST /api/data-sources/:id/purge` (`{requestId?}`). UI: per-request purge
+  button + global purge w/ in-app confirm. EN/FI/ET. 6 node tests (scoped
+  invalidation proven). See JOURNAL. Original spec: Per-request purge: a button on
   each saved request (Data Sources UI) + `POST /api/data-sources/:id/purge`
   (optionally scoped to one request) that evicts its cache entries. Global purge:
   "purge all API cache" action + endpoint. Requires the Slice-2 cache to key/

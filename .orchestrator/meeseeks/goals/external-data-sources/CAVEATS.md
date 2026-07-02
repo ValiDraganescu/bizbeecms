@@ -130,3 +130,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   (pre-existing debt from the combobox slice, NOT Slice 5). New Slice-5 strings
   all live under `pageBuilder.bind.*` EN/FI/ET; localizing the combobox labels is
   a separate small task.
+
+- **Purge = version-counter bump, ONE settings row** (`api_cache_versions`,
+  Slice 7): `cacheVersionFor(versions, sourceId, requestId)` composes
+  `global.source.request` into `deps.cacheVersion`; hydrate.ts reads the row
+  per api fetch (one extra D1 read — fine). Never try to delete Cache-API
+  entries directly. The static `/api/data-sources/purge` segment can't collide
+  with `[id]` (source ids are UUIDs). Counters for deleted sources/requests
+  linger in the row — harmless tiny ints.

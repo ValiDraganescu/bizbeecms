@@ -835,7 +835,12 @@
     "runTest": "Käivita test",
     "testing": "Testimine…",
     "testStatus": "HTTP {status}",
-    "testFailed": "Test ebaõnnestus (HTTP {status})."
+    "testFailed": "Test ebaõnnestus (HTTP {status}).",
+    "purge": "Tühjenda puhver",
+    "purged": "Puhver tühjendatud",
+    "purgeAll": "Tühjenda kogu API puhver",
+    "purgeAllAction": "Tühjenda kõik",
+    "purgeAllConfirm": "Kas tühjendada kõik puhverdatud API vastused? Lehed pärivad järgmisel laadimisel värsked andmed välistest liidestest."
   },
   "apiKeys": {
     "title": "API-võtmed",

@@ -147,3 +147,34 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/page-builder/page-builder-shell.tsx,
   CMS/src/lib/data-sources/bind.ts, CMS/src/lib/page-builder/types.ts,
   CMS/messages/{en,fi,et}.json, CMS/scripts/data-source-bind.test.mjs
+
+## 2026-07-02 03:17 — Slice 7: cache purging (version-counter eviction, endpoints + UI)
+- **Status:** DONE
+- **What I did:** Per-request + per-source + GLOBAL API-cache purge via VERSION
+  COUNTERS (the Cache-API impl can't enumerate keys). New pure
+  `lib/data-sources/purge.ts`: `{global, sources{}, requests{}}` counters,
+  `cacheVersionFor()` composes `g.s.r` into the fetch engine's existing
+  `deps.cacheVersion` (already embedded in `buildCacheKey`), immutable
+  `bumpGlobal/bumpSource/bumpRequest`, defensive `normalizeCacheVersions`.
+  Persisted as ONE settings row `api_cache_versions`
+  (settings-store `get/setApiCacheVersions`). hydrate.ts `fetchApiData` now
+  reads the counters and passes `cacheVersion` per fetch. Endpoints
+  (admin-gated): `POST /api/data-sources/purge` (global) and
+  `POST /api/data-sources/:id/purge` (body `{requestId?}` → request-scoped,
+  else whole source; 404 on unknown source/foreign requestId). UI
+  (data-sources-manager): "Purge cache" ghost button per cache-enabled saved
+  request (inline "Cache purged" feedback) + danger "Purge all API cache"
+  button with in-app ConfirmModal (never native confirm). 5 new strings
+  EN/FI/ET (`dataSources.purge*`, ICU-safe).
+- **Verified:** tsc green; npm test 1309/1309 (6 new purge tests incl.
+  integration: bump r1 → r1 refetches while r2 stays cached; global bump →
+  all refetch). LIVE on dev :3602: global purge → `{ok:true}`, counter row in
+  local D1 incremented (`{"global":2,...}`), bogus source id → 404. Opennext
+  build gate deferred a 6TH time (dev pid 79854 still on :3602 with an active
+  browser — not mine to kill).
+- **Files:** CMS/src/lib/data-sources/purge.ts (new),
+  CMS/src/db/settings-store.ts, CMS/src/lib/data-sources/hydrate.ts,
+  CMS/src/app/api/data-sources/purge/route.ts (new),
+  CMS/src/app/api/data-sources/[id]/purge/route.ts (new),
+  CMS/src/components/content/data-sources-manager.tsx,
+  CMS/messages/{en,fi,et}.json, CMS/scripts/data-source-purge.test.mjs (new)

@@ -31,6 +31,8 @@ import {
   listPaths,
   type ApiParamSpec,
 } from "@/lib/data-sources/bind";
+import { cacheVersionFor } from "@/lib/data-sources/purge";
+import { getApiCacheVersions } from "@/db/settings-store";
 import type { AuthType, HttpMethod } from "@/lib/data-sources/validate";
 import type { ListSource } from "@/lib/render/tree";
 
@@ -52,8 +54,8 @@ async function kek(): Promise<string> {
 // Workers Cache API (`caches.default`) keyed by a synthetic internal URL per
 // cache key; TTL rides on Cache-Control. Zero-config (no KV binding needed).
 // `next dev` (node) has no caches.default → module-level memory cache instead.
-// ponytail: Slice-7 purge will bump the fetch engine's cacheVersion rather than
-// enumerate entries — this impl needs no delete support until then.
+// ponytail: purge (Slice 7) bumps the fetch engine's cacheVersion rather than
+// enumerate entries — this impl needs no delete support.
 
 const CACHE_URL_PREFIX = "https://bizbee-api-cache.internal/";
 
@@ -108,6 +110,10 @@ async function fetchApiData(
       : null;
     const params = resolveBindingParams(ref.params, blockProps, locale, fallback);
 
+    // Slice-7 purge: the composed version counters ride in the cache key, so
+    // a purge (global / source / request bump) makes old entries unaddressable.
+    const versions = await getApiCacheVersions();
+
     const res = await fetchSource(
       {
         id: source.id,
@@ -127,7 +133,10 @@ async function fetchApiData(
         retryable: request.retryable,
       },
       params,
-      { cache: getApiCache() },
+      {
+        cache: getApiCache(),
+        cacheVersion: cacheVersionFor(versions, source.id, request.id),
+      },
     );
     return res.ok ? res.data : undefined;
   } catch {
