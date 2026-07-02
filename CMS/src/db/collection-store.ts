@@ -30,6 +30,8 @@ export interface CollectionView {
   name: string;
   tableName: string;
   fields: CollectionField[];
+  /** Form-block opt-in: may PUBLIC visitors submit DRAFT items? Default false. */
+  publicSubmissions: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -47,9 +49,28 @@ function toView(row: Collection): CollectionView {
     name: row.name,
     tableName: row.tableName,
     fields,
+    publicSubmissions: row.publicSubmissions === true,
     createdAt: row.createdAt instanceof Date ? row.createdAt.getTime() : Number(row.createdAt),
     updatedAt: row.updatedAt instanceof Date ? row.updatedAt.getTime() : Number(row.updatedAt),
   };
+}
+
+/**
+ * Toggle the public-submissions opt-in (Form-block collection target). Returns
+ * the updated view, or a 404 rejection for an unknown collection.
+ */
+export async function setPublicSubmissions(
+  tableName: string,
+  enabled: boolean,
+): Promise<PlanResult<CollectionView>> {
+  const db = await getDb();
+  const existing = await getCollection(tableName);
+  if (!existing) return { ok: false, status: 404, error: "collection not found" };
+  await db
+    .update(schema.collection)
+    .set({ publicSubmissions: enabled, updatedAt: new Date() })
+    .where(eq(schema.collection.tableName, tableName));
+  return { ok: true, plan: { ...existing, publicSubmissions: enabled } };
 }
 
 /** List all collections (registry rows), newest first. */
@@ -120,6 +141,7 @@ export async function createCollection(
       name: plan.name,
       tableName: plan.tableName,
       fields: plan.fields,
+      publicSubmissions: false,
       createdAt: now.getTime(),
       updatedAt: now.getTime(),
     },

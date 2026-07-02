@@ -1,0 +1,1 @@
+ALTER TABLE `collection` ADD `public_submissions` integer DEFAULT false NOT NULL;

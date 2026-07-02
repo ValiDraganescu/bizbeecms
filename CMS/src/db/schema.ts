@@ -419,6 +419,13 @@ export const collection = sqliteTable(
     // JSON array of field descriptors — the canonical logical schema. The DDL
     // generator (`collection-schema.ts`) maps these to real typed columns.
     schema: text("schema").notNull().default("[]"),
+    // Form-block opt-in (external-data-sources Form slice): may PUBLIC visitors
+    // submit items into this collection via a page's Form block? Default OFF —
+    // the submit endpoint refuses collections that haven't explicitly opted in.
+    // Submitted items always land as DRAFTS (operator reviews before publish).
+    publicSubmissions: integer("public_submissions", { mode: "boolean" })
+      .notNull()
+      .default(false),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

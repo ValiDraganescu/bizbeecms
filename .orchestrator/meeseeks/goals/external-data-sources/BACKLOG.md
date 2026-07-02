@@ -4,6 +4,24 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
 
+- BUG [P1]: Inspector bind panel shows DATA SOURCE "— none —" for ALL api-bound
+  ApiProbe blocks on api-fixture-httpbingo, even though the published page SSRs
+  the API values (bindings exist + hydrate; render path fine). The panel fails to
+  REFLECT an existing kind:"api" binding — operators can't see or edit api binds
+  after creation. Repro: builder → api-fixture-httpbingo → select any probe card
+  below the intro → panel shows none. Suspects: the single-item panel's select
+  value-matching for api sources (List panel may differ), or it only reads
+  kind:"collection" bindings. Fix + make the fixture's binds visible; verify both
+  single-item AND List panels round-trip an api bind (display → edit → save).
+  — reported 2026-07-02 (user, screenshot)
+
+- BUG [P2]: Page-builder single-item bind panel still says "Bind to collection" /
+  "Fill this block's props from the first matching collection item" — stale copy
+  now that the DATA SOURCE picker also offers API sources (user screenshot,
+  inspector on ApiProbe). Retitle source-agnostically (e.g. "Bind to data source",
+  description covering collection item OR API response), EN/FI/ET; check the List
+  bind panel for the same stale wording. — reported 2026-07-02
+
 - DONE (2026-07-02) [P2] (found by live AI smoke 2026-07-02): **Tool name shadowed in dispatch
   results.** FIXED: `{ ...payload, name }` ordering in makeDispatcher + regression
   test; create_data_source now nests `source:`, create_collection renamed its
@@ -37,6 +55,34 @@ Task states: TODO | DOING | DONE | BLOCKED.
   page what each block proves. NOTE: no visitor form-submission capability
   exists (render fetch only) — do NOT fake one; a form block is a separate
   not-yet-approved slice.
+
+> FORM BLOCK DECOMPOSITION (2026-07-02, from the approved TODO below):
+> - DONE (2026-07-02): **(a) Form block schema/plan/SSR + submit endpoint (both target kinds).**
+>   Shipped + live-verified (JOURNAL 2026-07-02 09:51): FORM_COMPONENT/planForm/
+>   stampFormPageId, /api/forms/submit dual-mode, publicSubmissions column +
+>   PATCH toggle, submit-core caps/rate/allowlist, 14 node tests, all gates green.
+>   Original slice spec:
+>   FORM_COMPONENT built-in (implicit `<form>` like List), `Block.formTarget`
+>   (kind api|collection), hidden page/block identity inputs, status region,
+>   dual-mode POST /api/forms/submit (native form-data → 303 redirect; fetch
+>   JSON via Accept header → inline status), api kind = central fetch engine
+>   (cache bypassed, never retried), collection kind = opt-in
+>   `collection.publicSubmissions` flag (new column, default OFF) + schema-
+>   validated fields + forced DRAFT status; per-IP rate limit + payload caps;
+>   progressive-enhancement client script shipped like combobox assets. Pure
+>   submit-core + plan-form node tests. Flag toggle via collections PATCH _op.
+> - TODO: **(b) page-builder UI**: bind a Form block → saved request OR opted-in
+>   collection; map fields → placeholders / schema fields; author success/error
+>   messages + optional redirect; publicSubmissions toggle in the Collections UI.
+>   EN/FI/ET. (Messages are authored strings on formTarget — localize via locale
+>   objects here if demanded.)
+> - TODO: **(c) httpbingo live test**: add a Form card to the api-fixture-httpbingo
+>   page (POST /post echo, saved request deec059d-…) + a collection-target
+>   contact-form card against an opted-in test collection; verify native +
+>   fetch modes live on :3602; document what each proves.
+> - TODO: **(d) AI tools**: let the assistant create/bind a Form block
+>   (create_form / bind_form or extend existing block tools) incl. target
+>   validation; 3 registrations caveat applies.
 
 - TODO (USER 2026-07-02, approved): **Form block — visitor form submission to a
   data-source saved request.** User's design intent (their words, distilled): "an

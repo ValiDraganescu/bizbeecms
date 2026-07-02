@@ -593,3 +593,48 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   No repo code touched → no tsc/opennext gate owed.
 - **Files:** goal memory only; fixture lives in the local D1
   (.wrangler/state, gitignored) + this recipe.
+
+## 2026-07-02 09:51 — Form block slice (a): built-in Form + dual-mode submit endpoint (api + collection targets)
+- **Status:** DONE
+- **What I did:** The user-approved Form block, first slice. (1) `FORM_COMPONENT`
+  ("Form") built-in in plan-types.ts (+BUILTIN_COMPONENTS, so the block PUT
+  route's component check passes); `Block.formTarget` (source-agnostic:
+  kind api → sourceId/requestId, kind collection → tableName; plus optional
+  successMessage/errorMessage/redirect) and renderer-set `Block.formPageId`.
+  (2) Pure `plan-form.ts`: `planForm` renders a real `<form method="POST"
+  action="/api/forms/submit">` wrapping the block's children (native submit
+  semantics — a child component's type=submit button just works) with hidden
+  `__bb_page`/`__bb_block` identity inputs + an aria-live `[data-form-status]`
+  region; `FORM_ENHANCE_SCRIPT` (shipped once via planPage assets, like the
+  combobox) intercepts submit and re-posts the same FormData with
+  Accept:application/json for inline success/error; `stampFormPageId` stamps
+  the page id in buildPlanFromPage (no-op without a Form). Un-targeted/
+  un-stamped Forms degrade to a plain container. (3) PUBLIC endpoint
+  `POST /api/forms/submit`: parses form-data OR JSON, caps (64KB body, 100
+  fields, 8KB/value), per-IP rate limit (20/10min riding login_attempt kind
+  "form"), resolves the target from the PUBLISHED page's blocks (client never
+  names a target), then: api kind → central fetchSource with placeholders
+  filled from form fields, cache bypassed + retryable forced false; collection
+  kind → `collection.publicSubmissions` opt-in gate (new D1 column, migration
+  0026, default OFF; toggle via collections PATCH `_op:"set_public_submissions"`)
+  → declared-schema-fields-only body → `createItem` with FORCED draft status.
+  Dual response: Accept json → `{ok,error?}`; native → 303 redirect (authored
+  same-site `redirect` or Referer) + `?bb_form=ok|error`. Pure trust-boundary
+  logic in dep-free `lib/forms/submit-core.ts`.
+- **Verified:** tsc clean; node suite 1375/1375 (14 new: plan-form 5,
+  submit-core 9); opennext gate GREEN in isolated worktree (changes copied in;
+  dev :3602 untouched). Live on :3602 (temp published page, then cleaned up):
+  SSR shows both `<form>`s w/ identity inputs + one enhancement script; api
+  target native mode → 303 `?bb_form=ok` and JSON mode → `{ok:true}` against
+  httpbingo POST /post echo ({msg} placeholder filled from the form field);
+  missing placeholder → 400 naming "msg"; non-Form block id → 404; collection
+  target: 403 before opt-in, ok after; item landed status=draft with rogue/
+  status/slug fields dropped; required-field miss → 400; page delete → 404.
+  Did NOT live-trip the rate limit (would lock local IP 10 min) — pure logic
+  node-tested.
+- **Files:** CMS/src/lib/render/{plan-types.ts,plan-form.ts,plan-form.test.ts,
+  tree.ts,render-page.tsx}; CMS/src/lib/forms/{submit-core.ts,
+  submit-core.test.ts}; CMS/src/app/api/forms/submit/route.ts;
+  CMS/src/app/api/collections/[name]/route.ts; CMS/src/db/{schema.ts,
+  collection-store.ts,login-attempt-store.ts}; CMS/migrations/0026_*.sql
+  (+meta).

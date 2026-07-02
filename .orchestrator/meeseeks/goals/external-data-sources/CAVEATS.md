@@ -264,6 +264,34 @@ Read every line before working. Each entry was learned the hard way by a previou
   trailing index: `args.foo.0`, `headers.X-Api-Key.0`. Parsed JSON bodies echo
   under `json.*` (no array wrap).
 
+- **Form block security model: the client only ever names PAGE + BLOCK ids**
+  (hidden `__bb_page`/`__bb_block` inputs); `/api/forms/submit` re-reads
+  `formTarget` from the PUBLISHED page's blocks server-side. Never accept a
+  sourceId/requestId/collection from the request body — that would let a
+  visitor fire arbitrary saved requests / write arbitrary collections.
+
+- **Form submissions force `retryable:false` + `cache:null` at the submit
+  endpoint** even if the operator marked the saved request retryable — a
+  visitor submission must fire exactly once and never touch the render cache.
+  The retryable flag's meaning is for RENDER binds only; don't "unify" them.
+
+- **Form rate limit rides the `login_attempt` table** (kind `"form"`, key
+  `form:<ip>`): the pure window (10 min, 20/IP, submit-core.ts) must stay ⊂
+  the store's 15-min `windowStart` filter/prune or counts silently truncate.
+  Note dev smoke: local IP is "unknown" — 20 rapid curl submits WILL lock you
+  out for 10 min; space out live tests.
+
+- **`collection.publicSubmissions` (opt-in flag, default OFF) gates the Form
+  collection target**; toggle via `PATCH /api/collections/:name` with
+  `{"_op":"set_public_submissions","enabled":true}`. Submitted items are
+  FORCED `status:"draft"` and slug/system/unknown fields are dropped in the
+  pure `collectionBodyFromFields` — keep that allowlist there, not in the route.
+
+- **planForm degrades to a plain `<div data-form>` when `formTarget.kind` or
+  `formPageId` is missing** — `formPageId` is stamped by `stampFormPageId` in
+  buildPlanFromPage (renderer-set, like listRows). The Develop single-component
+  preview never stamps it, so Forms there render as containers by design.
+
 - **The httpbingo living fixture lives in the LOCAL D1 only** (.wrangler/state,
   gitignored): page `api-fixture-httpbingo`, component `ApiProbe`, 5 sources
   "httpbingo fixture — …" + 12 requests. A DB reset wipes it — rebuild from the

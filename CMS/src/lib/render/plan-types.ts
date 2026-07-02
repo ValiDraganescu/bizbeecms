@@ -68,12 +68,29 @@ export const LIST_COMPONENT = "List";
  */
 export const LANGUAGE_SWITCHER_COMPONENT = "LanguageSwitcher";
 
+/**
+ * Reserved component name for a Form — a BUILT-IN block (external-data-sources
+ * Form slice), modeled on the List primitive: special-cased in the renderer
+ * (`planForm`), NOT a D1 component. A Form renders as a real `<form>` posting to
+ * the Worker's submit endpoint; ANY components can be placed inside it and their
+ * `<input name=…>` fields become the form's fields (native form semantics — a
+ * `type="submit"` button inside a child component just works). The form's TARGET
+ * (`block.formTarget`) is SOURCE-AGNOSTIC like binds: an api saved request
+ * (submitted server-side via the central fetch engine — the secret never reaches
+ * the browser) or an opted-in collection (visitor submissions land as DRAFT
+ * items). Dual submit: native form-data POST (no JS) + a fetch/JSON progressive
+ * enhancement, one endpoint. Like Section/List, the block PUT route excludes it
+ * from the component-existence check.
+ */
+export const FORM_COMPONENT = "Form";
+
 /** The reserved built-in block component names (not D1 component rows). */
 export const BUILTIN_COMPONENTS = [
   SECTION_COMPONENT,
   SECTION_ROW_COMPONENT,
   SECTION_COLUMN_COMPONENT,
   LIST_COMPONENT,
+  FORM_COMPONENT,
   LANGUAGE_SWITCHER_COMPONENT,
 ] as const;
 
@@ -225,6 +242,33 @@ export type ListSource = {
   searchPlaceholder?: string;
 };
 
+// ── Built-in `Form` block target (external-data-sources Form slice) ─────────
+//
+// Where a Form block's submission goes. SOURCE-AGNOSTIC like BindingRef/
+// ListSource: `kind:"api"` submits through the central fetch engine to a saved
+// request (form field values fill the request's `{placeholder}` tokens,
+// server-side, safely encoded — the secret never reaches the browser);
+// `kind:"collection"` writes the submitted fields as a DRAFT item into a
+// collection that has EXPLICITLY opted in to public submissions
+// (`collection.public_submissions`, default OFF). The submit endpoint resolves
+// this target from the PUBLISHED page's blocks — the client only names the
+// page + block ids, never the target.
+export type FormTarget = {
+  kind?: "api" | "collection";
+  /** api kind: the `data_source` row id. */
+  sourceId?: string;
+  /** api kind: the saved `data_source_request` row id. */
+  requestId?: string;
+  /** collection kind: the collection's `content_<slug>` table name. */
+  collection?: string;
+  /** Success message shown inline (fetch mode). Default English fallback. */
+  successMessage?: string;
+  /** Error message shown inline (fetch mode). Default English fallback. */
+  errorMessage?: string;
+  /** Optional same-site path to redirect to after a NATIVE (no-JS) submit. */
+  redirect?: string;
+};
+
 // ── Page block instances (what `page.blocks` holds, parsed) ──────────────────
 export type Block = {
   id: string;
@@ -260,6 +304,18 @@ export type Block = {
    * rows). All other List children form the per-row TEMPLATE. Ignored elsewhere.
    */
   listRole?: "template" | "empty";
+  /**
+   * Form block ONLY: where the submission goes (api saved request or opted-in
+   * collection). Authored; the submit endpoint re-reads it from the PUBLISHED
+   * page server-side. Ignored on non-Form blocks.
+   */
+  formTarget?: FormTarget;
+  /**
+   * Form block ONLY, set by the renderer host (`buildPlanFromPage`): the page id
+   * stamped into the form's hidden identity input so the submit endpoint can
+   * resolve the block from the published page. NOT authored.
+   */
+  formPageId?: string;
 };
 
 // A component artifact as stored (the fields the renderer needs).

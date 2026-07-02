@@ -39,12 +39,14 @@ import {
   SECTION_ROW_COMPONENT,
   SECTION_COLUMN_COMPONENT,
   LIST_COMPONENT,
+  FORM_COMPONENT,
   LANGUAGE_SWITCHER_COMPONENT,
   placeholder,
 } from "./plan-types.ts";
 import { planTree, declaredProps, schemaDefaults, bindTree, type IconMap } from "./plan-tree.ts";
 import { planSection, planColumn, planRow } from "./plan-section.ts";
 import { planList, LIST_AUTOSCROLL_ASSET_KEY, LIST_AUTOSCROLL_SCRIPT } from "./plan-list.ts";
+import { planForm, FORM_ENHANCE_ASSET_KEY, FORM_ENHANCE_SCRIPT } from "./plan-form.ts";
 import {
   planLanguageSwitcher,
   LANGUAGE_SWITCHER_SCRIPT,
@@ -60,6 +62,7 @@ export {
   type BindingRef,
   type ApiBindingParams,
   type ListSource,
+  type FormTarget,
   type Block,
   type ComponentArtifact,
   type ElementPlan,
@@ -69,12 +72,14 @@ export {
   SECTION_ROW_COMPONENT,
   SECTION_COLUMN_COMPONENT,
   LIST_COMPONENT,
+  FORM_COMPONENT,
   LANGUAGE_SWITCHER_COMPONENT,
   BUILTIN_COMPONENTS,
   isBuiltinComponent,
   placeholder,
 } from "./plan-types.ts";
 export { planTree, type IconMap } from "./plan-tree.ts";
+export { stampFormPageId, FORM_SUBMIT_PATH } from "./plan-form.ts";
 export {
   columnStyle,
   columnVisibilityClass,
@@ -194,6 +199,15 @@ export function planPage(
     scripts.push(LIST_AUTOSCROLL_SCRIPT);
   }
 
+  // Ship the Form progressive-enhancement script once, only if a targeted Form
+  // renders (the native form-data POST works without it — this adds fetch/JSON
+  // inline status handling on top).
+  function useFormAssets(): void {
+    if (seenAssets.has(FORM_ENHANCE_ASSET_KEY)) return;
+    seenAssets.add(FORM_ENHANCE_ASSET_KEY);
+    scripts.push(FORM_ENHANCE_SCRIPT);
+  }
+
   // Ship the LanguageSwitcher client script once, only if a switcher renders.
   function useLanguageSwitcherAssets(): void {
     if (seenAssets.has(LANGUAGE_SWITCHER_ASSET_KEY)) return;
@@ -234,6 +248,13 @@ export function planPage(
     // stamps + binds per row and delegates each stamped block back to planBlock.
     if (block.component === LIST_COMPONENT) {
       return planList(block, planBlock, useBuiltinComboboxAssets, useListAutoscrollAssets);
+    }
+    // A Form wraps its children in a real <form> posting to the Worker's submit
+    // endpoint (external-data-sources Form slice). The page id was stamped onto
+    // the block by buildPlanFromPage (stampFormPageId); un-targeted Forms render
+    // as a plain container.
+    if (block.component === FORM_COMPONENT) {
+      return planForm(block, planBlock, useFormAssets);
     }
     // The built-in LanguageSwitcher renders a <select> of the Site's content
     // locales (from `locale.available`); its one client script sets the locale

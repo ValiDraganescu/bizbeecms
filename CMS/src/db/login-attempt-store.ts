@@ -15,8 +15,11 @@ import { eq, gt, lt, and } from "drizzle-orm";
 import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import { windowStart } from "../lib/auth/throttle-core.ts";
 
-/** Which auth surface a throttle counter belongs to. */
-export type AttemptKind = "login" | "forgot";
+/** Which surface a throttle counter belongs to. 'form' rides the same table for
+ *  public Form-block submissions — the `email` column then holds `form:<ip>`
+ *  (same sliding-window shape; the form window ⊂ the 15-min store window, so
+ *  the shared read filter + prune stay correct). */
+export type AttemptKind = "login" | "forgot" | "form";
 
 /**
  * Failure timestamps (epoch ms) recorded for `email`/`kind` inside the current

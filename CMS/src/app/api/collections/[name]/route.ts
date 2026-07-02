@@ -16,6 +16,7 @@ import {
   deleteCollection,
   getCollection,
   rebuildCollectionSchema,
+  setPublicSubmissions,
 } from "@/db/collection-store";
 import type { SchemaChange } from "@/lib/content/schema-rebuild";
 
@@ -57,6 +58,14 @@ export async function PATCH(
   // safe table-rebuild). Without `_op`, the body is an add-field (`{ field: {...} }`).
   const op = obj._op;
   try {
+    // Form-block opt-in toggle: may PUBLIC visitors submit DRAFT items into this
+    // collection via a page Form? Explicit per-collection flag, default OFF.
+    if (op === "set_public_submissions") {
+      const result = await setPublicSubmissions(name, obj.enabled === true);
+      if (!result.ok) return Response.json({ error: result.error }, { status: result.status });
+      return Response.json(result.plan);
+    }
+
     if (op === "drop_field" || op === "rename_field") {
       const field = typeof obj.field === "string" ? obj.field : "";
       const change: SchemaChange =

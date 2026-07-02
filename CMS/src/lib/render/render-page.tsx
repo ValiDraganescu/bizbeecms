@@ -32,6 +32,8 @@ import {
   SECTION_ROW_COMPONENT,
   SECTION_COLUMN_COMPONENT,
   LIST_COMPONENT,
+  FORM_COMPONENT,
+  stampFormPageId,
   collectComponentNames,
   collectTreeComponentTags,
   collectPlanClasses,
@@ -187,6 +189,7 @@ export async function buildPlanFromPage(
   pending.delete(SECTION_ROW_COMPONENT);
   pending.delete(SECTION_COLUMN_COMPONENT);
   pending.delete(LIST_COMPONENT);
+  pending.delete(FORM_COMPONENT);
   for (let wave = 0; wave < MAX_FETCH_WAVES && pending.size > 0; wave++) {
     const want = [...pending].filter((n) => !components.has(n));
     if (want.length === 0) break;
@@ -221,7 +224,13 @@ export async function buildPlanFromPage(
   // any failed/empty query leaves the bound props blank (never throws / 500s).
   // external-data-sources Slice 3: api-kind bindings hydrate at the SAME seam
   // (locale is passed so `{placeholder}` params can read localized block props).
-  const hydratedBlocks = await hydrateBlockBindings(blocks, locale);
+  // Form slice: stamp the hosting page's id onto Form blocks so planForm can
+  // emit the hidden identity input the submit endpoint resolves the target from.
+  // No-op (same array back) on pages without a Form.
+  const hydratedBlocks = await hydrateBlockBindings(
+    stampFormPageId(blocks, pageRow.id),
+    locale,
+  );
 
   // Icon-sets epic: resolve every `{{icon "name"}}` / `{{icon prop}}` referenced
   // on this page into inline SVG BEFORE the pure walk (same hydrate-before-walk
