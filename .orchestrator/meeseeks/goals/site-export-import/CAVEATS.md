@@ -49,6 +49,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   execute uses 90) rather than one `.values([])` call per table. This is a
   general Workers/D1 constraint, not specific to this goal — worth knowing for
   ANY future bulk-insert code on this stack, not just export/import.
+- **`POST /api/site-import/asset/<key>` trusts the D1 `asset` row's
+  `contentType`, never the upload request's `content-type` header** — the row
+  was restored by import execute from the ORIGINAL export's metadata, so it's
+  the authoritative value; the route doesn't even read the incoming header.
+  Same pattern as `GET /api/site-export/asset/<key>` reading `contentType`
+  from the row instead of R2 `httpMetadata`. If a future asset-upload path
+  needs to accept a NEW asset (not restoring an existing key), that path is
+  different — it must derive/accept content-type itself since there's no
+  prior row to trust.
 
 - Content/theme/page work goes through the HTTP MCP at `http://localhost:3602/mcp` (bearer token in repo-root `.mcp.json`, key `local-site`), NOT direct DB edits. Call `get_authoring_guide` before block-tree edits — `update_page_blocks` expects the FULL current tree back, so `get_page` first or you wipe sections.
 - The dev server must be running for MCP calls (`npm run dev` in `CMS/`, port 3602). If :3602 is down, start it; don't switch to build mode. NEVER run `npx opennextjs-cloudflare build` while dev is running — it corrupts .next.

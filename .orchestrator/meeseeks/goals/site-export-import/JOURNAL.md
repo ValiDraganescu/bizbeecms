@@ -273,3 +273,45 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `CMS/src/lib/site-export/site-import-execute.test.ts` (new),
   `CMS/src/app/api/site-import/route.ts` (new), `BACKLOG.md` (flipped "Import
   execute" TODO to DONE), `CAVEATS.md`, `JOURNAL.md`, `NEXT.md`.
+
+## 2026-07-02 19:31 — Asset bytes upload leg: POST /api/site-import/asset/<key>
+- **Status:** DONE
+- **What I did:** Added `CMS/src/app/api/site-import/asset/[...key]/route.ts` —
+  the FORMAT.md §4 second import leg, the upload counterpart to
+  `GET /api/site-export/asset/<key>`. `POST /api/site-import/asset/<key>`:
+  `requireAdmin` guard, `isValidAssetKey` traversal guard (identical to
+  export's asset route), looks up the key in the (already import-execute-
+  restored) `asset` table and 404s with a named error if it's not there
+  (refuses to `Storage.put` bytes under a key the metadata doesn't know
+  about — an operator can't smuggle an arbitrary R2 object key through this
+  route), reads the raw request body via `request.arrayBuffer()`, and calls
+  `Storage.put(key, bytes, {contentType: row.contentType})`. Resolved the two
+  open questions NEXT.md left: (a) yes, verify the key exists in `asset`
+  first; (b) content-type is READ FROM THE D1 ROW (restored by import
+  execute, same value the export side captured), NOT trusted from the
+  client's request header at all — the route ignores any client
+  `content-type` header entirely rather than merely validating against it
+  (simpler and strictly safer: the row is authoritative, there's nothing a
+  mismatched header could legitimately override). No pure-logic extraction
+  needed — this route is a thin passthrough exactly like `GET
+  /api/site-export/asset/<key>`, which likewise has no dedicated unit test
+  file; both routes' only "logic" is the guard + one D1 lookup + one port
+  call, already covered by `isValidAssetKey`'s own tests and manual/live
+  verification.
+- **Verified:** `npx tsc --noEmit -p CMS` clean. `npm test` in `CMS/`: 1500/1500
+  pass (no regressions; no new pure logic to unit-test per above). LIVE
+  round-trip on the real dev D1/R2 (`:3602`, dev server already running, did
+  NOT run `opennextjs-cloudflare build`): picked a real gallery asset
+  (`assets/auj8y5_1782300296745_ccc1e2cf.jpg`, 88664 bytes, `image/jpeg`),
+  downloaded it via `GET /api/site-export/asset/<key>`
+  (sha256 `ea1f574f...28a2`), re-uploaded the SAME bytes to the SAME key via
+  the new `POST /api/site-import/asset/<key>` (`{"ok":true,"key":...,
+  "size":88664}`), re-downloaded via the export route again — sha256
+  IDENTICAL — then hit the PUBLIC `/media/<key>` route: `200`,
+  `content-type: image/jpeg`, `size: 88664` — confirms it actually renders
+  post-round-trip, not just that R2 accepted the bytes. Also verified both
+  guards live: a traversal-attempt key (`..%2f..%2fetc%2fpasswd`) → `404`;
+  a syntactically-valid but not-yet-restored key → `404` with the named
+  "not in the restored asset table" error, no `Storage.put` call made.
+- **Files:** `CMS/src/app/api/site-import/asset/[...key]/route.ts` (new),
+  `BACKLOG.md` (flipped this TODO to DONE), `JOURNAL.md`, `NEXT.md`.
