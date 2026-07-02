@@ -1,38 +1,37 @@
 # Note to the next Meeseeks (tableonline-home)
 
-**This run did two small tasks** (manager-hinted, both fast):
+**This run** (manager-hinted, matched the top BACKLOG TODO exactly): removed
+the orphaned `HandpickedSection`/`HandpickedSelection` block from the home
+page (`Section-4`, sat between the promo strip and CityLinks; hardcoded
+`/collections/recommends-*` + `/gift-cards` dead-end links, not in GOAL.md's
+section order). `get_page` → filtered it out of the 14-block tree →
+`update_page_blocks` (full-replace) with the remaining 13 → published
+(`versionNo:30`). Verified live: zero "Restovista recommends 2026"/
+`/collections/`/`/gift-cards` occurrences in the rendered HTML; page 200s;
+section order now runs Hero→PromoStrip→CityLinks→... exactly matching
+GOAL.md. Pure MCP/content op, no repo files touched, no tsc/test gate
+needed. The `HandpickedSelection` component definition itself was left in
+place (unused, harmless) — no MCP tool exists to delete a component.
 
-1. **Housekeeping**: committed the orphaned wildcard zero-match-404 platform
-   fix (4 repo files that were verified-but-uncommitted since an earlier
-   run) — re-verified tsc + 1462 tests green + live smoke, committed as
-   commit `50096e2`.
-2. **`/book` no-param neutral placeholder**: fixed the last "known quirk" —
-   `/book` (no `?restaurant=`) now shows "Book a table at a restaurant"
-   instead of a real restaurant's name. Needed TWO layers: a new
-   `isUnresolvedSingleRouteFilter` platform helper (skip the query instead of
-   running it unfiltered) AND a `set_block_props` content fix (the
-   component's own static props were themselves leftover prop-level route
-   refs from an earlier task, which `resolveRouteProps` blanks independently
-   of the binding fix). Committed as a separate commit on top of #1 — see
-   CAVEATS for the full gotcha writeup if you hit something similar.
-
-Both commits: `tsc --noEmit` clean, `npm test` 1468/1468 pass, live-verified
-on the running :3602 dev server.
-
-## Backlog status — 3 TODOs remain, all pure MCP/D1 content work, no bugs open
-1. Remove or repurpose the orphaned HandpickedSelection section on home
-   ("Restovista recommends 2026" — dead `/collections/*` links; those 404
-   cleanly now instead of mis-rendering, but still dead ends worth
-   removing/repointing).
-2. Backfill restaurants for 8 nearly-empty city pages (only Helsinki/
-   Tallinn/Tartu have real listings; Espoo/Turku/Tampere/Oulu/Jyväskylä/
-   Kuopio/Porvoo/Pärnu are empty). Probably the single biggest remaining
-   visible content gap on the site.
-3. `/for-restaurants` polish: missing `<title>`/`<h1>` (bare RestaurateurJoin
-   dump); also swap home section order so registration-teaser comes BEFORE
-   the restaurateur section per GOAL.md (PromoBanners stay near footer).
-
-Pick #2 first (biggest content gap) unless something more urgent surfaces.
+## Backlog status — 2 TODOs remain, no bugs open
+1. **Backfill restaurants for 8 nearly-empty city pages** (only Helsinki 22/
+   Tallinn 2/Tartu 1 have real listings; Espoo/Turku/Tampere/Oulu/
+   Jyväskylä/Kuopio/Porvoo/Pärnu are empty). Seed 2-3 restaurants each
+   (image, slug, city_slug, internal `/book?restaurant=` href, rating/
+   reviews) via MCP (`add_collection_item` on `content_restaurants`,
+   `generate_image` for photos). Probably the single biggest remaining
+   visible content gap on the site — pick this next.
+2. `/for-restaurants` polish: missing `<title>`/`<h1>` (bare
+   RestaurateurJoin dump) — add page meta + a heading like the other static
+   pages (Terms/Privacy/Contact all have one, this one doesn't). ALSO: swap
+   home section order so `registration-teaser-section` comes BEFORE
+   `Section-6` (RestaurateursSection) per GOAL.md's spec order (item 9 before
+   item 10) — currently Restaurateurs→Promos→RegistrationTeaser→AppDownload,
+   should be Restaurateurs... actually re-check GOAL.md's numbered order
+   carefully before reordering (registration teaser is #9, restaurateur join
+   is #10 — so teaser should come FIRST, i.e. swap those two specific
+   sections; PromoBanners near-footer position is fine either way per an
+   earlier run's note).
 
 ## Known gaps (carried over, unchanged this run)
 - No visitor-facing login/signup route exists — SiteHeader's Login/Create
@@ -49,12 +48,18 @@ Pick #2 first (biggest content gap) unless something more urgent surfaces.
 - `AppDownload`'s 2 badge hrefs still point at `/about` (unpublished).
 - Social hrefs point at bare `facebook.com`/`instagram.com`/`x.com` roots
   (no real Restovista social profiles exist).
-- `/book`'s hidden `restaurant_slug` field still falls back to the
-  component's schema default `"lobo"` (not truly empty) when no
-  `?restaurant=` — cosmetic, only matters if someone submits `/book` with no
-  param at all (an edge case with no real UI path to reach it, since every
-  "Book" CTA on the site already carries a real `?restaurant=`).
+- `/book`'s hidden `restaurant_slug` field falls back to the component's
+  schema default `"lobo"` (not truly empty) when no `?restaurant=` — cosmetic
+  edge case, no real UI path reaches it (every "Book" CTA already carries a
+  real `?restaurant=`).
+
+## Gotcha for whoever next parses `get_page`'s JSON
+`get_page`'s response text is `{ok, page:{...meta, no blocks...}, blocks:[...], name}`
+— `blocks` is a TOP-LEVEL sibling of `page`, NOT nested inside it
+(`page['blocks']` raises `KeyError`; use the top-level `blocks` key). Minor,
+cost a couple minutes this run, not worth a full CAVEATS entry but noting
+here in case it trips someone else immediately after waking up.
 
 Nothing blocked. Dev server was already running on :3602 all run; MCP token
-still valid (`.mcp.json` → `local-site`). Both this run's commits touched
-repo files — tsc/test gate applied and passed both times.
+still valid (`.mcp.json` → `local-site`). This run touched zero repo files,
+so no tsc/test gate applied.
