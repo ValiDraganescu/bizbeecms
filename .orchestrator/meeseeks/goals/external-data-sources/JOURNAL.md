@@ -762,3 +762,45 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/chat/form-tools.ts (new),
   CMS/src/lib/chat/form-tools.test.ts (new), CMS/src/lib/chat/tool-dispatch.ts,
   CMS/src/lib/chat/tool-scopes.ts, CMS/src/lib/pages/page-blocks.ts
+
+## 2026-07-02 10:29 — Live AI e2e smoke: Form tools (create_form, both target kinds + error path)
+- **Status:** DONE
+- **What I did:** Drove real /api/chat (context page-builder, default
+  gpt-4o-mini) rounds on :3602 against a TEMP page (`meeseeks-form-ai-smoke`,
+  one Section `smoke-sec`) + a TEMP non-opted-in collection
+  `content_smoke_noopt_enquiries`. The model, live:
+  (1) create_component SmokeApiChild (input name="msg" + type=submit) and
+  SmokeContactChild; (2) **create_form api target** by NAMES ("httpbingo
+  fixture — public" / "POST echo") → Form-1 persisted with resolved IDs +
+  authored success/error messages; result carried fields ["msg"] + the
+  author-matching-inputs note; (3) get_page → update_page_blocks full-tree
+  re-pass placing the child inside Form-1; (4) **create_form collection target
+  on the non-opted-in collection → the self-correcting error fired verbatim**
+  (names publicSubmissions + the exact PATCH `_op:set_public_submissions` fix)
+  **and the model recovered in the same round** — retried with
+  `content_form_fixture_enquiries` → Form-2 (fields name/email/message) and
+  placed SmokeContactChild; (5) when live submit 400'd `field "email" is
+  required` (model's child lacked it), a follow-up chat did
+  get_component → update_component adding the email input — component edit
+  landed as DRAFT; I published it via POST /api/components/... action:publish.
+  Published the page (version 1 + full-body PUT publishStatus) and live-fired
+  ALL 4 submit paths: api native → 303 `?bb_form=ok`, api fetch/JSON →
+  `{ok:true}`, collection native → 303 ok, collection fetch (with rogue
+  `status=published` + `rogue_field`) → `{ok:true}`; both items landed FORCED
+  `status:"draft"` with rogue/unknown fields dropped. 5 model calls, 5 submits
+  (under the 20/10min IP limit). Full cleanup: temp page deleted (route 404s),
+  temp collection + both Smoke components deleted; fixture untouched (its 2 new
+  draft enquiries are the deliberate accumulating proof).
+- **Findings (recorded as BACKLOG TODOs):**
+  (a) page-blocks validation says `id must be a short identifier…` when the id
+  is MISSING — not self-correcting enough: one run had gpt-4o-mini retry the
+  byte-identical payload twice and give up; another run recovered. Should say
+  "missing — add a short unique id, e.g. …".
+  (b) create_form → "place a child" requires the full-replace
+  update_page_blocks; an un-nudged gpt-4o-mini twice REPLACED the whole tree
+  with a hand-built fake "Form" block (never calling create_form / dropping
+  the real formTarget). An optional `child` component arg on create_form
+  (addFormToSection already exists) would make one call yield a working form.
+- **Verified:** everything above live; no repo code changed → no tsc/opennext
+  gate owed. Memory-only commit.
+- **Files:** goal memory only (/tmp scratch removed).

@@ -1,35 +1,33 @@
 # Note to the next Meeseeks (external-data-sources)
 
-2026-07-02 10:25: Form slice (d) is DONE — AI tools `create_form` + `bind_form`
-(both target kinds; api = resolveSourceAndRequest, collection = exists +
-publicSubmissions ON with a self-correcting error naming the PATCH toggle fix;
-NO map arg BY DESIGN — results return `fields` + a note since submit maps by
-NAME; all registrations; 15 node tests; tsc + 1396 + opennext worktree gate
-green; live debug-route scope check on :3602). Details: JOURNAL 2026-07-02 10:20.
+2026-07-02 10:29: The PINNED live AI e2e smoke of the Form tools is DONE — a
+real gpt-4o-mini /api/chat run drove create_form for BOTH target kinds, the
+publicSubmissions-off self-correcting error fired verbatim AND the model
+recovered in-round, all 4 live submit paths passed (native 303 / fetch JSON ×
+api / collection), items landed forced-draft with rogue fields dropped. Full
+cleanup done; memory-only commit. Details: JOURNAL 2026-07-02 10:29.
 
 ## FIRST: check ## Bugs (rule 0) — all DONE when I popped out.
 
 ## Heads-up: slice (b) is DOING by a parallel Meeseeks
-When I committed, Form slice (b) (page-builder Form panel + Collections
-publicSubmissions toggle) was freshly marked DOING by another worker — do NOT
-take it or touch the page-builder panel files unless it's clearly abandoned
-(check BACKLOG status + `git status`/`git log` for in-flight edits). Slice (d)
-left it helpers: page-blocks isForm/addFormToSection/setBlockField({formTarget}),
-form-tools mergeFormTarget; and the panel should SHOW the expected field names
-(by-name mapping) like the AI tools do — see the three new (d) caveats.
+Form slice (b) (page-builder Form panel + Collections publicSubmissions
+toggle) belongs to meeseeks-eds-ui in a parallel terminal — do NOT take it or
+touch binding-panels / Collections UI files unless clearly abandoned (check
+BACKLOG + git status for in-flight edits).
 
-## Good next task: live AI e2e smoke of the Form tools
-Mirror the Slice-6 live smoke: a real /api/chat model round-trip chaining
-list_data_sources → create_form (fixture source, e.g. the POST /post echo
-request) → create_component with matching `<input name=…>` + submit button →
-update_page_blocks to place it in the form → live submit on :3602; then clean
-up. Proves the model actually drives the new tools (node tests + scope check
-covered everything but a real model). Costs one model call.
+## Good next task: one of the two smoke-findings TODOs (top of ## Tasks)
+1. **Missing-block-id error message** (small, pure): page-blocks validation
+   says "id must be a short identifier…" even when the id is ABSENT — live,
+   the model retried an identical payload and gave up. Make the absent case
+   say "missing — add a short unique id, e.g. …". Failing-first test.
+2. **create_form optional `child` arg** (medium): one call → form + child
+   component placed (addFormToSection exists); removes the destructive
+   get_page/update_page_blocks dance that twice clobbered the smoke page.
+Both are pure-ish lib/chat + lib/pages work — they do NOT collide with slice
+(b)'s UI files, but re-check what (b) committed before touching page-blocks.ts.
 
-Otherwise: Form slices then read a-d DONE — re-read GOAL.md "what good looks
-like" for remaining gaps (most were confirmed shipped by earlier fresh-eyes
-hunts; the goal has twice been recommended for curator ARCHIVE once forms
-finish — flag it in your result if (b) is also DONE by then).
+Otherwise: forms a/c/d + AI smoke are DONE; when (b) lands, the goal has twice
+been recommended for curator ARCHIVE — flag it in your result.
 
 Gates: tsc + node suite + opennext (isolated-worktree recipe in CAVEATS; dev on
 :3602 is live — never build in-repo while it runs; `npm run cf-typegen` in the

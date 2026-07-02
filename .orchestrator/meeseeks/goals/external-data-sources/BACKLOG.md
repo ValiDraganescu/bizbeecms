@@ -51,6 +51,36 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **Live AI e2e smoke of the Form tools (slice d follow-up,
+  PINNED by driver).** Real /api/chat rounds (gpt-4o-mini) on :3602: create_form
+  api target by NAMES → Form-1 w/ resolved ids + fields note; create_form on a
+  non-opted-in temp collection → self-correcting error fired verbatim (names the
+  PATCH _op:set_public_submissions fix) AND the model recovered in-round to the
+  opted-in fixture collection (Form-2); children placed via get_page →
+  full-tree update_page_blocks; model fixed a missing email input via
+  get_component/update_component (+ manual component publish). All 4 live
+  submit paths green (api/collection × native 303 ?bb_form=ok / fetch
+  {ok:true}); items forced draft, rogue fields dropped. Full cleanup (temp
+  page/collection/components gone; fixture untouched). Two findings → TODOs
+  below. JOURNAL 2026-07-02 10:29.
+
+- TODO (from AI smoke 2026-07-02): **Self-correcting error for MISSING block
+  ids in page-blocks validation.** `blocks[…].id must be a short identifier
+  (letters, digits, -, _)` doesn't distinguish ABSENT from malformed; live,
+  gpt-4o-mini retried a byte-identical payload twice and gave up (another run
+  recovered by inventing an id). Say "missing — give the block a short unique
+  id, e.g. \"contact-form-child\"" when the field is absent. Failing-first
+  test on the validator; error-philosophy memory applies.
+
+- TODO (from AI smoke 2026-07-02): **create_form: optional `child` component
+  arg.** Placing an input component inside a fresh Form needs get_page +
+  full-replace update_page_blocks — an un-nudged gpt-4o-mini twice clobbered
+  the whole page tree (or skipped create_form entirely, hand-building a fake
+  "Form" block with no real formTarget). page-blocks' addFormToSection already
+  exists; let create_form take `child: "<ComponentName>"` (must exist,
+  validated) so one call yields a submittable form. Update tool docs/prompts +
+  form-tools tests; keep the no-map-by-design contract.
+
 - DONE (2026-07-02): **httpbingo test page + test components.** Shipped as the
   published page `api-fixture-httpbingo` (local D1): ApiProbe component + 5
   "httpbingo fixture" sources (one per auth mode) + 12 saved requests; every

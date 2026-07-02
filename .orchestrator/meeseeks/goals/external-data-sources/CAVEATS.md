@@ -353,3 +353,18 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **`setBlockField` now accepts `formTarget`** (Pick extended) and page-blocks
   exports isForm/addFormBlock/addFormToSection + FORM_COMPONENT — reuse these
   for slice (b)'s Form panel instead of re-adding tree helpers.
+
+- **PUT /api/pages needs the FULL page meta body** — a `{id, publishStatus}`-only
+  body 400s on slug validation. GET the page row from /api/pages and re-PUT it
+  whole with publishStatus flipped (buildPublishToggleBody pattern).
+
+- **update_component lands in draft_* — the PUBLIC page keeps serving the old
+  component** until `POST /api/components/<name> {"action":"publish"}`. A live
+  smoke that edits a component via the AI must publish it before re-testing the
+  public route (bit the Form AI smoke: added email input was invisible).
+
+- **gpt-4o-mini needs create_form NAMED and update_page_blocks chaperoned** in
+  smoke prompts: un-nudged it hand-builds a fake "Form" block via full-replace
+  update_page_blocks (no real formTarget → degrades to a container) and/or
+  re-passes a partial tree, deleting the page. Prompt it "use the create_form
+  tool", "first get_page, re-pass the ENTIRE tree", and "new blocks need an id".
