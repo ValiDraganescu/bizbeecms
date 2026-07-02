@@ -1,6 +1,31 @@
 # Backlog — external-data-sources
 Task states: TODO | DOING | DONE | BLOCKED.
 
+## Tasks (user 2026-07-02, approved — AI assistant enablement for data sources)
+
+- TODO (USER 2026-07-02): **On-demand data-sources guide for the CMS AI assistant.**
+  A skill-like prompt the page-builder AI reads ON DEMAND via a tool (mirror the
+  existing get_authoring_guide pattern — do NOT bloat the base system prompt).
+  Content: how to create/update/use external data sources (sources, saved
+  requests, auth modes, placeholders, caching/purge, test calls), how to bind
+  components/lists to them, how to build forms with create_form/bind_form —
+  BOTH api-target forms and forms saving to an opted-in collection (incl. the
+  publicSubmissions PATCH _op, forced-draft semantics, field-name mapping).
+  Written from the SHIPPED tool surface (verify names/args against the code, not
+  memory); teach the happy path + the known self-correcting errors. Register the
+  tool in the shared dispatch (3-registrations caveat) + mention it in the
+  context prompts so the model knows the guide exists. Node tests (tool returns
+  the guide; registration). Usual gates.
+
+- TODO (USER 2026-07-02): **Inline data-sources context on /admin/data-sources.**
+  When the operator's chat is opened while on /admin/data-sources, the assistant
+  receives inline context listing the available data sources (names, auth kind,
+  saved requests with method/path/placeholders/cache — NEVER secrets) so it can
+  answer/act without a discovery round-trip. Follow the existing route-aware
+  context-prompt mechanism (the chat already varies context by page). Keep it
+  compact (cap the list; summarize overflow). Node tests for the pure
+  context-builder. Usual gates.
+
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
 
