@@ -46,10 +46,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   the copy does NOT hot-reload from the original.
 - `contentSelect` caps any single read at `MAX_READ_ROWS` (1000 rows, see
   `lib/content/content-db.ts`) — a `SELECT * FROM content_x` export for a
-  collection with >1000 rows silently truncates to 1000, no error/warning. Not
-  fixed in Export core (FORMAT.md doesn't call this out either); flag as a real
-  gap if a later task needs whole-collection fidelity beyond 1000 rows (either
-  raise the cap for the export path specifically, or paginate).
+  collection with >1000 rows silently truncates to 1000, no error/warning.
+  **FIXED 2026-07-02**: export (`site-export/route.ts`) and the import
+  dry-run's target-row counter (`site-import/validate/route.ts`) now call the
+  new `contentSelectAll` (same file) — a `LIMIT`/`OFFSET` pager over
+  `contentSelect` that keeps paging until a page comes back short, so full
+  collection fidelity is preserved regardless of size. `contentSelect` itself
+  is UNCHANGED (still caps at 1000) — correct for its other ordinary-app-read
+  callers (item-store/query-store/collections-sql-route); only reach for
+  `contentSelectAll` when you genuinely need EVERY row of a `content_*` table
+  (full-fidelity export/dry-run style reads), not for normal paginated UI
+  reads.
 - `site_settings.value` for `site_identity` may not exist at all on a fresh
   site (no row) — `buildSiteExport`'s `siteName` extraction handles this (falls
   back to `""`), don't assume every settings key is always present when reading

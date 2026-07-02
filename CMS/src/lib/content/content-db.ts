@@ -62,6 +62,30 @@ export async function contentSelect<T = Record<string, unknown>>(
 }
 
 /**
+ * Like `contentSelect`, but for callers that need EVERY row of a plain
+ * `SELECT * FROM content_x` (e.g. full-site export) regardless of table size —
+ * `contentSelect` alone silently truncates at `MAX_READ_ROWS` per call, which
+ * is a correctness bug for any full-fidelity read (a >1000-row collection
+ * would export incomplete with no error/warning). Pages through with
+ * `LIMIT`/`OFFSET` (both fence-allowed keywords) until a page comes back
+ * short of the page size, then concatenates. `baseSql` must be a bare
+ * `SELECT * FROM content_x` with NO existing LIMIT/OFFSET/trailing `;`.
+ */
+export async function contentSelectAll<T = Record<string, unknown>>(
+  baseSql: string,
+  db?: D1Like,
+): Promise<T[]> {
+  const pageSize = MAX_READ_ROWS;
+  const out: T[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await contentSelect<T>(`${baseSql} LIMIT ${pageSize} OFFSET ${offset}`, [], db);
+    out.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return out;
+}
+
+/**
  * Run a fenced, parameterized write (INSERT/UPDATE/DELETE) over content_* tables.
  * Validates (write mode) first. Returns affected row count.
  */

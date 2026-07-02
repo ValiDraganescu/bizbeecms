@@ -13,7 +13,7 @@
  */
 import { requireAdmin } from "@/lib/auth/guard";
 import { getDb, schema } from "@/lib/ports/db";
-import { contentSelect } from "@/lib/content/content-db";
+import { contentSelectAll } from "@/lib/content/content-db";
 import { validateSiteImport, type DryRunCounts } from "@/lib/site-export/site-import-validate";
 
 export const dynamic = "force-dynamic";
@@ -40,9 +40,11 @@ export async function POST(request: Request): Promise<Response> {
       db.select().from(schema.asset),
     ]);
 
+    // contentSelectAll pages past the 1000-row single-call cap so the dry-run's
+    // "existing rows to be destroyed" count is accurate for large collections too.
     let collectionRows = 0;
     for (const c of collections) {
-      const rows = await contentSelect(`SELECT * FROM ${c.tableName}`);
+      const rows = await contentSelectAll(`SELECT * FROM ${c.tableName}`);
       collectionRows += rows.length;
     }
 

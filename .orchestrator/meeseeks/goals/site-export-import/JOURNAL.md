@@ -647,3 +647,42 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   verified elsewhere in this goal's JOURNAL).
 - **Files:** `CMS/scripts/scratch-instance.sh` (new), `BACKLOG.md` (flipped
   the 2nd-instance-tooling TODO to DONE), `JOURNAL.md`, `NEXT.md`.
+
+## 2026-07-02 20:10 — Fixed the flagged MAX_READ_ROWS export-truncation gap
+- **Status:** DONE
+- **What I did:** Confirmed the CAVEATS-flagged gap was real, not theoretical:
+  `GET /api/site-export` and `POST /api/site-import/validate` both ran a bare
+  `contentSelect(\`SELECT * FROM ${tableName}\`)` per collection — `contentSelect`
+  (`content-db.ts`) silently `.slice(0, MAX_READ_ROWS)`s (1000) any single call's
+  results, no error/warning. A collection with >1000 rows would export with only
+  its first 1000 rows and no indication anything was dropped — a real violation
+  of GOAL.md's "export EVERYTHING" contract. Added `contentSelectAll` (same file)
+  — a thin `LIMIT`/`OFFSET` pager over `contentSelect` (both keywords are
+  fence-allowed, confirmed by reading `fence.ts`'s `SQL_KEYWORDS`) that keeps
+  requesting pages until one comes back short of the page size, then
+  concatenates. Swapped both call sites (`site-export/route.ts`'s collection-row
+  export, `site-import/validate/route.ts`'s target-row dry-run counter) from
+  `contentSelect` to `contentSelectAll`. Left every OTHER `contentSelect` call in
+  the app (item-store/query-store/collections-sql-route — ordinary bounded reads)
+  untouched — the cap is correct behavior there, this fix is scoped to the two
+  full-fidelity read paths. Also checked the import EXECUTE (restore) insert
+  path: collection rows are inserted one `contentWrite` per row from the
+  artifact's own array (never re-read from D1), so there was no matching
+  truncation risk on the write side — nothing to fix there. Checked the other
+  gaps named in the manager's hint (asset listing caps, page-version caps):
+  `tables.page`/`pageVersion`/`asset`/`component` etc. all go through Drizzle's
+  `db.select().from(schema.x)` directly (not the fenced `content_*` path), which
+  has no default row cap — confirmed no equivalent gap there. Documented the fix
+  in FORMAT.md §3.
+- **Verified:** New `content-db.test.ts` (4 cases) — a fake `D1Like` with a
+  2500-row `content_big` table proves (a) plain `contentSelect` alone still caps
+  at exactly 1000 (the pre-existing, correct-for-ordinary-reads behavior) and
+  (b) `contentSelectAll` returns all 2500 with no dupes/gaps across the page
+  boundary; plus under-cap and empty-table edge cases. `npm test` 1505/1505
+  (was 1501; +4 new). `npx tsc --noEmit` clean.
+- **Files:** `CMS/src/lib/content/content-db.ts` (new `contentSelectAll`),
+  `CMS/src/lib/content/content-db.test.ts` (new),
+  `CMS/src/app/api/site-export/route.ts`,
+  `CMS/src/app/api/site-import/validate/route.ts`,
+  `.orchestrator/meeseeks/goals/site-export-import/FORMAT.md`, `BACKLOG.md`,
+  `JOURNAL.md`, `NEXT.md`.

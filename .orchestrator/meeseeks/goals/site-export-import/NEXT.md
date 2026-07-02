@@ -1,40 +1,42 @@
 # Note to the next Meeseeks (site-export-import)
 
-This run took the manager-hinted "2nd-instance tooling" TODO (checked the
-"confirm-string UI copy nit" first as suggested — it's genuinely already
-fine, see BACKLOG.md, no code change needed there). Built and live-verified
-`CMS/scripts/scratch-instance.sh up [port]` / `down [port]`, which automates
-the CAVEATS-documented manual recipe for spinning up a second, fully
-isolated local CMS instance (own D1, own R2, own port) for cross-instance
-E2E testing. Found + fixed 2 real bugs in the script itself before it
-worked (wrong scratch-dir depth landing inside the repo; missing
-`.env.local` causing every admin route to 401) — both are now CAVEATS
-entries so nobody re-discovers them.
+This run took the manager-hinted gap-check: verified the CAVEATS-flagged
+`MAX_READ_ROWS` (1000-row) truncation was a REAL bug, not just a documented
+limitation. `contentSelect(\`SELECT * FROM content_x\`)` (no LIMIT/OFFSET)
+silently `.slice(0, 1000)`s its result — a collection with >1000 rows would
+export with only its first 1000 rows and zero indication of data loss.
+Fixed with a new `contentSelectAll` pager (`CMS/src/lib/content/content-db.ts`)
+used by both `GET /api/site-export` (the actual export) and
+`POST /api/site-import/validate` (the dry-run's target-row counter). Regular
+`contentSelect` is UNCHANGED — the cap is still correct for its other
+ordinary-app-read callers; only export/dry-run-style "I need literally every
+row" callers use the new pager. 4 new tests (`content-db.test.ts`), `npm test`
+1505/1505, `tsc --noEmit` clean. FORMAT.md §3 documents the fix.
 
-**Both of BACKLOG's "New TODOs found by the E2E slice" are now closed.**
-BACKLOG.md's `## Tasks` section (the goal's original MVP scope) has been
-all-DONE since the E2E-slice run; this run closed out the trailing polish
-items too.
+Also checked (per the hint) whether other tables have an equivalent cap:
+pages/page-versions/components/assets/collections registry all go through
+plain Drizzle `db.select().from(schema.x)`, which has NO row cap — confirmed
+no equivalent gap there. Nothing else to fix on that front.
 
-**This goal may genuinely be feature-complete for its GOAL.md scope**:
-export (pages/components/collections/assets/settings/data-sources/prompts),
-import (validate/execute/asset-upload, destructive with typed confirmation
-and dry-run report), admin UI, a real cross-instance E2E pass (2 bugs found
-+ fixed), wipe-loop atomicity hardening, and now reusable 2nd-instance
-tooling for any FUTURE cross-instance verification need.
+**This goal is very likely feature-complete + now gap-checked for its GOAL.md
+scope.** Everything in BACKLOG.md's `## Tasks` and both rounds of "New TODOs"
+is DONE except one deliberately-parked LOW-priority UX nit (confirm-string
+copy — already fine, re-open only if reported). If you're picking this up
+next, reasonable options:
 
-**If you're picking up this goal next**, reasonable options:
-1. Re-read `GOAL.md` against current code for any deeper gap — e.g. the
-   `MAX_READ_ROWS` (1000-row) cap on `contentSelect` is a known, flagged,
-   NOT-yet-fixed limitation for collections with >1000 rows (see CAVEATS) —
-   could decide to actually raise/paginate it, or confirm it's an accepted
-   platform limit worth just documenting in FORMAT.md explicitly.
-2. Use the new `scripts/scratch-instance.sh` for a SECOND independent E2E
-   pass if you want extra confidence beyond the one already done (e.g. test
-   an import where the target has EXISTING different content, not just an
-   empty target — the E2E-slice run only tested empty-target import).
-3. Flag to the curator that this goal may be ready to archive like the other
-   delivered M2 tracks (page-builder, ai-assistant, binding-adapters,
-   deploy-audit-trail, custom-domains) if the user agrees there's no more
-   must-have work — this goal has now had a real cross-instance E2E pass,
-   which is more verification than some already-archived tracks got.
+1. **Flag to the curator that this goal is ready to archive** (like
+   page-builder/ai-assistant/binding-adapters/deploy-audit-trail/
+   custom-domains) — it's had a real cross-instance E2E pass, a completeness
+   gap-check, wipe-loop atomicity hardening, and reusable 2nd-instance
+   tooling. This is the strongest option if the user agrees there's no more
+   must-have work.
+2. If NOT archived yet, a genuinely fresh angle: performance, not
+   correctness — the import EXECUTE path inserts collection rows one
+   `contentWrite` call PER ROW (no batching), so a huge collection (say
+   10k+ rows) would do 10k sequential D1 round-trips on import. Not
+   incorrect, just slow. Only worth tackling if someone actually hits a
+   large-collection import in practice — no evidence of that yet, so low
+   priority; would want a realistic scale number before optimizing.
+3. Re-run the scratch-instance E2E pass with a NON-empty target (the
+   original E2E slice only tested an empty target) if you want a second
+   layer of cross-instance confidence beyond what's already been done.

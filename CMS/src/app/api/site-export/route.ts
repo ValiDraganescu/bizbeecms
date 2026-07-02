@@ -13,7 +13,7 @@
  */
 import { requireAdmin } from "@/lib/auth/guard";
 import { getDb, schema } from "@/lib/ports/db";
-import { contentSelect } from "@/lib/content/content-db";
+import { contentSelectAll } from "@/lib/content/content-db";
 import { buildSiteExport, type CollectionDataRow } from "@/lib/site-export/site-export";
 
 export const dynamic = "force-dynamic";
@@ -47,10 +47,12 @@ export async function GET(request: Request): Promise<Response> {
   ]);
 
   // Every content_* table's rows, via the fenced read path (FORMAT.md §3's
-  // "generic SELECT * → JSON" rule). One SELECT per registered collection.
+  // "generic SELECT * → JSON" rule). `contentSelectAll` PAGES past the single-call
+  // MAX_READ_ROWS (1000) cap so a >1000-row collection exports in full instead of
+  // silently truncating — export must be lossless, unlike ordinary app reads.
   const collectionData: Record<string, CollectionDataRow[]> = {};
   for (const c of collections) {
-    collectionData[c.tableName] = await contentSelect<CollectionDataRow>(
+    collectionData[c.tableName] = await contentSelectAll<CollectionDataRow>(
       `SELECT * FROM ${c.tableName}`,
     );
   }
