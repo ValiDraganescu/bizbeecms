@@ -878,3 +878,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   removed, dev on :3602 untouched. No UI strings → no i18n.
 - **Files:** CMS/src/lib/pages/page-blocks.ts,
   CMS/scripts/page-blocks.test.mjs.
+
+## 2026-07-02 10:45 — create_form optional `child` component arg (AI-smoke finding 2)
+- **Status:** DONE
+- **What I did:** create_form now takes an optional `child` (the name of an
+  EXISTING component) and places it inside the fresh Form in the SAME call —
+  killing the destructive get_page → full-replace update_page_blocks dance
+  that made un-nudged gpt-4o-mini clobber page trees. Pure side
+  (form-tools.ts): `child` in the tool schema (with create-it-first guidance),
+  CreateFormArgs, and validateCreateForm (trimmed; blank/non-string →
+  undefined); tool description now says PREFER `child`. Handler side
+  (tool-dispatch.ts): child validated via getComponentByName → the existing
+  self-correcting unknownComponentMessage (names the missing one + lists every
+  existing component); placed as `{id: "<formId>-child", component}` via
+  setBlockChildren (mirrors create_list's `-tpl` pattern); result payload
+  carries `child` and formFieldsNote gained a placed-child variant ("placed X
+  — verify it renders <input name=…> matching …"). Both context prompts
+  (page-builder + pages) updated to steer models to `child`. No map arg — the
+  no-map-by-design contract untouched.
+- **Verified:** 3 new node tests (child shaped/trimmed, blank→undefined,
+  schema declares it optional) + suite 1402/1402 + tsc clean. LIVE on :3602
+  (real gpt-4o-mini /api/chat, temp page): (1) api target one call →
+  Form-1 with formTarget (resolved fixture ids) AND child FormProbeApi placed,
+  result carried fields ["msg"] + the placed-child note, tool name intact;
+  (2) child "TotallyMissingWidget" → unknownComponentMessage fired verbatim
+  and the model SELF-CORRECTED in-round to FormProbeContact → Form-2
+  (collection target, fields name/email/message) — both kinds proven. Temp
+  page deleted (list clean). Opennext gate run in the isolated /tmp worktree
+  with the 4 changed files copied in (recipe per CAVEATS) — GREEN.
+- **Files:** CMS/src/lib/chat/form-tools.ts, CMS/src/lib/chat/form-tools.test.ts,
+  CMS/src/lib/chat/tool-dispatch.ts, CMS/src/lib/chat/tool-scopes.ts

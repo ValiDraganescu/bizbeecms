@@ -394,3 +394,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   multi-child (AI-authored) form renders its children read-only in the panel
   so the single-select can't clobber them. Keep that guard if you touch the
   content section.
+
+- **create_form's `child` is validated to EXIST only** (getComponentByName →
+  unknownComponentMessage) — its `<input name=…>`s are NOT checked against the
+  target's fields; by-name matching happens at submit and the result's
+  `fields`+note guide the model. Don't add speculative input-vs-fields parsing.
+
+- **Cheap deterministic live tool smoke**: one /api/chat round (context
+  "pages") with "call <tool> exactly once with these arguments … if it errors,
+  quote it verbatim, don't retry" costs ~10.5k prompt tokens on gpt-4o-mini
+  and reliably fires the tool. BUT the model may still self-correct off a
+  listed alternative despite "do not retry" — treat an unexpected SECOND tool
+  frame as the self-correction working, not the test failing.

@@ -74,8 +74,11 @@ export const CREATE_FORM_TOOL = {
       "visitor submissions post to the CMS's submit endpoint. " +
       TARGET_FIELDS_DOC +
       " Identify the page by id and the Section by its block id (get_page shows " +
-      "the tree). After creating the form, add the input component as its child " +
-      "(update_page_blocks) — the result's `fields` array names the inputs it needs. " +
+      "the tree). PREFER passing `child` (the name of an EXISTING component with " +
+      "the form's inputs) so one call yields a complete submittable form — the " +
+      "result's `fields` array names the inputs the child must render. Without " +
+      "`child` the form is created empty and you must place the component " +
+      "afterwards (update_page_blocks re-passing the ENTIRE tree). " +
       "Optional: authored success/error messages (shown inline) and a same-site " +
       "redirect path after a no-JS submit.",
     parameters: {
@@ -86,6 +89,7 @@ export const CREATE_FORM_TOOL = {
         source: { type: "string", description: "api target: the data source id or name (list_data_sources)." },
         request: { type: "string", description: "api target: the saved request id or name on that source (typically POST/PUT/DELETE)." },
         collection: { type: "string", description: "collection target: the content_<slug> table name (must have publicSubmissions enabled)." },
+        child: { type: "string", description: "The name of an EXISTING component to place inside the form (create_component it first). Its <input name=…> fields should match the target's field names and it needs a type=\"submit\" button." },
         successMessage: { type: "string", description: "Inline success message (fetch mode). Omit for the default." },
         errorMessage: { type: "string", description: "Inline error message (fetch mode). Omit for the default." },
         redirect: { type: "string", description: 'Same-site path to redirect to after a no-JS submit, e.g. "/thanks".' },
@@ -136,6 +140,8 @@ export interface CreateFormArgs {
   request?: string;
   /** collection target: the content_<slug> table name. */
   collection?: string;
+  /** Optional: an EXISTING component to place inside the form (validated in the dispatch handler). */
+  child?: string;
   successMessage?: string;
   errorMessage?: string;
   redirect?: string;
@@ -173,6 +179,7 @@ export function validateCreateForm(args: unknown): ArgResult<CreateFormArgs> {
       page,
       section,
       ...(source ? { source, request } : { collection }),
+      child: str(rec, "child"),
       successMessage: str(rec, "successMessage"),
       errorMessage: str(rec, "errorMessage"),
       redirect: redirect.value,

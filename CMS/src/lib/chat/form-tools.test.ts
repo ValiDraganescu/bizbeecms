@@ -59,6 +59,30 @@ test("create_form: rejects missing page/section and non-objects", () => {
   }
 });
 
+test("create_form: optional child component is shaped and trimmed", () => {
+  const r = validateCreateForm({
+    page: "p1",
+    section: "s1",
+    collection: "content_enquiries",
+    child: "  ContactCard  ",
+  });
+  assert.ok(r.ok);
+  assert.equal(r.value.child, "ContactCard");
+});
+
+test("create_form: blank/absent child stays undefined", () => {
+  for (const child of [undefined, "", "   ", 42]) {
+    const r = validateCreateForm({ page: "p", section: "s", collection: "c", child });
+    assert.ok(r.ok, `should accept child ${JSON.stringify(child)}`);
+    assert.equal(r.value.child, undefined);
+  }
+});
+
+test("create_form: schema declares the child arg", () => {
+  assert.ok("child" in CREATE_FORM_TOOL.function.parameters.properties);
+  assert.ok(!CREATE_FORM_TOOL.function.parameters.required.includes("child" as never));
+});
+
 test("create_form: redirect must be a same-site path", () => {
   for (const redirect of ["https://evil.example", "//evil.example", "thanks"]) {
     const r = validateCreateForm({ page: "p", section: "s", collection: "c", redirect });

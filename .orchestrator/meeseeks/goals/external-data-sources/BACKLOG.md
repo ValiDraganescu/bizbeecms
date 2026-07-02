@@ -77,14 +77,19 @@ Task states: TODO | DOING | DONE | BLOCKED.
   from malformed; live, gpt-4o-mini retried a byte-identical payload twice and
   gave up (another run recovered by inventing an id).
 
-- TODO (from AI smoke 2026-07-02): **create_form: optional `child` component
-  arg.** Placing an input component inside a fresh Form needs get_page +
-  full-replace update_page_blocks — an un-nudged gpt-4o-mini twice clobbered
-  the whole page tree (or skipped create_form entirely, hand-building a fake
-  "Form" block with no real formTarget). page-blocks' addFormToSection already
-  exists; let create_form take `child: "<ComponentName>"` (must exist,
-  validated) so one call yields a submittable form. Update tool docs/prompts +
-  form-tools tests; keep the no-map-by-design contract.
+- DONE (2026-07-02): **create_form: optional `child` component arg.** One call
+  now yields a submittable form: `child` (existing component name) validated
+  via getComponentByName → self-correcting unknownComponentMessage (lists all
+  existing components); placed as `<formId>-child` via setBlockChildren
+  (create_list `-tpl` pattern); result carries `child` + a placed-child note;
+  both context prompts steer models to prefer `child`. No-map contract kept.
+  3 new node tests (1402 suite) + tsc + opennext worktree gate GREEN; live
+  gpt-4o-mini smoke on :3602 proved BOTH kinds in one call each AND the model
+  self-correcting off the unknown-child error in-round. JOURNAL 2026-07-02
+  10:45. Original report: Placing an input component inside a fresh Form needs
+  get_page + full-replace update_page_blocks — an un-nudged gpt-4o-mini twice
+  clobbered the whole page tree (or skipped create_form entirely,
+  hand-building a fake "Form" block with no real formTarget).
 
 - DONE (2026-07-02): **httpbingo test page + test components.** Shipped as the
   published page `api-fixture-httpbingo` (local D1): ApiProbe component + 5

@@ -1,34 +1,28 @@
 # Note to the next Meeseeks (external-data-sources)
 
-2026-07-02 11:05: AI-smoke finding (1) is DONE — validateBlocks now emits a
-self-correcting "id is missing — … e.g. \"contact-form-child\"" for
-absent/empty block ids and names the exact bad token (80-char cap) for
-malformed ones. Failing-first regression test; tsc + 1399 + opennext
-isolated-worktree gate GREEN. JOURNAL 2026-07-02 11:05.
+2026-07-02 10:45: the LAST backlog TODO is DONE — create_form's optional
+`child` component arg (one call → submittable Form with its input component
+placed; unknown child → self-correcting error listing every component). Live
+gpt-4o-mini smoke proved both target kinds AND in-round self-correction.
+tsc + 1402 suite + opennext isolated-worktree gate GREEN.
 
 ## FIRST: check ## Bugs (rule 0) — all DONE when I popped out.
 
 ## State of the goal
-Slice (b) is COMMITTED (9b6f219) — forms a/b/c/d + live AI smoke all DONE.
-The parallel meeseeks-eds-ui terminal may be idle; still check git status for
-in-flight edits before touching page-builder UI files.
+Every task and bug in BACKLOG.md is DONE. All form slices (a–d), AI smoke,
+both smoke findings, all 8 data-source slices, purge, oauth2, hardening —
+shipped and gated. This goal has now been recommended for curator ARCHIVE by
+multiple workers, me included — **flag ARCHIVE in your result too** if you
+land here and nothing new has been reported.
 
-## Good next task: the last AI-smoke finding TODO (## Tasks)
-**create_form: optional `child` component arg** (medium): one call → Form +
-child component placed. addFormToSection exists in lib/pages/page-blocks.ts;
-validate the component EXISTS (self-correcting error naming known components
-if not). Update tool docs/prompts + form-tools tests; keep the
-no-map-by-design contract. Pure-ish lib/chat + lib/pages work.
+## If you must pick work anyway (rule 3 — never idle)
+- Real-browser smoke of the slice-(b) builder UI (drag a Form from the rail,
+  pick both target kinds, save/publish, submit live) — (b) was verified via
+  the SSR display check + live AI/API smokes, never a human-style browser
+  session. The fixture page api-fixture-httpbingo's fx-forms cards are
+  ready-made.
+- Or re-read main/GOAL.md and invent the next valuable slice.
 
-## Also worth doing (smaller)
-- Real-browser smoke of the slice-(b) builder UI (drag a Form in, pick both
-  target kinds, save/publish, submit live) — (b) was verified via the SSR
-  display check, not a browser session. The fixture page's fx-forms blocks
-  are ready-made.
-
-When the child-arg TODO lands, the backlog is empty and this goal has
-repeatedly been recommended for curator ARCHIVE — flag it in your result.
-
-Gates: tsc + node suite + opennext (isolated-worktree recipe in CAVEATS; dev
-on :3602 is live — never build in-repo while it runs; `npm run cf-typegen` in
-the worktree before a standalone tsc).
+Gates: tsc + node suite + opennext (isolated-worktree recipe in CAVEATS —
+copy uncommitted files in; `npm run cf-typegen` before a standalone tsc; dev
+on :3602 is live, never build in-repo while it runs).

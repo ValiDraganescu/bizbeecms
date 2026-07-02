@@ -1418,14 +1418,17 @@ async function resolveFormTarget(
 }
 
 /** The `fields` guidance both tools return (by-name mapping, see form-tools.ts). */
-function formFieldsNote(target: { api?: unknown }, fields: string[]): string {
+function formFieldsNote(target: { api?: unknown }, fields: string[], child?: string): string {
   const what = target.api
     ? "the saved request's {placeholder} names"
     : "the collection's declared field names";
-  return fields.length > 0
-    ? `place a component inside the form whose <input name=…> fields match ${what} ` +
-      `(${fields.join(", ")}) and include a type="submit" button`
-    : `this target declares no fields — the form only needs a type="submit" button inside it`;
+  const needs =
+    fields.length > 0
+      ? `<input name=…> fields matching ${what} (${fields.join(", ")}) and a type="submit" button`
+      : `only a type="submit" button (this target declares no fields)`;
+  return child
+    ? `placed "${child}" inside the form — verify it renders ${needs}`
+    : `place a component inside the form that renders ${needs}`;
 }
 
 async function handleCreateForm(args: unknown): Promise<Record<string, unknown>> {
@@ -1438,6 +1441,12 @@ async function handleCreateForm(args: unknown): Promise<Record<string, unknown>>
     const sectionBlock = findBlock(loaded.blocks, v.section);
     if (!sectionBlock) return { ok: false, errors: [`no block with id "${v.section}" on this page`] };
     if (!isSection(sectionBlock)) return { ok: false, errors: [`block "${v.section}" is not a Section (insert a Section first)`] };
+
+    // Optional `child`: an EXISTING component placed inside the form in the same
+    // call (one call → a submittable form, no full-replace update_page_blocks).
+    if (v.child && !(await getComponentByName(v.child))) {
+      return { ok: false, errors: [await unknownComponentMessage([v.child])] };
+    }
 
     const resolved = await resolveFormTarget(v.source, v.request, v.collection);
     if (!resolved.ok) return { ok: false, errors: [resolved.error] };
@@ -1453,6 +1462,7 @@ async function handleCreateForm(args: unknown): Promise<Record<string, unknown>>
     const formId = newBlockId(loaded.blocks, next, FORM_COMPONENT);
     if (!formId) return { ok: false, errors: [`failed to insert the Form into section "${v.section}"`] };
     next = setBlockField(next, formId, { formTarget });
+    if (v.child) next = setBlockChildren(next, formId, [{ id: `${formId}-child`, component: v.child }]);
 
     const shape = validateBlocks(next, {
       grandfatheredTopLevelIds: topLevelBlockIds(loaded.blocks),
@@ -1466,8 +1476,9 @@ async function handleCreateForm(args: unknown): Promise<Record<string, unknown>>
       page: v.page,
       form: formId,
       ...(resolved.value.target.api ? { source: resolved.value.boundTo } : { collection: resolved.value.boundTo }),
+      ...(v.child ? { child: v.child } : {}),
       fields: resolved.value.fields,
-      note: formFieldsNote(resolved.value.target, resolved.value.fields),
+      note: formFieldsNote(resolved.value.target, resolved.value.fields, v.child),
     };
   } catch (err) {
     return { ok: false, errors: [`failed to create form: ${(err as Error).message}`] };
