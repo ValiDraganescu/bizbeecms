@@ -327,3 +327,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   that order. Optional argv[2] points it at an old panel revision for
   fails-before demos (copy the old file INTO the same dir so `./shared`
   resolves).
+
+- **A fresh gate worktree needs `npm run cf-typegen` before tsc/tests** —
+  `cloudflare-env.d.ts` is generated (gitignored); without it tsc explodes with
+  missing D1Database/R2Bucket names. `opennextjs-cloudflare build` runs it via
+  prebuild, but a standalone `npx tsc --noEmit` in the worktree does not.
+
+- **The exact stale bind/list copy strings are locked out by
+  `scripts/bind-copy.test.mjs`** — if you reword `pageBuilder.bind.title/help`,
+  `list.help`, or `layoutList`, keep them source-agnostic (collection OR API) and
+  update that test's STALE list only if a string legitimately returns reworded.

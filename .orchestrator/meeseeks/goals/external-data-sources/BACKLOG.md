@@ -22,7 +22,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   select value-matching for api sources (List panel may differ), or it only
   reads kind:"collection" bindings. — reported 2026-07-02 (user, screenshot)
 
-- BUG [P2]: Page-builder single-item bind panel still says "Bind to collection" /
+- DONE (2026-07-02) BUG [P2]: stale "Bind to collection" copy — retitled
+  source-agnostically: bind.title "Bind to data source", bind.help covers
+  collection item OR mapped API response, list.help "once per item from the
+  selected data source", layoutList "List (from data source)". EN/FI/ET.
+  Regression scripts/bind-copy.test.mjs (stale-string check, fails pre-fix +
+  bind/list key-parity lock). Worktree gate: tsc + 1381 + opennext GREEN.
+  Original report: Page-builder single-item bind panel still says "Bind to collection" /
   "Fill this block's props from the first matching collection item" — stale copy
   now that the DATA SOURCE picker also offers API sources (user screenshot,
   inspector on ApiProbe). Retitle source-agnostically (e.g. "Bind to data source",

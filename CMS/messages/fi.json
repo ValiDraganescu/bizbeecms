@@ -433,10 +433,10 @@
       "collapse": "Tiivistä osio",
       "expand": "Laajenna osio"
     },
-    "layoutList": "Lista (kokoelmasta)",
+    "layoutList": "Lista (tietolähteestä)",
     "bind": {
-      "title": "Sido kokoelmaan",
-      "help": "Täytä tämän lohkon ominaisuudet ensimmäisestä osuvasta kokoelman kohteesta.",
+      "title": "Sido tietolähteeseen",
+      "help": "Täytä tämän lohkon ominaisuudet tietolähteestä — ensimmäisestä osuvasta kokoelman kohteesta tai API-vastauksesta.",
       "collection": "Kokoelma",
       "none": "— ei mitään —",
       "noCollections": "Ei vielä kokoelmia — luo sellainen Kokoelmat-osiossa.",
@@ -479,7 +479,7 @@
     },
     "list": {
       "title": "Lista",
-      "help": "Toista komponentti kerran jokaiselle osuvalle kokoelman kohteelle.",
+      "help": "Toista komponentti kerran jokaiselle valitun tietolähteen kohteelle.",
       "limit": "Kohteiden enimmäismäärä",
       "limitPlaceholder": "Oletus",
       "template": "Kohdekomponentti",

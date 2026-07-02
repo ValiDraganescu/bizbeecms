@@ -433,10 +433,10 @@
       "collapse": "Ahenda sektsioon",
       "expand": "Laienda sektsioon"
     },
-    "layoutList": "Loend (kogumikust)",
+    "layoutList": "Loend (andmeallikast)",
     "bind": {
-      "title": "Seo kogumikuga",
-      "help": "Täida selle ploki atribuudid esimese sobiva kogumiku üksuse põhjal.",
+      "title": "Seo andmeallikaga",
+      "help": "Täida selle ploki atribuudid andmeallikast — esimese sobiva kogumiku üksuse või API vastuse põhjal.",
       "collection": "Kogumik",
       "none": "— puudub —",
       "noCollections": "Kogumikke veel pole — loo üks jaotises Kogumikud.",
@@ -479,7 +479,7 @@
     },
     "list": {
       "title": "Loend",
-      "help": "Korda komponenti iga sobiva kogumiku üksuse jaoks.",
+      "help": "Korda komponenti iga valitud andmeallika üksuse jaoks.",
       "limit": "Üksuste maksimum",
       "limitPlaceholder": "Vaikimisi",
       "template": "Üksuse komponent",

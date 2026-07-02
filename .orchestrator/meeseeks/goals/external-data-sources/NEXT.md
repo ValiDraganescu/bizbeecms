@@ -1,28 +1,24 @@
 # Note to the next Meeseeks (external-data-sources)
 
-2026-07-02 10:05: P1 bind-panel bug is DONE (panel was blind to bindings
-stored under any key but "item"; now reads/writes via `firstBinding`,
-key-preserving — JOURNAL has the full map). tsc + 1379 suite + opennext
-worktree gate green. Note: a parallel Meeseeks landed Form slice (c)
-(fx-forms cards on the fixture page, D1-only) this same window.
+2026-07-02 10:12: P2 stale-copy bug is DONE — bind/list panel copy is now
+source-agnostic ("Bind to data source" etc.), EN/FI/ET, regression
+`scripts/bind-copy.test.mjs` (stale-string lockout + bind/list key parity).
+Worktree gate green (tsc + 1381 + opennext). ## Bugs is now EMPTY.
 
-## FIRST: one OPEN BUG remains (BACKLOG ## Bugs)
-[P2] Stale bind-panel copy: "Bind to collection" / "Fill this block's props
-from the first matching collection item" (`pageBuilder.bind.title` /
-`bind.help` in messages/{en,fi,et}.json — I saw both strings render in the
-SSR check). Retitle source-agnostically ("Bind to data source" + kind-neutral
-description), and check the List panel copy (`list.title`/`list.help`) for
-the same staleness. I deliberately did NOT take it (manager pinned me to the
-P1 only; my fix never touched the i18n strings). Cheap run: it's pure copy,
-EN/FI/ET, no logic.
+## Heads-up: parallel Meeseeks in flight
+A parallel worker is doing Form AI TOOLS — uncommitted changes in
+`lib/chat/tool-dispatch.ts`, `tool-scopes.ts`, `pages/page-blocks.ts`, new
+`lib/chat/form-tools.ts` (backlog form slice (d), marked DOING). Repo-local
+tsc FAILS on their in-flight state — that's theirs, don't fix or commit it.
+Gate your own work in an isolated worktree (see CAVEATS; run
+`npm run cf-typegen` there before tsc).
 
-## Then: Form slice (b) — page-builder UI (see BACKLOG decomposition)
+## Next task: Form slice (b) — page-builder UI (BACKLOG decomposition)
 Bind a Form block → saved request OR opted-in collection; map fields →
-placeholders/schema fields; success/error messages + optional redirect;
-publicSubmissions toggle in the Collections UI. EN/FI/ET. Slices (a)+(c) are
-done — authoring is pure data (`block.formTarget`), and the live fixture
-cards show exactly what persisted formTargets look like. Then (d) AI tools.
-
-Handy: `scripts/ssr-bind-panel-check.mjs` shows how to SSR-test builder
-panels with real data and no browser (see new CAVEATS entry). If you touch
-the bind panels, keep the `bindingKey` preservation intact.
+placeholders/schema fields; author success/error messages + optional
+redirect; publicSubmissions toggle in the Collections UI. EN/FI/ET.
+Slices (a)+(c) are done — authoring is pure data (`block.formTarget`), and
+the fixture page's fx-forms cards show exactly what persisted formTargets
+look like. If slice (d) landed by the time you run, its tool arg shapes are
+another reference. Keep `bindingKey` preservation intact if you touch the
+bind panels (P1 caveat).

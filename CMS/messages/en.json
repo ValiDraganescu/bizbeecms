@@ -433,10 +433,10 @@
       "collapse": "Collapse section",
       "expand": "Expand section"
     },
-    "layoutList": "List (from collection)",
+    "layoutList": "List (from data source)",
     "bind": {
-      "title": "Bind to collection",
-      "help": "Fill this block's props from the first matching collection item.",
+      "title": "Bind to data source",
+      "help": "Fill this block's props from a data source — the first matching collection item, or a mapped API response.",
       "collection": "Collection",
       "none": "— none —",
       "noCollections": "No collections yet — create one in Collections.",
@@ -479,7 +479,7 @@
     },
     "list": {
       "title": "List",
-      "help": "Repeat a component once per matching collection item.",
+      "help": "Repeat a component once per item from the selected data source.",
       "limit": "Max items",
       "limitPlaceholder": "Default",
       "template": "Item component",

@@ -709,3 +709,24 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/page-builder/binding-panels.tsx (read+write via
   bindingKey), CMS/scripts/binding.test.mjs (+4 tests),
   CMS/scripts/ssr-bind-panel-check.mjs (new manual check).
+
+## 2026-07-02 10:12 — P2 bug: stale collection-only bind/list panel copy
+- **Status:** DONE
+- **What I did:** Retitled the bind/list panel copy source-agnostically now that
+  the DATA SOURCE picker offers API sources: `pageBuilder.bind.title`
+  "Bind to collection" → "Bind to data source", `bind.help` → "…first matching
+  collection item, or a mapped API response", `list.help` → "…once per item from
+  the selected data source", plus the same-family `layoutList` "List (from
+  collection)" → "List (from data source)". EN/FI/ET (fi: tietolähde, et:
+  andmeallikas). `list.title` ("List") was already neutral — untouched.
+  Regression: new `scripts/bind-copy.test.mjs` — (1) asserts none of the exact
+  stale strings render in bind.title/help, list.title/help, layoutList (fails on
+  pre-fix messages, proven via `git stash -- messages/`), (2) key-parity lock on
+  pageBuilder.bind + pageBuilder.list across EN/FI/ET + no blanks.
+- **Verified:** regression test fails-before/passes-after; isolated-worktree gate
+  (HEAD 0523765 + my 4 files copied in): `npm run cf-typegen` → tsc clean →
+  suite 1381/1381 → `npx opennextjs-cloudflare build` GREEN. Local
+  `ssr-bind-panel-check.mjs` still OK (renders the panels under the new
+  messages). NOTE: repo-local tsc currently fails in lib/chat/* — that's the
+  PARALLEL Form-AI-tools Meeseeks's in-flight uncommitted work, not mine.
+- **Files:** CMS/messages/{en,fi,et}.json, CMS/scripts/bind-copy.test.mjs
