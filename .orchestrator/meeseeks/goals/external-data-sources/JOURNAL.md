@@ -555,3 +555,41 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **What I did:** Clean-checkout verification at HEAD e25895e: tsc --noEmit (exit 0), full node suite (1361/1361 pass, 0 fail), opennext gate via isolated worktree (`/tmp/cms-gate-worktree`, npm ci + `npx opennextjs-cloudflare build` → worker.js saved, GREEN; worktree removed, dev :3602 untouched). All gates green — goal confirmed ready for curator ARCHIVE.
 - **Verified:** everything above; nothing red, nothing changed.
 - **Files:** goal memory only.
+
+## 2026-07-02 09:36 — httpbingo living test fixture page (USER task)
+- **Status:** DONE
+- **What I did:** Built the user-requested end-to-end living fixture in the local
+  CMS site (dev :3602, local D1) exercising the whole feature against
+  https://httpbingo.org. All via live REST (no repo code changed):
+  - Component `ApiProbe` (PUT /api/components/ApiProbe, published): heading,
+    proves (self-documentation), l1–l3/v1–v3 (label/bind-value pairs), p1/p2
+    (param feeds for `{prop}` param specs).
+  - 5 data sources (names prefixed "httpbingo fixture — "), one per auth mode:
+    public/none `4cf4fb2a-cc5a-4cff-9d78-f0995e88f22b`,
+    basic (`bee:hive`) `bebdcfc8-44f0-40f5-bb3a-b7164aab13d5`,
+    bearer (header Authorization) `97bae8ab-3f64-4d64-9258-e546d918a2a6`,
+    header key (X-Api-Key) `6f005fb9-5da6-479a-a2ae-68ff24fd662f`,
+    query key (api_key) `4aa4db9e-9293-49d0-b44d-60810861e0b8`.
+  - 12 saved requests: GET /get echo, GET /json (List bind), GET
+    /anything/{thing}?greeting={greeting} (placeholder path+query), POST /post +
+    PUT /put (JSON bodyTemplate with {msg}), DELETE /delete?reason={reason},
+    /uuid cached TTL 300s vs /uuid cache-off, /basic-auth/bee/hive, /bearer,
+    /headers, /get (query-key echo).
+  - Page `api-fixture-httpbingo` (id `29acc0c0-4295-4ac5-bb6e-5d73d0ae492b`),
+    published, root-level: 7 sections — intro, GET single-item bind, List bind
+    (itemsPath slideshow.slides, grid), {placeholder}-from-props (params
+    {thing:{prop:"p1"},greeting:{prop:"p2"}}), POST/PUT/DELETE (literal params),
+    cache visibility (frozen vs live uuid side by side), 4 auth probes. Every
+    card's `proves` prop documents exactly what that block proves, on the page.
+  - Did NOT build any visitor form submission (explicitly excluded; now a
+    separate approved TODO in BACKLOG).
+- **Verified:** all 12 requests green via the Test endpoint; public route
+  http://localhost:3602/api-fixture-httpbingo SSRs real API data — checked
+  echoed query param, List rows ("Wake up to WonderWidgets!"/"Overview"),
+  URL-encoded path param (honey%20pot), POST/PUT body echoes, DELETE reason,
+  bearer token, X-Api-Key + api_key echoes, basic user=bee; 3 consecutive
+  renders: cached uuid IDENTICAL, cache-off uuid DIFFERENT each time (caching
+  made visible). Booleans (authenticated=true) render fine in string slots.
+  No repo code touched → no tsc/opennext gate owed.
+- **Files:** goal memory only; fixture lives in the local D1
+  (.wrangler/state, gitignored) + this recipe.

@@ -1,39 +1,21 @@
-# Note to the next Meeseeks (external-data-sources) — STATE OF THE GOAL / CURATOR HANDOFF
+# Note to the next Meeseeks (external-data-sources)
 
-2026-07-02: The LAST open candidate from defect hunt #3 (query-auth secret
-dropped on same-host redirect hops) is now FIXED with a failing-first
-regression test. **RECOMMEND THE CURATOR ARCHIVES THIS GOAL** — nothing
-actionable remains.
+2026-07-02 09:36: The user's httpbingo living fixture is DONE and live at
+http://localhost:3602/api-fixture-httpbingo (published; every card documents
+what it proves). Sources/component/page ids + full recipe: JOURNAL 2026-07-02
+09:36. It lives in the local D1 only — never delete it.
 
-2026-07-02 06:11 FINAL VERIFICATION PASS at HEAD e25895e: tsc clean, node
-suite 1361/1361, opennext gate GREEN (isolated worktree). Eighth worker
-confirms saturation. Archive-ready.
+## Your task: the APPROVED Form block (top TODO in BACKLOG)
+The user approved and spec'd a visitor form-submission slice — read the full
+TODO in BACKLOG (implicit Form block like List, native `<form>` baseline +
+fetch/JSON progressive enhancement, source-agnostic target: api saved request
+OR opted-in collection with draft-only writes). It's 3-4 slices — decompose in
+BACKLOG and take slice (a) (Form block schema/plan/SSR + submit endpoint)
+first. The httpbingo fixture page is the natural place for its live test
+(slice c) — POST /post echo already exists as saved request
+`deec059d-72da-419d-8162-2081a64e5e71` on source `4cf4fb2a-…f22b`.
 
-## What shipped (all verified, all in JOURNAL)
-- Slices 1–8 complete: schema + write-only encrypted secrets, central fetch/map
-  engine (`CMS/src/lib/data-sources/fetch.ts`), source-agnostic binding, Data
-  Sources admin UI + Test endpoint, bind-panel source picker, AI tools, cache
-  purge (version-counter), OAuth2 client-credentials.
-- Every GOAL.md "what good looks like" bullet met (incl. the 2026-07-02
-  revision: retries ≤2, per-request cache + purge, central request layer,
-  POST/PUT/DELETE, `{placeholder}` params).
-- Security/robustness: manual same-host-only redirects (max 3 hops), streaming
-  5MB body cap (`readBodyCapped`, covers oauth2 token fetch), and now query-auth
-  survival across same-host hops.
-- Gates: tsc + 1361 node tests green; opennext gate GREEN (isolated-worktree
-  recipe, see CAVEATS); help-copy audited.
-
-## If you land here anyway
-- SEVEN workers have judged this goal saturated. Do NOT hunt defects again and
-  do NOT invent features (client_secret_post, keyboard smoke — only on real
-  demand).
-- Known non-defects (only touch with PROOF of Workers exploitability):
-  (1) per-hop timeout → redirect chain ≤4×timeoutMs per attempt (bounded);
-  (2) http→https upgrade hop ignores ports (same host, harmless);
-  (3) numeric-form IP SSRF bypass of the internal-host blocklist — explicit
-      "light v1" scope + unreachable on Workers; only on user re-scope.
-- Otherwise: this track is done pending archive; report DONE with a one-line
-  journal entry rather than inventing work here.
-
-STRUCTURE (for the curator): archive `goals/external-data-sources/` — feature
-complete, security-reviewed, all hunt candidates closed, gates green.
+Gates: tsc + node suite + opennext (isolated-worktree recipe in CAVEATS —
+dev on :3602 is live, never build in-repo while it runs). EN/FI/ET for new UI
+strings. The archive recommendation from earlier runs is SUPERSEDED — the goal
+has fresh approved scope now.

@@ -20,7 +20,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
-- DOING (USER 2026-07-02): **httpbingo test page + test components.** In the local
+- DONE (2026-07-02): **httpbingo test page + test components.** Shipped as the
+  published page `api-fixture-httpbingo` (local D1): ApiProbe component + 5
+  "httpbingo fixture" sources (one per auth mode) + 12 saved requests; every
+  card documents what it proves. Verified live (SSR values, cached-vs-live
+  uuid, all auth echoes) — ids + rebuild recipe in JOURNAL 2026-07-02 09:36.
+  Original spec: In the local
   CMS site, build a dedicated test page with test components purpose-made to
   exercise this feature end-to-end against https://httpbingo.org: a GET bind
   (e.g. /get or /json), POST/PUT/DELETE saved requests (httpbingo echoes on
@@ -75,6 +80,9 @@ Task states: TODO | DOING | DONE | BLOCKED.
     live test (POST /post echo) + a collection-target test (contact-form style)
     added to the user's test page.
   Decompose as needed; EN/FI/ET; all the usual gates.
+
+- DONE (2026-07-02): **Query-auth secret re-applied on same-host redirect hops** —
+  hunt #3 edge: buildRequest put query auth on the initial URL only; the manual
   redirect loop took Location verbatim, so a same-host hop dropped the secret
   (header auth survived, query auth didn't). Fixed post-resolveSafeRedirect
   (query sources only, never cross-origin). Failing-first regression test;

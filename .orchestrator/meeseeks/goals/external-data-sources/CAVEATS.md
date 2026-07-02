@@ -254,3 +254,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   param. Don't "simplify" the loop to `currentUrl = next.value` for query-auth
   sources, and never re-apply before the same-host check (that would leak the
   secret cross-origin).
+
+- **Making a page publicly reachable is TWO steps**: `POST /api/pages/:id/publish`
+  snapshots the draft version, but the public `[[...slug]]` route ALSO gates on
+  `page.publishStatus === "published"` — flip it via `PUT /api/pages` with
+  `publishStatus:"published"` or the page 404s despite a published version.
+
+- **httpbingo echoes query params and headers as ARRAYS** — bind dot-paths with a
+  trailing index: `args.foo.0`, `headers.X-Api-Key.0`. Parsed JSON bodies echo
+  under `json.*` (no array wrap).
+
+- **The httpbingo living fixture lives in the LOCAL D1 only** (.wrangler/state,
+  gitignored): page `api-fixture-httpbingo`, component `ApiProbe`, 5 sources
+  "httpbingo fixture — …" + 12 requests. A DB reset wipes it — rebuild from the
+  recipe/ids in JOURNAL 2026-07-02 09:36. Don't delete it during cleanup passes;
+  it's a deliberate permanent fixture (per user).
