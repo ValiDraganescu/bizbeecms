@@ -175,13 +175,19 @@ function SampleLoader({
       </button>
       {state === "ok" && (
         <>
-          <p className="text-xs text-foreground-muted">{t("bind.sampleLoaded", { count })}</p>
+          <p role="status" className="text-xs text-foreground-muted">
+            {t("bind.sampleLoaded", { count })}
+          </p>
           <pre className="max-h-40 overflow-auto rounded-md border border-border bg-surface-muted p-2 font-mono text-[11px] text-foreground">
             {preview}
           </pre>
         </>
       )}
-      {state === "fail" && <p className="text-xs text-danger">{t("bind.sampleFailed")}</p>}
+      {state === "fail" && (
+        <p role="alert" className="text-xs text-danger">
+          {t("bind.sampleFailed")}
+        </p>
+      )}
     </div>
   );
 }
@@ -351,12 +357,15 @@ function QueryBuilder({
         <span className={ctlLabel}>{t("bind.filters")}</span>
         {filters.map((f, i) => {
           const noValue = f.op === "is_null" || f.op === "not_null";
+          // Row-scoped aria-labels via plain concat (ICU-brace caveat): with
+          // several rows, identical labels are ambiguous to screen readers.
+          const row = `${t("bind.filters")} ${i + 1}`;
           return (
             <div key={i} className="flex flex-wrap items-center gap-1.5">
               <select
                 className={`${ctlInput} flex-1`}
                 value={f.field}
-                aria-label={t("bind.field")}
+                aria-label={`${t("bind.field")} — ${row}`}
                 onChange={(e) =>
                   onFilters(filters.map((x, j) => (j === i ? { ...x, field: e.target.value } : x)))
                 }
@@ -370,7 +379,7 @@ function QueryBuilder({
               <select
                 className={`${ctlInput} w-24`}
                 value={f.op}
-                aria-label={t("bind.op")}
+                aria-label={`${t("bind.op")} — ${row}`}
                 onChange={(e) =>
                   onFilters(filters.map((x, j) => (j === i ? { ...x, op: e.target.value } : x)))
                 }
@@ -387,7 +396,7 @@ function QueryBuilder({
                   className={`${ctlInput} flex-1`}
                   value={f.value == null ? "" : String(f.value)}
                   placeholder={t("bind.value")}
-                  aria-label={t("bind.value")}
+                  aria-label={`${t("bind.value")} — ${row}`}
                   onChange={(e) =>
                     onFilters(filters.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))
                   }
@@ -395,7 +404,7 @@ function QueryBuilder({
               )}
               <button
                 type="button"
-                aria-label={t("bind.removeFilter")}
+                aria-label={`${t("bind.removeFilter")} — ${f.field} (${i + 1})`}
                 className="rounded-md border border-border px-2 py-1 text-xs text-foreground-muted hover:bg-surface-muted"
                 onClick={() => onFilters(filters.filter((_, j) => j !== i))}
               >
@@ -421,7 +430,7 @@ function QueryBuilder({
             <select
               className={`${ctlInput} flex-1`}
               value={s.field}
-              aria-label={t("bind.field")}
+              aria-label={`${t("bind.field")} — ${t("bind.sort")} ${i + 1}`}
               onChange={(e) =>
                 onSort(sort.map((x, j) => (j === i ? { ...x, field: e.target.value } : x)))
               }
@@ -435,7 +444,7 @@ function QueryBuilder({
             <select
               className={`${ctlInput} w-24`}
               value={s.dir ?? "asc"}
-              aria-label={t("bind.dir")}
+              aria-label={`${t("bind.dir")} — ${t("bind.sort")} ${i + 1}`}
               onChange={(e) =>
                 onSort(sort.map((x, j) => (j === i ? { ...x, dir: e.target.value as "asc" | "desc" } : x)))
               }
@@ -445,7 +454,7 @@ function QueryBuilder({
             </select>
             <button
               type="button"
-              aria-label={t("bind.removeSort")}
+              aria-label={`${t("bind.removeSort")} — ${s.field} (${i + 1})`}
               className="rounded-md border border-border px-2 py-1 text-xs text-foreground-muted hover:bg-surface-muted"
               onClick={() => onSort(sort.filter((_, j) => j !== i))}
             >

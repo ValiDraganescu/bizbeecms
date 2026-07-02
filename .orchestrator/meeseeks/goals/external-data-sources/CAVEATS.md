@@ -206,3 +206,9 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **Per-row action buttons carry `aria-label={action} — {name}`** via plain string
   concat — do NOT convert these to i18n message templates with braces (ICU crash
   caveat); concat is the deliberate pattern here.
+
+- **binding-panels.tsx has NO expand/collapse toggles** — don't hunt for
+  aria-expanded targets there (NEXT notes guessed wrong once). Its a11y pass
+  (2026-07-02) = live regions on SampleLoader + row-scoped concat labels in
+  QueryBuilder. Row-scoped labels reuse existing i18n keys via concat — no
+  new message strings needed.

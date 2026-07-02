@@ -393,3 +393,21 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/data-sources/query-lines.ts (new),
   CMS/scripts/query-lines.test.mjs (new),
   CMS/src/components/content/data-sources-manager.tsx (import swap)
+
+## 2026-07-02 05:21 — A11y pass on page-builder binding panels
+- **Status:** DONE
+- **What I did:** Mirrored the d8ea2c8 manager-forms a11y patterns onto
+  binding-panels.tsx: SampleLoader results are now live regions
+  (role="status" on the sampleLoaded count, role="alert" on sampleFailed);
+  QueryBuilder filter/sort rows got row-scoped aria-labels via plain concat
+  (field/op/value selects + remove buttons carry "label — row N" /
+  "remove — <field> (N)") so multiple rows aren't ambiguous to screen
+  readers. No aria-expanded/controls added — this file has no
+  expand/collapse toggles (NEXT.md guessed there were; there aren't).
+  ApiParamsEditor/DotPathMap were already per-row labeled. No new strings —
+  concat reuses existing keys (ICU-brace caveat honored).
+- **Verified:** tsc clean; full suite 1348/1348 green. JSX-attr-only change,
+  no pure logic → no new node test (test-business-logic-only). Not
+  live-smoked (panel is deep in the builder UI; attrs are static). Opennext
+  build gate deferred a 17th time — dev server pid 79854 still on :3602.
+- **Files:** CMS/src/components/page-builder/binding-panels.tsx

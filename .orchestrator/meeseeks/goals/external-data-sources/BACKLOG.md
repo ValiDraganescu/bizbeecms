@@ -20,6 +20,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **A11y pass on the page-builder binding panels** —
+  role="status"/role="alert" live regions on SampleLoader results; row-scoped
+  concat aria-labels on QueryBuilder filter/sort controls + remove buttons.
+  No toggles exist in this file (no aria-expanded needed). tsc + 1348 green;
+  opennext gate deferred (17th).
+
 - DONE (2026-07-02): **Query-lines edge-case tests** — extract pure
   `parseQueryLines`/`serializeQuery` from data-sources-manager.tsx into
   `lib/data-sources/query-lines.ts`, node tests for edge cases (no `=`,
