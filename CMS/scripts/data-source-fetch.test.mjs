@@ -239,6 +239,112 @@ test("fetch: body under the cap still parses fine", async () => {
   assert.deepEqual(r.data, { n: 42 });
 });
 
+/* ------------------------------------------------------------- redirects */
+
+/** Fetch that maps url → {status, body?, location?} and records calls. */
+function redirectFetch(routes) {
+  const calls = [];
+  const fn = async (url, init) => {
+    calls.push({ url, init });
+    const r = routes[url];
+    if (!r) throw new Error(`unexpected fetch to ${url}`);
+    const headers = { "content-type": "application/json" };
+    if (r.location) headers.location = r.location;
+    return new Response(JSON.stringify(r.body ?? {}), { status: r.status, headers });
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+test("redirect: cross-origin redirect is rejected — attacker host never fetched, no secret leak", async () => {
+  const f = redirectFetch({
+    "https://api.example.com/v2/weather": { status: 302, location: "http://169.254.169.254/latest" },
+  });
+  const r = await fetchSource(
+    src({ authType: "header", authParam: "X-API-Key", secret: "sek" }),
+    req(),
+    {},
+    { fetch: f, sleep: noSleep },
+  );
+  assert.equal(r.ok, false);
+  assert.match(r.error, /different host/);
+  assert.equal(f.calls.length, 1); // no retry either — same redirect would recur
+  assert.equal(f.calls[0].url, "https://api.example.com/v2/weather");
+});
+
+test("redirect: same-origin redirect is followed with manual redirect mode", async () => {
+  const f = redirectFetch({
+    "https://api.example.com/v2/weather": { status: 301, location: "/v3/weather" },
+    "https://api.example.com/v3/weather": { status: 200, body: { n: 7 } },
+  });
+  const r = await fetchSource(src(), req(), {}, { fetch: f, sleep: noSleep });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.data, { n: 7 });
+  assert.equal(f.calls.length, 2);
+  for (const c of f.calls) assert.equal(c.init.redirect, "manual");
+});
+
+test("redirect: http→https upgrade on the same host is allowed; downgrade is not", async () => {
+  const up = redirectFetch({
+    "http://api.example.com/v2/weather": { status: 301, location: "https://api.example.com/v2/weather" },
+    "https://api.example.com/v2/weather": { status: 200, body: { ok: 1 } },
+  });
+  const r1 = await fetchSource(
+    src({ baseUrl: "http://api.example.com/v2" }),
+    req(),
+    {},
+    { fetch: up, sleep: noSleep },
+  );
+  assert.equal(r1.ok, true);
+
+  const down = redirectFetch({
+    "https://api.example.com/v2/weather": { status: 301, location: "http://api.example.com/v2/weather" },
+  });
+  const r2 = await fetchSource(src(), req(), {}, { fetch: down, sleep: noSleep });
+  assert.equal(r2.ok, false);
+  assert.match(r2.error, /different host/);
+});
+
+test("redirect: hop count is capped", async () => {
+  const routes = {};
+  for (let i = 0; i < 10; i++) {
+    routes[`https://api.example.com/v2/weather${i === 0 ? "" : `-${i}`}`] = {
+      status: 302,
+      location: `/v2/weather-${i + 1}`,
+    };
+  }
+  const f = redirectFetch(routes);
+  const r = await fetchSource(src(), req(), {}, { fetch: f, sleep: noSleep });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /too many upstream redirects/);
+  assert.equal(f.calls.length, 4); // original + MAX_REDIRECTS hops
+});
+
+test("redirect: 302 on POST re-issues as GET without body (same origin)", async () => {
+  const f = redirectFetch({
+    "https://api.example.com/v2/weather": { status: 302, location: "/v2/created" },
+    "https://api.example.com/v2/created": { status: 200, body: { done: true } },
+  });
+  const r = await fetchSource(
+    src(),
+    req({ method: "POST", bodyTemplate: '{"a":1}' }),
+    {},
+    { fetch: f, sleep: noSleep },
+  );
+  assert.equal(r.ok, true);
+  assert.equal(f.calls[1].init.method, "GET");
+  assert.equal(f.calls[1].init.body, null);
+});
+
+test("redirect: missing Location is graceful", async () => {
+  const f = redirectFetch({
+    "https://api.example.com/v2/weather": { status: 302 },
+  });
+  const r = await fetchSource(src(), req(), {}, { fetch: f, sleep: noSleep });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /without a Location/);
+});
+
 /* --------------------------------------------------------------- caching */
 
 test("fetch: cache hit skips the network; TTL expiry refetches", async () => {
@@ -425,4 +531,14 @@ test("oauth2: token endpoint failure / bad payload is graceful", async () => {
   const missing = await fetchSource(oauthSrc({ secret: null }), req(), {}, { fetch: down, sleep: noSleep });
   assert.equal(missing.ok, false);
   assert.match(missing.error, /missing its token URL or client credentials/);
+});
+
+test("oauth2: token endpoint redirect is NOT followed (client creds stay put)", async () => {
+  const f = mockOauthFetch({ token: [{ status: 302 }] });
+  const r = await fetchSource(oauthSrc(), req(), {}, { fetch: f, sleep: noSleep });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /token endpoint responded 302/);
+  assert.equal(f.calls.token.length, 1);
+  assert.equal(f.calls.token[0].init.redirect, "manual");
+  assert.equal(f.calls.api.length, 0);
 });

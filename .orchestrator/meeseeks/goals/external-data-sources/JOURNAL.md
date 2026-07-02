@@ -443,3 +443,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   changes); dev pid 79854 on :3602 untouched.
 - **Files:** CMS/src/lib/data-sources/fetch.ts,
   CMS/scripts/data-source-fetch.test.mjs
+
+## 2026-07-02 05:45 — Redirect hardening in the central fetch engine (SSRF + secret-leak fix)
+- **Status:** DONE
+- **What I did:** Closed a PROVEN security gap: `fetchSource` and
+  `fetchOauth2Token` used fetch's default `redirect:"follow"`, so a
+  compromised/malicious upstream could (a) 302 the Worker past the save-time
+  SSRF check to 169.254.x/.internal, and (b) ship the custom auth header
+  (X-API-Key / Basic / Bearer + oauth2 client creds) to any host it named.
+  Fix: `redirect:"manual"` everywhere; fetchSource follows redirects itself —
+  only same-host hops (same origin OR http→https upgrade), max 3; 303 and
+  301/302-on-non-GET re-issue as GET without body (spec); rejected redirect →
+  graceful `{ok:false}`, never retried. oauth2 token fetch never follows
+  (3xx → existing "token endpoint responded N" error). +7 node tests
+  (cross-origin reject w/ no attacker fetch, same-origin follow w/ manual
+  mode asserted, https-upgrade allow + downgrade reject, hop cap, POST→GET
+  rewrite, missing Location, oauth2 302).
+- **Verified:** tsc green; suite 1358/1358 (+7); opennext gate GREEN in the
+  isolated /tmp worktree with both changed files cp'd in; LIVE smoke on :3602
+  via the real test endpoint against httpbingo.org — /redirect/1 (same
+  origin) → 200 with data, /redirect-to?url=https://example.com → graceful
+  `{ok:false,"upstream redirected to a different host"}`; source deleted
+  after (no leftovers).
+- **Files:** CMS/src/lib/data-sources/fetch.ts,
+  CMS/scripts/data-source-fetch.test.mjs

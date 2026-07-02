@@ -88,6 +88,8 @@ const DEFAULT_TIMEOUT_MS = 10_000;
  * ever matters.
  */
 const MAX_RESPONSE_BYTES = 5_000_000;
+const MAX_REDIRECTS = 3;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 const PLACEHOLDER_RE = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
 
@@ -275,6 +277,9 @@ async function fetchOauth2Token(
         authorization: `Basic ${btoa(source.secret)}`, // client_secret_basic
       },
       body: "grant_type=client_credentials",
+      // No redirect following: client creds must never travel to a host other
+      // than the configured token URL. A redirecting endpoint → !res.ok below.
+      redirect: "manual",
       signal: AbortSignal.timeout(deps.timeoutMs),
     });
   } catch (e) {
@@ -316,6 +321,37 @@ async function fetchOauth2Token(
 
 function isIdempotentSafe(request: FetchRequestConfig): boolean {
   return request.method === "GET" || request.retryable === true;
+}
+
+/**
+ * SSRF/secret boundary on redirects. Fetch's default `redirect: "follow"`
+ * would let a compromised upstream 302 the Worker past the SAVE-TIME baseUrl
+ * SSRF check (to 169.254.x / .internal) and forward the auth header / query
+ * secret to any host it names. So redirects are followed MANUALLY, and a hop
+ * is safe only if it stays on the SAME HOST — same origin, or an http→https
+ * upgrade. Foreign host, https→http downgrade, non-http(s) scheme or a
+ * missing/invalid Location all reject (gracefully, like every other failure).
+ */
+function resolveSafeRedirect(
+  fromUrl: string,
+  location: string | null,
+): { ok: true; value: string } | { ok: false; error: string } {
+  if (!location) return { ok: false, error: "upstream redirect without a Location header" };
+  let from: URL;
+  let to: URL;
+  try {
+    from = new URL(fromUrl);
+    to = new URL(location, fromUrl);
+  } catch {
+    return { ok: false, error: "upstream redirect with an invalid Location" };
+  }
+  const sameOrigin = to.origin === from.origin;
+  const httpsUpgrade =
+    from.protocol === "http:" && to.protocol === "https:" && to.hostname === from.hostname;
+  if (!sameOrigin && !httpsUpgrade) {
+    return { ok: false, error: "upstream redirected to a different host" };
+  }
+  return { ok: true, value: to.toString() };
 }
 
 /**
@@ -367,14 +403,36 @@ export async function fetchSource(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     if (attempt > 1) await sleep(BACKOFF_MS * (attempt - 1));
 
+    // Manual redirect handling (see resolveSafeRedirect). Same-host hops only,
+    // capped; 303 (and 301/302 on non-GET) re-issue as GET without body, per
+    // spec. A rejected redirect returns immediately — retrying would just get
+    // the same redirect again.
+    let currentUrl = built.value.url;
+    let currentMethod: HttpMethod = built.value.method;
+    let currentBody = built.value.body;
+    let redirects = 0;
     let res: Response;
     try {
-      res = await doFetch(built.value.url, {
-        method: built.value.method,
-        headers: built.value.headers,
-        body: built.value.body,
-        signal: AbortSignal.timeout(timeoutMs),
-      });
+      for (;;) {
+        res = await doFetch(currentUrl, {
+          method: currentMethod,
+          headers: built.value.headers,
+          body: currentBody,
+          redirect: "manual",
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        if (!REDIRECT_STATUSES.has(res.status)) break;
+        const next = resolveSafeRedirect(currentUrl, res.headers.get("location"));
+        if (!next.ok) return { ok: false, status: res.status, error: next.error };
+        if (++redirects > MAX_REDIRECTS) {
+          return { ok: false, status: res.status, error: "too many upstream redirects" };
+        }
+        if (res.status === 303 || (res.status !== 307 && res.status !== 308 && currentMethod !== "GET")) {
+          currentMethod = "GET";
+          currentBody = null;
+        }
+        currentUrl = next.value;
+      }
     } catch (e) {
       lastError = e instanceof Error ? e.message : "network error";
       lastStatus = null;

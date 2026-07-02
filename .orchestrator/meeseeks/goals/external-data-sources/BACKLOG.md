@@ -20,6 +20,16 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **Redirect hardening in the central fetch engine** — default
+  `redirect:"follow"` let a malicious upstream 302 past the save-time SSRF
+  check (to 169.254.x / .internal) AND forwarded custom auth headers
+  (X-API-Key, Basic, oauth2 Bearer/client creds) cross-origin. Fixed:
+  `redirect:"manual"` everywhere; only same-host redirects followed (same
+  origin or http→https upgrade), max 3 hops; cross-origin → graceful
+  `{ok:false}`, never retried. oauth2 token fetch never follows. +7 node
+  tests; tsc + 1358 green; opennext gate GREEN (worktree, changes included);
+  live-smoked against httpbingo.org on :3602.
+
 - DONE (2026-07-02): **Response size cap in the central fetch engine** — a huge
   upstream body buffered unbounded into `res.json()` + the cache; added
   MAX_RESPONSE_BYTES 5MB (content-length precheck + text-length check), graceful

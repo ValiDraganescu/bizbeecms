@@ -223,6 +223,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   changed files into the worktree after `worktree add` (verified 2026-07-02):
   gate covers pre-commit changes, journal stays truthful.
 
+- **fetchSource follows redirects MANUALLY — never re-enable `redirect:"follow"`.**
+  Default follow would bypass the save-time SSRF check (upstream 302s to
+  169.254.x/.internal) and ship auth headers (X-API-Key/Basic/Bearer) to any
+  host the upstream names. Only same-host hops are followed (same origin or
+  http→https upgrade, max 3); cross-origin → graceful `{ok:false}`, never
+  retried. The oauth2 token fetch never follows at all. If a real API ever
+  legitimately redirects cross-origin, the fix is updating the source baseUrl,
+  not loosening the redirect policy.
+
 - **fetchSource caps upstream bodies at MAX_RESPONSE_BYTES (5 MB)** —
   content-length precheck + buffered text-length check; too-large →
   `{ok:false}`, never retried, never cached. Don't add a second buffer of the
