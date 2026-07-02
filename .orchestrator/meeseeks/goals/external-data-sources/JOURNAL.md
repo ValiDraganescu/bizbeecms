@@ -322,3 +322,21 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   again (12th) — dev server pid 79854 still on :3602 with browser connections.
 - **Files:** CMS/src/lib/chat/tool-dispatch-core.ts,
   CMS/src/lib/chat/tool-dispatch.ts, CMS/scripts/tool-dispatch.test.mjs
+
+## 2026-07-02 04:47 — Renderer-side e2e render smoke (api-bound List on a PUBLISHED page)
+- **Status:** DONE
+- **What I did:** Fresh end-to-end insurance after purge/oauth2/dispatch-fix
+  landed on top of Slice-3/5. On live dev :3602 (dev-superadmin backdoor), all
+  via REST: created source "Render Smoke DS" (jsonplaceholder, authType none) +
+  saved request GET /posts?_limit=3; created page `meeseeks-render-smoke`
+  (published); PUT a hand-built draft (Section → __section_column__ → List with
+  listSource {kind:"api",sourceId,requestId}, listMap {title:"title",
+  subtitle:"body"}, SectionHeading listRole:"template" child); published v1;
+  GET the PUBLIC route.
+- **Verified:** public route 200; all 3 API rows stamped — titles in real SSR'd
+  `<h2>` markup (not just RSC payload), bodies in `<p>`. Graceful degrade:
+  DELETEd the source, re-render → 200 with 0 rows (never 500). Cleanup: page
+  deleted (route 404s), no smoke sources left in /api/data-sources, /tmp
+  scratch removed. No code changes this run. Opennext build gate DEFERRED again
+  (13th) — dev server pid 79854 still on :3602 with active browser connections.
+- **Files:** goal memory only.

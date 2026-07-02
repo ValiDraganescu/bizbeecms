@@ -20,6 +20,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **Renderer-side e2e render smoke** — api-bound List on a
+  PUBLISHED page SSRs real API data via the public route (fresh insurance after
+  purge/oauth2/dispatch-fix landed on top of Slice-3/5). Live on :3602:
+  jsonplaceholder source + GET /posts request, hand-built List draft, publish,
+  public route 200 with 3 rows in real `<h2>` SSR; source-delete → 200/0 rows
+  (graceful); full cleanup (page 404s, no sources left). Opennext gate
+  deferred (13th).
+
 - DONE (2026-07-02): **Live AI e2e smoke** — real /api/chat model round-trip
   (gpt-4o-mini) chained create_data_source → test_data_source → create_list
   (incl. one model self-correction on a bad section id); api-bound List landed

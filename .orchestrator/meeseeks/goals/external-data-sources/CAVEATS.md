@@ -190,3 +190,10 @@ Read every line before working. Each entry was learned the hard way by a previou
   makeDispatcher now sets `name` LAST (`{ ...payload, name }`, fixed 2026-07-02)
   so a payload `name` is silently OVERWRITTEN — your domain name would be lost,
   not leaked. Nest it (`source:`) or rename it (`collectionName`).
+
+- **A hand-built api List draft is valid & renders**: `List` block with
+  `listSource:{kind:"api",sourceId,requestId}` + `listMap:{prop:"dot.path"}` +
+  ONE child `{component:<Template>, listRole:"template"}` inside a Section's
+  `__section_column__`; PUT /api/pages/:id/draft accepts it, publish + public
+  route SSRs the stamped rows. Cheapest way to smoke the renderer without the
+  AI or the builder UI (verified 2026-07-02).
