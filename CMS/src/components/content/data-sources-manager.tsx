@@ -158,7 +158,12 @@ export function DataSourcesManager() {
     }
   }
 
-  if (sources === null) return <p className="text-foreground-muted">{t("loading")}</p>;
+  if (sources === null)
+    return (
+      <p role="status" className="text-foreground-muted">
+        {t("loading")}
+      </p>
+    );
 
   return (
     <div className="flex flex-col gap-4">
@@ -211,6 +216,9 @@ export function DataSourcesManager() {
                     <button
                       type="button"
                       className={ghostBtn}
+                      aria-expanded={expandedId === source.id}
+                      aria-controls={`ds-requests-${source.id}`}
+                      aria-label={`${t("requests")} — ${source.name}`}
                       onClick={() =>
                         setExpandedId(expandedId === source.id ? null : source.id)
                       }
@@ -220,6 +228,7 @@ export function DataSourcesManager() {
                     <button
                       type="button"
                       className={ghostBtn}
+                      aria-label={`${t("edit")} — ${source.name}`}
                       onClick={() => setEditingId(source.id)}
                     >
                       {t("edit")}
@@ -227,6 +236,7 @@ export function DataSourcesManager() {
                     <button
                       type="button"
                       className={dangerBtn}
+                      aria-label={`${t("delete")} — ${source.name}`}
                       onClick={() => setDeleting(source)}
                     >
                       {t("delete")}
@@ -268,7 +278,10 @@ export function DataSourcesManager() {
               {t("purgeAll")}
             </button>
           )}
-          {purgedAll && <span className="text-sm text-success">{t("purged")}</span>}
+          {/* Persistent live region so the purge confirmation is announced. */}
+          <span role="status" className="text-sm text-success">
+            {purgedAll ? t("purged") : ""}
+          </span>
         </div>
       )}
 
@@ -375,6 +388,7 @@ function SourceForm({
           className={inputCls}
           value={name}
           maxLength={100}
+          required
           onChange={(e) => setName(e.target.value)}
         />
       </label>
@@ -385,6 +399,7 @@ function SourceForm({
           placeholder="https://api.example.com/v1"
           value={baseUrl}
           maxLength={2000}
+          required
           onChange={(e) => setBaseUrl(e.target.value)}
         />
       </label>
@@ -423,6 +438,7 @@ function SourceForm({
               }
               value={authParam}
               maxLength={authType === "oauth2" ? 2000 : 100}
+              required
               onChange={(e) => setAuthParam(e.target.value)}
             />
           </label>
@@ -446,6 +462,8 @@ function SourceForm({
             }
             value={secret}
             maxLength={2000}
+            // On edit, blank = keep the stored secret — only a NEW source requires one.
+            required={source?.hasSecret !== true}
             onChange={(e) => setSecret(e.target.value)}
           />
           <span className="text-xs text-foreground-muted">{t("secretHelp")}</span>
@@ -536,10 +554,15 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
   }
 
   return (
-    <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
+    <div
+      id={`ds-requests-${sourceId}`}
+      className="mt-4 flex flex-col gap-3 border-t border-border pt-4"
+    >
       <h3 className="text-sm font-medium text-foreground">{t("requestsTitle")}</h3>
       {requests === null ? (
-        <p className="text-sm text-foreground-muted">{t("loading")}</p>
+        <p role="status" className="text-sm text-foreground-muted">
+          {t("loading")}
+        </p>
       ) : (
         <>
           {requests.length === 0 && !adding && (
@@ -572,9 +595,10 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
                           ? t("cacheSummary", { ttl: req.cacheTtlSec })
                           : t("cacheOff")}
                         {req.retryable ? ` · ${t("retryableBadge")}` : ""}
-                        {purgedId === req.id && (
-                          <span className="text-success">{` · ${t("purged")}`}</span>
-                        )}
+                        {/* role=status so the purge confirmation is announced. */}
+                        <span role="status" className="text-success">
+                          {purgedId === req.id ? ` · ${t("purged")}` : ""}
+                        </span>
                       </p>
                     </div>
                     <div className="flex shrink-0 gap-2">
@@ -582,6 +606,7 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
                         <button
                           type="button"
                           className={ghostBtn}
+                          aria-label={`${t("purge")} — ${req.name}`}
                           onClick={() => void purge(req)}
                         >
                           {t("purge")}
@@ -590,6 +615,9 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
                       <button
                         type="button"
                         className={ghostBtn}
+                        aria-expanded={testingId === req.id}
+                        aria-controls={`ds-test-${req.id}`}
+                        aria-label={`${t("test")} — ${req.name}`}
                         onClick={() => setTestingId(testingId === req.id ? null : req.id)}
                       >
                         {t("test")}
@@ -597,6 +625,7 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
                       <button
                         type="button"
                         className={ghostBtn}
+                        aria-label={`${t("edit")} — ${req.name}`}
                         onClick={() => setEditingId(req.id)}
                       >
                         {t("edit")}
@@ -604,6 +633,7 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
                       <button
                         type="button"
                         className={dangerBtn}
+                        aria-label={`${t("delete")} — ${req.name}`}
                         onClick={() => setDeleting(req)}
                       >
                         {t("delete")}
@@ -740,6 +770,7 @@ function RequestForm({
             className={inputCls}
             value={name}
             maxLength={100}
+            required
             onChange={(e) => setName(e.target.value)}
           />
         </label>
@@ -878,7 +909,10 @@ function TestPanel({ sourceId, request }: { sourceId: string; request: SavedRequ
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+    <div
+      id={`ds-test-${request.id}`}
+      className="mt-3 flex flex-col gap-2 border-t border-border pt-3"
+    >
       <p className="text-xs text-foreground-muted">{t("testHelp")}</p>
       {placeholders.length > 0 && (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -910,7 +944,9 @@ function TestPanel({ sourceId, request }: { sourceId: string; request: SavedRequ
       {result &&
         (result.ok ? (
           <div className="flex flex-col gap-1">
-            <p className="text-sm text-success">{t("testStatus", { status: result.status })}</p>
+            <p role="status" className="text-sm text-success">
+              {t("testStatus", { status: result.status })}
+            </p>
             <pre className="max-h-80 overflow-auto rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-foreground">
               {JSON.stringify(result.data, null, 2)}
             </pre>

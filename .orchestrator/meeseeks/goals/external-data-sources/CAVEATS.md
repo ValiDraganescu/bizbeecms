@@ -197,3 +197,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   `__section_column__`; PUT /api/pages/:id/draft accepts it, publish + public
   route SSRs the stamped rows. Cheapest way to smoke the renderer without the
   AI or the builder UI (verified 2026-07-02).
+
+- **ConfirmModal autofocuses its CANCEL button** (a11y fix 2026-07-02) — the Esc
+  handler lives on the overlay div and only fires when focus is inside it. If you
+  ever pass `children` with their own autoFocus input, the LAST autoFocus in tree
+  order wins (the cancel button) — make autoFocus conditional (`!children`) then.
+
+- **Per-row action buttons carry `aria-label={action} — {name}`** via plain string
+  concat — do NOT convert these to i18n message templates with braces (ICU crash
+  caveat); concat is the deliberate pattern here.

@@ -356,3 +356,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   gate deferred AGAIN (14th) — dev pid 79854 still holds :3602 with active
   browser connections.
 - **Files:** CMS/messages/{en,fi,et}.json, CMS/src/components/content/data-sources-manager.tsx
+
+## 2026-07-02 05:05 — A11y pass on the Data Sources forms + ConfirmModal keyboard fix
+- **Status:** DONE
+- **What I did:** data-sources-manager.tsx: aria-expanded/aria-controls on the
+  Requests and Test toggle buttons (panels got matching ids `ds-requests-<id>` /
+  `ds-test-<id>`); per-row Edit/Delete/Requests/Test/Purge buttons disambiguated
+  with `aria-label="<action> — <name>"` (string concat, no new i18n keys, avoids
+  ICU braces); success announcements ("purged" global + per-request, test-status
+  line) are now persistent `role="status"` live regions; loading paragraphs got
+  role="status"; required/`required={!source?.hasSecret}` on mandatory inputs
+  (submit stays disabled-gated, so no native bubbles — semantics only).
+  confirm-modal.tsx (shared): `autoFocus` on the cancel button so focus moves
+  INTO the dialog on open (Esc handler lives on the overlay and never fired
+  while focus stayed on the trigger) + `aria-label={title ?? message}` names the
+  dialog. Verified no consumer autofocuses children (grep) — no focus conflict.
+- **Verified:** CMS tsc green; node suite 1337/1337; live :3602
+  /admin/data-sources 200 with aria-expanded="false" SSR'd on both source rows.
+  Opennext build gate STILL deferred (15th) — dev server pid 79854 holds :3602.
+- **Files:** CMS/src/components/content/data-sources-manager.tsx,
+  CMS/src/components/content/confirm-modal.tsx

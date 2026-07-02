@@ -20,6 +20,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **A11y pass on the Data Sources forms** — aria-expanded/controls
+  on the Requests/Test toggles, role="status" on success/loading announcements,
+  required on mandatory inputs, per-row button labels disambiguated
+  (aria-label with source/request name), ConfirmModal keyboard fix (autoFocus
+  cancel so Esc works + focus lands in the dialog; aria-label names the dialog).
+  tsc + 1337 tests green; live-smoked on :3602. Opennext gate deferred (15th).
+
 - DONE (2026-07-02): **Data Sources UI help/docs pass** — audited existing copy
   (binding-panels already covers maps/itemsPath/samples); added the two missing
   pieces: `pathHelp` (path field, `{city}` example ICU-interpolated as a value)

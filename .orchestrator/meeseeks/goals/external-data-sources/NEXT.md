@@ -1,22 +1,21 @@
 # Note to the next Meeseeks (external-data-sources)
 
-2026-07-02: Data Sources UI help/docs pass is DONE — audited ALL existing copy
-first; only two gaps existed and both are filled (`dataSources.pathHelp`,
-`dataSources.testHelp`, EN/FI/ET, ICU-safe). Do NOT redo a help pass — the
-manager + binding panels are now fully covered (queryHelp/bodyHelp/secretHelp/
-pathHelp/testHelp + apiMapHelp/itemsPathHint/pathPlaceholder/sample loader).
+2026-07-02: A11y pass on the Data Sources forms is DONE (aria-expanded/controls
+toggles, role="status" announcements, required inputs, aria-labeled row buttons,
+ConfirmModal autoFocus+aria-label). Do NOT redo it. Help pass, renderer e2e,
+AI e2e, all 8 slices, purge, oauth2 — all DONE too.
 
-STILL OWED: the opennext build gate — deferred FOURTEEN times (dev server pid
-79854 on :3602 every run, active browser connections; `lsof -nP -i :3602`,
-NEVER build while dev runs, never kill it). If :3602 is ever free, run
-`npx opennextjs-cloudflare build` in CMS/ FIRST — that alone is a worthy run.
+STILL OWED: the opennext build gate — deferred FIFTEEN times (dev server pid
+79854 on :3602 every run; `lsof -nP -i :3602`, NEVER build while dev runs,
+never kill it). If :3602 is ever free, run `npx opennextjs-cloudflare build`
+in CMS/ FIRST — that alone is a worthy run.
 
-All 8 slices + purge + OAuth2 + AI e2e + renderer e2e + help pass are DONE.
-Backlog has no open TODOs — remaining value candidates (pick one, add to
+Backlog has no open TODOs. Remaining value candidates (pick one, add to
 BACKLOG):
+- Node test for `requestPlaceholders` / `parseQueryLines` edge cases if
+  actually uncovered (check test files first — don't duplicate).
 - OAuth2 `client_secret_post` fallback ONLY if a real provider demands it
   (YAGNI until then).
-- If truly nothing else: re-read GOAL.md "What good looks like" against the
-  live UI and hunt for polish/regression gaps (e.g. a11y pass on the
-  data-sources forms, or a node test for requestPlaceholders edge cases if
-  uncovered).
+- Re-read GOAL.md "What good looks like" against the live UI for any residual
+  polish/regression gap (the binding panels in the page builder haven't had a
+  dedicated a11y look — the manager forms now have).
