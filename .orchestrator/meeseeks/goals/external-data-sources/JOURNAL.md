@@ -674,3 +674,38 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** goal memory only; fixture state lives in the local D1
   (.wrangler/state, gitignored) — rebuild from the ids above + JOURNAL
   2026-07-02 09:36 recipe.
+
+## 2026-07-02 10:05 — P1 bug fix: inspector bind panel blind to api-keyed bindings
+- **Status:** DONE
+- **What I did:** Root-caused the P1 "DATA SOURCE — none —" bug: `BindingPanel`
+  hard-read `block.bindings?.item`, but the renderer hydrates EVERY binding key
+  (`Object.entries`, render-page.tsx:453) — the httpbingo fixture's hand-built
+  binds are stored under key `"api"`, so they SSR'd fine but were invisible and
+  uneditable in the inspector. Fix: new pure `firstBinding(bindings)` in
+  `lib/content/binding.ts` returns the block's first `[key, ref]` entry (any
+  key; skips null entries; defaults `["item", undefined]`); `BindingPanel` now
+  reads it and BOTH emit paths (`emit`/`emitApi`) write back under that same
+  preserved key — display → edit → save round-trips whatever the key.
+  `ListSettings` reads `block.listSource` directly and never had the bug.
+  Also added `scripts/ssr-bind-panel-check.mjs` — a manual (not-in-suite)
+  esbuild+react-dom/server harness that renders the REAL BindingPanel and
+  ListSettings with the REAL fx-get-echo / fx-slides-list fixture blocks + en
+  messages and asserts the source/request options are `selected` and the
+  map/itemsPath inputs carry values; it takes an optional path arg to run
+  against an old panel revision.
+- **Verified:** fails-before/passes-after: check FAILS against the pre-fix
+  panel (`git show HEAD:` copy → "— none —" selected) and PASSES against the
+  fixed one, for BOTH panels. 4 new node tests in scripts/binding.test.mjs
+  (key preservation contract). tsc clean; `npm test` 1379/1379 (was 1375);
+  opennext gate GREEN via the isolated-worktree recipe (HEAD 0095fb6 + my two
+  src files copied in; dev on :3602 untouched). Draft API confirmed to serve
+  `bindings.api` to the builder (fx-get-echo). Could NOT click through the
+  browser UI this run (no browser tooling available to this instance) — the
+  SSR check + key-preserving emits + the API's proven acceptance of api-keyed
+  bindings cover display→edit→save; a human/browser-equipped run can eyeball
+  the builder for final confidence. Did NOT touch the fixture page draft (a
+  parallel Meeseeks was working Form slice (c) on that same page).
+- **Files:** CMS/src/lib/content/binding.ts (firstBinding),
+  CMS/src/components/page-builder/binding-panels.tsx (read+write via
+  bindingKey), CMS/scripts/binding.test.mjs (+4 tests),
+  CMS/scripts/ssr-bind-panel-check.mjs (new manual check).

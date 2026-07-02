@@ -65,6 +65,26 @@ export function declaredPropNames(propsSchema: string | null | undefined): Set<s
 }
 
 /**
+ * A block's single authorable binding as `[key, ref]`. The RENDERER hydrates
+ * EVERY key in `block.bindings` (see `hydrateProps`), but the panel authors ONE
+ * binding — historically hard-wired to the `"item"` key, which made hand-built /
+ * AI binds stored under any other key (e.g. `"api"`) render fine yet show
+ * "— none —" in the inspector (P1 bug 2026-07-02). Pick the first entry and
+ * PRESERVE its key on write so display → edit → save round-trips; no bindings →
+ * `["item", undefined]` (the default key for a fresh binding).
+ */
+// ponytail: first entry only — the panel UI authors a single binding; multi-key
+// blocks need a panel redesign, not a helper change.
+export function firstBinding(
+  bindings: Record<string, BindingRef> | undefined,
+): [string, BindingRef | undefined] {
+  for (const [key, ref] of Object.entries(bindings ?? {})) {
+    if (ref && typeof ref === "object") return [key, ref];
+  }
+  return ["item", undefined];
+}
+
+/**
  * Validate a single-item binding against the collection's registry fields and the
  * target component's declared props. Returns `ok:true` when the collection exists,
  * EVERY mapped field exists on it (user field or system column), EVERY filter/sort

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { Block, BindingRef, ListSource, ApiBindingParams } from "@/lib/render/tree";
 import { normalizeLabelExpr } from "@/lib/render/tree";
-import { declaredPropNames } from "@/lib/content/binding";
+import { declaredPropNames, firstBinding } from "@/lib/content/binding";
 import { requestPlaceholders } from "@/lib/data-sources/validate";
 import { apiListElements, samplePaths } from "@/lib/data-sources/bind";
 import {
@@ -496,7 +496,10 @@ export function BindingPanel({
   onChange: (bindings: Record<string, BindingRef> | undefined) => void;
 }) {
   const t = useTranslations("pageBuilder");
-  const current = block.bindings?.item;
+  // The renderer hydrates EVERY bindings key; the panel authors ONE. Read the
+  // first entry (hand-built/AI binds may key it "api" etc., not just "item")
+  // and write back under the SAME key so edits round-trip (P1 fix 2026-07-02).
+  const [bindingKey, current] = firstBinding(block.bindings);
   const kind = current?.source.kind === "api" ? "api" : "collection";
   const collection = current?.source.collection ?? "";
   const meta = collections.find((c) => c.tableName === collection);
@@ -526,7 +529,7 @@ export function BindingPanel({
       return;
     }
     onChange({
-      item: {
+      [bindingKey]: {
         source: {
           kind: "api",
           sourceId,
@@ -558,7 +561,7 @@ export function BindingPanel({
       },
       map: m,
     };
-    onChange({ item: binding });
+    onChange({ [bindingKey]: binding });
   }
 
   return (

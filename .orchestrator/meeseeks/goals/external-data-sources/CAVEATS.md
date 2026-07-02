@@ -312,3 +312,18 @@ Read every line before working. Each entry was learned the hard way by a previou
 - **Grep-counting SSR output for `type="submit"` / `__bbForm` overcounts** — the
   inline FORM_ENHANCE_SCRIPT itself contains both strings. Count
   `<button type="submit"` / `form[data-form]` instead.
+
+- **A block's `bindings` key is NOT always `"item"`.** The renderer hydrates
+  every key; hand-built/AI binds may use `"api"` or anything else. The panel
+  must read via `firstBinding(bindings)` (lib/content/binding.ts) and write
+  back under the SAME key — never reintroduce a hard `bindings?.item` read or
+  a hard `{ item: … }` write (that was the P1 "— none —" bug, fixed 2026-07-02).
+
+- **Panels CAN be display-tested without a browser**: `node
+  scripts/ssr-bind-panel-check.mjs` (manual, not in the suite) esbuild-bundles
+  binding-panels.tsx (`@` aliased to src, react/next-intl external) and SSRs it
+  under NextIntlClientProvider with real fixture blocks. React SSR emits the
+  matching option as `value="…" selected=""` — value BEFORE selected; assert in
+  that order. Optional argv[2] points it at an old panel revision for
+  fails-before demos (copy the old file INTO the same dir so `./shared`
+  resolves).

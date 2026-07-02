@@ -15,6 +15,7 @@ import {
   bindingQuerySpec,
   hydrateProps,
   declaredPropNames,
+  firstBinding,
 } from "../src/lib/content/binding.ts";
 
 const fields = [
@@ -140,4 +141,27 @@ test("declaredPropNames parses propsSchema and tolerates junk", () => {
   assert.deepEqual([...declaredPropNames(null)], []);
   assert.deepEqual([...declaredPropNames("not json")], []);
   assert.deepEqual([...declaredPropNames("[1,2]")], []);
+});
+
+// P1 regression (2026-07-02): the inspector panel hard-read `bindings.item`, so
+// an api bind stored under another key (fixture uses "api") rendered fine but
+// showed "— none —". firstBinding must surface ANY key and preserve it.
+test("firstBinding returns the first entry whatever its key (api-keyed bind)", () => {
+  const ref = { source: { kind: "api", sourceId: "s1", requestId: "r1" }, map: { v1: "uuid" } };
+  assert.deepEqual(firstBinding({ api: ref }), ["api", ref]);
+});
+
+test("firstBinding keeps the canonical item key", () => {
+  const ref = { source: { collection: "content_posts" }, map: { heading: "title" } };
+  assert.deepEqual(firstBinding({ item: ref }), ["item", ref]);
+});
+
+test("firstBinding defaults to ['item', undefined] with no bindings", () => {
+  assert.deepEqual(firstBinding(undefined), ["item", undefined]);
+  assert.deepEqual(firstBinding({}), ["item", undefined]);
+});
+
+test("firstBinding skips null/garbage entries", () => {
+  const ref = { source: { collection: "c" }, map: {} };
+  assert.deepEqual(firstBinding({ dead: null, live: ref }), ["live", ref]);
 });

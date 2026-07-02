@@ -4,16 +4,23 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
 
-- DOING BUG [P1]: Inspector bind panel shows DATA SOURCE "— none —" for ALL api-bound
-  ApiProbe blocks on api-fixture-httpbingo, even though the published page SSRs
-  the API values (bindings exist + hydrate; render path fine). The panel fails to
-  REFLECT an existing kind:"api" binding — operators can't see or edit api binds
-  after creation. Repro: builder → api-fixture-httpbingo → select any probe card
-  below the intro → panel shows none. Suspects: the single-item panel's select
-  value-matching for api sources (List panel may differ), or it only reads
-  kind:"collection" bindings. Fix + make the fixture's binds visible; verify both
-  single-item AND List panels round-trip an api bind (display → edit → save).
-  — reported 2026-07-02 (user, screenshot)
+- DONE (2026-07-02) BUG [P1]: Inspector bind panel shows DATA SOURCE "— none —"
+  for ALL api-bound ApiProbe blocks. ROOT CAUSE: BindingPanel hard-read
+  `block.bindings?.item` while the renderer hydrates EVERY key
+  (`Object.entries`) — the fixture's hand-built binds use key `"api"`, so they
+  rendered fine but were invisible/uneditable in the panel. FIX: pure
+  `firstBinding(bindings)` in lib/content/binding.ts (first entry, any key;
+  defaults `["item", undefined]`); panel reads it AND writes back under the
+  SAME key (both emit paths), so display → edit → save round-trips. List panel
+  reads `listSource` directly — never had the bug (verified). Regression: 4
+  node tests + SSR display check `scripts/ssr-bind-panel-check.mjs` rendering
+  BOTH real panels with the real fixture blocks — FAILS on the pre-fix panel
+  (git HEAD copy), PASSES after; render host confirmed key-agnostic
+  (render-page.tsx:453). tsc + suite 1379/1379 + opennext worktree gate green.
+  Original report: Repro: builder → api-fixture-httpbingo → select any probe
+  card below the intro → panel shows none. Suspects: the single-item panel's
+  select value-matching for api sources (List panel may differ), or it only
+  reads kind:"collection" bindings. — reported 2026-07-02 (user, screenshot)
 
 - BUG [P2]: Page-builder single-item bind panel still says "Bind to collection" /
   "Fill this block's props from the first matching collection item" — stale copy
@@ -89,7 +96,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 >   page (POST /post echo, saved request deec059d-…) + a collection-target
 >   contact-form card against an opted-in test collection; verify native +
 >   fetch modes live on :3602; document what each proves.
-> - TODO: **(d) AI tools**: let the assistant create/bind a Form block
+> - DOING: **(d) AI tools**: let the assistant create/bind a Form block
 >   (create_form / bind_form or extend existing block tools) incl. target
 >   validation; 3 registrations caveat applies.
 
