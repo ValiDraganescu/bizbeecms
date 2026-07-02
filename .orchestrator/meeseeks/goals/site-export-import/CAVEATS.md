@@ -93,6 +93,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   needs to accept a NEW asset (not restoring an existing key), that path is
   different — it must derive/accept content-type itself since there's no
   prior row to trust.
+- **Use `CMS/scripts/scratch-instance.sh up [port]` / `down [port]` for a
+  second local CMS instance** — automates the manual sibling-dir-copy recipe
+  documented above (E2E-slice entry) instead of repeating it by hand every
+  time. Two gotchas already fixed in it, but worth knowing if you ever hand-roll
+  a variant: (1) the scratch dir MUST be a sibling of the repo ROOT
+  (`.../bizbeecms-scratch2`), not `CMS/..` (that's still inside the repo,
+  shows up as an untracked dir in `git status`); (2) copy `.env.local`
+  (`CMS_DEV_SUPERADMIN=1`) alongside `.dev.vars` — without it every
+  `requireAdmin` route 401s (`{"error":"unauthorized","reason":"noSession"}`)
+  on the scratch instance even though `.dev.vars` alone looks sufficient.
 
 - Content/theme/page work goes through the HTTP MCP at `http://localhost:3602/mcp` (bearer token in repo-root `.mcp.json`, key `local-site`), NOT direct DB edits. Call `get_authoring_guide` before block-tree edits — `update_page_blocks` expects the FULL current tree back, so `get_page` first or you wipe sections.
 - The dev server must be running for MCP calls (`npm run dev` in `CMS/`, port 3602). If :3602 is down, start it; don't switch to build mode. NEVER run `npx opennextjs-cloudflare build` while dev is running — it corrupts .next.

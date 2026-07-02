@@ -1,39 +1,40 @@
 # Note to the next Meeseeks (site-export-import)
 
-**Original BACKLOG.md `## Tasks` is still all DONE.** This run took the
-"wipe-loop atomicity" TODO from the "New TODOs found by the E2E slice"
-section (one of 3 candidates the manager hinted at) — `POST /api/site-import`
-now DROPs all `content_*` tables in ONE `contentDdlBatch` call instead of a
-sequential per-table loop, so a transient D1 error mid-wipe can't leave a
-partial DROPPED/not-DROPPED state anymore. Reused the existing
-`contentDdlBatch` primitive verbatim (already built for the schema-rebuild
-path) — no new code surface. Live-verified against the real dev D1: full
-export→re-import round-trip on :3602 (13 pages/136 versions/41 components/7
-collections/73 rows/61 assets/6 data sources/12 requests/2 prompt versions,
-counts matched exactly), home + a city page both 200 after. `npm test`
-1501/1501, `tsc --noEmit` clean.
+This run took the manager-hinted "2nd-instance tooling" TODO (checked the
+"confirm-string UI copy nit" first as suggested — it's genuinely already
+fine, see BACKLOG.md, no code change needed there). Built and live-verified
+`CMS/scripts/scratch-instance.sh up [port]` / `down [port]`, which automates
+the CAVEATS-documented manual recipe for spinning up a second, fully
+isolated local CMS instance (own D1, own R2, own port) for cross-instance
+E2E testing. Found + fixed 2 real bugs in the script itself before it
+worked (wrong scratch-dir depth landing inside the repo; missing
+`.env.local` causing every admin route to 401) — both are now CAVEATS
+entries so nobody re-discovers them.
 
-**2 remaining lower-priority TODOs left in BACKLOG.md's "New TODOs found by
-the E2E slice" section** (from the same hinted trio):
-1. UI copy nit around the confirm-string field — already probably fine
-   (`artifact.meta.siteName` is shown in a `<strong>`), re-check only if an
-   operator reports confusion. Genuinely low priority.
-2. No first-class way to spin up a second local CMS instance for E2E cross-
-   instance testing (current approach: manual sibling-directory copy, see
-   CAVEATS — `next dev`/Turbopack refuses symlinks outside its project
-   root). Only worth automating if cross-instance E2E testing becomes
-   routine for this or another goal; a one-off script isn't urgent.
+**Both of BACKLOG's "New TODOs found by the E2E slice" are now closed.**
+BACKLOG.md's `## Tasks` section (the goal's original MVP scope) has been
+all-DONE since the E2E-slice run; this run closed out the trailing polish
+items too.
 
-**If you're picking up this goal next**: per the prior NEXT.md's note, this
-goal's MVP scope (per GOAL.md) may be genuinely complete — export, import
-(validate/execute/asset-upload), admin UI, and a real cross-instance E2E
-pass with 2 found-and-fixed bugs are all shipped and verified, plus this
-run's wipe-loop hardening. The 2 remaining TODOs above are both genuinely
-optional polish, not scope gaps. Reasonable next moves: (a) pick one of the
-2 remaining TODOs if you want a concrete task, (b) re-read GOAL.md against
-current code for any deeper gap (e.g. double-check the "full page-version
-history" decision still holds, or whether large collections >1000 rows —
-see CAVEATS' `MAX_READ_ROWS` note — need a real fix rather than a flagged
-gap), or (c) flag to the curator that this goal may be ready to archive
-like the other delivered M2 tracks, if the user agrees there's no more
-must-have work.
+**This goal may genuinely be feature-complete for its GOAL.md scope**:
+export (pages/components/collections/assets/settings/data-sources/prompts),
+import (validate/execute/asset-upload, destructive with typed confirmation
+and dry-run report), admin UI, a real cross-instance E2E pass (2 bugs found
++ fixed), wipe-loop atomicity hardening, and now reusable 2nd-instance
+tooling for any FUTURE cross-instance verification need.
+
+**If you're picking up this goal next**, reasonable options:
+1. Re-read `GOAL.md` against current code for any deeper gap — e.g. the
+   `MAX_READ_ROWS` (1000-row) cap on `contentSelect` is a known, flagged,
+   NOT-yet-fixed limitation for collections with >1000 rows (see CAVEATS) —
+   could decide to actually raise/paginate it, or confirm it's an accepted
+   platform limit worth just documenting in FORMAT.md explicitly.
+2. Use the new `scripts/scratch-instance.sh` for a SECOND independent E2E
+   pass if you want extra confidence beyond the one already done (e.g. test
+   an import where the target has EXISTING different content, not just an
+   empty target — the E2E-slice run only tested empty-target import).
+3. Flag to the curator that this goal may be ready to archive like the other
+   delivered M2 tracks (page-builder, ai-assistant, binding-adapters,
+   deploy-audit-trail, custom-domains) if the user agrees there's no more
+   must-have work — this goal has now had a real cross-instance E2E pass,
+   which is more verification than some already-archived tracks got.

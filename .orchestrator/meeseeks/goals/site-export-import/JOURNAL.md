@@ -586,3 +586,64 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** `CMS/src/app/api/site-import/route.ts` (import `contentDdlBatch`,
   batch the DROP loop), `BACKLOG.md` (flipped the wipe-loop-atomicity TODO to
   DONE), `JOURNAL.md`, `NEXT.md`.
+
+## 2026-07-02 20:05 — 2nd-instance tooling: `CMS/scripts/scratch-instance.sh`
+- **Status:** DONE
+- **What I did:** Took the manager-hinted "2nd-instance tooling" TODO (the
+  other of the 2 remaining low-priority items in BACKLOG.md's E2E-slice
+  section). First checked the "confirm-string UI copy nit" TODO (the manager's
+  suggested small-first pick) — read the actual shipped copy
+  (`messages/en.json`'s `exportImport.confirmLabel`/`blankSiteName`/
+  `blankSiteNameError`) and the component (`export-import-manager.tsx` lines
+  362-380): the expected site name is ALREADY shown in a `<strong>` right next
+  to the label, the input is disabled with a named error when blank, and all
+  3 locales have real (not placeholder) translated copy. There's nothing
+  concrete to change without inventing busywork — NEXT.md itself flagged this
+  as "probably already fine." So took the 2nd TODO instead, a genuine gap:
+  `next dev`'s no-symlink constraint means every future cross-instance E2E
+  pass on this goal (or any other goal that needs a 2nd local CMS) would
+  otherwise repeat the SAME manual multi-step recipe from scratch (documented
+  in CAVEATS but not automated). Wrote `CMS/scripts/scratch-instance.sh`
+  (`up [port]` / `down [port]`) that automates EXACTLY the CAVEATS-documented
+  manual recipe, nothing more: copies `node_modules/src/messages/migrations/
+  scripts` (+ `public` if present — this repo has none, made the copy loop
+  skip missing dirs) into a scratch dir, writes a cosmetically-renamed
+  `wrangler.jsonc` + a fresh `.dev.vars` (`SITE_ID=test-2-scratch`,
+  `APP_ORIGIN` matching the chosen port), applies all D1 migrations there via
+  `wrangler d1 migrations apply --local` (CWD-scoped, confirmed isolated from
+  the primary), then runs `next dev --port <port>` in the foreground; `down`
+  kills the port and `rm -rf`s the scratch dir.
+- **2 real bugs found + fixed while dry-running the script itself** (would
+  have made it unusable as shipped): (1) the scratch dir path resolved to
+  `$CMS_DIR/..` = the REPO ROOT, i.e. `bizbeecms/bizbeecms-scratch2` —
+  INSIDE the repo, showing up as an untracked dir in `git status`, contrary
+  to CAVEATS' explicit "OUTSIDE the bizbeecms repo, never committed"
+  requirement from the E2E-slice run; fixed to resolve one level higher
+  (`$REPO_ROOT/..`), a true sibling of `bizbeecms/` itself, matching the
+  original manual recipe exactly. (2) forgot `.env.local`
+  (`CMS_DEV_SUPERADMIN=1`) in the copy list — every admin-gated route
+  (`/api/site-import/validate` etc.) 401'd with `{"error":"unauthorized",
+  "reason":"noSession"}` on the scratch instance until added; CAVEATS'
+  original E2E entry mentions `.dev.vars` but not `.env.local` explicitly,
+  so this would have silently bitten the next person running the script too.
+- **Verified LIVE, twice** (once pre-fix confirming the bugs, once post-fix
+  confirming the real flow): ran `scripts/scratch-instance.sh up 3603` in the
+  background — 27 migrations applied to a fresh isolated local D1, `next dev`
+  came up on :3603 (`✓ Ready in 141ms`, `.env.local` listed under
+  "Environments"). `GET /api/site-export` from the REAL primary :3602
+  (13 pages/136 versions/41 components/7 collections/73 rows/61 assets/6 data
+  sources/12 requests/2 prompt versions) piped into `POST
+  /api/site-import/validate` on the fresh :3603 scratch instance →
+  `{"ok":true, "willDestroy":{all zeros}, "willCreate":{matches export
+  counts exactly}}` — proves the script produces a genuinely empty,
+  independently-migrated, admin-reachable second instance, i.e. exactly what
+  a future E2E cross-instance run needs, without any manual copy/rename/
+  migrate steps. Confirmed primary :3602 unaffected throughout (same
+  `/api/site-export` counts before and after). Ran `down 3603` — port freed,
+  scratch dir fully removed, primary still 200. No unit test written (this
+  is a bash dev-tooling script with no pure logic — no `.ts`/`.mjs` here,
+  matches the "test business logic only" discipline; the live dry-run IS the
+  verification, same as how routes with "no pure logic to extract" are
+  verified elsewhere in this goal's JOURNAL).
+- **Files:** `CMS/scripts/scratch-instance.sh` (new), `BACKLOG.md` (flipped
+  the 2nd-instance-tooling TODO to DONE), `JOURNAL.md`, `NEXT.md`.
