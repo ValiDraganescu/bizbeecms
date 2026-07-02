@@ -1,28 +1,30 @@
 # Note to the next Meeseeks (external-data-sources)
 
-2026-07-02 10:45: the LAST backlog TODO is DONE — create_form's optional
-`child` component arg (one call → submittable Form with its input component
-placed; unknown child → self-correcting error listing every component). Live
-gpt-4o-mini smoke proved both target kinds AND in-round self-correction.
-tsc + 1402 suite + opennext isolated-worktree gate GREEN.
+2026-07-02 12:12: shipped `get_data_sources_guide` — the on-demand data-sources/
+bindings/forms playbook tool (first of the two USER AI-enablement TODOs). All
+gates green (tsc, 1406 suite, opennext isolated worktree, live scope check).
 
 ## FIRST: check ## Bugs (rule 0) — all DONE when I popped out.
 
-## State of the goal
-Every task and bug in BACKLOG.md is DONE. All form slices (a–d), AI smoke,
-both smoke findings, all 8 data-source slices, purge, oauth2, hardening —
-shipped and gated. This goal has now been recommended for curator ARCHIVE by
-multiple workers, me included — **flag ARCHIVE in your result too** if you
-land here and nothing new has been reported.
+## Your task: the remaining USER TODO — inline data-sources context on /admin/data-sources
+The USER confirmed it live mid-my-run (screenshots): the chat on
+/admin/data-sources shows NO "Context attached" chip, page-builder does, they
+want it there too. The BACKLOG TODO now carries the verified mechanism:
+- `ContextChip` (components/chat/chat-conversation.tsx ~line 400) subscribes to
+  page-context / component-context / collection-context stores; each admin page
+  publishes into its store and the send path appends the active contexts.
+- Build a data-sources-context store (PURE builder — names, auth kind, saved
+  requests w/ method/path/placeholders/cache, NEVER secrets; cap + summarize
+  overflow; mirror collection-context.ts + collection-context.test.ts), publish
+  from the /admin/data-sources page, wire BOTH chat-conversation.tsx points
+  (chip subscribe/snapshot + send-path collection).
+- Node tests for the pure builder. EN/FI/ET only if you add UI strings (the
+  chip label already exists: chat.contextAttached).
 
-## If you must pick work anyway (rule 3 — never idle)
-- Real-browser smoke of the slice-(b) builder UI (drag a Form from the rail,
-  pick both target kinds, save/publish, submit live) — (b) was verified via
-  the SSR display check + live AI/API smokes, never a human-style browser
-  session. The fixture page api-fixture-httpbingo's fx-forms cards are
-  ready-made.
-- Or re-read main/GOAL.md and invent the next valuable slice.
-
-Gates: tsc + node suite + opennext (isolated-worktree recipe in CAVEATS —
-copy uncommitted files in; `npm run cf-typegen` before a standalone tsc; dev
-on :3602 is live, never build in-repo while it runs).
+## Watch out
+- The guide tool is STATIC — if your slice changes any data-source tool
+  name/arg, update data-sources-guide.ts in the same commit (drift test:
+  scripts/data-sources-guide.test.mjs).
+- Gates: tsc + node suite + opennext (isolated-worktree recipe in CAVEATS —
+  copy uncommitted files in; `npm run cf-typegen` before standalone tsc; dev on
+  :3602 is live, never build in-repo while it runs).

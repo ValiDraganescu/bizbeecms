@@ -908,3 +908,40 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   with the 4 changed files copied in (recipe per CAVEATS) — GREEN.
 - **Files:** CMS/src/lib/chat/form-tools.ts, CMS/src/lib/chat/form-tools.test.ts,
   CMS/src/lib/chat/tool-dispatch.ts, CMS/src/lib/chat/tool-scopes.ts
+
+## 2026-07-02 12:12 — On-demand data-sources guide tool for the CMS AI (get_data_sources_guide)
+- **Status:** DONE
+- **What I did:** New zero-arg tool `get_data_sources_guide` mirroring the
+  get_authoring_guide on-demand pattern, but STATIC content (documents the
+  shipped tool surface, not live site data — list_data_sources covers that).
+  Pure module `CMS/src/lib/chat/data-sources-guide.ts` exports the tool schema +
+  `DATA_SOURCES_GUIDE` — a playbook covering: source/saved-request concepts
+  (auth modes incl. oauth2 token-URL-in-authParam, write-only secret/hasSecret,
+  cacheEnabled default true / cacheTtlSec default 60 / retryable-as-idempotent
+  marker), the create → test → bind workflow (test_data_source `paths` = the
+  map raw material), all three binding tools (collection vs api kinds, dot-path
+  maps, params literal|{prop}, itemsPath, declared-prop allowlist, clearing),
+  render semantics (server-side fetch, ≤2 retries on net/5xx/429 for
+  GET/retryable only, graceful failure, purge = operator-only), and BOTH form
+  target kinds (create_form/bind_form: by-NAME field mapping w/ NO map arg,
+  `child` one-call pattern, publicSubmissions opt-in incl. the verbatim PATCH
+  _op fix, forced-DRAFT + unknown-fields-dropped, dual submit modes, same-site
+  redirect) + a "read the self-correcting errors" coda. Every tool name/arg
+  verified against the SHIPPED schemas (data-source-tools/binding-tools/
+  form-tools/tool-dispatch @ 4c8c4fd), not memory. All 3 registrations
+  (KNOWN_TOOL_NAMES, TOOL_BY_NAME, HANDLERS — handler is a constant `{ok,guide}`
+  payload) + TOOLS_BY_CONTEXT page-builder+pages + one-line pointers appended to
+  both context prompts so the model knows the guide exists.
+- **Verified:** 4 new node tests in scripts/data-sources-guide.test.mjs (schema
+  shape; guide covers the 8 tools + 12 key semantic facts; a DRIFT LOCK — every
+  snake_case token in the guide must be a KNOWN_TOOL_NAME or an allowlisted
+  non-tool, it caught "client_id" during dev; scope+prompt registration). tsc
+  clean; full suite 1406/1406 (baseline 1402 + 4). Live on :3602 (hot reload,
+  free): debug route shows the tool in page-builder+pages scopes, NOT
+  components, and the assembled page-builder systemPrompt names it. Opennext
+  gate GREEN in an isolated worktree (changed files copied in; dev untouched).
+  Skipped a paid live model round — the handler is a constant payload; dispatch
+  completeness is tsc-enforced and scoping was proven live.
+- **Files:** CMS/src/lib/chat/data-sources-guide.ts (new),
+  CMS/src/lib/chat/tool-scopes.ts, CMS/src/lib/chat/tool-dispatch.ts,
+  CMS/scripts/data-sources-guide.test.mjs (new)

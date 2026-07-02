@@ -406,3 +406,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   and reliably fires the tool. BUT the model may still self-correct off a
   listed alternative despite "do not retry" — treat an unexpected SECOND tool
   frame as the self-correction working, not the test failing.
+
+- **`get_data_sources_guide` is a STATIC playbook — update it in the same commit
+  as any data-source/binding/form tool change** (it documents the shipped
+  surface; a stale guide teaches the model lies). Its drift test
+  (scripts/data-sources-guide.test.mjs) locks every snake_case token in the
+  guide to KNOWN_TOOL_NAMES + a tiny non-tool allowlist (set_public_submissions,
+  client_id, client_secret) — extend the allowlist when adding non-tool
+  snake_case text, never weaken the check.

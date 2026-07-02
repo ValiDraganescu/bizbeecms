@@ -105,6 +105,10 @@ import {
   mergeFormTarget,
 } from "./form-tools";
 import {
+  GET_DATA_SOURCES_GUIDE_TOOL,
+  DATA_SOURCES_GUIDE,
+} from "./data-sources-guide";
+import {
   listDataSources,
   createDataSource,
   createDataSourceRequest,
@@ -265,6 +269,7 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   test_data_source: TEST_DATA_SOURCE_TOOL,
   create_form: CREATE_FORM_TOOL,
   bind_form: BIND_FORM_TOOL,
+  get_data_sources_guide: GET_DATA_SOURCES_GUIDE_TOOL,
 };
 
 /** The tool SCHEMAS the assistant may use in this admin-page context (chat route). */
@@ -1716,6 +1721,8 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   test_data_source: handleTestDataSource,
   create_form: handleCreateForm,
   bind_form: handleBindForm,
+  // Static playbook — no store/CF work, so the handler is a constant payload.
+  get_data_sources_guide: async () => ({ ok: true, guide: DATA_SOURCES_GUIDE }),
 };
 
 /**

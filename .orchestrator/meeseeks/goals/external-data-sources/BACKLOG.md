@@ -3,7 +3,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Tasks (user 2026-07-02, approved — AI assistant enablement for data sources)
 
-- TODO (USER 2026-07-02): **On-demand data-sources guide for the CMS AI assistant.**
+- DONE (2026-07-02): **On-demand data-sources guide for the CMS AI assistant.**
+  Shipped as `get_data_sources_guide` (static playbook verified against the
+  shipped tool surface; 3 registrations + page-builder/pages scoping + context-
+  prompt pointers; 4 node tests incl. a tool-name drift lock; tsc + 1406 suite +
+  opennext worktree gate GREEN; live scope check on :3602). JOURNAL 2026-07-02
+  12:12. Original spec:
   A skill-like prompt the page-builder AI reads ON DEMAND via a tool (mirror the
   existing get_authoring_guide pattern — do NOT bloat the base system prompt).
   Content: how to create/update/use external data sources (sources, saved
@@ -25,6 +30,18 @@ Task states: TODO | DOING | DONE | BLOCKED.
   context-prompt mechanism (the chat already varies context by page). Keep it
   compact (cap the list; summarize overflow). Node tests for the pure
   context-builder. Usual gates.
+  USER CONFIRMED 2026-07-02 (screenshots): on /admin/data-sources the chat shows
+  NO "Context attached" chip while the page builder does — they expect it there
+  too. Mechanism (verified in code): `ContextChip` in
+  components/chat/chat-conversation.tsx useSyncExternalStore-subscribes to THREE
+  inline-context stores (lib/chat/page-context.ts, component-context.ts,
+  collection-context.ts — each admin page publishes its context into its store;
+  the send path appends the active contexts). Data-sources needs its own
+  data-sources-context store (pure builder + node tests, mirror
+  collection-context.ts + its .test.ts), a publisher effect on the
+  /admin/data-sources page (DataSourcesManager), and BOTH wiring points in
+  chat-conversation.tsx (the chip's subscribe/snapshot AND wherever the send
+  path collects active contexts).
 
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
