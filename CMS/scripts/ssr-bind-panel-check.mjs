@@ -3,6 +3,9 @@
  * SSR the REAL BindingPanel + ListSettings with the REAL api-fixture-httpbingo
  * block JSON and assert the DATA SOURCE select shows the api source SELECTED
  * (before the fix it fell back to "— none —" for api-keyed bindings).
+ * Form slice (b) extension: also SSRs FormSettings with the fixture's api- and
+ * collection-target Form blocks (target selected, expected input names shown,
+ * publicSubmissions-off warning present).
  *
  * Usage: node scripts/ssr-bind-panel-check.mjs [path-to-binding-panels.tsx]
  * (needs npm deps, no server; the optional arg lets you point it at an old
@@ -22,7 +25,7 @@ const panelPath = process.argv[2]
 
 await build({
   stdin: {
-    contents: `export { BindingPanel, ListSettings } from ${JSON.stringify(panelPath)};`,
+    contents: `export { BindingPanel, ListSettings, FormSettings } from ${JSON.stringify(panelPath)};`,
     resolveDir: root,
     loader: "ts",
   },
@@ -36,7 +39,7 @@ await build({
   logLevel: "silent",
 });
 
-const { BindingPanel, ListSettings } = await import(pathToFileURL(out).href);
+const { BindingPanel, ListSettings, FormSettings } = await import(pathToFileURL(out).href);
 rmSync(out, { force: true }); // bundle no longer needed once imported
 const React = (await import("react")).default;
 const { renderToStaticMarkup } = await import("react-dom/server");
@@ -101,6 +104,59 @@ const listHtml = render(
   }),
 );
 
+// ── Form slice (b): FormSettings display (mirrors the fixture fx-forms blocks) ──
+const POST_REQ_ID = "deec059d-0000-4000-8000-000000000000"; // fixture-style POST echo
+const formApiSources = [
+  {
+    id: SOURCE_ID,
+    name: "httpbingo fixture — public",
+    requests: [
+      { id: POST_REQ_ID, name: "POST echo", method: "POST", path: "/post", query: "", bodyTemplate: '{"msg":"{msg}"}' },
+    ],
+  },
+];
+const formApiBlock = {
+  id: "fx-form-api",
+  component: "Form",
+  formTarget: { kind: "api", sourceId: SOURCE_ID, requestId: POST_REQ_ID, successMessage: "Echoed!" },
+  children: [{ id: "fx-form-api-content", component: "FormProbeApi" }],
+};
+const formCollectionBlock = {
+  id: "fx-form-contact",
+  component: "Form",
+  formTarget: { kind: "collection", collection: "content_form_fixture_enquiries", redirect: "/thanks" },
+  children: [{ id: "fx-form-contact-content", component: "FormProbeContact" }],
+};
+const enquiryFields = [{ name: "name", type: "string" }, { name: "message", type: "string" }];
+const formApiHtml = render(
+  React.createElement(FormSettings, {
+    block: formApiBlock,
+    collections: [],
+    apiSources: formApiSources,
+    propsSchemas: { FormProbeApi: "{}", FormProbeContact: "{}" },
+    onChange: () => {},
+  }),
+);
+const formCollectionHtml = render(
+  React.createElement(FormSettings, {
+    block: formCollectionBlock,
+    // publicSubmissions OFF → the warning must render.
+    collections: [{ name: "Fixture enquiries", tableName: "content_form_fixture_enquiries", fields: enquiryFields, publicSubmissions: false }],
+    apiSources: [],
+    propsSchemas: { FormProbeApi: "{}", FormProbeContact: "{}" },
+    onChange: () => {},
+  }),
+);
+const formCollectionOnHtml = render(
+  React.createElement(FormSettings, {
+    block: formCollectionBlock,
+    collections: [{ name: "Fixture enquiries", tableName: "content_form_fixture_enquiries", fields: enquiryFields, publicSubmissions: true }],
+    apiSources: [],
+    propsSchemas: { FormProbeApi: "{}", FormProbeContact: "{}" },
+    onChange: () => {},
+  }),
+);
+
 import assert from "node:assert/strict";
 // React SSR marks the matching <option> of a controlled <select> with `selected`.
 assert.match(singleHtml, new RegExp(`value="a:${SOURCE_ID}" selected=""`), "single-item panel must show the api source selected");
@@ -108,4 +164,16 @@ assert.match(singleHtml, /value="094d8076-7544-41d0-960b-2c22620d4993" selected=
 assert.match(singleHtml, /value="args\.fixture\.0"/, "single-item panel must show the dot-path map");
 assert.match(listHtml, new RegExp(`value="a:${SOURCE_ID}" selected=""`), "List panel must show the api source selected");
 assert.match(listHtml, /value="slideshow\.slides"/, "List panel must show itemsPath");
-console.log("OK: both panels display the fixture's api binds (source + request + map + itemsPath).");
+// Form panel: api target selected + placeholder shown as an expected input name.
+assert.match(formApiHtml, new RegExp(`value="a:${SOURCE_ID}" selected=""`), "Form panel must show the api source selected");
+assert.match(formApiHtml, new RegExp(`value="${POST_REQ_ID}" selected=""`), "Form panel must show the saved request selected");
+assert.match(formApiHtml, />msg</, "Form panel must list the request's {msg} placeholder as an input name");
+assert.match(formApiHtml, /value="Echoed!"/, "Form panel must show the authored success message");
+assert.match(formApiHtml, /value="FormProbeApi" selected=""/, "Form panel must show the content component selected");
+// Form panel: collection target selected + schema fields + opt-in warning.
+assert.match(formCollectionHtml, /value="c:content_form_fixture_enquiries" selected=""/, "Form panel must show the collection selected");
+assert.match(formCollectionHtml, />name</, "Form panel must list the collection's fields as input names");
+assert.match(formCollectionHtml, /role="alert"/, "Form panel must warn when publicSubmissions is OFF");
+assert.match(formCollectionHtml, /value="\/thanks"/, "Form panel must show the authored redirect");
+assert.ok(!/role="alert"/.test(formCollectionOnHtml), "no warning when publicSubmissions is ON");
+console.log("OK: both bind panels + FormSettings display the fixture blocks (source/request/map/fields/messages).");

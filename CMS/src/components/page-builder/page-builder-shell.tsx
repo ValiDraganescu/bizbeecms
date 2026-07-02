@@ -60,12 +60,14 @@ import {
   isList,
   addListToSection,
   addListBlock,
+  isForm,
+  addFormBlock,
   listSections,
   sectionName,
   renameSection,
   parsePropsSchema,
 } from "@/lib/pages/page-blocks";
-import type { Block } from "@/lib/render/tree";
+import type { Block, FormTarget } from "@/lib/render/tree";
 import { declaredPropNames } from "@/lib/content/binding";
 import type {
   Viewport,
@@ -86,7 +88,7 @@ import { ColumnSettings } from "./column-settings";
 import { SectionSettings } from "./section-settings";
 import { RowSettings } from "./row-settings";
 import { ComponentSettings } from "./component-settings";
-import { BindingPanel, ListSettings } from "./binding-panels";
+import { BindingPanel, ListSettings, FormSettings } from "./binding-panels";
 import { PageSettings } from "./page-settings";
 import { VersionHistory } from "./version-history";
 
@@ -362,6 +364,12 @@ export function PageBuilderShell({
     setDirty(true);
   }
 
+  // Drop the built-in `Form` primitive into a specific Section column (DnD).
+  function onDropFormToColumn(sectionId: string, colIndex: number, rowId: string) {
+    setBlocks((b) => addFormBlock(b, sectionId, colIndex, rowId));
+    setDirty(true);
+  }
+
   // Add a row to a Section (migrates a grandfathered section to explicit rows).
   function onAddRow(sectionId: string) {
     setBlocks((b) => addRow(b, sectionId));
@@ -413,7 +421,7 @@ export function PageBuilderShell({
   // List's `listSource`/`listMap`/`listRole`). An undefined value deletes the key.
   function onUpdateBlockField(
     blockId: string,
-    patch: Partial<Pick<Block, "bindings" | "listSource" | "listMap" | "listRole">>,
+    patch: Partial<Pick<Block, "bindings" | "listSource" | "listMap" | "listRole" | "formTarget">>,
   ) {
     setBlocks((b) => setBlockField(b, blockId, patch));
     setDirty(true);
@@ -439,6 +447,22 @@ export function PageBuilderShell({
     const { __child, ...fields } = patch;
     setBlocks((b) => {
       let next = setBlockField(b, blockId, fields);
+      if (__child) next = setBlockChildren(next, blockId, __child);
+      return next;
+    });
+    setDirty(true);
+  }
+
+  // Form slice (b): apply a Form settings patch — `formTarget` through
+  // setBlockField (undefined deletes → untargeted container); the optional
+  // `__child` (content component) through setBlockChildren, like onUpdateList.
+  function onUpdateForm(
+    blockId: string,
+    patch: { formTarget?: FormTarget; __child?: Block[] },
+  ) {
+    const { __child, ...fields } = patch;
+    setBlocks((b) => {
+      let next = "formTarget" in fields ? setBlockField(b, blockId, fields) : b;
       if (__child) next = setBlockChildren(next, blockId, __child);
       return next;
     });
@@ -870,6 +894,7 @@ export function PageBuilderShell({
                   onSelect={setSelectedBlockId}
                   onDropComponent={onDropComponentToColumn}
                   onDropList={onDropListToColumn}
+                  onDropForm={onDropFormToColumn}
                   onMoveNode={onMoveNode}
                   onDeleteColumn={onDeleteColumn}
                   onDeleteNode={onDeleteNode}
@@ -1067,6 +1092,19 @@ export function PageBuilderShell({
                       apiSources={apiSources}
                       propsSchemas={propsSchemas}
                       onChange={(patch) => onUpdateList(sel.id, patch)}
+                    />
+                  );
+                }
+                // A built-in Form block: target + messages/redirect + content panel.
+                if (sel && isForm(sel)) {
+                  return (
+                    <FormSettings
+                      key={sel.id}
+                      block={sel}
+                      collections={collections}
+                      apiSources={apiSources}
+                      propsSchemas={propsSchemas}
+                      onChange={(patch) => onUpdateForm(sel.id, patch)}
                     />
                   );
                 }

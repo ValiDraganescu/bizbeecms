@@ -10,7 +10,13 @@ export type RightTab = "block" | "page" | "seo";
 /** A collection field descriptor (registry `CollectionView.fields[]` shape). */
 export type CollectionFieldMeta = { name: string; type: string };
 /** A collection registry view as the binding panels need it (`/api/collections`). */
-export type CollectionMeta = { name: string; tableName: string; fields: CollectionFieldMeta[] };
+export type CollectionMeta = {
+  name: string;
+  tableName: string;
+  fields: CollectionFieldMeta[];
+  /** Form-block opt-in: may PUBLIC visitors submit DRAFT items? (Form slice b) */
+  publicSubmissions?: boolean;
+};
 
 /** A saved request as the bind panels need it (`/api/data-sources/:id/requests`). */
 export type ApiRequestMeta = {

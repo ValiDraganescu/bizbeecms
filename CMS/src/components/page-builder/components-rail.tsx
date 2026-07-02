@@ -110,6 +110,17 @@ export function ComponentsRail({
               {t("layoutList")}
             </button>
           </li>
+          <li>
+            <button
+              type="button"
+              disabled={!canEdit}
+              draggable={canEdit}
+              onDragStart={(e) => setDragPayload(e, { kind: "form" })}
+              className={dragBtn}
+            >
+              {t("layoutForm")}
+            </button>
+          </li>
         </ul>
       </div>
 

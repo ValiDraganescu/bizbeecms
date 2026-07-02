@@ -434,6 +434,7 @@
       "expand": "Laajenna osio"
     },
     "layoutList": "Lista (tietolähteestä)",
+    "layoutForm": "Lomake (lähettää tietolähteeseen)",
     "bind": {
       "title": "Sido tietolähteeseen",
       "help": "Täytä tämän lohkon ominaisuudet tietolähteestä — ensimmäisestä osuvasta kokoelman kohteesta tai API-vastauksesta.",
@@ -531,6 +532,25 @@
       "cbFieldName": "Lomakekentän nimi",
       "cbPlaceholder": "Paikkamerkki",
       "cbPlaceholderDefault": "Valitse…"
+    },
+    "form": {
+      "title": "Lomakkeen kohde",
+      "help": "Lähetä tämän lomakkeen lähetykset tietolähteeseen: API:n tallennettuun pyyntöön (suoritetaan palvelimella — salaisuudet pysyvät palvelimella) tai kokoelmaan, joka hyväksyy julkiset lähetykset (merkinnät tallentuvat luonnoksina tarkistusta varten).",
+      "fields": "Odotetut kenttien nimet",
+      "fieldsHelpApi": "Nimeä jokainen lomakkeen sisällön syöttökenttä täsmälleen tallennetun pyynnön paikkamerkkien mukaan — kentät yhdistetään nimen perusteella, ja jokainen paikkamerkki on täytettävä.",
+      "fieldsHelpCollection": "Kokoelman kenttien mukaan nimetyt syöttökentät muodostavat luonnoskohteen; tuntemattomat nimet hylätään.",
+      "fieldsNone": "Tällä kohteella ei ole kenttiä.",
+      "publicOff": "Tämä kokoelma ei vielä hyväksy julkisia lähetyksiä — lähetykset hylätään, kunnes otat asetuksen käyttöön sivulla",
+      "publicOffLink": "Kokoelmat",
+      "content": "Lomakkeen sisältökomponentti",
+      "contentHelp": "Sen syöttökentistä tulee lomakkeen kentät, ja sen sisällä oleva lähetyspainike lähettää lomakkeen natiivisti.",
+      "contentMulti": "Lomakkeen sisältölohkot",
+      "successMessage": "Onnistumisviesti",
+      "errorMessage": "Virheviesti",
+      "messagesHelp": "Näytetään sivulla lähetyksen jälkeen. Jätä tyhjäksi käyttääksesi näytettyjä oletuksia.",
+      "redirect": "Uudelleenohjaus lähetyksen jälkeen (valinnainen)",
+      "redirectHint": "Saman sivuston polku, joka alkaa /-merkillä — käytetään ilman JavaScriptiä tehdyn lähetyksen jälkeen sivulle palaamisen sijaan.",
+      "redirectInvalid": "On oltava saman sivuston polku, joka alkaa yhdellä /-merkillä — muuten arvo ohitetaan."
     },
     "componentsEmpty": "Ei vielä komponentteja — tuo paketti tai komponentti.",
     "componentsNoMatch": "Mikään komponentti ei vastaa hakuasi.",
@@ -751,6 +771,8 @@
     "required": "Pakollinen",
     "create": "Luo",
     "manageItems": "Hallitse sisältöä",
+    "publicSubmissions": "Julkiset lomakelähetykset",
+    "publicSubmissionsHint": "Salli sivujen lomakkeiden lähettää luonnoskohteita tähän kokoelmaan julkiselta sivustolta.",
     "delete": "Poista",
     "deleteOne": "Poista kokoelma {name}",
     "confirmDelete": "Poistetaanko kokoelma ”{name}” ja kaikki sen tiedot? Tätä ei voi kumota.",

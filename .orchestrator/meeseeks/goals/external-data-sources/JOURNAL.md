@@ -804,3 +804,54 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Verified:** everything above live; no repo code changed → no tsc/opennext
   gate owed. Memory-only commit.
 - **Files:** goal memory only (/tmp scratch removed).
+
+## 2026-07-02 10:35 — Form slice (b): page-builder UI for the Form block (PINNED)
+- **Status:** DONE
+- **What I did:** Full builder surface for the built-in Form block:
+  (1) **FormSettings panel** (binding-panels.tsx, new export) wired into the
+  shell's Block tab via `isForm()` (before the generic component branch):
+  source-agnostic target picker (SAME SourceSelect optgroups as binds —
+  collections + API sources), saved-request select for api kind, and — by
+  design, mirroring slice (d)'s "NO map arg" — **no field→placeholder map
+  editor**: the submit endpoint matches fields BY NAME, so the panel SHOWS the
+  exact expected input names as mono chips (api = the request's
+  `{placeholders}` via requestPlaceholders; collection = its schema field
+  names) with per-kind help copy. Success/error message inputs (placeholders =
+  the real FORM_DEFAULT_* fallbacks), optional same-site redirect with a live
+  invalid warning (`/`-prefix check matching formRedirectUrl's rule), and a
+  role="alert" warning + link to /admin/collections when the picked
+  collection's `publicSubmissions` is OFF. Kind-switching is destructure-based
+  like bind_form (other kind's ids dropped; messages/redirect survive).
+  Content component set like the List template (single child by name via
+  select, `__child` → setBlockChildren); a multi-child (AI-authored) form
+  shows its children read-only instead so the select can't clobber them.
+  (2) **Form primitive insertable**: `{kind:"form"}` DragPayload, rail button
+  (`layoutForm`) under Section/List, layers-tree column drop → new
+  onDropForm → addFormBlock (slice-d helper). (3) **publicSubmissions toggle
+  in the Collections UI** (collections-manager.tsx): per-row checkbox PATCHing
+  `_op:set_public_submissions`, aria-labelled per collection, hint via title.
+  (4) `CollectionMeta.publicSubmissions?` added (GET /api/collections already
+  returns it — verified live on :3602). (5) shell: onUpdateBlockField accepts
+  `formTarget`; new onUpdateForm (formTarget via setBlockField + __child via
+  setBlockChildren). (6) EN/FI/ET: `pageBuilder.layoutForm`,
+  `pageBuilder.form.*` (18 keys), `collections.publicSubmissions{,Hint}` —
+  all brace-free (ICU caveat).
+- **Regression:** scripts/form-copy.test.mjs (suite): EN/FI/ET key parity for
+  the new namespaces + a no-literal-ICU-braces lock on all form copy.
+  scripts/ssr-bind-panel-check.mjs EXTENDED: SSRs FormSettings with fixture-
+  style api- and collection-target Form blocks — asserts selected source +
+  request options, expected-input-name chips, authored success message +
+  redirect displayed, warning present when publicSubmissions OFF and absent
+  when ON. (next/link had to be dropped for a plain <a> — the check's esbuild
+  bundle can't dynamic-require react/jsx-runtime; new caveat.)
+- **Verified:** repo tsc clean; suite 1398/1398; ssr-bind-panel-check OK (all
+  panels); GET /api/collections live on :3602 returns publicSubmissions
+  (fixture enquiries = true). Isolated-worktree gate (changes copied in):
+  npm ci → cf-typegen → tsc → 1398/1398 → opennextjs-cloudflare build ALL
+  GREEN; worktree removed, dev server untouched. NOT verified: a real-browser
+  drag/click smoke of the panel (SSR display check + wiring types cover
+  rendering; interaction handlers follow the byte-similar List panel pattern).
+- **Files:** CMS/src/components/page-builder/{binding-panels,page-builder-shell,layers-tree,components-rail}.tsx,
+  CMS/src/components/content/collections-manager.tsx,
+  CMS/src/lib/page-builder/{types,dnd}.ts, CMS/messages/{en,fi,et}.json,
+  CMS/scripts/form-copy.test.mjs (new), CMS/scripts/ssr-bind-panel-check.mjs.

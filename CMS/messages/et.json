@@ -434,6 +434,7 @@
       "expand": "Laienda sektsioon"
     },
     "layoutList": "Loend (andmeallikast)",
+    "layoutForm": "Vorm (saadab andmeallikasse)",
     "bind": {
       "title": "Seo andmeallikaga",
       "help": "Täida selle ploki atribuudid andmeallikast — esimese sobiva kogumiku üksuse või API vastuse põhjal.",
@@ -531,6 +532,25 @@
       "cbFieldName": "Vormivälja nimi",
       "cbPlaceholder": "Kohatäide",
       "cbPlaceholderDefault": "Vali…"
+    },
+    "form": {
+      "title": "Vormi siht",
+      "help": "Saada selle vormi esitused andmeallikasse: API salvestatud päringusse (käivitatakse serveris — saladused jäävad serverisse) või kogumikku, mis lubab avalikke esitusi (kirjed salvestatakse mustanditena ülevaatuseks).",
+      "fields": "Oodatavad väljanimed",
+      "fieldsHelpApi": "Nimeta iga vormi sisu sisestusväli täpselt salvestatud päringu kohatäidete järgi — väljad sobitatakse nime järgi ja iga kohatäide peab olema täidetud.",
+      "fieldsHelpCollection": "Kogumiku väljade järgi nimetatud sisestusväljad moodustavad mustandüksuse; tundmatud nimed jäetakse kõrvale.",
+      "fieldsNone": "Sellel sihil pole välju.",
+      "publicOff": "See kogumik ei luba veel avalikke esitusi — esitused lükatakse tagasi, kuni lülitad sätte sisse lehel",
+      "publicOffLink": "Kogumikud",
+      "content": "Vormi sisukomponent",
+      "contentHelp": "Selle sisestusväljadest saavad vormi väljad ja selle sees olev saatmisnupp esitab vormi natiivselt.",
+      "contentMulti": "Vormi sisuplokid",
+      "successMessage": "Õnnestumise teade",
+      "errorMessage": "Veateade",
+      "messagesHelp": "Kuvatakse lehel pärast esitamist. Jäta tühjaks, et kasutada näidatud vaikeväärtusi.",
+      "redirect": "Ümbersuunamine pärast esitamist (valikuline)",
+      "redirectHint": "Sama saidi tee, mis algab /-märgiga — kasutatakse ilma JavaScriptita esitamise järel lehele naasmise asemel.",
+      "redirectInvalid": "Peab olema sama saidi tee, mis algab ühe /-märgiga — muidu väärtust eiratakse."
     },
     "componentsEmpty": "Komponente pole veel — impordi komplekt või komponent.",
     "componentsNoMatch": "Ükski komponent ei vasta otsingule.",
@@ -751,6 +771,8 @@
     "required": "Kohustuslik",
     "create": "Loo",
     "manageItems": "Halda sisu",
+    "publicSubmissions": "Avalikud vormiesitused",
+    "publicSubmissionsHint": "Luba lehtede vormidel esitada sellesse kogumikku mustandüksusi avalikult saidilt.",
     "delete": "Kustuta",
     "deleteOne": "Kustuta kogumik {name}",
     "confirmDelete": "Kas kustutada kogumik „{name}“ ja kõik selle andmed? Seda ei saa tagasi võtta.",

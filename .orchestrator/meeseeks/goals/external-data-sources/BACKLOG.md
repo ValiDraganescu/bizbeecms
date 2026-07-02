@@ -114,7 +114,18 @@ Task states: TODO | DOING | DONE | BLOCKED.
 >   validated fields + forced DRAFT status; per-IP rate limit + payload caps;
 >   progressive-enhancement client script shipped like combobox assets. Pure
 >   submit-core + plan-form node tests. Flag toggle via collections PATCH _op.
-> - DOING: **(b) page-builder UI**: bind a Form block → saved request OR opted-in
+> - DONE (2026-07-02): **(b) page-builder UI.** Shipped (JOURNAL 2026-07-02
+>   10:35): FormSettings panel (source-agnostic target picker + request select;
+>   expected-input-NAME chips instead of a map editor — submit maps by name;
+>   success/error messages; same-site redirect w/ invalid warning;
+>   publicSubmissions-off alert + link), Form draggable from the rail
+>   (`{kind:"form"}` → addFormBlock), content component select (List-template
+>   pattern, multi-child read-only guard), publicSubmissions checkbox in the
+>   Collections UI (PATCH _op). EN/FI/ET (brace-free). Regression:
+>   scripts/form-copy.test.mjs (key parity + ICU lock) + FormSettings section
+>   in ssr-bind-panel-check.mjs (both kinds, warning on/off). Worktree gate:
+>   tsc + 1398 + opennext GREEN. Original slice spec: bind a Form block →
+>   saved request OR opted-in
 >   collection; map fields → placeholders / schema fields; author success/error
 >   messages + optional redirect; publicSubmissions toggle in the Collections UI.
 >   EN/FI/ET. (Messages are authored strings on formTarget — localize via locale

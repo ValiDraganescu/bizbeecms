@@ -109,6 +109,30 @@ export function CollectionsManager({ initial }: { initial: CollectionView[] }) {
     }
   }
 
+  // Form-block opt-in (Form slice b): may PUBLIC visitors submit DRAFT items
+  // into this collection via a page Form? Explicit per-collection flag, default
+  // OFF — the submit endpoint 403s until it's enabled.
+  async function togglePublicSubmissions(c: CollectionView, enabled: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/collections/${encodeURIComponent(c.tableName)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ _op: "set_public_submissions", enabled }),
+      });
+      if (!res.ok) {
+        setError(await errorOf(res));
+        return;
+      }
+      await refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function confirmDelete() {
     if (!pendingDelete) return;
     setBusy(true);
@@ -230,6 +254,19 @@ export function CollectionsManager({ initial }: { initial: CollectionView[] }) {
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                <label
+                  className="flex items-center gap-1.5 text-sm text-foreground-muted"
+                  title={t("publicSubmissionsHint")}
+                >
+                  <input
+                    type="checkbox"
+                    checked={c.publicSubmissions === true}
+                    disabled={busy}
+                    aria-label={`${t("publicSubmissions")} — ${c.name}`}
+                    onChange={(e) => void togglePublicSubmissions(c, e.target.checked)}
+                  />
+                  {t("publicSubmissions")}
+                </label>
                 <Link
                   href={`/admin/collections/${encodeURIComponent(c.tableName)}`}
                   className="rounded border border-border px-2 py-1 text-foreground-muted hover:text-foreground"

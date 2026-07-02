@@ -434,6 +434,7 @@
       "expand": "Expand section"
     },
     "layoutList": "List (from data source)",
+    "layoutForm": "Form (submits to data source)",
     "bind": {
       "title": "Bind to data source",
       "help": "Fill this block's props from a data source — the first matching collection item, or a mapped API response.",
@@ -531,6 +532,25 @@
       "cbFieldName": "Form field name",
       "cbPlaceholder": "Placeholder",
       "cbPlaceholderDefault": "Select…"
+    },
+    "form": {
+      "title": "Form target",
+      "help": "Send this form's submissions to a data source: an API saved request (fired server-side — secrets stay on the server) or a collection that accepts public submissions (entries land as draft items for review).",
+      "fields": "Expected input names",
+      "fieldsHelpApi": "Name each input inside the form's content exactly after the saved request's placeholders — fields are matched by name, and every placeholder must be supplied.",
+      "fieldsHelpCollection": "Inputs named after the collection's fields become the draft item; unknown names are dropped.",
+      "fieldsNone": "This target declares no fields.",
+      "publicOff": "This collection does not accept public submissions yet — submissions will be rejected until you enable the toggle in",
+      "publicOffLink": "Collections",
+      "content": "Form content component",
+      "contentHelp": "Its inputs become the form's fields, and a submit button inside it triggers the form natively.",
+      "contentMulti": "Form content blocks",
+      "successMessage": "Success message",
+      "errorMessage": "Error message",
+      "messagesHelp": "Shown inline after an in-page submit. Leave empty to use the defaults shown.",
+      "redirect": "Redirect after submit (optional)",
+      "redirectHint": "A same-site path starting with / — used after a no-JavaScript submit instead of returning to the page.",
+      "redirectInvalid": "Must be a same-site path starting with a single / — this value will be ignored."
     },
     "componentsEmpty": "No components yet — import a kit or component.",
     "componentsNoMatch": "No components match your search.",
@@ -751,6 +771,8 @@
     "required": "Required",
     "create": "Create",
     "manageItems": "Manage content",
+    "publicSubmissions": "Public form submissions",
+    "publicSubmissionsHint": "Allow page Forms to submit draft items into this collection from the public site.",
     "delete": "Delete",
     "deleteOne": "Delete collection {name}",
     "confirmDelete": "Delete collection “{name}” and all its data? This cannot be undone.",

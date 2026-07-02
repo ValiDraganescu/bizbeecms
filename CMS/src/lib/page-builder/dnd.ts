@@ -4,6 +4,7 @@
  * A rail item carries a small JSON payload on a custom MIME type:
  *  - `{kind:"section"}`            — the LAYOUT Section primitive
  *  - `{kind:"list"}`              — the built-in List block
+ *  - `{kind:"form"}`              — the built-in Form block
  *  - `{kind:"component", name}`    — a component from the components rail
  *  - `{kind:"move", id}`           — reorder/move an existing Layers node
  * Drop targets read it back via `readDragPayload`.
@@ -14,6 +15,7 @@ const DND_MIME = "application/x-page-builder";
 export type DragPayload =
   | { kind: "section" }
   | { kind: "list" }
+  | { kind: "form" }
   | { kind: "component"; name: string }
   | { kind: "move"; id: string };
 

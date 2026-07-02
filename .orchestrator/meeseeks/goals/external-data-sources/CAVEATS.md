@@ -368,3 +368,21 @@ Read every line before working. Each entry was learned the hard way by a previou
   update_page_blocks (no real formTarget → degrades to a container) and/or
   re-passes a partial tree, deleting the page. Prompt it "use the create_form
   tool", "first get_page, re-pass the ENTIRE tree", and "new blocks need an id".
+
+- **binding-panels.tsx must stay bundleable by ssr-bind-panel-check.mjs — no
+  `next/link` import there.** The check's esbuild bundle externals only
+  react/react-dom/next-intl; a bundled next/link dynamic-requires
+  react/jsx-runtime and crashes the script. Use a plain `<a>` for admin links
+  in the panels (full reload is fine); if a Next-only import ever becomes
+  unavoidable, add it to the script's `external` list in the same commit.
+
+- **FormSettings has NO field→placeholder map editor BY DESIGN** (mirrors
+  slice (d)'s no-map-arg): /api/forms/submit matches fields by NAME, so the
+  panel shows the expected input names (request placeholders / collection
+  schema fields) as read-only chips. Don't "complete" it with a map UI —
+  that would imply a mapping the endpoint doesn't do.
+
+- **The Form content select only writes when `children.length <= 1`** — a
+  multi-child (AI-authored) form renders its children read-only in the panel
+  so the single-select can't clobber them. Keep that guard if you touch the
+  content section.

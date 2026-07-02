@@ -107,6 +107,7 @@ export function LayersTree({
   onSelect,
   onDropComponent,
   onDropList,
+  onDropForm,
   onMoveNode,
   onDeleteColumn,
   onDeleteNode,
@@ -120,6 +121,7 @@ export function LayersTree({
   onSelect: (id: string) => void;
   onDropComponent: (sectionId: string, colIndex: number, name: string, rowId: string) => void;
   onDropList: (sectionId: string, colIndex: number, rowId: string) => void;
+  onDropForm: (sectionId: string, colIndex: number, rowId: string) => void;
   onMoveNode: (dragId: string, targetId: string, position: "before" | "after" | "into") => void;
   onDeleteColumn: (columnId: string) => void;
   onDeleteNode: (nodeId: string) => void;
@@ -516,6 +518,9 @@ export function LayersTree({
                               } else if (payload?.kind === "list") {
                                 e.preventDefault();
                                 onDropList(b.id, ci, rowId);
+                              } else if (payload?.kind === "form") {
+                                e.preventDefault();
+                                onDropForm(b.id, ci, rowId);
                               } else if (payload?.kind === "move") {
                                 e.preventDefault();
                                 onMoveNode(payload.id, col.id, "into");
