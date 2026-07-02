@@ -425,3 +425,21 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   working tree untouched (`git worktree list` back to just main).
 - **Files:** none in-repo (build ran in /tmp worktree of HEAD 38f8b4d);
   goal memory files only.
+
+## 2026-07-02 05:36 — Response size cap in the central fetch engine
+- **Status:** DONE
+- **What I did:** Hardening slice (no open TODOs/bugs; browser tools absent so
+  the keyboard-smoke candidate was off the table): `fetchSource` used
+  `res.json()`, buffering an UNBOUNDED upstream body into Worker memory
+  (128 MB isolate) and re-stringifying it into the cache. Added
+  MAX_RESPONSE_BYTES (5 MB): reject via content-length header pre-read, then
+  via buffered text length (header may be absent/lie); graceful
+  `{ok:false,"upstream response too large"}`, never retried, never cached.
+  3 new node tests (header reject 1 call, no-header big body reject + not
+  cached, under-cap still parses).
+- **Verified:** tsc green; suite 1351/1351 (+3); opennext gate GREEN in an
+  isolated /tmp worktree WITH my fetch.ts copied in (recipe from CAVEATS,
+  extended: cp uncommitted file into worktree = gate covers pre-commit
+  changes); dev pid 79854 on :3602 untouched.
+- **Files:** CMS/src/lib/data-sources/fetch.ts,
+  CMS/scripts/data-source-fetch.test.mjs

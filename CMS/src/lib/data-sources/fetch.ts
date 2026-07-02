@@ -78,6 +78,16 @@ export type FetchSourceResult =
 const MAX_ATTEMPTS = 3; // 1 try + 2 retries (USER DIRECTIVE)
 const BACKOFF_MS = 200;
 const DEFAULT_TIMEOUT_MS = 10_000;
+/**
+ * Hard cap on the upstream response body. Without it, `res.json()` buffers an
+ * unbounded body into Worker memory (128 MB isolate limit) AND the parsed blob
+ * gets re-stringified into the cache. Checked twice: content-length header
+ * (cheap pre-read reject) and the buffered text length (header may be absent).
+ * ponytail: text .length counts UTF-16 units, not bytes — off by ≤2× on
+ * non-ASCII; fine for a safety cap, use a streaming byte counter if exactness
+ * ever matters.
+ */
+const MAX_RESPONSE_BYTES = 5_000_000;
 
 const PLACEHOLDER_RE = /\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g;
 
@@ -392,9 +402,24 @@ export async function fetchSource(
       return { ok: false, status: res.status, error: `upstream responded ${res.status}` };
     }
 
+    // Size cap — reject oversized bodies before/after buffering (never retry:
+    // the same request would get the same oversized answer).
+    const contentLength = Number(res.headers.get("content-length"));
+    if (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES) {
+      return { ok: false, status: res.status, error: "upstream response too large" };
+    }
+    let text: string;
+    try {
+      text = await res.text();
+    } catch {
+      return { ok: false, status: res.status, error: "could not read upstream response" };
+    }
+    if (text.length > MAX_RESPONSE_BYTES) {
+      return { ok: false, status: res.status, error: "upstream response too large" };
+    }
     let data: unknown;
     try {
-      data = await res.json();
+      data = JSON.parse(text);
     } catch {
       return { ok: false, status: res.status, error: "upstream response is not valid JSON" };
     }

@@ -1,17 +1,15 @@
 # Note to the next Meeseeks (external-data-sources)
 
-2026-07-02: **The opennext build gate is PAID.** After 17 deferrals, HEAD
-38f8b4d built GREEN via an isolated git worktree (see the new CAVEATS entry
-for the exact recipe — it works even while dev owns :3602). No build debt
-remains. If YOUR run changes CMS code, gate it the same way: commit first,
-then worktree-build HEAD.
+2026-07-02: Hardened the central fetch engine with a 5 MB response size cap
+(fetch.ts, +3 tests, suite 1351). The opennext gate is GREEN for this change —
+and note the improved recipe: you can `cp` uncommitted files into the /tmp
+worktree so the gate covers YOUR change BEFORE you commit (CAVEATS updated).
 
-Backlog has no open TODOs and no open bugs. The feature surface is complete
-per the revised GOAL.md and now verified deploy-buildable. Candidates
-(invent-a-slice territory):
-- **Keyboard/VoiceOver smoke of the builder binding panels** in a real
-  browser — only if browser tooling is actually available in your run.
+No open TODOs, no bugs. The feature surface is complete per the revised
+GOAL.md, deploy-buildable, a11y-passed, live-smoked (renderer + AI e2e), and
+now size-capped. Remaining candidates are thin:
+- Keyboard/VoiceOver browser smoke of the binding panels — ONLY if your run
+  actually has browser tools (mine didn't; check your toolset before picking).
 - OAuth2 `client_secret_post` fallback ONLY if a real provider demands it.
-- Re-read GOAL.md "what good looks like" vs shipped state for any fresh gap;
-  otherwise consider flagging in your result that this goal may be ripe for
-  curator archive/consolidation.
+- Otherwise: this goal looks ripe for curator archive/consolidation — flag it
+  in your result rather than inventing busywork.

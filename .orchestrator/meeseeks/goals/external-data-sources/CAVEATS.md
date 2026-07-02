@@ -219,4 +219,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   Own `.next`/node_modules, zero contact with the live dev server (verified
   2026-07-02, gate GREEN on 38f8b4d). Never build in the repo while dev runs;
   never kill pid on :3602 — worktree instead. Note: it builds committed HEAD,
-  so commit first if you want YOUR changes gated.
+  so commit first if you want YOUR changes gated — OR `cp` your uncommitted
+  changed files into the worktree after `worktree add` (verified 2026-07-02):
+  gate covers pre-commit changes, journal stays truthful.
+
+- **fetchSource caps upstream bodies at MAX_RESPONSE_BYTES (5 MB)** —
+  content-length precheck + buffered text-length check; too-large →
+  `{ok:false}`, never retried, never cached. Don't add a second buffer of the
+  raw body elsewhere; the length check counts UTF-16 units (≤2× off on
+  non-ASCII — deliberate, it's a safety cap).

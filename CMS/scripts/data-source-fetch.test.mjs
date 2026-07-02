@@ -189,6 +189,56 @@ test("fetch: non-JSON success body fails gracefully, no retry", async () => {
   assert.match(r.error, /not valid JSON/);
 });
 
+/* -------------------------------------------------------------- size cap */
+
+test("fetch: oversized content-length header rejects before reading, no retry", async () => {
+  let calls = 0;
+  const f = async () => {
+    calls++;
+    return new Response('{"ok":true}', {
+      status: 200,
+      headers: { "content-length": String(50_000_000) },
+    });
+  };
+  const r = await fetchSource(src(), req(), {}, { fetch: f, sleep: noSleep });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /too large/);
+  assert.equal(calls, 1);
+});
+
+test("fetch: oversized buffered body (no content-length) rejects, not cached", async () => {
+  const cache = createMemoryCache();
+  const big = `{"pad":"${"x".repeat(6_000_000)}"}`;
+  const f = async () => {
+    const res = new Response(big, { status: 200 });
+    res.headers.delete("content-length");
+    return res;
+  };
+  const r = await fetchSource(
+    src(),
+    req({ cacheEnabled: true }),
+    {},
+    { fetch: f, sleep: noSleep, cache },
+  );
+  assert.equal(r.ok, false);
+  assert.match(r.error, /too large/);
+  // nothing cached: a fresh cacheable call must hit the network again
+  const r2 = await fetchSource(
+    src(),
+    req({ cacheEnabled: true }),
+    {},
+    { fetch: async () => new Response('{"n":1}', { status: 200 }), sleep: noSleep, cache },
+  );
+  assert.deepEqual([r2.ok, r2.cached], [true, false]);
+});
+
+test("fetch: body under the cap still parses fine", async () => {
+  const f = async () => new Response('{"n":42}', { status: 200 });
+  const r = await fetchSource(src(), req(), {}, { fetch: f, sleep: noSleep });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.data, { n: 42 });
+});
+
 /* --------------------------------------------------------------- caching */
 
 test("fetch: cache hit skips the network; TTL expiry refetches", async () => {

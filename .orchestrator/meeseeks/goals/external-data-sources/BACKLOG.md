@@ -20,6 +20,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collision. Suite + tsc gate.
 
 ## Tasks
+- DONE (2026-07-02): **Response size cap in the central fetch engine** — a huge
+  upstream body buffered unbounded into `res.json()` + the cache; added
+  MAX_RESPONSE_BYTES 5MB (content-length precheck + text-length check), graceful
+  `{ok:false}` never-retry/never-cache, 3 node tests. tsc + 1351 green;
+  opennext gate GREEN (worktree, change included).
+
 - DONE (2026-07-02): **Discharged the owed opennext build gate in an ISOLATED git
   worktree** (dev on :3602 live, so built HEAD 38f8b4d in a /tmp detached
   worktree: npm ci + `npx opennextjs-cloudflare build` → GREEN, worker.js
