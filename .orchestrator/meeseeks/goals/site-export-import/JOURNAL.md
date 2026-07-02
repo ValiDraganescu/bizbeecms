@@ -199,3 +199,77 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `CMS/src/lib/site-export/site-import-validate.test.ts` (new),
   `CMS/src/app/api/site-import/validate/route.ts` (new), `BACKLOG.md` (flipped
   "Import validate + dry-run" TODO to DONE), `JOURNAL.md`, `NEXT.md`.
+
+## 2026-07-02 19:26 — Import execute: the destructive path (FORMAT.md §6 Step C)
+- **Status:** DONE
+- **What I did:** Built `POST /api/site-import` (operator-only, DESTRUCTIVE) per
+  FORMAT.md §6 Step C verbatim. Confirmation contract (not pinned by FORMAT.md,
+  decided this run): request body is `{artifact, confirm}`; `confirm` must equal
+  the artifact's `meta.siteName` EXACTLY (case-sensitive) — a blank `siteName`
+  (no `site_identity` row set on the source) can NEVER be confirmed and the
+  import is refused outright with a named error, rather than silently accepting
+  an empty/omitted `confirm`. Pure planner `CMS/src/lib/site-export/site-import-execute.ts`
+  (`planImport`, `checkConfirmation`, `WIPE_BUILTIN_TABLES`, `PRESERVED_TABLES`)
+  re-validates format/version/tables-shape (defensively — never trusts the
+  caller already ran `/validate`) and additionally HARD-BLOCKS (not
+  warning-only, unlike dry-run) if `tables.collection.length > 100` — resolves
+  the CAVEATS.md-documented cap ambiguity exactly as flagged: warning in
+  validate, hard block in execute. `planImport` returns the full ordered
+  wipe+restore plan as DATA (table names, rows, `secretEnc` already nulled) so
+  it stays a pure, mocked-port-testable function; the route
+  (`CMS/src/app/api/site-import/route.ts`) is the thin executor that walks the
+  plan: DROP every `content_*` table in the current registry (fenced
+  `contentDdl`) → delete all rows from `collection, page_version, page,
+  component, data_source_request, data_source, prompt_version, asset,
+  site_settings` (via the plain `Db` port — `user/session/invite/
+  password_reset/login_attempt/api_key/icon_cache/chat_thread` never touched,
+  not in the wipe list) → recreate each collection's table via
+  `buildCreateTableSql`/`contentDdl` (never hand-authored DDL, per CAVEATS) →
+  insert collection rows via parameterized `contentWrite` → collection registry
+  rows → components → pages → page versions → site settings → prompt versions
+  → data sources (secretEnc forced `null`) → data source requests → asset
+  metadata rows (bytes are a follow-up per-key upload leg, out of scope this
+  run per NEXT.md). Response includes `assetKeysToUpload` (every asset key
+  needing its bytes re-uploaded next).
+- **Bug found + fixed via live verification (would NOT have been caught by
+  unit tests alone):** D1's per-statement bound-parameter cap is 100 —
+  `db.insert(table).values([...])` compiles ALL rows into ONE multi-row INSERT
+  with every cell bound, so a wide table (e.g. `component`'s 16 columns) 500s
+  after only ~6-7 rows in a single artifact-sized insert. Added `insertRows()`
+  in the route: chunks any builtin-table insert so `chunkSize = floor(90 /
+  columnCount)`, comfortably under the cap regardless of table width. Confirmed
+  empirically against the live dev D1: 5 `component` rows (80 params) succeeds,
+  8 rows (128 params) 500s with no D1 error surfaced to the client (silent
+  request failure) — this is now a CAVEATS entry since it's a hard Workers/D1
+  constraint, not specific to this task.
+- **Verified:** `npm test` — 1500/1500 pass (13 new tests in
+  `site-import-execute.test.ts`: confirmation contract, format/version
+  re-checks, hard cap block at/over 100, plan shape mirrors artifact tables
+  verbatim, `secretEnc` always nulled, `WIPE_BUILTIN_TABLES`/`PRESERVED_TABLES`
+  never overlap and match FORMAT.md's exact order). `tsc --noEmit` clean.
+  **Live end-to-end on `:3602`** (dev server already running, did NOT run
+  `opennextjs-cloudflare build`): exported the real tableonline site (13
+  pages/136 pageVersions/41 components/7 collections/73 collectionRows/61
+  assets/6 dataSources/12 dataSourceRequests/2 promptVersions), synthesized a
+  non-empty `meta.siteName` (source site has none set — confirmed the
+  blank-siteName refusal path first: `{"ok":false,"error":"artifact has no
+  meta.siteName to confirm against — cannot import"}`), then POSTed the SAME
+  artifact back with the matching `confirm` — re-importing into the SAME
+  instance is FORMAT.md/NEXT.md's own suggested simplest smoke test. Result:
+  `{"ok":true,"restored":{...all 9 keys matching the export counts exactly...}}`,
+  home page re-rendered `200` with the correct `<title>`, D1 counts matched
+  (`page:13, component:41, collection:7, site_settings:12, data_source:6,
+  asset:61, content_restaurants:42`), `data_source.secret_enc` confirmed
+  `NULL` on every row, `user` table untouched (2 rows preserved throughout).
+  **Idempotency**: re-POSTed the exact same artifact a SECOND time — `200 OK`
+  again, counts unchanged, home page still renders — confirms "a failed import
+  must be re-runnable" by the unconditional-wipe design, no rollback machinery
+  needed.
+- **Not built this run (explicitly out of scope per NEXT.md):** the per-key
+  asset BYTES upload route (`POST /api/site-import/asset/<key>`, FORMAT.md §4's
+  second leg) and the Admin UI. `assetKeysToUpload` in the response is the
+  checklist a future UI/route drives against.
+- **Files:** `CMS/src/lib/site-export/site-import-execute.ts` (new),
+  `CMS/src/lib/site-export/site-import-execute.test.ts` (new),
+  `CMS/src/app/api/site-import/route.ts` (new), `BACKLOG.md` (flipped "Import
+  execute" TODO to DONE), `CAVEATS.md`, `JOURNAL.md`, `NEXT.md`.

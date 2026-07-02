@@ -38,6 +38,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   needs a HARD block on cap-exceeded before any writes, that's the right
   place to add it (refuse to execute if `collectionCapOk===false`), not here
   in validate/dry-run.
+- **D1's per-statement bound-parameter cap is 100** — a Drizzle
+  `db.insert(table).values([...manyRows])` compiles ALL rows into ONE
+  multi-row `INSERT` with every cell bound, so a wide table (e.g. `component`
+  at 16 columns) 500s after only ~6-7 rows in a single call, with the error
+  swallowed (client just sees a generic `500`, no detail). Confirmed
+  empirically on the live dev D1: 5 rows (80 params) succeeds, 8 rows (128
+  params) fails. Any import/bulk-restore path that inserts artifact-sized row
+  batches MUST chunk by `floor(100 / columnCount)` (with margin — Import
+  execute uses 90) rather than one `.values([])` call per table. This is a
+  general Workers/D1 constraint, not specific to this goal — worth knowing for
+  ANY future bulk-insert code on this stack, not just export/import.
 
 - Content/theme/page work goes through the HTTP MCP at `http://localhost:3602/mcp` (bearer token in repo-root `.mcp.json`, key `local-site`), NOT direct DB edits. Call `get_authoring_guide` before block-tree edits — `update_page_blocks` expects the FULL current tree back, so `get_page` first or you wipe sections.
 - The dev server must be running for MCP calls (`npm run dev` in `CMS/`, port 3602). If :3602 is down, start it; don't switch to build mode. NEVER run `npx opennextjs-cloudflare build` while dev is running — it corrupts .next.
