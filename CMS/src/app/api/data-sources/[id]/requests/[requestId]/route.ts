@@ -12,6 +12,7 @@ import {
   updateDataSourceRequest,
 } from "@/db/data-source-store";
 import { validateRequestInput } from "@/lib/data-sources/validate";
+import { pruneApiCacheVersions } from "@/db/settings-store";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,7 @@ export async function DELETE(request: Request, { params }: Params): Promise<Resp
   try {
     const removed = await deleteDataSourceRequest(id, requestId);
     if (!removed) return Response.json({ error: "not found" }, { status: 404 });
+    await pruneApiCacheVersions({ requestIds: [requestId] });
     return Response.json({ ok: true });
   } catch (err) {
     return Response.json(

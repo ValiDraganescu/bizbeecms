@@ -13,9 +13,11 @@ import { requireAdmin } from "@/lib/auth/guard";
 import {
   deleteDataSource,
   getDataSource,
+  listDataSourceRequests,
   updateDataSource,
 } from "@/db/data-source-store";
 import { validateSourceInput } from "@/lib/data-sources/validate";
+import { pruneApiCacheVersions } from "@/db/settings-store";
 
 export const dynamic = "force-dynamic";
 
@@ -87,8 +89,11 @@ export async function DELETE(request: Request, { params }: Params): Promise<Resp
   if (denied) return denied;
   const { id } = await params;
   try {
+    // Capture the saved-request ids BEFORE the delete — they cascade with it.
+    const requestIds = (await listDataSourceRequests(id)).map((r) => r.id);
     const removed = await deleteDataSource(id);
     if (!removed) return Response.json({ error: "not found" }, { status: 404 });
+    await pruneApiCacheVersions({ sourceId: id, requestIds });
     return Response.json({ ok: true });
   } catch (err) {
     return Response.json(

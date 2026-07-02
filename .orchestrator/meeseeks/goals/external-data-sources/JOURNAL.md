@@ -259,3 +259,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   :3602 with active browser connections.
 - **Files:** CMS/src/components/page-builder/binding-panels.tsx,
   CMS/messages/{en,fi,et}.json
+
+## 2026-07-02 04:11 — Prune stale purge counters on source/request delete
+- **Status:** DONE
+- **What I did:** Added pure `pruneCounters(v, {sourceId?, requestIds?})` to
+  lib/data-sources/purge.ts (returns the SAME object when nothing matches so
+  callers skip the settings write) + effectful `pruneApiCacheVersions(drop)`
+  in db/settings-store.ts (best-effort, swallows errors — never fails a
+  completed delete). Wired both DELETE handlers: source delete captures its
+  saved-request ids BEFORE the delete (they cascade) and prunes source +
+  request counters; request delete prunes its one counter. 2 new node tests.
+- **Verified:** tsc green; node suite 1336/1336. LIVE smoke on :3602: created
+  source+request, purged both scopes (counters appeared in the
+  api_cache_versions row), DELETEd the source → both counters gone, global
+  counter preserved. Opennext build gate DEFERRED again (10th) — dev server
+  pid 79854 still on :3602 with active browser connections.
+- **Files:** CMS/src/lib/data-sources/purge.ts, CMS/src/db/settings-store.ts,
+  CMS/src/app/api/data-sources/[id]/route.ts,
+  CMS/src/app/api/data-sources/[id]/requests/[requestId]/route.ts,
+  CMS/scripts/data-source-purge.test.mjs

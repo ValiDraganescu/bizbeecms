@@ -65,8 +65,27 @@ export function cacheVersionFor(
   return `${v.global}.${v.sources[sourceId] ?? 0}.${v.requests[requestId] ?? 0}`;
 }
 
-// ponytail: the sources/requests maps keep counters for deleted rows; they're
-// tiny ints in one JSON row — prune on source-delete if it ever matters.
+/**
+ * Drop counters for a deleted source and/or deleted saved requests so the
+ * `api_cache_versions` row doesn't accumulate dead keys. Returns the SAME
+ * object when nothing was removed — callers skip the settings write then.
+ * (Dropping a counter resets its scope's version to 0; ids are UUIDs and
+ * never reused, so no live cache entry can be re-addressed by the reset.)
+ */
+export function pruneCounters(
+  v: ApiCacheVersions,
+  drop: { sourceId?: string; requestIds?: string[] },
+): ApiCacheVersions {
+  const reqIds = drop.requestIds ?? [];
+  const dropSource = drop.sourceId != null && drop.sourceId in v.sources;
+  const dropReqs = reqIds.some((id) => id in v.requests);
+  if (!dropSource && !dropReqs) return v;
+  const sources = { ...v.sources };
+  if (drop.sourceId != null) delete sources[drop.sourceId];
+  const requests = { ...v.requests };
+  for (const id of reqIds) delete requests[id];
+  return { global: v.global, sources, requests };
+}
 
 export function bumpGlobal(v: ApiCacheVersions): ApiCacheVersions {
   return { ...v, global: v.global + 1 };

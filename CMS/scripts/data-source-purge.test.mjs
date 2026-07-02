@@ -14,6 +14,7 @@ import {
   bumpGlobal,
   bumpSource,
   bumpRequest,
+  pruneCounters,
 } from "../src/lib/data-sources/purge.ts";
 import { createMemoryCache, fetchSource } from "../src/lib/data-sources/fetch.ts";
 
@@ -63,6 +64,24 @@ test("bumps are immutable + monotonic", () => {
   assert.deepEqual(v0, emptyCacheVersions()); // untouched
   assert.deepEqual(v1, { global: 1, sources: { s1: 1 }, requests: { r1: 1 } });
   assert.deepEqual(bumpGlobal(v1).global, 2);
+});
+
+test("pruneCounters drops exactly the deleted source/request keys", () => {
+  const v = { global: 2, sources: { s1: 3, s2: 1 }, requests: { r1: 4, r2: 2, r3: 1 } };
+
+  // Source delete with its cascading requests.
+  const p = pruneCounters(v, { sourceId: "s1", requestIds: ["r1", "r2"] });
+  assert.deepEqual(p, { global: 2, sources: { s2: 1 }, requests: { r3: 1 } });
+  assert.deepEqual(v.sources, { s1: 3, s2: 1 }); // input untouched
+
+  // Single request delete.
+  assert.deepEqual(pruneCounters(v, { requestIds: ["r3"] }).requests, { r1: 4, r2: 2 });
+});
+
+test("pruneCounters returns the SAME object when nothing matches (skip write)", () => {
+  const v = { global: 1, sources: { s1: 1 }, requests: { r1: 1 } };
+  assert.equal(pruneCounters(v, { sourceId: "nope", requestIds: ["also-nope"] }), v);
+  assert.equal(pruneCounters(v, {}), v);
 });
 
 /* ------------------------------------------- integration with fetchSource */

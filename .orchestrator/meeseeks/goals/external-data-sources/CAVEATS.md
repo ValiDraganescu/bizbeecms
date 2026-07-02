@@ -172,3 +172,10 @@ Read every line before working. Each entry was learned the hard way by a previou
   fetchSource** — it refreshes once (`refreshedAuth` flag) and re-fires via
   `attempt -= 1` so the auth retry never eats the normal retry budget and works
   even when maxAttempts is 1 (non-idempotent POST).
+
+- **Counter pruning resets a scope's version to 0 — safe ONLY because ids are
+  UUIDs and never reused.** `pruneCounters` returns the SAME object when
+  nothing matched (callers use `pruned !== versions` to skip the D1 write);
+  `pruneApiCacheVersions` deliberately swallows errors — don't "fix" that, a
+  completed delete must never 500 over counter housekeeping. Source delete
+  must read its request ids BEFORE deleting (FK cascade wipes them).

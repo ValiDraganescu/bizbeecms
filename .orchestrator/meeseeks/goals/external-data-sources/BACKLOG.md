@@ -5,6 +5,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-07-02): **Prune stale purge counters** in the `api_cache_versions`
+  settings row on source/request delete — pure `pruneCounters` + best-effort
+  `pruneApiCacheVersions` wired into both DELETE handlers; source delete captures
+  cascading request ids first. tsc + 1336 tests green; live-verified on :3602.
+  Opennext gate deferred (10th).
+
 - DONE (2026-07-02): **Localize the hardcoded-English combobox config section** in
   binding-panels.tsx (pre-existing debt from the combobox slice) — 27 EN/FI/ET keys
   under `pageBuilder.list.*` (`presentation*`, `cb*`); ICU-value interpolation for

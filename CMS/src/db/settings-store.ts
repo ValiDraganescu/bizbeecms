@@ -29,6 +29,7 @@ import { DEFAULT_ICON_SET, isValidIconSet } from "../lib/render/icons.ts";
 import {
   type ApiCacheVersions,
   normalizeCacheVersions,
+  pruneCounters,
 } from "../lib/data-sources/purge.ts";
 
 const CONTENT_LOCALES_KEY = "content_locales";
@@ -337,4 +338,23 @@ export async function setApiCacheVersions(
     JSON.stringify(normalizeCacheVersions(versions)),
     injectedDb,
   );
+}
+
+/**
+ * Best-effort: drop deleted rows' purge counters from `api_cache_versions`
+ * so the row doesn't accumulate dead keys (called by the source/request
+ * DELETE handlers AFTER the delete succeeds). Swallows errors — stale
+ * counters are harmless tiny ints and the next purge rewrites the row.
+ */
+export async function pruneApiCacheVersions(
+  drop: { sourceId?: string; requestIds?: string[] },
+  injectedDb?: Db,
+): Promise<void> {
+  try {
+    const versions = await getApiCacheVersions(injectedDb);
+    const pruned = pruneCounters(versions, drop);
+    if (pruned !== versions) await setApiCacheVersions(pruned, injectedDb);
+  } catch {
+    // ponytail: never fail a completed delete over counter housekeeping.
+  }
 }
