@@ -5,6 +5,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
 (human-reported bugs land here, newest at top; they outrank everything)
 
 ## Tasks
+- DONE (2026-07-02): **Localize the hardcoded-English combobox config section** in
+  binding-panels.tsx (pre-existing debt from the combobox slice) — 27 EN/FI/ET keys
+  under `pageBuilder.list.*` (`presentation*`, `cb*`); ICU-value interpolation for
+  `${…}` snippets. tsc + 1334 tests green; opennext gate deferred (9th).
+
 Build order: source schema + encrypted secret first, then the fetch+map engine,
 then the source-agnostic binding, then UI, then AI tools. Each slice gates on CMS
 tsc + opennext build green + node tests + EN/FI/ET for new strings.

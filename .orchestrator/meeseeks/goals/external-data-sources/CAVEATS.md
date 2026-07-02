@@ -126,10 +126,10 @@ Read every line before working. Each entry was learned the hard way by a previou
   `{prop}` specs from `block.props` for lists too; if Lists ever get prop inputs,
   just pass real propNames to `ApiParamsEditor`.
 
-- **The combobox config section in binding-panels.tsx is hardcoded English**
-  (pre-existing debt from the combobox slice, NOT Slice 5). New Slice-5 strings
-  all live under `pageBuilder.bind.*` EN/FI/ET; localizing the combobox labels is
-  a separate small task.
+- ~~The combobox config section in binding-panels.tsx is hardcoded English~~
+  FIXED 2026-07-02: now `pageBuilder.list.presentation*` / `list.cb*` keys
+  (EN/FI/ET). The `${name} · ★ ${rating}` labelExpr syntax example deliberately
+  stays as an untranslated `placeholder=` attr (ICU-brace caveat).
 
 - **Purge = version-counter bump, ONE settings row** (`api_cache_versions`,
   Slice 7): `cacheVersionFor(versions, sourceId, requestId)` composes

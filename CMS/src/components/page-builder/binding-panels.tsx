@@ -966,20 +966,20 @@ export function ListSettings({
 
           {templateName && (
             <label className="flex flex-col gap-1.5 border-t border-border pt-4">
-              <span className={ctlLabel}>Presentation</span>
+              <span className={ctlLabel}>{t("list.presentation")}</span>
               <select
                 className={ctlInput}
                 value={presentation}
-                aria-label="Presentation"
+                aria-label={t("list.presentation")}
                 onChange={(e) => emitSource({ presentation: e.target.value as "list" | "combobox" })}
               >
-                <option value="list">List — show all rows</option>
-                <option value="combobox">Combobox — select from rows in a dropdown</option>
+                <option value="list">{t("list.presentationList")}</option>
+                <option value="combobox">{t("list.presentationCombobox")}</option>
               </select>
               <span className="text-xs text-foreground-muted">
                 {presentation === "combobox"
-                  ? `Each row renders as ${templateName} inside a selectable dropdown; the combobox owns selection, search and limits.`
-                  : `Repeats ${templateName} once per matching row.`}
+                  ? t("list.presentationComboboxHint", { template: templateName })
+                  : t("list.presentationListHint", { template: templateName })}
               </span>
             </label>
           )}
@@ -1105,39 +1105,39 @@ export function ListSettings({
           {templateName && presentation === "combobox" && (
             <div className="space-y-3 rounded-md border border-border p-3">
               <label className="flex flex-col gap-1.5">
-                <span className={ctlLabel}>Selection</span>
+                <span className={ctlLabel}>{t("list.cbSelection")}</span>
                 <select
                   className={ctlInput}
                   value={cb.select ?? "multiple"}
-                  aria-label="Selection mode"
+                  aria-label={t("list.cbSelectionAria")}
                   onChange={(e) => emitSource({ select: e.target.value as "single" | "multiple" })}
                 >
-                  <option value="multiple">Multiple</option>
-                  <option value="single">Single</option>
+                  <option value="multiple">{t("list.cbMultiple")}</option>
+                  <option value="single">{t("list.cbSingle")}</option>
                 </select>
               </label>
               <div className="flex gap-2">
                 <label className="flex flex-1 flex-col gap-1.5">
-                  <span className={ctlLabel}>Min</span>
+                  <span className={ctlLabel}>{t("list.cbMin")}</span>
                   <input
                     type="number"
                     min={0}
                     className={ctlInput}
                     value={cb.min ?? ""}
                     placeholder="0"
-                    aria-label="Minimum selectable"
+                    aria-label={t("list.cbMinAria")}
                     onChange={(e) => emitSource({ min: e.target.value === "" ? undefined : Number(e.target.value) })}
                   />
                 </label>
                 <label className="flex flex-1 flex-col gap-1.5">
-                  <span className={ctlLabel}>Max (0 = ∞)</span>
+                  <span className={ctlLabel}>{t("list.cbMax")}</span>
                   <input
                     type="number"
                     min={0}
                     className={ctlInput}
                     value={cb.max ?? ""}
                     placeholder="0"
-                    aria-label="Maximum selectable"
+                    aria-label={t("list.cbMaxAria")}
                     onChange={(e) => emitSource({ max: e.target.value === "" ? undefined : Number(e.target.value) })}
                   />
                 </label>
@@ -1146,36 +1146,36 @@ export function ListSettings({
                 <input
                   type="checkbox"
                   checked={cb.searchable !== false}
-                  aria-label="Searchable"
+                  aria-label={t("list.cbSearchable")}
                   onChange={(e) => emitSource({ searchable: e.target.checked })}
                 />
-                Searchable
+                {t("list.cbSearchable")}
               </label>
               {/* api kind: identity/label are response DOT-PATHS (free text +
                   sample suggestions); collection kind keeps the column selects. */}
               {kind === "api" ? (
                 <>
                   <label className="flex flex-col gap-1.5">
-                    <span className={ctlLabel}>Value field (option identity)</span>
+                    <span className={ctlLabel}>{t("list.cbValueField")}</span>
                     <input
                       type="text"
                       list={`list-paths-${block.id}`}
                       className={`${ctlInput} font-mono`}
                       value={cb.valueField ?? ""}
                       placeholder={t("bind.pathPlaceholder")}
-                      aria-label="Value field"
+                      aria-label={t("list.cbValueFieldAria")}
                       onChange={(e) => emitSource({ valueField: e.target.value || undefined })}
                     />
                   </label>
                   <label className="flex flex-col gap-1.5">
-                    <span className={ctlLabel}>Label field (selected-item chip)</span>
+                    <span className={ctlLabel}>{t("list.cbLabelField")}</span>
                     <input
                       type="text"
                       list={`list-paths-${block.id}`}
                       className={`${ctlInput} font-mono`}
                       value={cb.labelField ?? ""}
                       placeholder={t("bind.pathPlaceholder")}
-                      aria-label="Label field"
+                      aria-label={t("list.cbLabelFieldAria")}
                       onChange={(e) => emitSource({ labelField: e.target.value || undefined })}
                     />
                   </label>
@@ -1183,14 +1183,14 @@ export function ListSettings({
               ) : (
                 <>
                   <label className="flex flex-col gap-1.5">
-                    <span className={ctlLabel}>Value field (option identity)</span>
+                    <span className={ctlLabel}>{t("list.cbValueField")}</span>
                     <select
                       className={ctlInput}
                       value={cb.valueField ?? ""}
-                      aria-label="Value field"
+                      aria-label={t("list.cbValueFieldAria")}
                       onChange={(e) => emitSource({ valueField: e.target.value || undefined })}
                     >
-                      <option value="">id (default)</option>
+                      <option value="">{t("list.cbValueDefault")}</option>
                       {columns.map((c) => (
                         <option key={c} value={c}>
                           {c}
@@ -1199,14 +1199,14 @@ export function ListSettings({
                     </select>
                   </label>
                   <label className="flex flex-col gap-1.5">
-                    <span className={ctlLabel}>Label field (selected-item chip)</span>
+                    <span className={ctlLabel}>{t("list.cbLabelField")}</span>
                     <select
                       className={ctlInput}
                       value={cb.labelField ?? ""}
-                      aria-label="Label field"
+                      aria-label={t("list.cbLabelFieldAria")}
                       onChange={(e) => emitSource({ labelField: e.target.value || undefined })}
                     >
-                      <option value="">component text (default)</option>
+                      <option value="">{t("list.cbLabelDefault")}</option>
                       {columns.map((c) => (
                         <option key={c} value={c}>
                           {c}
@@ -1217,38 +1217,39 @@ export function ListSettings({
                 </>
               )}
               <label className="flex flex-col gap-1.5">
-                <span className={ctlLabel}>Label expression (advanced)</span>
+                <span className={ctlLabel}>{t("list.cbLabelExpr")}</span>
                 <input
                   type="text"
                   className={`${ctlInput} font-mono`}
                   value={cb.labelExpr ?? ""}
                   placeholder={"${name} · ★ ${rating}"}
-                  aria-label="Label expression"
+                  aria-label={t("list.cbLabelExprAria")}
                   onChange={(e) => emitSource({ labelExpr: e.target.value || undefined })}
                 />
                 <span className="text-xs text-foreground-muted">
-                  A template for the chip text — use <code>{"${field}"}</code> for row values, e.g. <code>{"${name} · ${location}"}</code>. No backticks needed. Overrides the label field.
+                  {/* ${…} snippets are ICU values, not message text — literal braces crash next-intl. */}
+                  {t("list.cbLabelExprHelp", { syntax: "${field}", example: "${name} · ${location}" })}
                 </span>
               </label>
               <label className="flex flex-col gap-1.5">
-                <span className={ctlLabel}>Form field name</span>
+                <span className={ctlLabel}>{t("list.cbFieldName")}</span>
                 <input
                   type="text"
                   className={ctlInput}
                   value={cb.name ?? ""}
                   placeholder="selection"
-                  aria-label="Form field name"
+                  aria-label={t("list.cbFieldName")}
                   onChange={(e) => emitSource({ name: e.target.value || undefined })}
                 />
               </label>
               <label className="flex flex-col gap-1.5">
-                <span className={ctlLabel}>Placeholder</span>
+                <span className={ctlLabel}>{t("list.cbPlaceholder")}</span>
                 <input
                   type="text"
                   className={ctlInput}
                   value={cb.placeholder ?? ""}
-                  placeholder="Select…"
-                  aria-label="Placeholder"
+                  placeholder={t("list.cbPlaceholderDefault")}
+                  aria-label={t("list.cbPlaceholder")}
                   onChange={(e) => emitSource({ placeholder: e.target.value || undefined })}
                 />
               </label>

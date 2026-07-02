@@ -240,3 +240,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/content/data-sources-manager.tsx,
   CMS/messages/{en,fi,et}.json,
   CMS/scripts/data-source-{validate,fetch}.test.mjs
+
+## 2026-07-02 04:00 — Localize combobox config section in binding-panels.tsx
+- **Status:** DONE
+- **What I did:** Replaced all hardcoded English strings in the ListSettings
+  combobox/presentation section (Presentation select + hints, Selection mode,
+  Min/Max, Searchable, Value/Label field labels + defaults, Label expression +
+  help, Form field name, Placeholder) with `t("list.*")` keys — 27 new keys
+  (`presentation*`, `cb*`) added to en/fi/et.json under `pageBuilder.list`.
+  Template-name and `${…}` snippets interpolated as ICU VALUES (brace caveat);
+  the `${name} · ★ ${rating}` syntax example stays as an untranslated
+  `placeholder=` attr per the established pattern. `<code>` styling in the
+  labelExpr help dropped (plain interpolated string — lazy, no t.rich).
+- **Verified:** EN/FI/ET key-set parity (flatten+diff = empty), `tsc --noEmit`
+  green, node suite 1334/1334. Live UI render not eyeballed (dev :3602 belongs
+  to the user); all new messages are simple `{arg}` ICU — no literal braces.
+  Opennext build gate DEFERRED again (9th) — dev server pid 79854 still on
+  :3602 with active browser connections.
+- **Files:** CMS/src/components/page-builder/binding-panels.tsx,
+  CMS/messages/{en,fi,et}.json
