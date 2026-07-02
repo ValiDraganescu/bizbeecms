@@ -211,3 +211,32 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/chat/binding-tools.ts, CMS/src/lib/chat/tool-scopes.ts,
   CMS/src/lib/chat/tool-dispatch.ts, CMS/scripts/data-source-tools.test.mjs
   (new), CMS/scripts/binding-tools.test.mjs
+
+## 2026-07-02 03:48 — Slice 8: OAuth2 client-credentials auth
+- **Status:** DONE
+- **What I did:** Added `oauth2` to AUTH_TYPES. NO migration: `authParam` carries
+  the TOKEN URL (validated via validateBaseUrl — same SSRF boundary as baseUrl);
+  secret = write-only `client_id:client_secret` (mirrors basic). Central fetch
+  engine (fetch.ts): `fetchOauth2Token` POSTs `grant_type=client_credentials`
+  with Basic client creds + timeout, caches the token via the injected ApiCache
+  (key `ds-oauth2-token:<sourceId>`, UNVERSIONED by design; TTL = expires_in−60,
+  clamped ≥30), injects `Bearer` into the built request's headers in fetchSource
+  (buildRequest stays sync/pure; cache key unaffected — token rides in a header).
+  ONE forced refresh + re-fire on 401 (`attempt -= 1`, doesn't eat the retry
+  budget; safe for non-idempotent too since 401 rejects before work). UI: oauth2
+  select option (generic over AUTH_TYPES), token-URL label/placeholder,
+  maxLength 2000 for the URL, secret placeholders for oauth2/basic. AI
+  create_data_source: description + authParam/secret docs cover oauth2;
+  needs-secret check simplified to `authType !== "none"`. EN/FI/ET:
+  `authTypes.oauth2`, `authParamTokenUrl`.
+- **Verified:** 5 new fetch tests (Basic+form token call, Bearer on request,
+  token cached across calls, 401→one refresh+re-fire incl. POST, graceful
+  token-endpoint failures) + 1 validate test; suite 1334/1334; tsc green; LIVE
+  smoke on :3602 — bad token URL → 400, good → 201 w/ hasSecret (secret never
+  returned), cleaned up. Opennext build gate deferred an 8TH time (dev server
+  pid 79854 on :3602, active browser connections — user is using it).
+- **Files:** CMS/src/lib/data-sources/{validate,fetch}.ts,
+  CMS/src/lib/chat/data-source-tools.ts,
+  CMS/src/components/content/data-sources-manager.tsx,
+  CMS/messages/{en,fi,et}.json,
+  CMS/scripts/data-source-{validate,fetch}.test.mjs

@@ -64,7 +64,10 @@ export const CREATE_DATA_SOURCE_TOOL = {
       "saved requests. Auth types: 'header' (secret sent in the header named " +
       "`authParam`, e.g. Authorization or X-API-Key — include any 'Bearer ' prefix " +
       "IN the secret), 'query' (secret sent as the query param named `authParam`, " +
-      "e.g. appid), 'basic' (secret is 'user:password'), 'none' (public API). The " +
+      "e.g. appid), 'basic' (secret is 'user:password'), 'oauth2' (client " +
+      "credentials: `authParam` is the token URL, secret is " +
+      "'client_id:client_secret'; the engine mints/caches the Bearer token), " +
+      "'none' (public API). The " +
       "secret is stored encrypted and NEVER returned by any tool. A saved request's " +
       "path, query values and JSON body template may contain {placeholder} tokens " +
       "filled at bind/test time. After creating, call test_data_source to see the " +
@@ -75,8 +78,8 @@ export const CREATE_DATA_SOURCE_TOOL = {
         name: { type: "string", description: "Human-readable source name (unique-ish, 1–100 chars)." },
         baseUrl: { type: "string", description: "Absolute http(s) base URL, e.g. https://api.open-meteo.com" },
         authType: { type: "string", enum: [...AUTH_TYPES], description: "Auth method (default 'none')." },
-        authParam: { type: "string", description: "Header name (authType 'header') or query key (authType 'query') the secret rides in." },
-        secret: { type: "string", description: "The API key / 'user:password'. WRITE-ONLY — stored encrypted, never shown again." },
+        authParam: { type: "string", description: "Header name (authType 'header'), query key (authType 'query'), or token URL (authType 'oauth2')." },
+        secret: { type: "string", description: "The API key / 'user:password' / 'client_id:client_secret'. WRITE-ONLY — stored encrypted, never shown again." },
         requests: {
           type: "array",
           description: "Saved requests to create on this source (each is what you test/bind).",
@@ -148,8 +151,8 @@ export function validateCreateDataSource(args: unknown): ArgResult<CreateDataSou
     if (typeof rec.secret !== "string") return { ok: false, error: "secret must be a string" };
     secret = rec.secret;
   }
-  if ((source.value.authType === "header" || source.value.authType === "query" || source.value.authType === "basic") && !secret) {
-    return { ok: false, error: `authType "${source.value.authType}" needs a secret (the API key / user:password)` };
+  if (source.value.authType !== "none" && !secret) {
+    return { ok: false, error: `authType "${source.value.authType}" needs a secret (the API key / user:password / client_id:client_secret)` };
   }
 
   const requests: RequestInput[] = [];

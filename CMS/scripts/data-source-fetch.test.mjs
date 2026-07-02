@@ -261,3 +261,118 @@ test("mapResponse: primitive / null → null (graceful)", () => {
   assert.equal(mapResponse(null, { a: "b" }), null);
   assert.equal(mapResponse(42, { a: "b" }), null);
 });
+
+/* ---------------------------------------------------- oauth2 (Slice 8) */
+
+const oauthSrc = (over = {}) =>
+  src({
+    authType: "oauth2",
+    authParam: "https://auth.example.com/oauth2/token",
+    secret: "my-client:my-secret",
+    ...over,
+  });
+
+/** URL-routed mock fetch: token endpoint vs API, each with its own queue. */
+function mockOauthFetch({ token = [], api = [] }) {
+  const calls = { token: [], api: [] };
+  const fn = async (url, init) => {
+    const isToken = String(url).startsWith("https://auth.example.com/");
+    const bucket = isToken ? "token" : "api";
+    calls[bucket].push({ url, init });
+    const queue = isToken ? token : api;
+    const next = queue.shift() ?? queue.at(-1) ?? { status: 200, body: {} };
+    if (next instanceof Error) throw next;
+    return new Response(JSON.stringify(next.body ?? {}), {
+      status: next.status ?? 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+  fn.calls = calls;
+  return fn;
+}
+
+test("oauth2: mints token (Basic client creds, form grant) and sends Bearer", async () => {
+  const f = mockOauthFetch({
+    token: [{ body: { access_token: "tok-1", expires_in: 3600 } }],
+    api: [{ body: { ok: 1 } }],
+  });
+  const r = await fetchSource(oauthSrc(), req(), {}, { fetch: f, sleep: noSleep });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.data, { ok: 1 });
+
+  const tokenCall = f.calls.token[0];
+  assert.equal(tokenCall.init.method, "POST");
+  assert.equal(tokenCall.init.headers.authorization, `Basic ${btoa("my-client:my-secret")}`);
+  assert.equal(tokenCall.init.headers["content-type"], "application/x-www-form-urlencoded");
+  assert.equal(tokenCall.init.body, "grant_type=client_credentials");
+
+  const apiCall = f.calls.api[0];
+  assert.equal(apiCall.init.headers.authorization, "Bearer tok-1");
+});
+
+test("oauth2: token is cached across calls (one token fetch)", async () => {
+  const f = mockOauthFetch({
+    token: [{ body: { access_token: "tok-1", expires_in: 3600 } }],
+    api: [{ body: { n: 1 } }, { body: { n: 2 } }],
+  });
+  const cache = createMemoryCache();
+  const deps = { fetch: f, sleep: noSleep, cache };
+  const r1 = await fetchSource(oauthSrc(), req(), {}, deps);
+  const r2 = await fetchSource(oauthSrc(), req(), {}, deps);
+  assert.equal(r1.ok, true);
+  assert.equal(r2.ok, true);
+  assert.equal(f.calls.token.length, 1); // second call reused the cached token
+  assert.equal(f.calls.api.length, 2); // req() is not cacheable (cacheEnabled:false)
+});
+
+test("oauth2: 401 forces ONE token refresh and re-fires the request", async () => {
+  const f = mockOauthFetch({
+    token: [
+      { body: { access_token: "stale", expires_in: 3600 } },
+      { body: { access_token: "fresh", expires_in: 3600 } },
+    ],
+    api: [{ status: 401 }, { body: { ok: 1 } }],
+  });
+  const r = await fetchSource(oauthSrc(), req(), {}, { fetch: f, sleep: noSleep, cache: createMemoryCache() });
+  assert.equal(r.ok, true);
+  assert.equal(f.calls.token.length, 2);
+  assert.equal(f.calls.api.length, 2);
+  assert.equal(f.calls.api[1].init.headers.authorization, "Bearer fresh");
+});
+
+test("oauth2: 401 refresh works for non-idempotent POST too, but only once", async () => {
+  const f = mockOauthFetch({
+    token: [
+      { body: { access_token: "t1", expires_in: 3600 } },
+      { body: { access_token: "t2", expires_in: 3600 } },
+    ],
+    api: [{ status: 401 }, { status: 401 }],
+  });
+  const r = await fetchSource(
+    oauthSrc(),
+    req({ method: "POST", bodyTemplate: '{"a":1}' }),
+    {},
+    { fetch: f, sleep: noSleep },
+  );
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 401);
+  assert.equal(f.calls.api.length, 2); // 1 try + exactly 1 auth-refresh re-fire
+  assert.equal(f.calls.token.length, 2);
+});
+
+test("oauth2: token endpoint failure / bad payload is graceful", async () => {
+  const down = mockOauthFetch({ token: [{ status: 500 }] });
+  const r1 = await fetchSource(oauthSrc(), req(), {}, { fetch: down, sleep: noSleep });
+  assert.equal(r1.ok, false);
+  assert.match(r1.error, /token endpoint responded 500/);
+  assert.equal(down.calls.api.length, 0); // never hit the API without a token
+
+  const noTok = mockOauthFetch({ token: [{ body: { nope: true } }] });
+  const r2 = await fetchSource(oauthSrc(), req(), {}, { fetch: noTok, sleep: noSleep });
+  assert.equal(r2.ok, false);
+  assert.match(r2.error, /no access_token/);
+
+  const missing = await fetchSource(oauthSrc({ secret: null }), req(), {}, { fetch: down, sleep: noSleep });
+  assert.equal(missing.ok, false);
+  assert.match(missing.error, /missing its token URL or client credentials/);
+});

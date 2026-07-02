@@ -797,10 +797,12 @@
       "header": "API-võti päises",
       "query": "API-võti päringuparameetris",
       "basic": "Basic-autentimine",
+      "oauth2": "OAuth2 (client credentials)",
       "none": "Puudub (avalik)"
     },
     "authParamHeader": "Päise nimi",
     "authParamQuery": "Päringuparameetri nimi",
+    "authParamTokenUrl": "Tokeni URL-aadress",
     "secret": "Saladus / API-võti",
     "secretPlaceholder": "Kleebi API-võti",
     "secretKeptPlaceholder": "•••• salvestatud — jäta tühjaks, et säilitada",

@@ -118,6 +118,16 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   dispatch). Validate against propsSchema. Node tests per tool (mock fetch/store).
   Gate.
 
+- DONE (2026-07-02): **Slice 8 — OAuth2 client-credentials auth (deferred from v1).** Add
+  `oauth2` to AUTH_TYPES: `authParam` holds the TOKEN URL (no migration; validated
+  via validateBaseUrl incl. SSRF), secret = write-only `client_id:client_secret`
+  (mirrors basic's `user:password`). Central fetch engine: token POST
+  (grant_type=client_credentials, Basic client creds) with timeout, token cached
+  via the injected ApiCache (TTL from expires_in − margin), `Bearer` injected
+  server-side, ONE forced refresh + re-attempt on 401. UI: oauth2 option +
+  token-URL label/placeholder + secret hint. AI create_data_source covers oauth2.
+  EN/FI/ET. Node tests: token cached/refreshed, 401 refresh once, failure graceful.
+
 - DONE (2026-07-02): **Slice 7 — cache purging (NEW 2026-07-02).** Shipped via
   VERSION COUNTERS (pure `lib/data-sources/purge.ts`, one `api_cache_versions`
   settings row; `cacheVersionFor()` → fetch engine's `deps.cacheVersion`).

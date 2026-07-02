@@ -319,7 +319,8 @@ function SourceForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const needsParam = authType === "header" || authType === "query";
+  // oauth2 rides its TOKEN URL in authParam (secret = "client_id:client_secret").
+  const needsParam = authType === "header" || authType === "query" || authType === "oauth2";
   const needsSecret = authType !== "none";
   // A new source with auth needs a secret NOW; on edit, blank = keep the stored one.
   const canSave =
@@ -405,13 +406,23 @@ function SourceForm({
         {needsParam && (
           <label className="flex flex-col gap-1">
             <span className={labelCls}>
-              {authType === "header" ? t("authParamHeader") : t("authParamQuery")}
+              {authType === "header"
+                ? t("authParamHeader")
+                : authType === "query"
+                  ? t("authParamQuery")
+                  : t("authParamTokenUrl")}
             </span>
             <input
               className={inputCls + " font-mono"}
-              placeholder={authType === "header" ? "X-API-Key" : "appid"}
+              placeholder={
+                authType === "header"
+                  ? "X-API-Key"
+                  : authType === "query"
+                    ? "appid"
+                    : "https://auth.example.com/oauth2/token"
+              }
               value={authParam}
-              maxLength={100}
+              maxLength={authType === "oauth2" ? 2000 : 100}
               onChange={(e) => setAuthParam(e.target.value)}
             />
           </label>
@@ -424,7 +435,15 @@ function SourceForm({
             type="password"
             autoComplete="new-password"
             className={inputCls + " font-mono"}
-            placeholder={source?.hasSecret ? t("secretKeptPlaceholder") : t("secretPlaceholder")}
+            placeholder={
+              source?.hasSecret
+                ? t("secretKeptPlaceholder")
+                : authType === "oauth2"
+                  ? "client_id:client_secret"
+                  : authType === "basic"
+                    ? "user:password"
+                    : t("secretPlaceholder")
+            }
             value={secret}
             maxLength={2000}
             onChange={(e) => setSecret(e.target.value)}

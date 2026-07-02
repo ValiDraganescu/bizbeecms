@@ -10,7 +10,7 @@
  * only validate their SYNTAX; the Slice-2 engine owns safe encoding on insert.
  */
 
-export const AUTH_TYPES = ["header", "query", "basic", "none"] as const;
+export const AUTH_TYPES = ["header", "query", "basic", "oauth2", "none"] as const;
 export type AuthType = (typeof AUTH_TYPES)[number];
 
 export const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE"] as const;
@@ -26,7 +26,7 @@ export type SourceInput = {
   name: string;
   baseUrl: string;
   authType: AuthType;
-  /** Header name / query key; null for basic/none. */
+  /** Header name / query key; TOKEN URL for oauth2; null for basic/none. */
   authParam: string | null;
 };
 
@@ -143,7 +143,8 @@ export function validateSourceInput(input: unknown): Validated<SourceInput> {
     return { ok: false, error: `authType must be one of: ${AUTH_TYPES.join(", ")}` };
   }
 
-  // header/query need the parameter NAME the secret rides in; basic/none don't.
+  // header/query need the parameter NAME the secret rides in; oauth2 needs the
+  // TOKEN URL (rides in authParam — no schema change); basic/none need nothing.
   let authParam: string | null = null;
   if (authType === "header" || authType === "query") {
     authParam = typeof obj.authParam === "string" ? obj.authParam.trim() : "";
@@ -153,6 +154,13 @@ export function validateSourceInput(input: unknown): Validated<SourceInput> {
         error: "authParam (header name / query key) is required for header/query auth",
       };
     }
+  } else if (authType === "oauth2") {
+    // Same SSRF boundary as baseUrl — the Worker POSTs client creds there.
+    const tokenUrl = validateBaseUrl(obj.authParam);
+    if (!tokenUrl.ok) {
+      return { ok: false, error: "authParam (token URL) must be a valid external http(s) URL for oauth2 auth" };
+    }
+    authParam = tokenUrl.value;
   }
 
   return {

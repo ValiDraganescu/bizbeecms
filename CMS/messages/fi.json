@@ -797,10 +797,12 @@
       "header": "API-avain otsakkeessa",
       "query": "API-avain kyselyparametrissa",
       "basic": "Basic-todennus",
+      "oauth2": "OAuth2 (client credentials)",
       "none": "Ei mitään (julkinen)"
     },
     "authParamHeader": "Otsakkeen nimi",
     "authParamQuery": "Kyselyparametrin nimi",
+    "authParamTokenUrl": "Tokenin URL-osoite",
     "secret": "Salaisuus / API-avain",
     "secretPlaceholder": "Liitä API-avain",
     "secretKeptPlaceholder": "•••• tallennettu — jätä tyhjäksi säilyttääksesi",

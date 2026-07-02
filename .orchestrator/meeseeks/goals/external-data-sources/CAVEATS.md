@@ -157,3 +157,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   TOOL_BY_NAME + HANDLERS (tool-dispatch) — tsc's Record<ToolName,…> catches a
   miss. Context scoping (TOOLS_BY_CONTEXT) + context prompt are separate,
   easy-to-forget steps; "general" gets everything automatically.
+
+- **oauth2 rides its TOKEN URL in `authParam`** (Slice 8, no schema change) and
+  its secret is `client_id:client_secret` (like basic's `user:password`). If you
+  ever move the token URL to its own column, migrate validate.ts + fetch.ts +
+  the SourceForm + the AI tool docs together.
+
+- **The oauth2 token cache key (`ds-oauth2-token:<sourceId>`) is UNVERSIONED
+  on purpose** — purge targets the RESPONSE cache; a stale/revoked token
+  self-heals via the one forced 401 refresh. Don't wire cacheVersion into it
+  (per-request versions would mint one token per request key).
+
+- **Keep the oauth2 401 check BEFORE the generic `!res.ok` 4xx return in
+  fetchSource** — it refreshes once (`refreshedAuth` flag) and re-fires via
+  `attempt -= 1` so the auth retry never eats the normal retry budget and works
+  even when maxAttempts is 1 (non-idempotent POST).

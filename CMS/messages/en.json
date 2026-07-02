@@ -797,10 +797,12 @@
       "header": "API key in header",
       "query": "API key in query parameter",
       "basic": "Basic auth",
+      "oauth2": "OAuth2 (client credentials)",
       "none": "None (public)"
     },
     "authParamHeader": "Header name",
     "authParamQuery": "Query parameter name",
+    "authParamTokenUrl": "Token URL",
     "secret": "Secret / API key",
     "secretPlaceholder": "Paste the API key",
     "secretKeptPlaceholder": "•••• saved — leave blank to keep",

@@ -87,7 +87,32 @@ test("source: valid input normalizes", () => {
 
 test("source: name required, authType enum enforced", () => {
   assert.equal(validateSourceInput({ ...goodSource, name: "  " }).ok, false);
+  assert.equal(validateSourceInput({ ...goodSource, authType: "digest" }).ok, false);
+});
+
+test("source: oauth2 requires a valid external token URL in authParam (Slice 8)", () => {
+  // a header-name-ish authParam is not a token URL
   assert.equal(validateSourceInput({ ...goodSource, authType: "oauth2" }).ok, false);
+  assert.equal(
+    validateSourceInput({ ...goodSource, authType: "oauth2", authParam: null }).ok,
+    false,
+  );
+  // token URL gets the same SSRF boundary as baseUrl
+  assert.equal(
+    validateSourceInput({
+      ...goodSource,
+      authType: "oauth2",
+      authParam: "http://localhost/oauth/token",
+    }).ok,
+    false,
+  );
+  const ok = validateSourceInput({
+    ...goodSource,
+    authType: "oauth2",
+    authParam: "https://auth.example.com/oauth2/token",
+  });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.value.authParam, "https://auth.example.com/oauth2/token");
 });
 
 test("source: header/query auth requires authParam; basic/none don't", () => {

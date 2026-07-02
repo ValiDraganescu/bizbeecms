@@ -30,9 +30,15 @@ export type FetchSourceConfig = {
   id: string;
   baseUrl: string;
   authType: AuthType;
-  /** Header name / query key the secret rides in (header/query auth). */
+  /**
+   * Header name / query key the secret rides in (header/query auth);
+   * the TOKEN URL for oauth2 client-credentials.
+   */
   authParam: string | null;
-  /** DECRYPTED secret; for basic auth the stored secret is "user:password". */
+  /**
+   * DECRYPTED secret; for basic auth the stored secret is "user:password",
+   * for oauth2 it is "client_id:client_secret".
+   */
   secret: string | null;
 };
 
@@ -143,7 +149,9 @@ export function buildRequest(
 
   const headers: Record<string, string> = { accept: "application/json" };
 
-  // Auth — the only place a secret touches a request.
+  // Auth — the only place a secret touches a request. (oauth2 is the one
+  // exception: its Bearer token is minted async in fetchSource and injected
+  // into these headers there — buildRequest stays sync and pure.)
   if (source.secret) {
     if (source.authType === "header" && source.authParam) {
       headers[source.authParam] = source.secret;
@@ -211,6 +219,89 @@ export function createMemoryCache(now: () => number = Date.now): ApiCache {
   };
 }
 
+/* --------------------------------------------------- oauth2 (Slice 8) */
+
+const OAUTH2_TOKEN_TTL_MARGIN_SEC = 60;
+const OAUTH2_TOKEN_DEFAULT_TTL_SEC = 3600;
+
+/** Token cache key per source. Deliberately UNVERSIONED — purge targets the
+ * response cache; a stale/revoked token self-heals via the 401 refresh. */
+export function oauth2TokenCacheKey(sourceId: string): string {
+  return `ds-oauth2-token:${sourceId}`;
+}
+
+/**
+ * RFC 6749 client-credentials grant: POST the token URL (source.authParam)
+ * with `grant_type=client_credentials`, client creds as Basic auth
+ * (secret = "client_id:client_secret"). Token cached via the injected
+ * ApiCache for `expires_in − margin`. Never throws.
+ */
+async function fetchOauth2Token(
+  source: FetchSourceConfig,
+  deps: { fetch: typeof fetch; cache: ApiCache | null; timeoutMs: number },
+  forceRefresh: boolean,
+): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
+  const key = oauth2TokenCacheKey(source.id);
+  if (!forceRefresh && deps.cache) {
+    try {
+      const hit = await deps.cache.get(key);
+      if (hit) return { ok: true, token: hit };
+    } catch {
+      // cache trouble is never fatal
+    }
+  }
+
+  if (!source.authParam || !source.secret) {
+    return { ok: false, error: "oauth2 source is missing its token URL or client credentials" };
+  }
+
+  let res: Response;
+  try {
+    res = await deps.fetch(source.authParam, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+        authorization: `Basic ${btoa(source.secret)}`, // client_secret_basic
+      },
+      body: "grant_type=client_credentials",
+      signal: AbortSignal.timeout(deps.timeoutMs),
+    });
+  } catch (e) {
+    return {
+      ok: false,
+      error: `oauth2 token fetch failed: ${e instanceof Error ? e.message : "network error"}`,
+    };
+  }
+  if (!res.ok) return { ok: false, error: `oauth2 token endpoint responded ${res.status}` };
+
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    return { ok: false, error: "oauth2 token response is not valid JSON" };
+  }
+  const obj = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  const token = obj.access_token;
+  if (typeof token !== "string" || token === "") {
+    return { ok: false, error: "oauth2 token response has no access_token" };
+  }
+
+  const expiresIn =
+    typeof obj.expires_in === "number" && obj.expires_in > 0
+      ? obj.expires_in
+      : OAUTH2_TOKEN_DEFAULT_TTL_SEC;
+  const ttl = Math.max(expiresIn - OAUTH2_TOKEN_TTL_MARGIN_SEC, 30);
+  if (deps.cache) {
+    try {
+      await deps.cache.put(key, token, ttl);
+    } catch {
+      // best-effort
+    }
+  }
+  return { ok: true, token };
+}
+
 /* ------------------------------------------------------------- fetching */
 
 function isIdempotentSafe(request: FetchRequestConfig): boolean {
@@ -235,6 +326,15 @@ export async function fetchSource(
   const built = buildRequest(source, request, params);
   if (!built.ok) return { ok: false, status: null, error: built.error };
 
+  // oauth2: mint/reuse the Bearer token BEFORE the request. The token rides in
+  // a header, so the cache key (URL+body) is unaffected.
+  const tokenDeps = { fetch: doFetch, cache: deps.cache ?? null, timeoutMs };
+  if (source.authType === "oauth2") {
+    const tok = await fetchOauth2Token(source, tokenDeps, false);
+    if (!tok.ok) return { ok: false, status: null, error: tok.error };
+    built.value.headers["authorization"] = `Bearer ${tok.token}`;
+  }
+
   const cacheable = request.cacheEnabled && isIdempotentSafe(request) && !!deps.cache;
   const key = cacheable ? buildCacheKey(source.id, built.value, deps.cacheVersion) : null;
 
@@ -252,6 +352,7 @@ export async function fetchSource(
   const maxAttempts = isIdempotentSafe(request) ? MAX_ATTEMPTS : 1;
   let lastError = "request failed";
   let lastStatus: number | null = null;
+  let refreshedAuth = false;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     if (attempt > 1) await sleep(BACKOFF_MS * (attempt - 1));
@@ -274,6 +375,17 @@ export async function fetchSource(
       lastError = `upstream responded ${res.status}`;
       lastStatus = res.status;
       continue; // retryable status
+    }
+    if (res.status === 401 && source.authType === "oauth2" && !refreshedAuth) {
+      // Cached token expired/revoked: ONE forced refresh, then re-fire. A 401
+      // is rejected before any work happens, so this extra attempt is safe
+      // even for non-idempotent requests (and doesn't eat the retry budget).
+      refreshedAuth = true;
+      const tok = await fetchOauth2Token(source, tokenDeps, true);
+      if (!tok.ok) return { ok: false, status: 401, error: tok.error };
+      built.value.headers["authorization"] = `Bearer ${tok.token}`;
+      attempt -= 1;
+      continue;
     }
     if (!res.ok) {
       // other 4xx: our request is wrong — retrying can't fix it
