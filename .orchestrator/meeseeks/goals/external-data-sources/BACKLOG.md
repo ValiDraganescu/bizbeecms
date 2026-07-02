@@ -57,6 +57,20 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
 
+- DONE (2026-07-02) BUG [P2]: "Data sources" sidebar nav item had NO icon.
+  ROOT CAUSE: SidebarShell casts ADMIN_SECTIONS keys `as … IconKey`, so tsc
+  can't see a key without a NavIcon case — "dataSources" fell through the
+  switch → undefined → iconless. FIX: added "dataSources" to the IconKey union
+  + a Lucide-style plug glyph case (same 18px / viewBox 24 / stroke 1.5 set).
+  Regression: admin-nav.test.mjs now PARSES top-level ADMIN_SECTIONS keys from
+  source (the test's hand-mirrored SECTIONS list had drifted the same way —
+  also missing dataSources) and locks every key to a `case "<key>":` +
+  IconKey union entry (fails-before proven via git stash). tsc + 1414 suite
+  green; live SSR check on :3602 (plug path inside the data-sources link);
+  opennext isolated-worktree gate GREEN. Original report: every other item
+  (Home, Page Builder, Components, Collections, Media, Settings) has one
+  (user screenshot). — reported 2026-07-02
+
 - DONE (2026-07-02) BUG [P1]: Inspector bind panel shows DATA SOURCE "— none —"
   for ALL api-bound ApiProbe blocks. ROOT CAUSE: BindingPanel hard-read
   `block.bindings?.item` while the renderer hydrates EVERY key

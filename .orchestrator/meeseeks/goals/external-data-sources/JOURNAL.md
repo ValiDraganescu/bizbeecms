@@ -982,3 +982,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/chat/chat-conversation.tsx,
   CMS/src/components/chat/chat-widget.tsx,
   CMS/scripts/live-ds-context-chip-check.mjs
+
+## 2026-07-02 12:45 — BUG [P2]: missing "Data sources" icon in the admin sidebar
+- **Status:** DONE
+- **What I did:** Root-caused the iconless nav item: `SidebarShell` builds its
+  links via `ADMIN_SECTIONS as (AdminSection & { key: IconKey })[]` — the cast
+  hides any section key without a `NavIcon` case from tsc, and `"dataSources"`
+  had none, so the switch returned undefined. Added `"dataSources"` to the
+  `IconKey` union + a plug glyph case (external APIs plug in; same Lucide-style
+  set: 18px, viewBox 24, stroke 1.5, currentColor). Regression: extended
+  `scripts/admin-nav.test.mjs` — its hand-mirrored `SECTIONS` list had drifted
+  the exact same way (no dataSources), so it now PARSES top-level keys from
+  `admin-sections.ts` (children stripped) and locks every key (`home` + all
+  sections) to both a `case "<key>":` in NavIcon and a `| "<key>"` IconKey
+  union entry. Only the admin index page also consumes ADMIN_SECTIONS — it
+  renders no icons (verified), nothing else to fix.
+- **Verified:** fails-before proven (git stash of the sidebar fix → the new
+  icon-lock test fails with the "iconless" message; pop → 4/4). tsc clean;
+  full suite 1414/1414 (baseline 1412 + 2 new). Live SSR on :3602: the
+  `/admin/data-sources` nav link segment contains the plug `<svg>` path.
+  Opennext gate GREEN in an isolated worktree (changed files copied in, dev
+  :3602 untouched, worktree removed).
+- **Files:** CMS/src/components/admin-sidebar.tsx,
+  CMS/scripts/admin-nav.test.mjs

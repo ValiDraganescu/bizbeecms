@@ -433,3 +433,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   node's built-in WebSocket — navigate, Runtime.evaluate to click/read DOM.
   Reuse the pattern instead of declaring browser checks impossible; kill only
   the Chrome pid it spawned (fresh temp profile), never other Chromes.
+
+- **A new ADMIN_SECTIONS entry needs a NavIcon case — tsc will NOT tell you.**
+  SidebarShell casts section keys `as … IconKey`, so a key without a `case` in
+  NavIcon silently renders iconless (the "Data sources" P2 bug). The icon lock
+  in scripts/admin-nav.test.mjs now parses top-level keys from
+  admin-sections.ts and fails on a missing case/union entry — add the icon,
+  don't weaken the test. (Its old hand-mirrored SECTIONS list had drifted the
+  same way; keep it parsed, never re-hardcode.)

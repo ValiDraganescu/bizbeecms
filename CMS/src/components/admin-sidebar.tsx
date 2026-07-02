@@ -27,6 +27,7 @@ type IconKey =
   | "pageBuilder"
   | "components"
   | "collections"
+  | "dataSources"
   | "media"
   | "settings";
 
@@ -87,6 +88,16 @@ function NavIcon({ name }: { name: IconKey }) {
           <ellipse cx="12" cy="5" rx="9" ry="3" />
           <path d="M3 5v6c0 1.66 4 3 9 3s9-1.34 9-3V5" />
           <path d="M3 11v6c0 1.66 4 3 9 3s9-1.34 9-3v-6" />
+        </svg>
+      );
+    case "dataSources":
+      // Plug glyph (external APIs plug into the site) — same Lucide-style set.
+      return (
+        <svg {...common}>
+          <path d="M12 22v-5" />
+          <path d="M9 8V2" />
+          <path d="M15 8V2" />
+          <path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" />
         </svg>
       );
     case "media":
