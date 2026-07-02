@@ -22,7 +22,18 @@ Task states: TODO | DOING | DONE | BLOCKED.
   context prompts so the model knows the guide exists. Node tests (tool returns
   the guide; registration). Usual gates.
 
-- TODO (USER 2026-07-02): **Inline data-sources context on /admin/data-sources.**
+- DONE (2026-07-02): **Inline data-sources context on /admin/data-sources.**
+  Shipped: pure store lib/chat/data-sources-context.ts (formatDataSourcesContext
+  — names/auth kind/requests method+path+placeholders+cache, input shape has NO
+  secret-ish fields; caps 10 sources / 8 requests w/ overflow summary; coda
+  steers to test_data_source/bind tools + get_data_sources_guide), publisher
+  effect in DataSourcesManager (fetches per-source requests itself; ctxBump via
+  RequestsPanel onChanged on add/edit/delete), ContextChip 4th store
+  (chat-conversation.tsx) + send path (chat-widget.tsx — NOT chat-conversation
+  as this TODO guessed). 6 node tests (1412 suite) + tsc green; live-verified
+  via headless-Chrome CDP script scripts/live-ds-context-chip-check.mjs (chip
+  present, expands to the fixture sources, no secret leak); opennext
+  isolated-worktree gate GREEN. JOURNAL 2026-07-02 12:28. Original spec:
   When the operator's chat is opened while on /admin/data-sources, the assistant
   receives inline context listing the available data sources (names, auth kind,
   saved requests with method/path/placeholders/cache — NEVER secrets) so it can

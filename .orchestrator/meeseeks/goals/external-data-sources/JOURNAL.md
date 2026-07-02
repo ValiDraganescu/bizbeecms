@@ -945,3 +945,40 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/chat/data-sources-guide.ts (new),
   CMS/src/lib/chat/tool-scopes.ts, CMS/src/lib/chat/tool-dispatch.ts,
   CMS/scripts/data-sources-guide.test.mjs (new)
+
+## 2026-07-02 12:28 — Inline data-sources context on /admin/data-sources (2nd USER AI-enablement TODO)
+- **Status:** DONE
+- **What I did:** 4th inline-context store, mirroring collection-context.ts:
+  - `CMS/src/lib/chat/data-sources-context.ts` — pure `formatDataSourcesContext`
+    + module-level store (set/get/subscribe). Input shape carries ONLY name,
+    authType (kind), and per-request name/method/path/query/bodyTemplate/
+    cacheEnabled/cacheTtlSec — no secret/hasSecret/authParam/baseUrl fields
+    EXIST on it, so secrets can't leak by construction. Placeholders computed
+    via the shipped `requestPlaceholders` (relative import, node-testable).
+    Compact: caps 10 sources / 8 requests per source, "…and N more" overflow;
+    coda steers the model to use the names directly (test_data_source,
+    bind_component, create_list, bind_form) + call get_data_sources_guide.
+  - Publisher effect in `DataSourcesManager` (data-sources-manager.tsx):
+    requests load lazily per RequestsPanel, so the effect fetches
+    `/api/data-sources/:id/requests` per source itself (Promise.all, offline →
+    source published without requests), publishes on sources change + a
+    `ctxBump` counter; RequestsPanel got an `onChanged` prop fired after
+    add/edit/delete so request mutations republish. Cleanup clears (null).
+  - Wiring: ContextChip in chat-conversation.tsx (4th subscribe + snapshot
+    entry) AND the send path — which lives in **chat-widget.tsx** (useChat's
+    inline-context lambda), not chat-conversation.tsx as the TODO guessed.
+- **Verified:** 6 new node tests (empty→"", source/request lines w/ params +
+  cache, cache-off + empty-path + no-requests rendering, placeholder dedupe
+  across path+body, secret-leak lock, overflow caps) — suite 1412/1412; tsc
+  clean; LIVE: scripts/live-ds-context-chip-check.mjs (new, manual) drives
+  headless Chrome over raw CDP (node built-in WebSocket) → navigates
+  /admin/data-sources on :3602, clicks the chat bubble, finds + expands the
+  "Context attached" chip, asserts "[Data sources context]" + a live fixture
+  source name + no secret-ish strings → GREEN first run; opennext
+  isolated-worktree gate GREEN (changed files copied in; dev :3602 untouched,
+  200 after).
+- **Files:** CMS/src/lib/chat/data-sources-context.ts (+.test.ts),
+  CMS/src/components/content/data-sources-manager.tsx,
+  CMS/src/components/chat/chat-conversation.tsx,
+  CMS/src/components/chat/chat-widget.tsx,
+  CMS/scripts/live-ds-context-chip-check.mjs

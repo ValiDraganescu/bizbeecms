@@ -1,30 +1,33 @@
 # Note to the next Meeseeks (external-data-sources)
 
-2026-07-02 12:12: shipped `get_data_sources_guide` — the on-demand data-sources/
-bindings/forms playbook tool (first of the two USER AI-enablement TODOs). All
-gates green (tsc, 1406 suite, opennext isolated worktree, live scope check).
+2026-07-02 12:28: shipped the SECOND (and last) queued USER AI-enablement TODO —
+inline data-sources context on /admin/data-sources. Chip live-verified via
+headless-Chrome CDP (scripts/live-ds-context-chip-check.mjs). All gates green
+(tsc, 1412 suite, opennext isolated worktree, live chip check).
 
 ## FIRST: check ## Bugs (rule 0) — all DONE when I popped out.
 
-## Your task: the remaining USER TODO — inline data-sources context on /admin/data-sources
-The USER confirmed it live mid-my-run (screenshots): the chat on
-/admin/data-sources shows NO "Context attached" chip, page-builder does, they
-want it there too. The BACKLOG TODO now carries the verified mechanism:
-- `ContextChip` (components/chat/chat-conversation.tsx ~line 400) subscribes to
-  page-context / component-context / collection-context stores; each admin page
-  publishes into its store and the send path appends the active contexts.
-- Build a data-sources-context store (PURE builder — names, auth kind, saved
-  requests w/ method/path/placeholders/cache, NEVER secrets; cap + summarize
-  overflow; mirror collection-context.ts + collection-context.test.ts), publish
-  from the /admin/data-sources page, wire BOTH chat-conversation.tsx points
-  (chip subscribe/snapshot + send-path collection).
-- Node tests for the pure builder. EN/FI/ET only if you add UI strings (the
-  chip label already exists: chat.contextAttached).
+## State: the backlog has NO open TODOs.
+Both AI-enablement TODOs (guide tool + inline context) are DONE; every earlier
+slice/bug is DONE. Before this run the goal was already declared saturated by
+multiple workers and NEXT recommended the curator ARCHIVE it — that still
+stands unless the user queued something new.
+
+## If you must invent work (rule 3), candidates in value order:
+1. Live AI smoke of the new inline context: one real /api/chat round from
+   /admin/data-sources context ("pages" ctx + the context string prepended)
+   proving the model uses a source by name WITHOUT calling list_data_sources.
+2. The other admin pages with stores (collections) cap nothing — data-sources
+   caps at 10/8; check with the user whether collections should cap too
+   (do NOT change without directive).
+3. Fresh-eyes defect hunt on the context publisher (races on rapid nav?).
 
 ## Watch out
-- The guide tool is STATIC — if your slice changes any data-source tool
-  name/arg, update data-sources-guide.ts in the same commit (drift test:
-  scripts/data-sources-guide.test.mjs).
-- Gates: tsc + node suite + opennext (isolated-worktree recipe in CAVEATS —
-  copy uncommitted files in; `npm run cf-typegen` before standalone tsc; dev on
-  :3602 is live, never build in-repo while it runs).
+- Inline-context stores wire into TWO files (chip: chat-conversation.tsx,
+  send: chat-widget.tsx) — see the new caveat.
+- The guide tool (get_data_sources_guide) is STATIC — any tool-surface change
+  must update data-sources-guide.ts in the same commit (drift test).
+- Gates: isolated-worktree opennext recipe in CAVEATS; dev on :3602 is live.
+
+## STRUCTURE (for the curator)
+Goal remains a candidate for ARCHIVE once the user confirms no more directives.

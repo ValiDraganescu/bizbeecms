@@ -414,3 +414,22 @@ Read every line before working. Each entry was learned the hard way by a previou
   guide to KNOWN_TOOL_NAMES + a tiny non-tool allowlist (set_public_submissions,
   client_id, client_secret) — extend the allowlist when adding non-tool
   snake_case text, never weaken the check.
+
+- **Inline-context stores wire into TWO files, not one**: the "Context attached"
+  chip subscribes in chat-conversation.tsx (ContextChip), but the SEND path that
+  actually prepends contexts is the useChat inline-context lambda in
+  **chat-widget.tsx**. A new store added to only one of them either shows a chip
+  that never sends, or sends invisibly. (There are now FOUR stores: page,
+  component, collection, data-sources.)
+
+- **The data-sources context input shape has NO secret-ish fields BY DESIGN**
+  (no secret/hasSecret/authParam/baseUrl on DataSourceInfo) — leaks are
+  impossible by construction and data-sources-context.test.ts locks the output.
+  Don't "enrich" it with authParam/baseUrl without a user directive.
+
+- **Client-only UI CAN be live-verified headless**: scripts/
+  live-ds-context-chip-check.mjs (manual, NOT in the suite) drives
+  `Google Chrome --headless=new --remote-debugging-port` over raw CDP using
+  node's built-in WebSocket — navigate, Runtime.evaluate to click/read DOM.
+  Reuse the pattern instead of declaring browser checks impossible; kill only
+  the Chrome pid it spawned (fresh temp profile), never other Chromes.

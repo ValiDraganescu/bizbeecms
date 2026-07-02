@@ -32,6 +32,7 @@ import {
   type HttpMethod,
 } from "@/lib/data-sources/validate";
 import { parseQueryLines, serializeQuery } from "@/lib/data-sources/query-lines";
+import { setActiveDataSourcesContext } from "@/lib/chat/data-sources-context";
 
 type Source = {
   id: string;
@@ -90,6 +91,49 @@ export function DataSourcesManager() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [purgeAllOpen, setPurgeAllOpen] = useState(false);
   const [purgedAll, setPurgedAll] = useState(false);
+  // Bumped after request-level mutations (RequestsPanel onChanged) so the
+  // published AI context below re-reads the saved requests.
+  const [ctxBump, setCtxBump] = useState(0);
+
+  // Publish the site's data sources (names, auth KIND, saved requests with
+  // method/path/placeholders/cache — never secrets) to the AI assistant, same
+  // pattern as CollectionsManager. Requests load lazily per panel, so this
+  // fetches them itself; the context builder caps/summarizes overflow.
+  useEffect(() => {
+    if (!sources) return;
+    let cancelled = false;
+    void (async () => {
+      const withRequests = await Promise.all(
+        sources.map(async (s) => {
+          let requests: SavedRequest[] = [];
+          try {
+            const res = await fetch(`/api/data-sources/${s.id}/requests`);
+            if (res.ok) requests = (await res.json()) as SavedRequest[];
+          } catch {
+            /* offline — publish the source without its requests */
+          }
+          return {
+            name: s.name,
+            authType: s.authType,
+            requests: requests.map((r) => ({
+              name: r.name,
+              method: r.method,
+              path: r.path,
+              query: r.query,
+              bodyTemplate: r.bodyTemplate,
+              cacheEnabled: r.cacheEnabled,
+              cacheTtlSec: r.cacheTtlSec,
+            })),
+          };
+        }),
+      );
+      if (!cancelled) setActiveDataSourcesContext({ sources: withRequests });
+    })();
+    return () => {
+      cancelled = true;
+      setActiveDataSourcesContext(null);
+    };
+  }, [sources, ctxBump]);
 
   async function load() {
     setError(null);
@@ -225,7 +269,12 @@ export function DataSourcesManager() {
                     </button>
                   </div>
                 </div>
-                {expandedId === source.id && <RequestsPanel sourceId={source.id} />}
+                {expandedId === source.id && (
+                  <RequestsPanel
+                    sourceId={source.id}
+                    onChanged={() => setCtxBump((n) => n + 1)}
+                  />
+                )}
               </>
             )}
           </li>
@@ -473,7 +522,14 @@ function SourceForm({
 
 /* --------------------------------------------------------- requests panel */
 
-function RequestsPanel({ sourceId }: { sourceId: string }) {
+function RequestsPanel({
+  sourceId,
+  onChanged,
+}: {
+  sourceId: string;
+  /** Fired after a request is added/edited/deleted so the parent republishes the AI context. */
+  onChanged?: () => void;
+}) {
   const t = useTranslations("dataSources");
   const [requests, setRequests] = useState<SavedRequest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -511,6 +567,7 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
       if (!res.ok) throw new Error(await readError(res));
       setDeleting(null);
       await load();
+      onChanged?.();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -560,6 +617,7 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
                     onDone={async () => {
                       setEditingId(null);
                       await load();
+                      onChanged?.();
                     }}
                     onCancel={() => setEditingId(null)}
                   />
@@ -637,6 +695,7 @@ function RequestsPanel({ sourceId }: { sourceId: string }) {
             onDone={async () => {
               setAdding(false);
               await load();
+              onChanged?.();
             }}
             onCancel={() => setAdding(false)}
           />

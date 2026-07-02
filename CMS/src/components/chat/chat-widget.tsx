@@ -26,6 +26,7 @@ import {
 } from "@/lib/chat/page-context";
 import { getActiveComponentContext } from "@/lib/chat/component-context";
 import { getActiveCollectionContext } from "@/lib/chat/collection-context";
+import { getActiveDataSourcesContext } from "@/lib/chat/data-sources-context";
 import { CHAT_MODELS, DEFAULT_MODEL, type CatalogModel } from "@/lib/chat/models";
 import { coerceCatalog } from "@/lib/chat/catalog-coerce";
 import { ModelPicker } from "@/components/chat/model-picker";
@@ -178,6 +179,7 @@ export function ChatWidget() {
         formatMentionedSections(message, getActiveSections()),
         getActiveComponentContext(),
         getActiveCollectionContext(),
+        getActiveDataSourcesContext(),
       ]
         .filter((s) => s !== "")
         .join("\n\n") || undefined,

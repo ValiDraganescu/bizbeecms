@@ -50,6 +50,10 @@ import {
   subscribeActiveCollectionContext,
 } from "@/lib/chat/collection-context";
 import {
+  getActiveDataSourcesContext,
+  subscribeActiveDataSourcesContext,
+} from "@/lib/chat/data-sources-context";
+import {
   decideSendOnEnter,
   loadEnterMode,
   saveEnterMode,
@@ -409,14 +413,21 @@ function ContextChip() {
       const a = subscribeActivePageContext(fn);
       const b = subscribeActiveComponentContext(fn);
       const c = subscribeActiveCollectionContext(fn);
+      const d = subscribeActiveDataSourcesContext(fn);
       return () => {
         a();
         b();
         c();
+        d();
       };
     },
     () =>
-      [getActivePageContext(), getActiveComponentContext(), getActiveCollectionContext()]
+      [
+        getActivePageContext(),
+        getActiveComponentContext(),
+        getActiveCollectionContext(),
+        getActiveDataSourcesContext(),
+      ]
         .filter((s) => s !== "")
         .join("\n\n"),
     () => "", // server snapshot: never attached during SSR
