@@ -1,52 +1,42 @@
 # Note to the next Meeseeks (tableonline-home)
 
-**Home page visual replica pass 2 (below the fold) is DONE and live.** Added
-`RegistrationTeaser` (bordered teal callout, 3 perks, CTA) and `AppDownload`
-(App Store / Google Play badge-style buttons) as two new Sections between the
-existing bottom `PromoBanner` tiles and the footer. Upgraded `SiteFooter`:
-vertical `#001414→#073535` gradient (was flat `bg-foreground`), a "Follow us"
-social row (hand-authored inline Facebook/Instagram/X SVGs — lucide has no
-brand icons at all), and all 9 previously-dead `href="#"` footer links now
-point somewhere real: Finland→`/helsinki`, Estonia→`/tallinn`, and the other
-7 (Contact us, Restaurant backoffice, Terms, Gift card terms, Privacy policy,
-For restaurants, For affiliate partners) → `/about` per the task's explicit
-"point not-yet-built legal pages at /about for now" instruction. Same `/about`
-fallback used for the new teaser's CTA and both app-store badge hrefs. See
-JOURNAL 2026-07-02 17:22 for the full build.
+**Static/footer pages are DONE.** Built 4 new top-level pages: `/terms`,
+`/privacy`, `/contact` (all via a new `LegalContent` component — title +
+richtext body, real EN/FI/RO/ES copy authored for each, `whitespace-pre-line`
+paragraphs) and `/for-restaurants` (reuses the existing `RestaurateurJoin`
+component as-is, its pre-existing content). Repointed `SiteFooter`'s
+`col2Link1Href` (Contact us)→`/contact`, `col3Link1Href` (Terms)→`/terms`,
+`col3Link2Href` (Gift card terms)→`/terms` (folded in, no separate content),
+`col3Link3Href` (Privacy policy)→`/privacy`, `col4Link1Href` (For
+restaurants)→`/for-restaurants`. Home page republished. See JOURNAL "this
+run" entry for full detail + verification.
 
-**Important discovery this run:** `/about` (and ANY unmatched slug, e.g.
-`/signup`) currently 200s but is NOT really a distinct page — the
-`[[...slug]]` catch-all silently falls back to rendering the HOME page for
-any unmatched/unpublished route. `about` exists as a real page row but its
-`publishStatus` is still `"draft"`, so it serves this same fallback. This
-means every `/about`-pointing link added this run (and any added previously)
-is CURRENTLY a soft-dead-end (looks like a page, is actually just the home
-page again) until `/about` (or real Terms/Privacy/Contact/For-restaurants
-pages) actually get built and published.
+**Left on `/about` deliberately (not missed):** `col2Link2Href` (Restaurant
+backoffice — no CMS-content target, presumably external SaaS login),
+`col4Link2Href` (For affiliate partners — no content asked for),
+`RegistrationTeaser.ctaHref`, both `AppDownload` badge hrefs, and the 3
+social-icon hrefs (Facebook/Instagram/X — no real profiles to link).
 
-## Recommended next task (per BACKLOG.md order)
-**Static/footer pages**: build real content pages for Terms, Privacy policy,
-Contact us, and "For restaurants" (reuse the existing `RestaurateurJoin`
-component's copy/content for the latter), publish them, then repoint:
-- `SiteFooter`'s `col2Link1Href` (Contact us), `col3Link1Href` (Terms),
-  `col3Link2Href` (Gift card terms — maybe fold into Terms), `col3Link3Href`
-  (Privacy policy), `col4Link1Href` (For restaurants) off `/about` onto the
-  new real pages.
-- `RegistrationTeaser.ctaHref` and `AppDownload.appStoreHref`/`playStoreHref`
-  can stay `/about` (or a dedicated `/signup` page if one gets built later —
-  no scope for that yet, it's a real auth flow, not a content page).
-- `col2Link2Href` ("Restaurant backoffice") has no natural CMS-content target
-  at all (it's presumably an external SaaS login) — leave on `/about` or
-  reconsider entirely; not part of the static-pages task.
+## Backlog status
+Every item in BACKLOG.md's `## Tasks` section is now DONE. No open bugs.
+This was explicitly flagged as the LAST known dead-end class on the home
+page in the prior NEXT.md — that's now closed too.
 
-This closes the LAST known dead-end class on the home page. After that,
-GOAL.md's home-page spec is essentially fully delivered — a future run should
-re-read `GOAL.md` + do a full click-through regression pass (every card,
-every nav link, every footer link) to confirm nothing was missed, then look
-for polish (locale coverage gaps, restaurant description quality, etc.) or
-flag the goal as effectively "steady state" pending user review.
+## Recommended next task
+GOAL.md's home-page spec is essentially fully delivered. Per the prior run's
+own recommendation (never acted on since footer pages took priority):
+1. **Full click-through regression pass**: re-read `GOAL.md`, then manually
+   walk every nav link, every card (restaurant/offer/event/city), every
+   footer link, the search form, and the booking flow end-to-end on :3602 to
+   confirm nothing regressed across the many runs that touched shared
+   components (`SiteHeader`, `SiteFooter`, `RestaurantCard`, etc.).
+2. If that's clean, look for polish from the "Known gaps" list below, or
+   consider the goal "steady state" pending user/design review — there is no
+   more scaffolding work queued in BACKLOG.md, so the next Meeseeks should
+   either do a real regression pass or pick ONE polish item and log it as a
+   new BACKLOG TODO before starting (don't invent silently).
 
-## Known gaps (carried over + unchanged this run, plus new ones above)
+## Known gaps (carried over, unchanged this run)
 - Two-step booking UX not built (single-step form shipped instead).
 - Offer/event `restaurant` fields are free-text names not matching any real
   `content_restaurants` row for 5 names (LOBO, Kustavin Kipinä, Wohls Gård,
@@ -54,8 +44,10 @@ flag the goal as effectively "steady state" pending user review.
 - Restaurant `cuisine`/`description` are templated/guessed, not authored.
 - City strip "Show all" links still go to plain `/search` (no city filter).
 - Only 1 offer has `is_main=1`.
-- **NEW: every `/about`-pointing link (footer ×7, registration teaser CTA,
-  2 app-store badges) is a soft dead-end** — see "Important discovery" above.
+- `RestaurateurJoin` (reused for `/for-restaurants`) still only has EN copy
+  for its translatable props — a pre-existing gap from the run that first
+  created it, not introduced here. Low priority: fill in FI/RO/ES if a
+  future pass wants full locale parity on that page.
 
 Nothing blocked. No new bugs reported. Dev server was already running on
 :3602 all run; MCP token still valid (`.mcp.json` → `local-site`). No repo
