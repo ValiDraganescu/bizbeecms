@@ -730,3 +730,35 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   messages). NOTE: repo-local tsc currently fails in lib/chat/* — that's the
   PARALLEL Form-AI-tools Meeseeks's in-flight uncommitted work, not mine.
 - **Files:** CMS/messages/{en,fi,et}.json, CMS/scripts/bind-copy.test.mjs
+
+## 2026-07-02 10:20 — Form slice (d): AI tools create_form / bind_form
+- **Status:** DONE
+- **What I did:** Two new AI tools for the built-in Form block. Pure
+  `lib/chat/form-tools.ts`: CREATE_FORM_TOOL/BIND_FORM_TOOL schemas,
+  validateCreateForm/validateBindForm (source+request XOR collection; redirect
+  must be same-site "/…" not "//…"; bind_form is PATCH-like with `clear:true`
+  and rejects empty patches with guidance), and pure `mergeFormTarget`
+  (kind-switch drops the other kind's fields; messages/redirect survive).
+  CF handlers in tool-dispatch.ts: `resolveFormTarget` validates api targets
+  via the existing resolveSourceAndRequest (id OR name; only IDs persisted)
+  and collection targets via getCollection + the publicSubmissions gate —
+  the opt-in-off error is self-correcting (names the exact PATCH
+  `_op:set_public_submissions` fix and says it's operator-only). NO field→
+  placeholder map argument BY DESIGN: submit-core maps by NAME, so both tools
+  return `fields` (requestPlaceholders() for api / declared schema field
+  names for collection) + a `note` telling the model to author a child
+  component with matching `<input name=…>` + a type="submit" button.
+  Registrations: KNOWN_TOOL_NAMES + TOOL_BY_NAME + HANDLERS + TOOLS_BY_CONTEXT
+  (page-builder, pages) + both context prompts. page-blocks.ts: isForm,
+  addFormBlock/addFormToSection (mirror of the List inserters), setBlockField
+  Pick extended with formTarget, FORM_COMPONENT re-exported; newListId
+  generalized to newBlockId(component).
+- **Verified:** 15 new node tests (form-tools.test.ts); tsc clean; full suite
+  1396/1396; live GET /api/chat/debug?context=page-builder on :3602 lists both
+  tools + the prompt mentions create_form; opennext gate GREEN in an isolated
+  /tmp worktree (HEAD 0523765 + my 5 files copied in). NOT verified: a real
+  model round-trip driving create_form (mirror the Slice-6 live AI smoke if
+  wanted — costs a model call).
+- **Files:** CMS/src/lib/chat/form-tools.ts (new),
+  CMS/src/lib/chat/form-tools.test.ts (new), CMS/src/lib/chat/tool-dispatch.ts,
+  CMS/src/lib/chat/tool-scopes.ts, CMS/src/lib/pages/page-blocks.ts

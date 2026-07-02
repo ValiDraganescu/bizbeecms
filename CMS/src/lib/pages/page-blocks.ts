@@ -27,6 +27,7 @@ import {
   SECTION_ROW_COMPONENT,
   SECTION_COLUMN_COMPONENT,
   LIST_COMPONENT,
+  FORM_COMPONENT,
   isBuiltinComponent,
   type Block,
 } from "../render/tree.ts";
@@ -34,7 +35,7 @@ import { isLocaleObject } from "../render/localize.ts";
 
 // Re-export so the editor/UI keeps importing the reserved names from here (the
 // renderer in tree.ts owns the single definitions, so both layers agree).
-export { SECTION_COMPONENT, SECTION_ROW_COMPONENT, SECTION_COLUMN_COMPONENT, LIST_COMPONENT };
+export { SECTION_COMPONENT, SECTION_ROW_COMPONENT, SECTION_COLUMN_COMPONENT, LIST_COMPONENT, FORM_COMPONENT };
 
 const ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
 
@@ -1239,6 +1240,56 @@ export function addListToSection(blocks: Block[], sectionId: string): Block[] {
   return addListBlock(blocks, sectionId, 0);
 }
 
+/** True if a block is the built-in `Form` block (external-data-sources Form slice). */
+export function isForm(block: Block): boolean {
+  return block.component === FORM_COMPONENT;
+}
+
+/**
+ * Append a built-in `Form` block into a Section's column (immutable) — the Form
+ * mirror of `addListBlock`. Seeded with NO children (the operator/AI adds the
+ * input component) and no `formTarget` (set separately via `setBlockField`) —
+ * an untargeted Form renders as a plain container, graceful by design.
+ * No-op for a non-Section id / out-of-range column. PURE.
+ */
+export function addFormBlock(
+  blocks: Block[],
+  sectionId: string,
+  colIndex: number,
+  rowId?: string,
+): Block[] {
+  const form: Block = {
+    id: uniqueIdAcrossTree(FORM_COMPONENT, blocks),
+    component: FORM_COMPONENT,
+    children: [],
+  };
+  return blocks.map((section) => {
+    if (section.id !== sectionId || !isSection(section)) return section;
+    const holder = resolveRowHolder(section, rowId);
+    if (!holder) return section;
+    const cols = rowColumns(holder);
+    if (colIndex < 0 || colIndex >= cols.length) return section;
+    const targetId = cols[colIndex].id;
+    const nextHolder: Block = {
+      ...holder,
+      children: (holder.children ?? []).map((c) =>
+        c.id === targetId ? { ...c, children: [...(c.children ?? []), form] } : c,
+      ),
+    };
+    return holder === section
+      ? nextHolder
+      : {
+          ...section,
+          children: (section.children ?? []).map((c) => (c.id === holder.id ? nextHolder : c)),
+        };
+  });
+}
+
+/** Append a Form into a Section's FIRST column (click-insert shim, like addListToSection). */
+export function addFormToSection(blocks: Block[], sectionId: string): Block[] {
+  return addFormBlock(blocks, sectionId, 0);
+}
+
 /**
  * Replace the `children` of the block `id` wherever it sits in the tree
  * (immutable). Empty array drops the key. Used to set a List's per-row TEMPLATE
@@ -1258,16 +1309,17 @@ export function setBlockChildren(blocks: Block[], id: string, children: Block[])
 
 /**
  * Merge a patch of NON-prop block fields (`bindings`, `listSource`, `listMap`,
- * `listRole`) into the block `id` wherever it sits in the tree (immutable). A
- * patch value of `undefined` deletes that key (revert to unbound / no query).
- * Used by the Slice-C binding panels — `props` go through `mergeBlockProps`;
- * binding/list config live OUTSIDE props (renderer reads them separately).
- * No-op if `id` is absent. PURE — never mutates inputs.
+ * `listRole`, `formTarget`) into the block `id` wherever it sits in the tree
+ * (immutable). A patch value of `undefined` deletes that key (revert to
+ * unbound / no query / untargeted form). Used by the Slice-C binding panels —
+ * `props` go through `mergeBlockProps`; binding/list/form config live OUTSIDE
+ * props (renderer reads them separately). No-op if `id` is absent. PURE —
+ * never mutates inputs.
  */
 export function setBlockField(
   blocks: Block[],
   id: string,
-  patch: Partial<Pick<Block, "bindings" | "listSource" | "listMap" | "listRole">>,
+  patch: Partial<Pick<Block, "bindings" | "listSource" | "listMap" | "listRole" | "formTarget">>,
 ): Block[] {
   return blocks.map((b) => {
     if (b.id === id) {

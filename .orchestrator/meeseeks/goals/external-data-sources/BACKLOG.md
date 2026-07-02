@@ -84,7 +84,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 >   validated fields + forced DRAFT status; per-IP rate limit + payload caps;
 >   progressive-enhancement client script shipped like combobox assets. Pure
 >   submit-core + plan-form node tests. Flag toggle via collections PATCH _op.
-> - TODO: **(b) page-builder UI**: bind a Form block → saved request OR opted-in
+> - DOING: **(b) page-builder UI**: bind a Form block → saved request OR opted-in
 >   collection; map fields → placeholders / schema fields; author success/error
 >   messages + optional redirect; publicSubmissions toggle in the Collections UI.
 >   EN/FI/ET. (Messages are authored strings on formTarget — localize via locale
@@ -102,9 +102,24 @@ Task states: TODO | DOING | DONE | BLOCKED.
 >   page (POST /post echo, saved request deec059d-…) + a collection-target
 >   contact-form card against an opted-in test collection; verify native +
 >   fetch modes live on :3602; document what each proves.
-> - DOING: **(d) AI tools**: let the assistant create/bind a Form block
->   (create_form / bind_form or extend existing block tools) incl. target
->   validation; 3 registrations caveat applies.
+> - DONE (2026-07-02): **(d) AI tools**: `create_form` (insert a Form into a
+>   Section + set formTarget) + `bind_form` (PATCH target/messages/redirect;
+>   `clear:true` untargets). Pure lib/chat/form-tools.ts (validators +
+>   mergeFormTarget) + CF handlers in tool-dispatch; target validation: api =
+>   resolveSourceAndRequest (id OR name, ids persisted), collection = must
+>   exist AND publicSubmissions ON (self-correcting error names the PATCH
+>   toggle fix). NO map arg BY DESIGN (submit maps by NAME) — tools return
+>   `fields` (request placeholders / collection field names) + a note so the
+>   model authors matching `<input name=…>`. All registrations done
+>   (KNOWN_TOOL_NAMES, TOOL_BY_NAME, HANDLERS, TOOLS_BY_CONTEXT
+>   page-builder+pages, both context prompts). page-blocks: isForm/
+>   addFormBlock/addFormToSection, setBlockField accepts formTarget. 15 node
+>   tests; tsc + 1396 suite green; live debug-route scope check on :3602;
+>   opennext isolated-worktree gate GREEN. Follow-up idea: live AI e2e smoke
+>   (real model chains create_form like the Slice-6 smoke). Original spec: let
+>   the assistant create/bind a Form block (create_form / bind_form or extend
+>   existing block tools) incl. target validation; 3 registrations caveat
+>   applies.
 
 - TODO (USER 2026-07-02, approved): **Form block — visitor form submission to a
   data-source saved request.** User's design intent (their words, distilled): "an

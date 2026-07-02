@@ -337,3 +337,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   `scripts/bind-copy.test.mjs`** — if you reword `pageBuilder.bind.title/help`,
   `list.help`, or `layoutList`, keep them source-agnostic (collection OR API) and
   update that test's STALE list only if a string legitimately returns reworded.
+
+- **The Form AI tools have NO field→placeholder map arg BY DESIGN** — the submit
+  pipeline maps by NAME (input name == request `{placeholder}` == collection
+  field, see submit-core.ts). create_form/bind_form instead RETURN `fields` +
+  a note so the model authors matching `<input name=…>`. Don't bolt a map
+  layer onto the tools without changing submit-core too.
+
+- **The collection form-target gate is enforced at AUTHORING time too**:
+  resolveFormTarget (tool-dispatch) rejects a collection without
+  publicSubmissions with an error naming the PATCH `_op:set_public_submissions`
+  fix — deliberately NO AI tool to flip the opt-in (operator-only switch).
+  Don't "helpfully" add one without a user directive.
+
+- **`setBlockField` now accepts `formTarget`** (Pick extended) and page-blocks
+  exports isForm/addFormBlock/addFormToSection + FORM_COMPONENT — reuse these
+  for slice (b)'s Form panel instead of re-adding tree helpers.

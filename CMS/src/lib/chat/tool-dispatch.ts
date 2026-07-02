@@ -98,6 +98,13 @@ import {
   sampleForModel,
 } from "./data-source-tools";
 import {
+  CREATE_FORM_TOOL,
+  BIND_FORM_TOOL,
+  validateCreateForm,
+  validateBindForm,
+  mergeFormTarget,
+} from "./form-tools";
+import {
   listDataSources,
   createDataSource,
   createDataSourceRequest,
@@ -108,7 +115,11 @@ import {
 } from "@/db/data-source-store";
 import { fetchSource } from "@/lib/data-sources/fetch";
 import { samplePaths } from "@/lib/data-sources/bind";
-import type { AuthType, HttpMethod } from "@/lib/data-sources/validate";
+import {
+  requestPlaceholders,
+  type AuthType,
+  type HttpMethod,
+} from "@/lib/data-sources/validate";
 import {
   LIST_PROMPTS_TOOL,
   CREATE_PROMPT_TOOL,
@@ -136,11 +147,14 @@ import {
   setBlockField,
   setBlockChildren,
   addListToSection,
+  addFormToSection,
   isList,
+  isForm,
   isSection,
   LIST_COMPONENT,
+  FORM_COMPONENT,
 } from "@/lib/pages/page-blocks";
-import type { Block, TreeNode, BindingRef, ListSource } from "@/lib/render/tree";
+import type { Block, TreeNode, BindingRef, ListSource, FormTarget } from "@/lib/render/tree";
 import { treeToHtml } from "@/lib/render/parse-html";
 import { effectiveTheme } from "@/lib/render/theme";
 import {
@@ -249,6 +263,8 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   list_data_sources: LIST_DATA_SOURCES_TOOL,
   create_data_source: CREATE_DATA_SOURCE_TOOL,
   test_data_source: TEST_DATA_SOURCE_TOOL,
+  create_form: CREATE_FORM_TOOL,
+  bind_form: BIND_FORM_TOOL,
 };
 
 /** The tool SCHEMAS the assistant may use in this admin-page context (chat route). */
@@ -1339,6 +1355,190 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
   }
 }
 
+// ── external-data-sources Form slice (d): built-in Form block tools ───────────
+// create_form inserts a Form block into a Section column (mirroring create_list)
+// and sets its `formTarget`; bind_form PATCHes an existing Form's target/
+// messages. Target validation is the whole point: an api target must name a
+// REAL source + saved request (resolved by id OR name, ids persisted); a
+// collection target must EXIST and have publicSubmissions ENABLED — the same
+// gates the submit endpoint enforces at POST time, surfaced at AUTHORING time
+// with self-correcting errors. Both tools return the field NAMES the form's
+// child inputs must use (mapping is by-name — see submit-core.ts).
+
+type ResolvedFormTarget = {
+  target: { api?: { sourceId: string; requestId: string }; collection?: string };
+  /** The input names the form's child component must render. */
+  fields: string[];
+  /** Human label for the result payload (source name / table name). */
+  boundTo: string;
+};
+
+/** Resolve + validate a form target (api source/request OR collection). */
+async function resolveFormTarget(
+  sourceRef: string | undefined,
+  requestRef: string | undefined,
+  collectionRef: string | undefined,
+): Promise<{ ok: true; value: ResolvedFormTarget } | { ok: false; error: string }> {
+  if (sourceRef) {
+    const resolved = await resolveSourceAndRequest(sourceRef, requestRef!);
+    if (!resolved.ok) return { ok: false, error: resolved.error };
+    return {
+      ok: true,
+      value: {
+        target: { api: { sourceId: resolved.source.id, requestId: resolved.request.id } },
+        fields: requestPlaceholders({
+          path: resolved.request.path,
+          query: resolved.request.query,
+          bodyTemplate: resolved.request.bodyTemplate,
+        }),
+        boundTo: resolved.source.name,
+      },
+    };
+  }
+  const view = await getCollection(collectionRef!);
+  if (!view) return { ok: false, error: await unknownCollectionMessage(collectionRef!) };
+  if (!view.publicSubmissions) {
+    return {
+      ok: false,
+      error:
+        `collection "${view.tableName}" exists but has NOT opted in to public form submissions ` +
+        `(publicSubmissions is off), so a visitor form cannot write to it. The operator must enable it ` +
+        `first — PATCH /api/collections/${view.tableName} with {"_op":"set_public_submissions","enabled":true} ` +
+        `(a deliberate operator-only switch; there is no AI tool to flip it). Then retry this tool.`,
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      target: { collection: view.tableName },
+      fields: view.fields.map((f) => f.name),
+      boundTo: view.tableName,
+    },
+  };
+}
+
+/** The `fields` guidance both tools return (by-name mapping, see form-tools.ts). */
+function formFieldsNote(target: { api?: unknown }, fields: string[]): string {
+  const what = target.api
+    ? "the saved request's {placeholder} names"
+    : "the collection's declared field names";
+  return fields.length > 0
+    ? `place a component inside the form whose <input name=…> fields match ${what} ` +
+      `(${fields.join(", ")}) and include a type="submit" button`
+    : `this target declares no fields — the form only needs a type="submit" button inside it`;
+}
+
+async function handleCreateForm(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateCreateForm(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const v = valid.value;
+  try {
+    const loaded = await getDraftBlocks(v.page);
+    if (!loaded) return { ok: false, errors: [`no page with id "${v.page}"`] };
+    const sectionBlock = findBlock(loaded.blocks, v.section);
+    if (!sectionBlock) return { ok: false, errors: [`no block with id "${v.section}" on this page`] };
+    if (!isSection(sectionBlock)) return { ok: false, errors: [`block "${v.section}" is not a Section (insert a Section first)`] };
+
+    const resolved = await resolveFormTarget(v.source, v.request, v.collection);
+    if (!resolved.ok) return { ok: false, errors: [resolved.error] };
+
+    const formTarget = mergeFormTarget(undefined, {
+      ...resolved.value.target,
+      successMessage: v.successMessage,
+      errorMessage: v.errorMessage,
+      redirect: v.redirect,
+    });
+
+    let next = addFormToSection(loaded.blocks, v.section);
+    const formId = newBlockId(loaded.blocks, next, FORM_COMPONENT);
+    if (!formId) return { ok: false, errors: [`failed to insert the Form into section "${v.section}"`] };
+    next = setBlockField(next, formId, { formTarget });
+
+    const shape = validateBlocks(next, {
+      grandfatheredTopLevelIds: topLevelBlockIds(loaded.blocks),
+    });
+    if (!shape.ok) return { ok: false, errors: shape.errors };
+    const res = await setDraftBlocks(v.page, shape.blocks, loaded.meta);
+    if (!res.ok) return { ok: false, errors: res.errors };
+    return {
+      ok: true,
+      action: "created",
+      page: v.page,
+      form: formId,
+      ...(resolved.value.target.api ? { source: resolved.value.boundTo } : { collection: resolved.value.boundTo }),
+      fields: resolved.value.fields,
+      note: formFieldsNote(resolved.value.target, resolved.value.fields),
+    };
+  } catch (err) {
+    return { ok: false, errors: [`failed to create form: ${(err as Error).message}`] };
+  }
+}
+
+async function handleBindForm(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateBindForm(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const v = valid.value;
+  try {
+    const loaded = await getDraftBlocks(v.page);
+    if (!loaded) return { ok: false, errors: [`no page with id "${v.page}"`] };
+    const formBlock = findBlock(loaded.blocks, v.block);
+    if (!formBlock) return { ok: false, errors: [`no block with id "${v.block}" on this page`] };
+    if (!isForm(formBlock)) return { ok: false, errors: [`block "${v.block}" is not a Form (create one with create_form)`] };
+
+    if (v.clear) {
+      const next = setBlockField(loaded.blocks, v.block, { formTarget: undefined });
+      const res = await setDraftBlocks(v.page, next, loaded.meta);
+      if (!res.ok) return { ok: false, errors: res.errors };
+      return { ok: true, action: "cleared", page: v.page, form: v.block };
+    }
+
+    // A target patch is validated fresh; a messages-only patch keeps (and
+    // re-validates nothing about) the stored target — but the stored target must
+    // EXIST for the messages to ever show, so surface that as a hint, not a block.
+    let resolved: ResolvedFormTarget | null = null;
+    if (v.source || v.collection) {
+      const r = await resolveFormTarget(v.source, v.request, v.collection);
+      if (!r.ok) return { ok: false, errors: [r.error] };
+      resolved = r.value;
+    }
+
+    const prev = formBlock.formTarget as FormTarget | undefined;
+    const formTarget = mergeFormTarget(prev, {
+      ...(resolved ? resolved.target : {}),
+      successMessage: v.successMessage,
+      errorMessage: v.errorMessage,
+      redirect: v.redirect,
+    });
+    if (!formTarget.kind) {
+      return {
+        ok: false,
+        errors: [
+          "this form has no target yet — pass `source`+`request` (API saved request) or `collection` (opted-in collection) along with your change",
+        ],
+      };
+    }
+
+    const next = setBlockField(loaded.blocks, v.block, { formTarget });
+    const res = await setDraftBlocks(v.page, next, loaded.meta);
+    if (!res.ok) return { ok: false, errors: res.errors };
+    return {
+      ok: true,
+      action: "bound",
+      page: v.page,
+      form: v.block,
+      ...(resolved
+        ? {
+            ...(resolved.target.api ? { source: resolved.boundTo } : { collection: resolved.boundTo }),
+            fields: resolved.fields,
+            note: formFieldsNote(resolved.target, resolved.fields),
+          }
+        : {}),
+    };
+  } catch (err) {
+    return { ok: false, errors: [`failed to bind form: ${(err as Error).message}`] };
+  }
+}
+
 // ── System-prompt version CRUD ────────────────────────────────────────────────
 // Manage saved system-prompt versions (the named full prompts an operator keeps
 // to compare). Storing/editing a version NEVER changes the site's active default
@@ -1441,18 +1641,23 @@ async function handleEditText(args: unknown): Promise<Record<string, unknown>> {
   }
 }
 
-/** The id of the List just appended by addListToSection (the new block in `after`). */
-function newListId(before: Block[], after: Block[]): string {
+/** The id of the built-in block just appended by add*ToSection (the new block in `after`). */
+function newBlockId(before: Block[], after: Block[], component: string): string {
   const had = new Set<string>();
   const collect = (bs: Block[]) => bs.forEach((b) => { had.add(b.id); if (b.children) collect(b.children); });
   collect(before);
   let found = "";
   const scan = (bs: Block[]) => bs.forEach((b) => {
-    if (!had.has(b.id) && b.component === LIST_COMPONENT) found = b.id;
+    if (!had.has(b.id) && b.component === component) found = b.id;
     if (b.children) scan(b.children);
   });
   scan(after);
   return found;
+}
+
+/** The id of the List just appended by addListToSection. */
+function newListId(before: Block[], after: Block[]): string {
+  return newBlockId(before, after, LIST_COMPONENT);
 }
 
 // ── The handler map + dispatcher ──────────────────────────────────────────────
@@ -1498,6 +1703,8 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   list_data_sources: () => handleListDataSources(),
   create_data_source: handleCreateDataSource,
   test_data_source: handleTestDataSource,
+  create_form: handleCreateForm,
+  bind_form: handleBindForm,
 };
 
 /**
