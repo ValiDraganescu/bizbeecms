@@ -138,3 +138,22 @@ Read every line before working. Each entry was learned the hard way by a previou
   entries directly. The static `/api/data-sources/purge` segment can't collide
   with `[id]` (source ids are UUIDs). Counters for deleted sources/requests
   linger in the row — harmless tiny ints.
+
+- **AI binding tools resolve source/request by ID OR NAME** (Slice 6,
+  `resolveSourceAndRequest` in tool-dispatch.ts) but PERSIST only ids into the
+  BindingRef/ListSource. Don't store names — renames would break bindings.
+
+- **bind_list kind-switching is destructure-based** (Slice 6): switching to api
+  drops `collection/filter/sort`; switching to collection drops
+  `kind/sourceId/requestId/params/itemsPath`; presentation + combobox config
+  always survive. Keep it symmetrical if you add ListSource fields.
+
+- **`asRecord` in the pure chat tool modules must reject ARRAYS** — `typeof []
+  === "object"`; an array `params` would silently validate as an empty object.
+  data-source-tools.ts has the Array.isArray guard; binding-tools' shapeMap is
+  saved by its own value checks.
+
+- **New chat tools need THREE registrations**: KNOWN_TOOL_NAMES (tool-scopes),
+  TOOL_BY_NAME + HANDLERS (tool-dispatch) — tsc's Record<ToolName,…> catches a
+  miss. Context scoping (TOOLS_BY_CONTEXT) + context prompt are separate,
+  easy-to-forget steps; "general" gets everything automatically.

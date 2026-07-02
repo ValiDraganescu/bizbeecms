@@ -26,6 +26,7 @@
  */
 import { FILTER_OPS } from "../content/query-compiler.ts";
 import { normalizeLabelExpr } from "../render/tree.ts";
+import type { ApiParamSpec } from "../data-sources/bind.ts";
 
 // ── Shared arg-shaping (mirrors collection-tools.validateQuery's filter/sort) ──
 
@@ -110,6 +111,34 @@ function shapeMap(rec: Record<string, unknown>): ArgResult<Record<string, string
   return { ok: true, value: out };
 }
 
+/**
+ * Shape `rec.params` (api-source `{placeholder}` values) into an ApiParamSpec:
+ * a literal (string/number/boolean → string) or `{ prop: "propName" }` read from
+ * the block's props at render. external-data-sources Slice 6.
+ */
+function shapeApiParams(rec: Record<string, unknown>): ArgResult<ApiParamSpec | undefined> {
+  const raw = rec.params;
+  if (raw === undefined) return { ok: true, value: undefined };
+  const obj = asRecord(raw);
+  if (!obj) {
+    return { ok: false, error: "params must be an object of placeholder → literal value or { prop: 'propName' }" };
+  }
+  const out: ApiParamSpec = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+      out[k] = String(v);
+    } else {
+      const p = asRecord(v);
+      const prop = p ? str(p, "prop") : undefined;
+      if (!prop) {
+        return { ok: false, error: `param "${k}" must be a literal (string) or { prop: "propName" }` };
+      }
+      out[k] = { prop };
+    }
+  }
+  return { ok: true, value: out };
+}
+
 function shapeLimit(rec: Record<string, unknown>): number | undefined {
   if (typeof rec.limit === "number" && Number.isFinite(rec.limit)) return rec.limit;
   if (typeof rec.limit === "string" && rec.limit.trim() !== "" && Number.isFinite(Number(rec.limit))) {
@@ -155,6 +184,28 @@ const MAP_SCHEMA = {
     "fields that EXIST on the collection are accepted.",
 } as const;
 
+// external-data-sources Slice 6: API-source binding fragments (shared by the
+// three binding tools). An api bind names a data source + saved request instead
+// of a collection; `map` values are then response DOT-PATHS, not field names.
+const API_SOURCE_SCHEMA = {
+  type: "string",
+  description:
+    "API-source binding: the external data source id or name (list_data_sources). " +
+    "Pass EITHER `collection` (collection binding) OR `source`+`request` (API binding), never both.",
+} as const;
+
+const API_REQUEST_SCHEMA = {
+  type: "string",
+  description: "API-source binding: the saved request id or name on that source.",
+} as const;
+
+const API_PARAMS_SCHEMA = {
+  type: "object",
+  description:
+    "API-source binding: values for the request's {placeholder} tokens — a literal " +
+    "string, or { prop: 'propName' } to read one of the block's own props at render.",
+} as const;
+
 // ── Tool schemas (OpenAI/Workers-AI function-calling shape) ───────────────────
 
 export const BIND_COMPONENT_TOOL = {
@@ -162,22 +213,27 @@ export const BIND_COMPONENT_TOOL = {
   function: {
     name: "bind_component",
     description:
-      "Bind ONE block on a page to a SINGLE collection item: the block's props are " +
-      "filled live from the FIRST item matching a structured query. Use this to make " +
-      "a component show real collection data (e.g. a Hero showing the featured post). " +
-      "Identify the page by its id (list_pages/get_page) and the block by its id " +
-      "(get_page shows the block tree). The collection is its content_<slug> table " +
-      "name (query_collection / list a collection to find it). Pass `map` as " +
-      "{ propName: fieldName }. To REMOVE a binding, omit `collection` (or pass an " +
-      "empty map) — the block reverts to its static props.",
+      "Bind ONE block on a page to a SINGLE data item: the block's props are filled " +
+      "live at render. Two source kinds: a COLLECTION (the FIRST item matching a " +
+      "structured query — pass `collection` + `map` of { propName: fieldName }) or an " +
+      "external API DATA SOURCE (pass `source` + `request` + `map` of { propName: " +
+      "'response.dot.path' } — run test_data_source first to see the response's " +
+      "paths, and use `params` for the request's {placeholder} tokens). Identify the " +
+      "page by its id (list_pages/get_page) and the block by its id (get_page shows " +
+      "the block tree). Map only props DECLARED on the component. To REMOVE a " +
+      "binding, omit both `collection` and `source` — the block reverts to its " +
+      "static props.",
     parameters: {
       type: "object",
       properties: {
         page: { type: "string", description: "The page id." },
         block: { type: "string", description: "The id of the block to bind." },
-        collection: { type: "string", description: "The collection's content_<slug> table name. Omit to clear the binding." },
+        collection: { type: "string", description: "Collection binding: the content_<slug> table name. Omit (with no `source`) to clear the binding." },
         filter: FILTER_SCHEMA,
         sort: SORT_SCHEMA,
+        source: API_SOURCE_SCHEMA,
+        request: API_REQUEST_SCHEMA,
+        params: API_PARAMS_SCHEMA,
         map: MAP_SCHEMA,
       },
       required: ["page", "block"],
@@ -191,25 +247,32 @@ export const CREATE_LIST_TOOL = {
     name: "create_list",
     description:
       "Insert a built-in List block into a page Section that repeats a TEMPLATE " +
-      "component once per matching collection item (e.g. a card per blog post). " +
-      "Identify the page by id and the Section by its block id (get_page shows the " +
-      "tree; create the Section first if there is none). `collection` is the " +
-      "content_<slug> table name, `template` is an existing component name, and `map` " +
-      "is { templatePropName: fieldName } binding each row's fields into the template. " +
-      "Optional filter/sort/limit shape which rows appear.",
+      "component once per data row (e.g. a card per blog post). Rows come from a " +
+      "COLLECTION (pass `collection`, optional filter/sort; `map` values are field " +
+      "names) OR an external API DATA SOURCE (pass `source` + `request`; `map` " +
+      "values are response dot-paths — run test_data_source first; `itemsPath` digs " +
+      "to a nested rows array like OpenWeather's 'list'; `params` fills the " +
+      "request's {placeholder} tokens). Identify the page by id and the Section by " +
+      "its block id (get_page shows the tree; create the Section first if there is " +
+      "none). `template` is an existing component name; `map` is " +
+      "{ templatePropName: fieldOrPath } binding each row into the template.",
     parameters: {
       type: "object",
       properties: {
         page: { type: "string", description: "The page id." },
         section: { type: "string", description: "The id of the Section block to insert the List into." },
-        collection: { type: "string", description: "The collection's content_<slug> table name." },
+        collection: { type: "string", description: "Collection rows: the content_<slug> table name." },
         template: { type: "string", description: "The component name to stamp per row." },
         filter: FILTER_SCHEMA,
         sort: SORT_SCHEMA,
+        source: API_SOURCE_SCHEMA,
+        request: API_REQUEST_SCHEMA,
+        params: API_PARAMS_SCHEMA,
+        itemsPath: { type: "string", description: "API rows: dot-path to the rows array when nested in the response." },
         limit: { type: "number", description: "Max rows to render." },
         map: MAP_SCHEMA,
       },
-      required: ["page", "section", "collection", "template", "map"],
+      required: ["page", "section", "template", "map"],
     },
   },
 } as const;
@@ -219,8 +282,10 @@ export const BIND_LIST_TOOL = {
   function: {
     name: "bind_list",
     description:
-      "Reconfigure an EXISTING List block on a page: its collection query, its per-row " +
-      "template component, the row-field → template-prop map, AND its presentation. A " +
+      "Reconfigure an EXISTING List block on a page: its row source (a collection " +
+      "query, OR an external API data source via `source`+`request` — `map` values " +
+      "are then response dot-paths), its per-row template component, the row → " +
+      "template-prop map, AND its presentation. A " +
       "List can present as a flat list (default) OR as a COMBOBOX/SELECT dropdown — the " +
       "combobox/select control on a page IS a List block with `presentation:\"combobox\"`, " +
       "NOT a separate component. To change anything about a select/combobox (how the " +
@@ -233,10 +298,14 @@ export const BIND_LIST_TOOL = {
       properties: {
         page: { type: "string", description: "The page id." },
         block: { type: "string", description: "The id of the List block." },
-        collection: { type: "string", description: "The collection's content_<slug> table name." },
+        collection: { type: "string", description: "Collection rows: the content_<slug> table name (switches the List to collection rows)." },
         template: { type: "string", description: "The component name to stamp per row (replaces the current template)." },
         filter: FILTER_SCHEMA,
         sort: SORT_SCHEMA,
+        source: API_SOURCE_SCHEMA,
+        request: API_REQUEST_SCHEMA,
+        params: API_PARAMS_SCHEMA,
+        itemsPath: { type: "string", description: "API rows: dot-path to the rows array when nested in the response." },
         limit: { type: "number", description: "Max rows to render." },
         map: MAP_SCHEMA,
         presentation: {
@@ -292,9 +361,10 @@ export const BIND_LIST_TOOL = {
 // ── Pure arg validation/coercion (no store, no CF — node-testable) ────────────
 
 /**
- * bind_component: { page, block, collection?, filter?, sort?, map? }.
- * Omitting `collection` (or passing an empty map) means "clear the binding"
- * (`clear: true`); otherwise a full single-item binding payload.
+ * bind_component: { page, block, collection?, filter?, sort?, source?, request?,
+ * params?, map? }. Omitting BOTH `collection` and `source` means "clear the
+ * binding" (`clear: true`); `collection` → a collection binding; `source` (+
+ * `request`) → an api-source binding (external-data-sources Slice 6).
  */
 export interface BindComponentArgs {
   page: string;
@@ -304,6 +374,12 @@ export interface BindComponentArgs {
   collection?: string;
   filter?: FilterClause[];
   sort?: SortClause[];
+  /** api binding: the data source id or name (resolved in the dispatch handler). */
+  source?: string;
+  /** api binding: the saved request id or name. */
+  request?: string;
+  /** api binding: `{placeholder}` → literal or { prop } spec. */
+  params?: ApiParamSpec;
   map?: Record<string, string>;
 }
 
@@ -316,15 +392,33 @@ export function validateBindComponent(args: unknown): ArgResult<BindComponentArg
   if (!block) return { ok: false, error: "block (id) is required" };
 
   const collection = str(rec, "collection");
-  // No collection → clear the binding.
-  if (!collection) return { ok: true, value: { page, block, clear: true } };
+  const source = str(rec, "source");
+  if (collection && source) {
+    return { ok: false, error: "pass either `collection` (collection binding) or `source` (API binding), not both" };
+  }
+  // No source of any kind → clear the binding.
+  if (!collection && !source) return { ok: true, value: { page, block, clear: true } };
+
+  const map = shapeMap(rec);
+  if (!map.ok) return map;
+
+  if (source) {
+    const request = str(rec, "request");
+    if (!request) {
+      return { ok: false, error: "request (the saved request id or name) is required for an API binding — list_data_sources shows them" };
+    }
+    const params = shapeApiParams(rec);
+    if (!params.ok) return params;
+    return {
+      ok: true,
+      value: { page, block, clear: false, source, request, params: params.value, map: map.value },
+    };
+  }
 
   const filters = shapeFilters(rec);
   if (!filters.ok) return filters;
   const sort = shapeSort(rec);
   if (!sort.ok) return sort;
-  const map = shapeMap(rec);
-  if (!map.ok) return map;
 
   return {
     ok: true,
@@ -332,36 +426,73 @@ export function validateBindComponent(args: unknown): ArgResult<BindComponentArg
   };
 }
 
-/** create_list: { page, section, collection, template, filter?, sort?, limit?, map }. */
+/**
+ * create_list: { page, section, template, map, collection? | source?+request?,
+ * filter?, sort?, params?, itemsPath?, limit? }. Rows come from a collection OR
+ * an api source (external-data-sources Slice 6) — exactly one of the two.
+ */
 export interface CreateListArgs {
   page: string;
   section: string;
-  collection: string;
+  collection?: string;
   template: string;
   filter: FilterClause[];
   sort: SortClause[];
+  /** api rows: the data source id or name (resolved in the dispatch handler). */
+  source?: string;
+  /** api rows: the saved request id or name. */
+  request?: string;
+  /** api rows: `{placeholder}` → literal or { prop } spec. */
+  params?: ApiParamSpec;
+  /** api rows: dot-path to a nested rows array. */
+  itemsPath?: string;
   limit?: number;
   map: Record<string, string>;
 }
 
 export function validateCreateList(args: unknown): ArgResult<CreateListArgs> {
   const rec = asRecord(args);
-  if (!rec) return { ok: false, error: "expected an object with page, section, collection, template and map" };
+  if (!rec) return { ok: false, error: "expected an object with page, section, template, map and a collection OR source+request" };
   const page = str(rec, "page");
   if (!page) return { ok: false, error: "page (id) is required" };
   const section = str(rec, "section");
   if (!section) return { ok: false, error: "section (block id) is required" };
-  const collection = str(rec, "collection");
-  if (!collection) return { ok: false, error: "collection (table name) is required" };
   const template = str(rec, "template");
   if (!template) return { ok: false, error: "template (component name) is required" };
+
+  const collection = str(rec, "collection");
+  const source = str(rec, "source");
+  if (collection && source) {
+    return { ok: false, error: "pass either `collection` (collection rows) or `source` (API rows), not both" };
+  }
+  if (!collection && !source) {
+    return { ok: false, error: "rows need a source: pass `collection` (table name) or `source`+`request` (API data source)" };
+  }
+
+  const map = shapeMap(rec);
+  if (!map.ok) return map;
+
+  if (source) {
+    const request = str(rec, "request");
+    if (!request) {
+      return { ok: false, error: "request (the saved request id or name) is required for API rows — list_data_sources shows them" };
+    }
+    const params = shapeApiParams(rec);
+    if (!params.ok) return params;
+    return {
+      ok: true,
+      value: {
+        page, section, template, source, request,
+        params: params.value, itemsPath: str(rec, "itemsPath"),
+        filter: [], sort: [], limit: shapeLimit(rec), map: map.value,
+      },
+    };
+  }
 
   const filters = shapeFilters(rec);
   if (!filters.ok) return filters;
   const sort = shapeSort(rec);
   if (!sort.ok) return sort;
-  const map = shapeMap(rec);
-  if (!map.ok) return map;
 
   return {
     ok: true,
@@ -380,6 +511,14 @@ export interface BindListArgs {
   template?: string;
   filter?: FilterClause[];
   sort?: SortClause[];
+  /** api rows: the data source id or name (resolved in the dispatch handler). */
+  source?: string;
+  /** api rows: the saved request id or name. */
+  request?: string;
+  /** api rows: `{placeholder}` → literal or { prop } spec. */
+  params?: ApiParamSpec;
+  /** api rows: dot-path to a nested rows array. */
+  itemsPath?: string;
   limit?: number;
   map?: Record<string, string>;
   // Presentation + combobox config (all optional, PATCH-like).
@@ -418,6 +557,27 @@ export function validateBindList(args: unknown): ArgResult<BindListArgs> {
   if (collection) out.collection = collection;
   const template = str(rec, "template");
   if (template) out.template = template;
+
+  // api-source patch fields (external-data-sources Slice 6).
+  const source = str(rec, "source");
+  if (collection && source) {
+    return { ok: false, error: "pass either `collection` (collection rows) or `source` (API rows), not both" };
+  }
+  if (source) {
+    out.source = source;
+    const request = str(rec, "request");
+    if (!request) {
+      return { ok: false, error: "request (the saved request id or name) is required with `source` — list_data_sources shows them" };
+    }
+    out.request = request;
+  }
+  if (rec.params !== undefined) {
+    const params = shapeApiParams(rec);
+    if (!params.ok) return params;
+    out.params = params.value;
+  }
+  const itemsPath = str(rec, "itemsPath");
+  if (itemsPath) out.itemsPath = itemsPath;
 
   if (rec.filter !== undefined || rec.filters !== undefined) {
     const filters = shapeFilters(rec);

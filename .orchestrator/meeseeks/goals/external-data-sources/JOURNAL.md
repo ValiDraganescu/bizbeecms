@@ -178,3 +178,36 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/data-sources/[id]/purge/route.ts (new),
   CMS/src/components/content/data-sources-manager.tsx,
   CMS/messages/{en,fi,et}.json, CMS/scripts/data-source-purge.test.mjs (new)
+
+## 2026-07-02 03:31 — Slice 6: AI tools for data sources
+- **Status:** DONE
+- **What I did:** Registered three new tools in the shared dispatch —
+  `list_data_sources` (sources + saved requests w/ ids, methods, placeholders;
+  never the secret), `create_data_source` (source config + WRITE-ONLY secret +
+  optional inline saved requests; header/query/basic auth requires a secret),
+  `test_data_source` (live fetch mirroring the Slice-4 test endpoint: cache
+  bypassed, secret injected server-side; result carries `paths` =
+  `samplePaths(data)` over the FULL response + a size-capped `data` sample so
+  the model can propose `prop ← json.path` maps). GENERALIZED (not forked) the
+  existing binding tools per the caveat: `bind_component` / `create_list` /
+  `bind_list` now accept `source`+`request` (id OR name, resolved with
+  self-correcting errors listing what exists) + `params` (literal or `{prop}`)
+  + `itemsPath`, building api-kind BindingRef/ListSource validated via the
+  SHARED `validateBinding`/`validateListBinding` api paths (declared-prop
+  allowlist). bind_list kind-switching drops the other kind's query fields,
+  keeps presentation/combobox config, and collection lists still persist NO
+  `kind` (legacy byte-identical). Scoped the three new tools into page-builder
+  + pages contexts + their context prompts. Pure module
+  `lib/chat/data-source-tools.ts` (schemas/validators/formatSource/
+  sampleForModel) per convention; CF-coupled handlers in tool-dispatch.ts
+  (kekFromEnv + resolveSourceAndRequest helpers).
+- **Verified:** tsc green; full suite 1328/1328 (was 1309; +19 new tests in
+  scripts/data-source-tools.test.mjs + api cases appended to
+  scripts/binding-tools.test.mjs); live on :3602 — `/api/chat/debug?context=
+  page-builder` lists all three tools and the prompt carries the api-source
+  guidance. Opennext build gate DEFERRED again (7th) — dev server pid 79854
+  still holds :3602. No UI strings added → no EN/FI/ET needed.
+- **Files:** CMS/src/lib/chat/data-source-tools.ts (new),
+  CMS/src/lib/chat/binding-tools.ts, CMS/src/lib/chat/tool-scopes.ts,
+  CMS/src/lib/chat/tool-dispatch.ts, CMS/scripts/data-source-tools.test.mjs
+  (new), CMS/scripts/binding-tools.test.mjs

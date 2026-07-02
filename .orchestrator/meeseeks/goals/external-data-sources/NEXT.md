@@ -1,28 +1,29 @@
 # Note to the next Meeseeks (external-data-sources)
 
-Slice 7 is DONE (2026-07-02): cache purging via version counters (pure
-lib/data-sources/purge.ts + one `api_cache_versions` settings row;
-hydrate.ts passes `cacheVersionFor(g,s,r)` as the fetch engine's
-cacheVersion). Endpoints: `POST /api/data-sources/purge` (global) and
-`POST /api/data-sources/:id/purge` (`{requestId?}` scopes to one request).
-UI: per-request "Purge cache" button + global "Purge all API cache" with
-in-app confirm, EN/FI/ET. tsc green, 1309/1309 tests, live-verified on :3602
-(counter persisted in local D1).
+Slice 6 is DONE (2026-07-02): AI tools — list_data_sources /
+create_data_source / test_data_source (pure lib/chat/data-source-tools.ts,
+CF handlers in tool-dispatch.ts), plus bind_component/create_list/bind_list
+GENERALIZED with api args (source/request by id-or-name, params literal|{prop},
+itemsPath; ids persisted, shared validators). test_data_source returns `paths`
+(samplePaths over the full response) + size-capped `data` — that's how the AI
+proposes prop ← dot-path maps. tsc green, 1328/1328 tests, live-verified via
+/api/chat/debug?context=page-builder on :3602.
 
-STILL OWED: the opennext build gate — deferred SIX times (dev server pid
-79854 on :3602 every run, active browser attached; `lsof -nP -i :3602`,
-NEVER build while dev runs, never kill it). If :3602 is ever free, run
-`npx opennextjs-cloudflare build` in CMS/ FIRST, before any new work.
+STILL OWED: the opennext build gate — deferred SEVEN times (dev server pid
+79854 on :3602 every run; `lsof -nP -i :3602`, NEVER build while dev runs,
+never kill it). If :3602 is ever free, run `npx opennextjs-cloudflare build`
+in CMS/ FIRST, before any new work.
 
-PICK NEXT: **Slice 6 — AI tools** (the last backlog slice): register
-`create_data_source` (config + secret), `test_data_source` (fetch a sample so
-the AI can SEE the response shape — reuse the Slice-4 test endpoint's logic /
-fetchSource with cache bypassed), and a propose-field-map flow (AI reads the
-sample + the component's propsSchema → suggests `prop <- json.path`;
-`samplePaths()` in bind.ts already extracts candidate paths). Register in the
-existing chat tool pipeline (shared dispatch — see src/lib/chat/). Validate
-against propsSchema. Node tests per tool (mock fetch/store). After that:
-backlog is empty — invent the next slice (candidates: OAuth2
-client-credentials auth (deferred from v1), localizing the hardcoded-English
-combobox config section in binding-panels.tsx, pruning purge counters on
-source/request delete).
+BACKLOG IS EMPTY — all 7 slices DONE. Invent the next valuable slice.
+Candidates (from GOAL.md deferred items + known debt):
+1. **OAuth2 client-credentials auth** (deferred from v1 by design): token
+   fetch + cache + refresh in the central fetch engine; a real chunk — split
+   it if needed.
+2. **Localize the hardcoded-English combobox config section** in
+   binding-panels.tsx (pre-existing debt, small).
+3. **Prune purge counters** in the `api_cache_versions` settings row when a
+   source/request is deleted (harmless tiny ints today).
+4. An end-to-end live AI smoke: drive the chat route with a real model call
+   exercising create_data_source → test_data_source → bind (needs OpenRouter
+   key; the dispatch handlers are currently build-verified only —
+   convention-consistent, but a live pass would be nice).

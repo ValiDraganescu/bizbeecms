@@ -152,3 +152,96 @@ test("bind_list rejects a malformed map when supplied", () => {
   const r = validateBindList({ page: "p", block: "b", map: { title: 1 } });
   assert.equal(r.ok, false);
 });
+
+// ── API-source binding args (external-data-sources Slice 6) ──────────────────
+
+test("bind_component: source+request → api args with shaped params", () => {
+  const r = validateBindComponent({
+    page: "p1", block: "b1",
+    source: "Weather", request: "forecast",
+    params: { city: { prop: "city" }, units: "metric", days: 3 },
+    map: { temp: "main.temp" },
+  });
+  assert.ok(r.ok);
+  assert.equal(r.value.clear, false);
+  assert.equal(r.value.source, "Weather");
+  assert.equal(r.value.request, "forecast");
+  // Literals stringify; { prop } refs pass through.
+  assert.deepEqual(r.value.params, { city: { prop: "city" }, units: "metric", days: "3" });
+  assert.deepEqual(r.value.map, { temp: "main.temp" });
+});
+
+test("bind_component: collection AND source together is rejected", () => {
+  const r = validateBindComponent({
+    page: "p", block: "b", collection: "content_x", source: "s", request: "r", map: { a: "b" },
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /not both/);
+});
+
+test("bind_component: source without request is rejected", () => {
+  const r = validateBindComponent({ page: "p", block: "b", source: "s", map: { a: "b" } });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /request/);
+});
+
+test("bind_component: a malformed param spec names the exact param", () => {
+  const r = validateBindComponent({
+    page: "p", block: "b", source: "s", request: "r",
+    params: { city: { nope: 1 } }, map: { a: "b" },
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /"city"/);
+});
+
+test("create_list: api rows via source+request (+itemsPath), no collection needed", () => {
+  const r = validateCreateList({
+    page: "p", section: "s", template: "Card",
+    source: "Weather", request: "forecast", itemsPath: "list",
+    params: { city: "Turku" }, limit: 5,
+    map: { title: "weather.0.main" },
+  });
+  assert.ok(r.ok);
+  assert.equal(r.value.source, "Weather");
+  assert.equal(r.value.request, "forecast");
+  assert.equal(r.value.itemsPath, "list");
+  assert.deepEqual(r.value.params, { city: "Turku" });
+  assert.equal(r.value.limit, 5);
+  assert.equal(r.value.collection, undefined);
+});
+
+test("create_list: neither collection nor source is rejected with both options named", () => {
+  const r = validateCreateList({ page: "p", section: "s", template: "Card", map: { a: "b" } });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /collection/);
+  assert.match(r.error, /source/);
+});
+
+test("create_list: collection AND source together is rejected", () => {
+  const r = validateCreateList({
+    page: "p", section: "s", template: "t", collection: "content_x",
+    source: "s1", request: "r1", map: { a: "b" },
+  });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /not both/);
+});
+
+test("bind_list: api patch fields shape through (source/request/params/itemsPath)", () => {
+  const r = validateBindList({
+    page: "p", block: "l",
+    source: "Weather", request: "forecast",
+    params: { city: { prop: "city" } }, itemsPath: "list",
+  });
+  assert.ok(r.ok);
+  assert.equal(r.value.source, "Weather");
+  assert.equal(r.value.request, "forecast");
+  assert.deepEqual(r.value.params, { city: { prop: "city" } });
+  assert.equal(r.value.itemsPath, "list");
+});
+
+test("bind_list: source without request is rejected; collection+source rejected", () => {
+  assert.equal(validateBindList({ page: "p", block: "l", source: "s" }).ok, false);
+  const both = validateBindList({ page: "p", block: "l", collection: "content_x", source: "s", request: "r" });
+  assert.equal(both.ok, false);
+  assert.match(both.error, /not both/);
+});

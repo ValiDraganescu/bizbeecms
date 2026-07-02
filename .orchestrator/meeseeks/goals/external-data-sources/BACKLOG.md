@@ -102,7 +102,15 @@ tsc + opennext build green + node tests + EN/FI/ET for new strings.
   chosen request, pick a component prop/input (or a literal) as its value; the bind
   stores that param map and Slice-3 hydration resolves it at render.
 
-- TODO: **Slice 6 — AI tools for data sources.** Tools so the assistant can:
+- DONE (2026-07-02): **Slice 6 — AI tools for data sources.** Shipped:
+  list_data_sources / create_data_source / test_data_source (pure
+  lib/chat/data-source-tools.ts + CF handlers in tool-dispatch.ts), and the
+  EXISTING bind_component/create_list/bind_list generalized with
+  source/request/params/itemsPath api args (shared validateBinding/
+  validateListBinding, declared-prop allowlist). test_data_source returns
+  `paths` (samplePaths over the full response) — the propose-map raw material.
+  33 tool tests; suite 1328/1328; live-verified via /api/chat/debug. Opennext
+  gate deferred (7th, dev server on :3602). Original spec: Tools so the assistant can:
   `create_data_source` (config + secret), `test_data_source` (fetch a sample so the
   AI can SEE the response shape), and propose/set a field map when binding (the AI
   reads the sample + the component's propsSchema → suggests `prop <- json.path`).

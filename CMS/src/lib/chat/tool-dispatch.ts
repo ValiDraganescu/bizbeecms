@@ -89,6 +89,27 @@ import {
   validateBindList,
 } from "./binding-tools";
 import {
+  LIST_DATA_SOURCES_TOOL,
+  CREATE_DATA_SOURCE_TOOL,
+  TEST_DATA_SOURCE_TOOL,
+  validateCreateDataSource,
+  validateTestDataSource,
+  formatSource,
+  sampleForModel,
+} from "./data-source-tools";
+import {
+  listDataSources,
+  createDataSource,
+  createDataSourceRequest,
+  listDataSourceRequests,
+  decryptSourceSecret,
+  type SafeDataSource,
+  type SafeDataSourceRequest,
+} from "@/db/data-source-store";
+import { fetchSource } from "@/lib/data-sources/fetch";
+import { samplePaths } from "@/lib/data-sources/bind";
+import type { AuthType, HttpMethod } from "@/lib/data-sources/validate";
+import {
   LIST_PROMPTS_TOOL,
   CREATE_PROMPT_TOOL,
   UPDATE_PROMPT_TOOL,
@@ -119,7 +140,7 @@ import {
   isSection,
   LIST_COMPONENT,
 } from "@/lib/pages/page-blocks";
-import type { Block, TreeNode } from "@/lib/render/tree";
+import type { Block, TreeNode, BindingRef, ListSource } from "@/lib/render/tree";
 import { treeToHtml } from "@/lib/render/parse-html";
 import { effectiveTheme } from "@/lib/render/theme";
 import {
@@ -225,6 +246,9 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   edit_text: EDIT_TEXT_TOOL,
   get_authoring_guide: GET_AUTHORING_GUIDE_TOOL,
   generate_image: GENERATE_IMAGE_TOOL,
+  list_data_sources: LIST_DATA_SOURCES_TOOL,
+  create_data_source: CREATE_DATA_SOURCE_TOOL,
+  test_data_source: TEST_DATA_SOURCE_TOOL,
 };
 
 /** The tool SCHEMAS the assistant may use in this admin-page context (chat route). */
@@ -908,6 +932,137 @@ async function handleRenameCollectionField(args: unknown): Promise<Record<string
   }
 }
 
+// ── external-data-sources (Slice 6): external API data-source tools ───────────
+// Same discipline as the collection tools: pure validation in
+// data-source-tools.ts, store/fetch effects here. Secrets are WRITE-ONLY — a
+// tool may SET one (encrypted via the Worker's CMS_AUTH_SECRET KEK) but no tool
+// result ever contains it. test_data_source mirrors the Slice-4 test endpoint:
+// live fetch, cache BYPASSED, secret injected server-side.
+
+/** The secret-box KEK from the Worker env ("" when unavailable, e.g. node tests). */
+async function kekFromEnv(): Promise<string> {
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    const e = env as unknown as { CMS_AUTH_SECRET?: string };
+    return typeof e.CMS_AUTH_SECRET === "string" ? e.CMS_AUTH_SECRET : "";
+  } catch {
+    return "";
+  }
+}
+
+type ResolvedSourceRequest =
+  | { ok: true; source: SafeDataSource; request: SafeDataSourceRequest }
+  | { ok: false; error: string };
+
+/**
+ * Resolve a source + saved request from the model's refs (id OR name), with
+ * self-correcting errors that list what actually exists (AI error philosophy).
+ */
+async function resolveSourceAndRequest(
+  sourceRef: string,
+  requestRef: string,
+): Promise<ResolvedSourceRequest> {
+  const sources = await listDataSources();
+  const source =
+    sources.find((s) => s.id === sourceRef) ?? sources.find((s) => s.name === sourceRef);
+  if (!source) {
+    if (sources.length === 0) {
+      return { ok: false, error: `no data source "${sourceRef}" — this site has no API data sources yet (create one with create_data_source)` };
+    }
+    const names = sources.map((s) => `${s.name} (${s.id})`).join(", ");
+    return { ok: false, error: `no data source "${sourceRef}". Available sources: ${names}` };
+  }
+  const requests = await listDataSourceRequests(source.id);
+  const request =
+    requests.find((r) => r.id === requestRef) ?? requests.find((r) => r.name === requestRef);
+  if (!request) {
+    if (requests.length === 0) {
+      return { ok: false, error: `source "${source.name}" has no saved requests yet — add one (create_data_source with \`requests\`, or the operator via Data Sources)` };
+    }
+    const names = requests.map((r) => `${r.name} (${r.id})`).join(", ");
+    return { ok: false, error: `no saved request "${requestRef}" on source "${source.name}". Available requests: ${names}` };
+  }
+  return { ok: true, source, request };
+}
+
+async function handleListDataSources(): Promise<Record<string, unknown>> {
+  try {
+    const sources = await listDataSources();
+    const out: Record<string, unknown>[] = [];
+    for (const s of sources) {
+      out.push(formatSource(s, await listDataSourceRequests(s.id)));
+    }
+    return { ok: true, sources: out };
+  } catch (err) {
+    return { ok: false, errors: [`failed to list data sources: ${(err as Error).message}`] };
+  }
+}
+
+async function handleCreateDataSource(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateCreateDataSource(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  try {
+    const kek = await kekFromEnv();
+    if (valid.value.secret && !kek) {
+      return { ok: false, errors: ["cannot store a secret: the site has no CMS_AUTH_SECRET configured"] };
+    }
+    const source = await createDataSource(valid.value.source, valid.value.secret, kek);
+    const requests: SafeDataSourceRequest[] = [];
+    for (const r of valid.value.requests) {
+      const created = await createDataSourceRequest(source.id, r);
+      if (created) requests.push(created);
+    }
+    return { ok: true, action: "created", ...formatSource(source, requests) };
+  } catch (err) {
+    return { ok: false, errors: [`failed to create data source: ${(err as Error).message}`] };
+  }
+}
+
+async function handleTestDataSource(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateTestDataSource(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  try {
+    const resolved = await resolveSourceAndRequest(valid.value.source, valid.value.request);
+    if (!resolved.ok) return { ok: false, errors: [resolved.error] };
+    const { source, request } = resolved;
+    const secret = source.hasSecret ? await decryptSourceSecret(source.id, await kekFromEnv()) : null;
+    const result = await fetchSource(
+      {
+        id: source.id,
+        baseUrl: source.baseUrl,
+        authType: source.authType as AuthType,
+        authParam: source.authParam,
+        secret,
+      },
+      {
+        id: request.id,
+        method: request.method as HttpMethod,
+        path: request.path,
+        query: request.query,
+        bodyTemplate: request.bodyTemplate,
+        cacheEnabled: false, // live test — never read/write the render cache
+        cacheTtlSec: request.cacheTtlSec,
+        retryable: request.retryable,
+      },
+      valid.value.params,
+      { cache: null },
+    );
+    if (!result.ok) {
+      return {
+        ok: false,
+        errors: [
+          `upstream request failed (status ${result.status ?? "none"}): ${result.error}. ` +
+            `Check the request's {placeholder} params and the source's auth config.`,
+        ],
+      };
+    }
+    // `paths` covers the FULL response; `data` is size-capped for the context.
+    return { ok: true, status: result.status, paths: samplePaths(result.data), data: sampleForModel(result.data) };
+  } catch (err) {
+    return { ok: false, errors: [`failed to test data source: ${(err as Error).message}`] };
+  }
+}
+
 // ── content-collections (Slice D): component↔collection BINDING tools ─────────
 // These mutate a PAGE's draft block tree (NOT a collection store): load the
 // blocks, find the target block, validate the binding against the registry + the
@@ -947,20 +1102,49 @@ async function handleBindComponent(args: unknown): Promise<Record<string, unknow
       return { ok: true, action: "cleared", page, block };
     }
 
-    const binding = {
-      source: { collection: valid.value.collection!, filter: valid.value.filter, sort: valid.value.sort },
-      map: valid.value.map!,
-    };
-    const fields = await collectionFields(valid.value.collection!);
-    if (fields === null) return { ok: false, errors: [await unknownCollectionMessage(valid.value.collection!)] };
-    const declared = await declaredProps(target.component);
-    const check = validateBinding(binding, fields, declared);
-    if (!check.ok) return { ok: false, errors: check.errors };
+    // external-data-sources Slice 6: `source`+`request` → an api-kind binding
+    // (map values are response dot-paths; only declared props are validatable).
+    let binding: BindingRef;
+    let boundTo: string;
+    if (valid.value.source) {
+      const resolved = await resolveSourceAndRequest(valid.value.source, valid.value.request!);
+      if (!resolved.ok) return { ok: false, errors: [resolved.error] };
+      binding = {
+        source: {
+          kind: "api",
+          sourceId: resolved.source.id,
+          requestId: resolved.request.id,
+          ...(valid.value.params ? { params: valid.value.params } : {}),
+        },
+        map: valid.value.map!,
+      };
+      boundTo = resolved.source.name;
+      const declared = await declaredProps(target.component);
+      const check = validateBinding(binding, null, declared);
+      if (!check.ok) return { ok: false, errors: check.errors };
+    } else {
+      binding = {
+        source: { collection: valid.value.collection!, filter: valid.value.filter, sort: valid.value.sort },
+        map: valid.value.map!,
+      };
+      boundTo = valid.value.collection!;
+      const fields = await collectionFields(valid.value.collection!);
+      if (fields === null) return { ok: false, errors: [await unknownCollectionMessage(valid.value.collection!)] };
+      const declared = await declaredProps(target.component);
+      const check = validateBinding(binding, fields, declared);
+      if (!check.ok) return { ok: false, errors: check.errors };
+    }
 
     const next = setBlockField(loaded.blocks, block, { bindings: { item: binding } });
     const res = await setDraftBlocks(page, next, loaded.meta);
     if (!res.ok) return { ok: false, errors: res.errors };
-    return { ok: true, action: "bound", page, block, collection: valid.value.collection };
+    return {
+      ok: true,
+      action: "bound",
+      page,
+      block,
+      ...(valid.value.source ? { source: boundTo } : { collection: boundTo }),
+    };
   } catch (err) {
     return { ok: false, errors: [`failed to bind component: ${(err as Error).message}`] };
   }
@@ -977,12 +1161,32 @@ async function handleCreateList(args: unknown): Promise<Record<string, unknown>>
     if (!sectionBlock) return { ok: false, errors: [`no block with id "${section}" on this page`] };
     if (!isSection(sectionBlock)) return { ok: false, errors: [`block "${section}" is not a Section (insert a Section first)`] };
 
-    const listSource = { collection, filter, sort, limit };
-    const fields = await collectionFields(collection);
-    if (fields === null) return { ok: false, errors: [await unknownCollectionMessage(collection)] };
+    // external-data-sources Slice 6: api rows (`source`+`request`) OR collection rows.
+    let listSource: ListSource;
+    let rowsFrom: string;
     const declared = await declaredProps(template);
-    const check = validateListBinding(listSource, map, fields, declared);
-    if (!check.ok) return { ok: false, errors: check.errors };
+    if (valid.value.source) {
+      const resolved = await resolveSourceAndRequest(valid.value.source, valid.value.request!);
+      if (!resolved.ok) return { ok: false, errors: [resolved.error] };
+      listSource = {
+        kind: "api",
+        sourceId: resolved.source.id,
+        requestId: resolved.request.id,
+        ...(valid.value.params ? { params: valid.value.params } : {}),
+        ...(valid.value.itemsPath ? { itemsPath: valid.value.itemsPath } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+      };
+      rowsFrom = resolved.source.name;
+      const check = validateListBinding(listSource, map, null, declared);
+      if (!check.ok) return { ok: false, errors: check.errors };
+    } else {
+      listSource = { collection: collection!, filter, sort, limit };
+      rowsFrom = collection!;
+      const fields = await collectionFields(collection!);
+      if (fields === null) return { ok: false, errors: [await unknownCollectionMessage(collection!)] };
+      const check = validateListBinding(listSource, map, fields, declared);
+      if (!check.ok) return { ok: false, errors: check.errors };
+    }
 
     // Insert the built-in List, then stamp its query/map + a template child.
     let next = addListToSection(loaded.blocks, section);
@@ -1001,7 +1205,14 @@ async function handleCreateList(args: unknown): Promise<Record<string, unknown>>
 
     const res = await setDraftBlocks(page, shape.blocks, loaded.meta);
     if (!res.ok) return { ok: false, errors: res.errors };
-    return { ok: true, action: "created", page, list: listId, collection, template };
+    return {
+      ok: true,
+      action: "created",
+      page,
+      list: listId,
+      template,
+      ...(valid.value.source ? { source: rowsFrom } : { collection: rowsFrom }),
+    };
   } catch (err) {
     return { ok: false, errors: [`failed to create list: ${(err as Error).message}`] };
   }
@@ -1018,16 +1229,47 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
     if (!listBlock) return { ok: false, errors: [`no block with id "${block}" on this page`] };
     if (!isList(listBlock)) return { ok: false, errors: [`block "${block}" is not a List`] };
 
-    // Merge the patch onto the existing config so partial updates work. Spreading
-    // prevSource first preserves any field the patch doesn't touch (presentation +
-    // combobox config included) — only explicitly-passed fields are overwritten.
-    const prevSource = listBlock.listSource ?? { collection: "" };
-    const collection = valid.value.collection ?? prevSource.collection;
-    if (!collection) return { ok: false, errors: ["this list has no collection yet — pass `collection`"] };
+    // Merge the patch onto the existing config so partial updates work. The row
+    // SOURCE kind is resolved first (external-data-sources Slice 6): an explicit
+    // `source`/`collection` switches kinds (dropping the other kind's query
+    // fields); otherwise the stored kind is kept and patched. Presentation +
+    // combobox config always survive — only explicitly-passed fields change.
     const v = valid.value;
-    const patch: Partial<typeof prevSource> = { collection };
-    if (v.filter !== undefined) patch.filter = v.filter;
-    if (v.sort !== undefined) patch.sort = v.sort;
+    const prevSource: ListSource = listBlock.listSource ?? { collection: "" };
+    const wantsApi = v.source !== undefined || (v.collection === undefined && prevSource.kind === "api");
+
+    let base: ListSource;
+    let rowsFrom: string;
+    if (wantsApi) {
+      let sourceId = prevSource.kind === "api" ? prevSource.sourceId : undefined;
+      let requestId = prevSource.kind === "api" ? prevSource.requestId : undefined;
+      rowsFrom = sourceId ?? "";
+      if (v.source) {
+        const resolved = await resolveSourceAndRequest(v.source, v.request!);
+        if (!resolved.ok) return { ok: false, errors: [resolved.error] };
+        sourceId = resolved.source.id;
+        requestId = resolved.request.id;
+        rowsFrom = resolved.source.name;
+      }
+      if (!sourceId || !requestId) {
+        return { ok: false, errors: ["this list has no row source yet — pass `collection`, or `source`+`request` for API rows"] };
+      }
+      const { collection: _c, filter: _f, sort: _s, ...keep } = prevSource;
+      base = { ...keep, kind: "api", sourceId, requestId };
+      if (v.params !== undefined) base.params = v.params;
+      if (v.itemsPath !== undefined) base.itemsPath = v.itemsPath;
+    } else {
+      const collection = v.collection ?? prevSource.collection;
+      if (!collection) return { ok: false, errors: ["this list has no collection yet — pass `collection`, or `source`+`request` for API rows"] };
+      // Collection lists persist NO kind field (legacy stored lists stay byte-identical).
+      const { kind: _k, sourceId: _si, requestId: _ri, params: _p, itemsPath: _ip, ...keep } = prevSource;
+      base = { ...keep, collection };
+      if (v.filter !== undefined) base.filter = v.filter;
+      if (v.sort !== undefined) base.sort = v.sort;
+      rowsFrom = collection;
+    }
+
+    const patch: Partial<ListSource> = {};
     if (v.limit !== undefined) patch.limit = v.limit;
     if (v.presentation !== undefined) patch.presentation = v.presentation;
     if (v.direction !== undefined) patch.direction = v.direction;
@@ -1048,7 +1290,7 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
     if (v.name !== undefined) patch.name = v.name;
     if (v.placeholder !== undefined) patch.placeholder = v.placeholder;
     if (v.searchPlaceholder !== undefined) patch.searchPlaceholder = v.searchPlaceholder;
-    const listSource = { ...prevSource, ...patch };
+    const listSource = { ...base, ...patch };
     const listMap = valid.value.map ?? listBlock.listMap ?? {};
 
     // Template: the existing template child's component, unless replacing it.
@@ -1056,10 +1298,15 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
     const template = valid.value.template ?? prevTpl?.component;
     if (!template) return { ok: false, errors: ["this list has no template yet — pass `template`"] };
 
-    const fields = await collectionFields(collection);
-    if (fields === null) return { ok: false, errors: [await unknownCollectionMessage(collection)] };
     const declared = await declaredProps(template);
-    const check = validateListBinding(listSource, listMap, fields, declared);
+    let check: { ok: true } | { ok: false; errors: string[] };
+    if (listSource.kind === "api") {
+      check = validateListBinding(listSource, listMap, null, declared);
+    } else {
+      const fields = await collectionFields(listSource.collection!);
+      if (fields === null) return { ok: false, errors: [await unknownCollectionMessage(listSource.collection!)] };
+      check = validateListBinding(listSource, listMap, fields, declared);
+    }
     if (!check.ok) return { ok: false, errors: check.errors };
 
     let next = setBlockField(loaded.blocks, block, { listSource, listMap });
@@ -1076,7 +1323,14 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
     if (!shape.ok) return { ok: false, errors: shape.errors };
     const res = await setDraftBlocks(page, shape.blocks, loaded.meta);
     if (!res.ok) return { ok: false, errors: res.errors };
-    return { ok: true, action: "bound", page, list: block, collection, template };
+    return {
+      ok: true,
+      action: "bound",
+      page,
+      list: block,
+      template,
+      ...(listSource.kind === "api" ? { source: rowsFrom } : { collection: rowsFrom }),
+    };
   } catch (err) {
     return { ok: false, errors: [`failed to bind list: ${(err as Error).message}`] };
   }
@@ -1238,6 +1492,9 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   edit_text: handleEditText,
   get_authoring_guide: handleGetAuthoringGuide,
   generate_image: handleGenerateImage,
+  list_data_sources: () => handleListDataSources(),
+  create_data_source: handleCreateDataSource,
+  test_data_source: handleTestDataSource,
 };
 
 /**
