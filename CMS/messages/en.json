@@ -178,7 +178,8 @@
     "google": "Google sign-in",
     "openrouterKey": "OpenRouter key",
     "media": "Media",
-    "iconSet": "Icons"
+    "iconSet": "Icons",
+    "exportImport": "Export / Import"
   },
   "theme": {
     "title": "Theme",
@@ -1140,5 +1141,37 @@
     "label": "Translation model",
     "hint": "This AI model translates page and component text into the site’s other languages.",
     "saved": "Saved"
+  },
+  "exportImport": {
+    "title": "Export / Import",
+    "subtitle": "Export this site's entire content database as a portable file, or import one to replace this site's content.",
+    "exportTitle": "Export",
+    "exportSubtitle": "Downloads a site-export.json file with pages, components, collections, settings, data sources, and prompt history. Gallery images are listed separately below — download them individually.",
+    "exportButton": "Export site",
+    "exporting": "Exporting…",
+    "exportDone": "Export ready — {count} gallery assets to download.",
+    "downloadAsset": "Download",
+    "importTitle": "Import",
+    "importSubtitle": "Replaces this site's ENTIRE content — pages, components, collections, settings, data sources — with the contents of an exported file. This cannot be undone.",
+    "pickFileLabel": "Choose a site-export.json file",
+    "badJson": "That file isn't valid JSON.",
+    "willDestroy": "Will be replaced on this site",
+    "willCreate": "Will be imported",
+    "collectionCapExceeded": "This import has more collections than the 100-table limit and cannot be executed.",
+    "secretsTitle": "Data sources needing a secret",
+    "secretsHint": "These data sources will import without their secret — re-enter it after import in Data sources.",
+    "pickAssetsLabel": "Gallery files to upload ({count} referenced by this export)",
+    "pickAssetsHint": "{picked} file(s) selected — select all the files you downloaded from the source site's export.",
+    "confirmLabel": "Type the site name to confirm —",
+    "blankSiteName": "(no site name set on the export — this import cannot be confirmed)",
+    "blankSiteNameError": "This export has no site name set, so it can't be confirmed or imported.",
+    "cancel": "Cancel",
+    "importButton": "Replace this site's content",
+    "importing": "Importing…",
+    "uploadingProgress": "Uploading gallery files… {done} / {total}",
+    "importSuccess": "Import complete.",
+    "uploadFailures": "{count} file(s) failed to upload",
+    "secretsReminder": "Remember to re-enter data source secrets in Data sources.",
+    "importAnother": "Import another file"
   }
 }

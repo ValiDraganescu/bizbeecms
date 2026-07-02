@@ -20,6 +20,7 @@ const TABS = [
   { key: "openrouterKey", href: "/admin/settings/openrouter-key" },
   { key: "media", href: "/admin/settings/media" },
   { key: "iconSet", href: "/admin/settings/icon-set" },
+  { key: "exportImport", href: "/admin/settings/export-import" },
 ] as const;
 
 export function SettingsNav() {

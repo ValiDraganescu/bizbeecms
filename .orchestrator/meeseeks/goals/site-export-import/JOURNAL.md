@@ -315,3 +315,106 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   "not in the restored asset table" error, no `Storage.put` call made.
 - **Files:** `CMS/src/app/api/site-import/asset/[...key]/route.ts` (new),
   `BACKLOG.md` (flipped this TODO to DONE), `JOURNAL.md`, `NEXT.md`.
+
+## 2026-07-02 19:39 — Admin UI: Settings → "Export / Import"
+- **Status:** DONE
+- **What I did:** Built the whole client-side orchestration UI per FORMAT.md
+  §4/§6/§7 and NEXT.md's suggested flow, driving the already-shipped API
+  surface with zero new server code:
+  - `CMS/src/app/admin/settings/export-import/page.tsx` — server component
+    shell (mirrors `theme`/`api-keys` pages: `SettingsNav` + header +
+    `getTranslations`), renders the client manager.
+  - `CMS/src/components/settings/export-import-manager.tsx` — the whole flow,
+    one `"use client"` component (matches the repo's existing pattern: one
+    manager component per Settings sub-page, e.g. `ApiKeysManager`,
+    `ThemeEditor`):
+    - **Export**: button → `GET /api/site-export` → client-side
+      `Blob`+`<a download>` triggers a `site-export-<name>-<ts>.json` file
+      save (no server changes — same envelope every prior task already
+      built). Below it, every `tables.asset[]` entry renders as a row with a
+      "Download" link that fetches `GET /api/site-export/asset/<key>` client-
+      side and triggers its own `<a download>` — chose this over a
+      client-side zip (no zip lib installed; FORMAT.md §4 explicitly reasoned
+      against bundling into one blob) — "one export" stays ONE primary click
+      (the JSON), with assets individually available right below rather than
+      a second required step.
+    - **Import**: file `<input>` (JSON only) → `pickFile` reads+parses text
+      client-side (bad JSON caught before ever POSTing) → `POST
+      /api/site-import/validate` with the raw parsed body (route expects the
+      artifact directly, NOT wrapped) → renders the dry-run report
+      (`willDestroy`/`willCreate` side-by-side, `collectionCapOk`-derived hard
+      warning that also disables the confirm button, `warnings[]`,
+      `secretsToReenter[]` with a re-entry hint) → a `<input multiple>` file
+      picker for the gallery assets the user separately downloaded from the
+      SOURCE site's export screen → a typed-confirmation text input that
+      must equal `artifact.meta.siteName` EXACTLY (case-sensitive, per
+      `checkConfirmation`'s contract from Import execute) — **a blank
+      `meta.siteName` disables the input entirely and shows a named error**,
+      matching the route's own "blank siteName can never be confirmed"
+      refusal (verified live: the real tableonline site currently has NO
+      `site_identity` row, so this exact path is what a real operator hits
+      today, not just a theoretical case) → `POST /api/site-import` with
+      `{artifact, confirm}` (matches `planImport`'s exact body shape) → on
+      success, sequentially uploads every key in the response's
+      `assetKeysToUpload` via `POST /api/site-import/asset/<key>` with the
+      raw file bytes (`file.arrayBuffer()` as the body, matching the route's
+      `request.arrayBuffer()` read), matching picked files by exact filename
+      first then by the key's final path segment as a fallback (asset keys
+      are `assets/<slug>_<ts>_<hash>.<ext>`, filenames are the original
+      upload name) → progress counter (`done`/`total`) → final report
+      (restored counts, any upload failures named, a secrets-re-entry
+      reminder if applicable, "import another file" reset).
+  - `CMS/src/components/settings/settings-nav.tsx` — added the `exportImport`
+    tab (`/admin/settings/export-import`), same pattern as every other tab.
+  - `CMS/messages/{en,fi,et}.json` — added `exportImport.*` (28 keys) +
+    `settingsNav.exportImport` to all 3 locales via one Python script (kept
+    them in sync, avoided a partial-locale gap).
+- **Design decisions not pinned by FORMAT.md/NEXT.md, made this run:**
+  - No `t.rich()` — the repo has zero prior `t.rich` usage anywhere, so kept
+    the confirm-label copy as plain `t()` + a separate `<strong>` for the
+    site name instead of introducing a new next-intl pattern for one label.
+  - Asset upload matching is by-filename (exact) then by-key-tail (fallback)
+    since the export UI's per-asset download uses the ORIGINAL `filename`
+    (not the storage `key`) as the saved file's name — an operator re-picking
+    those exact downloaded files in the import step will match by filename;
+    the key-tail fallback covers a user who renames/re-selects differently.
+  - Collection-cap-exceeded (`collectionCapOk:false`) additionally disables
+    the execute button client-side (not just a red warning banner) — the
+    route hard-blocks it anyway (Import execute's CAVEATS-documented
+    warning-vs-hard-fail split: warn in validate, hard-block in execute), so
+    surfacing the eventual failure at the confirm-button level avoids a
+    guaranteed-to-fail POST.
+- **Verified:** `npx tsc --noEmit` clean. `npm test` — 1500/1500 pass
+  (no new pure logic here — this is UI orchestration calling already-tested
+  server logic, matches the repo convention of no test file for thin/UI-only
+  components, e.g. `ApiKeysManager` has none either). Live-verified against
+  the running `:3602` dev server (already up, did NOT run `opennextjs-
+  cloudflare build`): (1) `GET /admin/settings/export-import` → `200`, page
+  renders with the new nav tab + both sections' copy; (2) curl-simulated the
+  EXACT fetch calls my client code makes — `GET /api/site-export` (real
+  envelope, `siteName:""` confirming the blank-name UI path is real, not
+  theoretical), `GET /api/site-export/asset/<key>` with a `/`-containing key
+  exactly as my template string builds it (200, correct bytes) confirming the
+  catch-all route resolves my URL construction correctly, `POST
+  /api/site-import/validate` with the raw unwrapped artifact body (matches
+  `pickFile`'s fetch) → `ok:true` dry-run report shape matches my
+  `DryRunReport` interface field-for-field; (3) full destructive round-trip:
+  patched the artifact's `meta.siteName` to a test value, POSTed `{artifact,
+  confirm}` to `/api/site-import` (exact body shape `runImport` sends) →
+  `{"ok":true,"restored":{...},"assetKeysToUpload":[...]}` — response shape
+  matches my `ImportResult` interface exactly, then confirmed
+  `GET /` still renders `200` post-import (same-instance smoke test, the
+  documented-safe pattern from the Import-execute task's own JOURNAL entry).
+  No `.claude-in-chrome` browser tools were available in this run's toolset
+  (not granted to this Meeseeks instance) — verification was via the exact
+  same HTTP calls the client issues rather than clicking through Chrome;
+  every fetch URL/body/response-shape the component depends on was checked
+  against the real live server, not just against route source code.
+- **Not built this run**: the E2E/HITL cross-instance slice (BACKLOG's last
+  remaining TODO) — that needs a genuinely SECOND CMS instance (scratch local
+  D1 or `bizbeecms-cms-test-1`), out of scope for this UI task.
+- **Files:** `CMS/src/app/admin/settings/export-import/page.tsx` (new),
+  `CMS/src/components/settings/export-import-manager.tsx` (new),
+  `CMS/src/components/settings/settings-nav.tsx`, `CMS/messages/en.json`,
+  `CMS/messages/fi.json`, `CMS/messages/et.json`, `BACKLOG.md` (flipped
+  "Admin UI" TODO to DONE), `JOURNAL.md`, `NEXT.md`.

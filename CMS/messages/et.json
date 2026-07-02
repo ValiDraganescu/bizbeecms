@@ -178,7 +178,8 @@
     "google": "Google'i sisselogimine",
     "openrouterKey": "OpenRouteri võti",
     "media": "Meedia",
-    "iconSet": "Ikoonid"
+    "iconSet": "Ikoonid",
+    "exportImport": "Eksport / Import"
   },
   "theme": {
     "title": "Teema",
@@ -1140,5 +1141,37 @@
     "label": "Tõlkemudel",
     "hint": "See AI-mudel tõlgib lehtede ja komponentide teksti saidi teistesse keeltesse.",
     "saved": "Salvestatud"
+  },
+  "exportImport": {
+    "title": "Eksport / Import",
+    "subtitle": "Ekspordi selle saidi kogu sisuandmebaas teisaldatava failina või impordi see, et asendada saidi sisu.",
+    "exportTitle": "Eksport",
+    "exportSubtitle": "Laadib alla site-export.json faili lehtede, komponentide, kogumike, seadete, andmeallikate ja viipade ajalooga. Galerii pildid on loetletud eraldi allpool — laadi need alla ükshaaval.",
+    "exportButton": "Ekspordi sait",
+    "exporting": "Eksporditakse…",
+    "exportDone": "Eksport valmis — {count} galerii faili allalaadimiseks.",
+    "downloadAsset": "Laadi alla",
+    "importTitle": "Import",
+    "importSubtitle": "Asendab selle saidi KOGU sisu — lehed, komponendid, kogumikud, seaded, andmeallikad — eksporditud faili sisuga. Seda ei saa tagasi võtta.",
+    "pickFileLabel": "Vali site-export.json fail",
+    "badJson": "See fail ei ole kehtiv JSON.",
+    "willDestroy": "Asendatakse sellel saidil",
+    "willCreate": "Imporditakse",
+    "collectionCapExceeded": "Selles impordis on rohkem kogumikke kui 100-tabeli piirang lubab ja seda ei saa käivitada.",
+    "secretsTitle": "Andmeallikad, mis vajavad saladust",
+    "secretsHint": "Need andmeallikad imporditakse ilma saladuseta — sisesta see pärast importi uuesti lehel Andmeallikad.",
+    "pickAssetsLabel": "Üleslaaditavad galerii failid ({count} viidatud selles ekspordis)",
+    "pickAssetsHint": "{picked} fail(i) valitud — vali kõik failid, mille laadisid alla lähtesaidi ekspordist.",
+    "confirmLabel": "Kinnitamiseks sisesta saidi nimi —",
+    "blankSiteName": "(ekspordil ei ole saidi nime seatud — seda importi ei saa kinnitada)",
+    "blankSiteNameError": "Sellel ekspordil pole saidi nime, seega ei saa seda kinnitada ega importida.",
+    "cancel": "Tühista",
+    "importButton": "Asenda selle saidi sisu",
+    "importing": "Imporditakse…",
+    "uploadingProgress": "Laaditakse galerii faile… {done} / {total}",
+    "importSuccess": "Import valmis.",
+    "uploadFailures": "{count} faili üleslaadimine ebaõnnestus",
+    "secretsReminder": "Ära unusta andmeallikate saladusi lehel Andmeallikad uuesti sisestada.",
+    "importAnother": "Impordi teine fail"
   }
 }

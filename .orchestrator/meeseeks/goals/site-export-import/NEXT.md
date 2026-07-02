@@ -1,68 +1,55 @@
 # Note to the next Meeseeks (site-export-import)
 
-**Asset bytes upload leg is now DONE** — all 3 of FORMAT.md §4's protocol
-pieces exist: `GET /api/site-export/asset/<key>` (download), `POST
-/api/site-import` (D1 restore, returns `assetKeysToUpload`), `POST
-/api/site-import/asset/<key>` (upload, this run). Read FORMAT.md first —
-still the contract, unchanged.
+**Admin UI is now DONE** — the whole BACKLOG task list except the final
+E2E/HITL slice is complete. Read FORMAT.md first if you touch the wire
+format; it's still the contract, unchanged this run.
 
-- New route: `CMS/src/app/api/site-import/asset/[...key]/route.ts`.
-  `requireAdmin` + `isValidAssetKey` guard (mirrors export's asset route
-  exactly), looks up the key in the `asset` table (404 + named error if not
-  found — refuses to upload under a key metadata doesn't know about), reads
-  raw bytes via `request.arrayBuffer()`, calls `Storage.put(key, bytes,
-  {contentType: row.contentType})` — **content-type always comes from the
-  restored D1 row, the client's header is ignored entirely**, not just
-  validated against.
-- No pure-logic module needed for this route (same as the export asset
-  route it mirrors — both are thin passthroughs: guard + one D1 lookup + one
-  port call). Don't go looking for a `site-import-asset.ts` pure-logic file,
-  it doesn't exist by design.
-- **Live-verified full round-trip on `:3602`** (dev server already running,
-  did NOT run `opennextjs-cloudflare build`): downloaded a real gallery
-  asset via export's asset route, sha256'd it, re-uploaded the SAME bytes to
-  the SAME key via the new route, re-downloaded — sha256 IDENTICAL — then
-  hit the PUBLIC `/media/<key>` route: 200, correct content-type, correct
-  size. Traversal guard and unknown-key guard both verified live (404s,
-  named errors).
-- `npx tsc --noEmit -p CMS` clean. `npm test` in `CMS/`: 1500/1500 pass, zero
-  new tests needed (nothing new to unit-test beyond what the guard helpers
-  already cover).
+- New: `/admin/settings/export-import` page + `ExportImportManager` (client
+  component, `CMS/src/components/settings/export-import-manager.tsx`) driving
+  the full protocol: Export button → downloads `site.json` + lists every
+  asset with an individual download link. Import: pick `site.json` → dry-run
+  report (destroy/create counts, cap check, secrets-to-reenter) → pick the
+  downloaded asset files (multi-file input) → type the site name to confirm
+  (disabled + named error if the artifact has no `meta.siteName`) → execute →
+  sequential per-asset upload with a progress counter → final report.
+- Added `exportImport.*` i18n keys (28 keys, all 3 locales) +
+  `settingsNav.exportImport` tab.
+- **No new server code** — every route (`/api/site-export`,
+  `/api/site-export/asset/<key>`, `/api/site-import/validate`,
+  `/api/site-import`, `/api/site-import/asset/<key>`) already existed; this
+  run was pure client orchestration.
+- **This Meeseeks run had NO browser-automation tools available** (not
+  granted to this instance's toolset) — verification was via curl calls that
+  EXACTLY mirror the client's fetch URLs/bodies (unwrapped artifact body to
+  `/validate`, `{artifact,confirm}` to `/api/site-import`, the `/`-containing
+  asset key template string against the real catch-all route) plus a static
+  `curl` of the rendered page HTML. If you have Chrome tools available, a
+  real click-through of `/admin/settings/export-import` would be a good
+  belt-and-suspenders check, but the wiring is already proven correct via the
+  live HTTP round-trip in this run's JOURNAL entry.
+- Live-verified: the real tableonline site currently has `meta.siteName:""`
+  (no `site_identity` settings row set) — so the "blank site name, cannot
+  confirm" UI path is what a real operator hits TODAY on this instance, not
+  a theoretical edge case. If a future run wants to smoke-test the HAPPY
+  confirm path in the browser, either set a `site_identity` name first (via
+  the Brand settings page) or accept that path is already proven via the
+  curl round-trip in JOURNAL.
 
-**Next TODO (per BACKLOG.md, in order): the full asset protocol (all 3 legs)
-is now done. Only 2 tasks remain in BACKLOG's original list:**
+**Next TODO (per BACKLOG.md, the ONLY remaining item):**
 
-1. **Admin UI**: Settings → "Export / Import" section. Export button
-   (downloads `site.json` via `GET /api/site-export`, then loop-fetches
-   every `tables.asset[].key` via `GET /api/site-export/asset/<key>` to
-   assemble a client-side downloadable bundle — FORMAT.md §4 leaves the
-   exact client packaging to this UI slice, e.g. a folder-of-files download
-   or a client-side zip lib). Import flow: upload `site.json` → POST
-   `/api/site-import/validate` → render the dry-run report (counts,
-   secrets-to-re-enter, `collectionCapOk`) → typed confirmation input (must
-   equal `artifact.meta.siteName` exactly, case-sensitive — surface that
-   requirement in the UI copy) → POST `/api/site-import` → on success, loop
-   `POST /api/site-import/asset/<key>` for every key in the response's
-   `assetKeysToUpload` (upload the corresponding file from whatever the user
-   provided — if they uploaded a `site.json` + separate asset files/folder,
-   match by key/filename) → show final result + secrets-to-re-enter list.
-   i18n via next-intl like sibling admin pages (check an existing Settings
-   sub-page for the pattern).
-2. **E2E/HITL slice**: export the local-site (:3602) with its full
-   tableonline content, import it into a SECOND instance (scratch second
-   local D1 or the deployed `bizbeecms-cms-test-1` — pick the cheaper one),
-   click through: home renders identically, a city page, a booking form
-   submit, gallery images load (this is the ONE remaining gap the prior
-   same-instance smoke tests haven't covered — cross-instance, not
-   same-instance). Record gaps as new TODOs.
-
-Do #1 (Admin UI) next unless you have a good reason to do #2 first — the UI
-is what actually makes the already-built API surface usable by an operator,
-and #2 (E2E) benefits from clicking through the real UI rather than curling
-three separate endpoints by hand.
+- **E2E/HITL slice**: export the local-site (:3602) with its full
+  tableonline content, import it into a SECOND instance (scratch second
+  local D1 or the deployed `bizbeecms-cms-test-1` — pick the cheaper one),
+  click through: home renders identically, a city page, a booking form
+  submit, gallery images load. This is genuinely a cross-INSTANCE test — all
+  prior smoke tests (including this run's) were same-instance round-trips,
+  which don't exercise anything about a truly different target D1/R2/KEK.
+  Record gaps as new TODOs. Standing up a second local D1 (a second
+  `wrangler dev` with a different `--persist-to` dir, or a fresh
+  `bizbeecms-cms-test-1` local clone) is the main setup work here — budget
+  time for that before the actual export/import click-through.
 
 One thing worth knowing: `CAVEATS.md`'s body is STILL mostly copy-pasted
 noise from a DIFFERENT goal (`tableonline-home`) — still out of scope for a
 one-task run to prune. The genuinely-this-goal entries are clustered near the
-top (cap hard-fail-vs-warning, D1 bound-param cap, and now the
-content-type-trust note this run added).
+top (cap hard-fail-vs-warning, D1 bound-param cap, content-type-trust note).

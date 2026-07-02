@@ -178,7 +178,8 @@
     "google": "Google-kirjautuminen",
     "openrouterKey": "OpenRouter-avain",
     "media": "Media",
-    "iconSet": "Kuvakkeet"
+    "iconSet": "Kuvakkeet",
+    "exportImport": "Vienti / Tuonti"
   },
   "theme": {
     "title": "Teema",
@@ -1140,5 +1141,37 @@
     "label": "Käännösmalli",
     "hint": "Tämä tekoälymalli kääntää sivujen ja komponenttien tekstit sivuston muille kielille.",
     "saved": "Tallennettu"
+  },
+  "exportImport": {
+    "title": "Vienti / Tuonti",
+    "subtitle": "Vie tämän sivuston koko sisältötietokanta siirrettävänä tiedostona tai tuo sellainen korvaamaan tämän sivuston sisältö.",
+    "exportTitle": "Vienti",
+    "exportSubtitle": "Lataa site-export.json-tiedoston, jossa on sivut, komponentit, kokoelmat, asetukset, datalähteet ja kehotehistoria. Galleriakuvat on lueteltu erikseen alla — lataa ne yksitellen.",
+    "exportButton": "Vie sivusto",
+    "exporting": "Viedään…",
+    "exportDone": "Vienti valmis — {count} galleriakuvaa ladattavana.",
+    "downloadAsset": "Lataa",
+    "importTitle": "Tuonti",
+    "importSubtitle": "Korvaa tämän sivuston KOKO sisällön — sivut, komponentit, kokoelmat, asetukset, datalähteet — viedyn tiedoston sisällöllä. Tätä ei voi perua.",
+    "pickFileLabel": "Valitse site-export.json-tiedosto",
+    "badJson": "Tiedosto ei ole kelvollista JSON:ia.",
+    "willDestroy": "Korvataan tällä sivustolla",
+    "willCreate": "Tuodaan",
+    "collectionCapExceeded": "Tässä tuonnissa on enemmän kokoelmia kuin 100 taulun raja sallii, eikä sitä voida suorittaa.",
+    "secretsTitle": "Datalähteet, jotka tarvitsevat salaisuuden",
+    "secretsHint": "Nämä datalähteet tuodaan ilman salaisuutta — syötä se uudelleen tuonnin jälkeen Datalähteet-sivulla.",
+    "pickAssetsLabel": "Ladattavat galleriatiedostot ({count} viitattu tässä viennissä)",
+    "pickAssetsHint": "{picked} tiedosto(a) valittu — valitse kaikki tiedostot, jotka latasit lähdesivuston viennistä.",
+    "confirmLabel": "Vahvista kirjoittamalla sivuston nimi —",
+    "blankSiteName": "(viennissä ei ole asetettua sivuston nimeä — tätä tuontia ei voi vahvistaa)",
+    "blankSiteNameError": "Tässä viennissä ei ole sivuston nimeä, joten sitä ei voi vahvistaa tai tuoda.",
+    "cancel": "Peruuta",
+    "importButton": "Korvaa tämän sivuston sisältö",
+    "importing": "Tuodaan…",
+    "uploadingProgress": "Ladataan galleriatiedostoja… {done} / {total}",
+    "importSuccess": "Tuonti valmis.",
+    "uploadFailures": "{count} tiedoston lataus epäonnistui",
+    "secretsReminder": "Muista syöttää datalähteiden salaisuudet uudelleen Datalähteet-sivulla.",
+    "importAnother": "Tuo toinen tiedosto"
   }
 }
