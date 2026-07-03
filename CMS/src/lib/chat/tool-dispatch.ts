@@ -141,6 +141,8 @@ import { withWhiteBackgroundInstruction } from "./cutout";
 import { removeBackgroundFromPng } from "./png-cutout";
 import { describeImage } from "./describe-image";
 import { applyEdit } from "./apply-edit";
+import { reconcileComponentClasses } from "./reconcile-classes";
+import { lintComponentScript } from "./lint-component-script";
 import {
   validateBlocks,
   topLevelBlockIds,
@@ -290,9 +292,26 @@ export function allToolSchemas(): unknown[] {
 async function handleCreateComponent(args: unknown): Promise<Record<string, unknown>> {
   const valid = validateComponentArtifact(args);
   if (!valid.ok) return { ok: false, errors: valid.errors };
+  // The script is being authored HERE, so script↔markup findings block: a
+  // static selector matching nothing this component renders/builds is either
+  // a cross-component reach or dead code — both fixable by the model now.
+  const scriptFindings = lintComponentScript(valid.artifact.tree, valid.artifact.script);
+  if (scriptFindings.length > 0) return { ok: false, errors: scriptFindings };
   try {
     const res = await upsertComponent(valid.artifact);
-    return { ok: true, action: res.action, component: res.name };
+    // Quality nits (unknown html classes, dead css rules) ride back as
+    // non-blocking warnings so the model can clean up in its next call.
+    const warnings = await reconcileComponentClasses(
+      valid.artifact.tree,
+      valid.artifact.css,
+      valid.artifact.script,
+    );
+    return {
+      ok: true,
+      action: res.action,
+      component: res.name,
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
   } catch (err) {
     return { ok: false, errors: [`failed to save component: ${(err as Error).message}`] };
   }
@@ -609,9 +628,22 @@ async function handleGenerateImage(args: unknown): Promise<Record<string, unknow
 async function handleUpdateComponent(args: unknown): Promise<Record<string, unknown>> {
   const valid = validateComponentArtifact(args);
   if (!valid.ok) return { ok: false, errors: valid.errors };
+  // Full re-author = the model owns the whole script; findings block (see create).
+  const scriptFindings = lintComponentScript(valid.artifact.tree, valid.artifact.script);
+  if (scriptFindings.length > 0) return { ok: false, errors: scriptFindings };
   try {
     const res = await upsertComponent(valid.artifact);
-    return { ok: true, action: res.action, component: res.name };
+    const warnings = await reconcileComponentClasses(
+      valid.artifact.tree,
+      valid.artifact.css,
+      valid.artifact.script,
+    );
+    return {
+      ok: true,
+      action: res.action,
+      component: res.name,
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
   } catch (err) {
     return { ok: false, errors: [`failed to save component: ${(err as Error).message}`] };
   }
@@ -1627,35 +1659,68 @@ async function handleEditText(args: unknown): Promise<Record<string, unknown>> {
   const { target, selector, oldString, newString, replaceAll } = valid;
 
   try {
-    if (target === "component.script" || target === "component.css") {
-      // Edit the DRAFT base (preferDraft) so a script/css tweak stacks on the
-      // pending draft instead of reverting to live; upsertComponent re-drafts it.
+    if (target === "component.html" || target === "component.script" || target === "component.css") {
+      // Edit the DRAFT base (preferDraft) so a tweak stacks on the pending
+      // draft instead of reverting to live; upsertComponent re-drafts it.
       const row = await getComponentByName(selector, true);
       if (!row) return { ok: false, errors: [`no component named "${selector}"`] };
-      const field = target === "component.script" ? "script" : "css";
-      const current = (row[field] as string) ?? "";
-      const edit = applyEdit(current, oldString, newString, replaceAll);
-      if (!edit.ok) return { ok: false, errors: [edit.error] };
-
-      // Re-pass the FULL artifact through the same validate gate as create/update.
-      // This edit only touches script/css; the markup is unchanged — re-serialize
-      // the stored tree back to html (the gate's input shape) so it round-trips.
+      // The edit base for html is the SAME serialization get_component shows the
+      // model (treeToHtml of the stored tree), so its oldString quotes match.
       let tree: TreeNode;
       try {
         tree = JSON.parse(row.tree as string) as TreeNode;
       } catch {
         return { ok: false, errors: ["stored component markup is not valid; use update_component"] };
       }
+      const storedHtml = treeToHtml(tree);
+      const field = target === "component.html" ? "html" : target === "component.script" ? "script" : "css";
+      const current =
+        field === "html" ? storedHtml
+        : field === "script" ? ((row.script as string) ?? "")
+        : ((row.css as string) ?? "");
+      const edit = applyEdit(current, oldString, newString, replaceAll);
+      if (!edit.ok) return { ok: false, errors: [edit.error] };
+
+      // Re-pass the FULL artifact through the same validate gate as create/update
+      // — an html patch re-runs the strict lint (tag balance, slot syntax). For
+      // html edits the STORED propsSchema rides along so the slot↔schema
+      // cross-check runs too (only for html: a script/css tweak must not be
+      // blocked by a pre-existing slot issue in untouched markup).
       const artifact = {
         name: row.name,
-        html: treeToHtml(tree),
+        html: field === "html" ? edit.content : storedHtml,
         script: field === "script" ? edit.content : ((row.script as string) ?? ""),
         css: field === "css" ? edit.content : ((row.css as string) ?? ""),
+        ...(field === "html" && row.propsSchema ? { propsSchema: row.propsSchema as string } : {}),
       };
       const checked = validateComponentArtifact(artifact);
       if (!checked.ok) return { ok: false, errors: checked.errors };
+      // Script↔markup lint: BLOCKS when the script itself is being edited (the
+      // model is authoring it now); rides as a warning on html/css edits — a
+      // pre-existing script nit must not block an unrelated text tweak, but an
+      // html edit that removes a hook the script queries should be surfaced.
+      const scriptFindings = lintComponentScript(checked.artifact.tree, checked.artifact.script);
+      if (field === "script" && scriptFindings.length > 0) {
+        return { ok: false, errors: scriptFindings };
+      }
       const res = await upsertComponent(checked.artifact);
-      return { ok: true, action: "edited", target, component: res.name, replacements: edit.replacements, matcher: edit.matcher };
+      const warnings = [
+        ...(field === "script" ? [] : scriptFindings),
+        ...(await reconcileComponentClasses(
+          checked.artifact.tree,
+          checked.artifact.css,
+          checked.artifact.script,
+        )),
+      ];
+      return {
+        ok: true,
+        action: "edited",
+        target,
+        component: res.name,
+        replacements: edit.replacements,
+        matcher: edit.matcher,
+        ...(warnings.length > 0 ? { warnings } : {}),
+      };
     }
 
     // prompt.prompt

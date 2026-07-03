@@ -18,6 +18,7 @@ import { isImageProp, isLinkProp, isLongText, type PropField } from "@/lib/pages
 import { ImagePicker } from "./image-picker";
 import { IconPicker } from "./icon-picker";
 import { LinkInput } from "./link-input";
+import { NumberInput } from "@/components/ui/number-input";
 
 const label = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
 const input =
@@ -112,13 +113,12 @@ export function PropFieldInput({
           onChange={(e) => onValue(e.target.value)}
         />
       ) : f.type === "number" ? (
-        <input
-          type="number"
+        <NumberInput
           className={input}
-          value={typeof raw === "number" ? raw : f.default}
+          value={typeof raw === "number" ? raw : undefined}
           placeholder={f.default}
-          aria-label={labelText}
-          onChange={(e) => onValue(e.target.value === "" ? "" : Number(e.target.value))}
+          ariaLabel={labelText}
+          onValue={(v) => onValue(v ?? "")}
         />
       ) : f.type === "richtext" || isLongText(f.default) || isLongText(raw) ? (
         // Textarea for richtext, or any string prop whose default/value is long.

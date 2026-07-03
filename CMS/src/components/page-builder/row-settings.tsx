@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import type { Block } from "@/lib/render/tree";
+import { UnitNumberInput, type SizeUnit } from "./shared";
 
 /**
  * Per-ROW settings panel (right-rail Block tab when a `__section_row__` is
@@ -95,14 +96,14 @@ export function RowSettings({
       </div>
 
       {/* Column gap */}
-      <label className="flex flex-col gap-1.5">
+      <label className="flex w-24 flex-col gap-1.5">
         <span className={label}>{t("sectionGap")}</span>
-        <input
-          type="number"
-          min={0}
+        <UnitNumberInput
           value={num(p.gap, 16)}
-          onChange={(e) => onChange({ gap: +e.target.value })}
-          className="w-24 rounded-md border border-border bg-surface px-2 py-1 text-sm text-foreground outline-none"
+          unit={s(p.gapUnit, "px") as SizeUnit}
+          onValue={(v) => onChange({ gap: v ?? 0 })}
+          onUnit={(u) => onChange({ gapUnit: u })}
+          ariaLabel={t("sectionGap")}
         />
       </label>
 
@@ -110,34 +111,20 @@ export function RowSettings({
       <div className="flex flex-col gap-1.5">
         <span className={label}>{t("sectionPadding")}</span>
         <div className="grid grid-cols-2 gap-2">
-          {sides.map((side) => {
-            const unit = s(p[`padding${side}Unit`], "rem");
-            return (
-              <label key={side} className="flex flex-col gap-1">
-                <span className="text-[11px] text-foreground-muted">
-                  {t(`sectionSide.${side.toLowerCase()}`)}
-                </span>
-                <div className="flex items-stretch overflow-hidden rounded-md border border-border">
-                  <input
-                    type="number"
-                    min={0}
-                    value={num(p[`padding${side}`], 0)}
-                    onChange={(e) => onChange({ [`padding${side}`]: +e.target.value })}
-                    className="w-full bg-surface px-2 py-1 text-sm text-foreground outline-none"
-                    aria-label={`padding ${side}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onChange({ [`padding${side}Unit`]: unit === "rem" ? "px" : "rem" })}
-                    className="border-l border-border bg-surface-muted px-2 text-xs text-foreground-muted hover:text-foreground"
-                    aria-label={`padding ${side} unit: ${unit}`}
-                  >
-                    {unit}
-                  </button>
-                </div>
-              </label>
-            );
-          })}
+          {sides.map((side) => (
+            <label key={side} className="flex flex-col gap-1">
+              <span className="text-[11px] text-foreground-muted">
+                {t(`sectionSide.${side.toLowerCase()}`)}
+              </span>
+              <UnitNumberInput
+                value={num(p[`padding${side}`], 0)}
+                unit={s(p[`padding${side}Unit`], "rem") as SizeUnit}
+                onValue={(v) => onChange({ [`padding${side}`]: v ?? 0 })}
+                onUnit={(u) => onChange({ [`padding${side}Unit`]: u })}
+                ariaLabel={`padding ${side}`}
+              />
+            </label>
+          ))}
         </div>
       </div>
 

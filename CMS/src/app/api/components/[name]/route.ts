@@ -16,6 +16,8 @@
  */
 import { requireAdmin } from "@/lib/auth/guard";
 import { validateComponentArtifact } from "@/lib/chat/component-tool";
+import { reconcileComponentClasses } from "@/lib/chat/reconcile-classes";
+import { lintComponentScript } from "@/lib/chat/lint-component-script";
 import {
   upsertComponent,
   publishComponentDraft,
@@ -60,7 +62,21 @@ export async function PUT(
 
   try {
     const res = await upsertComponent(valid.artifact);
-    return Response.json({ action: res.action, name: res.name });
+    // Non-blocking quality nits (unknown html classes, dead css rules,
+    // script selectors that match nothing) — advisory for the human editor.
+    const warnings = [
+      ...lintComponentScript(valid.artifact.tree, valid.artifact.script),
+      ...(await reconcileComponentClasses(
+        valid.artifact.tree,
+        valid.artifact.css,
+        valid.artifact.script,
+      )),
+    ];
+    return Response.json({
+      action: res.action,
+      name: res.name,
+      ...(warnings.length > 0 ? { warnings } : {}),
+    });
   } catch (err) {
     return Response.json(
       { error: `failed to save: ${(err as Error).message}` },

@@ -243,6 +243,20 @@ test("validateBlockProps: reserved layout prop `width` survives schema validatio
   assert.equal("width" in validateBlockProps({ width: "weird" }, schema), false);
 });
 
+test("validateBlockProps: reserved spacing props (padding/margin + unit) survive", () => {
+  const schema = parsePropsSchema(JSON.stringify({ title: { type: "string" } }));
+  const out = validateBlockProps(
+    { title: "Hi", paddingTop: 2, marginBottom: 4, marginBottomUnit: "px", paddingTopUnit: "em" },
+    schema,
+  );
+  assert.equal(out.paddingTop, 2);
+  assert.equal(out.marginBottom, 4);
+  assert.equal(out.marginBottomUnit, "px");
+  // Only rem/px units pass through; numbers must be finite.
+  assert.equal("paddingTopUnit" in out, false);
+  assert.equal("marginLeft" in validateBlockProps({ marginLeft: "big" }, schema), false);
+});
+
 test("validateBlockProps: legacy Set allowlist still works (no coercion)", () => {
   const out = validateBlockProps({ a: "x", b: "", c: 3 }, new Set(["a", "c"]));
   assert.deepEqual(out, { a: "x", c: 3 }); // b undeclared+empty dropped, c untouched

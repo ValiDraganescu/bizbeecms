@@ -53,3 +53,30 @@ test("width:auto wraps to content", () => {
 test("an unknown width value falls back to fill", () => {
   assert.deepEqual(wrapEl({ width: "weird" }).props.style, { width: "100%", alignSelf: "stretch" });
 });
+
+// --- per-block spacing (standard padding/margin controls on every block) ---
+
+test("padding/margin sides emit only when set, rem default, per-side unit", () => {
+  assert.deepEqual(wrapEl({ paddingTop: 2, marginBottom: 4, marginBottomUnit: "px" }).props.style, {
+    width: "100%",
+    alignSelf: "stretch",
+    paddingTop: "2rem",
+    marginBottom: "4px",
+  });
+});
+
+test("a horizontal margin on a fill block drops width:100% (stretch subtracts margins)", () => {
+  assert.deepEqual(wrapEl({ marginLeft: 1 }).props.style, {
+    alignSelf: "stretch",
+    marginLeft: "1rem",
+  });
+});
+
+test("spacing applies to width:auto blocks too", () => {
+  assert.deepEqual(wrapEl({ width: "auto", paddingLeft: 8, paddingLeftUnit: "px" }).props.style, {
+    width: "auto",
+    maxWidth: "100%",
+    alignSelf: "auto",
+    paddingLeft: "8px",
+  });
+});

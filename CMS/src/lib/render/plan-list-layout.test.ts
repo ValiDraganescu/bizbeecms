@@ -82,6 +82,16 @@ test("gap applies in px on every direction", () => {
   );
 });
 
+test("gapUnit/maxSizeUnit honor rem; absent units stay px (legacy)", () => {
+  const s = style(planList(listBlock({ gap: 2, gapUnit: "rem", maxSize: 30, maxSizeUnit: "rem" }), planBlock));
+  assert.equal(s.gap, "2rem");
+  assert.equal(s.maxHeight, "30rem");
+  const h = style(
+    planList(listBlock({ direction: "horizontal", maxSize: 40, maxSizeUnit: "rem" }), planBlock),
+  );
+  assert.equal(h.maxWidth, "40rem");
+});
+
 test("responsive grid → per-breakpoint column vars + the grid class", () => {
   const p = el(
     planList(

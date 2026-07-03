@@ -3,7 +3,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Bugs
 (human-reported bugs land here, newest at top; they outrank everything)
-- BUG [P1]: Invite/reset email uses the workers.dev address, not the site's custom domain. — repro: site with a custom domain attached → invite a user → email body link is `https://bizbeecms-cms-<slug>.<acct>.workers.dev/invite/accept/<token>` instead of the custom domain. Subject is also generic ("You're invited to BizbeeCMS"). — reported 2026-06-26.
+- DONE (2026-07-03, USER live-HITL-verified: custom-domain link host + domain-prefixed subjects work — closed at archive) BUG [P1]: Invite/reset email uses the workers.dev address, not the site's custom domain. — repro: site with a custom domain attached → invite a user → email body link is `https://bizbeecms-cms-<slug>.<acct>.workers.dev/invite/accept/<token>` instead of the custom domain. Subject is also generic ("You're invited to BizbeeCMS"). — reported 2026-06-26.
   STATUS 2026-06-26: PART (2) subject DONE in ALL FOUR mails — CMS invite, PM invite,
   PM reset, and now CMS reset (this run — CMS reset subject domain-prefixed via
   `inviteSubject` in the forgot route + `resetEmail.subjectWithDomain` EN/FI/ET). Full

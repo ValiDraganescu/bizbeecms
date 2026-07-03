@@ -39,3 +39,17 @@
 
 - **REST routes only — no server actions** (they 500 on OpenNext/Workers).
 - Pure helper modules avoid `@/`/React/D1/CF imports so they run under dep-free `node --test`.
+- **Every sizing control in the page builder ships with a rem/px unit picker** (user rule,
+  2026-07-03) — use `UnitNumberInput` from `page-builder/shared.tsx`. Stored as `<prop>` +
+  `<prop>Unit`; the renderer's unit default must match what legacy blocks rendered as
+  (gaps/max-size → px, padding/margin → rem) so old pages don't move.
+- **Every block's settings panel starts with the standard layout controls** (user rule,
+  2026-07-03) — `SpacingControls` (per-side padding/margin, rem/px) from
+  `page-builder/shared.tsx` at the top of components/List/Form/column panels. Stored as
+  reserved block props (`padding<Side>`/`margin<Side>` + `…Unit`, preserved by
+  `validateBlockProps`); rendered by `wrapBlockWidth` (block wrapper) / `columnStyle`.
+- **Never hand-roll `<input type="number">`** (user rule, 2026-07-03) — use `NumberInput`
+  from `src/components/ui/number-input.tsx` (UnitNumberInput wraps it). It keeps a string
+  draft while focused so the field can be fully CLEARED while typing; a bare controlled
+  input snaps back to its fallback on every keystroke ("02"-instead-of-"2" bug). New
+  reusable form primitives belong in `src/components/ui/`.

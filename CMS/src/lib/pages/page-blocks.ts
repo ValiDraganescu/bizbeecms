@@ -548,6 +548,17 @@ export function validateBlockProps(
   // settings the renderer reads (see wrapBlockWidth). Preserve them so a field
   // edit (which re-validates the whole props) doesn't strip the chosen layout.
   if (props.width === "auto" || props.width === "fill") out.width = props.width;
+  // Per-block spacing (page-builder Spacing panel): padding/margin per side +
+  // companion unit — the renderer reads them off the block wrapper
+  // (wrapBlockWidth), so keep them through re-validation like `width`.
+  for (const kind of ["padding", "margin"]) {
+    for (const side of ["Top", "Right", "Bottom", "Left"]) {
+      const v = props[`${kind}${side}`];
+      if (typeof v === "number" && Number.isFinite(v)) out[`${kind}${side}`] = v;
+      const u = props[`${kind}${side}Unit`];
+      if (u === "rem" || u === "px") out[`${kind}${side}Unit`] = u;
+    }
+  }
   // Companion "open in new tab" flags: for each LINK prop `X`, preserve the
   // `XNewTab` boolean (the editor's new-tab toggle). It isn't a declared schema
   // prop, but the renderer reads it to add target/rel — so keep it, like `width`.

@@ -204,13 +204,18 @@ export type ListSource = {
   columnsTablet?: number;
   /** Grid columns at MOBILE width (≤767px). Unset = same as `columns`. */
   columnsMobile?: number;
-  /** Gap between items, in px (all directions). Default 0. */
+  /** Gap between items (all directions). Default 0, in `gapUnit`. */
   gap?: number;
+  /** Unit for `gap`. Default "px". */
+  gapUnit?: "rem" | "px";
   /**
-   * Max size along the scroll axis, in px — max-height for vertical/grid,
-   * max-width for horizontal. Content past it SCROLLS. Unset = grows to fit.
+   * Max size along the scroll axis, in `maxSizeUnit` — max-height for
+   * vertical/grid, max-width for horizontal. Content past it SCROLLS.
+   * Unset = grows to fit.
    */
   maxSize?: number;
+  /** Unit for `maxSize`. Default "px". */
+  maxSizeUnit?: "rem" | "px";
   /** Auto-scroll the overflowing content in a seamless loop. Default off. */
   autoscroll?: boolean;
   /** Auto-scroll speed. Default "normal". */

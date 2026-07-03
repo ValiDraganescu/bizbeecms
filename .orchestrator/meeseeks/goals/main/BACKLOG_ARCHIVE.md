@@ -54,3 +54,8 @@ The full record lives in JOURNAL.md; this is the trimmed backlog trace.
 - 2026-06-19 Stop tracking `CMS/tsconfig.tsbuildinfo`
 - 2026-06-19 Move "View site" to the top of the CMS admin sidebar + open in a new tab
 - 2026-06-19 Make theme presets complete, coordinated palettes (E1)
+- Deploy engine core: Cloudflare Script-Upload client + draft→deploying→deployed state machine + setSiteDeployStatus, unit-tested
+- CMS bundle production: build-cms-bundle.mjs esbuilds OpenNext worker into committed cms-bundle.generated.js + buildCmsBundle() loader
+- Deploy UI: deploySiteAction authz + Deploy/Redeploy button + status on Site detail page, sites.deploy.* EN/FI/ET
+- Site deployment DELIVERED live via deployer Container (opennextjs build + wrangler deploy); Script-Upload assets/e2e TODOs superseded
+- 2026-06-19 G5 — pricing/e-commerce component kit: 5 bundles + KITS registry + install i18n + tests

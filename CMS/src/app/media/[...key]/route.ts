@@ -14,14 +14,32 @@ import { assetServeHeaders, isValidAssetKey } from "@/lib/render/asset";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Cloudflare's per-PoP edge cache (Workers Cache API). Worker responses are
+ * NOT CDN-cached automatically — without this, every visitor's request runs
+ * the Worker and reads R2 (single-region). Assets are content-addressed
+ * (timestamp+rand in the key) and served `immutable`, so caching hard is safe.
+ * Absent in `next dev` on Node → undefined → straight to R2 (same behavior).
+ * ponytail: a deleted asset can persist at a PoP until eviction — browsers
+ * already cache it for a year anyway; purge-on-delete if it ever matters.
+ */
+const edgeCache = (): Cache | undefined =>
+  (globalThis as { caches?: { default?: Cache } }).caches?.default;
+
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ key: string[] }> },
 ): Promise<Response> {
   const { key: segments } = await params;
   const key = (segments ?? []).join("/");
   if (!isValidAssetKey(key)) {
     return new Response("not found", { status: 404 });
+  }
+
+  const cache = edgeCache();
+  if (cache) {
+    const hit = await cache.match(request.url).catch(() => undefined);
+    if (hit) return hit;
   }
 
   let object: Awaited<ReturnType<typeof getAssetObject>>;
@@ -51,5 +69,10 @@ export async function GET(
   for (const [k, v] of Object.entries(assetServeHeaders(headers.get("content-type") ?? ""))) {
     headers.set(k, v);
   }
-  return new Response(object.body, { headers });
+  const response = new Response(object.body, { headers });
+  if (cache) {
+    // Best-effort: a cache.put failure must never fail the serve.
+    await cache.put(request.url, response.clone()).catch(() => {});
+  }
+  return response;
 }

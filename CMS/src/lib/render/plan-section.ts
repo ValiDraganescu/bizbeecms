@@ -59,6 +59,10 @@ function pad(
 function mgn(p: Record<string, unknown>, side: "Top" | "Right" | "Bottom" | "Left"): string {
   return `${num(p[`margin${side}`], 0)}${str(p[`margin${side}Unit`], "rem")}`;
 }
+/** A gap value + its `gapUnit` (px default — legacy gaps were bare px numbers). */
+function gapValue(p: Record<string, unknown>, fallback: number): string {
+  return `${num(p.gap, fallback)}${str(p.gapUnit, "px")}`;
+}
 
 /**
  * Per-column cell style (epic: Column settings panel). A column carries its OWN
@@ -90,7 +94,7 @@ export function columnStyle(
     flexDirection: "column",
     alignItems,
     justifyContent,
-    gap: `${num(p.gap, 0)}px`,
+    gap: gapValue(p, 0),
     paddingTop: pad(p, "Top"),
     paddingRight: pad(p, "Right"),
     paddingBottom: pad(p, "Bottom"),
@@ -134,7 +138,7 @@ function planRowGrid(
   planBlock: (b: Block) => ElementPlan,
   alignItems: string,
   justify: string,
-  sectionGap: number,
+  sectionGap: string,
 ): ElementPlan {
   const rp = (row.props ?? {}) as Record<string, unknown>;
   const cols = (row.children ?? []).filter(
@@ -142,7 +146,8 @@ function planRowGrid(
   );
   const columns = num(rp.columns, cols.length || 1);
   const columnBehavior = str(rp.columnBehavior, "equal");
-  const gap = num(rp.gap, sectionGap);
+  // Row gap (value + unit) overrides the section's; absent → inherit BOTH.
+  const gap = rp.gap != null ? gapValue(rp, 0) : sectionGap;
   // Row overrides the Section's vertical alignment for its own columns (absent →
   // inherit the passed-in section default).
   const rowAlign = rp.verticalAlign != null ? (ALIGN_ITEMS[str(rp.verticalAlign, "top")] ?? alignItems) : alignItems;
@@ -150,7 +155,7 @@ function planRowGrid(
   const style: Record<string, string | number> = {
     display: "grid",
     gridTemplateColumns: rowGridCols(cols, columns, columnBehavior),
-    gap: `${gap}px`,
+    gap,
     overflow: "hidden",
     paddingTop: pad(rp, "Top"),
     paddingRight: pad(rp, "Right"),
@@ -171,7 +176,7 @@ function planRowGrid(
  * dragged loose) — render its grid with default alignment/gap.
  */
 export function planRow(row: Block, planBlock: (b: Block) => ElementPlan): ElementPlan {
-  return planRowGrid(row, planBlock, "flex-start", "flex-start", 16);
+  return planRowGrid(row, planBlock, "flex-start", "flex-start", "16px");
 }
 
 /**
@@ -193,7 +198,7 @@ export function planSection(
   planBlock: (b: Block) => ElementPlan,
 ): ElementPlan {
   const p = (block.props ?? {}) as Record<string, unknown>;
-  const gap = num(p.gap, 16);
+  const gap = gapValue(p, 16);
   const maxWidth = str(p.maxWidth, "1280px");
   // ONE shared padding unit for all four sides (user decision 2026-06-19). MIGRATE
   // legacy per-side units: a saved page only had `padding<Side>Unit` — treat Top's
@@ -223,7 +228,7 @@ export function planSection(
           style: {
             display: "flex",
             flexDirection: "column",
-            gap: `${gap}px`,
+            gap,
             paddingTop: pad(p, "Top", paddingUnit),
             paddingRight: pad(p, "Right", paddingUnit),
             paddingBottom: pad(p, "Bottom", paddingUnit),
@@ -285,17 +290,33 @@ export function planColumn(
  *    alignment then positions it horizontally).
  * A column child is always a flex item of the column; `align-self` makes "fill"
  * stretch and "auto" honor the column's `align-items`.
+ *
+ * The wrapper also carries the per-block SPACING (padding/margin per side +
+ * `*Unit`, rem default — the standard control atop every block's editor).
+ * Only sides actually set emit a style so legacy blocks render byte-identical.
+ * A fill block with a horizontal margin drops `width:100%` and relies on
+ * `align-self:stretch` (which subtracts margins) so it never overflows.
  */
 export function wrapBlockWidth(block: Block, el: ElementPlan): ElementPlan {
-  const fill = str(block.props?.width, "fill") !== "auto";
+  const p = block.props ?? {};
+  const fill = str(p.width, "fill") !== "auto";
+  const spacing: Record<string, string> = {};
+  for (const side of ["Top", "Right", "Bottom", "Left"] as const) {
+    if (p[`padding${side}`] != null) spacing[`padding${side}`] = pad(p, side);
+    if (p[`margin${side}`] != null) spacing[`margin${side}`] = mgn(p, side);
+  }
+  const hMargin = p.marginLeft != null || p.marginRight != null;
   return {
     kind: "element",
     tag: "div",
     props: {
       "data-block-wrap": block.id,
-      style: fill
-        ? { width: "100%", alignSelf: "stretch" }
-        : { width: "auto", maxWidth: "100%", alignSelf: "auto" },
+      style: {
+        ...(fill
+          ? { ...(hMargin ? {} : { width: "100%" }), alignSelf: "stretch" }
+          : { width: "auto", maxWidth: "100%", alignSelf: "auto" }),
+        ...spacing,
+      },
     },
     children: [el],
   };

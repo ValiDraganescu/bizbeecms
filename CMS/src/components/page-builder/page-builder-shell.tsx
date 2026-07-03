@@ -469,18 +469,18 @@ export function PageBuilderShell({
     setDirty(true);
   }
 
-  // Patch-merge a single column's own props (e.g. per-viewport visibility). Reads
-  // the live column, applies the patch (undefined deletes a key), and writes the
-  // full props back via the tree-walking mergeBlockProps.
-  function onUpdateColumnProps(columnId: string, patch: Record<string, unknown>) {
+  // Patch-merge one block's own props (column visibility/spacing, List/Form
+  // spacing). Reads the live block, applies the patch (undefined/false deletes
+  // a key), and writes the full props back via the tree-walking mergeBlockProps.
+  function onPatchBlockProps(blockId: string, patch: Record<string, unknown>) {
     setBlocks((b) => {
-      const col = findBlock(b, columnId);
+      const col = findBlock(b, blockId);
       const next: Record<string, unknown> = { ...(col?.props ?? {}) };
       for (const [k, v] of Object.entries(patch)) {
         if (v === undefined || v === false) delete next[k];
         else next[k] = v;
       }
-      return mergeBlockProps(b, columnId, next);
+      return mergeBlockProps(b, blockId, next);
     });
     setDirty(true);
   }
@@ -1078,7 +1078,7 @@ export function PageBuilderShell({
                     <ColumnSettings
                       key={sel.id}
                       column={sel}
-                      onChange={(patch) => onUpdateColumnProps(sel.id, patch)}
+                      onChange={(patch) => onPatchBlockProps(sel.id, patch)}
                     />
                   );
                 }
@@ -1092,6 +1092,7 @@ export function PageBuilderShell({
                       apiSources={apiSources}
                       propsSchemas={propsSchemas}
                       onChange={(patch) => onUpdateList(sel.id, patch)}
+                      onProps={(patch) => onPatchBlockProps(sel.id, patch)}
                     />
                   );
                 }
@@ -1105,6 +1106,7 @@ export function PageBuilderShell({
                       apiSources={apiSources}
                       propsSchemas={propsSchemas}
                       onChange={(patch) => onUpdateForm(sel.id, patch)}
+                      onProps={(patch) => onPatchBlockProps(sel.id, patch)}
                     />
                   );
                 }

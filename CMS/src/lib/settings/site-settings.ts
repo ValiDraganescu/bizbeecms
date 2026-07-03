@@ -206,7 +206,10 @@ export function buildSystemPrompt(opts: {
       "hyphenated (class, stroke-width, stroke-linecap, viewBox, for) — NOT React " +
       "/JSX names (className, strokeWidth). For interactivity, put ALL of it in the " +
       "component `script` (trusted, runs in the browser) and wire it up there by " +
-      "selecting elements (e.g. data-* hooks) — do NOT use inline event-handler " +
+      "selecting elements (e.g. data-* hooks) — scope every lookup to THIS " +
+      "component's own data-* hooks and never reach into markup other components " +
+      "render (pages compose components freely, so foreign markup may not exist " +
+      "on the page). Do NOT use inline event-handler " +
       "attributes like onclick/onsubmit in the html; they are stripped at render. " +
       "Reference another component by its PascalCase tag, e.g. " +
       "`<AuthorCard name=\"{{author}}\"></AuthorCard>`. " +
@@ -248,6 +251,18 @@ export function buildSystemPrompt(opts: {
       "background (a logo, icon, product or food illustration) — not a full-bleed " +
       "photo backdrop — pass transparentBackground:true so it's a clean cut-out with " +
       "no white box around it.",
+  );
+
+  if (authorsComponents && has("edit_text"))
+  parts.push(
+    "To MODIFY an existing component, PREFER edit_text over a full re-author: " +
+      "get_component to read it, then replace just the snippet you're changing " +
+      "(oldString → newString) in component.html, component.script, or " +
+      "component.css. Every edit passes the same validation as a full update, so " +
+      "a patch that would break the markup is rejected with the reason. Reach for " +
+      "update_component ONLY when restructuring the component wholesale, or when " +
+      "several edit_text attempts in a row could not apply (snippet not found or " +
+      "ambiguous).",
   );
 
   if (authorsComponents)

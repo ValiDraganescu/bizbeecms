@@ -36,6 +36,17 @@ test("replaceAll defaults to false and is read as boolean", () => {
   assert.equal(b.replaceAll, true);
 });
 
-test("the three editable targets are exactly the fixed long-text fields", () => {
-  assert.deepEqual([...EDIT_TEXT_TARGETS], ["component.script", "component.css", "prompt.prompt"]);
+test("the editable targets are exactly the fixed long-text fields", () => {
+  assert.deepEqual(
+    [...EDIT_TEXT_TARGETS],
+    ["component.html", "component.script", "component.css", "prompt.prompt"],
+  );
+});
+
+test("component.html requires the component name, like the other component targets", () => {
+  const missing = validateEditText({ target: "component.html", oldString: "a", newString: "b" });
+  assert.ok("error" in missing);
+  const ok = validateEditText({ target: "component.html", name: "Hero", oldString: "a", newString: "b" });
+  assert.equal(ok.target, "component.html");
+  assert.equal(ok.selector, "Hero");
 });

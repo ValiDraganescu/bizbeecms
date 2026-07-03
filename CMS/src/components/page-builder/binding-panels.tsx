@@ -17,7 +17,8 @@ import {
   type FilterClause,
   type SortClause,
 } from "@/lib/page-builder/types";
-import { ctlLabel, ctlInput } from "./shared";
+import { ctlLabel, ctlInput, SpacingControls, UnitNumberInput } from "./shared";
+import { NumberInput } from "@/components/ui/number-input";
 
 // ── Phase-2 binding authoring (Slice C) ──────────────────────────────────────
 //
@@ -690,6 +691,7 @@ export function ListSettings({
   apiSources,
   propsSchemas,
   onChange,
+  onProps,
 }: {
   block: Block;
   collections: CollectionMeta[];
@@ -698,6 +700,7 @@ export function ListSettings({
   onChange: (
     patch: Partial<Pick<Block, "listSource" | "listMap">> & { __child?: Block[] },
   ) => void;
+  onProps: (patch: Record<string, unknown>) => void;
 }) {
   const t = useTranslations("pageBuilder");
   const source = block.listSource;
@@ -733,7 +736,9 @@ export function ListSettings({
     columnsTablet: source?.columnsTablet,
     columnsMobile: source?.columnsMobile,
     gap: source?.gap,
+    gapUnit: source?.gapUnit,
     maxSize: source?.maxSize,
+    maxSizeUnit: source?.maxSizeUnit,
     autoscroll: source?.autoscroll,
     autoscrollSpeed: source?.autoscrollSpeed,
   };
@@ -796,7 +801,10 @@ export function ListSettings({
         if (l.columnsMobile != null) src.columnsMobile = l.columnsMobile;
       }
       if (l.gap != null) src.gap = l.gap;
+      // Units persist only when non-default (rem) so px lists stay byte-identical.
+      if (l.gapUnit === "rem") src.gapUnit = "rem";
       if (l.maxSize != null) src.maxSize = l.maxSize;
+      if (l.maxSizeUnit === "rem") src.maxSizeUnit = "rem";
       if (l.autoscroll) src.autoscroll = true;
       if (l.autoscrollSpeed && l.autoscrollSpeed !== "normal") src.autoscrollSpeed = l.autoscrollSpeed;
     }
@@ -828,6 +836,7 @@ export function ListSettings({
   return (
     <section className="space-y-4">
       <p className="font-mono text-sm text-foreground">{t("list.title")}</p>
+      <SpacingControls props={block.props ?? {}} onPatch={onProps} />
       <p className="text-xs text-foreground-muted">{t("list.help")}</p>
 
       <SourceSelect
@@ -933,16 +942,13 @@ export function ListSettings({
 
           <label className="flex flex-col gap-1.5">
             <span className={ctlLabel}>{t("list.limit")}</span>
-            <input
-              type="number"
+            <NumberInput
               min={1}
               className={ctlInput}
-              value={limit ?? ""}
+              value={limit}
               placeholder={t("list.limitPlaceholder")}
-              aria-label={t("list.limit")}
-              onChange={(e) =>
-                emitSource({ limit: e.target.value === "" ? undefined : Number(e.target.value) })
-              }
+              ariaLabel={t("list.limit")}
+              onValue={(v) => emitSource({ limit: v })}
             />
           </label>
         </>
@@ -1031,17 +1037,14 @@ export function ListSettings({
                     ).map(([key, labelKey, fallback]) => (
                       <label key={key} className="flex flex-col gap-1">
                         <span className="text-[11px] text-foreground-muted">{t(labelKey)}</span>
-                        <input
-                          type="number"
+                        <NumberInput
                           min={1}
                           className={ctlInput}
-                          value={layout[key] ?? (fallback ?? layout.columns ?? 2)}
-                          aria-label={t(labelKey)}
-                          onChange={(e) =>
-                            emitSource({
-                              [key]:
-                                e.target.value === "" ? undefined : Math.max(1, Number(e.target.value)),
-                            })
+                          value={layout[key]}
+                          placeholder={String(fallback ?? layout.columns ?? 2)}
+                          ariaLabel={t(labelKey)}
+                          onValue={(v) =>
+                            emitSource({ [key]: v == null ? undefined : Math.max(1, Math.floor(v)) })
                           }
                         />
                       </label>
@@ -1053,16 +1056,13 @@ export function ListSettings({
 
               <label className="flex flex-col gap-1.5">
                 <span className={ctlLabel}>{t("list.gap")}</span>
-                <input
-                  type="number"
-                  min={0}
-                  className={ctlInput}
-                  value={layout.gap ?? ""}
+                <UnitNumberInput
+                  value={layout.gap}
+                  unit={layout.gapUnit ?? "px"}
                   placeholder="0"
-                  aria-label={t("list.gap")}
-                  onChange={(e) =>
-                    emitSource({ gap: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)) })
-                  }
+                  ariaLabel={t("list.gap")}
+                  onValue={(v) => emitSource({ gap: v == null ? undefined : Math.max(0, v) })}
+                  onUnit={(u) => emitSource({ gapUnit: u })}
                 />
               </label>
 
@@ -1070,16 +1070,14 @@ export function ListSettings({
                 <span className={ctlLabel}>
                   {layout.direction === "horizontal" ? t("list.maxWidth") : t("list.maxHeight")}
                 </span>
-                <input
-                  type="number"
+                <UnitNumberInput
+                  value={layout.maxSize}
+                  unit={layout.maxSizeUnit ?? "px"}
                   min={1}
-                  className={ctlInput}
-                  value={layout.maxSize ?? ""}
                   placeholder={t("list.maxSizePlaceholder")}
-                  aria-label={t("list.maxSize")}
-                  onChange={(e) =>
-                    emitSource({ maxSize: e.target.value === "" ? undefined : Number(e.target.value) })
-                  }
+                  ariaLabel={t("list.maxSize")}
+                  onValue={(v) => emitSource({ maxSize: v ?? undefined })}
+                  onUnit={(u) => emitSource({ maxSizeUnit: u })}
                 />
                 <span className="text-xs text-foreground-muted">{t("list.maxSizeHint")}</span>
               </label>
@@ -1132,26 +1130,24 @@ export function ListSettings({
               <div className="flex gap-2">
                 <label className="flex flex-1 flex-col gap-1.5">
                   <span className={ctlLabel}>{t("list.cbMin")}</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={0}
                     className={ctlInput}
-                    value={cb.min ?? ""}
+                    value={cb.min}
                     placeholder="0"
-                    aria-label={t("list.cbMinAria")}
-                    onChange={(e) => emitSource({ min: e.target.value === "" ? undefined : Number(e.target.value) })}
+                    ariaLabel={t("list.cbMinAria")}
+                    onValue={(v) => emitSource({ min: v })}
                   />
                 </label>
                 <label className="flex flex-1 flex-col gap-1.5">
                   <span className={ctlLabel}>{t("list.cbMax")}</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={0}
                     className={ctlInput}
-                    value={cb.max ?? ""}
+                    value={cb.max}
                     placeholder="0"
-                    aria-label={t("list.cbMaxAria")}
-                    onChange={(e) => emitSource({ max: e.target.value === "" ? undefined : Number(e.target.value) })}
+                    ariaLabel={t("list.cbMaxAria")}
+                    onValue={(v) => emitSource({ max: v })}
                   />
                 </label>
               </div>
@@ -1337,12 +1333,14 @@ export function FormSettings({
   apiSources,
   propsSchemas,
   onChange,
+  onProps,
 }: {
   block: Block;
   collections: CollectionMeta[];
   apiSources: ApiSourceMeta[];
   propsSchemas: Record<string, string | null>;
   onChange: (patch: { formTarget?: FormTarget; __child?: Block[] }) => void;
+  onProps: (patch: Record<string, unknown>) => void;
 }) {
   const t = useTranslations("pageBuilder");
   const target = block.formTarget;
@@ -1397,6 +1395,7 @@ export function FormSettings({
   return (
     <section className="space-y-3">
       <h3 className="text-sm font-semibold text-foreground">{t("form.title")}</h3>
+      <SpacingControls props={block.props ?? {}} onPatch={onProps} />
       <p className="text-xs text-foreground-muted">{t("form.help")}</p>
 
       <SourceSelect

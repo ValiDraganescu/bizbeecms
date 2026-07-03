@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import type { Block } from "@/lib/render/tree";
+import { UnitNumberInput, type SizeUnit } from "./shared";
+import { NumberInput } from "@/components/ui/number-input";
 
 /**
  * Right-rail Block tab when a Section is selected — the visual settings panel
@@ -122,13 +124,12 @@ export function SectionSettings({
               <span className="text-[11px] text-foreground-muted">
                 {t(`sectionSide.${side.toLowerCase()}`)}
               </span>
-              <input
-                type="number"
+              <NumberInput
                 min={0}
                 value={num(p[`padding${side}`], 0)}
-                onChange={(e) => onChange({ [`padding${side}`]: +e.target.value })}
+                onValue={(v) => onChange({ [`padding${side}`]: v ?? 0 })}
                 className="w-full rounded-md border border-border bg-surface px-2 py-1 text-sm text-foreground outline-none"
-                aria-label={`${t("sectionPadding")} ${side}`}
+                ariaLabel={`${t("sectionPadding")} ${side}`}
               />
             </label>
           ))}
@@ -136,14 +137,14 @@ export function SectionSettings({
       </div>
 
       {/* Gap */}
-      <label className="flex flex-col gap-1.5">
+      <label className="flex w-24 flex-col gap-1.5">
         <span className={label}>{t("sectionGap")}</span>
-        <input
-          type="number"
-          min={0}
+        <UnitNumberInput
           value={num(p.gap, 16)}
-          onChange={(e) => onChange({ gap: +e.target.value })}
-          className="w-24 rounded-md border border-border bg-surface px-2 py-1 text-sm text-foreground outline-none"
+          unit={s(p.gapUnit, "px") as SizeUnit}
+          onValue={(v) => onChange({ gap: v ?? 0 })}
+          onUnit={(u) => onChange({ gapUnit: u })}
+          ariaLabel={t("sectionGap")}
         />
       </label>
 

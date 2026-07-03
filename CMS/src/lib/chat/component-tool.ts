@@ -31,6 +31,7 @@
 import { planTree, type TreeNode } from "../render/tree.ts";
 import { parseHtml } from "../render/parse-html.ts";
 import { normalizeTags } from "../components/tags.ts";
+import { lintComponentHtml, lintSlotsDeclared } from "./lint-component-html.ts";
 
 /** The validated, ready-to-persist component artifact. */
 export interface ComponentArtifactInput {
@@ -190,6 +191,12 @@ export function validateComponentArtifact(
     // Tailwind classes at request time (see tw-compile.ts), so ANY valid
     // Tailwind class — variants (hover:, md:), arbitrary values (h-[37px]) —
     // ships real CSS. Nothing to reject here.
+    //
+    // STRICT lint on the raw string: parseHtml is lenient (auto-closes, drops
+    // stray closers), so an unbalanced/misnested artifact would otherwise be
+    // silently "repaired" into a wrong-but-valid tree. The slot↔schema check
+    // runs below, once propsSchema is coerced.
+    errors.push(...lintComponentHtml(html));
   }
 
   // ── script ── (optional, bounded)
@@ -209,6 +216,11 @@ export function validateComponentArtifact(
   const propsSchema = coercePropsSchema(a.propsSchema);
   if (propsSchema === "invalid") {
     errors.push("propsSchema must be an object { propName: { type, default } } (or a JSON string of one)");
+  } else if (propsSchema && html.trim() !== "") {
+    // Slot↔schema cross-check, only when THIS call supplies a schema (an update
+    // that omits propsSchema keeps the stored one, which we can't see here — the
+    // pure validator has no DB access).
+    errors.push(...lintSlotsDeclared(html, propsSchema));
   }
 
   // ── tags ── (optional; array of short labels). Absent → undefined (update

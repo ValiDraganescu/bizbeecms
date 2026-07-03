@@ -7,7 +7,9 @@
  * without pulling in the shell.
  */
 
+import { useTranslations } from "next-intl";
 import type { Viewport } from "@/lib/page-builder/types";
+import { NumberInput } from "@/components/ui/number-input";
 
 export const ICON = {
   width: 16,
@@ -22,6 +24,102 @@ export const ICON = {
 export const ctlLabel = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
 export const ctlInput =
   "w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-foreground placeholder:text-foreground-muted";
+
+export type SizeUnit = "rem" | "px";
+
+/**
+ * A number input with a rem/px unit toggle — THE control for every sizing value
+ * in the builder (rule: all sizing controls of all kinds carry a unit picker).
+ * Stored as two props: the number and a companion `<name>Unit`. Pass the
+ * renderer's default as `unit` so legacy blocks (no unit prop) show what they
+ * actually render as.
+ */
+export function UnitNumberInput({
+  value,
+  unit,
+  onValue,
+  onUnit,
+  min = 0,
+  placeholder,
+  ariaLabel,
+}: {
+  value: number | undefined;
+  unit: SizeUnit;
+  onValue: (v: number | undefined) => void;
+  onUnit: (u: SizeUnit) => void;
+  min?: number;
+  placeholder?: string;
+  ariaLabel: string;
+}) {
+  return (
+    <div className="flex items-stretch overflow-hidden rounded-md border border-border">
+      <NumberInput
+        min={min}
+        value={value}
+        placeholder={placeholder}
+        onValue={onValue}
+        className="w-full bg-surface px-2 py-1 text-sm text-foreground outline-none"
+        ariaLabel={ariaLabel}
+      />
+      <button
+        type="button"
+        onClick={() => onUnit(unit === "rem" ? "px" : "rem")}
+        className="border-l border-border bg-surface-muted px-2 text-xs text-foreground-muted hover:text-foreground"
+        aria-label={`${ariaLabel} unit: ${unit}`}
+      >
+        {unit}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Padding + margin editor (per-side, rem/px) — THE standard spacing control at
+ * the top of every block's settings panel (components, List, Form, columns).
+ * Patches `padding<Side>`/`margin<Side>` (+ companion `<…>Unit`, rem default)
+ * into the block's props; the renderer reads them off the block wrapper
+ * (`wrapBlockWidth`) / column shell (`columnStyle`).
+ */
+export function SpacingControls({
+  props,
+  onPatch,
+}: {
+  props: Record<string, unknown>;
+  onPatch: (patch: Record<string, unknown>) => void;
+}) {
+  const t = useTranslations("pageBuilder");
+  const sides = ["Top", "Right", "Bottom", "Left"] as const;
+  const num = (v: unknown) => (typeof v === "number" ? v : undefined);
+  const unit = (v: unknown): SizeUnit => (v === "px" ? "px" : "rem");
+  return (
+    <>
+      {(["padding", "margin"] as const).map((kind) => (
+        <div key={kind} className="flex flex-col gap-1.5">
+          <span className={ctlLabel}>
+            {t(kind === "padding" ? "sectionPadding" : "columnMargin")}
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            {sides.map((side) => (
+              <label key={side} className="flex flex-col gap-1">
+                <span className="text-[11px] text-foreground-muted">
+                  {t(`sectionSide.${side.toLowerCase()}`)}
+                </span>
+                <UnitNumberInput
+                  value={num(props[`${kind}${side}`])}
+                  unit={unit(props[`${kind}${side}Unit`])}
+                  placeholder="0"
+                  onValue={(v) => onPatch({ [`${kind}${side}`]: v ?? 0 })}
+                  onUnit={(u) => onPatch({ [`${kind}${side}Unit`]: u })}
+                  ariaLabel={`${kind} ${side}`}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
 
 export function ViewportIcon({ kind }: { kind: Viewport }) {
   switch (kind) {

@@ -162,14 +162,15 @@ function listWrapper(
     horizontal || grid || src.maxSize != null || src.autoscroll === true || src.gap != null;
   if (shaped) Object.assign(style, layoutStyle(src));
 
+  const maxSizeUnit = src.maxSizeUnit ?? "px";
   if (horizontal) {
     // Horizontal scrolls on X (the row can exceed its container width); maxSize
-    // caps the visible width in px.
+    // caps the visible width.
     style.overflowX = "auto";
-    if (src.maxSize != null) style.maxWidth = `${src.maxSize}px`;
+    if (src.maxSize != null) style.maxWidth = `${src.maxSize}${maxSizeUnit}`;
   } else if (src.maxSize != null) {
     // Vertical / grid: maxSize caps height; content past it scrolls on Y.
-    style.maxHeight = `${src.maxSize}px`;
+    style.maxHeight = `${src.maxSize}${maxSizeUnit}`;
     style.overflowY = "auto";
   }
 
@@ -217,7 +218,8 @@ export const LIST_GRID_CLASS = "pb-list-grid";
  * `listGridCss()` read them at each breakpoint (inline styles can't do @media).
  */
 function layoutStyle(src: ListSource): Record<string, string | number> {
-  const gap: Record<string, string> = src.gap != null ? { gap: `${Math.max(0, src.gap)}px` } : {};
+  const gap: Record<string, string> =
+    src.gap != null ? { gap: `${Math.max(0, src.gap)}${src.gapUnit ?? "px"}` } : {};
   if (src.direction === "grid") {
     const clamp = (n: number | undefined, fallback: number) =>
       Math.max(1, Math.floor(n ?? fallback));

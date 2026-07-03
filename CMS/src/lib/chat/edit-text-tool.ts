@@ -6,10 +6,13 @@
  * or a saved prompt's body costs a snippet and can't corrupt the untouched text.
  *
  * Targets are the FIXED long-text fields worth editing in place:
- *   - component.script / component.css   (selector: name)
- *   - prompt.prompt                       (selector: id)
- * (A tree field like component.tree or a page's blocks is NOT a text field — those
- * stay read→replace-whole; editing structure by string-replace is unsafe.)
+ *   - component.html / component.script / component.css   (selector: name)
+ *   - prompt.prompt                                        (selector: id)
+ * html edits are safe because the patched string re-enters the SAME strict gate
+ * as a full update (parse + planTree + lint-component-html tag/slot checks, plus
+ * the slot↔schema cross-check against the stored propsSchema) — a patch that
+ * unbalances the markup is rejected, never silently "repaired". A page's blocks
+ * stay read→replace-whole (structured JSON, not a text field).
  *
  * PURE here: the SCHEMA + the untrusted-arg validator. The dispatch handler in
  * `tool-dispatch.ts` does the load/apply/save (it owns the stores + apply-edit).
@@ -17,6 +20,7 @@
 
 /** The editable long-text fields, as `target` enum values. */
 export const EDIT_TEXT_TARGETS = [
+  "component.html",
   "component.script",
   "component.css",
   "prompt.prompt",
@@ -28,7 +32,7 @@ export const EDIT_TEXT_TOOL = {
   function: {
     name: "edit_text",
     description:
-      "Patch a long-text field by replacing a snippet, instead of rewriting the whole value (use this to change a few words/lines without re-emitting everything). Provide `oldString` (an exact snippet currently in the field, with enough surrounding context to be unique) and `newString`. Editable targets: 'component.script' / 'component.css' (selector: name), 'prompt.prompt' (selector: id). For structural fields (a component's tree or a page's blocks) use the update_* tools instead.",
+      "Patch a long-text field by replacing a snippet, instead of rewriting the whole value — the PREFERRED way to change an EXISTING component (cheaper, and the untouched code cannot drift). get_component first, then provide `oldString` (an exact snippet currently in the field, with enough surrounding context to be unique) and `newString`. Editable targets: 'component.html' / 'component.script' / 'component.css' (selector: name), 'prompt.prompt' (selector: id). Every html edit is re-validated exactly like update_component (tag balance, slot syntax, declared slots) — a patch that would break the markup is rejected with the reason. Fall back to update_component's full re-author ONLY for a wholesale restructure, or when several edit_text attempts in a row could not locate their snippet. For a page's blocks use the page tools instead.",
     parameters: {
       type: "object",
       properties: {

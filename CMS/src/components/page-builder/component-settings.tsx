@@ -8,6 +8,7 @@ import {
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
 import { PropFieldInput } from "./prop-field-input";
+import { SpacingControls } from "./shared";
 import { TranslatableField } from "./translatable-field";
 
 /**
@@ -54,31 +55,38 @@ export function ComponentSettings({
     onChange(validateBlockProps({ ...props, width: w }, schema));
   }
 
-  // Width toggle (fill column vs wrap content) — shown for every component block.
-  const widthControl = (
-    <div className="flex flex-col gap-1.5">
-      <span className={segLabel}>{t("blockWidth.label")}</span>
-      <div className="flex gap-1">
-        {(["fill", "auto"] as const).map((w) => (
-          <button
-            key={w}
-            type="button"
-            onClick={() => setWidth(w)}
-            aria-pressed={width === w}
-            className={`${seg} ${width === w ? segOn : segOff}`}
-          >
-            {t(`blockWidth.${w}`)}
-          </button>
-        ))}
+  // Standard layout controls at the top of EVERY component block's editor:
+  // width toggle (fill column vs wrap content) + per-side padding/margin.
+  const layoutControls = (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <span className={segLabel}>{t("blockWidth.label")}</span>
+        <div className="flex gap-1">
+          {(["fill", "auto"] as const).map((w) => (
+            <button
+              key={w}
+              type="button"
+              onClick={() => setWidth(w)}
+              aria-pressed={width === w}
+              className={`${seg} ${width === w ? segOn : segOff}`}
+            >
+              {t(`blockWidth.${w}`)}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
+      <SpacingControls
+        props={props}
+        onPatch={(patch) => onChange(validateBlockProps({ ...props, ...patch }, schema))}
+      />
+    </>
   );
 
   if (schema.length === 0) {
     return (
       <div className="flex flex-col gap-4">
         <p className="font-mono text-sm text-foreground">{block.component}</p>
-        {widthControl}
+        {layoutControls}
         <p className="text-sm text-foreground-muted">{t("componentNoProps")}</p>
       </div>
     );
@@ -87,7 +95,7 @@ export function ComponentSettings({
   return (
     <div className="flex flex-col gap-4">
       <p className="font-mono text-sm text-foreground">{block.component}</p>
-      {widthControl}
+      {layoutControls}
       {schema.map((f) => {
         // Translatable text → its own per-locale field (lang tabs + AI translate).
         if (f.translatable) {

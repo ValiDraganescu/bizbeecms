@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import type { Block } from "@/lib/render/tree";
+import { SpacingControls, UnitNumberInput, type SizeUnit } from "./shared";
 
 /**
  * Per-column settings panel (right-rail Block tab when a column shell is
@@ -38,7 +39,6 @@ export function ColumnSettings({
   // inherit. The "inherit" cell (no override) clears both props.
   const vAlign = p.verticalAlign != null ? s(p.verticalAlign, "top") : null;
   const hAlign = p.horizontalAlign != null ? s(p.horizontalAlign, "left") : null;
-  const sides: ("Top" | "Right" | "Bottom" | "Left")[] = ["Top", "Right", "Bottom", "Left"];
   const aligns: { v: string; h: string }[] = [
     { v: "top", h: "left" }, { v: "top", h: "center" }, { v: "top", h: "right" },
     { v: "center", h: "left" }, { v: "center", h: "center" }, { v: "center", h: "right" },
@@ -56,43 +56,6 @@ export function ColumnSettings({
     { value: "var(--color-primary-subtle)", key: "bgPrimarySubtle" },
     { value: "var(--color-foreground)", key: "bgForeground" },
   ];
-
-  // padding/margin: one number input + per-side rem/px unit toggle (rem default).
-  const spacing = (kind: "padding" | "margin") => (
-    <div className="flex flex-col gap-1.5">
-      <span className={label}>{t(kind === "padding" ? "sectionPadding" : "columnMargin")}</span>
-      <div className="grid grid-cols-2 gap-2">
-        {sides.map((side) => {
-          const unit = s(p[`${kind}${side}Unit`], "rem");
-          return (
-            <label key={side} className="flex flex-col gap-1">
-              <span className="text-[11px] text-foreground-muted">
-                {t(`sectionSide.${side.toLowerCase()}`)}
-              </span>
-              <div className="flex items-stretch overflow-hidden rounded-md border border-border">
-                <input
-                  type="number"
-                  min={0}
-                  value={num(p[`${kind}${side}`], 0)}
-                  onChange={(e) => onChange({ [`${kind}${side}`]: +e.target.value })}
-                  className="w-full bg-surface px-2 py-1 text-sm text-foreground outline-none"
-                  aria-label={`${kind} ${side}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => onChange({ [`${kind}${side}Unit`]: unit === "rem" ? "px" : "rem" })}
-                  className="border-l border-border bg-surface-muted px-2 text-xs text-foreground-muted hover:text-foreground"
-                  aria-label={`${kind} ${side} unit: ${unit}`}
-                >
-                  {unit}
-                </button>
-              </div>
-            </label>
-          );
-        })}
-      </div>
-    </div>
-  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -131,20 +94,18 @@ export function ColumnSettings({
         </div>
       </div>
 
-      {/* Padding */}
-      {spacing("padding")}
-      {/* Margin */}
-      {spacing("margin")}
+      {/* Padding + margin (shared per-side rem/px control) */}
+      <SpacingControls props={p} onPatch={onChange} />
 
       {/* Gap between stacked components */}
-      <label className="flex flex-col gap-1.5">
+      <label className="flex w-24 flex-col gap-1.5">
         <span className={label}>{t("columnGap")}</span>
-        <input
-          type="number"
-          min={0}
+        <UnitNumberInput
           value={num(p.gap, 0)}
-          onChange={(e) => onChange({ gap: +e.target.value })}
-          className="w-24 rounded-md border border-border bg-surface px-2 py-1 text-sm text-foreground outline-none"
+          unit={s(p.gapUnit, "px") as SizeUnit}
+          onValue={(v) => onChange({ gap: v ?? 0 })}
+          onUnit={(u) => onChange({ gapUnit: u })}
+          ariaLabel={t("columnGap")}
         />
       </label>
 

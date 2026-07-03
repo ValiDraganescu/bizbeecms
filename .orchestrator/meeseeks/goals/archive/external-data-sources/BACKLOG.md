@@ -239,7 +239,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 >   existing block tools) incl. target validation; 3 registrations caveat
 >   applies.
 
-- TODO (USER 2026-07-02, approved): **Form block — visitor form submission to a
+- DONE (2026-07-02, closed at archive 2026-07-03 — delivered in full via the four decomposed slices a–d above + the live AI e2e smoke) (USER 2026-07-02, approved): **Form block — visitor form submission to a
   data-source saved request.** User's design intent (their words, distilled): "an
   implicit form block like the List block that renders as a `<form>` and takes
   care of the options. Inside it we could render any component with inputs; the

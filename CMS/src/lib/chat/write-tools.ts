@@ -39,10 +39,14 @@ export const UPDATE_COMPONENT_TOOL = {
   function: {
     name: "update_component",
     description:
-      "Update an EXISTING component by re-authoring its full artifact. Use " +
+      "FULL re-author of an EXISTING component — the whole artifact is replaced, " +
+      "not merged. PREFER edit_text for targeted changes (a class, a line, some " +
+      "copy): it patches just a snippet and the untouched code cannot drift. Use " +
+      "THIS tool only to restructure a component wholesale, or after several " +
+      "edit_text attempts in a row could not locate their snippet. Use " +
       "get_component first to read the current artifact, then pass the complete " +
       "new { name, html, script, css } (keep the same name to update in place — a " +
-      "new name creates a new component). The whole artifact is replaced, not merged.",
+      "new name creates a new component).",
     parameters: {
       type: "object",
       properties: {

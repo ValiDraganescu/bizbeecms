@@ -267,7 +267,7 @@ function planComponentTag(
  * locale objects are already resolved to the active locale upstream (localize.ts)
  * before binding. Identifier only, optional inner whitespace.
  */
-const SLOT_RE = /\{\{\s*(?:t\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
+export const SLOT_RE = /\{\{\s*(?:t\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
 
 /** Parse a component's propsSchema JSON into the set of declared prop names. */
 export function declaredProps(propsSchema: string | null | undefined): Set<string> {
