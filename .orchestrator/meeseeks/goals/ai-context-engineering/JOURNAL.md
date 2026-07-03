@@ -62,3 +62,32 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   list-assets-tool.ts, prompt-tools.ts, data-source-tools.ts,
   collection-tools.ts, tool-dispatch.ts; CMS/scripts/list-assets-tool.test.mjs,
   collection-tools.test.mjs
+
+## 2026-07-03 13:00 — Context-aware buildSystemPrompt (section gating by in-scope tools)
+- **Status:** DONE
+- **What I did:** `buildSystemPrompt` (site-settings.ts) gained an optional
+  `tools?: readonly string[]`; when given, each base-prompt section ships only
+  if a tool it explains is in scope: html-data-walk / slots-propsSchema /
+  ICONS / Tailwind-tokens paragraphs → create_component|update_component;
+  builtins list → create_page|update_page_blocks; existing-components list →
+  either group; collections list → query_collection|bind_component|bind_list;
+  list_assets line → list_assets; set_block_props para → set_block_props;
+  combobox + List-layout paras → bind_list; i18n rule → prop-WRITERS only
+  (authoring/composing/set_block_props — NOT bare `translate`, the rule is
+  entirely about props, so settings drops it). Omitted `tools` → full prompt
+  (legacy/direct callers unchanged). `assembleSystemPrompt` passes
+  `toolsForContext(context)` — chat POST, export, debug GET, /mcp getPrompt,
+  and get_authoring_guide all flow through it, so no fork. Opening paragraph
+  intentionally untouched (stale-4-tools reword belongs to the dedup TODO).
+- **Measured (live :3602 debug endpoint, chars/4; baseline from GOAL.md):**
+  media 5,200→545 tok; settings 5,250→579; collections 5,400→911;
+  components 5,300→4,108; pages 5,600→4,324; page-builder ~5,955 and
+  general ~5,194 unchanged (all sections in scope) — target "media/settings/
+  collections → 1–2k, building contexts lose nothing" beaten.
+- **Verified:** 5 new gating tests in scripts/site-settings.test.mjs (media/
+  settings/collections drops, general byte-identical to ungated, page-builder
+  keeps everything); full suite 1518/1518; `tsc --noEmit` clean; live probes on
+  ?context=media confirm assets line + identity kept, authoring prose gone.
+  Skipped opennextjs build gate — dev server running (CAVEATS).
+- **Files:** CMS/src/lib/settings/site-settings.ts,
+  CMS/src/lib/chat/assemble-prompt.ts, CMS/scripts/site-settings.test.mjs

@@ -167,3 +167,64 @@ test("buildSystemPrompt: folds in built-in block types", () => {
   assert.match(p, /Built-in block types/);
   assert.match(p, /Section: A layout container\./);
 });
+
+// ── Context-aware section gating (ai-context-engineering) ────────────────────
+// `tools` = the in-scope tool names; each guidance section ships only where a
+// tool it explains is scoped. Omitted `tools` → full prompt (MCP/legacy path).
+import { toolsForContext } from "../src/lib/chat/tool-scopes.ts";
+
+const richOpts = {
+  components: [{ name: "Hero", props: [{ name: "title", type: "string", translatable: true }] }],
+  builtins: [{ name: "Section", description: "A layout container." }],
+  collections: [{ tableName: "content_restaurants", fields: ["name"] }],
+  locales: ["en", "fi"],
+};
+
+test("gating: media scope drops authoring/builder prose, keeps assets line", () => {
+  const p = buildSystemPrompt({ ...richOpts, tools: toolsForContext("media") });
+  assert.match(p, /call list_assets and use a returned/); // list_assets scoped
+  assert.doesNotMatch(p, /propsSchema/); // component authoring gone
+  assert.doesNotMatch(p, /ICONS:/);
+  assert.doesNotMatch(p, /Tailwind utility/);
+  assert.doesNotMatch(p, /Built-in block types/);
+  assert.doesNotMatch(p, /This Site's existing components/); // component list gone
+  assert.doesNotMatch(p, /no components yet/);
+  assert.doesNotMatch(p, /content collections/);
+  assert.doesNotMatch(p, /set_block_props/);
+  assert.doesNotMatch(p, /combobox/);
+  assert.doesNotMatch(p, /languages:/); // i18n rule gone (no translatable writers)
+});
+
+test("gating: settings scope drops component list + prop-centric i18n rule", () => {
+  const p = buildSystemPrompt({ ...richOpts, tools: toolsForContext("settings") });
+  // The i18n rule is about writing PROPS — settings has no prop-writing tool.
+  assert.doesNotMatch(p, /languages:/);
+  assert.doesNotMatch(p, /Hero \{/);
+  assert.doesNotMatch(p, /call list_assets/); // list_assets NOT scoped in settings
+});
+
+test("gating: collections scope keeps collections list, drops authoring prose", () => {
+  const p = buildSystemPrompt({ ...richOpts, tools: toolsForContext("collections") });
+  assert.match(p, /content_restaurants \(name\)/); // query_collection scoped
+  assert.doesNotMatch(p, /Hero \{/);
+  assert.doesNotMatch(p, /Tailwind utility/);
+});
+
+test("gating: general scope is byte-identical to the ungated full prompt", () => {
+  assert.equal(
+    buildSystemPrompt({ ...richOpts, tools: toolsForContext("general") }),
+    buildSystemPrompt(richOpts),
+  );
+});
+
+test("gating: page-builder scope keeps everything a builder needs", () => {
+  const p = buildSystemPrompt({ ...richOpts, tools: toolsForContext("page-builder") });
+  assert.match(p, /propsSchema/);
+  assert.match(p, /ICONS:/);
+  assert.match(p, /Built-in block types/);
+  assert.match(p, /Hero \{ title: string \(t\) \}/);
+  assert.match(p, /content_restaurants \(name\)/);
+  assert.match(p, /set_block_props/);
+  assert.match(p, /combobox/);
+  assert.match(p, /2 languages: en, fi/);
+});

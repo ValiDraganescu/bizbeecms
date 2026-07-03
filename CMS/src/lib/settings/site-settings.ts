@@ -142,8 +142,21 @@ export function buildSystemPrompt(opts: {
    * the model to fill translatable props in EVERY locale. Omitted/≤1 → no i18n rule.
    */
   locales?: string[];
+  /**
+   * The in-scope tool NAMES for this chat context (from `toolsForContext`).
+   * When given, each guidance section ships ONLY if a tool it explains is in
+   * scope — so the media/settings/collections contexts don't pay ~4k tokens of
+   * component-authoring prose they can't act on. Omitted → full prompt
+   * (external MCP clients and legacy callers keep everything).
+   */
+  tools?: readonly string[];
 }): string {
   const parts: string[] = [];
+
+  // Section gating: no `tools` list → everything ships (backward compatible).
+  const has = (t: string) => !opts.tools || opts.tools.includes(t);
+  const authorsComponents = has("create_component") || has("update_component");
+  const composesPages = has("create_page") || has("update_page_blocks");
 
   parts.push(
     "You are the AI website builder for a CMS Site. You author content by " +
@@ -177,6 +190,7 @@ export function buildSystemPrompt(opts: {
       "which tools ran. Describe what changed on the site in their terms.",
   );
 
+  if (authorsComponents)
   parts.push(
     "Component `html` is parsed and rendered server-side as a data walk — never " +
       "assume any JavaScript eval runs on the server. Author plain HTML: tags, " +
@@ -194,6 +208,7 @@ export function buildSystemPrompt(opts: {
       "Use the actual glyph (→, ☽, —, ·, ©) directly in the markup.",
   );
 
+  if (authorsComponents)
   parts.push(
     "Mark every spot that takes page content with a slot in the html: " +
       "`{{propName}}` for a plain value and `{{t propName}}` for a TRANSLATABLE " +
@@ -228,6 +243,7 @@ export function buildSystemPrompt(opts: {
       "no white box around it.",
   );
 
+  if (authorsComponents)
   parts.push(
     "ICONS: to place a vector icon, use an `{{icon \"name\"}}` slot — a SEPARATE " +
       "slot from `{{prop}}` (the icon name is QUOTED, e.g. " +
@@ -243,6 +259,7 @@ export function buildSystemPrompt(opts: {
       "An unknown icon simply renders nothing.",
   );
 
+  if (authorsComponents)
   parts.push(
     "For `className` use any standard Tailwind utility — the full Tailwind is " +
       "compiled per page at render time, so variants (hover:, focus:, md:, " +
@@ -263,7 +280,7 @@ export function buildSystemPrompt(opts: {
   );
 
   const builtins = opts.builtins ?? [];
-  if (builtins.length > 0) {
+  if (composesPages && builtins.length > 0) {
     parts.push(
       "Built-in block types (use directly in a page's block tree — no need to " +
         "create them):\n" +
@@ -273,7 +290,10 @@ export function buildSystemPrompt(opts: {
 
   const defs = opts.components ?? [];
   const names = opts.componentNames ?? [];
-  if (defs.length > 0) {
+  const buildsWithComponents = authorsComponents || composesPages;
+  if (!buildsWithComponents) {
+    /* non-building context (media/settings/collections) — no component list */
+  } else if (defs.length > 0) {
     parts.push(
       "This Site's existing components (reuse them when they fit; props shown — " +
         "`!` = required, `(t)` = translatable). Set these props when you place a " +
@@ -290,8 +310,12 @@ export function buildSystemPrompt(opts: {
   }
 
   // Multi-locale sites: translatable (`(t)`) props must be filled in EVERY locale.
+  // The rule is about writing PROPS (blocks + propsSchema defaults), so it ships
+  // only where a prop-writing tool is in scope — bare `translate` doesn't need it.
+  const writesTranslatable =
+    authorsComponents || composesPages || has("set_block_props");
   const locales = (opts.locales ?? []).filter((l) => typeof l === "string" && l);
-  if (locales.length > 1) {
+  if (writesTranslatable && locales.length > 1) {
     const [def] = locales;
     const example = `{ ${locales.map((l) => `"${l}":"…"`).join(", ")} }`;
     parts.push(
@@ -312,7 +336,9 @@ export function buildSystemPrompt(opts: {
   }
 
   const collections = opts.collections ?? [];
-  if (collections.length > 0) {
+  const usesCollections =
+    has("query_collection") || has("bind_component") || has("bind_list");
+  if (usesCollections && collections.length > 0) {
     parts.push(
       "This Site's content collections (pass the EXACT table name to " +
         "query_collection / bind_component / bind_list — do NOT guess the bare " +
@@ -323,11 +349,13 @@ export function buildSystemPrompt(opts: {
     );
   }
 
+  if (has("list_assets"))
   parts.push(
     "When a design references an image, call list_assets and use a returned " +
       "/media/<key> URL — never invent image URLs.",
   );
 
+  if (has("set_block_props"))
   parts.push(
     "Editing an EXISTING page's content: to change a block's text or props (a hero " +
       "title, a button label, an image), call set_block_props with the page id, the " +
@@ -345,6 +373,7 @@ export function buildSystemPrompt(opts: {
       "your change applied, never a partial tree.",
   );
 
+  if (has("bind_list"))
   parts.push(
     "Selects/comboboxes are a List block, NOT a component: a List with " +
       "presentation:\"combobox\" stamps its item component per row inside a " +
@@ -358,6 +387,7 @@ export function buildSystemPrompt(opts: {
       "fields you're changing.",
   );
 
+  if (has("bind_list"))
   parts.push(
     "A plain List (presentation:\"list\", the default) also has LAYOUT options on " +
       "bind_list: `direction` = \"vertical\" (default), \"horizontal\", or \"grid\"; " +

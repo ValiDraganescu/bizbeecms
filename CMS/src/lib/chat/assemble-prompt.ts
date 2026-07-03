@@ -12,7 +12,11 @@
  * NOT pure (it reads stores), so it can't live in tool-scopes.ts. It owns the
  * @/db + @/lib imports; the pure scoping logic stays in tool-scopes.ts.
  */
-import { contextPrompt, type AdminPageContext } from "@/lib/chat/tool-scopes";
+import {
+  contextPrompt,
+  toolsForContext,
+  type AdminPageContext,
+} from "@/lib/chat/tool-scopes";
 import { getSiteIdentity, getContentLocales } from "@/db/settings-store";
 import { listComponents } from "@/db/component-store";
 import { listCollections } from "@/db/collection-store";
@@ -79,6 +83,10 @@ export async function assembleSystemPrompt(
       builtins: builtinBlockTypes(),
       collections,
       locales,
+      // Context-aware gating: each base-prompt section ships only where its
+      // tools are in scope (media/settings/collections drop authoring prose).
+      // "general" scopes every tool, so it keeps the full prompt.
+      tools: toolsForContext(context),
     }) +
     "\n\n" +
     contextPrompt(context)
