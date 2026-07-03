@@ -49,8 +49,15 @@ export const LIST_DATA_SOURCES_TOOL = {
       "(id, name, method, path, query, and the {placeholder} names the request " +
       "expects). Use this to discover what can be tested (test_data_source) or " +
       "bound to components (bind_component / create_list / bind_list with " +
-      "`source` + `request`). Secrets are never returned — only whether one is set.",
-    parameters: { type: "object", properties: {} },
+      "`source` + `request`). Secrets are never returned — only whether one is " +
+      "set. Paged: the result includes a `total`; pass `offset` for more.",
+    parameters: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max sources to return (default 20, max 100)." },
+        offset: { type: "number", description: "Skip this many rows (paging; default 0)." },
+      },
+    },
   },
 } as const;
 

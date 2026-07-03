@@ -171,7 +171,7 @@ export const QUERY_COLLECTION_TOOL = {
         search: { type: "string", description: "Free-text search over text fields." },
         status: { type: "string", description: "Filter by status (e.g. draft|published)." },
         archived: { type: "string", enum: ["live", "archived", "all"], description: "Which items: live (default), archived, or all." },
-        limit: { type: "number", description: "Page size (1-1000, default 1000)." },
+        limit: { type: "number", description: "Page size (1-1000, default 20). The result carries `total` — raise limit or pass offset for more." },
         offset: { type: "number", description: "Row offset (default 0)." },
       },
       required: ["collection"],
@@ -458,6 +458,10 @@ export function validateQuery(
 
   if (typeof rec.limit === "number" && Number.isFinite(rec.limit)) spec.limit = rec.limit;
   else if (typeof rec.limit === "string" && rec.limit.trim() !== "" && Number.isFinite(Number(rec.limit))) spec.limit = Number(rec.limit);
+  // Small default page for the AI tool (the compiler's own default is 1000, which
+  // dumps a whole store into model context — the ~6.8k-token accidental query).
+  // Only THIS tool path defaults to 20; REST/binding callers pass their own limit.
+  else spec.limit = 20;
   if (typeof rec.offset === "number" && Number.isFinite(rec.offset)) spec.offset = rec.offset;
   else if (typeof rec.offset === "string" && rec.offset.trim() !== "" && Number.isFinite(Number(rec.offset))) spec.offset = Number(rec.offset);
 

@@ -25,8 +25,14 @@ export const LIST_PROMPTS_TOOL = {
   function: {
     name: "list_prompts",
     description:
-      "List the saved system-prompt versions (newest first) — each is a named full version of the AI assistant's system prompt an operator saved to compare. Returns id, label, prompt text, and created time.",
-    parameters: { type: "object", properties: {} },
+      "List the saved system-prompt versions (newest first) — each is a named full version of the AI assistant's system prompt an operator saved to compare. Returns id, label, prompt text, and created time. Paged: the result includes a `total`; pass `offset` for more.",
+    parameters: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max versions to return (default 20, max 100)." },
+        offset: { type: "number", description: "Skip this many rows (paging; default 0)." },
+      },
+    },
   },
 } as const;
 

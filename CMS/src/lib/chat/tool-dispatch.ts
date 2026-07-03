@@ -25,7 +25,8 @@ import {
   CREATE_TRANSLATION_TOOL,
   validateTranslationInput,
 } from "./translate-tool";
-import { LIST_ASSETS_TOOL, coerceLimit, formatAssetList } from "./list-assets-tool";
+import { LIST_ASSETS_TOOL, DEFAULT_ASSET_LIMIT, MAX_ASSET_LIMIT, formatAssetList } from "./list-assets-tool";
+import { coercePageArgs, pagedResult } from "./paging";
 import {
   LIST_COMPONENTS_TOOL,
   GET_COMPONENT_TOOL,
@@ -337,15 +338,19 @@ async function handleTranslate(args: unknown): Promise<Record<string, unknown>> 
 async function handleListAssets(args: unknown): Promise<Record<string, unknown>> {
   try {
     const rows = await listAssets();
-    return { ok: true, assets: formatAssetList(rows, coerceLimit(args)) };
+    return pagedResult(
+      "assets",
+      formatAssetList(rows),
+      coercePageArgs(args, DEFAULT_ASSET_LIMIT, MAX_ASSET_LIMIT),
+    );
   } catch (err) {
     return { ok: false, errors: [`failed to list assets: ${(err as Error).message}`] };
   }
 }
 
-async function handleListComponents(): Promise<Record<string, unknown>> {
+async function handleListComponents(args: unknown): Promise<Record<string, unknown>> {
   try {
-    return { ok: true, components: formatComponentList(await listComponents()) };
+    return pagedResult("components", formatComponentList(await listComponents()), coercePageArgs(args));
   } catch (err) {
     return { ok: false, errors: [`failed to list components: ${(err as Error).message}`] };
   }
@@ -383,9 +388,9 @@ async function handleGetComponent(args: unknown): Promise<Record<string, unknown
   }
 }
 
-async function handleListPages(): Promise<Record<string, unknown>> {
+async function handleListPages(args: unknown): Promise<Record<string, unknown>> {
   try {
-    return { ok: true, pages: formatPageList(await listPages()) };
+    return pagedResult("pages", formatPageList(await listPages()), coercePageArgs(args));
   } catch (err) {
     return { ok: false, errors: [`failed to list pages: ${(err as Error).message}`] };
   }
@@ -876,7 +881,12 @@ async function handleQueryCollection(args: unknown): Promise<Record<string, unkn
   try {
     const res = await queryCollection(requested, valid.value.spec);
     if (!res.ok) return { ok: false, errors: [res.error] };
-    return { ok: true, items: res.plan.items, total: res.plan.total, limit: res.plan.limit, offset: res.plan.offset };
+    const { items, total, limit, offset } = res.plan;
+    const out: Record<string, unknown> = { ok: true, items, total, limit, offset };
+    if (offset + items.length < total) {
+      out.hint = `showing ${items.length} of ${total} — more available; call again with offset=${offset + items.length} (or raise limit, max 1000)`;
+    }
+    return out;
   } catch (err) {
     return { ok: false, errors: [`failed to query collection: ${(err as Error).message}`] };
   }
@@ -1007,14 +1017,17 @@ async function resolveSourceAndRequest(
   return { ok: true, source, request };
 }
 
-async function handleListDataSources(): Promise<Record<string, unknown>> {
+async function handleListDataSources(args: unknown): Promise<Record<string, unknown>> {
   try {
-    const sources = await listDataSources();
-    const out: Record<string, unknown>[] = [];
-    for (const s of sources) {
-      out.push(formatSource(s, await listDataSourceRequests(s.id)));
+    // Page the raw source rows first, then fetch saved requests only for the
+    // page (not the whole store), and swap the shaped items into the result.
+    const res = pagedResult("sources", await listDataSources(), coercePageArgs(args));
+    const shaped: Record<string, unknown>[] = [];
+    for (const s of res.sources as Awaited<ReturnType<typeof listDataSources>>) {
+      shaped.push(formatSource(s, await listDataSourceRequests(s.id)));
     }
-    return { ok: true, sources: out };
+    res.sources = shaped;
+    return res;
   } catch (err) {
     return { ok: false, errors: [`failed to list data sources: ${(err as Error).message}`] };
   }
@@ -1561,9 +1574,9 @@ async function handleBindForm(args: unknown): Promise<Record<string, unknown>> {
 // to compare). Storing/editing a version NEVER changes the site's active default
 // — selecting one to actually use is the chat route's per-request override path.
 
-async function handleListPrompts(): Promise<Record<string, unknown>> {
+async function handleListPrompts(args: unknown): Promise<Record<string, unknown>> {
   try {
-    return { ok: true, prompts: await listPromptVersions() };
+    return pagedResult("prompts", await listPromptVersions(), coercePageArgs(args));
   } catch (err) {
     return { ok: false, errors: [`failed to list prompts: ${(err as Error).message}`] };
   }
@@ -1685,9 +1698,9 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   create_page: handleCreatePage,
   translate: handleTranslate,
   list_assets: handleListAssets,
-  list_components: () => handleListComponents(),
+  list_components: handleListComponents,
   get_component: handleGetComponent,
-  list_pages: () => handleListPages(),
+  list_pages: handleListPages,
   get_page: handleGetPage,
   list_locales: () => handleListLocales(),
   search_icons: (args) => handleSearchIcons(args),
@@ -1710,14 +1723,14 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   bind_component: handleBindComponent,
   create_list: handleCreateList,
   bind_list: handleBindList,
-  list_prompts: () => handleListPrompts(),
+  list_prompts: handleListPrompts,
   create_prompt: handleCreatePrompt,
   update_prompt: handleUpdatePrompt,
   delete_prompt: handleDeletePrompt,
   edit_text: handleEditText,
   get_authoring_guide: handleGetAuthoringGuide,
   generate_image: handleGenerateImage,
-  list_data_sources: () => handleListDataSources(),
+  list_data_sources: handleListDataSources,
   create_data_source: handleCreateDataSource,
   test_data_source: handleTestDataSource,
   create_form: handleCreateForm,

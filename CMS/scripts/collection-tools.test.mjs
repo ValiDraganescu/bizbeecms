@@ -107,10 +107,12 @@ test("query_collection: shapes filters/sort/search/paging into a QuerySpec", () 
   assert.equal(r.value.spec.offset, 10);
 });
 
-test("query_collection: minimal (collection only) is valid + empty spec", () => {
+test("query_collection: minimal (collection only) is valid + small default page", () => {
   const r = validateQuery({ collection: "content_blog" });
   assert.ok(r.ok);
-  assert.deepEqual(r.value.spec, {});
+  // No explicit limit → the AI-tool default of 20 (NOT the compiler's 1000 —
+  // that dumped whole collections into model context).
+  assert.deepEqual(r.value.spec, { limit: 20 });
 });
 
 test("query_collection: rejects missing collection, bad op, non-array filters", () => {

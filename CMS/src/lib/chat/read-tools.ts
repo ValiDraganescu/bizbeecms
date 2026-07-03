@@ -36,8 +36,16 @@ export const LIST_COMPONENTS_TOOL = {
     description:
       "List the reusable UI components that already exist on this site (names " +
       "and whether each has a props schema). Call this before authoring a " +
-      "component so you reuse or update an existing one instead of duplicating it.",
-    parameters: { type: "object", properties: {}, required: [] },
+      "component so you reuse or update an existing one instead of duplicating " +
+      "it. Paged: the result includes a `total`; pass `offset` for more.",
+    parameters: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max components to return (default 20, max 100)." },
+        offset: { type: "number", description: "Skip this many rows (paging; default 0)." },
+      },
+      required: [],
+    },
   },
 } as const;
 
@@ -66,8 +74,16 @@ export const LIST_PAGES_TOOL = {
     description:
       "List the site's pages (id, slug, parent slug, publish status, and the " +
       "per-locale meta title/description). Call this before creating or editing " +
-      "a page so you reference real slugs/ids.",
-    parameters: { type: "object", properties: {}, required: [] },
+      "a page so you reference real slugs/ids. Paged: the result includes a " +
+      "`total`; pass `offset` for more.",
+    parameters: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max pages to return (default 20, max 100)." },
+        offset: { type: "number", description: "Skip this many rows (paging; default 0)." },
+      },
+      required: [],
+    },
   },
 } as const;
 

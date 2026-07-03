@@ -10,13 +10,14 @@
  * real URL into a component `tree` or block prop.
  *
  * Unlike the write tools (B2/B3/B4) there is no UNTRUSTED artifact to validate —
- * this lists what already exists. The only model-supplied arg is an optional
- * `limit` we clamp. The two PURE concerns mirror the other tools:
+ * this lists what already exists. The only model-supplied args are `limit` +
+ * `offset`, coerced by the shared `paging.ts` helper (which also shapes the
+ * paged result with total + hint). The two PURE concerns mirror the other tools:
  *
  *  1. `LIST_ASSETS_TOOL` — the OpenAI-style function/tool schema.
- *  2. `coerceLimit` / `formatAssetList` — pure shaping of the args and the D1
- *     rows into the tool result the model sees. PURE — no React/D1/CF imports —
- *     so it's unit-tested with the project's dep-free `node --test`.
+ *  2. `formatAssetList` — pure shaping of the D1 rows into the items the model
+ *     sees. PURE — no React/D1/CF imports — so it's unit-tested with the
+ *     project's dep-free `node --test`.
  *
  * The D1 read lives in `db/asset-store.ts` (`listAssets`); the route wires it
  * (`handleListAssets`) and turns the rows into URLs via `assetUrl`.
@@ -58,13 +59,18 @@ export const LIST_ASSETS_TOOL = {
       "each asset's public URL (use it directly in a component's <img> " +
       "src or any image prop), filename and content type. Call this before " +
       "referencing an image so you use a real uploaded asset instead of a " +
-      "placeholder URL.",
+      "placeholder URL. Paged: the result includes a `total`; pass `offset` " +
+      "for more.",
     parameters: {
       type: "object",
       properties: {
         limit: {
           type: "number",
           description: `Max number of assets to return (default ${DEFAULT_ASSET_LIMIT}, max ${MAX_ASSET_LIMIT}).`,
+        },
+        offset: {
+          type: "number",
+          description: "Skip this many rows (paging; default 0).",
         },
       },
       required: [],
@@ -73,26 +79,12 @@ export const LIST_ASSETS_TOOL = {
 } as const;
 
 /**
- * Clamp the model's `limit` arg to a sane range. Tolerates a number, a numeric
- * string (open models emit numbers as strings), missing/garbage → default.
- * PURE, never throws.
- */
-export function coerceLimit(args: unknown): number {
-  const raw = (args as { limit?: unknown } | null | undefined)?.limit;
-  const n = typeof raw === "string" ? Number(raw) : raw;
-  if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) {
-    return DEFAULT_ASSET_LIMIT;
-  }
-  return Math.min(Math.floor(n), MAX_ASSET_LIMIT);
-}
-
-/**
- * Turn D1 asset rows into the tool result the model sees: each row becomes a
+ * Turn D1 asset rows into the tool items the model sees: each row becomes a
  * `{ url, filename, contentType, size }` with the public `/media/<key>` URL.
- * PURE.
+ * Paging (limit/offset/total) is applied by the caller via `paging.ts`. PURE.
  */
-export function formatAssetList(rows: AssetRowLike[], limit: number): AssetListItem[] {
-  return rows.slice(0, limit).map((r) => ({
+export function formatAssetList(rows: AssetRowLike[]): AssetListItem[] {
+  return rows.map((r) => ({
     url: assetUrl(r.key),
     filename: r.filename,
     contentType: r.contentType,

@@ -11,3 +11,7 @@ Read every line before working. Each entry was learned the hard way by a previou
 - In the transcript, `tools` (flat) is what buildModelHistory REPLAYS to the model; `parts` is what the UI RENDERS. Compact/trim `tools[].output` freely at load time — `parts` keeps the cards intact. Exception: legacy threads saved before `parts` existed derive their cards FROM `tools` in `chat.seed`, so those cards show whatever you did to `tools`.
 - The history route's `getThread` already returns `updatedAt` (epoch ms) — no store/route change needed to know a thread's age client-side.
 - CMS dev often runs on :3602 — never run the `opennextjs-cloudflare build` gate while it's up; `tsc --noEmit` + `npm test` are the safe pre-commit checks then.
+- POST /mcp on :3602 answers PLAIN JSON (not SSE) even with `Accept: text/event-stream` — don't regex for `data:` lines when measuring; `json.load` the body directly.
+- query_collection's default-limit-20 lives in `validateQuery` (collection-tools.ts), NOT in the compiler/store — `compileQuery`'s 1000 default still serves REST + list bindings. Don't "fix" the compiler default.
+- Lister paging is in-memory over the store's full row list (pagedResult slices after fetch) — deliberate: the win is model-context tokens, not DB work. Exception: list_data_sources slices sources BEFORE fetching each one's saved requests.
+- Chat tests live in TWO places: `src/**/*.test.ts` AND `scripts/*.test.mjs` — a result-shape change can break a scripts-side lock your src-side grep won't find (list-assets-tool + collection-tools did).
