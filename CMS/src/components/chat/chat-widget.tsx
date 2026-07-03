@@ -33,6 +33,7 @@ import { ModelPicker } from "@/components/chat/model-picker";
 import { resolveInitialModel, loadModel, saveModel } from "@/lib/chat/selected-model";
 import { formatUsd } from "@/lib/chat/credit";
 import { nextUnread } from "@/lib/chat/unread-badge";
+import { compactStaleThreadMessages } from "@/lib/chat/compact-stale";
 import { CHAT_OPEN_EVENT } from "@/lib/chat/chat-attach-bus";
 import { nextTabStop } from "@/lib/chat/focus-trap";
 import {
@@ -285,11 +286,16 @@ export function ChatWidget() {
       const j = (await res.json()) as {
         thread?: {
           id: string;
+          updatedAt?: number;
           messages: { role: string; content: string; tools?: unknown[]; parts?: unknown[]; media?: unknown[] }[];
         };
       };
       if (!j.thread) return;
-      chat.seed(j.thread.messages);
+      // Stale-thread compaction: a thread cold for >24h gets oversized tool
+      // RESULTS stubbed before seeding, so the next send doesn't replay them
+      // forever. Fresh threads pass through by reference — NEVER mutate a
+      // live thread's replayed history (it breaks provider prompt caching).
+      chat.seed(compactStaleThreadMessages(j.thread.messages, j.thread.updatedAt ?? NaN));
       threadId.current = j.thread.id;
       try {
         sessionStorage.setItem(THREAD_KEY, j.thread.id);
