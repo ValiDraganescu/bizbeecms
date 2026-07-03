@@ -735,3 +735,58 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `CMS/messages/{en,fi,et}.json`,
   `.orchestrator/meeseeks/goals/site-export-import/FORMAT.md`, `BACKLOG.md`,
   `JOURNAL.md`, `CAVEATS.md`, `NEXT.md`.
+
+## 2026-07-03 10:03 — Zip import: single site.zip upload, unzip client-side, auto-push bundled asset bytes
+- **Status:** DONE
+- **What I did:** Taught `ExportImportManager`'s Import picker to accept the
+  SAME `site.zip` the Export button now produces (last run), completing the
+  2026-07-03 user-requested pair. `pickFile()` now sniffs the picked file:
+  `.zip` extension OR a peek at the first 4 bytes for the `PK\x03\x04` zip
+  magic (covers a renamed/extensionless file) → `unzipSync` it (fflate,
+  already a dep), pull `unzipped["site.json"]`, `JSON.parse(strFromU8(...))`
+  it, and stash every OTHER unzipped entry in a new `zipAssets: Map<string,
+  Uint8Array>` state keyed by the exact zip entry path. Everything downstream
+  is UNCHANGED: the parsed envelope still drives
+  `/api/site-import/validate` → review UI → typed-confirm →
+  `/api/site-import` execute exactly as before — zero server-route changes,
+  per NEXT.md's explicit instruction not to touch those routes.
+  The asset-upload leg (`runImport()`'s loop over `assetKeysToUpload`) now
+  prefers `zipAssets.get(key)` bytes over the old manual multi-file picker;
+  since `assetKeysToUpload` entries ARE `asset.key` verbatim (same as the zip
+  entry paths — confirmed both in FORMAT.md and by the live check below), no
+  re-derivation/stripping was needed, matching the NEXT.md instruction to the
+  letter. Kept the bare-`site.json` path fully working: when `isZip` is
+  false, `zipAssets` is left `null`, and the UI falls back to showing the
+  original manual multi-file "pick assets" input (backward compat, required
+  by BACKLOG). Added a `pickAssetsBundled` copy string (EN/FI/ET) shown
+  instead of the manual picker whenever a zip's assets are already bundled.
+  Updated `pickFileLabel`/`badJson` copy in all 3 locales to mention zip.
+  One `BodyInit` typing snag: `fetch(..., { body: uint8array })` doesn't
+  typecheck directly against this repo's `lib.dom` config (Uint8Array's
+  `buffer: ArrayBufferLike` isn't assignable to the stricter `ArrayBuffer`
+  the fetch overloads want) — fixed by `zipBytes.slice().buffer` (a fresh
+  copy sidesteps the `ArrayBufferLike`/`SharedArrayBuffer` mismatch); see
+  CAVEATS.
+- **Verified:** `tsc --noEmit` clean; `npm test` 1505/1505 (no new pure-logic
+  unit needed — this is client-only orchestration wiring already-tested
+  `fflate` + the already-tested import REST endpoints, nothing new to unit
+  test per repo discipline). LIVE end-to-end round-trip on a real second
+  instance: started `scripts/scratch-instance.sh up 3603` alongside the
+  already-running primary dev server (:3602, left untouched), then ran a
+  standalone Node script (mirrors the component's exact logic: fetch envelope
+  + all 61 real asset bytes from :3602, `zipSync` them, `unzipSync` the
+  result, POST to `:3603/api/site-import/validate` → execute → upload every
+  asset straight from the unzipped in-memory bytes to
+  `/api/site-import/asset/<key>`, no separate file-picking). Confirmed: (a)
+  every `asset.key` has a matching zip entry path verbatim, (b) dry-run
+  willCreate == execute restored == 13 pages/136 versions/41 components/7
+  collections/73 rows/61 assets/6 data sources/12 requests/2 prompt versions,
+  (c) all 61/61 assets uploaded successfully from zip bytes, (d) one asset's
+  sha256 BEFORE zipping == sha256 fetched back from the target AFTER import
+  (`52aed40c...` both sides) — genuinely byte-identical round trip. Tore down
+  the scratch instance after (`scratch-instance.sh down`); confirmed primary
+  :3602 still listening throughout and after.
+- **Files:** `CMS/src/components/settings/export-import-manager.tsx`,
+  `CMS/messages/{en,fi,et}.json`,
+  `.orchestrator/meeseeks/goals/site-export-import/BACKLOG.md`,
+  `JOURNAL.md`, `CAVEATS.md`, `NEXT.md`.

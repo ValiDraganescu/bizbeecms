@@ -14,10 +14,14 @@
  * per-asset endpoints as before, just bundles them in the browser instead of
  * offering N separate downloads.
  *
- * Import: pick the exported `site.json` → validate (dry-run report + typed
- * site-name confirmation) → execute (destructive) → upload every asset the
- * response lists in `assetKeysToUpload`, matched by filename against a
- * multi-file picker.
+ * Import: pick the exported file — either `site.zip` (unzipped CLIENT-SIDE
+ * with fflate: `site.json` extracted, every other entry kept in memory as
+ * that asset's bytes, keyed by its zip entry path, which IS `asset.key`
+ * verbatim per FORMAT.md §4a) or a bare `site.json` (back-compat: no bundled
+ * bytes, falls back to a manual multi-file asset picker) → validate (dry-run
+ * report + typed site-name confirmation) → execute (destructive) → upload
+ * every asset the response lists in `assetKeysToUpload`, either straight from
+ * the unzipped bytes or matched by filename against the manual picker.
  *
  * REST-only (no server actions). Copy via next-intl. Never native confirm() —
  * the destructive step is gated by a typed-text match, not a dialog.
@@ -25,7 +29,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { zipSync, type Zippable } from "fflate";
+import { zipSync, unzipSync, strFromU8, type Zippable } from "fflate";
 
 interface SiteEnvelope {
   format: string;
@@ -80,6 +84,7 @@ export function ExportImportManager() {
   const [report, setReport] = useState<DryRunReport | null>(null);
   const [confirmText, setConfirmText] = useState("");
   const [assetFiles, setAssetFiles] = useState<File[]>([]);
+  const [zipAssets, setZipAssets] = useState<Map<string, Uint8Array> | null>(null);
   const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 });
   const [result, setResult] = useState<ImportResult | null>(null);
   const [uploadFailures, setUploadFailures] = useState<string[]>([]);
@@ -125,6 +130,7 @@ export function ExportImportManager() {
     setReport(null);
     setConfirmText("");
     setAssetFiles([]);
+    setZipAssets(null);
     setUploadProgress({ done: 0, total: 0 });
     setResult(null);
     setUploadFailures([]);
@@ -134,12 +140,36 @@ export function ExportImportManager() {
     setImportError(null);
     setBusy(true);
     try {
-      const text = await file.text();
+      // Detect zip by extension or the "PK\x03\x04" magic (peek first 4 bytes) —
+      // covers a renamed/extensionless file too, bare .json stays a plain-text parse.
+      const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+      const isZip =
+        file.name.toLowerCase().endsWith(".zip") ||
+        (head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04);
+
       let parsed: unknown;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        throw new Error(t("badJson"));
+      if (isZip) {
+        const unzipped = unzipSync(new Uint8Array(await file.arrayBuffer()));
+        const siteJson = unzipped["site.json"];
+        if (!siteJson) throw new Error(t("badJson"));
+        try {
+          parsed = JSON.parse(strFromU8(siteJson));
+        } catch {
+          throw new Error(t("badJson"));
+        }
+        const bytes = new Map<string, Uint8Array>();
+        for (const [key, data] of Object.entries(unzipped)) {
+          if (key !== "site.json") bytes.set(key, data);
+        }
+        setZipAssets(bytes);
+      } else {
+        const text = await file.text();
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          throw new Error(t("badJson"));
+        }
+        setZipAssets(null);
       }
       const res = await fetch("/api/site-import/validate", {
         method: "POST",
@@ -188,17 +218,22 @@ export function ExportImportManager() {
       setStep("uploading");
       setUploadProgress({ done: 0, total: toUpload.length });
       const failures: string[] = [];
+      // zip entries are keyed by asset.key verbatim (FORMAT.md §4a) — no
+      // re-derivation needed. Bare-json imports have no bundled bytes, so
+      // fall back to the manual multi-file picker matched by filename.
       const byFilename = new Map(assetFiles.map((f) => [f.name, f]));
       const byKeyTail = new Map(assetFiles.map((f) => [f.name.split("/").pop() ?? f.name, f]));
       for (const key of toUpload) {
+        const zipBytes = zipAssets?.get(key);
         const file = byFilename.get(key) ?? byKeyTail.get(key.split("/").pop() ?? key);
-        if (!file) {
+        if (!zipBytes && !file) {
           failures.push(key);
         } else {
           try {
+            const body: BodyInit = zipBytes ? zipBytes.slice().buffer : await file!.arrayBuffer();
             const up = await fetch(`/api/site-import/asset/${key}`, {
               method: "POST",
-              body: await file.arrayBuffer(),
+              body,
             });
             if (!up.ok) failures.push(key);
           } catch {
@@ -266,7 +301,7 @@ export function ExportImportManager() {
             <span className="font-medium">{t("pickFileLabel")}</span>
             <input
               type="file"
-              accept="application/json"
+              accept=".zip,application/zip,application/json"
               disabled={busy}
               className="text-foreground-muted file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-primary-foreground hover:file:bg-primary-hover disabled:opacity-50"
               onChange={(e) => {
@@ -331,7 +366,13 @@ export function ExportImportManager() {
               </div>
             )}
 
-            {artifact.tables.asset.length > 0 && (
+            {artifact.tables.asset.length > 0 && zipAssets && (
+              <p className="text-sm text-foreground-muted">
+                {t("pickAssetsBundled", { count: artifact.tables.asset.length })}
+              </p>
+            )}
+
+            {artifact.tables.asset.length > 0 && !zipAssets && (
               <label className="flex flex-col gap-2 text-sm text-foreground">
                 <span className="font-medium">
                   {t("pickAssetsLabel", { count: artifact.tables.asset.length })}
