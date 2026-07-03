@@ -686,3 +686,52 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `CMS/src/app/api/site-import/validate/route.ts`,
   `.orchestrator/meeseeks/goals/site-export-import/FORMAT.md`, `BACKLOG.md`,
   `JOURNAL.md`, `NEXT.md`.
+
+## 2026-07-03 09:55 — One-file zip export (client-side, fflate)
+- **Status:** DONE
+- **What I did:** Per the manager-hinted USER REQUEST (2026-07-03), the Export
+  button now downloads ONE `site-<name>-<ts>.zip` instead of a bare
+  `site.json` + a separate per-asset download list. Zero server changes:
+  `ExportImportManager.runExport()` still calls the exact same
+  `GET /api/site-export` (envelope) and `GET /api/site-export/asset/<key>`
+  (per-asset bytes) endpoints as before, then bundles everything CLIENT-SIDE
+  with `fflate`'s `zipSync` (`level: 0` — no compression, gallery images are
+  already compressed) before triggering one download. This REVERSES FORMAT.md
+  §4's earlier "reject single-zip" call, but only for the CLIENT packaging
+  step — the server-side manifest+per-asset HTTP protocol §4 already
+  documented is completely unchanged, so the Workers 100MB body-ceiling
+  argument that motivated the original rejection never applies (the zip is
+  built in the browser tab from bytes already downloaded over N small
+  responses, not built inside a Worker). Added `fflate` (^0.8.3) as a real
+  `CMS/package.json` dependency (previously absent — confirmed by the prior
+  Meeseeks). Retired the per-asset "Download" button/list (superseded by the
+  zip) and added an export-progress readout (`Zipping… {done}/{total} assets`)
+  since the loop now takes a few seconds for a gallery-heavy site. New i18n
+  keys (`exportingProgress`, reworded `exportSubtitle`/`exportDone`) in all 3
+  locales (en/fi/et); removed the now-dead `downloadAsset` key (confirmed
+  zero remaining references). Documented the zip layout in FORMAT.md §4a.
+  Import stays 100% untouched this run (still expects bare `site.json` +
+  per-asset multipart uploads) — the zip-import half is explicitly the NEXT
+  task per the manager's hint, deliberately not taken this run to keep the
+  slice small.
+- **Verified:** `npx tsc --noEmit` clean. `npm test` still 1505/1505 (no new
+  pure-logic unit — this is a client-only UI change wiring an already-tested
+  third-party lib, nothing new to unit-test per the repo's "test business
+  logic only" discipline). Live-verified the actual zip/asset-key logic
+  against the real running dev server (:3602) with a standalone Node script
+  using the SAME `fflate` + fetch calls the component makes: fetched the real
+  export envelope + 3 real asset bytes, `zipSync`'d them, then `unzipSync`'d
+  the result and confirmed (a) `site.json` extracts and parses back to the
+  same `format`, (b) the asset entry paths are correctly `assets/<file>`
+  (single-prefixed, NOT `assets/assets/<file>`), (c) the round-tripped asset
+  bytes are byte-IDENTICAL (`Buffer.compare === 0`) to what was fetched.
+  Caught and fixed one real bug during this check: `asset.key` in the DB/R2 is
+  ALREADY namespaced `assets/<file>` — my first draft used
+  `` `assets/${a.key}` `` as the zip entry path, which would have produced
+  `assets/assets/<file>.jpg` inside every shipped zip. Fixed to use `a.key`
+  verbatim as the entry path once caught by the live check.
+- **Files:** `CMS/package.json` (+`fflate` dep), `CMS/package-lock.json`,
+  `CMS/src/components/settings/export-import-manager.tsx`,
+  `CMS/messages/{en,fi,et}.json`,
+  `.orchestrator/meeseeks/goals/site-export-import/FORMAT.md`, `BACKLOG.md`,
+  `JOURNAL.md`, `CAVEATS.md`, `NEXT.md`.

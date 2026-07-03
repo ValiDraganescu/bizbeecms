@@ -1,42 +1,50 @@
 # Note to the next Meeseeks (site-export-import)
 
-This run took the manager-hinted gap-check: verified the CAVEATS-flagged
-`MAX_READ_ROWS` (1000-row) truncation was a REAL bug, not just a documented
-limitation. `contentSelect(\`SELECT * FROM content_x\`)` (no LIMIT/OFFSET)
-silently `.slice(0, 1000)`s its result — a collection with >1000 rows would
-export with only its first 1000 rows and zero indication of data loss.
-Fixed with a new `contentSelectAll` pager (`CMS/src/lib/content/content-db.ts`)
-used by both `GET /api/site-export` (the actual export) and
-`POST /api/site-import/validate` (the dry-run's target-row counter). Regular
-`contentSelect` is UNCHANGED — the cap is still correct for its other
-ordinary-app-read callers; only export/dry-run-style "I need literally every
-row" callers use the new pager. 4 new tests (`content-db.test.ts`), `npm test`
-1505/1505, `tsc --noEmit` clean. FORMAT.md §3 documents the fix.
+This run shipped the ONE-FILE EXPORT half of the 2026-07-03 user request:
+the Export button now downloads a single `site-<name>-<ts>.zip` (`site.json`
++ `assets/<key>` per binary), built CLIENT-SIDE with `fflate`'s `zipSync`
+over the unchanged `/api/site-export` + `/api/site-export/asset/<key>`
+endpoints. Zero server changes. FORMAT.md §4a has the layout + reasoning
+(client-side zip doesn't reopen the Workers-body-size argument that killed
+a *server-built* zip in the original FORMAT.md §4 — the browser already
+downloaded every asset over N small responses before zipping them).
 
-Also checked (per the hint) whether other tables have an equivalent cap:
-pages/page-versions/components/assets/collections registry all go through
-plain Drizzle `db.select().from(schema.x)`, which has NO row cap — confirmed
-no equivalent gap there. Nothing else to fix on that front.
+**Your task: the other half — zip IMPORT** (already queued in BACKLOG.md's
+"USER REQUEST 2026-07-03" section, second line):
+1. The Import file picker (`ExportImportManager`'s `step==="pick"` input,
+   currently `accept="application/json"`) needs to also accept `.zip` —
+   detect which one was picked (extension, or peek the first 4 bytes for the
+   `PK\x03\x04` zip magic) and branch:
+   - Bare `.json` → today's path unchanged (`JSON.parse(file.text())`).
+   - `.zip` → `unzipSync(new Uint8Array(await file.arrayBuffer()))` (fflate,
+     already a dependency now), pull `unzipped["site.json"]` and
+     `JSON.parse(strFromU8(...))` it, then treat every OTHER entry
+     (`assets/<file>`) as the asset bytes to upload later.
+2. Feed the parsed envelope into the EXISTING `/api/site-import/validate` →
+   review → typed-confirm → `/api/site-import` execute flow completely
+   unchanged (don't touch those routes or the dry-run report UI at all).
+3. Replace the current "pick asset files via a second multi-file `<input>`"
+   step with pushing the bytes straight from the ALREADY-unzipped
+   `assets/<key>` entries (no second file picker needed once you have a zip
+   — you already have every asset's bytes in memory) through the existing
+   `POST /api/site-import/asset/<key>` route. **`assetKeysToUpload` from the
+   execute response IS the zip entry path verbatim** (both are `asset.key`,
+   confirmed this run — no re-derivation/stripping needed, see this run's
+   CAVEATS entry about `asset.key` already being `assets/<file>`-namespaced).
+4. Keep the bare-`site.json`-only upload path working too (backward compat,
+   explicitly required by BACKLOG) — in that case there's no bundled asset
+   bytes, so fall back to today's separate multi-file asset picker for that
+   branch only.
+5. Live-verify a FULL zip round-trip end-to-end: export a real zip from
+   :3602, import it into a scratch second instance
+   (`CMS/scripts/scratch-instance.sh up <port>` — already built, use it, see
+   CAVEATS for the two gotchas already fixed in it), confirm at least one
+   asset is sha256-identical after the round trip (`crypto.subtle.digest` or
+   Node's `crypto.createHash` on both the pre-zip fetch and the post-import
+   R2 object, or just byte-compare like this run's Node sanity check did).
 
-**This goal is very likely feature-complete + now gap-checked for its GOAL.md
-scope.** Everything in BACKLOG.md's `## Tasks` and both rounds of "New TODOs"
-is DONE except one deliberately-parked LOW-priority UX nit (confirm-string
-copy — already fine, re-open only if reported). If you're picking this up
-next, reasonable options:
-
-1. **Flag to the curator that this goal is ready to archive** (like
-   page-builder/ai-assistant/binding-adapters/deploy-audit-trail/
-   custom-domains) — it's had a real cross-instance E2E pass, a completeness
-   gap-check, wipe-loop atomicity hardening, and reusable 2nd-instance
-   tooling. This is the strongest option if the user agrees there's no more
-   must-have work.
-2. If NOT archived yet, a genuinely fresh angle: performance, not
-   correctness — the import EXECUTE path inserts collection rows one
-   `contentWrite` call PER ROW (no batching), so a huge collection (say
-   10k+ rows) would do 10k sequential D1 round-trips on import. Not
-   incorrect, just slow. Only worth tackling if someone actually hits a
-   large-collection import in practice — no evidence of that yet, so low
-   priority; would want a realistic scale number before optimizing.
-3. Re-run the scratch-instance E2E pass with a NON-empty target (the
-   original E2E slice only tested an empty target) if you want a second
-   layer of cross-instance confidence beyond what's already been done.
+Everything else in BACKLOG.md's `## Tasks` + both "New TODOs" sections is
+still DONE from before — don't re-touch those. The goal is otherwise still
+"very likely feature-complete" per the prior NEXT.md note; this zip-export/
+import pair is genuinely new user-requested scope on top of that baseline,
+not a gap in the original build.

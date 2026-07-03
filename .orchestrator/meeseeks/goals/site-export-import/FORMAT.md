@@ -83,18 +83,27 @@ Rules:
 - **No checksums in v1.** ponytail: the artifact travels as one authenticated (operator-only, same-origin) HTTP request/response pair, not over an untrusted channel — a checksum guards against transport corruption we have no other evidence of yet. Add a `sha256` counts field later only if a real corruption incident shows up.
 - **`format`/`version` are the trust-boundary gate on import**, exactly like `PORTABLE_FORMAT`/`PORTABLE_VERSION` in `portable.ts` — reject anything else outright, no partial-tolerant parsing at the envelope level (unlike the kit bundle's per-component partial tolerance, a site import is all-or-nothing per GOAL.md's "de-facto resetting" framing).
 
-## 4. Asset bytes — size strategy: **manifest + per-asset fetch/upload protocol** (not a single zip)
+## 4. Asset bytes — size strategy: manifest + per-asset fetch/upload protocol, **zipped client-side into one file (§4a)**
 
-**Decision: reject the single-zip-via-fflate approach. Use `site.json` (the envelope above, WITHOUT bytes) + a separate per-asset download/upload leg, driven by one export/import UI flow.**
+**Decision: keep the manifest + per-asset HTTP protocol below (server side, unchanged) — `site.json` (the envelope, WITHOUT bytes inline) + a separate per-asset download/upload leg. The ONE-FILE requirement (USER REQUEST 2026-07-03) is satisfied entirely in the browser: the export UI fetches the same envelope + per-asset bytes it always did, then zips them CLIENT-SIDE with `fflate` before triggering the download. Zero server changes.**
 
-Justification:
-- `fflate` is **not an installed dependency** (checked `package.json` — confirmed absent) and Workers' ~100MB request/response body ceiling (GOAL.md's own constraint) makes "build one zip in a Worker's memory, stream it out" a real ceiling for any gallery-heavy site — a manifest+per-asset protocol has no such cap since each asset moves as its own request.
-- The `Storage` port (`lib/ports/storage.ts`) already exposes exactly `put`/`get`/`delete` per key — a per-asset fetch/upload maps 1:1 onto the existing port with zero new capability, whereas a zip would need buffering the whole bucket contents into one in-Worker archive (fights the "streamable/chunkable" constraint GOAL.md explicitly calls out).
-- The user's bar is "one export, one import" as a UX experience, not a literal single HTTP transfer — GOAL.md says this explicitly: *"a `site.json` + per-asset download/upload protocol behind one export/import UI is acceptable."*
+Justification (why client-side zip, not a server-built zip):
+- `fflate` was previously rejected as "not installed" — now added as a direct dependency (`CMS/package.json`) specifically for this client-only use. It never runs in the Worker; `zipSync` executes in the browser tab, so the Workers ~100MB request/response ceiling (the reason a *server-built* zip was rejected) never applies — the browser already downloaded every asset individually over N small responses exactly as before, `fflate` just archives bytes already sitting in the tab's memory.
+- The `Storage`/export/import REST surface (§4's protocol, unchanged) still moves one small JSON blob + N independent asset blobs — no new server-side trust boundary, no new route, no per-request size cap increase. The zip step is purely a client packaging convenience layered on top.
+- Satisfies the user's literal ask ("download all in one go, maybe zip it") without reopening the streamable/chunkable constraint GOAL.md calls out for the SERVER side — that constraint is about what the Worker buffers in one request/response, not what the browser assembles client-side after the fact.
 
-**Protocol:**
-- Export: `GET /api/site-export` returns `site.json` (the envelope, `tables.asset` lists every asset's metadata + key, no bytes inline). A second endpoint `GET /api/site-export/asset/<key>` streams one asset's raw bytes (content-type from the `asset` row) — called once per key by the export UI (or a follow-up script) to assemble a **downloadable bundle on the client** (e.g. the browser zips via a client-side lib, or simply saves `site.json` + an `/assets/` folder — UI slice decides the exact client packaging, out of scope for this format doc).
-- Import: `POST /api/site-import` accepts `site.json` first (validate + dry-run report, no writes — see §6). On confirm, the execute step inserts all D1 rows, THEN for each `asset` row the client/UI uploads the corresponding bytes to `POST /api/site-import/asset/<key>` (operator-only, same trust boundary), which calls `Storage.put`. Import is considered complete only once every listed asset key has been uploaded (the dry-run report's asset count is the checklist the UI drives against).
+**Protocol (§4, unchanged) + §4a client zip on top:**
+- Export: `GET /api/site-export` returns the envelope (`tables.asset` lists every asset's metadata + key, no bytes inline); `GET /api/site-export/asset/<key>` streams one asset's raw bytes — both exactly as before.
+- **§4a — one-file export (2026-07-03):** `ExportImportManager`'s `runExport()` now fetches the envelope, then loops every `tables.asset` entry fetching its bytes via the existing per-asset route, and zips the whole set with `fflate`'s `zipSync` into ONE archive:
+  ```
+  site.zip
+  ├── site.json          ← the envelope (§3), verbatim, UTF-8 JSON text
+  └── assets/<file>       ← one entry per asset row, raw bytes; entry path = asset.key VERBATIM
+                             (asset.key is already namespaced "assets/<file>" in the DB/R2 —
+                              don't re-prefix it, or you'd get assets/assets/<file>)
+  ```
+  `zipSync(files, { level: 0 })` — level 0 (store, no compression) since most gallery assets are already-compressed images/video; skips wasted CPU compressing incompressible bytes. Downloaded as `site-<siteName>-<timestamp>.zip`. The per-asset download button/list from the original Admin UI slice is retired (superseded by the zip); the dry-run/import flow is untouched this run — it still accepts a bare `site.json` (import-side zip support is the NEXT task, see BACKLOG).
+- Import: unchanged this run — `POST /api/site-import/validate` / `POST /api/site-import` / `POST /api/site-import/asset/<key>` still expect the envelope JSON + per-asset multipart uploads exactly as before. A future task teaches the Import picker to accept `site.zip` too (unzip client-side, extract `site.json`, drive the same validate→execute→per-asset-upload flow from the zip's `assets/*` entries) — tracked as its own BACKLOG item, deliberately NOT done in this run per the manager's hint to keep this slice small.
 - This keeps every individual HTTP payload small (one D1-rows JSON blob + N independent asset blobs) regardless of total site size — no artificial ceiling on gallery size, and it reuses `Storage.put/get` untouched.
 
 ## 5. Collection schema recreation on import — reuse the fenced DDL path, don't hand-author SQL

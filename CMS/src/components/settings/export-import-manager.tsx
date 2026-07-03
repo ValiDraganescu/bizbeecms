@@ -8,12 +8,11 @@
  * (destructive execute), `POST /api/site-import/asset/<key>` (per-asset
  * upload). No new server logic — this component is pure client orchestration.
  *
- * Export: one click downloads `site-export-<name>.json` (the envelope, no
- * asset bytes inline per FORMAT.md §4) plus lists every asset as an
- * individually-downloadable link — "one export" as one primary action, with
- * the (usually few, large) binary assets available right below it rather than
- * bundled into a single oversized in-memory blob (no zip lib installed, see
- * FORMAT.md §4's own reasoning — this UI follows the same decision).
+ * Export: one click downloads ONE `site-<name>.zip` — `site.json` (the
+ * envelope) + every asset under `assets/<key>` — zipped CLIENT-SIDE with
+ * `fflate` (FORMAT.md §4a). Zero server changes: fetches the same envelope +
+ * per-asset endpoints as before, just bundles them in the browser instead of
+ * offering N separate downloads.
  *
  * Import: pick the exported `site.json` → validate (dry-run report + typed
  * site-name confirmation) → execute (destructive) → upload every asset the
@@ -26,6 +25,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { zipSync, type Zippable } from "fflate";
 
 interface SiteEnvelope {
   format: string;
@@ -54,8 +54,7 @@ interface ImportResult {
 
 type ImportStep = "pick" | "review" | "uploading" | "done";
 
-function downloadJson(filename: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -71,6 +70,7 @@ export function ExportImportManager() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [exported, setExported] = useState<SiteEnvelope | null>(null);
+  const [exportProgress, setExportProgress] = useState({ done: 0, total: 0 });
 
   // --- Import state ---
   const [step, setStep] = useState<ImportStep>("pick");
@@ -87,30 +87,35 @@ export function ExportImportManager() {
   async function runExport() {
     setExporting(true);
     setExportError(null);
+    setExportProgress({ done: 0, total: 0 });
     try {
       const res = await fetch("/api/site-export");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const envelope = (await res.json()) as SiteEnvelope;
       setExported(envelope);
+
+      const assets = envelope.tables.asset;
+      setExportProgress({ done: 0, total: assets.length });
+      const files: Zippable = {
+        "site.json": new TextEncoder().encode(JSON.stringify(envelope)),
+      };
+      for (const a of assets) {
+        const assetRes = await fetch(`/api/site-export/asset/${a.key}`);
+        if (!assetRes.ok) throw new Error(`HTTP ${assetRes.status} (asset ${a.key})`);
+        const bytes = new Uint8Array(await assetRes.arrayBuffer());
+        // ponytail: a.key is already "assets/<file>" (the R2 key namespace) — use it verbatim as the zip entry path, don't double-prefix.
+        files[a.key] = bytes;
+        setExportProgress((p) => ({ ...p, done: p.done + 1 }));
+      }
+
+      const zipped = zipSync(files, { level: 0 });
       const name = envelope.meta.siteName || "site";
-      downloadJson(`site-export-${name}-${Date.now()}.json`, envelope);
+      downloadBlob(`site-${name}-${Date.now()}.zip`, new Blob([zipped], { type: "application/zip" }));
     } catch (err) {
       setExportError((err as Error).message);
     } finally {
       setExporting(false);
     }
-  }
-
-  async function downloadAsset(key: string, filename: string) {
-    const res = await fetch(`/api/site-export/asset/${key}`);
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename || key;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   function resetImport() {
@@ -226,7 +231,9 @@ export function ExportImportManager() {
             disabled={exporting}
             onClick={() => void runExport()}
           >
-            {exporting ? t("exporting") : t("exportButton")}
+            {exporting
+              ? t("exportingProgress", { done: exportProgress.done, total: exportProgress.total })
+              : t("exportButton")}
           </button>
         </div>
         {exportError && (
@@ -234,28 +241,10 @@ export function ExportImportManager() {
             {exportError}
           </p>
         )}
-        {exported && (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-foreground-muted">
-              {t("exportDone", { count: exported.tables.asset.length })}
-            </p>
-            {exported.tables.asset.length > 0 && (
-              <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border border-border bg-surface p-2">
-                {exported.tables.asset.map((a) => (
-                  <li key={a.key} className="flex items-center justify-between gap-2 text-sm">
-                    <span className="truncate text-foreground">{a.filename}</span>
-                    <button
-                      type="button"
-                      className="shrink-0 text-primary hover:underline"
-                      onClick={() => void downloadAsset(a.key, a.filename)}
-                    >
-                      {t("downloadAsset")}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+        {exported && !exporting && (
+          <p className="text-sm text-foreground-muted">
+            {t("exportDone", { count: exported.tables.asset.length })}
+          </p>
         )}
       </section>
 
