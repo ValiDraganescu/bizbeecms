@@ -3,6 +3,7 @@ Children that decompose main/GOAL.md. Each is a directory `goals/<slug>/` with i
 Status: ACTIVE (being worked / available to drive) | PAUSED (set aside by the user) | ARCHIVED (work folded into main, files moved to goals/archive/<slug>/). Goals never end — there is no DONE; ARCHIVED means "delivered, parked for reference".
 
 ## Active
+- site-export-import — full-site export→import between CMS instances: one artifact carrying pages/components/collections+rows/data-sources(sans secrets)/R2 assets/settings; destructive reset-then-restore import with dry-run report + typed confirmation; operator REST + admin UI — ACTIVE
 - tableonline-home — replicate tableonline.fi on the local-site CMS home page as Restovista: teal retheme, all home lists collection-driven (cities/offers/events/restaurants), landing pages for every home link (city wildcard pages, offer detail, book, /search?q=), incl. the param-driven-pages platform feature (deferred Phase 3 of archived content-collections) — ACTIVE
 - sso — make CMS single sign-on LIVE-WORK end-to-end (Google own-client + PM-SSO) on deployed sites incl. custom domains; build shipped in archived cms-auth. First issue: Google `redirect_uri_mismatch` (APP_ORIGIN ignores custom domains; shared root cause with cms-mcp URL bug) — ACTIVE
 - external-data-sources — define external APIs (e.g. weather) as bindable DATA SOURCES w/ configurable auth (header/query/basic/none) + write-only encrypted secret; server-side cached fetch at render; binding seam generalized to collection|api; UI + AI tools (sample+map) — ACTIVE
