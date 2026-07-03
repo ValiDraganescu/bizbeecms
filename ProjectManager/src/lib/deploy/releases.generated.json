@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.20.0",
+      "tag": "r-1.20.0",
+      "markdown": "# CMS v1.20.0\n\n_2026-07-03 · changes since r-1.19.0_\n\n## Features\n- Site export / import: from Settings → Export / Import, download a whole Site as a single `.zip` (pages, components, collections and their items, settings, and asset bytes) and import it into another CMS instance. Import runs a validate + dry-run first, then a destructive replace, uploading the bundled asset bytes automatically.\n\n## Fixes\n- Export no longer silently truncates at 1000 rows — large collections export in full.\n"
+    },
+    {
       "version": "1.19.0",
       "tag": "r-1.19.0",
       "markdown": "# CMS v1.19.0\n\n_2026-07-02 · changes since r-1.18.0_\n\n## Features\n- Dynamic / parameter-driven pages: a page path can carry parameters (e.g. `/:city-slug`, `/offers/:offer-slug`, nested wildcards under a static parent). The matched param resolves at render time — bind sections to it, look up the matching collection item, and surface it in the page's title/meta. Un-matched wildcards return a proper 404.\n- Page params flow into bindings and the AI page tools, so the assistant can author param-driven pages and bind blocks to the resolved item.\n\n## Fixes\n- Deploy: a timed-out or killed deploy no longer wedges a Site in the \"deploying\" state forever — the state now clears so the Site can be redeployed.\n"
@@ -19,11 +24,6 @@
       "version": "1.16.0",
       "tag": "r-1.16.0",
       "markdown": "# CMS v1.16.0\n\n_2026-06-30 · changes since r-1.15.0_\n\n## Features\n- Chat: the assistant can generate images via a new generate-image tool, saving results into your media library.\n- A configurable per-site image-generation model setting, with a manager in admin settings.\n- Model picker and MCP improvements supporting the new image-gen flow.\n"
-    },
-    {
-      "version": "1.15.0",
-      "tag": "r-1.15.0",
-      "markdown": "# CMS v1.15.0\n\n_2026-06-29 · changes since r-1.14.0_\n\n## Features\n- Page builder: per-field translation in the SEO/settings forms, so individual fields can be translated independently.\n- Page builder: a gallery image picker for selecting media-library assets into fields.\n- A configurable translation model setting (per-site translate-model), feeding the translate flow.\n\n## Other\n- Internal refactor: the page-builder shell and the render pipeline were split into smaller per-component / per-concern files (plan-tree, plan-section, plan-list, etc.), plus render hardening. No user-facing change from the refactor itself.\n"
     },
     {
       "version": "0.11.0",
