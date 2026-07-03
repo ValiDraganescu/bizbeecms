@@ -24,6 +24,7 @@ test("detectAdminContext reads the segment after /admin (no locale prefix)", () 
   assert.equal(detectAdminContext("/admin/pages"), "pages");
   assert.equal(detectAdminContext("/admin/settings"), "settings");
   assert.equal(detectAdminContext("/admin/media"), "media");
+  assert.equal(detectAdminContext("/admin/data-sources"), "data-sources");
 });
 
 test("detectAdminContext handles trailing slugs and query/hash", () => {
@@ -50,6 +51,7 @@ test("detectAdminContext accepts a full URL too", () => {
 test("isAdminContext guards untrusted client input", () => {
   assert.equal(isAdminContext("settings"), true);
   assert.equal(isAdminContext("general"), true);
+  assert.equal(isAdminContext("data-sources"), true);
   assert.equal(isAdminContext("artworks"), false); // aicms-only, not ours
   assert.equal(isAdminContext(""), false);
   assert.equal(isAdminContext(undefined), false);
@@ -58,7 +60,7 @@ test("isAdminContext guards untrusted client input", () => {
 
 test("toolsForContext only ever returns EXISTING tool names", () => {
   const known = new Set(KNOWN_TOOL_NAMES);
-  for (const ctx of ["page-builder", "components", "pages", "settings", "media", "general"]) {
+  for (const ctx of ["page-builder", "components", "pages", "settings", "media", "collections", "data-sources", "general"]) {
     const names = toolsForContext(ctx);
     assert.ok(names.length > 0, `${ctx} should expose at least one tool`);
     for (const n of names) {
@@ -90,6 +92,19 @@ test("toolsForContext scopes per page (write + Slice 3 read tools)", () => {
   }
   // general gets the full catalog.
   assert.deepEqual([...toolsForContext("general")].sort(), [...KNOWN_TOOL_NAMES].sort());
+  // data-sources: JUST the source workflow — no binder/page tools (page has no
+  // block surface; binding is a page-builder/pages job).
+  assert.deepEqual(
+    [...toolsForContext("data-sources")].sort(),
+    ["create_data_source", "get_data_sources_guide", "list_data_sources", "test_data_source"],
+  );
+});
+
+test("data-sources contextPrompt leans on the guide, not an inlined playbook", () => {
+  const p = contextPrompt("data-sources");
+  assert.match(p, /get_data_sources_guide/);
+  assert.match(p, /Page Builder/); // redirects binding work to the building contexts
+  assert.ok(p.length < 1200, `keep it short (guide carries the playbook): ${p.length}`);
 });
 
 test("contextPrompt is non-empty and context-specific", () => {

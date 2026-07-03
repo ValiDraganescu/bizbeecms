@@ -23,6 +23,7 @@ export type AdminPageContext =
   | "settings"
   | "media"
   | "collections"
+  | "data-sources"
   | "general";
 
 const KNOWN_CONTEXTS: AdminPageContext[] = [
@@ -32,6 +33,7 @@ const KNOWN_CONTEXTS: AdminPageContext[] = [
   "settings",
   "media",
   "collections",
+  "data-sources",
 ];
 
 // The tools that EXIST in bizbee today (must match each tool's function.name).
@@ -247,6 +249,15 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "drop_collection_field",
     "rename_collection_field",
   ],
+  // Data sources admin: manage external API sources + saved requests, test live
+  // calls. Binding that data into blocks/Lists/forms is a page-building job —
+  // the binder tools live in page-builder/pages (this page has no block surface).
+  "data-sources": [
+    "list_data_sources",
+    "create_data_source",
+    "test_data_source",
+    "get_data_sources_guide",
+  ],
   // Anywhere else: full toolset.
   general: [...KNOWN_TOOL_NAMES],
 };
@@ -270,6 +281,8 @@ const CONTEXT_PROMPTS: Record<AdminPageContext, string> = {
   media: `You are in the Media library. Help the operator find and reference uploaded assets (list_assets) by their /media/<key> URLs.`,
 
   collections: `You are in Collections — the site's structured data. You can define a new typed collection (create_collection: name + typed fields; each collection gets system fields id/slug/status/created_at/updated_at automatically). You can add, update, archive/unarchive/delete items (add_collection_item / update_collection_item / archive_collection_item), and find items with structured filters/sort/search (query_collection — collections are addressed by their content_<slug> table name). You can also evolve a collection's schema: add a new field (add_collection_field — one call per field; this is how you add a property to an EXISTING collection, never create_collection again), drop a user field (drop_collection_field — permanent, data lost), or rename one keeping its data (rename_collection_field). System fields can't be dropped or renamed. Prefer query_collection to discover a collection's table name and item ids before editing. Prefer archiving over deleting.`,
+
+  "data-sources": `You are on the Data Sources page — external APIs this site can pull data from. Configured sources and their saved requests are already listed in this prompt's context when any exist — don't call list_data_sources to rediscover them. You can define a new source with saved requests (create_data_source — its secret is write-only, never readable back) and fetch a live sample of a saved request (test_data_source — its result's paths array lists the mappable response dot-paths). Before any non-trivial work, call get_data_sources_guide for the full playbook (auth modes, placeholders, caching/retries). Binding this data into page blocks, Lists, or forms happens in the Page Builder or Pages assistant, not here — point the operator there for that.`,
 
   general: `You are the site's AI assistant. You can author components, compose pages, translate content, and reference uploaded media. Help the operator with whatever they need.`,
 };

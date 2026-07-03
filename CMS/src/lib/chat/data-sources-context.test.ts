@@ -43,6 +43,9 @@ test("lists source name + auth kind and each request's method/path/params/cache"
   assert.match(out, /cache 60s/);
   assert.match(out, /get_data_sources_guide/); // steers the model to the playbook
   assert.match(out, /test_data_source/);
+  // Binder tools are OUT of the data-sources context scope (ai-context-eng):
+  // the tail must not name-drop tools the model can't call on this page.
+  assert.doesNotMatch(out, /bind_component|create_list|bind_form/);
 });
 
 test("cache-off request says so; empty path renders as /; no-requests source noted", () => {

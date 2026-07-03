@@ -91,3 +91,34 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   Skipped opennextjs build gate — dev server running (CAVEATS).
 - **Files:** CMS/src/lib/settings/site-settings.ts,
   CMS/src/lib/chat/assemble-prompt.ts, CMS/scripts/site-settings.test.mjs
+
+## 2026-07-03 13:07 — New `data-sources` admin context
+- **Status:** DONE
+- **What I did:** Added "data-sources" to AdminPageContext + KNOWN_CONTEXTS
+  (tool-scopes.ts) so /admin/data-sources no longer falls through to `general`.
+  Scoped TOOLS_BY_CONTEXT to the source workflow ONLY: list_data_sources,
+  create_data_source, test_data_source, get_data_sources_guide. Binder tools
+  (bind_component/create_list/bind_list/create_form/bind_form) deliberately
+  EXCLUDED — read the page first per task spec: DataSourcesManager manages
+  sources + saved requests + test calls, no page/block surface, and binders are
+  unusable without get_page/list_pages which would balloon scope back toward
+  general. New short CONTEXT_PROMPT leans on get_data_sources_guide and
+  redirects binding work to Page Builder/Pages. Aligned the inline context
+  block's tail (data-sources-context.ts) to stop name-dropping the now
+  out-of-scope binders.
+- **Measured (live :3602):** debug?context=data-sources → 4 tools, prompt 672
+  tok (section gating drops everything authoring-related);
+  toolSchemasForContext("data-sources") = 4,938 chars ≈ 1,235 tok. Fixed cost
+  ~1.9k tok vs ~17.7k before (42-tool general fallback).
+  debug?pathname=/admin/data-sources detects the new context; general unchanged
+  (42 tools). /mcp tools/list still serves the full catalog by design (context
+  only shapes getPrompt there).
+- **Verified:** tsc --noEmit clean; full suite 1519/1519 (1 new contextPrompt
+  test + new scope/detect/isAdminContext assertions in tool-scopes.test.mjs +
+  a doesNotMatch binder lock in data-sources-context.test.ts). Chip/send path:
+  only a string literal changed in the store; detection + POST-route context
+  resolution share resolveRequestContext, live-verified via the debug GET.
+  admin-nav drift locks don't key off contexts — no change needed. Skipped
+  opennextjs build gate — dev server running (CAVEATS).
+- **Files:** CMS/src/lib/chat/tool-scopes.ts, data-sources-context.ts,
+  data-sources-context.test.ts; CMS/scripts/tool-scopes.test.mjs

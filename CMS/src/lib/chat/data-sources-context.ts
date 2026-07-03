@@ -79,9 +79,8 @@ export function formatDataSourcesContext(
     `[Data sources context] External data sources in this site ` +
     `(saved requests as "name": METHOD path):\n${lines.join("\n")}\n` +
     `Use these source/request names directly with the data-source tools ` +
-    `(test_data_source, bind_component, create_list, bind_form) — do NOT call ` +
-    `list_data_sources to rediscover them. Call get_data_sources_guide for the ` +
-    `full workflow.`
+    `(e.g. test_data_source) — do NOT call list_data_sources to rediscover ` +
+    `them. Call get_data_sources_guide for the full workflow.`
   );
 }
 
