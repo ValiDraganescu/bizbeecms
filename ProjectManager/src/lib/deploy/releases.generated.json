@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.21.0",
+      "tag": "r-1.21.0",
+      "markdown": "# CMS v1.21.0\n\n_2026-07-03 · changes since r-1.20.0_\n\n## Features\n- Page builder: every sizing control now has a rem/px unit picker, and every block's settings panel starts with standard spacing controls (per-side padding & margin). Existing pages keep their current look — legacy defaults are preserved.\n- A more reliable number input across the page builder: fields can be fully cleared while typing (no more values snapping back mid-edit).\n- Chat assistant context engineering: the assistant's system prompt now scopes to the tools available on the current page, and long lists (components, collections) are capped — cutting token cost substantially (e.g. data-sources admin ~17.7k → ~1.9k tokens) with no loss of capability. Old, cold chat threads are compacted on load so they no longer blow up context.\n- Component authoring now lints generated HTML and scripts and reconciles CSS classes, catching malformed output before it ships.\n\n## Fixes\n- SSO: closed a `redirect_uri_mismatch` on login (the shared app-origin fix), verified live.\n"
+    },
+    {
       "version": "1.20.0",
       "tag": "r-1.20.0",
       "markdown": "# CMS v1.20.0\n\n_2026-07-03 · changes since r-1.19.0_\n\n## Features\n- Site export / import: from Settings → Export / Import, download a whole Site as a single `.zip` (pages, components, collections and their items, settings, and asset bytes) and import it into another CMS instance. Import runs a validate + dry-run first, then a destructive replace, uploading the bundled asset bytes automatically.\n\n## Fixes\n- Export no longer silently truncates at 1000 rows — large collections export in full.\n"
@@ -19,11 +24,6 @@
       "version": "1.17.0",
       "tag": "r-1.17.0",
       "markdown": "# CMS v1.17.0\n\n_2026-07-02 · changes since r-1.16.0_\n\n## Features\n- Icon sets: a per-site icon library with an editor in settings and an icon picker in the page builder, so pages can drop in named icons that render on the published site.\n- Components: a \"used-by\" view — see which pages and components consume a given component before you edit it, so the blast radius of a change is visible up front.\n- A built-in Language Switcher block you can place on a page; it renders the site's available content locales for visitors.\n- Chat can produce transparent image cut-outs (background removed) alongside generated images, saved to your media library.\n"
-    },
-    {
-      "version": "1.16.0",
-      "tag": "r-1.16.0",
-      "markdown": "# CMS v1.16.0\n\n_2026-06-30 · changes since r-1.15.0_\n\n## Features\n- Chat: the assistant can generate images via a new generate-image tool, saving results into your media library.\n- A configurable per-site image-generation model setting, with a manager in admin settings.\n- Model picker and MCP improvements supporting the new image-gen flow.\n"
     },
     {
       "version": "0.11.0",
