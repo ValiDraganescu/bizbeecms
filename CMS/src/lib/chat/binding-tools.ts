@@ -178,12 +178,10 @@ const FILTER_SCHEMA = {
       value: {
         description:
           "The comparison value (array for `in`; omit for is_null/not_null). " +
-          "Platform feature — dynamic/param-driven pages: instead of a literal, " +
-          "pass { \"param\": \"city-slug\" } to filter by this page's WILDCARD " +
-          "route param (a slug segment authored as \":city-slug\" via create_page), " +
-          "or { \"query\": \"q\" } to filter by the request's URL query param " +
-          "(e.g. ?q=). Resolved per-request; a clause whose param/query is absent " +
-          "is dropped (no filter), never errors.",
+          "Dynamic pages: instead of a literal, pass { \"param\": \"city-slug\" } " +
+          "(the page's wildcard route segment) or { \"query\": \"q\" } (a URL " +
+          "query param) — absent per-request → clause dropped, never errors " +
+          "(see get_data_sources_guide).",
       },
     },
     required: ["field", "op"],
@@ -192,13 +190,11 @@ const FILTER_SCHEMA = {
 
 const SEARCH_SCHEMA = {
   description:
-    "create_list/bind_list ONLY (collection rows): free-text search, OR'd " +
-    "across the collection's text-typed fields (e.g. name/location) — case-" +
-    "insensitive contains. Use this, not `filter`, when the same needle should " +
-    "match ANY of several fields (filter clauses AND together, this doesn't). " +
-    'Pass a literal string, or { "param": "city-slug" } / { "query": "q" } to ' +
-    "read it from the page's route (same param/query-ref shape as filter " +
-    "values) — dropped (no search) if absent this request.",
+    "Collection rows only: free-text search OR'd across the collection's " +
+    "text-typed fields (case-insensitive contains). Use it, not `filter`, when " +
+    "one needle should match ANY of several fields (filter clauses AND). A " +
+    'literal string, or { "param": … } / { "query": … } route ref (absent → ' +
+    "no search).",
 } as const;
 
 const SORT_SCHEMA = {
@@ -251,16 +247,13 @@ export const BIND_COMPONENT_TOOL = {
   function: {
     name: "bind_component",
     description:
-      "Bind ONE block on a page to a SINGLE data item: the block's props are filled " +
-      "live at render. Two source kinds: a COLLECTION (the FIRST item matching a " +
-      "structured query — pass `collection` + `map` of { propName: fieldName }) or an " +
-      "external API DATA SOURCE (pass `source` + `request` + `map` of { propName: " +
-      "'response.dot.path' } — run test_data_source first to see the response's " +
-      "paths, and use `params` for the request's {placeholder} tokens). Identify the " +
-      "page by its id (list_pages/get_page) and the block by its id (get_page shows " +
-      "the block tree). Map only props DECLARED on the component. To REMOVE a " +
-      "binding, omit both `collection` and `source` — the block reverts to its " +
-      "static props.",
+      "Bind ONE block on a page to a SINGLE data item; its props fill live at " +
+      "render. Collection kind: `collection` + `map` of { propName: fieldName } " +
+      "(first match of filter/sort wins). API kind: `source` + `request` + `map` " +
+      "of { propName: 'response.dot.path' } (+ `params` for {placeholder} tokens) " +
+      "— test_data_source lists the mappable paths. Never both kinds; omit both " +
+      "to REMOVE the binding. Page + block are ids (get_page shows the tree). Map " +
+      "only props DECLARED on the component. Full playbook: get_data_sources_guide.",
     parameters: {
       type: "object",
       properties: {
@@ -284,16 +277,15 @@ export const CREATE_LIST_TOOL = {
   function: {
     name: "create_list",
     description:
-      "Insert a built-in List block into a page Section that repeats a TEMPLATE " +
-      "component once per data row (e.g. a card per blog post). Rows come from a " +
-      "COLLECTION (pass `collection`, optional filter/sort; `map` values are field " +
-      "names) OR an external API DATA SOURCE (pass `source` + `request`; `map` " +
-      "values are response dot-paths — run test_data_source first; `itemsPath` digs " +
-      "to a nested rows array like OpenWeather's 'list'; `params` fills the " +
-      "request's {placeholder} tokens). Identify the page by id and the Section by " +
-      "its block id (get_page shows the tree; create the Section first if there is " +
-      "none). `template` is an existing component name; `map` is " +
-      "{ templatePropName: fieldOrPath } binding each row into the template.",
+      "Insert a built-in List block into a page Section: repeats a TEMPLATE " +
+      "component once per data row (e.g. a card per blog post). Rows from a " +
+      "COLLECTION (`collection` + optional filter/sort; `map` values are field " +
+      "names) OR an API DATA SOURCE (`source` + `request`; `map` values are " +
+      "response dot-paths from test_data_source; `itemsPath` digs to a nested " +
+      "rows array; `params` fills {placeholder} tokens). `template` is an " +
+      "existing component name; `map` = { templatePropName: fieldOrPath }. Page " +
+      "+ Section are ids (get_page shows the tree; create the Section first if " +
+      "none). Full playbook: get_data_sources_guide.",
     parameters: {
       type: "object",
       properties: {
@@ -321,17 +313,15 @@ export const BIND_LIST_TOOL = {
   function: {
     name: "bind_list",
     description:
-      "Reconfigure an EXISTING List block on a page: its row source (a collection " +
-      "query, OR an external API data source via `source`+`request` — `map` values " +
-      "are then response dot-paths), its per-row template component, the row → " +
-      "template-prop map, AND its presentation. A " +
-      "List can present as a flat list (default) OR as a COMBOBOX/SELECT dropdown — the " +
-      "combobox/select control on a page IS a List block with `presentation:\"combobox\"`, " +
-      "NOT a separate component. To change anything about a select/combobox (how the " +
-      "chosen item's chip reads, single vs multiple, min/max, search, placeholder), call " +
-      "THIS tool with the combobox fields below — do NOT update_component the item " +
-      "component for that. Identify the page by id and the List by its block id (get_page " +
-      "shows it; component is 'List'). PATCH semantics: pass only what you want to change.",
+      "Reconfigure an EXISTING List block — PATCH semantics, pass only what " +
+      "changes: row source (`collection` query OR `source`+`request` API with a " +
+      "dot-path map), per-row `template` component, the row → prop `map`, and " +
+      "presentation/layout. A select/combobox on a page IS a List with " +
+      "`presentation:\"combobox\"`, NOT a separate component — change anything " +
+      "about it (chip text, single vs multiple, min/max, search, placeholder) via " +
+      "THIS tool's combobox fields, never by update_component on the item " +
+      "component. Page + block are ids (get_page shows it; component is 'List'). " +
+      "Full playbook: get_data_sources_guide.",
     parameters: {
       type: "object",
       properties: {

@@ -55,6 +55,11 @@ test("guide covers the full shipped surface", () => {
     'type="submit"', // native form semantics
     "itemsPath", // nested rows arrays
     "BY NAME", // form field mapping contract
+    // Dynamic-pages route refs moved here (dedup slice): the guide is now the
+    // canonical home; schemas/context prompts carry only terse pointers.
+    '{ "param": "city-slug" }',
+    '{ "query": "q" }',
+    "WILDCARD",
   ]) {
     assert.ok(DATA_SOURCES_GUIDE.includes(fact), `guide should state: ${fact}`);
   }

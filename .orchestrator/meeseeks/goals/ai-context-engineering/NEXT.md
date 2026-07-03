@@ -1,24 +1,23 @@
 # Note to the next Meeseeks (ai-context-engineering)
 
-`data-sources` admin context is DONE (JOURNAL 2026-07-03 13:07): 4 tools
-(list/create/test data_source + get_data_sources_guide), fixed cost ~1.9k tok
-vs ~17.7k general fallback. Binders deliberately excluded — the page has no
-block surface; the inline context tail no longer name-drops them (locked by a
-doesNotMatch test).
+The dedup/cap/opening task is DONE (JOURNAL 2026-07-03 13:17) — the BACKLOG is
+now EMPTY. Every original GOAL.md "what good looks like" bullet is delivered:
+stale-thread compaction, paging on all listers, context-gated system prompt,
+data-sources context, dedup + caps + generic opening.
 
-ONE backlog TODO remains — the dedup/cap task, take it:
-(a) diff bind_list/create_list/bind_component schema prose (binding-tools.ts)
-against CONTEXT_PROMPTS + data-sources-guide.ts; move duplicated playbook
-prose into the guide, keep terse point-of-use semantics in schemas (schemas
-also serve external MCP clients with NO context prompt — never strip a fact
-whose only other home is the widget-only context prompt);
-(b) cap the existing-components list + collections list in buildSystemPrompt
-("…and N more — use list_components");
-(c) reword the prompt's stale opening paragraph (still claims the toolbox is
-create_component/create_page/translate/list_assets — and in gated contexts it
-now name-drops out-of-scope tools, so this got MORE wrong after gating).
-Measure before/after via GET /api/chat/debug and record numbers in JOURNAL.
+So: re-read GOAL.md and invent the next most valuable slice. Candidates left
+by previous runs (roughly in value order):
+1. Measure REAL steady-state thread costs: pull a few real threads from local
+   D1 (chat threads table), compute replayed-history token totals before/after
+   compaction kicks in — validates the >24h compactor actually pays off, and
+   may motivate a size budget for LIVE turns (append-only, cache-safe: e.g.
+   truncate a tool result ONCE at the moment it's first appended, never after).
+2. Per-context tool-RESULT budgets: get_page on a big page is still ~4.7k tok
+   every call; consider a `depth`/`fields` arg or a compact tree format.
+3. A `develop`/`sitemap` admin context (check which /admin pages still fall
+   through to general — e.g. /admin/develop, /admin/sitemap if they exist).
+Add what you pick to BACKLOG.md first, then take it.
 
-After that the backlog is empty — re-read GOAL.md "what good looks like" and
-invent the next slice (candidates: per-context result-size budgets, a
-sitemap/develop context, measuring real-thread steady-state costs).
+Watch-outs beyond CAVEATS.md: general prompt grew +7 tok this run (gated
+composing paragraph) — fine, but don't let "one more always-on paragraph"
+creep back; prefer gated sections or the guides.

@@ -94,12 +94,24 @@ test("isEmptyIdentity: empty is empty, any field fills it", () => {
 
 test("buildSystemPrompt: always ships base + tools, omits empty identity", () => {
   const p = buildSystemPrompt({});
-  assert.match(p, /create_component/);
+  assert.match(p, /CALLING TOOLS/);
   assert.match(p, /create_page/);
   assert.match(p, /list_assets/);
   assert.match(p, /no components yet/);
   // No identity given → no identity block.
   assert.doesNotMatch(p, /Brand name:/);
+});
+
+test("buildSystemPrompt: opening is toolbox-generic (no stale fixed tool list)", () => {
+  const p = buildSystemPrompt({});
+  // The old opening claimed the toolbox was exactly 4 tools — locked out.
+  assert.doesNotMatch(p, /author content by calling tools:/);
+  assert.match(p, /toolbox varies/);
+  // The components-before-pages rule ships only where a composing tool is scoped.
+  assert.match(p, /must already exist BEFORE/);
+  const media = buildSystemPrompt({ tools: ["list_assets", "generate_image"] });
+  assert.doesNotMatch(media, /must already exist BEFORE/);
+  assert.doesNotMatch(media, /create_page/);
 });
 
 test("buildSystemPrompt: folds in identity + components", () => {
@@ -208,6 +220,44 @@ test("gating: collections scope keeps collections list, drops authoring prose", 
   assert.match(p, /content_restaurants \(name\)/); // query_collection scoped
   assert.doesNotMatch(p, /Hero \{/);
   assert.doesNotMatch(p, /Tailwind utility/);
+});
+
+// ── Prompt-list caps (ai-context-engineering: dedup/cap slice) ───────────────
+
+test("component list caps at 60 defs with an '…and N more' overflow line", () => {
+  const defs = Array.from({ length: 61 }, (_, i) => ({ name: `C${i}`, props: [] }));
+  const p = buildSystemPrompt({ components: defs });
+  assert.match(p, /- C59 \(no props\)/); // 60th shown
+  assert.doesNotMatch(p, /- C60 /); // 61st capped
+  assert.match(p, /…and 1 more — use list_components/);
+  // At exactly the cap there is no overflow line.
+  assert.doesNotMatch(
+    buildSystemPrompt({ components: defs.slice(0, 60) }),
+    /…and \d+ more/,
+  );
+});
+
+test("legacy bare-name component list caps too", () => {
+  const names = Array.from({ length: 62 }, (_, i) => `N${i}`);
+  const p = buildSystemPrompt({ componentNames: names });
+  assert.match(p, /N59/);
+  assert.doesNotMatch(p, /N60[,. ]/);
+  assert.match(p, /…and 2 more \(use list_components\)/);
+});
+
+test("collections list caps at 30 with a self-correcting overflow hint", () => {
+  const cols = Array.from({ length: 31 }, (_, i) => ({
+    tableName: `content_c${i}`,
+    fields: ["name"],
+  }));
+  const p = buildSystemPrompt({ collections: cols });
+  assert.match(p, /- content_c29 \(name\)/);
+  assert.doesNotMatch(p, /- content_c30 /);
+  assert.match(p, /…and 1 more — query_collection/);
+  assert.doesNotMatch(
+    buildSystemPrompt({ collections: cols.slice(0, 30) }),
+    /…and \d+ more/,
+  );
 });
 
 test("gating: general scope is byte-identical to the ungated full prompt", () => {

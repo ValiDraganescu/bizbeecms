@@ -122,3 +122,40 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   opennextjs build gate — dev server running (CAVEATS).
 - **Files:** CMS/src/lib/chat/tool-scopes.ts, data-sources-context.ts,
   data-sources-context.test.ts; CMS/scripts/tool-scopes.test.mjs
+
+## 2026-07-03 13:17 — Dedup triple-paid prose + cap prompt lists + fix stale opening
+- **Status:** DONE
+- **What I did:** (a) DEDUP: added a "Dynamic pages & route values" section to
+  DATA_SOURCES_GUIDE (data-sources-guide.ts) — now the canonical home of the
+  { "param" }/{ "query" } route-ref + wildcard-slug playbook; trimmed the three
+  binder tool descriptions + shared FILTER value / SEARCH fragments
+  (binding-tools.ts) to terse point-of-use semantics ending in "Full playbook:
+  get_data_sources_guide" (guide is tool-served, so external MCP clients keep
+  every fact); trimmed the duplicated "Platform feature — dynamic/param-driven
+  pages" paragraphs in the page-builder + pages CONTEXT_PROMPTS to one pointer
+  sentence each. (b) CAPS: buildSystemPrompt caps the existing-components list
+  at 60 defs ("…and N more — use list_components", legacy bare-name list too)
+  and collections at 30 ("…and N more — query_collection with an unknown table
+  name lists them all" — accurate, unknownCollectionMessage lists real names).
+  (c) OPENING: replaced the stale "your tools are create_component/create_page/
+  translate/list_assets" opening with a toolbox-generic paragraph (keeps the
+  text-is-inert / always-call-tools invariant); components-before-pages rule
+  moved to its own paragraph gated on composesPages (names create_page/
+  update_page_blocks only where scoped).
+- **Measured (live :3602, chars/4, before → after):** schemas bind_component
+  732→651 tok, create_list 931→817, bind_list 1,619→1,475 (−339 tok on every
+  page-builder/pages/general request); prompts media 545→489, settings 579→523,
+  collections 911→855, data-sources 672→615, components 4,108→4,052,
+  pages 4,324→4,311, page-builder 5,955→5,905, general 5,194→5,201 (+7: the
+  gated composing paragraph nets out the shorter opening). Guide 1,498→1,641
+  tok (on-demand only). Caps are future-proofing (site has 41 comps today) —
+  verified by unit tests, not live.
+- **Verified:** tsc --noEmit clean; full suite 1523/1523 (4 new tests: generic
+  opening + 3 cap tests in site-settings.test.mjs; new guide-fact locks for
+  '{ "param": "city-slug" }'/'{ "query": "q" }'/WILDCARD in
+  data-sources-guide.test.mjs); live: debug endpoint per-context prompts +
+  /mcp tools/list serving trimmed binder schemas (42 tools, guide pointer
+  present). Skipped opennextjs build gate — dev server running (CAVEATS).
+- **Files:** CMS/src/lib/chat/binding-tools.ts, data-sources-guide.ts,
+  tool-scopes.ts; CMS/src/lib/settings/site-settings.ts;
+  CMS/scripts/site-settings.test.mjs, data-sources-guide.test.mjs

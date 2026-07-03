@@ -82,6 +82,16 @@ export const DATA_SOURCES_GUIDE = `# External data sources, bindings, and visito
   rejected. \`params\` values are literal strings, or { prop: "propName" } to read
   one of the block's own props at render.
 
+## Dynamic pages & route values
+- A create_page slug segment authored as ":city-slug" is a WILDCARD matching
+  any value in that position. Prefer ONE wildcard page bound to a collection
+  over authoring N near-identical static pages per item.
+- Anywhere a binding filter value, a List \`search\`, or a set_block_props
+  string prop takes a literal, you may instead pass { "param": "city-slug" }
+  to read the page's wildcard match, or { "query": "q" } to read a URL query
+  param (?q=...). Resolved per-request; a clause whose param/query is absent
+  that request is dropped (no filter/search) — never an error.
+
 ## Render semantics (why binds are safe)
 - The Worker fetches server-side at render; the secret NEVER reaches the browser.
 - Responses are cached per request (only GET or retryable-marked requests);

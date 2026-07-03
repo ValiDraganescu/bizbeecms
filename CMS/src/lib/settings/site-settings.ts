@@ -158,20 +158,27 @@ export function buildSystemPrompt(opts: {
   const authorsComponents = has("create_component") || has("update_component");
   const composesPages = has("create_page") || has("update_page_blocks");
 
+  // Opening: toolbox-generic on purpose — the in-scope tool set varies per
+  // context, so naming specific tools here would go stale/out-of-scope again.
   parts.push(
-    "You are the AI website builder for a CMS Site. You author content by " +
-      "calling tools: create_component (emit an {html, script, css} artifact — " +
-      "the html is the component markup), create_page (compose existing " +
-      "components into a page block tree), translate (add per-locale content), " +
-      "and list_assets (read the Site's uploaded media). Always create the " +
-      "components a page needs BEFORE create_page — a page referencing an " +
-      "unknown component is rejected. ALWAYS deliver an artifact by CALLING the " +
-      "tool — put the html/script/css in the tool arguments. NEVER paste a " +
-      "component or page as a code block in your chat reply: text in the message " +
-      "is inert, it does NOT change the Site. Your reply is for talking to the " +
-      "operator (a short summary of what you changed); the tool call is what " +
-      "actually builds.",
+    "You are the AI website builder for a CMS Site. You act by CALLING TOOLS " +
+      "— every real change to the Site (components, pages, content, " +
+      "translations, data, media, settings) happens through a tool call; your " +
+      "toolbox varies with the admin page you're on. ALWAYS deliver work by " +
+      "calling the tool with the full arguments. NEVER paste a component or " +
+      "page as a code block in your chat reply: text in the message is inert, " +
+      "it does NOT change the Site. Your reply is for talking to the operator " +
+      "(a short summary of what you changed); the tool call is what actually " +
+      "builds.",
   );
+
+  if (composesPages)
+    parts.push(
+      "Pages are composed from components: create_page authors a new page's " +
+        "block tree; update_page_blocks REPLACES an existing one. Every " +
+        "component a page references must already exist BEFORE you compose it " +
+        "— a page naming an unknown component is rejected.",
+    );
 
   parts.push(
     "Follow the user's instructions as closely as possible. Do exactly what " +
@@ -288,22 +295,33 @@ export function buildSystemPrompt(opts: {
     );
   }
 
+  // ponytail: hard caps so a 200-component/50-collection site can't silently
+  // re-bloat the prompt; the overflow line points at the paged discovery tool.
+  const MAX_PROMPT_COMPONENTS = 60;
+  const MAX_PROMPT_COLLECTIONS = 30;
+
   const defs = opts.components ?? [];
   const names = opts.componentNames ?? [];
   const buildsWithComponents = authorsComponents || composesPages;
   if (!buildsWithComponents) {
     /* non-building context (media/settings/collections) — no component list */
   } else if (defs.length > 0) {
+    const shown = defs.slice(0, MAX_PROMPT_COMPONENTS);
+    const moreDefs = defs.length - shown.length;
     parts.push(
       "This Site's existing components (reuse them when they fit; props shown — " +
         "`!` = required, `(t)` = translatable). Set these props when you place a " +
         "component in a page; do NOT call get_component just to learn props — they're " +
         "listed here:\n" +
-        defs.map((c) => `- ${formatComponentDef(c)}`).join("\n"),
+        shown.map((c) => `- ${formatComponentDef(c)}`).join("\n") +
+        (moreDefs > 0 ? `\n…and ${moreDefs} more — use list_components to see the rest.` : ""),
     );
   } else if (names.length > 0) {
+    const shown = names.slice(0, MAX_PROMPT_COMPONENTS);
+    const moreNames = names.length - shown.length;
     parts.push(
-      `This Site already has these components — reuse them when they fit: ${names.join(", ")}.`,
+      `This Site already has these components — reuse them when they fit: ${shown.join(", ")}` +
+        (moreNames > 0 ? ` …and ${moreNames} more (use list_components).` : "."),
     );
   } else {
     parts.push("This Site has no components yet — create the ones each page needs.");
@@ -339,13 +357,18 @@ export function buildSystemPrompt(opts: {
   const usesCollections =
     has("query_collection") || has("bind_component") || has("bind_list");
   if (usesCollections && collections.length > 0) {
+    const shown = collections.slice(0, MAX_PROMPT_COLLECTIONS);
+    const moreCols = collections.length - shown.length;
     parts.push(
       "This Site's content collections (pass the EXACT table name to " +
         "query_collection / bind_component / bind_list — do NOT guess the bare " +
         "label, the tables are prefixed `content_`):\n" +
-        collections
+        shown
           .map((c) => `- ${c.tableName} (${c.fields.join(", ") || "no user fields"})`)
-          .join("\n"),
+          .join("\n") +
+        (moreCols > 0
+          ? `\n…and ${moreCols} more — query_collection with an unknown table name lists them all.`
+          : ""),
     );
   }
 
