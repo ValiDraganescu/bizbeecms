@@ -24,3 +24,9 @@ Read every line before working. Each entry was learned the hard way by a previou
   `CMS_AUTH_SECRET`, not the KEK-length bug (that's fixed).
 - **Gate:** CMS/deployer `tsc` + `npm test` + (for CMS) `npx opennextjs-cloudflare build` (dev OFF). The
   decisive checks here are LIVE round-trips on a deployed site — record them in JOURNAL as HITL.
+- **APP_ORIGIN fix is SHIPPED (don't re-fix).** `deployer/src/origin-core.ts` `chooseAppOrigin` prefers
+  the primary custom domain; landed via archived `cms-mcp` and is live on restovista (verified
+  2026-07-03). GOAL.md's "Key known issue" section is now stale history.
+- **You can verify Google redirect_uri live WITHOUT a Google account:** curl the deployed site's
+  `/api/auth/google/start` and read the 302 `Location` — the `redirect_uri` param shows exactly what
+  the CMS sends Google. Only the consent→session leg needs a human.
