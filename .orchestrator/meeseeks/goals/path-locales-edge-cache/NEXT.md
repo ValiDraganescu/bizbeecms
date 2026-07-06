@@ -1,16 +1,24 @@
 # Note to the next Meeseeks (path-locales-edge-cache)
 
-Run 1 done: `resolvePage` + `loadPlan` now live in `CMS/src/lib/render/resolve-page.ts`;
-`app/[[...slug]]/page.tsx` is a thin caller. Pure move, tests + build gate green.
+Run 2 done: locale-prefix routing is LIVE. `peelLocaleSegment` (pure, in
+`lib/render/slug.ts`, 10 unit tests) peels a leading non-default content-locale segment;
+`loadPlan` passes the URL-derived locale into `buildPlanFromPage(..., activeLocale)` which
+short-circuits `resolveContentLocaleContext` BEFORE any cookie read. Verified live on dev:
+`/`→EN, `/fi`→FI, cookie on `/` ignored, `/fi/search` works, `/fi` serves HOME_SLUG.
 
-**Take next:** the second Stage-1 backlog TODO — locale-prefix routing. Add a pure helper in
-`lib/render/slug.ts` (unit-tested, dep-free) that peels a leading path segment matching a
-configured NON-default content locale; wire it into `loadPlan` (in resolve-page.ts now, NOT
-page.tsx) so `render-page.tsx` gets the active locale from the URL instead of the
-`bb_content_locale` cookie. Default locale stays unprefixed; `/` and `/<code>` both resolve
-HOME_SLUG; preview keeps its explicit locale selection. Look at how `buildPlanFromPage`
-currently obtains the locale (cookie via next/headers) before touching it — preview passes
-`isPreview=true` and must keep working.
+**Known mid-flight state:** the built-in LanguageSwitcher is now inert on published pages
+(cookie+reload changes nothing). That's expected — see the new caveat. It makes the switcher
+rework the most urgent next slice.
 
-Gotcha you'll hit: run the deploy gate as `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`
-or the auth build-failsafe kills the build (see CAVEATS).
+**Take next (pick one, switcher first is my recommendation):**
+1. LanguageSwitcher → real navigation (`lib/render/plan-language-switcher.ts`): navigate to
+   the same path under the target locale prefix (strip current non-default prefix, prepend
+   target's unless it's the default). Retire `CONTENT_LOCALE_COOKIE` — grep ALL consumers
+   first (`render-page.tsx` still reads it for preview; decide whether preview keeps a
+   cookie or gets an explicit query param). The switcher script needs the current locale +
+   default — the plan walk already has `locale.locale`/`locale.fallback` (fallback === default).
+2. Or the slug-vs-locale-code guard (page save + locale-settings save, localized errors).
+
+Gotchas: deploy gate = `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` (never while
+`npm run dev` runs). Local dev D1 has locales en(default)/fi/ro-ro/es — handy for smoke tests
+(`curl localhost:3602/fi` after `npm run dev`).

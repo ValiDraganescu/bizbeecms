@@ -81,15 +81,30 @@ import { themeFontsToCss } from "@/lib/render/fonts";
 /**
  * Resolve the active content locale + the switchable set for a page render.
  *
- * The active locale comes from the `bb_content_locale` cookie (written by the
- * built-in LanguageSwitcher) — NOT next-intl's `getLocale`, which only knows the
- * fixed admin set (EN/FI/ET) and would reject arbitrary content codes like
- * `ro-ro`. Falls back to the admin locale (if it happens to be a content locale),
- * then the Site default. `available` carries each code + its endonym label (via
- * `Intl.DisplayNames` in the locale's own language) for the switcher's options.
+ * PUBLIC renders pass `explicitLocale` — the locale peeled from the URL path
+ * (path-locales-edge-cache Stage 1). The URL alone determines the response;
+ * cookies must NOT influence it, or default-locale URLs become uncacheable at
+ * the edge. When no explicit locale is given (admin PREVIEW / Develop routes),
+ * the legacy `bb_content_locale` cookie path applies — NOT next-intl's
+ * `getLocale`, which only knows the fixed admin set (EN/FI/ET) and would reject
+ * arbitrary content codes like `ro-ro`. Falls back to the admin locale (if it
+ * happens to be a content locale), then the Site default. `available` carries
+ * each code + its endonym label (via `Intl.DisplayNames` in the locale's own
+ * language) for the switcher's options.
  */
-async function resolveContentLocaleContext(): Promise<LocaleContext> {
+async function resolveContentLocaleContext(
+  explicitLocale?: string,
+): Promise<LocaleContext> {
   const contentLocales = await getContentLocales();
+
+  if (explicitLocale && contentLocales.locales.includes(explicitLocale)) {
+    return {
+      locale: explicitLocale,
+      fallback: contentLocales.default,
+      available: buildAvailableLocales(contentLocales),
+    };
+  }
+
   const cookieValue = (await cookies()).get(CONTENT_LOCALE_COOKIE)?.value;
   const adminLocale = await getLocale();
 
@@ -178,6 +193,8 @@ export async function buildPlanFromPage(
   blocksOverride?: string,
   preferDraft = false,
   routeContext: RouteContext = EMPTY_ROUTE_CONTEXT,
+  /** URL-derived content locale (public route). Absent → legacy cookie path (preview). */
+  activeLocale?: string,
 ): Promise<{
   plan: RenderPlan;
   locale: LocaleContext;
@@ -236,7 +253,7 @@ export async function buildPlanFromPage(
     pending = next;
   }
 
-  const locale = await resolveContentLocaleContext();
+  const locale = await resolveContentLocaleContext(activeLocale);
 
   // Phase-2 binding (Slice A): hydrate single-item collection bindings INTO the
   // blocks' props BEFORE the pure walk. `planPage`/`planTree` stay pure+sync; all

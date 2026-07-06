@@ -35,6 +35,31 @@ export function resolveSlugPath(segments: string[] | undefined): string[] {
   return cleaned.length === 0 ? [HOME_SLUG] : cleaned;
 }
 
+/**
+ * Locale-prefixed routes (path-locales-edge-cache Stage 1): peel a leading URL
+ * segment that names a configured NON-default content locale. The default
+ * locale stays UNPREFIXED (existing live URLs unchanged, and — critically — no
+ * cookie may influence an unprefixed response, or default-locale pages become
+ * uncacheable at the edge). `/fi/about` → locale "fi", rest ["about"];
+ * `/about` → default locale, rest ["about"]; `/fi` → locale "fi", rest []
+ * (which `resolveSlugPath` maps to HOME_SLUG, same as `/`). A leading segment
+ * equal to the DEFAULT locale is NOT peeled — it resolves as an ordinary slug.
+ * Matching is case-insensitive; the returned code is the stored one.
+ */
+export function peelLocaleSegment(
+  segments: string[] | undefined,
+  locales: string[],
+  defaultLocale: string,
+): { locale: string; rest: string[] } {
+  const raw = segments ?? [];
+  const first = raw.length > 0 ? safeDecode(raw[0]).trim().toLowerCase() : "";
+  if (first !== "" && first !== defaultLocale.toLowerCase()) {
+    const match = locales.find((code) => code.toLowerCase() === first);
+    if (match) return { locale: match, rest: raw.slice(1) };
+  }
+  return { locale: defaultLocale, rest: raw };
+}
+
 function safeDecode(s: string): string {
   try {
     return decodeURIComponent(s);

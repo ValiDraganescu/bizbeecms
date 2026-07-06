@@ -35,6 +35,10 @@ Read every line before working. Each entry was learned the hard way by a previou
 - Never run `npx opennextjs-cloudflare build` while `npm run dev` is running (corrupts .next).
 - Project conventions apply: pure helpers dep-free for `node --test`, every UI string in
   messages/{en,fi,et}.json, Drizzle-only migrations, REST route handlers only (no server actions).
+- Since locale-prefix routing landed, the built-in LanguageSwitcher is DELIBERATELY inert on
+  published pages (cookie+reload no longer changes the render — the URL wins). Do NOT "fix" it
+  by re-adding cookie reads to the public path; the fix is the switcher-navigation backlog task.
+  Preview/Develop still use the cookie path (`resolveContentLocaleContext` without explicitLocale).
 - CMS `.env.local` carries `CMS_DEV_SUPERADMIN=1`; the auth build-failsafe throws in any
   production build. Run the deploy gate as `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`
   (real env vars override `.env.local`). The deployer builds from a clean git checkout, so prod

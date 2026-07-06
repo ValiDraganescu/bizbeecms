@@ -11,8 +11,9 @@ import { eq, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { page as pageTable } from "@/db/schema";
 import type { Page } from "@/db/schema";
-import { resolveSlugPath, matchSlugSegment } from "@/lib/render/slug";
+import { resolveSlugPath, matchSlugSegment, peelLocaleSegment } from "@/lib/render/slug";
 import { buildPlanFromPage } from "@/lib/render/render-page";
+import { getContentLocales } from "@/db/settings-store";
 import { getVersion } from "@/db/page-version-store";
 import { pickRenderBlocks } from "@/lib/pages/page-version";
 import type { RouteContext } from "@/lib/content/route-params";
@@ -59,7 +60,17 @@ export async function resolvePage(
 /** Load the page + its render plan, or null if no published page matches. */
 export async function loadPlan(params: RouteParams, query: Record<string, string>) {
   const db = await getDb();
-  const path = resolveSlugPath(params.slug);
+  // Stage 1 (path-locales-edge-cache): the URL alone determines the locale.
+  // A leading NON-default content-locale segment is peeled off before the tree
+  // walk; the default locale stays unprefixed. No cookie may influence this —
+  // cookie-dependent responses would make default-locale URLs uncacheable.
+  const contentLocales = await getContentLocales(db);
+  const { locale: activeLocale, rest } = peelLocaleSegment(
+    params.slug,
+    contentLocales.locales,
+    contentLocales.default,
+  );
+  const path = resolveSlugPath(rest);
   const resolved = await resolvePage(db, path);
   if (!resolved) return null;
   const { page: pageRow, params: routeParams } = resolved;
@@ -69,7 +80,13 @@ export async function loadPlan(params: RouteParams, query: Record<string, string
   const published = await getVersion(pageRow.publishedVersionId);
   const blocks = pickRenderBlocks(published, null, pageRow.blocks);
   const routeContext: RouteContext = { params: routeParams, query };
-  const { plan, locale, routeNotFound } = await buildPlanFromPage(pageRow, blocks, false, routeContext);
+  const { plan, locale, routeNotFound } = await buildPlanFromPage(
+    pageRow,
+    blocks,
+    false,
+    routeContext,
+    activeLocale,
+  );
   // A route-driven binding (e.g. `:city-slug`'s hero) matched zero rows: the
   // segment names something that doesn't exist (bad city/offer/restaurant
   // slug) — 404 instead of silently rendering the component's static
