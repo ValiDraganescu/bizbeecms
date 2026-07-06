@@ -50,25 +50,31 @@ function firstSegment(path: string): string {
  *   (never double-prefix; a first segment equal to the default code is already
  *   unreachable as a page slug — the localeSlugConflicts guard);
  * - when the active locale IS the default (default stays unprefixed).
+ *
+ * Stage-2 localized slugs: when `translate` is given (see localize-paths.ts),
+ * the default-locale slug chain is reverse-resolved into the active locale's
+ * BEFORE prefixing, so `/about` becomes `/fi/meista`, not a 404ing `/fi/about`.
  */
 export function localizeHref(
   href: string,
   activeLocale: string,
   defaultLocale: string,
   localeCodes: string[],
+  translate?: (path: string, locale: string) => string,
 ): string {
   if (activeLocale.toLowerCase() === defaultLocale.toLowerCase()) return href;
   if (!href.startsWith("/") || href.startsWith("//")) return href;
   const first = firstSegment(href);
   if (SKIP_SEGMENTS.has(first)) return href;
   if (localeCodes.some((code) => code.toLowerCase() === first)) return href;
+  const path = translate ? translate(href, activeLocale) : href;
   // Locale codes are URL-safe by shape (letters + hyphen) — no encoding needed.
   // Root links drop the trailing slash ("/" → "/fi", "/?x=1" → "/fi?x=1") so the
   // browser isn't bounced through Next's 308 trailing-slash redirect.
   const prefix = `/${activeLocale}`;
-  if (href === "/") return prefix;
-  if (href.startsWith("/?") || href.startsWith("/#")) return prefix + href.slice(1);
-  return prefix + href;
+  if (path === "/") return prefix;
+  if (path.startsWith("/?") || path.startsWith("/#")) return prefix + path.slice(1);
+  return prefix + path;
 }
 
 /**
@@ -83,13 +89,14 @@ export function localizePlanLinks(
 ): ElementPlan[] {
   if (locale.locale.toLowerCase() === locale.fallback.toLowerCase()) return plans;
   const codes = locale.available?.map((l) => l.code) ?? [locale.locale, locale.fallback];
+  const translate = locale.translatePath;
 
   function walk(plan: ElementPlan): ElementPlan {
     if (plan.kind !== "element") return plan;
     let props = plan.props;
     const href = props.href;
     if (typeof href === "string") {
-      const next = localizeHref(href, locale.locale, locale.fallback, codes);
+      const next = localizeHref(href, locale.locale, locale.fallback, codes, translate);
       if (next !== href) props = { ...props, href: next };
     }
     let children = plan.children;

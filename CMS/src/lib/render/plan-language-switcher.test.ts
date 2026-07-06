@@ -81,6 +81,29 @@ test("the <select> carries the default-locale attr the client rewrite needs", ()
   assert.equal(sel.props["data-bb-default-locale"], "en", "fallback (= default) is embedded");
 });
 
+test("options carry the plan-time per-locale path when pagePaths is present", () => {
+  const locale: LocaleContext = {
+    ...ctx("fi", ["en", "fi"]),
+    pagePaths: { en: "/about/team", fi: "/fi/meista/tiimi" },
+  };
+  const plan = planLanguageSwitcher(locale, () => {});
+  const sel = findTag(plan, "select");
+  assert.ok(sel && sel.kind === "element");
+  const [en, fi] = sel.children as Array<Extract<ElementPlan, { kind: "element" }>>;
+  assert.equal(en.props["data-bb-path"], "/about/team");
+  assert.equal(fi.props["data-bb-path"], "/fi/meista/tiimi");
+});
+
+test("options carry NO path attr without pagePaths (client rewrite fallback)", () => {
+  const plan = planLanguageSwitcher(ctx("fi", ["en", "fi"]), () => {});
+  const sel = findTag(plan, "select");
+  assert.ok(sel && sel.kind === "element");
+  for (const opt of sel.children) {
+    assert.ok(opt.kind === "element");
+    assert.equal("data-bb-path" in opt.props, false);
+  }
+});
+
 test("switchLocalePathname: default → non-default prefixes the path", () => {
   const codes = ["en", "fi", "et"];
   assert.equal(switchLocalePathname("/about", "fi", "en", codes), "/fi/about");
@@ -130,6 +153,11 @@ test("the client script navigates on published pages and only cookies under /pre
   // The pure rewrite ships verbatim — a broken .toString() interpolation would
   // leave the placeholder or an empty body.
   assert.ok(LANGUAGE_SWITCHER_SCRIPT.includes("var rewrite = "), "rewrite fn interpolated");
+  // Stage-2: the plan-time per-locale path wins over the client rewrite.
+  assert.ok(
+    LANGUAGE_SWITCHER_SCRIPT.includes("'data-bb-path'"),
+    "plan-time option path is preferred",
+  );
 });
 
 test("a component tree embedding <LanguageSwitcher/> resolves the built-in (not a placeholder)", () => {

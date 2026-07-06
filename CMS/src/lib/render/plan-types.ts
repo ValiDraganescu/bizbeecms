@@ -385,6 +385,18 @@ export type LocaleContext = {
    * (the switcher then renders nothing). Ordered as configured; the default leads.
    */
   available?: Array<{ code: string; label: string }>;
+  /**
+   * Stage-2 localized slugs: translate a DEFAULT-locale internal path into a
+   * locale's slug chain (see localize-paths.ts). Built per render from the
+   * page tree; absent → prefix-only href rewriting (no overrides applied).
+   */
+  translatePath?: (path: string, locale: string) => string;
+  /**
+   * The rendered page's own pathname in each locale (localized slug chain,
+   * locale prefix included), for the LanguageSwitcher to navigate to. Absent →
+   * the switcher falls back to its client-side prefix-only rewrite.
+   */
+  pagePaths?: Record<string, string>;
 };
 
 /** Make a hidden placeholder element carrying a render-error message. Shared by

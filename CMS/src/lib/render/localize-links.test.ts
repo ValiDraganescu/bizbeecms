@@ -136,6 +136,32 @@ test("non-string href (bound object that failed to coerce) is untouched", () => 
   assert.equal((out[0] as Extract<ElementPlan, { kind: "element" }>).props.href, 7);
 });
 
+// ── Stage-2: translate (localized slugs) ─────────────────────────────────────
+
+const upFi = (path: string, locale: string): string =>
+  locale === "fi" ? path.replace("/about", "/meista") : path;
+
+test("localizeHref reverse-resolves the slug chain before prefixing", () => {
+  assert.equal(localizeHref("/about/team", "fi", "en", CODES, upFi), "/fi/meista/team");
+  // Skip checks run BEFORE translation: system + already-prefixed paths untouched.
+  assert.equal(localizeHref("/api/about", "fi", "en", CODES, upFi), "/api/about");
+  assert.equal(localizeHref("/fi/about", "fi", "en", CODES, upFi), "/fi/about");
+  // Default locale: identity regardless of translate.
+  assert.equal(localizeHref("/about", "en", "en", CODES, upFi), "/about");
+});
+
+test("localizePlanLinks uses LocaleContext.translatePath", () => {
+  const locale: LocaleContext = { ...ctx("fi"), translatePath: upFi };
+  const plans: ElementPlan[] = [
+    { kind: "element", tag: "a", props: { href: "/about" }, children: [] },
+  ];
+  const out = localizePlanLinks(plans, locale);
+  assert.equal(
+    (out[0] as Extract<ElementPlan, { kind: "element" }>).props.href,
+    "/fi/meista",
+  );
+});
+
 test("without `available`, active+fallback still guard double-prefixing", () => {
   const locale: LocaleContext = { locale: "fi", fallback: "en" };
   const plans: ElementPlan[] = [

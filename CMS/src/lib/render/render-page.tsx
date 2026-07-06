@@ -16,8 +16,12 @@
  */
 import type { Page } from "@/db/schema";
 import { getDb } from "@/db";
-import { component as componentTable } from "@/db/schema";
+import { component as componentTable, page as pageTable } from "@/db/schema";
 import { inArray } from "drizzle-orm";
+import {
+  createPathTranslator,
+  pagePathsByLocale,
+} from "@/lib/render/localize-paths";
 import { getLocale } from "next-intl/server";
 import { cookies } from "next/headers";
 import { CONTENT_LOCALE_COOKIE } from "@/lib/render/plan-language-switcher";
@@ -254,6 +258,33 @@ export async function buildPlanFromPage(
   }
 
   const locale = await resolveContentLocaleContext(activeLocale);
+
+  // Stage-2 localized slugs: build the default-path → locale-path translator
+  // (internal hrefs are authored in default-locale slugs; a per-locale slug
+  // override 404s the prefix-only rewrite) plus the rendered page's own path
+  // in every locale for the LanguageSwitcher. One small full-table read per
+  // render; best-effort — any failure keeps the prefix-only behavior.
+  try {
+    const pageRows = await db
+      .select({
+        id: pageTable.id,
+        slug: pageTable.slug,
+        parentPageId: pageTable.parentPageId,
+        localizedSlugs: pageTable.localizedSlugs,
+      })
+      .from(pageTable);
+    locale.translatePath = createPathTranslator(pageRows, locale.fallback);
+    locale.pagePaths = pagePathsByLocale(
+      pageRows,
+      pageRow.id,
+      routeContext.params,
+      locale.fallback,
+      (locale.available ?? []).map((l) => l.code),
+      locale.translatePath,
+    );
+  } catch {
+    /* unbound D1 / read failure — links fall back to prefix-only rewriting */
+  }
 
   // Phase-2 binding (Slice A): hydrate single-item collection bindings INTO the
   // blocks' props BEFORE the pure walk. `planPage`/`planTree` stay pure+sync; all

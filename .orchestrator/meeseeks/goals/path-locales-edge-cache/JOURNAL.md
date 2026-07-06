@@ -264,3 +264,34 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (no override) → 200. Fixture reset, dev killed.
 - **Files:** CMS/src/lib/render/slug.ts, slug.test.ts, resolve-page.ts,
   load-plan.ts, CMS/worker.ts
+
+## 2026-07-07 02:37 — Reverse-resolve internal links + LanguageSwitcher under localized slugs (part 1)
+- **Status:** DONE
+- **What I did:** (1) New pure `lib/render/localize-paths.ts`:
+  `createPathTranslator(rows, defaultLocale)` — default-locale path →
+  locale's slug chain (children-index walk; match by DEFAULT slug, re-emit
+  `effectiveSlug`; wildcard values pass through; unmatched tail passes
+  through; ?/# suffix untouched; identity when unchanged);
+  `defaultPathForPage` (parent-chain walk, wildcards filled from route
+  params, HOME → "/", null on cycle/dangling/missing-param);
+  `pagePathsByLocale` (the rendered page's full pathname per locale, prefix
+  included, undefined when unreconstructible). (2) `LocaleContext` gains
+  `translatePath?` + `pagePaths?`. (3) `localizeHref` takes optional
+  `translate` (applied AFTER skip checks, before prefixing);
+  `localizePlanLinks` reads `locale.translatePath`. (4) Switcher: options
+  stamp `data-bb-path` from `locale.pagePaths`; client script prefers the
+  stamped path, falls back to the prefix-only rewrite (preview cookie branch
+  unchanged). (5) `buildPlanFromPage` populates both (one small full-table
+  page read per render, try/catch best-effort).
+- **Verified:** 12 new localize-paths tests + 2 localize-links + 3 switcher
+  cases; full `npm test` 1672/1672; `npx tsc --noEmit` clean;
+  `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` + `wrangler deploy
+  --dry-run` green. LIVE smoke via wrangler dev (local D1 en/fi/ro-ro/es;
+  terms fi:"ehdot"): `/fi` home rewrites the terms link to `/fi/ehdot`
+  (default render untouched); switcher options carry data-bb-path per
+  locale; `/fi/ehdot` 200, `/fi/terms` 404, `/ehdot` 404, `/terms` 200.
+  Fixture reset, dev killed.
+- **Files:** CMS/src/lib/render/localize-paths.ts (new),
+  localize-paths.test.ts (new), plan-types.ts, localize-links.ts,
+  localize-links.test.ts, plan-language-switcher.ts,
+  plan-language-switcher.test.ts, render-page.tsx

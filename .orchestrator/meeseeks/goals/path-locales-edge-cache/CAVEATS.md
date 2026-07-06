@@ -122,4 +122,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   rewrites for that page: switcher/localize-links/hreflang/sitemap still emit
   `/fi/<default-slug>` which now 404s. That's why reverse-resolution is the immediate
   next task — don't ship a release with operator-visible localized-slug inputs live
-  before it lands.
+  before it lands. [PART 1 DONE 2026-07-07: links + switcher reverse-resolve; hreflang
+  + sitemap STILL emit default chains under /fi (SEO-only breakage) — part 2 pending.]
+- `LocaleContext.translatePath` is a FUNCTION on the context (built per render in
+  buildPlanFromPage from one full `page`-table read). Never JSON-serialize a
+  LocaleContext; if a new seam needs that, move the translator to a separate param.
+- The switcher's per-option `data-bb-path` is stamped only when the page's default
+  path is reconstructible (wildcard pages need their route param captured). Absent →
+  the shipped `switchLocalePathname` prefix-only rewrite is the client fallback —
+  keep BOTH paths working; don't remove the rewrite fn.
+- Path translation matches by DEFAULT slugs only (unique among siblings → unambiguous).
+  A locale-URL → default-URL reverse direction is NOT needed anywhere; don't build it.

@@ -31,6 +31,14 @@ const SWITCHER_ATTR = "data-bb-lang-switcher";
 const DEFAULT_LOCALE_ATTR = "data-bb-default-locale";
 
 /**
+ * Per-<option>: the page's FULL pathname in that locale, computed at plan time
+ * (Stage-2 localized slugs — the client can't know `/fi/meista` from
+ * `/about`). When present the script navigates straight to it; absent (no
+ * page context, e.g. Develop preview) → the prefix-only client rewrite.
+ */
+const OPTION_PATH_ATTR = "data-bb-path";
+
+/**
  * Pure path rewrite for a locale switch — the client-side mirror of
  * `peelLocaleSegment` (slug.ts): strip a leading segment naming a NON-default
  * locale (case-insensitive, URL-decoded), then prefix the target locale unless
@@ -86,9 +94,15 @@ export const LANGUAGE_SWITCHER_SCRIPT = `
         window.location.reload();
         return;
       }
-      var codes = Array.prototype.map.call(sel.options, function (o) { return o.value; });
-      var path = rewrite(window.location.pathname, sel.value,
-        sel.getAttribute('${DEFAULT_LOCALE_ATTR}') || '', codes);
+      // Prefer the plan-time path (correct under localized slugs); fall back
+      // to the prefix-only rewrite when no path was stamped.
+      var opt = sel.options[sel.selectedIndex];
+      var path = opt && opt.getAttribute('${OPTION_PATH_ATTR}');
+      if (!path) {
+        var codes = Array.prototype.map.call(sel.options, function (o) { return o.value; });
+        path = rewrite(window.location.pathname, sel.value,
+          sel.getAttribute('${DEFAULT_LOCALE_ATTR}') || '', codes);
+      }
       window.location.assign(path + window.location.search + window.location.hash);
     });
   });
@@ -119,12 +133,15 @@ export function planLanguageSwitcher(
   // Guard: only select a code that's actually an option, else the first.
   const wanted = str(locale?.locale, "");
   const active = available.some((l) => l.code === wanted) ? wanted : available[0].code;
-  const options: ElementPlan[] = available.map((l) => ({
-    kind: "element",
-    tag: "option",
-    props: { value: l.code },
-    children: [{ kind: "text", text: l.label }],
-  }));
+  const options: ElementPlan[] = available.map((l) => {
+    const path = locale?.pagePaths?.[l.code];
+    return {
+      kind: "element",
+      tag: "option",
+      props: path ? { value: l.code, [OPTION_PATH_ATTR]: path } : { value: l.code },
+      children: [{ kind: "text", text: l.label }],
+    };
+  });
 
   return {
     kind: "element",
