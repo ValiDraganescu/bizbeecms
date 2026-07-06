@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { planLanguageSwitcher } from "./plan-language-switcher.ts";
+import {
+  planLanguageSwitcher,
+  switchLocalePathname,
+  LANGUAGE_SWITCHER_SCRIPT,
+} from "./plan-language-switcher.ts";
 import { planPage } from "./tree.ts";
 import {
   LANGUAGE_SWITCHER_COMPONENT,
@@ -68,6 +72,64 @@ test("planPage renders no switcher script when there's nothing to switch", () =>
   const blocks: Block[] = [{ id: "a", component: LANGUAGE_SWITCHER_COMPONENT }];
   const plan = planPage(blocks, new Map(), ctx("en", ["en"]));
   assert.equal(plan.scripts.length, 0);
+});
+
+test("the <select> carries the default-locale attr the client rewrite needs", () => {
+  const plan = planLanguageSwitcher(ctx("fi", ["en", "fi", "et"]), () => {});
+  const sel = findTag(plan, "select");
+  assert.ok(sel && sel.kind === "element");
+  assert.equal(sel.props["data-bb-default-locale"], "en", "fallback (= default) is embedded");
+});
+
+test("switchLocalePathname: default → non-default prefixes the path", () => {
+  const codes = ["en", "fi", "et"];
+  assert.equal(switchLocalePathname("/about", "fi", "en", codes), "/fi/about");
+  assert.equal(switchLocalePathname("/", "fi", "en", codes), "/fi");
+  assert.equal(switchLocalePathname("/a/b", "et", "en", codes), "/et/a/b");
+});
+
+test("switchLocalePathname: non-default → default strips the prefix", () => {
+  const codes = ["en", "fi", "et"];
+  assert.equal(switchLocalePathname("/fi/about", "en", "en", codes), "/about");
+  assert.equal(switchLocalePathname("/fi", "en", "en", codes), "/");
+});
+
+test("switchLocalePathname: non-default → non-default swaps the prefix", () => {
+  const codes = ["en", "fi", "et"];
+  assert.equal(switchLocalePathname("/fi/about", "et", "en", codes), "/et/about");
+});
+
+test("switchLocalePathname: prefix match is case-insensitive + URL-decoded (mirror of peelLocaleSegment)", () => {
+  const codes = ["en", "ro-RO"];
+  assert.equal(switchLocalePathname("/RO-ro/about", "en", "en", codes), "/about");
+  assert.equal(switchLocalePathname("/ro%2DRO/x", "en", "en", codes), "/x");
+});
+
+test("switchLocalePathname: a leading segment equal to the DEFAULT locale is a slug, not a prefix", () => {
+  const codes = ["en", "fi"];
+  // /en/about when en is default = page slug "en" — never stripped.
+  assert.equal(switchLocalePathname("/en/about", "fi", "en", codes), "/fi/en/about");
+});
+
+test("switchLocalePathname: unknown first segment is left alone", () => {
+  const codes = ["en", "fi"];
+  assert.equal(switchLocalePathname("/blog/post", "fi", "en", codes), "/fi/blog/post");
+});
+
+test("switchLocalePathname: target locale code is URL-encoded in the prefix", () => {
+  const codes = ["en", "zh hant"]; // pathological code — must not break the path
+  assert.equal(switchLocalePathname("/about", "zh hant", "en", codes), "/zh%20hant/about");
+});
+
+test("the client script navigates on published pages and only cookies under /preview/", () => {
+  assert.ok(LANGUAGE_SWITCHER_SCRIPT.includes("location.assign"), "navigation path present");
+  assert.ok(
+    LANGUAGE_SWITCHER_SCRIPT.includes("'/preview/'"),
+    "cookie fallback is gated to the preview iframe",
+  );
+  // The pure rewrite ships verbatim — a broken .toString() interpolation would
+  // leave the placeholder or an empty body.
+  assert.ok(LANGUAGE_SWITCHER_SCRIPT.includes("var rewrite = "), "rewrite fn interpolated");
 });
 
 test("a component tree embedding <LanguageSwitcher/> resolves the built-in (not a placeholder)", () => {

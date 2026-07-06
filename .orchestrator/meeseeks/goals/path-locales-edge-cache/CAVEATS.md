@@ -43,3 +43,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   production build. Run the deploy gate as `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`
   (real env vars override `.env.local`). The deployer builds from a clean git checkout, so prod
   is unaffected.
+- CONTENT_LOCALE_COOKIE stays (decision 2026-07-07): the /preview/ iframe has no locale-prefixed
+  routes, so the switcher script cookie+reloads THERE ONLY; published paths navigate. Don't delete
+  the cookie constant or the cookie branch in resolveContentLocaleContext.
+- LANGUAGE_SWITCHER_SCRIPT embeds `switchLocalePathname` via `.toString()` — keep that function
+  fully self-contained (no imports/outer-scope refs, browser-safe syntax only); a test asserts the
+  interpolation, and changing it means the client + unit tests share one source.
+- If Stage-2 localized slugs land, `switchLocalePathname` (prefix-only rewrite) becomes wrong —
+  the switcher must then emit per-locale FULL paths computed at plan time (see backlog Stage 2).

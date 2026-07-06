@@ -59,8 +59,9 @@ export const LIST_COMPONENT = "List";
  * Reserved component name for the built-in LanguageSwitcher — a renderer
  * primitive (like Section/List, no D1 row) that renders a `<select>` of the
  * Site's configured content locales, current one selected. Choosing a locale
- * writes the `bb_content_locale` cookie and reloads, so the published page
- * re-renders in that locale AND the choice survives a refresh. It resolves BY
+ * NAVIGATES to the same path under that locale's URL prefix (default locale =
+ * unprefixed; see plan-language-switcher.ts) — the URL, not a cookie, decides
+ * the published render (edge-cacheable). It resolves BY
  * REFERENCE like a component, so an AI-authored nav-bar component can embed it
  * with a `<LanguageSwitcher />` tag (composition-by-tag). The available locale
  * set + active locale come from `LocaleContext.available` — the pure renderer

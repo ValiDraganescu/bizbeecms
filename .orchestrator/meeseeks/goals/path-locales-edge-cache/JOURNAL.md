@@ -31,3 +31,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `Cookie: bb_content_locale=fi` on `/` still renders EN (URL alone determines HTML).
 - **Files:** CMS/src/lib/render/slug.ts, CMS/src/lib/render/slug.test.ts (new),
   CMS/src/lib/render/resolve-page.ts, CMS/src/lib/render/render-page.tsx
+
+## 2026-07-07 01:17 — LanguageSwitcher: cookie+reload → real locale-prefix navigation
+- **Status:** DONE
+- **What I did:** Rewrote the built-in LanguageSwitcher client script
+  (`lib/render/plan-language-switcher.ts`). New pure `switchLocalePathname(pathname,
+  target, defaultLocale, codes)` — the client-side mirror of `peelLocaleSegment`
+  (strip a leading NON-default locale segment, case-insensitive + URL-decoded;
+  prepend the target's encoded prefix unless it's the default) — shipped verbatim
+  into LANGUAGE_SWITCHER_SCRIPT via `.toString()`. On change the script
+  `location.assign`s the rewritten path (search + hash preserved). The `<select>`
+  now carries `data-bb-default-locale` (from `LocaleContext.fallback`).
+  DECISION (was open in NEXT.md): CONTENT_LOCALE_COOKIE is NOT deleted — the admin
+  preview iframe (`/preview/...`) has no locale-prefixed routes, so the script
+  falls back to legacy cookie+reload there, and render-page.tsx's
+  no-explicit-locale path still reads it. Published pages never write the cookie.
+  Updated stale jsdoc in plan-types.ts (LANGUAGE_SWITCHER_COMPONENT).
+- **Verified:** 9 new node --test cases (rewrite matrix incl. case/URL-decode,
+  default-code-as-slug, encoding; script-content asserts); full `npm test` 1588/0;
+  `new Function(script)` syntax check; DOM-stub eval of the shipped script
+  (en→fi assigns /fi/about?x=1#h, fi→en assigns /about, /preview/ cookies+reloads);
+  live dev smoke: / and /fi ship the attr + transpiled rewrite fn;
+  `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` green.
+- **Files:** CMS/src/lib/render/plan-language-switcher.ts,
+  CMS/src/lib/render/plan-language-switcher.test.ts, CMS/src/lib/render/plan-types.ts
