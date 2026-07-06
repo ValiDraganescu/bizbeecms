@@ -1,0 +1,1 @@
+ALTER TABLE `page` ADD `localized_slugs` text DEFAULT '{}' NOT NULL;

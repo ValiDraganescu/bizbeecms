@@ -14,7 +14,10 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import type { PageInput } from "@/lib/chat/page-tool";
-import type { PageMetaInput } from "@/lib/pages/page-meta";
+import {
+  localizedSlugSiblingConflicts,
+  type PageMetaInput,
+} from "../lib/pages/page-meta.ts";
 import { parseJsonColumn, type Block } from "../lib/render/tree.ts";
 import {
   applyTranslatableFromSlots,
@@ -120,6 +123,8 @@ export interface PageSummary {
   metaTitle: Record<string, string>;
   metaDescription: Record<string, string>;
   metaImage: Record<string, string>;
+  /** Per-locale slug overrides (Stage 2); missing key = default `slug`. */
+  localizedSlugs: Record<string, string>;
   /** Edge-cache max-age seconds (0 = never cache). */
   cacheMaxAge: number;
   updatedAt: number;
@@ -149,6 +154,7 @@ function toSummary(row: Page, idToSlug: Map<string, string>): PageSummary {
     metaTitle: parseMap(row.metaTitle),
     metaDescription: parseMap(row.metaDescription),
     metaImage: parseMap(row.metaImage),
+    localizedSlugs: parseMap(row.localizedSlugs),
     cacheMaxAge: row.cacheMaxAge,
     updatedAt: row.updatedAt.getTime(),
   };
@@ -230,13 +236,40 @@ export async function upsertPageMeta(
     return { ok: false, errors: [`a sibling page already uses slug "${meta.slug}"`] };
   }
 
+  let existingLocalized: Record<string, string> = {};
   if (id !== null) {
     const existing = await db
-      .select({ id: schema.page.id })
+      .select({ id: schema.page.id, localizedSlugs: schema.page.localizedSlugs })
       .from(schema.page)
       .where(eq(schema.page.id, id))
       .limit(1);
     if (existing.length === 0) return { ok: false, errors: ["page not found"] };
+    existingLocalized = parseMap(existing[0].localizedSlugs);
+  }
+
+  // Per-locale sibling uniqueness (Stage 2 localized slugs): a page's effective
+  // slug in locale L (localizedSlugs[L] ?? slug) must be unique among siblings
+  // in every locale — app-side, SQLite can't index JSON keys. Absent
+  // localizedSlugs = the stored map stays, so check against what will persist.
+  const effectiveLocalized = meta.localizedSlugs ?? existingLocalized;
+  const siblings = await db
+    .select({ id: schema.page.id, slug: schema.page.slug, localizedSlugs: schema.page.localizedSlugs })
+    .from(schema.page)
+    .where(parentMatch);
+  const localeClashes = localizedSlugSiblingConflicts(
+    { id, slug: meta.slug, localizedSlugs: effectiveLocalized },
+    siblings.map((s) => ({ id: s.id, slug: s.slug, localizedSlugs: parseMap(s.localizedSlugs) })),
+  );
+  if (localeClashes.length > 0) {
+    return {
+      ok: false,
+      errors: localeClashes.map(
+        (c) => `a sibling page already uses slug "${c.slug}" for locale "${c.locale}"`,
+      ),
+    };
+  }
+
+  if (id !== null) {
     await db
       .update(schema.page)
       .set({
@@ -249,6 +282,10 @@ export async function upsertPageMeta(
         // Absent cacheMaxAge = preserve the stored opt-in (SEO/publish bodies
         // don't carry it); only an explicit value writes.
         ...(meta.cacheMaxAge !== undefined ? { cacheMaxAge: meta.cacheMaxAge } : {}),
+        // Same preserve-when-absent contract for the per-locale slug overrides.
+        ...(meta.localizedSlugs !== undefined
+          ? { localizedSlugs: JSON.stringify(meta.localizedSlugs) }
+          : {}),
         updatedAt: now,
       })
       .where(eq(schema.page.id, id));
@@ -265,6 +302,7 @@ export async function upsertPageMeta(
     metaTitle,
     metaDescription,
     metaImage,
+    localizedSlugs: JSON.stringify(meta.localizedSlugs ?? {}),
     cacheMaxAge: meta.cacheMaxAge ?? 0,
     createdAt: now,
     updatedAt: now,

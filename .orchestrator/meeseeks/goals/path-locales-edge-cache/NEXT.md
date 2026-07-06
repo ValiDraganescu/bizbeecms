@@ -1,24 +1,24 @@
 # Note to the next Meeseeks (path-locales-edge-cache)
 
-Run 9 done: **purge wiring landed — the Edge-caching section is fully coded.**
-`purgeCacheTags` (pure, edge-cache.ts) + `purgeEdgeTags` (purge-edge.ts, the single
-getCloudflareContext call site). Publish/unpublish(meta PUT)/delete purge `page:<id>`;
-theme colors/fonts, brand, content-locales, component publish purge `PAGES_CACHE_TAG`.
-All best-effort AFTER the successful write. 1642 tests green; deploy-gate build +
-wrangler dry-run green. Live hit/miss/purge (cf-cache-status) = HITL after the next
-`r-*` release deploy — flag it, don't cut releases yourself.
+Run 10 done: **Stage 2 data model landed.** `page.localized_slugs` (migration 0028,
+applied --local), optional `localizedSlugs` in validatePageMeta (preserve-when-absent,
+same contract as cacheMaxAge), pure `localizedSlugSiblingConflicts` wired into
+upsertPageMeta, locale-code guard extended to localized values (/api/pages +
+content-locales PUT), per-locale slug inputs in PageSettings (`buildLocalizedSlugsBody`,
+en/fi/et strings). 1648 tests green; tsc clean; deploy-gate build + dry-run green.
 
-**Take next: Stage 2 localized slugs, data-model slice (backlog order):**
-- Drizzle-only migration: `page.localized_slugs` JSON column (existing `slug` stays the
-  default-locale slug; `UNIQUE(parent_page_id, slug)` untouched). schema.ts → db:generate
-  → migrations apply --local.
-- Per-locale sibling-uniqueness validation on save (app-side, pure helper + tests).
-- Per-locale slug inputs in page settings (mirror metaTitle's per-locale UI).
-- Apply the top-level slug-vs-locale-code guard to `localized_slugs` values too (CAVEATS).
+**Take next: locale-aware slug walk (backlog order):**
+- `matchSlugSegment` / the resolvePage tree walk resolves against
+  `localizedSlugs[locale] ?? slug`; wildcard `:param` stays locale-agnostic; dep-free
+  unit tests. NOTE: resolve-page.ts must stay lean (no Next imports — worker.ts uses it),
+  and the walk needs the ACTIVE locale (peelLocaleSegment output) passed down.
+- The custom worker entrypoint (`CMS/worker.ts`) reuses resolvePage for cache stamping —
+  the localized walk automatically fixes its lookups too; verify with `wrangler dev`.
 
-After the data model: locale-aware slug walk, then reverse-resolved links/switcher/
-hreflang/sitemap (they're all prefix-only rewrites today — see CAVEATS Stage-2 lines).
+After the walk: reverse-resolved links/switcher/hreflang/sitemap (all prefix-only
+rewrites today — see CAVEATS Stage-2 lines), then the small TODO to wire
+localizedSlugSiblingConflicts into the AI upsertPage path.
 
-Gotchas: deploy gate = `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`, never while
-a dev server runs (none was when I woke). Migration discipline: NEVER hand-write SQL —
-schema.ts + drizzle-kit only (CMS/CLAUDE.md).
+Gotchas: deploy gate = `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`, never
+while dev runs (none was). Drizzle-only migrations. localizedSlugs PUT semantics:
+absent = preserve, {} = clear all — don't break that in new bodies.

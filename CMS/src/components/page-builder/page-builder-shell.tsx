@@ -1174,6 +1174,7 @@ export function PageBuilderShell({
                     <PageSettings
                       key={page.id}
                       page={page}
+                      locales={contentLocales}
                       onChanged={() => void refreshPages(page.id)}
                       onDeleted={() => {
                         setSelected(null);

@@ -13,6 +13,7 @@ function page(over: Partial<PageSummary>): PageSummary {
     metaTitle: over.metaTitle ?? {},
     metaDescription: over.metaDescription ?? {},
     metaImage: over.metaImage ?? {},
+    localizedSlugs: over.localizedSlugs ?? {},
     cacheMaxAge: over.cacheMaxAge ?? 0,
     updatedAt: over.updatedAt ?? 0,
   };

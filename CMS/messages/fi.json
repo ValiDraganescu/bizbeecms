@@ -680,7 +680,11 @@
       "delete": "Poista sivu",
       "deleteConfirm": "Poistetaanko tämä sivu? Tätä ei voi kumota.",
       "deleteAction": "Poista",
-      "cancel": "Peruuta"
+      "cancel": "Peruuta",
+      "localizedSlugsLabel": "Lokalisoidut polkutunnukset",
+      "localizedSlugsHint": "Sivun kielikohtainen URL-polkutunnus. Jätä tyhjäksi käyttääksesi oletustunnusta.",
+      "localizedSlugsSave": "Tallenna polkutunnukset",
+      "localizedSlugInvalid": "Kielen \"{locale}\" polkutunnuksen on oltava pienikirjaiminen URL-osa (kirjaimia, numeroita, väliviivoja)"
     },
     "versions": {
       "label": "Versiohistoria",

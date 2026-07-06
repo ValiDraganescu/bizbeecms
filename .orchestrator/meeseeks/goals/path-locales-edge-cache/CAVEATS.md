@@ -105,3 +105,10 @@ Read every line before working. Each entry was learned the hard way by a previou
   change is covered — the tag is by id, not URL). `purgeEdgeTags` (lib/render/purge-edge.ts)
   is the ONLY CF-coupled purge call site; the pure best-effort logic is `purgeCacheTags` in
   edge-cache.ts. Don't add a second getCloudflareContext purge path.
+- `localizedSlugs` follows the cacheMaxAge contract: ABSENT in the PUT body = preserve the
+  stored map; PRESENT-but-{} = clear all overrides. buildLocalizedSlugsBody always sends the
+  cleaned map; publish/SEO/cache bodies omit it. Don't "default" it in validatePageMeta.
+- Per-locale sibling uniqueness lives ONLY in upsertPageMeta (app-side; SQLite can't index
+  JSON keys). The AI create_page path (`upsertPage`) never writes localizedSlugs, but a NEW
+  AI page's default slug can still collide with a sibling's override in some locale — the
+  backlog has a TODO to wire localizedSlugSiblingConflicts there too.

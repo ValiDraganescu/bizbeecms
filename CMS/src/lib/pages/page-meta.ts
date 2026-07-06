@@ -28,6 +28,13 @@ export interface PageMetaInput {
    * so an SEO save must not silently reset a page's cache opt-in.
    */
   cacheMaxAge?: number;
+  /**
+   * Per-locale slug overrides (Stage 2 localized slugs), e.g. { fi: "meista" }.
+   * `slug` stays the DEFAULT-locale slug; a missing key falls back to it.
+   * OPTIONAL like cacheMaxAge: absent = preserve the stored map (SEO/publish
+   * bodies don't carry it). Empty-string values clear an override.
+   */
+  localizedSlugs?: Record<string, string>;
 }
 
 /**
@@ -109,6 +116,27 @@ export function validatePageMeta(
     }
   }
 
+  let localizedSlugs: Record<string, string> | undefined;
+  if (a.localizedSlugs != null) {
+    const raw = coerceStringMap(a.localizedSlugs);
+    if (raw === undefined) {
+      errors.push("localizedSlugs must be a map of locale → slug string");
+    } else {
+      localizedSlugs = {};
+      for (const [loc, value] of Object.entries(raw)) {
+        const v = value.trim();
+        if (v === "") continue; // empty clears the override → key dropped
+        if (isParamSlug(v)) {
+          errors.push(`localizedSlugs.${loc}: wildcard ":param" slugs are locale-agnostic — leave the localized slug empty`);
+        } else if (!SLUG_RE.test(v)) {
+          errors.push(`localizedSlugs.${loc} must be a lowercase URL segment (letters, digits, hyphens)`);
+        } else {
+          localizedSlugs[loc.toLowerCase()] = v;
+        }
+      }
+    }
+  }
+
   if (errors.length > 0) return { ok: false, errors };
   return {
     ok: true,
@@ -120,8 +148,45 @@ export function validatePageMeta(
       metaDescription: metaDescription as Record<string, string>,
       metaImage: metaImage as Record<string, string>,
       ...(cacheMaxAge !== undefined ? { cacheMaxAge } : {}),
+      ...(localizedSlugs !== undefined ? { localizedSlugs } : {}),
     },
   };
+}
+
+/** The minimal slug identity of a page for per-locale sibling-uniqueness checks. */
+export interface SiblingSlugSource {
+  id: string;
+  slug: string;
+  localizedSlugs: Record<string, string>;
+}
+
+/**
+ * Per-locale sibling-uniqueness check (Stage 2 localized slugs). A page's
+ * EFFECTIVE slug in locale L is `localizedSlugs[L] ?? slug`; two siblings may
+ * never share an effective slug in ANY locale or their URLs collide. Locales
+ * checked = the union of keys across candidate + siblings (the default locale
+ * is unkeyed and already guarded by UNIQUE(parent_page_id, slug)). The
+ * candidate's own row (`id` match) is skipped. Returns the colliding
+ * {locale, slug} pairs. PURE — no DB.
+ */
+export function localizedSlugSiblingConflicts(
+  candidate: { id: string | null; slug: string; localizedSlugs: Record<string, string> },
+  siblings: SiblingSlugSource[],
+): { locale: string; slug: string }[] {
+  const others = siblings.filter((s) => s.id !== candidate.id);
+  const locales = new Set<string>(Object.keys(candidate.localizedSlugs));
+  for (const s of others) for (const k of Object.keys(s.localizedSlugs)) locales.add(k);
+  const conflicts: { locale: string; slug: string }[] = [];
+  for (const loc of locales) {
+    const mine = candidate.localizedSlugs[loc] ?? candidate.slug;
+    for (const s of others) {
+      if ((s.localizedSlugs[loc] ?? s.slug) === mine) {
+        conflicts.push({ locale: loc, slug: mine });
+        break;
+      }
+    }
+  }
+  return conflicts;
 }
 
 /**
@@ -202,6 +267,32 @@ export function buildPublishToggleBody(
     metaTitle: page.metaTitle,
     metaDescription: page.metaDescription,
     metaImage: page.metaImage,
+  };
+}
+
+/**
+ * Assemble the `PUT /api/pages` body that changes ONLY the per-locale slug
+ * overrides (`localizedSlugs`), keeping publish state, slug/parent and all
+ * per-locale SEO maps exactly as stored. Empty/whitespace values are dropped
+ * client-side too so clearing an input clears the override. PURE.
+ */
+export function buildLocalizedSlugsBody(
+  page: PagePublishSource,
+  localizedSlugs: Record<string, string>,
+): { id: string } & PageMetaInput {
+  const cleaned: Record<string, string> = {};
+  for (const [loc, v] of Object.entries(localizedSlugs)) {
+    if (v.trim() !== "") cleaned[loc] = v.trim();
+  }
+  return {
+    id: page.id,
+    slug: page.slug,
+    parentSlug: page.parentSlug,
+    publishStatus: page.publishStatus === "published" ? "published" : "draft",
+    metaTitle: page.metaTitle,
+    metaDescription: page.metaDescription,
+    metaImage: page.metaImage,
+    localizedSlugs: cleaned,
   };
 }
 

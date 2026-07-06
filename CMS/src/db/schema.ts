@@ -109,6 +109,11 @@ export const page = sqliteTable(
     metaDescription: text("meta_description").notNull().default("{}"),
     // Per-locale OpenGraph image URL (R2 asset url), e.g. { "en": "https://…/x.png" }.
     metaImage: text("meta_image").notNull().default("{}"),
+    // Per-locale slug overrides (Stage 2 localized slugs), e.g. { "fi": "meista" }.
+    // `slug` stays the DEFAULT-locale slug (and keeps the unique index below);
+    // a missing key falls back to it. Per-locale sibling uniqueness is enforced
+    // app-side (localizedSlugSiblingConflicts) — SQLite can't index JSON keys.
+    localizedSlugs: text("localized_slugs").notNull().default("{}"),
     // PAGE VERSIONING (slice 1): pointers into `page_version`. `draftVersionId`
     // is the currently-editable version; `publishedVersionId` is the live one.
     // Nullable so existing rows backfill safely (no FK — the app resolves them).

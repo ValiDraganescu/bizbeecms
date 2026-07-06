@@ -680,7 +680,11 @@
       "delete": "Kustuta leht",
       "deleteConfirm": "Kas kustutada see leht? Seda ei saa tagasi võtta.",
       "deleteAction": "Kustuta",
-      "cancel": "Tühista"
+      "cancel": "Tühista",
+      "localizedSlugsLabel": "Lokaliseeritud lühiaadressid",
+      "localizedSlugsHint": "Lehe keelepõhine URL-i lühiaadress. Jäta tühjaks, et kasutada vaikimisi lühiaadressi.",
+      "localizedSlugsSave": "Salvesta lühiaadressid",
+      "localizedSlugInvalid": "Keele \"{locale}\" lühiaadress peab olema väiketäheline URL-i osa (tähed, numbrid, sidekriipsud)"
     },
     "versions": {
       "label": "Versiooniajalugu",

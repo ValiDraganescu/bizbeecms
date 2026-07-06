@@ -207,3 +207,34 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/render/edge-cache.test.ts, CMS/src/app/api/pages/route.ts,
   CMS/src/app/api/pages/[id]/publish/route.ts, CMS/src/app/api/components/[name]/route.ts,
   CMS/src/app/api/settings/{theme,theme/fonts,brand,content-locales}/route.ts
+
+## 2026-07-07 02:20 — Stage 2 data model: page.localized_slugs + per-locale uniqueness + slug inputs
+- **Status:** DONE
+- **What I did:** (1) Drizzle-only migration 0028 (`page.localized_slugs` TEXT
+  NOT NULL DEFAULT '{}'; `slug` stays the default-locale slug, unique index
+  untouched); applied --local. (2) `validatePageMeta` gains optional
+  `localizedSlugs` (SAME preserve-when-absent contract as cacheMaxAge; empty
+  values drop the key = clear override; wildcard ":param" values rejected —
+  wildcards are locale-agnostic; locale keys lowercased). (3) New pure
+  `localizedSlugSiblingConflicts` (page-meta.ts): effective slug in locale L =
+  `localizedSlugs[L] ?? slug`, unique among siblings per locale over the UNION
+  of keyed locales (default locale covered by UNIQUE(parent,slug)); wired into
+  `upsertPageMeta` (checks what WILL persist: body map ?? stored map).
+  (4) PageSummary/toSummary expose `localizedSlugs`. (5) /api/pages top-level
+  locale-code guard now also covers localized values; content-locales PUT
+  checks localized top-level slugs too (CAVEATS Stage-2 line honored).
+  (6) PageSettings gets a "Localized slugs" section: one input per NON-default
+  locale (placeholder = default slug, empty = fallback), pure
+  `buildLocalizedSlugsBody`, client pre-validation, slugIsLocaleCode code
+  mapped to the existing t() key; en/fi/et strings added.
+- **Verified:** page-meta tests 17/17; full `npm test` 1648/1648;
+  `npx tsc --noEmit` clean; `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare
+  build` + `wrangler deploy --dry-run` green; migration applied to local D1.
+  UI save flow not browser-tested (dev server was down) — exercised via the
+  pure body builder + route validation tests.
+- **Files:** CMS/src/db/schema.ts, CMS/migrations/0028_shocking_sir_ram.sql (new),
+  CMS/migrations/meta/*, CMS/src/lib/pages/page-meta.ts, page-meta.test.ts,
+  page-picker.test.ts, CMS/src/db/page-store.ts, CMS/src/app/api/pages/route.ts,
+  CMS/src/app/api/settings/content-locales/route.ts,
+  CMS/src/components/page-builder/page-settings.tsx, page-builder-shell.tsx,
+  CMS/messages/{en,fi,et}.json

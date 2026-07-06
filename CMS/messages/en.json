@@ -680,7 +680,11 @@
       "delete": "Delete page",
       "deleteConfirm": "Delete this page? This can't be undone.",
       "deleteAction": "Delete",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "localizedSlugsLabel": "Localized slugs",
+      "localizedSlugsHint": "Per-locale URL slug for this page. Leave empty to use the default slug.",
+      "localizedSlugsSave": "Save slugs",
+      "localizedSlugInvalid": "Localized slug for \"{locale}\" must be a lowercase URL segment (letters, digits, hyphens)"
     },
     "versions": {
       "label": "Version history",

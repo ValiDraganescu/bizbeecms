@@ -91,12 +91,15 @@ async function persist(body: unknown, id: string | null): Promise<Response> {
   try {
     // A top-level slug equal to a configured content-locale code would collide
     // with the /<code>/ locale URL prefix (Stage 1 locale-prefix routing).
+    // Localized slug overrides get the same guard (CAVEATS: Stage 2).
     if (v.meta.parentSlug === null) {
       const { locales } = await getContentLocales();
-      if (localeSlugConflicts(locales, [v.meta.slug]).length > 0) {
+      const candidates = [v.meta.slug, ...Object.values(v.meta.localizedSlugs ?? {})];
+      const clash = localeSlugConflicts(locales, candidates);
+      if (clash.length > 0) {
         return Response.json(
           {
-            error: `slug "${v.meta.slug}" is a configured content-locale code — the /${v.meta.slug}/ locale prefix would shadow this page; pick a different slug`,
+            error: `slug "${clash[0]}" is a configured content-locale code — the /${clash[0]}/ locale prefix would shadow this page; pick a different slug`,
             code: "slugIsLocaleCode",
           },
           { status: 409 },

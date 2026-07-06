@@ -56,7 +56,7 @@ export async function PUT(request: Request): Promise<Response> {
     // page behind the /<code>/ locale URL prefix (Stage 1 locale-prefix routing).
     const topLevelSlugs = (await listPages())
       .filter((p) => p.parentPageId === null)
-      .map((p) => p.slug);
+      .flatMap((p) => [p.slug, ...Object.values(p.localizedSlugs)]);
     const conflicts = localeSlugConflicts(normalized.locales, topLevelSlugs);
     if (conflicts.length > 0) {
       return Response.json(

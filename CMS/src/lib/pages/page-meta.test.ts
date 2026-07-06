@@ -11,7 +11,9 @@ import {
   buildSeoMetaBody,
   buildPublishToggleBody,
   buildCacheMaxAgeBody,
+  buildLocalizedSlugsBody,
   CACHE_MAX_AGE_OPTIONS,
+  localizedSlugSiblingConflicts,
   validatePageMeta,
 } from "./page-meta.ts";
 
@@ -163,4 +165,102 @@ test("publish/SEO bodies omit cacheMaxAge so a save can't reset the opt-in", () 
   };
   assert.equal("cacheMaxAge" in buildPublishToggleBody(page), false);
   assert.equal("cacheMaxAge" in buildSeoMetaBody(page, {}, {}, {}), false);
+});
+
+// ── Localized slugs (Stage 2, path-locales-edge-cache) ───────────────────────
+
+test("validatePageMeta accepts localizedSlugs, drops empty values, lowercases locale keys", () => {
+  const v = validatePageMeta({
+    slug: "about",
+    localizedSlugs: { FI: "meista", et: "  ", en: "about-us " },
+  });
+  assert.equal(v.ok, true);
+  if (v.ok) assert.deepEqual(v.meta.localizedSlugs, { fi: "meista", en: "about-us" });
+});
+
+test("validatePageMeta leaves localizedSlugs undefined when absent (preserve stored map)", () => {
+  const v = validatePageMeta({ slug: "about" });
+  assert.equal(v.ok, true);
+  if (v.ok) assert.equal(v.meta.localizedSlugs, undefined);
+});
+
+test("validatePageMeta rejects invalid + wildcard localized slug values, naming the locale", () => {
+  const bad = validatePageMeta({ slug: "about", localizedSlugs: { fi: "Meistä" } });
+  assert.equal(bad.ok, false);
+  if (!bad.ok) assert.match(bad.errors.join(";"), /localizedSlugs\.fi/);
+  const wild = validatePageMeta({ slug: "about", localizedSlugs: { fi: ":city" } });
+  assert.equal(wild.ok, false);
+  if (!wild.ok) assert.match(wild.errors.join(";"), /wildcard/);
+  const shape = validatePageMeta({ slug: "about", localizedSlugs: { fi: 5 } });
+  assert.equal(shape.ok, false);
+});
+
+test("localizedSlugSiblingConflicts flags effective-slug collisions per locale", () => {
+  const siblings: { id: string; slug: string; localizedSlugs: Record<string, string> }[] = [
+    { id: "a", slug: "about", localizedSlugs: { fi: "meista" } },
+    { id: "b", slug: "contact", localizedSlugs: {} },
+  ];
+  // Direct override collision in fi.
+  assert.deepEqual(
+    localizedSlugSiblingConflicts(
+      { id: null, slug: "team", localizedSlugs: { fi: "meista" } },
+      siblings,
+    ),
+    [{ locale: "fi", slug: "meista" }],
+  );
+  // Fallback collision: candidate default slug collides with a sibling's fi override.
+  assert.deepEqual(
+    localizedSlugSiblingConflicts({ id: null, slug: "meista", localizedSlugs: {} }, siblings),
+    [{ locale: "fi", slug: "meista" }],
+  );
+  // Candidate override collides with a sibling's DEFAULT slug (sibling has no fi key).
+  assert.deepEqual(
+    localizedSlugSiblingConflicts(
+      { id: null, slug: "team", localizedSlugs: { fi: "contact" } },
+      siblings,
+    ),
+    [{ locale: "fi", slug: "contact" }],
+  );
+  // No collision; the candidate's own row is skipped on update.
+  assert.deepEqual(
+    localizedSlugSiblingConflicts(
+      { id: "a", slug: "about", localizedSlugs: { fi: "meista" } },
+      siblings,
+    ),
+    [],
+  );
+});
+
+test("buildLocalizedSlugsBody carries cleaned overrides, keeps identity, omits cacheMaxAge", () => {
+  const page = {
+    id: "p1",
+    slug: "about",
+    parentSlug: null,
+    publishStatus: "published",
+    metaTitle: { en: "About" },
+    metaDescription: {},
+    metaImage: {},
+  };
+  const body = buildLocalizedSlugsBody(page, { fi: " meista ", et: "" });
+  assert.deepEqual(body.localizedSlugs, { fi: "meista" });
+  assert.equal(body.publishStatus, "published");
+  assert.equal(body.slug, "about");
+  assert.equal("cacheMaxAge" in body, false);
+  assert.equal(validatePageMeta(body).ok, true);
+  // Clearing every input clears all overrides (present-but-empty map = write {}).
+  assert.deepEqual(buildLocalizedSlugsBody(page, { fi: "" }).localizedSlugs, {});
+});
+
+test("publish/SEO bodies omit localizedSlugs so a save can't reset the overrides", () => {
+  const page = {
+    id: "p1",
+    slug: "home",
+    parentSlug: null,
+    publishStatus: "draft",
+    metaTitle: {},
+    metaDescription: {},
+    metaImage: {},
+  };
+  assert.equal("localizedSlugs" in buildPublishToggleBody(page), false);
+  assert.equal("localizedSlugs" in buildSeoMetaBody(page, {}, {}, {}), false);
 });

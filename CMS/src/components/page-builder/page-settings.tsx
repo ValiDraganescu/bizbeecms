@@ -4,8 +4,10 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   buildCacheMaxAgeBody,
+  buildLocalizedSlugsBody,
   buildPublishToggleBody,
   CACHE_MAX_AGE_OPTIONS,
+  isValidSlug,
 } from "@/lib/pages/page-meta";
 import type { PageSummary } from "@/db/page-store";
 
@@ -19,10 +21,13 @@ import type { PageSummary } from "@/db/page-store";
  */
 export function PageSettings({
   page,
+  locales,
   onChanged,
   onDeleted,
 }: {
   page: PageSummary;
+  /** Site content locales, DEFAULT FIRST — non-default ones get a slug input. */
+  locales: string[];
   onChanged: () => void;
   onDeleted: () => void;
 }) {
@@ -30,7 +35,13 @@ export function PageSettings({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // Draft per-locale slug overrides (Stage 2 localized slugs). Keyed by the
+  // page id via the caller's `key={page.id}` remount, same as SeoForm drafts.
+  const [slugDrafts, setSlugDrafts] = useState<Record<string, string>>({
+    ...page.localizedSlugs,
+  });
   const published = page.publishStatus === "published";
+  const extraLocales = locales.slice(1); // default locale = the plain slug column
 
   async function togglePublish() {
     setError(null);
@@ -66,6 +77,35 @@ export function PageSettings({
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
         setError(j.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveLocalizedSlugs() {
+    setError(null);
+    const bad = extraLocales.find(
+      (loc) => (slugDrafts[loc] ?? "").trim() !== "" && !isValidSlug(slugDrafts[loc]),
+    );
+    if (bad) {
+      setError(t("page.localizedSlugInvalid", { locale: bad }));
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/pages", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildLocalizedSlugsBody(page, slugDrafts)),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+        setError(j.code === "slugIsLocaleCode" ? t("create.slugIsLocaleCode") : j.error ?? `HTTP ${res.status}`);
         return;
       }
       onChanged();
@@ -144,6 +184,40 @@ export function PageSettings({
         </select>
         <p className="text-xs text-foreground-muted">{t("page.cacheHint")}</p>
       </div>
+
+      {/* LOCALIZED SLUGS (Stage 2): per-locale slug overrides for non-default
+          locales; empty = fall back to the default slug */}
+      {extraLocales.length > 0 && (
+        <div className="flex flex-col gap-2 border-t border-border pt-4">
+          <span className="text-xs uppercase tracking-wide text-foreground-muted">
+            {t("page.localizedSlugsLabel")}
+          </span>
+          {extraLocales.map((loc) => (
+            <label key={loc} className="flex items-center gap-2">
+              <span className="w-8 font-mono text-xs text-foreground-muted">{loc}</span>
+              <input
+                className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-foreground-muted"
+                value={slugDrafts[loc] ?? ""}
+                placeholder={page.slug}
+                disabled={busy}
+                onChange={(e) =>
+                  setSlugDrafts((m) => ({ ...m, [loc]: e.target.value }))
+                }
+                aria-label={`${t("page.localizedSlugsLabel")} (${loc})`}
+              />
+            </label>
+          ))}
+          <p className="text-xs text-foreground-muted">{t("page.localizedSlugsHint")}</p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void saveLocalizedSlugs()}
+            className={`${btn} self-start bg-primary text-primary-foreground hover:opacity-90`}
+          >
+            {t("page.localizedSlugsSave")}
+          </button>
+        </div>
+      )}
 
       {/* DELETE (in-app confirm, no native window.confirm) */}
       <div className="flex flex-col gap-2 border-t border-border pt-4">
