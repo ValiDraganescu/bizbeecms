@@ -81,3 +81,24 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/pages/route.ts, CMS/src/app/api/settings/content-locales/route.ts,
   CMS/src/lib/chat/tool-dispatch.ts, CMS/src/components/page-builder/page-picker.tsx,
   CMS/src/components/settings/content-locales-editor.tsx, CMS/messages/{en,fi,et}.json
+
+## 2026-07-07 01:33 — Locale-prefix internal links at plan time
+- **Status:** DONE
+- **What I did:** New pure `lib/render/localize-links.ts`: `localizeHref(href,
+  active, default, codes)` + `localizePlanLinks(plans, localeCtx)` — a post-pass
+  over the FINISHED ElementPlan (so it covers operator link props, schema
+  defaults, binding-hydrated values, List row stamps, and static hrefs authored
+  in component trees alike). Rules: only absolute internal paths ("/..."), never
+  "//" protocol-relative/external/mailto/#/relative/empty; segment-exact skip set
+  {media, api, admin, preview, _next}; never double-prefixes a path whose first
+  segment (decoded, case-insensitive) is ANY configured locale code; default
+  locale = identity no-op (same array back). Root "/" → "/fi" (not "/fi/") to
+  avoid Next's 308 trailing-slash hop; "/?q"/"/#h" likewise. Wired as the final
+  step of `planPage` (tree.ts) — one seam, both public + preview renders.
+- **Verified:** 13 dep-free node --test cases; full `npm test` 1609/0; live dev
+  smoke (local D1 en/fi/ro-ro/es): `/fi` render rewrites every internal href
+  (incl. `/fi/book?restaurant=...` query links), `/` render untouched, `/_next`
+  untouched, zero `/fi/fi` double-prefixes, root link `/fi` → 200 (no 308);
+  `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` green.
+- **Files:** CMS/src/lib/render/localize-links.ts (new),
+  CMS/src/lib/render/localize-links.test.ts (new), CMS/src/lib/render/tree.ts

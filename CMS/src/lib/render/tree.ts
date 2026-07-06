@@ -53,6 +53,7 @@ import {
   LANGUAGE_SWITCHER_ASSET_KEY,
 } from "./plan-language-switcher.ts";
 import { resolveLocalized } from "./localize.ts";
+import { localizePlanLinks } from "./localize-links.ts";
 
 // Re-export the full public surface so `@/lib/render/tree` stays the one import
 // path the renderer, editor, chat tools, and tests already use.
@@ -328,7 +329,15 @@ export function planPage(
     };
   }
 
-  return { root: blocks.map(planTopBlock), scripts, styles };
+  // Stage-1 locale-prefix routing: on a non-default-locale render, rewrite every
+  // internal href in the finished plan to carry the locale prefix (pure post-pass;
+  // identity no-op on default-locale renders). See localize-links.ts.
+  const root = blocks.map(planTopBlock);
+  return {
+    root: locale ? localizePlanLinks(root, locale) : root,
+    scripts,
+    styles,
+  };
 }
 
 /** Parse a JSON column defensively; returns `fallback` on bad/empty JSON. */

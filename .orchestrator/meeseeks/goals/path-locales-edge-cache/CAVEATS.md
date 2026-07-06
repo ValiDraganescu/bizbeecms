@@ -58,3 +58,13 @@ Read every line before working. Each entry was learned the hard way by a previou
 - The slug-vs-locale guard (`localeSlugConflicts`) deliberately includes the DEFAULT locale and
   only top-level slugs; child pages may legitimately be named "fi". Stage-2 localized slugs must
   apply the same guard to top-level `localized_slugs` values.
+- Href locale-prefixing is a POST-pass over the finished ElementPlan (last step of `planPage`),
+  NOT done during slot binding — that's what makes it cover static tree hrefs + hydrated values.
+  Don't add a second prefixing site upstream or links double-prefix (the guard would eat it, but
+  still). It also runs on preview/Develop renders (cookie locale) — intended, true-to-site.
+- localize-links' skip set is SEGMENT-exact {media, api, admin, preview, _next} — keep it in
+  sync with the future edge-cache worker's excluded path list (backlog custom-entrypoint task).
+- Root links rewrite "/" → "/fi" WITHOUT trailing slash — "/fi/" triggers Next's 308
+  trailing-slash redirect (observed live). Same for "/?q" → "/fi?q".
+- Stage-2 localized slugs make prefix-only href rewriting insufficient (same as the switcher):
+  localizeHref must then reverse-resolve the default-locale slug chain to the active locale's.
