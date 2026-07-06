@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.22.0",
+      "tag": "r-1.22.0",
+      "markdown": "# CMS v1.22.0\n\n_2026-07-06 · changes since r-1.21.0_\n\n## Features\n- Components gallery: a redesigned components view. The old fixed starter kits (blog / docs / landing / portfolio / pricing) are gone — instead you export and import component kits as a single `.zip` (component definitions plus their asset bytes), so you can move a curated set between Sites.\n- Google Fonts in theme settings: a fonts editor lets you pick Google fonts for the Site; they're wired into the rendered pages.\n- Settings restructure: settings now has a proper landing page and a shared layout across the settings sections.\n"
+    },
+    {
       "version": "1.21.0",
       "tag": "r-1.21.0",
       "markdown": "# CMS v1.21.0\n\n_2026-07-03 · changes since r-1.20.0_\n\n## Features\n- Page builder: every sizing control now has a rem/px unit picker, and every block's settings panel starts with standard spacing controls (per-side padding & margin). Existing pages keep their current look — legacy defaults are preserved.\n- A more reliable number input across the page builder: fields can be fully cleared while typing (no more values snapping back mid-edit).\n- Chat assistant context engineering: the assistant's system prompt now scopes to the tools available on the current page, and long lists (components, collections) are capped — cutting token cost substantially (e.g. data-sources admin ~17.7k → ~1.9k tokens) with no loss of capability. Old, cold chat threads are compacted on load so they no longer blow up context.\n- Component authoring now lints generated HTML and scripts and reconciles CSS classes, catching malformed output before it ships.\n\n## Fixes\n- SSO: closed a `redirect_uri_mismatch` on login (the shared app-origin fix), verified live.\n"
@@ -19,11 +24,6 @@
       "version": "1.18.0",
       "tag": "r-1.18.0",
       "markdown": "# CMS v1.18.0\n\n_2026-07-02 · changes since r-1.17.0_\n\n## Features\n- External data sources: connect pages to external HTTP APIs. Define reusable sources with saved requests (all methods, `{placeholder}` params), five auth modes (none / basic / bearer / header key / query key) plus OAuth2 client-credentials, per-request caching, and retries — all through one central fetch engine.\n- Bind components and lists to either a Collection **or** an API source: pick a saved request, pass params from props, and map response fields with dot-paths (with sample-data-driven suggestions).\n- Data Sources admin UI: create and manage sources and saved requests, with write-only encrypted secrets, per-request cache config, live test calls, and cache purging (per-request / per-source / global).\n- AI assistant can drive data sources end to end — list/create/test a source, bind components and lists to API responses, and read an on-demand data-sources guide; plus inline data-sources context on the admin page.\n- Built-in **Form** block: a native `<form>` whose child inputs are the fields, submitting to either an API saved request or an opt-in Collection (submissions land as drafts). Dual submit mode (native form-data + progressive-enhancement fetch/JSON), page-builder Form settings panel, per-collection \"public submissions\" toggle, and AI tools (`create_form` with an optional child component, `bind_form`).\n\n## Fixes\n- Inspector bind panel now edits API-keyed bindings (previously showed \"data source — none —\").\n- Bind/List panel copy is source-agnostic now that API sources are selectable.\n- \"Data sources\" sidebar nav item now shows its icon.\n\n## Other\n- Security hardening in the fetch engine: same-host-only redirect follow (SSRF/auth-leak safe), a 5MB streaming response size cap, and query-auth secrets preserved across same-host redirects.\n"
-    },
-    {
-      "version": "1.17.0",
-      "tag": "r-1.17.0",
-      "markdown": "# CMS v1.17.0\n\n_2026-07-02 · changes since r-1.16.0_\n\n## Features\n- Icon sets: a per-site icon library with an editor in settings and an icon picker in the page builder, so pages can drop in named icons that render on the published site.\n- Components: a \"used-by\" view — see which pages and components consume a given component before you edit it, so the blast radius of a change is visible up front.\n- A built-in Language Switcher block you can place on a page; it renders the site's available content locales for visitors.\n- Chat can produce transparent image cut-outs (background removed) alongside generated images, saved to your media library.\n"
     },
     {
       "version": "0.11.0",
