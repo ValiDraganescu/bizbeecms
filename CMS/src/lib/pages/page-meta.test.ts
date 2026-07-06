@@ -10,6 +10,8 @@ import {
   setLocaleValue,
   buildSeoMetaBody,
   buildPublishToggleBody,
+  buildCacheMaxAgeBody,
+  CACHE_MAX_AGE_OPTIONS,
   validatePageMeta,
 } from "./page-meta.ts";
 
@@ -103,4 +105,62 @@ test("validatePageMeta rejects a non-string metaImage value", () => {
     metaImage: { en: 5 },
   });
   assert.equal(v.ok, false);
+});
+
+// ── Edge-cache opt-in (path-locales-edge-cache) ──────────────────────────────
+
+test("validatePageMeta accepts each CACHE_MAX_AGE_OPTIONS value", () => {
+  for (const s of CACHE_MAX_AGE_OPTIONS) {
+    const v = validatePageMeta({ slug: "x", cacheMaxAge: s });
+    assert.equal(v.ok, true, `option ${s}`);
+    if (v.ok) assert.equal(v.meta.cacheMaxAge, s);
+  }
+});
+
+test("validatePageMeta leaves cacheMaxAge undefined when absent (preserve stored value)", () => {
+  const v = validatePageMeta({ slug: "x" });
+  assert.equal(v.ok, true);
+  if (v.ok) assert.equal(v.meta.cacheMaxAge, undefined);
+});
+
+test("validatePageMeta rejects cacheMaxAge outside the option set", () => {
+  for (const bad of [-1, 42, 300.5, "300", true]) {
+    const v = validatePageMeta({ slug: "x", cacheMaxAge: bad });
+    assert.equal(v.ok, false, `bad value ${String(bad)}`);
+  }
+});
+
+test("buildCacheMaxAgeBody changes only cacheMaxAge; publish state NOT toggled", () => {
+  const page = {
+    id: "p1",
+    slug: "home",
+    parentSlug: null,
+    publishStatus: "published",
+    metaTitle: { en: "Home" },
+    metaDescription: { en: "Welcome" },
+    metaImage: { en: "https://r2/og.png" },
+  };
+  const body = buildCacheMaxAgeBody(page, 3600);
+  assert.equal(body.cacheMaxAge, 3600);
+  assert.equal(body.publishStatus, "published", "publish state preserved, not flipped");
+  assert.equal(body.slug, "home");
+  assert.deepEqual(body.metaTitle, { en: "Home" });
+  assert.equal(validatePageMeta(body).ok, true);
+  const draft = buildCacheMaxAgeBody({ ...page, publishStatus: "draft" }, 0);
+  assert.equal(draft.publishStatus, "draft");
+  assert.equal(draft.cacheMaxAge, 0);
+});
+
+test("publish/SEO bodies omit cacheMaxAge so a save can't reset the opt-in", () => {
+  const page = {
+    id: "p1",
+    slug: "home",
+    parentSlug: null,
+    publishStatus: "draft",
+    metaTitle: {},
+    metaDescription: {},
+    metaImage: {},
+  };
+  assert.equal("cacheMaxAge" in buildPublishToggleBody(page), false);
+  assert.equal("cacheMaxAge" in buildSeoMetaBody(page, {}, {}, {}), false);
 });

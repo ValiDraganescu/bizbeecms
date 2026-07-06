@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { buildPublishToggleBody } from "@/lib/pages/page-meta";
+import {
+  buildCacheMaxAgeBody,
+  buildPublishToggleBody,
+  CACHE_MAX_AGE_OPTIONS,
+} from "@/lib/pages/page-meta";
 import type { PageSummary } from "@/db/page-store";
 
 /**
@@ -36,6 +40,28 @@ export function PageSettings({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPublishToggleBody(page)),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(j.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setCacheMaxAge(seconds: number) {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/pages", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildCacheMaxAgeBody(page, seconds)),
       });
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
@@ -92,6 +118,31 @@ export function PageSettings({
         >
           {published ? t("page.unpublish") : t("page.publish")}
         </button>
+      </div>
+
+      {/* EDGE CACHE opt-in (0 = never cache; the custom worker entrypoint
+          turns a positive value into Cache-Control/Cache-Tag headers) */}
+      <div className="flex flex-col gap-2 border-t border-border pt-4">
+        <label
+          htmlFor="bb-page-cache-max-age"
+          className="text-xs uppercase tracking-wide text-foreground-muted"
+        >
+          {t("page.cacheLabel")}
+        </label>
+        <select
+          id="bb-page-cache-max-age"
+          disabled={busy}
+          value={page.cacheMaxAge}
+          onChange={(e) => void setCacheMaxAge(Number(e.target.value))}
+          className="self-start rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground disabled:opacity-50"
+        >
+          {CACHE_MAX_AGE_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {t(`page.cacheOption${s}`)}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-foreground-muted">{t("page.cacheHint")}</p>
       </div>
 
       {/* DELETE (in-app confirm, no native window.confirm) */}

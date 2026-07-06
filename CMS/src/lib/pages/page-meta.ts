@@ -22,7 +22,20 @@ export interface PageMetaInput {
   metaDescription: Record<string, string>;
   /** Per-locale OpenGraph image URL (R2 asset url). */
   metaImage: Record<string, string>;
+  /**
+   * Edge-cache max-age seconds (0 = never cache). OPTIONAL: absent means
+   * "leave the stored value untouched" — SEO/publish bodies don't carry it,
+   * so an SEO save must not silently reset a page's cache opt-in.
+   */
+  cacheMaxAge?: number;
 }
+
+/**
+ * The page-settings "Edge cache" select options, in seconds:
+ * Off / 5 minutes / 1 hour / 1 day. Single source for the UI select AND the
+ * save-API validation — anything else is rejected.
+ */
+export const CACHE_MAX_AGE_OPTIONS = [0, 300, 3600, 86400] as const;
 
 // Same slug grammar as the create_page tool: a lowercase URL segment. A leading
 // ":" marks a WILDCARD param segment (e.g. ":city") — see lib/render/slug.ts —
@@ -87,6 +100,15 @@ export function validatePageMeta(
   const metaImage = coerceStringMap(a.metaImage);
   if (metaImage === undefined) errors.push("metaImage must be a map of locale → string");
 
+  let cacheMaxAge: number | undefined;
+  if (a.cacheMaxAge != null) {
+    if ((CACHE_MAX_AGE_OPTIONS as readonly number[]).includes(a.cacheMaxAge as number)) {
+      cacheMaxAge = a.cacheMaxAge as number;
+    } else {
+      errors.push(`cacheMaxAge must be one of ${CACHE_MAX_AGE_OPTIONS.join(", ")} (seconds)`);
+    }
+  }
+
   if (errors.length > 0) return { ok: false, errors };
   return {
     ok: true,
@@ -97,6 +119,7 @@ export function validatePageMeta(
       metaTitle: metaTitle as Record<string, string>,
       metaDescription: metaDescription as Record<string, string>,
       metaImage: metaImage as Record<string, string>,
+      ...(cacheMaxAge !== undefined ? { cacheMaxAge } : {}),
     },
   };
 }
@@ -166,6 +189,7 @@ export interface PagePublishSource extends PageSeoSource {
 /**
  * Assemble the `PUT /api/pages` body that flips a page draft↔published, keeping
  * slug/parent and all per-locale SEO maps untouched. PURE — no fetch, no DB.
+ * Deliberately omits `cacheMaxAge` (absent = stored value preserved).
  */
 export function buildPublishToggleBody(
   page: PagePublishSource,
@@ -178,6 +202,27 @@ export function buildPublishToggleBody(
     metaTitle: page.metaTitle,
     metaDescription: page.metaDescription,
     metaImage: page.metaImage,
+  };
+}
+
+/**
+ * Assemble the `PUT /api/pages` body that changes ONLY the edge-cache opt-in
+ * (`cacheMaxAge`), keeping publish state, slug/parent and all per-locale SEO
+ * maps exactly as stored. PURE — no fetch, no DB.
+ */
+export function buildCacheMaxAgeBody(
+  page: PagePublishSource,
+  cacheMaxAge: number,
+): { id: string } & PageMetaInput {
+  return {
+    id: page.id,
+    slug: page.slug,
+    parentSlug: page.parentSlug,
+    publishStatus: page.publishStatus === "published" ? "published" : "draft",
+    metaTitle: page.metaTitle,
+    metaDescription: page.metaDescription,
+    metaImage: page.metaImage,
+    cacheMaxAge,
   };
 }
 

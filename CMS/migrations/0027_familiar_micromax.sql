@@ -1,0 +1,1 @@
+ALTER TABLE `page` ADD `cache_max_age` integer DEFAULT 0 NOT NULL;

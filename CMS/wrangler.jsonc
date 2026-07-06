@@ -84,6 +84,14 @@
   // enabling: uncomment, set a real `destination_address`/sender domain, and
   // rerun typegen so `env.EMAIL` is typed.
   "send_email": [{ "name": "EMAIL" }],
+  // Workers Cache (edge caching for published pages). The custom worker
+  // entrypoint sets Cache-Control/Cache-Tag on opted-in public pages
+  // (page.cache_max_age > 0); publish/unpublish purge by tag via ctx.cache.
+  // BILLING NOTE: enabling "cache" makes static-asset requests bill at the
+  // standard request rate (they are free with cache disabled).
+  "cache": {
+    "enabled": true
+  },
   "observability": {
     "enabled": true
   }

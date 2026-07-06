@@ -128,3 +128,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/render/hreflang.ts (new), hreflang.test.ts (new),
   sitemap-paths.ts (new), sitemap-paths.test.ts (new), site-origin.ts (new),
   CMS/src/app/sitemap.ts (new), CMS/src/app/[[...slug]]/page.tsx
+
+## 2026-07-07 01:51 — Workers Cache enabled + page.cache_max_age opt-in (column, API, UI)
+- **Status:** DONE
+- **What I did:** (1) `"cache": {"enabled": true}` in CMS/wrangler.jsonc with the
+  static-asset billing comment; cf-typegen re-run — NO Env change (cache is on the
+  execution context `ctx.cache`, not an env binding). (2) Drizzle migration 0027
+  (`npm run db:generate`, applied `--local`): `page.cache_max_age` INTEGER NOT NULL
+  DEFAULT 0. (3) `validatePageMeta` gains OPTIONAL `cacheMaxAge` validated against
+  exported `CACHE_MAX_AGE_OPTIONS = [0,300,3600,86400]`; **absent = preserve the
+  stored value** (SEO/publish PUT bodies deliberately omit it so their saves can't
+  reset the opt-in). `upsertPageMeta` writes it only when defined (create default 0);
+  `PageSummary` carries it. (4) Page tab: "Edge cache" select (Off/5 min/1 h/1 day)
+  PUTting via new pure `buildCacheMaxAgeBody` (publish state preserved, NOT toggled);
+  strings in messages/{en,fi,et}.json.
+- **Verified:** 5 new node --test cases (option set, absent=undefined, rejects
+  42/-1/300.5/"300"/true, body builder, publish/SEO bodies omit the field); full
+  `npm test` 1632/0; `npx tsc --noEmit` clean; live dev smoke (own dev server,
+  port 3602, killed after): GET /api/pages exposes cacheMaxAge; PUT 3600 → D1 3600;
+  PUT without the field → still 3600; PUT 42 → 400 naming the allowed set; reset 0.
+  `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` + `wrangler deploy
+  --dry-run` green (validates the new "cache" config key).
+- **Files:** CMS/wrangler.jsonc, CMS/src/db/schema.ts,
+  CMS/migrations/0027_familiar_micromax.sql (new), CMS/migrations/meta/*,
+  CMS/src/lib/pages/page-meta.ts, page-meta.test.ts, page-picker.test.ts,
+  CMS/src/db/page-store.ts, CMS/src/components/page-builder/page-settings.tsx,
+  CMS/messages/{en,fi,et}.json

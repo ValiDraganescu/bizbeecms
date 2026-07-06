@@ -1,23 +1,25 @@
 # Note to the next Meeseeks (path-locales-edge-cache)
 
-Run 6 done: **Stage 1 is COMPLETE.** SEO landed — canonical + hreflang alternates in
-`[[...slug]]/page.tsx` generateMetadata (pure `lib/render/hreflang.ts`, 11 tests) and a
-public `app/sitemap.ts` (published pages × locales, pure `lib/render/sitemap-paths.ts`,
-7 tests). `lib/render/site-origin.ts` resolves the absolute origin (APP_ORIGIN first —
-request host is workers.dev behind the router proxy).
+Run 7 done: **Workers Cache is enabled + the per-page opt-in exists end to end.**
+`"cache": {"enabled": true}` in CMS/wrangler.jsonc (billing comment inline); migration 0027
+added `page.cache_max_age` (0 = never cache, default); `validatePageMeta` accepts an OPTIONAL
+`cacheMaxAge` from `CACHE_MAX_AGE_OPTIONS = [0,300,3600,86400]` (absent = preserve stored —
+don't break this, see CAVEATS); Page tab has the "Edge cache" select (en/fi/et).
 
-**Take next: first edge-caching task** — enable Workers Cache:
-add `"cache": { "enabled": true }` to CMS/wrangler.jsonc (wrangler 4.101 ≥ 4.69 ok),
-re-run cf-typegen so `ctx.cache` is typed, verify the deploy-gate build, and comment the
-static-asset billing change next to the config key. Small task — consider pairing it with
-the `page.cache_max_age` Drizzle migration task if it stays one clean slice (Drizzle-only:
-edit schema.ts → `npm run db:generate` → `wrangler d1 migrations apply --local`).
+**Take next: the custom worker entrypoint** (backlog Edge-caching #3):
+new `CMS/worker.ts` set as wrangler `main`, importing `.open-next/worker.js`'s default handler
+(re-export DOQueueHandler/DOShardedTagCache if present — see CAVEATS OpenNext pattern). For
+GET 200 responses on public page paths — excluded segments MUST match localize-links'
+SKIP_SEGMENTS {media, api, admin, preview, _next} — without Set-Cookie: peel the locale +
+resolve the page via `resolvePage`/`loadPlan` pieces in `lib/render/resolve-page.ts`, and when
+`cache_max_age > 0` set `Cache-Control: public, max-age=<n>, stale-while-revalidate=86400` +
+`Cache-Tag: pages,page:<id>`. The extra D1 lookup only runs on cache misses. Assert headers in
+unit tests (pure header-decision helper); real hit/miss (cf-cache-status) is HITL post-deploy.
 
-Then in backlog order: custom worker entrypoint (reuse `resolvePage` from
-lib/render/resolve-page.ts; keep its excluded-path list in sync with localize-links'
-SKIP_SEGMENTS {media,api,admin,preview,_next}), then purge wiring.
+Then: purge wiring (publish/unpublish/delete → `ctx.cache.purge({tags:["page:<id>"]})`,
+global-blast writes → `pages` tag; best-effort, never fail the write).
 
-Gotchas: deploy gate = `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`, NEVER while
-dev runs. Dev was NOT running when I woke; started/killed my own (port 3602). sitemap.ts
-needs `dynamic = "force-dynamic"` (already there — don't remove). Edge cache hit/miss is
-only verifiable on a deployed site (cf-cache-status) — assert headers in unit tests.
+Gotchas: deploy gate = `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`, NEVER while dev
+runs (none was running when I woke; I started/killed my own, pid file /tmp/cms-dev-meeseeks.pid).
+`wrangler deploy --dry-run --outdir /tmp/...` validates wrangler.jsonc cheaply. My API smoke
+fixture (page :city-slug… actually top-level page 8ee61c31…) was reset to cache_max_age 0.

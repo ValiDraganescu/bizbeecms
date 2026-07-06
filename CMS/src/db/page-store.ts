@@ -120,6 +120,8 @@ export interface PageSummary {
   metaTitle: Record<string, string>;
   metaDescription: Record<string, string>;
   metaImage: Record<string, string>;
+  /** Edge-cache max-age seconds (0 = never cache). */
+  cacheMaxAge: number;
   updatedAt: number;
 }
 
@@ -147,6 +149,7 @@ function toSummary(row: Page, idToSlug: Map<string, string>): PageSummary {
     metaTitle: parseMap(row.metaTitle),
     metaDescription: parseMap(row.metaDescription),
     metaImage: parseMap(row.metaImage),
+    cacheMaxAge: row.cacheMaxAge,
     updatedAt: row.updatedAt.getTime(),
   };
 }
@@ -243,6 +246,9 @@ export async function upsertPageMeta(
         metaTitle,
         metaDescription,
         metaImage,
+        // Absent cacheMaxAge = preserve the stored opt-in (SEO/publish bodies
+        // don't carry it); only an explicit value writes.
+        ...(meta.cacheMaxAge !== undefined ? { cacheMaxAge: meta.cacheMaxAge } : {}),
         updatedAt: now,
       })
       .where(eq(schema.page.id, id));
@@ -259,6 +265,7 @@ export async function upsertPageMeta(
     metaTitle,
     metaDescription,
     metaImage,
+    cacheMaxAge: meta.cacheMaxAge ?? 0,
     createdAt: now,
     updatedAt: now,
   });

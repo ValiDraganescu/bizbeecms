@@ -78,3 +78,11 @@ Read every line before working. Each entry was learned the hard way by a previou
   and localize-links, they are prefix-only rewrites of the SAME slug chain today.
 - Next serializes `alternates.languages` in sitemap entries as `xhtml:link` (works on Next 16.2);
   root canonical renders without the trailing slash ("https://x.tld") — equivalent, don't "fix".
+- `cacheMaxAge` is OPTIONAL in PageMetaInput: **absent = preserve the stored value**. The SEO form
+  and publish toggle PUT full-meta bodies that deliberately omit it — do NOT default it to 0 in
+  validatePageMeta or every SEO save silently resets a page's cache opt-in. Allowed values live in
+  `CACHE_MAX_AGE_OPTIONS` (page-meta.ts) — single source for the UI select AND validation.
+- wrangler's `"cache"` key adds NO Env binding — cf-typegen output is unchanged; `ctx.cache` hangs
+  off the execution context (getCloudflareContext().ctx), not env. Don't hunt for a missing binding.
+- The AI create_page tool / `upsertPage` (page-store) don't set cacheMaxAge — column default 0
+  applies (AI-created pages start uncached). Intentional; revisit only if the user asks.

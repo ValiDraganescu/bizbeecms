@@ -116,6 +116,10 @@ export const page = sqliteTable(
     // readers; these pointers are additive this slice.
     draftVersionId: text("draft_version_id"),
     publishedVersionId: text("published_version_id"),
+    // Edge-cache opt-in (path-locales-edge-cache): max-age seconds for the
+    // Workers Cache Cache-Control header on this page's public responses.
+    // 0 = never cache (the default — live-data pages stay uncached).
+    cacheMaxAge: integer("cache_max_age").notNull().default(0),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
