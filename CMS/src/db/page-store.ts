@@ -16,6 +16,7 @@ import { getDb, schema, type Db } from "../lib/ports/db.ts";
 import type { PageInput } from "@/lib/chat/page-tool";
 import {
   localizedSlugSiblingConflicts,
+  newPageSiblingSlugConflicts,
   type PageMetaInput,
 } from "../lib/pages/page-meta.ts";
 import { parseJsonColumn, type Block } from "../lib/render/tree.ts";
@@ -95,6 +96,29 @@ export async function upsertPage(
       })
       .where(eq(schema.page.id, existing[0].id));
     return { ok: true, action: "updated", slug: page.slug };
+  }
+
+  // Stage-2 localized slugs: UNIQUE(parent_page_id, slug) only guards the
+  // default locale — a NEW page's slug can still collide with a sibling's
+  // per-locale override (both would resolve to the same URL in that locale).
+  // Self-correcting AI-facing error: name the exact slug + locale + the fix.
+  const siblings = await db
+    .select({
+      id: schema.page.id,
+      slug: schema.page.slug,
+      localizedSlugs: schema.page.localizedSlugs,
+    })
+    .from(schema.page)
+    .where(parentMatch);
+  const conflicts = newPageSiblingSlugConflicts(page.slug, siblings);
+  if (conflicts.length > 0) {
+    const { locale } = conflicts[0];
+    return {
+      ok: false,
+      errors: [
+        `slug "${page.slug}" collides with a sibling page's "${locale}" localized slug — in locale "${locale}" both pages would resolve to the same URL; choose a different slug, or change that sibling's "${locale}" slug override in its page settings`,
+      ],
+    };
   }
 
   await db.insert(schema.page).values({

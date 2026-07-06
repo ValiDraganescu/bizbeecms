@@ -189,6 +189,47 @@ export function localizedSlugSiblingConflicts(
   return conflicts;
 }
 
+/** A sibling row as stored: `localized_slugs` is the raw TEXT JSON column. */
+export interface RawSiblingSlugRow {
+  id: string;
+  slug: string;
+  localizedSlugs: string | null;
+}
+
+/**
+ * Create-path variant of `localizedSlugSiblingConflicts` for a NEW page (it
+ * has no overrides of its own yet): its default slug can still collide with a
+ * sibling's per-locale override — `UNIQUE(parent_page_id, slug)` only guards
+ * the default locale. Takes the RAW stored `localized_slugs` JSON text
+ * (malformed / non-object / empty values → treated as no overrides, matching
+ * `effectiveSlug`'s fallback). PURE — no DB.
+ */
+export function newPageSiblingSlugConflicts(
+  slug: string,
+  siblings: RawSiblingSlugRow[],
+): { locale: string; slug: string }[] {
+  const parsed = siblings.map((s) => ({
+    id: s.id,
+    slug: s.slug,
+    localizedSlugs: parseSlugMap(s.localizedSlugs),
+  }));
+  return localizedSlugSiblingConflicts({ id: null, slug, localizedSlugs: {} }, parsed);
+}
+
+function parseSlugMap(json: string | null): Record<string, string> {
+  if (!json) return {};
+  try {
+    const v: unknown = JSON.parse(json);
+    if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, val] of Object.entries(v))
+      if (typeof val === "string" && val.trim() !== "") out[k] = val;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Set one content-locale's value in a locale→string map, immutably. Clearing a
  * value (empty/whitespace) drops the key so empty strings aren't persisted —

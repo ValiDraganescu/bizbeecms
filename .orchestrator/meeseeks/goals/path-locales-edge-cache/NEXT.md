@@ -1,30 +1,23 @@
 # Note to the next Meeseeks (path-locales-edge-cache)
 
-Run 13 done: **reverse-resolve part 2 — hreflang + sitemap.** `pathForLocale` gained an
-optional `translate` param (sitemap builds `createPathTranslator` from its own row read,
-now selecting `localizedSlugs`); `hreflangAlternates` gained optional plan-time
-`pagePaths` (wins over the prefix rewrite, per-code fallback); generateMetadata passes
-`loaded.locale.pagePaths` — zero new D1 reads there. 1676 tests green; tsc clean;
-deploy-gate build + dry-run green; live smoke (terms fi:"ehdot"): /fi/ehdot canonical +
-en alternate /terms, /terms fi alternate /fi/ehdot, sitemap emits /fi/ehdot with zero
-fi/terms. **The release-blocking caveat is fully cleared** — all four rewrite seams
-(links, switcher, hreflang, sitemap) are localized-slug-aware.
+Run 14 done: **the backlog is EMPTY** — the last TODO landed. AI create_page is now
+guarded against sibling localized-slug collisions: pure `newPageSiblingSlugConflicts`
+(page-meta.ts, raw-JSON variant of the sibling check) wired into `upsertPage`'s CREATE
+branch with a self-correcting AI error (exact slug + locale + fix). 1677 tests green,
+tsc clean, deploy-gate build + dry-run green.
 
-**Take next — the last open TODO:** wire `localizedSlugSiblingConflicts` into the AI
-create_page path (`upsertPage` in CMS/src/db/page-store.ts) — a NEW AI page's default
-slug can collide with a sibling's per-locale override. Small: fetch siblings under the
-target parent, run the pure check (it's in lib/pages/page-meta.ts), return a
-self-correcting English error from the tool (AI-error philosophy: name the exact
-conflicting slug + locale + fix). Add a regression test.
+**Goal state:** all Stage 1, Edge-caching, and Stage 2 code tasks are DONE. What remains
+is HITL-ish: real cf-cache-status hit/miss/purge verification needs a deployed site +
+a new r-* release (worker.ts only ships via a release tag — landing on main deploys
+nothing). Don't cut releases yourself (release manager owns them).
 
-After that the backlog is empty — remaining goal-level work is HITL-ish: real
-cf-cache-status hit/miss/purge verification needs a deployed site + release (worker.ts
-only ships via a new r-* tag). Codeable next slices if you must invent: hreflang/sitemap
-entries for wildcard `:param` pages are skipped by design (fine), but a defect hunt over
-the locale peel + edge-cache interplay (e.g. localized slug + cache purge on slug change)
-or an operator-docs pass are honest options.
+**If you must invent the next slice** (goals never end), honest options:
+- Defect hunt over locale peel × edge-cache interplay (e.g. slug change on a cached
+  localized page — purge is by page:<id> tag so it should be covered; prove it in tests).
+- Operator docs: a short "URL locales + edge cache" page (how prefixes, localized slugs,
+  cache opt-in, and purging behave) — nothing user-facing documents Stage 1/2 yet.
+- Live end-to-end AI create_page smoke (needs an AI chat session; run 14 couldn't).
 
 Gotchas: deploy gate = `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`, never
-while a dev server runs. Don't serialize LocaleContext (carries functions). The
-hreflang rest-based fallback must NEVER get a translate param (active-locale segments
-are the wrong input — see CAVEATS).
+while a dev server runs. upsertPage's UPDATE branch deliberately skips the sibling
+check — don't "fix" that (see CAVEATS).

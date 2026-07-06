@@ -107,10 +107,13 @@ Read every line before working. Each entry was learned the hard way by a previou
 - `localizedSlugs` follows the cacheMaxAge contract: ABSENT in the PUT body = preserve the
   stored map; PRESENT-but-{} = clear all overrides. buildLocalizedSlugsBody always sends the
   cleaned map; publish/SEO/cache bodies omit it. Don't "default" it in validatePageMeta.
-- Per-locale sibling uniqueness lives ONLY in upsertPageMeta (app-side; SQLite can't index
-  JSON keys). The AI create_page path (`upsertPage`) never writes localizedSlugs, but a NEW
-  AI page's default slug can still collide with a sibling's override in some locale — the
-  backlog has a TODO to wire localizedSlugSiblingConflicts there too.
+- Per-locale sibling uniqueness lives in upsertPageMeta AND upsertPage's create branch
+  (app-side; SQLite can't index JSON keys). upsertPage's UPDATE branch deliberately skips
+  the check — it matches by (parent, slug), the slug can't change there, and override
+  writes are guarded in upsertPageMeta. Don't add a third check site.
+- `newPageSiblingSlugConflicts` (page-meta.ts) is the raw-JSON entry point for sibling
+  checks from a store (rows carry localized_slugs TEXT); `localizedSlugSiblingConflicts`
+  takes parsed maps. Pick by input shape, don't parse twice.
 - Locale-aware walk semantics (DELIBERATE): in locale L only the EFFECTIVE slug matches —
   where an override exists the default slug 404s in that locale, and the override 404s in
   every other locale (one canonical URL per locale, no duplicate-content aliases). Don't

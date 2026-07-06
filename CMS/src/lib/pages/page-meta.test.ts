@@ -14,6 +14,7 @@ import {
   buildLocalizedSlugsBody,
   CACHE_MAX_AGE_OPTIONS,
   localizedSlugSiblingConflicts,
+  newPageSiblingSlugConflicts,
   validatePageMeta,
 } from "./page-meta.ts";
 
@@ -227,6 +228,33 @@ test("localizedSlugSiblingConflicts flags effective-slug collisions per locale",
       { id: "a", slug: "about", localizedSlugs: { fi: "meista" } },
       siblings,
     ),
+    [],
+  );
+});
+
+test("newPageSiblingSlugConflicts: new page's slug vs sibling raw-JSON overrides", () => {
+  const siblings = [
+    { id: "a", slug: "about", localizedSlugs: '{"fi":"meista"}' },
+    { id: "b", slug: "contact", localizedSlugs: null },
+  ];
+  // Regression (AI create_page path): default slug collides with a sibling's fi override.
+  assert.deepEqual(newPageSiblingSlugConflicts("meista", siblings), [
+    { locale: "fi", slug: "meista" },
+  ]);
+  // Colliding with a sibling's DEFAULT slug in a keyed locale (sibling b has no fi key).
+  assert.deepEqual(newPageSiblingSlugConflicts("contact", siblings), [
+    { locale: "fi", slug: "contact" },
+  ]);
+  // No collision.
+  assert.deepEqual(newPageSiblingSlugConflicts("team", siblings), []);
+  // Malformed / non-object / empty-value JSON → treated as no overrides.
+  assert.deepEqual(
+    newPageSiblingSlugConflicts("meista", [
+      { id: "a", slug: "about", localizedSlugs: "not json" },
+      { id: "b", slug: "contact", localizedSlugs: '["meista"]' },
+      { id: "c", slug: "team", localizedSlugs: '{"fi":""}' },
+      { id: "d", slug: "info", localizedSlugs: '{"fi":42}' },
+    ]),
     [],
   );
 });

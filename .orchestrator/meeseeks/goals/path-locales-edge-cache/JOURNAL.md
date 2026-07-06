@@ -322,3 +322,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   opennextjs-cloudflare build` + `wrangler deploy --dry-run` green.
 - **Files:** CMS/src/lib/render/hreflang.ts, hreflang.test.ts,
   CMS/src/app/[[...slug]]/page.tsx, CMS/src/app/sitemap.ts
+
+## 2026-07-07 02:49 — AI create_page guarded against sibling localized-slug collisions (last open TODO)
+- **Status:** DONE (empties the backlog)
+- **What I did:** New pure `newPageSiblingSlugConflicts(slug, siblings)` in
+  `lib/pages/page-meta.ts` — create-path variant of `localizedSlugSiblingConflicts`
+  for a NEW page (no overrides of its own): parses the RAW stored `localized_slugs`
+  TEXT (malformed / non-object / empty / non-string values → no overrides, matching
+  `effectiveSlug`'s fallback) and delegates to the existing pure check. Wired into
+  `upsertPage` (page-store.ts) on the CREATE branch only (updates match by
+  (parent, slug) — the slug isn't changing, and override writes are guarded in
+  `upsertPageMeta`): one sibling select under `parentMatch`, and on conflict a
+  self-correcting English AI-facing error naming the exact slug + locale + fix
+  ("choose a different slug, or change that sibling's <locale> slug override").
+  Flows to the model via `handleCreatePage`'s existing `res.errors` path — no
+  tool-dispatch change needed.
+- **Verified:** 4-scenario regression test in page-meta.test.ts (collision via
+  override, collision with sibling default in a keyed locale, no collision,
+  malformed-JSON tolerance) — fails without the helper, passes with it; full
+  `npm test` 1677/1677; `npx tsc --noEmit` clean; `CMS_DEV_SUPERADMIN=0 npx
+  opennextjs-cloudflare build` + `wrangler deploy --dry-run` green. Could NOT
+  live-exercise the AI tool end-to-end (needs an AI chat session); the wiring is
+  a typed one-select + pure-call path.
+- **Files:** CMS/src/lib/pages/page-meta.ts, page-meta.test.ts,
+  CMS/src/db/page-store.ts
