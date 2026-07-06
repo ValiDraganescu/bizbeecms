@@ -226,6 +226,7 @@ import {
   deletePromptVersion,
   getPromptVersion,
 } from "@/db/prompt-version-store";
+import { localeSlugConflicts } from "@/lib/render/localize";
 
 export type { DispatchResult } from "./tool-dispatch-core";
 
@@ -328,6 +329,21 @@ async function handleCreatePage(args: unknown): Promise<Record<string, unknown>>
     const missing = await missingComponents(valid.componentNames);
     if (missing.length > 0) {
       return { ok: false, errors: [await unknownComponentMessage(missing)] };
+    }
+    // A top-level slug equal to a content-locale code would be shadowed by the
+    // /<code>/ locale URL prefix (Stage 1 locale-prefix routing) — same guard
+    // as the /api/pages REST route.
+    if (valid.page.parentSlug === null) {
+      const { locales } = await getContentLocales();
+      const clash = localeSlugConflicts(locales, [valid.page.slug]);
+      if (clash.length > 0) {
+        return {
+          ok: false,
+          errors: [
+            `slug "${valid.page.slug}" equals the configured content-locale code "${clash[0]}" — the /${clash[0]}/ locale prefix would shadow this page; choose a different top-level slug`,
+          ],
+        };
+      }
     }
     const res = await upsertPage(valid.page);
     if (!res.ok) return { ok: false, errors: res.errors };

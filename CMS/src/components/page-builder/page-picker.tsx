@@ -51,9 +51,15 @@ export function PagePicker({
       const body = (await res.json().catch(() => ({}))) as {
         id?: string;
         error?: string;
+        code?: string;
       };
       if (!res.ok || !body.id) {
-        setError(body.error ?? `HTTP ${res.status}`);
+        // Known server rejections get a localized message; others show raw.
+        setError(
+          body.code === "slugIsLocaleCode"
+            ? t("create.slugIsLocaleCode")
+            : body.error ?? `HTTP ${res.status}`,
+        );
         return;
       }
       onCreated(body.id);

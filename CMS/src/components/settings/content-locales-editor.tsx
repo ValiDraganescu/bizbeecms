@@ -71,8 +71,17 @@ export function ContentLocalesEditor({ initial }: { initial: ContentLocales }) {
       if (!res.ok) {
         let msg = `HTTP ${res.status}`;
         try {
-          const j = (await res.json()) as { error?: string };
-          if (j.error) msg = j.error;
+          const j = (await res.json()) as {
+            error?: string;
+            code?: string;
+            conflicts?: string[];
+          };
+          // Known server rejections get a localized message; others show raw.
+          if (j.code === "localeIsPageSlug") {
+            msg = t("pageSlugConflict", { slugs: (j.conflicts ?? []).join(", ") });
+          } else if (j.error) {
+            msg = j.error;
+          }
         } catch {
           /* non-JSON body */
         }

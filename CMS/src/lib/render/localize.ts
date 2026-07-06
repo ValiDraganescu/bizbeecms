@@ -89,6 +89,24 @@ export function normalizeContentLocales(raw: unknown): ContentLocales {
   return { default: def, locales };
 }
 
+/**
+ * Locale codes from `locales` that collide with a top-level page slug (Stage 1
+ * locale-prefix routing): a page at `/fi` would be shadowed by the `/fi/...`
+ * locale prefix — and adding locale "fi" would shadow an existing `/fi` page.
+ * Guards BOTH write paths (page save + content-locale settings save). The
+ * DEFAULT locale is deliberately included (it's unprefixed today, but flipping
+ * the default later would silently shadow the page). Case-insensitive; wildcard
+ * ":param" slugs never collide (the ":" prefix isn't a valid locale code).
+ * Returns the conflicting codes, normalized. PURE.
+ */
+export function localeSlugConflicts(
+  locales: string[],
+  topLevelSlugs: string[],
+): string[] {
+  const slugs = new Set(topLevelSlugs.map((s) => s.trim().toLowerCase()));
+  return locales.map(normalizeLocaleCode).filter((code) => slugs.has(code));
+}
+
 // ── Locale-object resolution (the render-time core) ──────────────────────────
 
 /**

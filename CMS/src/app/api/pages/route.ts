@@ -15,6 +15,8 @@
  */
 import { deletePage, listPages, upsertPageMeta } from "@/db/page-store";
 import { validatePageMeta } from "@/lib/pages/page-meta";
+import { getContentLocales } from "@/db/settings-store";
+import { localeSlugConflicts } from "@/lib/render/localize";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -83,6 +85,20 @@ async function persist(body: unknown, id: string | null): Promise<Response> {
   const v = validatePageMeta(body);
   if (!v.ok) return Response.json({ error: v.errors.join("; ") }, { status: 400 });
   try {
+    // A top-level slug equal to a configured content-locale code would collide
+    // with the /<code>/ locale URL prefix (Stage 1 locale-prefix routing).
+    if (v.meta.parentSlug === null) {
+      const { locales } = await getContentLocales();
+      if (localeSlugConflicts(locales, [v.meta.slug]).length > 0) {
+        return Response.json(
+          {
+            error: `slug "${v.meta.slug}" is a configured content-locale code — the /${v.meta.slug}/ locale prefix would shadow this page; pick a different slug`,
+            code: "slugIsLocaleCode",
+          },
+          { status: 409 },
+        );
+      }
+    }
     const res = await upsertPageMeta(v.meta, id);
     if (!res.ok) return Response.json({ error: res.errors.join("; ") }, { status: 409 });
     return Response.json(res, { status: id === null ? 201 : 200 });

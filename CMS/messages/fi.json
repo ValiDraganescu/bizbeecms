@@ -179,6 +179,7 @@
     "addPlaceholder": "Kielikoodi, esim. fi tai pt-br",
     "invalidCode": "Anna kelvollinen kielikoodi (2–3 kirjainta, valinnainen alue).",
     "duplicate": "Kieli on jo listalla.",
+    "pageSlugConflict": "Ei voi tallentaa: {slugs} on jo käytössä sivun URL-osoitteena. Nimeä sivu ensin uudelleen.",
     "save": "Tallenna",
     "saving": "Tallennetaan…",
     "saved": "Sisältökielet tallennettu.",
@@ -649,7 +650,8 @@
       "create": "Luo sivu",
       "creating": "Luodaan…",
       "cancel": "Peruuta",
-      "invalidSlug": "Polkutunnus voi sisältää vain pieniä kirjaimia, numeroita tai väliviivoja."
+      "invalidSlug": "Polkutunnus voi sisältää vain pieniä kirjaimia, numeroita tai väliviivoja.",
+      "slugIsLocaleCode": "Polkutunnus on sama kuin sisältökielen koodi, joten sen URL on varattu kyseiselle kielelle. Valitse toinen polkutunnus."
     },
     "refresh": "Päivitä",
     "previewUrlPlaceholder": "Valitse sivu esikatselua varten",

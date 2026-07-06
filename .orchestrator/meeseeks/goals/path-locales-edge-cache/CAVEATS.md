@@ -51,3 +51,10 @@ Read every line before working. Each entry was learned the hard way by a previou
   interpolation, and changing it means the client + unit tests share one source.
 - If Stage-2 localized slugs land, `switchLocalePathname` (prefix-only rewrite) becomes wrong —
   the switcher must then emit per-locale FULL paths computed at plan time (see backlog Stage 2).
+- Localized SERVER errors pattern: API routes return English `error` + a stable `code` field
+  (e.g. `slugIsLocaleCode`, `localeIsPageSlug`); the admin client maps known codes to t() keys.
+  Don't try to run next-intl inside route handlers. Page saves have THREE paths — /api/pages,
+  the AI create_page tool, and (slug-immutable) SEO/publish bodies — guard the first two.
+- The slug-vs-locale guard (`localeSlugConflicts`) deliberately includes the DEFAULT locale and
+  only top-level slugs; child pages may legitimately be named "fi". Stage-2 localized slugs must
+  apply the same guard to top-level `localized_slugs` values.

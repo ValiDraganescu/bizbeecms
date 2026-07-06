@@ -179,6 +179,7 @@
     "addPlaceholder": "Language code, e.g. fi or pt-br",
     "invalidCode": "Enter a valid language code (2–3 letters, optional region).",
     "duplicate": "That language is already in the list.",
+    "pageSlugConflict": "Can't save: {slugs} already in use as a page URL. Rename that page first.",
     "save": "Save",
     "saving": "Saving…",
     "saved": "Content languages saved.",
@@ -649,7 +650,8 @@
       "create": "Create page",
       "creating": "Creating…",
       "cancel": "Cancel",
-      "invalidSlug": "Slug must be lowercase letters, digits or hyphens."
+      "invalidSlug": "Slug must be lowercase letters, digits or hyphens.",
+      "slugIsLocaleCode": "This slug matches a content-language code, so its URL is reserved for that language. Pick a different slug."
     },
     "refresh": "Refresh",
     "previewUrlPlaceholder": "Select a page to preview",

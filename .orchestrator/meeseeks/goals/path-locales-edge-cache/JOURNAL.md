@@ -55,3 +55,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` green.
 - **Files:** CMS/src/lib/render/plan-language-switcher.ts,
   CMS/src/lib/render/plan-language-switcher.test.ts, CMS/src/lib/render/plan-types.ts
+
+## 2026-07-07 01:26 — Slug-vs-locale-code collision guard (both write paths)
+- **Status:** DONE
+- **What I did:** New pure `localeSlugConflicts(locales, topLevelSlugs)` in
+  `lib/render/localize.ts` (case-insensitive, trimmed; `:param` wildcards never
+  collide; DEFAULT locale deliberately included — flipping the default later
+  would silently shadow the page). Wired into THREE write paths:
+  (1) `/api/pages` POST/PUT — top-level slug equal to a configured locale code →
+  409 `{code:"slugIsLocaleCode"}`; (2) `/api/settings/content-locales` PUT —
+  adding a locale equal to an existing top-level page slug → 409
+  `{code:"localeIsPageSlug", conflicts}`; (3) AI `create_page` tool
+  (tool-dispatch handleCreatePage) — same guard, English self-correcting error
+  naming the exact code + fix. Clients map the codes to localized messages:
+  page-picker → `pageBuilder.create.slugIsLocaleCode`, content-locales-editor →
+  `contentLocales.pageSlugConflict` ({slugs} param), in messages/{en,fi,et}.json.
+  Child pages may still use locale-code slugs (only top level collides).
+- **Verified:** 8 new dep-free node --test cases (localize-slug-guard.test.ts);
+  full `npm test` 1596/0. Live dev smoke (local D1, en/fi/ro-ro/es): POST slug
+  "fi" top-level → 409 w/ code; same slug under a parent → 201; PUT locales
+  +"sv" while top-level page "sv" exists → 409 conflicts:["sv"]; unchanged
+  locales PUT → 200; normal create → 201 (all fixtures cleaned up).
+  `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` green.
+- **Files:** CMS/src/lib/render/localize.ts, CMS/src/lib/render/localize-slug-guard.test.ts (new),
+  CMS/src/app/api/pages/route.ts, CMS/src/app/api/settings/content-locales/route.ts,
+  CMS/src/lib/chat/tool-dispatch.ts, CMS/src/components/page-builder/page-picker.tsx,
+  CMS/src/components/settings/content-locales-editor.tsx, CMS/messages/{en,fi,et}.json

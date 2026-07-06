@@ -179,6 +179,7 @@
     "addPlaceholder": "Keelekood, nt fi või pt-br",
     "invalidCode": "Sisesta kehtiv keelekood (2–3 tähte, valikuline piirkond).",
     "duplicate": "See keel on juba loendis.",
+    "pageSlugConflict": "Ei saa salvestada: {slugs} on juba kasutusel lehe URL-ina. Nimeta see leht enne ümber.",
     "save": "Salvesta",
     "saving": "Salvestan…",
     "saved": "Sisukeeled salvestatud.",
@@ -649,7 +650,8 @@
       "create": "Loo leht",
       "creating": "Loomine…",
       "cancel": "Tühista",
-      "invalidSlug": "Identifikaator võib sisaldada ainult väiketähti, numbreid või sidekriipse."
+      "invalidSlug": "Identifikaator võib sisaldada ainult väiketähti, numbreid või sidekriipse.",
+      "slugIsLocaleCode": "Identifikaator kattub sisukeele koodiga, seega on selle URL reserveeritud sellele keelele. Vali teine identifikaator."
     },
     "refresh": "Värskenda",
     "previewUrlPlaceholder": "Eelvaateks vali leht",

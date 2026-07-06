@@ -13,7 +13,8 @@
  * normalize/validate path is exercisable here.
  */
 import { getContentLocales, setContentLocales } from "@/db/settings-store";
-import { normalizeContentLocales } from "@/lib/render/localize";
+import { listPages } from "@/db/page-store";
+import { localeSlugConflicts, normalizeContentLocales } from "@/lib/render/localize";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,22 @@ export async function PUT(request: Request): Promise<Response> {
   }
 
   try {
+    // A locale code equal to an existing top-level page slug would shadow that
+    // page behind the /<code>/ locale URL prefix (Stage 1 locale-prefix routing).
+    const topLevelSlugs = (await listPages())
+      .filter((p) => p.parentPageId === null)
+      .map((p) => p.slug);
+    const conflicts = localeSlugConflicts(normalized.locales, topLevelSlugs);
+    if (conflicts.length > 0) {
+      return Response.json(
+        {
+          error: `locale code(s) ${conflicts.join(", ")} collide with existing top-level page slug(s) — rename those pages first`,
+          code: "localeIsPageSlug",
+          conflicts,
+        },
+        { status: 409 },
+      );
+    }
     return Response.json(await setContentLocales(normalized));
   } catch (err) {
     return Response.json(
