@@ -56,11 +56,18 @@ export async function generateMetadata({
   const description = localized(loaded.page.metaDescription, loaded.locale);
   const image = localized(loaded.page.metaImage, loaded.locale);
   // SEO (Stage 1): canonical + hreflang alternates across the configured
-  // content locales — same slug chain, default unprefixed, others /<code>/….
+  // content locales — default unprefixed, others /<code>/….
   // metadataBase (APP_ORIGIN) absolutizes them; without a known origin Next
   // falls back to the request-derived default, fine for local dev.
+  // Stage 2: `locale.pagePaths` (plan-time, localized-slug-aware full paths)
+  // wins over the prefix-only rewrite of the request segments.
   const codes = loaded.locale.available?.map((l) => l.code) ?? [loaded.locale.fallback];
-  const { canonical, languages } = hreflangAlternates(slug, codes, loaded.locale.fallback);
+  const { canonical, languages } = hreflangAlternates(
+    slug,
+    codes,
+    loaded.locale.fallback,
+    loaded.locale.pagePaths,
+  );
   const origin = await resolveSiteOrigin();
   return {
     title,

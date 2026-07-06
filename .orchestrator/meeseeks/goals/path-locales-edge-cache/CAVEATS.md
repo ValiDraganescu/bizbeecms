@@ -74,8 +74,7 @@ Read every line before working. Each entry was learned the hard way by a previou
   internal workers.dev origin, so `host` is workers.dev on proxied requests. Use
   `resolveSiteOrigin()` (lib/render/site-origin.ts) — APP_ORIGIN first, host only as dev fallback,
   null when unknown (sitemap then returns [] rather than wrong hosts).
-- Stage-2 must also update `hreflang.ts` (`pathForLocale`) + `app/sitemap.ts` — like the switcher
-  and localize-links, they are prefix-only rewrites of the SAME slug chain today.
+- [DONE 2026-07-07] `hreflang.ts` + `app/sitemap.ts` are now localized-slug-aware (part 2).
 - Next serializes `alternates.languages` in sitemap entries as `xhtml:link` (works on Next 16.2);
   root canonical renders without the trailing slash ("https://x.tld") — equivalent, don't "fix".
 - `cacheMaxAge` is OPTIONAL in PageMetaInput: **absent = preserve the stored value**. The SEO form
@@ -118,12 +117,20 @@ Read every line before working. Each entry was learned the hard way by a previou
   "fix" by matching both. `effectiveSlug`/`matchSlugSegment` take the RAW stored JSON text
   (`localizedSlugs?: string | null`), not a parsed map — Page rows carry TEXT; parse cost
   per sibling is trivial and keeps callers alloc-free.
-- Until the reverse-resolve task lands, setting a localized slug BREAKS prefix-only
-  rewrites for that page: switcher/localize-links/hreflang/sitemap still emit
-  `/fi/<default-slug>` which now 404s. That's why reverse-resolution is the immediate
-  next task — don't ship a release with operator-visible localized-slug inputs live
-  before it lands. [PART 1 DONE 2026-07-07: links + switcher reverse-resolve; hreflang
-  + sitemap STILL emit default chains under /fi (SEO-only breakage) — part 2 pending.]
+- [RESOLVED 2026-07-07 — kept for history] Localized slugs used to break prefix-only
+  rewrites. All four seams now reverse-resolve: links + switcher (part 1),
+  hreflang + sitemap (part 2). The "don't release with localized-slug inputs" blocker
+  is CLEARED.
+- hreflangAlternates' rest-based fallback CANNOT translate — generateMetadata's request
+  segments are the ACTIVE locale's chain (`/fi/ehdot` → rest ["ehdot"]), so a translate
+  param there would be wrong-input. The localized-slug truth arrives via the plan-time
+  `pagePaths` 4th arg (LocaleContext.pagePaths); if buildPlanFromPage's best-effort
+  page read fails, alternates degrade to prefix-only — same failure mode as the
+  switcher's client fallback, don't "harden" it with a second D1 read.
+- app/sitemap.ts is the only pathForLocale caller that passes `translate` — its
+  segments ARE the default chain (publishedPagePaths walks default slugs), the valid
+  input for createPathTranslator. Don't pass a translator anywhere the segments came
+  from a request URL.
 - `LocaleContext.translatePath` is a FUNCTION on the context (built per render in
   buildPlanFromPage from one full `page`-table read). Never JSON-serialize a
   LocaleContext; if a new seam needs that, move the translator to a separate param.

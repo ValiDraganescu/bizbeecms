@@ -295,3 +295,30 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   localize-paths.test.ts (new), plan-types.ts, localize-links.ts,
   localize-links.test.ts, plan-language-switcher.ts,
   plan-language-switcher.test.ts, render-page.tsx
+
+## 2026-07-07 02:44 — Reverse-resolve hreflang + sitemap under localized slugs (part 2)
+- **Status:** DONE (clears the release-blocking caveat — all four rewrite seams
+  are now localized-slug-aware: links, switcher, hreflang, sitemap)
+- **What I did:** (1) `pathForLocale` (hreflang.ts) gains optional
+  `translate?: (path, locale) => string` — applied to the DEFAULT-locale path
+  before prefixing (never runs for the default locale; root translate stays
+  `/code`). (2) `hreflangAlternates` gains optional
+  `pagePaths?: Record<string,string>` — plan-time LocaleContext.pagePaths
+  entries (already translated + prefixed) win over the prefix-only rewrite,
+  per-code fallback when absent. Needed because generateMetadata's request
+  segments are the ACTIVE locale's chain (a prefix rewrite of `/fi/ehdot`
+  would emit `/ehdot` for en). (3) generateMetadata ([[...slug]]/page.tsx)
+  passes `loaded.locale.pagePaths` — zero new D1 reads (part 1 already builds
+  it in buildPlanFromPage). (4) app/sitemap.ts selects `localizedSlugs`,
+  builds `createPathTranslator(rows, default)` once, passes it to both
+  pathForLocale call sites (url + per-entry xhtml:link alternates).
+- **Verified:** 4 new dep-free node --test cases (toy translator + pagePaths
+  precedence + fallback); full `npm test` 1676/1676; `npx tsc --noEmit` clean;
+  live dev smoke (local D1 en/fi/ro-ro/es; terms fi:"ehdot"): `/fi/ehdot` →
+  canonical `/fi/ehdot` + en alternate `/terms` (not `/ehdot`); `/terms` → fi
+  alternate `/fi/ehdot` (not `/fi/terms`); sitemap emits `/fi/ehdot`, zero
+  `fi/terms` occurrences; statuses /fi/ehdot 200, /fi/terms 404, /ehdot 404,
+  /terms 200. Fixture reset, dev killed. `CMS_DEV_SUPERADMIN=0 npx
+  opennextjs-cloudflare build` + `wrangler deploy --dry-run` green.
+- **Files:** CMS/src/lib/render/hreflang.ts, hreflang.test.ts,
+  CMS/src/app/[[...slug]]/page.tsx, CMS/src/app/sitemap.ts

@@ -1,29 +1,30 @@
 # Note to the next Meeseeks (path-locales-edge-cache)
 
-Run 12 done: **reverse-resolve part 1 — internal links + LanguageSwitcher.** New pure
-`lib/render/localize-paths.ts` (`createPathTranslator`, `defaultPathForPage`,
-`pagePathsByLocale`); threaded via `LocaleContext.translatePath`/`pagePaths` (populated in
-buildPlanFromPage, one page-table read per render, best-effort). localizeHref translates
-the chain before prefixing; switcher options carry plan-time `data-bb-path`, client falls
-back to the old rewrite when absent. 1672 tests green; tsc clean; deploy-gate build +
-dry-run green; wrangler-dev smoke (terms fi:"ehdot"): /fi home link → /fi/ehdot (200),
-/fi/terms 404, switcher options stamped.
+Run 13 done: **reverse-resolve part 2 — hreflang + sitemap.** `pathForLocale` gained an
+optional `translate` param (sitemap builds `createPathTranslator` from its own row read,
+now selecting `localizedSlugs`); `hreflangAlternates` gained optional plan-time
+`pagePaths` (wins over the prefix rewrite, per-code fallback); generateMetadata passes
+`loaded.locale.pagePaths` — zero new D1 reads there. 1676 tests green; tsc clean;
+deploy-gate build + dry-run green; live smoke (terms fi:"ehdot"): /fi/ehdot canonical +
+en alternate /terms, /terms fi alternate /fi/ehdot, sitemap emits /fi/ehdot with zero
+fi/terms. **The release-blocking caveat is fully cleared** — all four rewrite seams
+(links, switcher, hreflang, sitemap) are localized-slug-aware.
 
-**Take next — part 2: hreflang + sitemap under localized slugs.** Both are still
-prefix-only rewrites of the DEFAULT chain (`hreflang.ts` pathForLocale, `app/sitemap.ts`),
-so an overridden page's alternates/sitemap URLs 404 in that locale (SEO-only breakage;
-the release-blocking caveat is only half-cleared). Reuse the part-1 machinery:
-`generateMetadata` ([[...slug]]/page.tsx) and sitemap.ts already query D1 — fetch the
-4-col page rows, build `createPathTranslator`, and feed translated paths into
-`hreflangAlternates` / the sitemap entries (pathForLocale likely gains an optional
-translate param, same pattern as localizeHref). Segments arrive as the ACTIVE locale's
-URL in generateMetadata — careful: you need the DEFAULT chain first (resolve the page,
-then `defaultPathForPage` + route params, exactly like buildPlanFromPage does).
+**Take next — the last open TODO:** wire `localizedSlugSiblingConflicts` into the AI
+create_page path (`upsertPage` in CMS/src/db/page-store.ts) — a NEW AI page's default
+slug can collide with a sibling's per-locale override. Small: fetch siblings under the
+target parent, run the pure check (it's in lib/pages/page-meta.ts), return a
+self-correcting English error from the tool (AI-error philosophy: name the exact
+conflicting slug + locale + fix). Add a regression test.
 
-Also queued (small): wire `localizedSlugSiblingConflicts` into the AI create_page path
-(`upsertPage` in page-store).
+After that the backlog is empty — remaining goal-level work is HITL-ish: real
+cf-cache-status hit/miss/purge verification needs a deployed site + release (worker.ts
+only ships via a new r-* tag). Codeable next slices if you must invent: hreflang/sitemap
+entries for wildcard `:param` pages are skipped by design (fine), but a defect hunt over
+the locale peel + edge-cache interplay (e.g. localized slug + cache purge on slug change)
+or an operator-docs pass are honest options.
 
-Gotchas: deploy gate = `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`, never while
-a dev server runs. Don't serialize LocaleContext (it now carries a function). Keep the
-switcher's client rewrite fallback — Develop preview / unreconstructible wildcard paths
-rely on it.
+Gotchas: deploy gate = `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`, never
+while a dev server runs. Don't serialize LocaleContext (carries functions). The
+hreflang rest-based fallback must NEVER get a translate param (active-locale segments
+are the wrong input — see CAVEATS).
