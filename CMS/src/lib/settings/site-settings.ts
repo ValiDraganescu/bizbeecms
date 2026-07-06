@@ -298,7 +298,12 @@ export function buildSystemPrompt(opts: {
       "bg-foreground/60). For a DARK panel (e.g. a hero over a photo), build it from " +
       "tokens: bg-foreground as the dark base, from-foreground gradients to darken " +
       "the image, text-surface for the light text on top, text-primary for accents " +
-      "— so it stays correct in both light and dark mode and follows the brand.",
+      "— so it stays correct in both light and dark mode and follows the brand. " +
+      "FONTS work the same way: never a literal font-family. The theme's font slots " +
+      "are font-body (the default — rarely needed explicitly), font-heading " +
+      "(h1–h6 get it automatically) and font-accent (opt-in, for a highlighted " +
+      "word or a hero line). Use font-accent when a design calls for a distinct " +
+      "display/script face; the operator picks the actual families in Theme settings.",
   );
 
   const builtins = opts.builtins ?? [];

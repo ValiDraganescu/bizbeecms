@@ -29,7 +29,7 @@ import {
   parsePortableComponent,
   serializeComponent,
 } from "@/lib/components/portable";
-import { normalizeTags } from "@/lib/components/tags";
+import { normalizeTags, parseTags } from "@/lib/components/tags";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -63,8 +63,13 @@ export async function GET(request: Request): Promise<Response> {
         hasCss: (r.css ?? "") !== "",
         // Has declared props → the standalone preview has placeholder data to bind.
         hasPreviewData: (r.propsSchema ?? "") !== "",
-        tags: normalizeTags(r.tags),
+        // r.tags is the raw JSON-string column — parseTags, never normalizeTags
+        // (which only accepts arrays and turns a string into []).
+        tags: parseTags(r.tags),
         label: r.label ?? null,
+        // Cache-bust token for the gallery's preview iframes: every component
+        // mutation bumps updatedAt, so `?v=` changes and the browser refetches.
+        version: r.updatedAt?.getTime() ?? 0,
       })),
     );
   } catch (err) {

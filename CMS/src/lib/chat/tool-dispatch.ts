@@ -45,7 +45,7 @@ import {
 import { assembleSystemPrompt } from "./assemble-prompt";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { putAsset, setAssetTags } from "@/db/asset-store";
-import { buildAssetKey, assetUrl } from "@/lib/render/asset";
+import { buildAssetKey, assetUrl, filenameFromText } from "@/lib/render/asset";
 import { effectiveOpenrouterKey } from "@/lib/settings/openrouter-key";
 import { getDecryptedOpenrouterUserKey } from "@/db/openrouter-key-store";
 import {
@@ -164,6 +164,7 @@ import {
 import type { Block, TreeNode, BindingRef, ListSource, FormTarget } from "@/lib/render/tree";
 import { treeToHtml } from "@/lib/render/parse-html";
 import { effectiveTheme } from "@/lib/render/theme";
+import { FONT_SLOTS } from "@/lib/render/fonts";
 import {
   validateBinding,
   validateListBinding,
@@ -197,6 +198,7 @@ import { applyTranslation } from "@/db/translate-store";
 import {
   getContentLocales,
   getSiteIdentity,
+  getThemeFonts,
   getThemeOverrides,
   getThemeOverridesDark,
   setSiteIdentity,
@@ -467,7 +469,11 @@ async function handleSearchIcons(args: unknown): Promise<Record<string, unknown>
 
 async function handleGetTheme(): Promise<Record<string, unknown>> {
   try {
-    const [light, dark] = await Promise.all([getThemeOverrides(), getThemeOverridesDark()]);
+    const [light, dark, fonts] = await Promise.all([
+      getThemeOverrides(),
+      getThemeOverridesDark(),
+      getThemeFonts(),
+    ]);
     // Return the EFFECTIVE theme (defaults + overrides) so the model sees the
     // real color of every token — an empty override map is the DEFAULT theme,
     // not "no theme". `overrides` keeps the diff for when it wants to know what
@@ -479,6 +485,12 @@ async function handleGetTheme(): Promise<Record<string, unknown>> {
         dark: effectiveTheme(dark, true),
       },
       overrides: { light, dark },
+      // Font SLOTS (theme-fonts): which family backs font-body / font-heading /
+      // font-accent. Unset slot = system default. Read-only here — families
+      // are picked in Theme settings (the save self-hosts the files).
+      fonts: Object.fromEntries(
+        FONT_SLOTS.map((s) => [s, fonts.slots[s]?.family ?? null]),
+      ),
     };
   } catch (err) {
     return { ok: false, errors: [`failed to get theme: ${(err as Error).message}`] };
@@ -594,10 +606,16 @@ async function handleGenerateImage(args: unknown): Promise<Record<string, unknow
   }
 
   try {
-    const assetKey = buildAssetKey(`generated-${valid.prompt.slice(0, 40)}`, image.contentType, crypto.randomUUID().slice(0, 8));
+    // Filename = 2–5 meaningful words from the AI description (prompt when
+    // describe failed) so the gallery shows what the image IS, not "generated".
+    const filename = filenameFromText(
+      description || valid.prompt,
+      image.contentType.split("/")[1] ?? "png",
+    );
+    const assetKey = buildAssetKey(filename, image.contentType, crypto.randomUUID().slice(0, 8));
     const row = await putAsset({
       key: assetKey,
-      filename: `generated.${image.contentType.split("/")[1] ?? "png"}`,
+      filename,
       contentType: image.contentType,
       bytes: image.bytes,
       description,

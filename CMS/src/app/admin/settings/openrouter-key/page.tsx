@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { SettingsNav } from "@/components/settings/settings-nav";
 import { OpenrouterKeyManager } from "@/components/settings/openrouter-key-manager";
 import { checkRoleFromHeaders, canManageUsers } from "@/lib/auth/guard";
 
@@ -22,8 +21,7 @@ export default async function OpenrouterKeySettingsPage() {
   const decision = await checkRoleFromHeaders(canManageUsers);
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
-      <SettingsNav />
+    <main className="mx-auto flex max-w-2xl flex-col gap-6">
       <header>
         <h1 className="text-2xl font-semibold text-foreground">{t("title")}</h1>
         <p className="mt-1 text-foreground-muted">{t("subtitle")}</p>

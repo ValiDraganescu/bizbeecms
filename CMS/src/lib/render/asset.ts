@@ -80,6 +80,29 @@ export function buildAssetKey(
   return `assets/${base}_${now}_${safeRand}.${ext}`;
 }
 
+/** Words that carry no meaning in a filename derived from a description. */
+const FILLER_WORDS = new Set([
+  "a", "an", "the", "of", "in", "on", "at", "with", "and", "or", "to", "for",
+  "is", "are", "this", "that", "its", "it", "by", "from", "over", "under",
+]);
+
+/**
+ * A short human filename (2–5 meaningful words, kebab-case) from an image
+ * description or prompt — "a rustic terrace overlooking the vineyards" →
+ * "rustic-terrace-overlooking-vineyards.png". Falls back to raw words when
+ * filler-filtering leaves fewer than two, and to "generated" on empty text.
+ */
+export function filenameFromText(text: string, ext: string): string {
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+  const meaningful = words.filter((w) => !FILLER_WORDS.has(w));
+  const base = (meaningful.length >= 2 ? meaningful : words).slice(0, 5).join("-");
+  return `${base || "generated"}.${ext}`;
+}
+
 /** Whether a key is one this app produced (guards the serve route against traversal). */
 export function isValidAssetKey(key: string): boolean {
   return /^assets\/[a-z0-9][a-z0-9_]*_\d+_[a-z0-9]+\.[a-z0-9]+$/.test(key);
@@ -89,6 +112,34 @@ export function isValidAssetKey(key: string): boolean {
 export function assetUrl(key: string): string {
   return ASSET_URL_PREFIX + key;
 }
+
+/**
+ * Delivery format negotiation for `/media/<key>` (transform-on-delivery).
+ *
+ * PNG/JPEG masters (the AI generator emits ~1.5MB PNGs) are transcoded to WebP
+ * at serve time when the client advertises support — ~10x smaller for
+ * photographic content. Everything else passes through untouched: WebP is
+ * already the target, GIF may be animated (a naive transcode drops frames),
+ * and SVG must keep its locked-down serve path (see assetServeHeaders).
+ * Returns the target format, or null for "serve the original". Pure — tested.
+ * ponytail: WebP only; add AVIF here if the extra ~30% ever matters (it doubles
+ * the cached/billed variants).
+ */
+export function deliveryFormat(
+  key: string,
+  accept: string | null | undefined,
+): "image/webp" | null {
+  // Decide from the KEY's extension (every stored key has one — buildAssetKey/
+  // isValidAssetKey guarantee it) so the serve route can compute its cache key
+  // and take an edge-cache hit WITHOUT touching R2 first.
+  const ext = key.toLowerCase().split(".").pop() ?? "";
+  if (ext !== "png" && ext !== "jpg" && ext !== "jpeg") return null;
+  if (!(accept ?? "").toLowerCase().includes("image/webp")) return null;
+  return "image/webp";
+}
+
+/** WebP quality for delivery transcodes — the size/fidelity sweet spot for photos. */
+export const DELIVERY_WEBP_QUALITY = 82;
 
 /**
  * Security headers the serve route adds for a given content type.

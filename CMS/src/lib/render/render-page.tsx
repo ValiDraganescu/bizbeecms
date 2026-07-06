@@ -71,10 +71,12 @@ import {
 } from "@/lib/content/route-params";
 import {
   getContentLocales,
+  getThemeFonts,
   getThemeOverrides,
   getThemeOverridesDark,
 } from "@/db/settings-store";
 import { themeOverridesToCss } from "@/lib/render/theme";
+import { themeFontsToCss } from "@/lib/render/fonts";
 
 /**
  * Resolve the active content locale + the switchable set for a page render.
@@ -552,6 +554,10 @@ export async function RenderedPage({ plan }: { plan: RenderPlan }) {
       await getThemeOverrides(),
       await getThemeOverridesDark(),
     );
+    // Theme fonts (@font-face + --font-<slot> vars + body/heading defaults)
+    // ride the same <style>, after the compiled utilities so the vars win over
+    // tw-compile's registered system-stack placeholders.
+    themeCss += themeFontsToCss(await getThemeFonts());
   } catch {
     /* unbound D1 in this env — no per-Site theme */
   }

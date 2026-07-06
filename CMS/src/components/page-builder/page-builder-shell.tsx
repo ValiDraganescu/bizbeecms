@@ -208,6 +208,10 @@ export function PageBuilderShell({
   // Versioning slice 3: the draft auto-save status badge (saving…/saved/published).
   const [draftStatus, setDraftStatus] = useState<DraftStatus>("saved");
   const [publishing, setPublishing] = useState(false);
+  // Unpublished-changes warning (mirrors the develop workbench's draft bar):
+  // seeded by the draft GET (server compares draft vs published), turned on by
+  // any local edit, cleared by a successful publish.
+  const [pendingChanges, setPendingChanges] = useState(false);
   // Versioning slice 4: bumped to re-run the draft load effect (e.g. after a
   // restore replaces the draft with a copy of a past version).
   const [draftReloadNonce, setDraftReloadNonce] = useState(0);
@@ -223,6 +227,7 @@ export function PageBuilderShell({
       setBlocks([]);
       setSelectedBlockId(null);
       setDirty(false);
+      setPendingChanges(false);
       return;
     }
     let live = true;
@@ -231,10 +236,12 @@ export function PageBuilderShell({
       const res = await fetch(`/api/pages/${selected.id}/draft`);
       if (!live) return;
       if (res.ok) {
-        const body = (await res.json()) as { blocks?: Block[] };
+        const body = (await res.json()) as { blocks?: Block[]; pendingChanges?: boolean };
         setBlocks(body.blocks ?? []);
+        setPendingChanges(Boolean(body.pendingChanges));
       } else {
         setBlocks([]);
+        setPendingChanges(false);
       }
       setSelectedBlockId(null);
       setDirty(false);
@@ -563,6 +570,7 @@ export function PageBuilderShell({
       const res = await fetch(`/api/pages/${selected.id}/publish`, { method: "POST" });
       if (res.ok) {
         setDraftStatus((s) => nextDraftStatus(s, "publishDone"));
+        setPendingChanges(false);
         setPreviewNonce((n) => n + 1);
       } else {
         setDraftStatus((s) => nextDraftStatus(s, "error"));
@@ -576,8 +584,12 @@ export function PageBuilderShell({
 
   // Reflect a pending edit in the status badge ("Unsaved changes") the moment a
   // block edit marks the page dirty (the debounce below then auto-saves it).
+  // Any edit also means the draft now differs from the published version.
   useEffect(() => {
-    if (dirty) setDraftStatus((s) => nextDraftStatus(s, "edit"));
+    if (dirty) {
+      setDraftStatus((s) => nextDraftStatus(s, "edit"));
+      setPendingChanges(true);
+    }
   }, [dirty]);
 
   // Versioning slice 3: debounced AUTO-SAVE to the draft. Every block edit (after
@@ -736,6 +748,12 @@ export function PageBuilderShell({
 
         {/* Right: draft status + save + publish */}
         <div className="flex items-center gap-2">
+          {/* Unpublished-changes warning — same signal as the develop draft bar. */}
+          {selected && pendingChanges && (
+            <span className="rounded-md border border-warning bg-warning-subtle px-2 py-1 text-xs font-medium text-foreground">
+              {t("pendingChanges")}
+            </span>
+          )}
           {selected && draftStatusKey(draftStatus) && (
             <span
               className="text-xs text-foreground-muted"

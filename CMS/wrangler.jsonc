@@ -39,6 +39,13 @@
       "bucket_name": "bizbeecms-cms-media"
     }
   ],
+  // Cloudflare Images binding — transform-on-delivery for `/media/<key>`
+  // (PNG/JPEG → WebP when the client Accepts it; cached per-variant at the
+  // edge). Account-level product, no per-Site resource to provision — the
+  // deployer needs no override. Absent/failed binding = originals served.
+  "images": {
+    "binding": "IMAGES"
+  },
   "vars": {
     "AI_GATEWAY": "bizbeecms-ai-gateway",
     // CMS admin-auth bridge (Sec1). The deployer OVERRIDES these per-Site at

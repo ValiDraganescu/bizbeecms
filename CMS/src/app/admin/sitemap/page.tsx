@@ -40,7 +40,6 @@ const ADMIN_API: { path: string; methods: string }[] = [
   { path: "/api/chat", methods: "POST (SSE)" },
   { path: "/api/pages", methods: "GET · POST · PUT · DELETE" },
   { path: "/api/components", methods: "GET · POST (import)" },
-  { path: "/api/components/kit", methods: "POST (install)" },
   { path: "/api/assets", methods: "GET · POST · DELETE" },
   { path: "/api/settings", methods: "GET · PUT (content-locales/theme/brand)" },
 ];

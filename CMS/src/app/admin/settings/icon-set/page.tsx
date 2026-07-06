@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { SettingsNav } from "@/components/settings/settings-nav";
 import { IconSetEditor } from "@/components/settings/icon-set-editor";
 import { getIconSet } from "@/db/settings-store";
 import { DEFAULT_ICON_SET, ICON_SET_OPTIONS } from "@/lib/render/icons";
@@ -22,8 +21,7 @@ export default async function IconSetPage() {
   }
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
-      <SettingsNav />
+    <main className="mx-auto flex max-w-2xl flex-col gap-6">
       <header>
         <h1 className="text-2xl font-semibold text-foreground">Icon set</h1>
         <p className="mt-1 text-foreground-muted">

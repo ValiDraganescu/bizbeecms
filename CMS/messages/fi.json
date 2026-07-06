@@ -186,14 +186,20 @@
   },
   "settingsNav": {
     "label": "Asetusosiot",
+    "groups": {
+      "site": "Sivusto",
+      "appearance": "Ulkoasu",
+      "ai": "Tekoäly",
+      "access": "Käyttöoikeudet"
+    },
     "contentLocales": "Sisältökielet",
     "theme": "Teema",
     "brand": "Brändi ja tekoäly",
-    "apiKeys": "API-avaimet",
+    "apiKeys": "MCP",
     "users": "Käyttäjät",
     "google": "Google-kirjautuminen",
     "openrouterKey": "OpenRouter-avain",
-    "media": "Media",
+    "media": "AI-mallit",
     "iconSet": "Kuvakkeet",
     "exportImport": "Vienti / Tuonti"
   },
@@ -204,7 +210,6 @@
     "swatchLabel": "Värinäyte tunnukselle {token}",
     "valueLabel": "Väriarvo tunnukselle {token}",
     "reset": "Palauta",
-    "save": "Tallenna",
     "saving": "Tallennetaan…",
     "saved": "Teema tallennettu.",
     "invalidValue": "Virheellinen väri tunnukselle {token}: {value}",
@@ -240,7 +245,33 @@
     "mode": {
       "light": "Vaalea",
       "dark": "Tumma"
-    }
+    },
+    "fonts": {
+      "title": "Typografia",
+      "subtitle": "Valitse julkaistun sivuston fontit. Leipäteksti on oletus kaikkialla, Otsikot koskee h1–h6-otsikoita, Korostus on valinnainen korostetulle tekstille (komponentit käyttävät sitä font-accent-luokalla).",
+      "systemDefault": "Järjestelmän oletus",
+      "slot": {
+        "body": "Leipäteksti",
+        "heading": "Otsikot",
+        "accent": "Korostus"
+      },
+      "hint": {
+        "body": "Oletusteksti kaikkialla",
+        "heading": "Koskee otsikoita h1–h6",
+        "accent": "Valinnainen, esim. heron korostus"
+      },
+      "category": {
+        "sans": "Sans-serif",
+        "serif": "Antiikva",
+        "display": "Display",
+        "script": "Kaunokirjoitus",
+        "mono": "Tasalevyinen"
+      },
+      "sample": "Nopea ruskea kettu — ÄÖÕŠŽ äöõšž 0123",
+      "selfHostNote": "Tallennettaessa fonttitiedostot ladataan kerran ja tarjoillaan sivustoltasi — kävijät eivät koskaan yhdistä Google Fontsiin.",
+      "save": "Tallenna fontit"
+    },
+    "saveColors": "Tallenna värit"
   },
   "media": {
     "title": "Mediakirjasto",
@@ -284,27 +315,22 @@
   },
   "components": {
     "title": "Komponentit",
-    "subtitle": "Vie komponentti siirrettävänä pakettina tai tuo komponentti tähän sivustoon.",
+    "subtitle": "Selaa komponentteja esikatseluina, vie valinta ZIP-tiedostona tai tuo paketti toiselta sivustolta.",
     "listTitle": "Komponenttisi",
     "empty": "Ei vielä komponentteja. Luo komponentti tekoälychatissa ja vie se tästä.",
-    "export": "Vie",
     "flagScript": "sisältää skriptin",
     "flagCss": "sisältää CSS:n",
     "flagStatic": "staattinen",
     "importTitle": "Tuo komponentti",
-    "importHint": "Liitä komponenttipaketin JSON tai lataa .json-tiedosto. Tuodut komponentit tarkistetaan ennen tallennusta.",
-    "uploadLabel": "Lataa paketti (.json)",
+    "importHint": "Lataa komponentti-ZIP (.kit.zip) tai liitä paketin JSON. Tuonnit tarkistetaan ennen tallennusta; ZIP asentaa myös mukana pakatut mediaresurssit.",
+    "uploadLabel": "Lataa paketti (.kit.zip tai .json)",
     "pasteLabel": "Tai liitä paketin JSON",
-    "pastePlaceholder": "{ \"format\": \"bizbeecms.component\", \"version\": 1, ... }",
+    "pastePlaceholder": "Liitä paketin JSON — \"format\": \"bizbeecms.kit\" tai \"bizbeecms.component\"",
     "import": "Tuo",
     "importing": "Tuodaan…",
     "importEmpty": "Liitä paketti tai valitse tiedosto ensin.",
     "imported": "Tuotiin ”{name}”.",
     "updated": "Päivitettiin ”{name}”.",
-    "kitsTitle": "Aloituspaketit",
-    "kitsHint": "Asenna valmis joukko komponentteja yhdellä napsautuksella. Blogipaketti lisää artikkelin otsikon, rungon, kirjoittajakortin ja artikkelilistan; laskeutumispaketti lisää hero-osion, ominaisuusruudukon, CTA-palkin, suosittelun ja alatunnisteen; dokumentaatiopaketti lisää otsikon, huomiolaatikon, koodilohkon, vaiheluettelon ja API-parametrin; portfoliopaketti lisää hero-osion, projektikortin, taitoluettelon, työaikajanan ja yhteydenottokehotteen; hinnoittelupaketti lisää osio-otsikon, hintatason, ominaisuusrivin, tuotekortin ja UKK-kohdan.",
-    "installBlogKit": "Asenna blogipaketti",
-    "kitInstalled": "Blogipaketti asennettu: {created} luotu, {updated} päivitetty.",
     "kitImported": "Paketti “{kit}” tuotu: {created} luotu, {updated} päivitetty.",
     "kitSkipped": "{count} komponentti(a) ohitettu (virheellinen).",
     "kitResultTitle": "Paketti “{kit}” — mitä asennettiin",
@@ -324,10 +350,6 @@
     "rebindToLabel": "Ohjaa mediatiedostoon…",
     "applyRebind": "Tuo uudelleen uudelleenmäärityksellä",
     "applyingRebind": "Tuodaan uudelleen…",
-    "installLandingKit": "Asenna laskeutumispaketti",
-    "installDocsKit": "Asenna dokumentaatiopaketti",
-    "installPortfolioKit": "Asenna portfoliopaketti",
-    "installPricingKit": "Asenna hinnoittelupaketti",
     "filterByTag": "Suodata tunnisteella",
     "filterAllTags": "Kaikki tunnisteet",
     "noneForTag": "Yksikään komponentti ei käytä tätä tunnistetta.",
@@ -344,8 +366,6 @@
     "bulkAdded": "Lisättiin ”{tag}” {count} komponenttiin.",
     "bulkRemoved": "Poistettiin ”{tag}” {count} komponentista.",
     "bulkNoChange": "Yksikään valittu komponentti ei muuttunut tunnisteelle ”{tag}”.",
-    "exportKit": "Vie paketti",
-    "exportKitPickTag": "Valitse vietävä tunniste",
     "kitNameLabel": "Paketin nimi (valinnainen)",
     "kitNoteLabel": "Paketin kuvaus (valinnainen)",
     "kitNotePlaceholder": "Mihin tämä paketti on tarkoitettu",
@@ -358,7 +378,26 @@
     "previewAssets": "Viittaa {count} resurssiin — lataa ne tai sido uudelleen asennuksen jälkeen.",
     "previewSkipped": "{count} komponenttia ei läpäissyt vahvistusta ja ohitetaan.",
     "previewConfirm": "Vahvista asennus",
-    "previewCancel": "Peruuta"
+    "previewCancel": "Peruuta",
+    "searchPlaceholder": "Hae komponentteja…",
+    "galleryCount": "{count} yhteensä",
+    "noneForSearch": "Mikään komponentti ei vastaa hakua.",
+    "previewFrame": "Esikatselu: {name}",
+    "exportZipOne": "Vie {name} ZIP-tiedostona",
+    "openDevelop": "Avaa {name} kehitysnäkymässä",
+    "exportZipSelected": "Vie {count} ZIP-tiedostona",
+    "exportingZip": "Pakataan… {done}/{total}",
+    "exportedZip": "Vietiin {components} komponenttia ja {assets} resurssia ZIP-tiedostona.",
+    "exportUnbundled": "{count} viitattua resurssia puuttuu tältä sivustolta eikä niitä pakattu mukaan: {keys}",
+    "zipMissingKit": "ZIP-tiedostossa ei ole kit.json-tiedostoa — se ei ole komponenttipaketin vienti.",
+    "zipLoaded": "ZIP ladattu — {count} mukana pakattua resurssia asennetaan tuonnin jälkeen.",
+    "assetsInstalling": "Asennetaan resursseja… {done}/{total}",
+    "assetsInstalled": "{count} mukana pakattua resurssia asennettu tai jo olemassa.",
+    "assetsInstallFailed": "{count} resurssin asennus epäonnistui: {keys}",
+    "previewAssetsBundled": "Viittaa {count} resurssiin — pakattu tähän ZIPiin ja asennetaan automaattisesti.",
+    "showMore": "Näytä {count} lisää",
+    "tagButton": "Tunnisteet…",
+    "downloadZip": "Lataa ZIP"
   },
   "adminAuth": {
     "forbiddenTitle": "Pääsy estetty",
@@ -430,6 +469,7 @@
     "preview": "Esikatselu",
     "save": "Tallenna",
     "publish": "Julkaise",
+    "pendingChanges": "Julkaisemattomia muutoksia",
     "draftStatus": {
       "saving": "Tallennetaan…",
       "saved": "Tallennettu",
@@ -912,7 +952,7 @@
     "purgeAllConfirm": "Tyhjennetäänkö kaikki välimuistiin tallennetut API-vastaukset? Sivut hakevat tuoreet tiedot ulkoisista rajapinnoista seuraavalla latauksella."
   },
   "apiKeys": {
-    "title": "API-avaimet",
+    "title": "MCP",
     "subtitle": "Bearer-avaimet etä-MCP-palvelimelle. Jokainen avain antaa täyden ohjelmallisen pääsyn tähän sivustoon — jaa se vain luotetuille työkaluille.",
     "forbidden": "Sinulla ei ole oikeutta hallita API-avaimia. Pyydä järjestelmänvalvojaa.",
     "labelPlaceholder": "Avaimen nimi (esim. Claude Code)",

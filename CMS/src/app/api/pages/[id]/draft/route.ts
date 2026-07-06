@@ -12,9 +12,10 @@
  * `lib/pages/page-version.ts`; D1 in `db/page-version-store.ts`. The shell's
  * Save button and the debounced auto-save both PUT here.
  */
-import { getDraft, saveDraftBlocks } from "@/db/page-version-store";
+import { getDraft, getPublishedVersion, saveDraftBlocks } from "@/db/page-version-store";
 import { missingComponents } from "@/db/page-store";
 import { validateBlocks, topLevelBlockIds } from "@/lib/pages/page-blocks";
+import { hasPendingChanges } from "@/lib/pages/page-version";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,14 @@ export async function GET(
   try {
     const draft = await getDraft(id);
     if (!draft) return Response.json({ error: "page not found" }, { status: 404 });
-    return Response.json({ id, blocks: JSON.parse(draft.blocks) as unknown });
+    // `pendingChanges` = draft differs from the published version — drives the
+    // builder's unpublished-changes warning (like the develop draft bar).
+    const published = await getPublishedVersion(id);
+    return Response.json({
+      id,
+      blocks: JSON.parse(draft.blocks) as unknown,
+      pendingChanges: hasPendingChanges(draft, published),
+    });
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to load draft" },

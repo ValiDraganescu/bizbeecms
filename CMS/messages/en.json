@@ -186,14 +186,20 @@
   },
   "settingsNav": {
     "label": "Settings sections",
+    "groups": {
+      "site": "Site",
+      "appearance": "Appearance",
+      "ai": "AI",
+      "access": "Access"
+    },
     "contentLocales": "Content languages",
     "theme": "Theme",
     "brand": "Brand & AI",
-    "apiKeys": "API keys",
+    "apiKeys": "MCP",
     "users": "Users",
     "google": "Google sign-in",
     "openrouterKey": "OpenRouter key",
-    "media": "Media",
+    "media": "AI models",
     "iconSet": "Icons",
     "exportImport": "Export / Import"
   },
@@ -204,7 +210,6 @@
     "swatchLabel": "Color swatch for {token}",
     "valueLabel": "Color value for {token}",
     "reset": "Reset",
-    "save": "Save",
     "saving": "Saving…",
     "saved": "Theme saved.",
     "invalidValue": "Invalid color for {token}: {value}",
@@ -240,7 +245,33 @@
     "mode": {
       "light": "Light",
       "dark": "Dark"
-    }
+    },
+    "fonts": {
+      "title": "Typography",
+      "subtitle": "Pick fonts for the published site. Body is the default everywhere, Heading applies to h1–h6, Accent is opt-in for highlighted text (components use it via the font-accent class).",
+      "systemDefault": "System default",
+      "slot": {
+        "body": "Body",
+        "heading": "Headings",
+        "accent": "Accent"
+      },
+      "hint": {
+        "body": "Default text everywhere",
+        "heading": "Applied to h1–h6",
+        "accent": "Opt-in, e.g. a hero highlight"
+      },
+      "category": {
+        "sans": "Sans-serif",
+        "serif": "Serif",
+        "display": "Display",
+        "script": "Script",
+        "mono": "Monospace"
+      },
+      "sample": "The quick brown fox — ÄÖÕŠŽ äöõšž 0123",
+      "selfHostNote": "On save, the font files are downloaded once and self-hosted with your site — visitors never connect to Google Fonts.",
+      "save": "Save fonts"
+    },
+    "saveColors": "Save colors"
   },
   "media": {
     "title": "Media library",
@@ -284,27 +315,22 @@
   },
   "components": {
     "title": "Components",
-    "subtitle": "Export a component as a portable bundle, or import one into this site.",
+    "subtitle": "Browse your components as live previews, export a selection as a ZIP, or import a kit from another site.",
     "listTitle": "Your components",
     "empty": "No components yet. Create one in the AI chat, then export it here.",
-    "export": "Export",
     "flagScript": "has script",
     "flagCss": "has CSS",
     "flagStatic": "static",
     "importTitle": "Import a component",
-    "importHint": "Paste a component bundle JSON, or upload a .json file. Imported components are validated before saving.",
-    "uploadLabel": "Upload bundle (.json)",
+    "importHint": "Upload a component ZIP (.kit.zip) or paste a bundle JSON. Imports are validated before saving; a ZIP also installs the media assets it bundles.",
+    "uploadLabel": "Upload bundle (.kit.zip or .json)",
     "pasteLabel": "Or paste bundle JSON",
-    "pastePlaceholder": "{ \"format\": \"bizbeecms.component\", \"version\": 1, ... }",
+    "pastePlaceholder": "Paste the bundle JSON — \"format\": \"bizbeecms.kit\" or \"bizbeecms.component\"",
     "import": "Import",
     "importing": "Importing…",
     "importEmpty": "Paste a bundle or choose a file first.",
     "imported": "Imported “{name}”.",
     "updated": "Updated “{name}”.",
-    "kitsTitle": "Starter kits",
-    "kitsHint": "Install a curated set of premade components in one click. The blog kit adds a post header, body, author card and post list; the landing kit adds a hero, feature grid, CTA band, testimonial and footer; the docs kit adds a header, callout, code block, step list and API parameter; the portfolio kit adds a hero, project card, skill list, work timeline and contact callout; the pricing kit adds a section header, plan tier, feature row, product card and FAQ item.",
-    "installBlogKit": "Install blog kit",
-    "kitInstalled": "Blog kit installed: {created} created, {updated} updated.",
     "kitImported": "Kit “{kit}” imported: {created} created, {updated} updated.",
     "kitSkipped": "{count} component(s) skipped (invalid).",
     "kitResultTitle": "Kit “{kit}” — what was installed",
@@ -324,10 +350,6 @@
     "rebindToLabel": "Rebind to a media file…",
     "applyRebind": "Re-import with rebind",
     "applyingRebind": "Re-importing…",
-    "installLandingKit": "Install landing kit",
-    "installDocsKit": "Install docs kit",
-    "installPortfolioKit": "Install portfolio kit",
-    "installPricingKit": "Install pricing kit",
     "filterByTag": "Filter by tag",
     "filterAllTags": "All tags",
     "noneForTag": "No components carry this tag.",
@@ -344,8 +366,6 @@
     "bulkAdded": "Added “{tag}” to {count} components.",
     "bulkRemoved": "Removed “{tag}” from {count} components.",
     "bulkNoChange": "No selected components changed for “{tag}”.",
-    "exportKit": "Export kit",
-    "exportKitPickTag": "Pick a tag to export as a kit",
     "kitNameLabel": "Kit name (optional)",
     "kitNoteLabel": "Kit description (optional)",
     "kitNotePlaceholder": "What this kit is for",
@@ -358,7 +378,26 @@
     "previewAssets": "References {count} asset(s) — upload them or rebind after install.",
     "previewSkipped": "{count} component(s) failed validation and will be skipped.",
     "previewConfirm": "Confirm install",
-    "previewCancel": "Cancel"
+    "previewCancel": "Cancel",
+    "searchPlaceholder": "Search components…",
+    "galleryCount": "{count} total",
+    "noneForSearch": "No components match your search.",
+    "previewFrame": "Preview of {name}",
+    "exportZipOne": "Export {name} as ZIP",
+    "openDevelop": "Open {name} in Develop",
+    "exportZipSelected": "Export {count} as ZIP",
+    "exportingZip": "Packaging… {done}/{total}",
+    "exportedZip": "Exported {components} component(s) and {assets} asset(s) as a ZIP.",
+    "exportUnbundled": "{count} referenced asset(s) are missing on this site and were not bundled: {keys}",
+    "zipMissingKit": "No kit.json in this ZIP — it isn't a component kit export.",
+    "zipLoaded": "ZIP loaded — {count} bundled asset file(s) will be installed after import.",
+    "assetsInstalling": "Installing assets… {done}/{total}",
+    "assetsInstalled": "{count} bundled asset(s) installed or already present.",
+    "assetsInstallFailed": "{count} asset(s) failed to install: {keys}",
+    "previewAssetsBundled": "References {count} asset(s) — bundled in this ZIP and installed automatically.",
+    "showMore": "Show {count} more",
+    "tagButton": "Tag…",
+    "downloadZip": "Download ZIP"
   },
   "adminAuth": {
     "forbiddenTitle": "Access denied",
@@ -430,6 +469,7 @@
     "preview": "Preview",
     "save": "Save",
     "publish": "Publish",
+    "pendingChanges": "Unpublished changes",
     "draftStatus": {
       "saving": "Saving…",
       "saved": "Saved",
@@ -912,7 +952,7 @@
     "purgeAllConfirm": "Purge every cached API response? Pages will fetch fresh data from the external APIs on their next render."
   },
   "apiKeys": {
-    "title": "API keys",
+    "title": "MCP",
     "subtitle": "Bearer keys for the remote MCP server. Each key gives full programmatic access to this site — share it only with trusted tools.",
     "forbidden": "You don't have permission to manage API keys. Ask an Admin.",
     "labelPlaceholder": "Key label (e.g. Claude Code)",

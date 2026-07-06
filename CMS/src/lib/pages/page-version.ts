@@ -124,6 +124,30 @@ export function planPublish(
 }
 
 /**
+ * Does the page have UNPUBLISHED work — a draft that differs from what's live?
+ * Drives the page-builder's pending-changes warning (mirrors the component
+ * develop workbench's draft bar). Byte-compares the blocks JSON: a fresh draft
+ * copies the published blocks string VERBATIM (planDraftFrom/planPublish), so
+ * equality holds until a real edit re-serializes. Never published → any
+ * non-empty draft counts as pending.
+ */
+export function hasPendingChanges(
+  draft: Pick<VersionRecord, "blocks"> | null,
+  published: Pick<VersionRecord, "blocks"> | null,
+): boolean {
+  if (!draft) return false;
+  if (!published) {
+    try {
+      const b = JSON.parse(draft.blocks) as unknown;
+      return Array.isArray(b) && b.length > 0;
+    } catch {
+      return false;
+    }
+  }
+  return draft.blocks !== published.blocks;
+}
+
+/**
  * Plan a RESTORE: copy a past `version` into a NEW draft (never mutate the
  * source — restore must be non-destructive). Same shape as `planDraftFrom`
  * but named for intent; the store sets `draft_version_id` to the new row.

@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { ComponentDevelop } from "@/components/components/component-develop";
 import { listComponents } from "@/db/component-store";
-import { normalizeTags } from "@/lib/components/tags";
+import { parseTags } from "@/lib/components/tags";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +18,15 @@ export async function generateMetadata(): Promise<Metadata> {
  * with its placeholder data), or delete unwanted ones. Sibling of the
  * export/import page under the Components nav group.
  */
-export default async function ComponentDevelopPage() {
+export default async function ComponentDevelopPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const t = await getTranslations("develop");
+  // ?name=<component> deep link (the gallery's open-in-Develop affordance).
+  const sp = await searchParams;
+  const rawName = Array.isArray(sp.name) ? sp.name[0] : sp.name;
   let initial: {
     name: string;
     hasScript: boolean;
@@ -35,7 +42,7 @@ export default async function ComponentDevelopPage() {
       hasScript: (r.script ?? "") !== "",
       hasCss: (r.css ?? "") !== "",
       hasPreviewData: (r.propsSchema ?? "") !== "",
-      tags: normalizeTags(r.tags),
+      tags: parseTags(r.tags),
       label: r.label ?? null,
     }));
   } catch {
@@ -51,7 +58,10 @@ export default async function ComponentDevelopPage() {
         </div>
         <LocaleSwitcher />
       </header>
-      <ComponentDevelop initialComponents={initial} />
+      <ComponentDevelop
+        initialComponents={initial}
+        initialSelected={initial.some((c) => c.name === rawName) ? rawName ?? null : null}
+      />
     </main>
   );
 }

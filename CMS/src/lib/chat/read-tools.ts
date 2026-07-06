@@ -168,7 +168,10 @@ export const GET_THEME_TOOL = {
       "each map every color token to its active value (built-in defaults merged " +
       "with the operator's overrides), so you see the real palette. `overrides` " +
       "holds only the tokens the operator explicitly changed (empty = pure " +
-      "defaults, which is normal, not a misconfiguration).",
+      "defaults, which is normal, not a misconfiguration). `fonts` maps the " +
+      "font slots (body/heading/accent → the font-body/font-heading/font-accent " +
+      "utilities) to their picked family, or null for the system default; " +
+      "families are read-only here (picked in Theme settings).",
     parameters: { type: "object", properties: {}, required: [] },
   },
 } as const;

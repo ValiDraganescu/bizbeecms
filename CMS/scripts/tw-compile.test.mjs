@@ -40,6 +40,13 @@ test("purpose color tokens resolve to var(--color-*) so the theme drives them", 
   assert.ok(css.includes("var(--color-foreground)"), "text-foreground uses the token var");
 });
 
+test("font slot utilities resolve to var(--font-*) so theme fonts drive them", async () => {
+  const css = await buildCss(["font-body", "font-heading", "font-accent"]);
+  for (const slot of ["body", "heading", "accent"]) {
+    assert.ok(css.includes(`var(--font-${slot}`), `font-${slot} uses the slot var`);
+  }
+});
+
 test("order- and dedup-independent: same class set → identical CSS (cache key)", async () => {
   const a = await buildCss(["p-4", "p-4", "m-2"]);
   const b = await buildCss(["m-2", "p-4"]);

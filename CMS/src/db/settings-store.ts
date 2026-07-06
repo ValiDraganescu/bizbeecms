@@ -21,6 +21,11 @@ import {
   normalizeThemeOverrides,
 } from "../lib/render/theme.ts";
 import {
+  type ThemeFonts,
+  emptyThemeFonts,
+  normalizeThemeFonts,
+} from "../lib/render/fonts.ts";
+import {
   type SiteIdentity,
   emptySiteIdentity,
   normalizeSiteIdentity,
@@ -35,6 +40,7 @@ import {
 const CONTENT_LOCALES_KEY = "content_locales";
 const THEME_OVERRIDES_KEY = "theme_overrides";
 const THEME_OVERRIDES_DARK_KEY = "theme_overrides_dark";
+const THEME_FONTS_KEY = "theme_fonts";
 const SITE_IDENTITY_KEY = "site_identity";
 const MODEL_CATALOG_KEY = "model_catalog";
 const IMAGE_MODEL_KEY = "image_model";
@@ -150,6 +156,31 @@ export async function setThemeOverridesDark(
 ): Promise<ThemeOverrides> {
   const normalized = normalizeThemeOverrides(overrides);
   await upsertSetting(THEME_OVERRIDES_DARK_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+/** Read the per-Site theme fonts (slot picks + self-hosted faces), or empty. */
+export async function getThemeFonts(): Promise<ThemeFonts> {
+  const db = await getDb();
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, THEME_FONTS_KEY))
+    .limit(1);
+
+  const raw = rows[0]?.value;
+  if (!raw) return emptyThemeFonts();
+  try {
+    return normalizeThemeFonts(JSON.parse(raw));
+  } catch {
+    return emptyThemeFonts();
+  }
+}
+
+/** Upsert the theme fonts (normalized — only known slots + safe values). */
+export async function setThemeFonts(fonts: unknown): Promise<ThemeFonts> {
+  const normalized = normalizeThemeFonts(fonts);
+  await upsertSetting(THEME_FONTS_KEY, JSON.stringify(normalized));
   return normalized;
 }
 

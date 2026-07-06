@@ -21,6 +21,7 @@ import { useTranslations } from "next-intl";
 import { ConfirmModal } from "@/components/content/confirm-modal";
 import { makeDescribeThumb } from "@/lib/chat/image-thumb";
 import { normalizeTags } from "@/lib/components/tags";
+import { TagChip } from "@/components/ui/tag-chip";
 import { cycleIndex, formatBytes, pageWindow } from "@/lib/media/format";
 
 export interface GalleryAsset {
@@ -332,14 +333,10 @@ export function MediaLibrary({
                           {tags.length > 0 && (
                             <span className="pointer-events-none absolute inset-x-1 bottom-1 flex flex-wrap gap-0.5">
                               {tags.slice(0, 3).map((tag) => (
-                                <span key={tag} className="rounded bg-foreground/75 px-1 py-0.5 text-[10px] leading-none text-surface">
-                                  {tag}
-                                </span>
+                                <TagChip key={tag} label={tag} variant="overlay" />
                               ))}
                               {tags.length > 3 && (
-                                <span className="rounded bg-foreground/75 px-1 py-0.5 text-[10px] leading-none text-surface">
-                                  +{tags.length - 3}
-                                </span>
+                                <TagChip label={`+${tags.length - 3}`} variant="overlay" />
                               )}
                             </span>
                           )}
@@ -609,20 +606,12 @@ function TagEditor({ tags, onChange }: { tags: string[]; onChange: (tags: string
   return (
     <div className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-surface p-1">
       {tags.map((tag) => (
-        <span
+        <TagChip
           key={tag}
-          className="flex items-center gap-1 rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] text-foreground"
-        >
-          {tag}
-          <button
-            type="button"
-            onClick={() => onChange(tags.filter((x) => x !== tag))}
-            aria-label={t("gallery.removeTag", { tag })}
-            className="text-foreground-muted hover:text-danger"
-          >
-            ×
-          </button>
-        </span>
+          label={tag}
+          removeLabel={t("gallery.removeTag", { tag })}
+          onRemove={() => onChange(tags.filter((x) => x !== tag))}
+        />
       ))}
       <input
         value={draft}
@@ -635,7 +624,7 @@ function TagEditor({ tags, onChange }: { tags: string[]; onChange: (tags: string
         }}
         onBlur={commit}
         placeholder={t("gallery.addTag")}
-        className="min-w-[4rem] flex-1 bg-transparent px-1 text-[11px] text-foreground focus-visible:outline-none"
+        className="min-w-[4rem] flex-1 bg-transparent px-1 text-xs text-foreground focus-visible:outline-none"
       />
     </div>
   );

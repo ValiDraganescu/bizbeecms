@@ -59,6 +59,7 @@ export async function listComponents(): Promise<ComponentRow[]> {
       propsSchema: schema.component.propsSchema,
       tags: schema.component.tags,
       label: schema.component.label,
+      updatedAt: schema.component.updatedAt,
     })
     .from(schema.component);
   return rows
@@ -70,6 +71,7 @@ export async function listComponents(): Promise<ComponentRow[]> {
       propsSchema: r.propsSchema,
       tags: r.tags,
       label: r.label,
+      updatedAt: r.updatedAt,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

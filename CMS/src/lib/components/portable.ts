@@ -114,13 +114,17 @@ export interface PortableComponent {
 
 /**
  * Enumerate the distinct, sorted `/media/<key>` asset keys referenced anywhere
- * in a component artifact (tree text + string prop values, script, css). PURE.
- * Only the known safe shape is collected — see MEDIA_URL_RE.
+ * in a component artifact (tree text + string prop values, script, css, and the
+ * propsSchema JSON — placeholder-data defaults are where AI-authored components
+ * usually carry their image URLs). PURE. Only the known safe shape is collected
+ * — see MEDIA_URL_RE.
  */
 export function enumerateAssetDeps(parts: {
   tree: TreeNode;
   script?: string;
   css?: string;
+  /** The propsSchema column's JSON string; scanned as raw text. */
+  propsSchema?: string | null;
 }): string[] {
   const keys = new Set<string>();
   const scan = (s: string) => {
@@ -141,6 +145,7 @@ export function enumerateAssetDeps(parts: {
   walk(parts.tree);
   if (parts.script) scan(parts.script);
   if (parts.css) scan(parts.css);
+  if (parts.propsSchema) scan(parts.propsSchema);
   return [...keys].sort();
 }
 
@@ -212,6 +217,8 @@ export interface ComponentRow {
   tags?: string | null;
   /** Optional human display label (UI only; not part of the portable bundle). */
   label?: string | null;
+  /** Last-mutation timestamp (UI cache-busting only; not part of the bundle). */
+  updatedAt?: Date | null;
 }
 
 /**
@@ -242,7 +249,7 @@ export function serializeComponent(
     format: PORTABLE_FORMAT,
     version: PORTABLE_VERSION,
     ...(meta ? { meta } : {}),
-    assets: enumerateAssetDeps({ tree, script, css }),
+    assets: enumerateAssetDeps({ tree, script, css, propsSchema: row.propsSchema }),
     // Other components this one renders, minus a self-reference.
     componentDeps: enumerateComponentDeps(tree).filter((n) => n !== row.name),
     tags,
@@ -589,6 +596,9 @@ export function parsePortableComponent(
     if (treeObj !== null) tree = rebindTree(treeObj, opts.rebind);
     if (typeof script === "string") script = rebindString(script, opts.rebind);
     if (typeof css === "string") css = rebindString(css, opts.rebind);
+    // propsSchema defaults carry /media/ URLs too; rewriting the raw JSON text
+    // is safe — keys are [a-z0-9_./]-shaped, so the string stays valid JSON.
+    if (propsSchema) propsSchema = rebindString(propsSchema, opts.rebind);
   }
 
   // ── the artifact itself: reuse the SAME gate the AI tool uses ──
@@ -611,7 +621,7 @@ export function parsePortableComponent(
     ok: true,
     component: { ...v.artifact, propsSchema, tags },
     // Deps remaining AFTER any rebind — what the target Site must actually have.
-    assets: enumerateAssetDeps(v.artifact),
+    assets: enumerateAssetDeps({ ...v.artifact, propsSchema }),
     // Other components this one renders, minus a self-reference (H3b).
     componentDeps: enumerateComponentDeps(v.artifact.tree).filter(
       (n) => n !== v.artifact.name,

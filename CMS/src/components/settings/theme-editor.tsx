@@ -286,7 +286,7 @@ function ModeEditor({
             disabled={busy}
             onClick={() => void save()}
           >
-            {busy ? t("saving") : t("save")}
+            {busy ? t("saving") : t("saveColors")}
           </button>
         </div>
       </div>

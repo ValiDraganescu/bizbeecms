@@ -104,15 +104,18 @@ type ComponentSummary = {
 
 export function ComponentDevelop({
   initialComponents,
+  initialSelected = null,
 }: {
   initialComponents: ComponentSummary[];
+  /** Optional deep-linked component (`?name=`), pre-validated by the page. */
+  initialSelected?: string | null;
 }) {
   const t = useTranslations("develop");
   // Reuse the Page Builder's inspector-width + collapse strings (same controls).
   const tPb = useTranslations("pageBuilder");
   const [components, setComponents] = useState<ComponentSummary[]>(initialComponents);
   const [selected, setSelected] = useState<string | null>(
-    initialComponents[0]?.name ?? null,
+    initialSelected ?? initialComponents[0]?.name ?? null,
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

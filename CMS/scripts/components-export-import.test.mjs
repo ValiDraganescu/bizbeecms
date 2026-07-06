@@ -268,3 +268,47 @@ test("H3b: a present nested dep is NOT flagged on import", () => {
   // Target Site has both deps installed → nothing flagged.
   assert.deepEqual(missingAgainst(deps, ["AuthorCard", "PostListItem"]), []);
 });
+
+// ── propsSchema asset deps (components-gallery zip export) ──
+// AI-authored components usually carry their image URLs in the propsSchema
+// placeholder DEFAULTS, not in the tree — the dep enumeration must scan it or
+// a zip export bundles zero assets for the most common component shape.
+const PROPS_KEY = "assets/generated_hero_1782994234349_83825b04.png";
+const propsRow = {
+  name: "PropsHero",
+  tree: JSON.stringify({ tag: "img", props: { src: "{{image}}" }, children: [] }),
+  script: "",
+  css: "",
+  propsSchema: JSON.stringify({
+    image: { type: "image", default: `/media/${PROPS_KEY}` },
+  }),
+};
+
+test("enumerateAssetDeps scans propsSchema defaults", () => {
+  assert.deepEqual(
+    enumerateAssetDeps({
+      tree: { tag: "div", props: {}, children: [] },
+      propsSchema: propsRow.propsSchema,
+    }),
+    [PROPS_KEY],
+  );
+});
+
+test("export declares propsSchema asset deps", () => {
+  assert.deepEqual(serializeComponent(propsRow).assets, [PROPS_KEY]);
+});
+
+test("import re-enumerates propsSchema deps and rebind rewrites them", () => {
+  const bundle = serializeComponent(propsRow);
+  const parsed = parsePortableComponent(bundle);
+  assert.ok(parsed.ok, parsed.ok ? "" : parsed.errors.join("; "));
+  assert.deepEqual(parsed.assets, [PROPS_KEY]);
+
+  const target = "assets/other_1_zz.png";
+  const rebound = parsePortableComponent(bundle, { rebind: { [PROPS_KEY]: target } });
+  assert.ok(rebound.ok, rebound.ok ? "" : rebound.errors.join("; "));
+  assert.deepEqual(rebound.assets, [target]);
+  // The stored propsSchema is still valid JSON after the text rewrite.
+  const schema = JSON.parse(rebound.component.propsSchema);
+  assert.equal(schema.image.default, `/media/${target}`);
+});

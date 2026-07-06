@@ -186,14 +186,20 @@
   },
   "settingsNav": {
     "label": "Seadete jaotised",
+    "groups": {
+      "site": "Sait",
+      "appearance": "Välimus",
+      "ai": "AI",
+      "access": "Ligipääs"
+    },
     "contentLocales": "Sisukeeled",
     "theme": "Teema",
     "brand": "Bränd ja AI",
-    "apiKeys": "API-võtmed",
+    "apiKeys": "MCP",
     "users": "Kasutajad",
     "google": "Google'i sisselogimine",
     "openrouterKey": "OpenRouteri võti",
-    "media": "Meedia",
+    "media": "AI mudelid",
     "iconSet": "Ikoonid",
     "exportImport": "Eksport / Import"
   },
@@ -204,7 +210,6 @@
     "swatchLabel": "Värvinäidis tunnusele {token}",
     "valueLabel": "Värviväärtus tunnusele {token}",
     "reset": "Lähtesta",
-    "save": "Salvesta",
     "saving": "Salvestan…",
     "saved": "Teema salvestatud.",
     "invalidValue": "Vigane värv tunnusele {token}: {value}",
@@ -240,7 +245,33 @@
     "mode": {
       "light": "Hele",
       "dark": "Tume"
-    }
+    },
+    "fonts": {
+      "title": "Tüpograafia",
+      "subtitle": "Vali avaldatud saidi fondid. Põhitekst on vaikimisi kõikjal, Pealkirjad rakendub h1–h6 pealkirjadele, Rõhutus on valikuline esiletõstetud tekstile (komponendid kasutavad seda font-accent-klassiga).",
+      "systemDefault": "Süsteemi vaikimisi",
+      "slot": {
+        "body": "Põhitekst",
+        "heading": "Pealkirjad",
+        "accent": "Rõhutus"
+      },
+      "hint": {
+        "body": "Vaiketekst kõikjal",
+        "heading": "Rakendub pealkirjadele h1–h6",
+        "accent": "Valikuline, nt hero esiletõst"
+      },
+      "category": {
+        "sans": "Sans-serif",
+        "serif": "Seriif",
+        "display": "Display",
+        "script": "Käekiri",
+        "mono": "Püsisammuga"
+      },
+      "sample": "Kiire pruun rebane — ÄÖÕŠŽ äöõšž 0123",
+      "selfHostNote": "Salvestamisel laaditakse fondifailid üks kord alla ja neid serveeritakse sinu saidilt — külastajad ei ühendu kunagi Google Fontsiga.",
+      "save": "Salvesta fondid"
+    },
+    "saveColors": "Salvesta värvid"
   },
   "media": {
     "title": "Meediateek",
@@ -284,27 +315,22 @@
   },
   "components": {
     "title": "Komponendid",
-    "subtitle": "Ekspordi komponent teisaldatava paketina või impordi komponent sellele saidile.",
+    "subtitle": "Sirvi komponente eelvaadetena, ekspordi valik ZIP-failina või impordi komplekt teiselt saidilt.",
     "listTitle": "Sinu komponendid",
     "empty": "Komponente veel pole. Loo komponent AI-vestluses ja ekspordi see siit.",
-    "export": "Ekspordi",
     "flagScript": "sisaldab skripti",
     "flagCss": "sisaldab CSS-i",
     "flagStatic": "staatiline",
     "importTitle": "Impordi komponent",
-    "importHint": "Kleebi komponendipaketi JSON või lae üles .json-fail. Imporditud komponendid valideeritakse enne salvestamist.",
-    "uploadLabel": "Lae üles pakett (.json)",
+    "importHint": "Lae üles komponendi ZIP (.kit.zip) või kleebi paketi JSON. Impordid valideeritakse enne salvestamist; ZIP paigaldab ka kaasa pakitud meediaressursid.",
+    "uploadLabel": "Lae üles pakett (.kit.zip või .json)",
     "pasteLabel": "Või kleebi paketi JSON",
-    "pastePlaceholder": "{ \"format\": \"bizbeecms.component\", \"version\": 1, ... }",
+    "pastePlaceholder": "Kleebi paketi JSON — \"format\": \"bizbeecms.kit\" või \"bizbeecms.component\"",
     "import": "Impordi",
     "importing": "Impordin…",
     "importEmpty": "Kleebi pakett või vali esmalt fail.",
     "imported": "Imporditud „{name}”.",
     "updated": "Uuendatud „{name}”.",
-    "kitsTitle": "Stardipaketid",
-    "kitsHint": "Paigalda valmis komplekt komponente ühe klõpsuga. Blogipakett lisab postituse päise, sisu, autorikaardi ja postituste loendi; maandumispakett lisab hero-ploki, omaduste ruudustiku, CTA-riba, soovituse ja jaluse; dokumentatsioonipakett lisab päise, märkuse, koodiploki, sammude loendi ja API-parameetri; portfooliopakett lisab hero-ploki, projektikaardi, oskuste loendi, töö ajajoone ja kontaktikutse; hinnapakett lisab sektsiooni päise, hinnaastme, omaduste rea, tootekaardi ja KKK-kirje.",
-    "installBlogKit": "Paigalda blogipakett",
-    "kitInstalled": "Blogipakett paigaldatud: {created} loodud, {updated} uuendatud.",
     "kitImported": "Komplekt “{kit}” imporditud: {created} loodud, {updated} uuendatud.",
     "kitSkipped": "{count} komponent(i) vahele jäetud (vigane).",
     "kitResultTitle": "Komplekt “{kit}” — mis paigaldati",
@@ -324,10 +350,6 @@
     "rebindToLabel": "Seo meediafailiga…",
     "applyRebind": "Impordi uuesti ümberseostamisega",
     "applyingRebind": "Impordin uuesti…",
-    "installLandingKit": "Paigalda maandumispakett",
-    "installDocsKit": "Paigalda dokumentatsioonipakett",
-    "installPortfolioKit": "Paigalda portfooliopakett",
-    "installPricingKit": "Paigalda hinnapakett",
     "filterByTag": "Filtreeri sildi järgi",
     "filterAllTags": "Kõik sildid",
     "noneForTag": "Ükski komponent ei kanna seda silti.",
@@ -344,8 +366,6 @@
     "bulkAdded": "Lisati „{tag}” {count} komponendile.",
     "bulkRemoved": "Eemaldati „{tag}” {count} komponendilt.",
     "bulkNoChange": "Ükski valitud komponent ei muutunud sildi „{tag}” puhul.",
-    "exportKit": "Ekspordi komplekt",
-    "exportKitPickTag": "Vali eksporditav silt",
     "kitNameLabel": "Komplekti nimi (valikuline)",
     "kitNoteLabel": "Komplekti kirjeldus (valikuline)",
     "kitNotePlaceholder": "Milleks see komplekt on mõeldud",
@@ -358,7 +378,26 @@
     "previewAssets": "Viitab {count} ressursile — laadi need üles või seo pärast paigaldust ümber.",
     "previewSkipped": "{count} komponenti ei läbinud valideerimist ja jäetakse vahele.",
     "previewConfirm": "Kinnita paigaldus",
-    "previewCancel": "Tühista"
+    "previewCancel": "Tühista",
+    "searchPlaceholder": "Otsi komponente…",
+    "galleryCount": "kokku {count}",
+    "noneForSearch": "Ükski komponent ei vasta otsingule.",
+    "previewFrame": "Eelvaade: {name}",
+    "exportZipOne": "Ekspordi {name} ZIP-failina",
+    "openDevelop": "Ava {name} arendusvaates",
+    "exportZipSelected": "Ekspordi {count} ZIP-failina",
+    "exportingZip": "Pakin… {done}/{total}",
+    "exportedZip": "Eksporditi {components} komponenti ja {assets} ressurssi ZIP-failina.",
+    "exportUnbundled": "{count} viidatud ressurssi puudub sellel saidil ja neid ei pakitud kaasa: {keys}",
+    "zipMissingKit": "ZIP-failis pole kit.json-faili — see ei ole komponendikomplekti eksport.",
+    "zipLoaded": "ZIP laaditud — {count} kaasa pakitud ressurssi paigaldatakse pärast importi.",
+    "assetsInstalling": "Paigaldan ressursse… {done}/{total}",
+    "assetsInstalled": "{count} kaasa pakitud ressurssi paigaldatud või juba olemas.",
+    "assetsInstallFailed": "{count} ressursi paigaldamine ebaõnnestus: {keys}",
+    "previewAssetsBundled": "Viitab {count} ressursile — pakitud sellesse ZIPi ja paigaldatakse automaatselt.",
+    "showMore": "Näita veel {count}",
+    "tagButton": "Sildid…",
+    "downloadZip": "Laadi ZIP alla"
   },
   "adminAuth": {
     "forbiddenTitle": "Juurdepääs keelatud",
@@ -430,6 +469,7 @@
     "preview": "Eelvaade",
     "save": "Salvesta",
     "publish": "Avalda",
+    "pendingChanges": "Avaldamata muudatused",
     "draftStatus": {
       "saving": "Salvestan…",
       "saved": "Salvestatud",
@@ -912,7 +952,7 @@
     "purgeAllConfirm": "Kas tühjendada kõik puhverdatud API vastused? Lehed pärivad järgmisel laadimisel värsked andmed välistest liidestest."
   },
   "apiKeys": {
-    "title": "API-võtmed",
+    "title": "MCP",
     "subtitle": "Bearer-võtmed kaug-MCP-serverile. Iga võti annab täieliku programmilise juurdepääsu sellele saidile — jaga seda ainult usaldusväärsete tööriistadega.",
     "forbidden": "Sul pole õigust API-võtmeid hallata. Küsi administraatorilt.",
     "labelPlaceholder": "Võtme nimi (nt Claude Code)",

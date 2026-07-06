@@ -18,7 +18,23 @@ import {
   isValidAssetKey,
   assetUrl,
   assetServeHeaders,
+  filenameFromText,
+  deliveryFormat,
 } from "../src/lib/render/asset.ts";
+
+// ── filenameFromText ──────────────────────────────────────────────────────────
+test("filenameFromText: 2-5 meaningful words, filler dropped, kebab-case", () => {
+  assert.equal(
+    filenameFromText("A rustic terrace overlooking the rolling Tuscan vineyards at sunset", "png"),
+    "rustic-terrace-overlooking-rolling-tuscan.png",
+  );
+  // Punctuation stripped; short texts keep what they have.
+  assert.equal(filenameFromText("Fresh sushi, close-up!", "jpeg"), "fresh-sushi-close-up.jpeg");
+  // All-filler text falls back to the raw words rather than nothing.
+  assert.equal(filenameFromText("of the at", "png"), "of-the-at.png");
+  // Empty text → "generated".
+  assert.equal(filenameFromText("", "png"), "generated.png");
+});
 
 // ── validateAsset ─────────────────────────────────────────────────────────────
 test("validateAsset: accepts allowed image types within size", () => {
@@ -102,6 +118,33 @@ test("assetServeHeaders: raster images are NOT sandboxed/forced-download", () =>
     assert.equal(h["content-security-policy"], undefined, t);
     assert.equal(h["content-disposition"], undefined, t);
   }
+});
+
+// ── deliveryFormat (transform-on-delivery negotiation) ────────────────────────
+const WEBP_ACCEPT = "image/avif,image/webp,image/apng,*/*;q=0.8";
+
+test("deliveryFormat: PNG/JPEG keys + webp-capable Accept → webp", () => {
+  for (const key of ["assets/photo_1_x.png", "assets/photo_1_x.jpg", "assets/photo_1_x.jpeg"]) {
+    assert.equal(deliveryFormat(key, WEBP_ACCEPT), "image/webp", key);
+  }
+});
+
+test("deliveryFormat: non-transcodable types pass through untouched", () => {
+  for (const key of [
+    "assets/anim_1_x.gif", // may be animated
+    "assets/logo_1_x.svg", // vector + locked-down serve path
+    "assets/pic_1_x.webp", // already the target
+    "assets/blob_1_x.bin",
+  ]) {
+    assert.equal(deliveryFormat(key, WEBP_ACCEPT), null, key);
+  }
+});
+
+test("deliveryFormat: no webp in Accept (or no Accept) → original", () => {
+  assert.equal(deliveryFormat("assets/photo_1_x.png", "image/png,*/*;q=0.8"), null);
+  assert.equal(deliveryFormat("assets/photo_1_x.png", null), null);
+  assert.equal(deliveryFormat("assets/photo_1_x.png", undefined), null);
+  assert.equal(deliveryFormat("assets/photo_1_x.png", ""), null);
 });
 
 // ── i18n parity ───────────────────────────────────────────────────────────────

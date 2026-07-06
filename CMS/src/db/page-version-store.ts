@@ -109,6 +109,24 @@ export async function getDraft(pageId: string, injectedDb?: Db): Promise<Version
 }
 
 /**
+ * The page's PUBLISHED version record (null when never published or the
+ * pointer dangles). Read-only sibling of `getDraft` — creates nothing.
+ */
+export async function getPublishedVersion(
+  pageId: string,
+  injectedDb?: Db,
+): Promise<VersionRecord | null> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ publishedVersionId: schema.page.publishedVersionId })
+    .from(schema.page)
+    .where(eq(schema.page.id, pageId))
+    .limit(1);
+  const id = rows[0]?.publishedVersionId;
+  return id ? loadVersion(db, id) : null;
+}
+
+/**
  * Overwrite the draft version's blocks + meta (NO publish). Creates the draft
  * first if absent. `seed.blocks`/`seed.meta` are JSON strings (caller serializes
  * after `validateBlocks`). Returns the updated draft.

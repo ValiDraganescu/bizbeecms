@@ -42,9 +42,20 @@ const COLOR_TOKENS = [
 
 const THEME = COLOR_TOKENS.map((t) => `  --color-${t}: oklch(0.5 0.1 268);`).join("\n");
 
+// Purpose FONT slots (theme-fonts, mirrors lib/render/fonts.ts FONT_SLOTS):
+// registering `--font-<slot>` makes `font-body` / `font-heading` /
+// `font-accent` valid utilities emitting `var(--font-<slot>)`. The values here
+// are the no-theme default (system stack); a Site's picked fonts override the
+// variables via the theme <style> injected AFTER the compiled sheet.
+const FONT_SLOTS = ["body", "heading", "accent"];
+const FONT_THEME = FONT_SLOTS.map(
+  (s) =>
+    `  --font-${s}: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;`,
+).join("\n");
+
 // Our compiler entry: pull in tailwind, then register the purpose tokens so
 // `bg-primary` etc. are recognized utilities.
-const ENTRY = `@import "tailwindcss";\n@theme {\n${THEME}\n}`;
+const ENTRY = `@import "tailwindcss";\n@theme {\n${THEME}\n${FONT_THEME}\n}`;
 
 /**
  * Build one Tailwind compiler instance. `compile` resolves `@import` via

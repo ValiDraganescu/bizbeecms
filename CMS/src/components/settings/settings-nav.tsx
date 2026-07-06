@@ -5,22 +5,43 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 /**
- * Tab bar linking the Settings sub-pages (content-locales / theme / brand). The
- * sidebar's single "Settings" link only lands on content-locales, so without
- * this the theme + brand pages were unreachable from the UI. Rendered at the top
- * of every settings page.
+ * Settings sub-sidebar — a page-builder-style second rail with GROUPED links
+ * to every settings page, rendered ONCE by the settings layout (content on the
+ * right). Replaces the old top tab bar. Groups: Site (locales, export/import),
+ * Appearance (theme, brand, icons), AI (OpenRouter key, AI models, MCP API
+ * keys — all AI integration & management), Access (users, Google sign-in).
  */
-const TABS = [
-  { key: "contentLocales", href: "/admin/settings/content-locales" },
-  { key: "theme", href: "/admin/settings/theme" },
-  { key: "brand", href: "/admin/settings/brand" },
-  { key: "apiKeys", href: "/admin/settings/api-keys" },
-  { key: "users", href: "/admin/settings/users" },
-  { key: "google", href: "/admin/settings/google" },
-  { key: "openrouterKey", href: "/admin/settings/openrouter-key" },
-  { key: "media", href: "/admin/settings/media" },
-  { key: "iconSet", href: "/admin/settings/icon-set" },
-  { key: "exportImport", href: "/admin/settings/export-import" },
+const GROUPS = [
+  {
+    key: "site",
+    items: [
+      { key: "contentLocales", href: "/admin/settings/content-locales" },
+      { key: "exportImport", href: "/admin/settings/export-import" },
+    ],
+  },
+  {
+    key: "appearance",
+    items: [
+      { key: "theme", href: "/admin/settings/theme" },
+      { key: "brand", href: "/admin/settings/brand" },
+      { key: "iconSet", href: "/admin/settings/icon-set" },
+    ],
+  },
+  {
+    key: "ai",
+    items: [
+      { key: "openrouterKey", href: "/admin/settings/openrouter-key" },
+      { key: "media", href: "/admin/settings/media" },
+      { key: "apiKeys", href: "/admin/settings/api-keys" },
+    ],
+  },
+  {
+    key: "access",
+    items: [
+      { key: "users", href: "/admin/settings/users" },
+      { key: "google", href: "/admin/settings/google" },
+    ],
+  },
 ] as const;
 
 export function SettingsNav() {
@@ -28,25 +49,32 @@ export function SettingsNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-wrap gap-1 border-b border-border" aria-label={t("label")}>
-      {TABS.map(({ key, href }) => {
-        const active = pathname.startsWith(href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active ? "page" : undefined}
-            className={
-              "rounded-t-md px-3 py-2 text-sm transition-colors " +
-              (active
-                ? "border-b-2 border-primary font-medium text-foreground"
-                : "text-foreground-muted hover:text-foreground")
-            }
-          >
-            {t(key)}
-          </Link>
-        );
-      })}
+    <nav aria-label={t("label")} className="flex-1 space-y-4 overflow-y-auto p-3">
+      {GROUPS.map((group) => (
+        <div key={group.key} className="flex flex-col gap-0.5">
+          <span className="mb-1 px-1 font-mono text-[11px] uppercase tracking-wide text-foreground-muted">
+            {t(`groups.${group.key}`)}
+          </span>
+          {group.items.map(({ key, href }) => {
+            const active = pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={
+                  "rounded-md px-3 py-1.5 text-sm transition-colors " +
+                  (active
+                    ? "bg-primary-subtle font-medium text-foreground"
+                    : "text-foreground-muted hover:bg-surface-muted hover:text-foreground")
+                }
+              >
+                {t(key)}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }

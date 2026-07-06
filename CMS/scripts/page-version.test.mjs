@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 
 import {
   applyDraftEdit,
+  hasPendingChanges,
   nextVersionNo,
   pickRenderBlocks,
   planDraftFrom,
@@ -120,4 +121,23 @@ test("pickRenderBlocks (preview): no draft → published (just published, no dra
 
 test("pickRenderBlocks (preview): no draft, no published → legacy page.blocks", () => {
   assert.equal(pickRenderBlocks(null, null, '["LEGACY"]'), '["LEGACY"]');
+});
+
+// ── hasPendingChanges ─────────────────────────────────────────────────────────
+test("hasPendingChanges: draft differing from published → pending", () => {
+  assert.equal(hasPendingChanges({ blocks: '["EDITED"]' }, { blocks: '["PUB"]' }), true);
+});
+
+test("hasPendingChanges: fresh draft (verbatim copy of published) → not pending", () => {
+  assert.equal(hasPendingChanges({ blocks: '["PUB"]' }, { blocks: '["PUB"]' }), false);
+});
+
+test("hasPendingChanges: never published → non-empty draft pending, empty draft not", () => {
+  assert.equal(hasPendingChanges({ blocks: '["A"]' }, null), true);
+  assert.equal(hasPendingChanges({ blocks: "[]" }, null), false);
+});
+
+test("hasPendingChanges: no draft (or bad JSON, unpublished) → never pending", () => {
+  assert.equal(hasPendingChanges(null, { blocks: '["PUB"]' }), false);
+  assert.equal(hasPendingChanges({ blocks: "not json" }, null), false);
 });
