@@ -26,10 +26,15 @@ export type RouteParams = { slug?: string[] };
  * and the concrete path segment is captured under that param name. Returns the
  * leaf page row + captured params, or null if any segment is unmatched or the
  * leaf isn't published.
+ *
+ * Stage 2 (localized slugs): pass the ACTIVE locale (from `peelLocaleSegment`)
+ * and each level matches the page's effective slug in that locale
+ * (`localizedSlugs[locale] ?? slug`); omitted = default-slug walk.
  */
 export async function resolvePage(
   db: Db,
   path: string[],
+  locale?: string,
 ): Promise<{ page: Page; params: Record<string, string> } | null> {
   let parentId: string | null = null;
   let current: Page | null = null;
@@ -44,7 +49,7 @@ export async function resolvePage(
           ? isNull(pageTable.parentPageId)
           : eq(pageTable.parentPageId, parentId),
       );
-    const match = matchSlugSegment(siblings, segment);
+    const match = matchSlugSegment(siblings, segment, locale);
     if (!match) return null;
     current = match.page;
     if (match.param) params[match.param.name] = match.param.value;

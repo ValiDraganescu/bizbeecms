@@ -238,3 +238,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/api/settings/content-locales/route.ts,
   CMS/src/components/page-builder/page-settings.tsx, page-builder-shell.tsx,
   CMS/messages/{en,fi,et}.json
+
+## 2026-07-07 02:27 — Locale-aware slug walk (localizedSlugs[locale] ?? slug)
+- **Status:** DONE
+- **What I did:** (1) New pure `effectiveSlug(candidate, locale)` in
+  `lib/render/slug.ts`: the slug a page answers to in a locale —
+  `localizedSlugs[locale] ?? slug`; takes the RAW stored JSON text (SlugCandidate
+  gains optional `localizedSlugs?: string | null`), locale lowercased for the
+  lookup (keys stored lowercase), wildcard ":param" pages locale-agnostic
+  (overrides ignored), malformed JSON / non-string / empty values fall back to
+  the default slug. (2) `matchSlugSegment` gains optional `locale` — the EXACT
+  match runs against the effective slug; where an override exists the DEFAULT
+  slug 404s in that locale (one canonical URL per locale) and the override
+  doesn't leak into other locales. Wildcard fallback unchanged. (3) `resolvePage`
+  gains optional `locale`, passed per level. (4) Both callers pass the peel's
+  active locale: `loadPlan` (route) and `CMS/worker.ts` (edge-cache stamping) —
+  localized URLs get the same Cache-Control/Cache-Tag stamps for free.
+- **Verified:** 9 new dep-free node --test cases (18 total in slug.test.ts);
+  full `npm test` 1656/1656; `npx tsc --noEmit` clean; `CMS_DEV_SUPERADMIN=0
+  npx opennextjs-cloudflare build` + `wrangler deploy --dry-run` green. LIVE
+  smoke via `wrangler dev` (local D1 en/fi/ro-ro/es; terms page given
+  fi:"ehdot" + cache_max_age 3600): `/fi/ehdot` → 200 with
+  `Cache-Control: public,max-age=3600,SWR` + `Cache-Tag: pages,page:<terms-id>`;
+  `/fi/terms` → 404; `/ehdot` → 404; `/terms` → 200 + stamped; `/fi/search`
+  (no override) → 200. Fixture reset, dev killed.
+- **Files:** CMS/src/lib/render/slug.ts, slug.test.ts, resolve-page.ts,
+  load-plan.ts, CMS/worker.ts

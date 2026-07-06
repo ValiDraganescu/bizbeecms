@@ -46,12 +46,13 @@ export default {
       }
       const db = cfDb(env.DB);
       const contentLocales = await getContentLocales(db);
-      const { rest } = peelLocaleSegment(
+      const { locale, rest } = peelLocaleSegment(
         pathnameSegments(new URL(request.url).pathname),
         contentLocales.locales,
         contentLocales.default,
       );
-      const resolved = await resolvePage(db, resolveSlugPath(rest));
+      // Stage 2: locale-aware walk — localized-slug URLs stamp the same tags.
+      const resolved = await resolvePage(db, resolveSlugPath(rest), locale);
       const headers = resolved
         ? edgeCacheHeaders(resolved.page.cacheMaxAge, resolved.page.id)
         : null;

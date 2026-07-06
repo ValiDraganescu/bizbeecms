@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import {
   peelLocaleSegment,
   resolveSlugPath,
+  matchSlugSegment,
+  effectiveSlug,
   HOME_SLUG,
 } from "./slug.ts";
 
@@ -90,4 +92,69 @@ test("wildcard-style deep paths keep their segments after a peel", () => {
     peelLocaleSegment(["fi", "city", "helsinki"], LOCALES, DEFAULT),
     { locale: "fi", rest: ["city", "helsinki"] },
   );
+});
+
+// ── Stage 2: locale-aware matching (localizedSlugs[locale] ?? slug) ─────────
+
+const about = { slug: "about", localizedSlugs: '{"fi":"meista","et":"meist"}' };
+const contact = { slug: "contact", localizedSlugs: "{}" };
+const city = { slug: ":city-slug", localizedSlugs: "{}" };
+
+test("effectiveSlug: override wins in its locale, default slug elsewhere", () => {
+  assert.equal(effectiveSlug(about, "fi"), "meista");
+  assert.equal(effectiveSlug(about, "et"), "meist");
+  assert.equal(effectiveSlug(about, "en"), "about");
+  assert.equal(effectiveSlug(about, undefined), "about");
+});
+
+test("effectiveSlug: locale lookup is lowercased (keys stored lowercase)", () => {
+  assert.equal(effectiveSlug(about, "FI"), "meista");
+  assert.equal(effectiveSlug({ slug: "x", localizedSlugs: '{"ro-ro":"y"}' }, "RO-RO"), "y");
+});
+
+test("effectiveSlug: wildcard pages are locale-agnostic — overrides ignored", () => {
+  const wild = { slug: ":city-slug", localizedSlugs: '{"fi":"kaupunki"}' };
+  assert.equal(effectiveSlug(wild, "fi"), ":city-slug");
+});
+
+test("effectiveSlug: malformed/missing/empty stored maps fall back to slug", () => {
+  assert.equal(effectiveSlug({ slug: "a", localizedSlugs: "not json" }, "fi"), "a");
+  assert.equal(effectiveSlug({ slug: "a", localizedSlugs: null }, "fi"), "a");
+  assert.equal(effectiveSlug({ slug: "a" }, "fi"), "a");
+  assert.equal(effectiveSlug({ slug: "a", localizedSlugs: '{"fi":""}' }, "fi"), "a");
+  assert.equal(effectiveSlug({ slug: "a", localizedSlugs: '{"fi":42}' }, "fi"), "a");
+  assert.equal(effectiveSlug({ slug: "a", localizedSlugs: '"str"' }, "fi"), "a");
+});
+
+test("matchSlugSegment: localized slug resolves in its locale", () => {
+  const siblings = [about, contact];
+  assert.deepEqual(matchSlugSegment(siblings, "meista", "fi"), { page: about });
+  // no fi override on contact → default slug still matches in fi
+  assert.deepEqual(matchSlugSegment(siblings, "contact", "fi"), { page: contact });
+});
+
+test("matchSlugSegment: default slug does NOT match where an override exists (one canonical URL per locale)", () => {
+  assert.equal(matchSlugSegment([about], "about", "fi"), null);
+  // …and the override does not leak into other locales
+  assert.equal(matchSlugSegment([about], "meista", "en"), null);
+  assert.equal(matchSlugSegment([about], "meista"), null);
+});
+
+test("matchSlugSegment: wildcard fallback still captures params in any locale", () => {
+  const siblings = [about, city];
+  assert.deepEqual(matchSlugSegment(siblings, "helsinki", "fi"), {
+    page: city,
+    param: { name: "city-slug", value: "helsinki" },
+  });
+  // exact localized match beats the wildcard
+  assert.deepEqual(matchSlugSegment(siblings, "meista", "fi"), { page: about });
+});
+
+test("matchSlugSegment: legacy no-locale calls behave as before", () => {
+  const siblings = [about, contact, city];
+  assert.deepEqual(matchSlugSegment(siblings, "about"), { page: about });
+  assert.deepEqual(matchSlugSegment(siblings, "nope", "fi"), {
+    page: city,
+    param: { name: "city-slug", value: "nope" },
+  });
 });

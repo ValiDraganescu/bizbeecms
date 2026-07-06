@@ -112,3 +112,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   JSON keys). The AI create_page path (`upsertPage`) never writes localizedSlugs, but a NEW
   AI page's default slug can still collide with a sibling's override in some locale — the
   backlog has a TODO to wire localizedSlugSiblingConflicts there too.
+- Locale-aware walk semantics (DELIBERATE): in locale L only the EFFECTIVE slug matches —
+  where an override exists the default slug 404s in that locale, and the override 404s in
+  every other locale (one canonical URL per locale, no duplicate-content aliases). Don't
+  "fix" by matching both. `effectiveSlug`/`matchSlugSegment` take the RAW stored JSON text
+  (`localizedSlugs?: string | null`), not a parsed map — Page rows carry TEXT; parse cost
+  per sibling is trivial and keeps callers alloc-free.
+- Until the reverse-resolve task lands, setting a localized slug BREAKS prefix-only
+  rewrites for that page: switcher/localize-links/hreflang/sitemap still emit
+  `/fi/<default-slug>` which now 404s. That's why reverse-resolution is the immediate
+  next task — don't ship a release with operator-visible localized-slug inputs live
+  before it lands.

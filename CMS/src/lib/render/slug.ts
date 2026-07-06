@@ -89,21 +89,53 @@ export function paramName(slug: string): string {
 /** A page row shape the pure matcher needs (real `Page` rows satisfy this). */
 export interface SlugCandidate {
   slug: string;
+  /**
+   * Raw `page.localized_slugs` JSON text (locale → slug override), as stored.
+   * Optional so plain fixtures / legacy callers don't need it.
+   */
+  localizedSlugs?: string | null;
+}
+
+/**
+ * Stage 2 (localized slugs): the slug a page answers to in `locale` —
+ * `localizedSlugs[locale] ?? slug`. Wildcard (":param") pages are
+ * LOCALE-AGNOSTIC and always keep their default slug (validatePageMeta also
+ * rejects wildcard override values). Override keys are stored lowercased, so
+ * the locale is lowercased for the lookup. Malformed JSON / non-string /
+ * empty override values fall back to the default slug (best-effort — a bad
+ * stored map must never 404 the default chain).
+ */
+export function effectiveSlug(candidate: SlugCandidate, locale?: string): string {
+  if (!locale || isParamSlug(candidate.slug)) return candidate.slug;
+  const raw = candidate.localizedSlugs;
+  if (!raw) return candidate.slug;
+  try {
+    const map: unknown = JSON.parse(raw);
+    if (typeof map !== "object" || map === null) return candidate.slug;
+    const v = (map as Record<string, unknown>)[locale.toLowerCase()];
+    return typeof v === "string" && v.length > 0 ? v : candidate.slug;
+  } catch {
+    return candidate.slug;
+  }
 }
 
 /**
  * Pick which SIBLING page matches one path segment: an EXACT slug match wins;
  * otherwise the first sibling whose slug is a WILDCARD (":name") matches, and
  * the concrete segment is the captured param value. Returns `null` if neither
- * matches. PURE — the D1 fetch of `siblings` stays in the route (`resolvePage`
- * in `[[...slug]]/page.tsx`); this is just the per-level decision, unit-tested
- * in isolation from D1.
+ * matches. With `locale` (Stage 2), the exact match runs against the page's
+ * EFFECTIVE slug in that locale (`localizedSlugs[locale] ?? slug`) — when an
+ * override exists, ONLY the override matches (the default slug 404s in that
+ * locale: one canonical URL per locale). PURE — the D1 fetch of `siblings`
+ * stays in `resolvePage`; this is just the per-level decision, unit-tested in
+ * isolation from D1.
  */
 export function matchSlugSegment<T extends SlugCandidate>(
   siblings: T[],
   segment: string,
+  locale?: string,
 ): { page: T; param?: { name: string; value: string } } | null {
-  const exact = siblings.find((p) => p.slug === segment);
+  const exact = siblings.find((p) => effectiveSlug(p, locale) === segment);
   if (exact) return { page: exact };
   const wildcard = siblings.find((p) => isParamSlug(p.slug));
   if (!wildcard) return null;

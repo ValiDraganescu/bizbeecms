@@ -32,7 +32,7 @@ export async function loadPlan(params: RouteParams, query: Record<string, string
     contentLocales.default,
   );
   const path = resolveSlugPath(rest);
-  const resolved = await resolvePage(db, path);
+  const resolved = await resolvePage(db, path, activeLocale);
   if (!resolved) return null;
   const { page: pageRow, params: routeParams } = resolved;
   // Versioning slice 2: render the PUBLISHED version's blocks; legacy pages
