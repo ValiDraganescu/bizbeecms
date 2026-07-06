@@ -86,3 +86,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   off the execution context (getCloudflareContext().ctx), not env. Don't hunt for a missing binding.
 - The AI create_page tool / `upsertPage` (page-store) don't set cacheMaxAge — column default 0
   applies (AI-created pages start uncached). Intentional; revisit only if the user asks.
+- `CMS/worker.ts` must NEVER (transitively) import React/next-intl/`next/headers` — that's why
+  `resolvePage` (lean, drizzle+slug only) and `loadPlan` (full render stack) live in separate
+  modules (resolve-page.ts vs load-plan.ts). Adding a Next-coupled import to resolve-page.ts or
+  its deps breaks the custom worker bundle.
+- Use `@ts-ignore` (NOT `@ts-expect-error`) on the `./.open-next/worker.js` imports in worker.ts:
+  the module resolves after a build (expect-error → "unused directive" tsc failure) but is absent
+  on a clean checkout (no directive → cannot-find-module). @ts-ignore covers both states.
+- `.open-next/worker.js` DOES export DOQueueHandler/DOShardedTagCache/BucketCachePurge even with
+  the all-dummy open-next.config.ts — worker.ts must re-export all three or `wrangler deploy`
+  fails resolving the DO class bindings.
+- Header STAMPING is verifiable locally via `npx wrangler dev` (it runs the custom entrypoint +
+  local D1) — only the real hit/miss/purge behavior (cf-cache-status) needs a deployed site.
+- Live sites get worker.ts only via a new `r-*` release + redeploy (the deployer builds from the
+  release tag) — merely landing on main changes nothing deployed.

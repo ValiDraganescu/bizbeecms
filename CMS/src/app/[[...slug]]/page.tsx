@@ -6,7 +6,8 @@
  * React.createElement (a DATA WALK — never eval/Function, banned on Workers),
  * and ships each used component's client `script` as a <script> the BROWSER
  * runs. This route is a THIN caller — slug → page → plan resolution lives in
- * `lib/render/resolve-page.ts` (shared with the edge-cache worker entrypoint);
+ * `lib/render/load-plan.ts` (page walk in `resolve-page.ts`, shared with the
+ * edge-cache worker entrypoint `CMS/worker.ts`);
  * the pure walker is `lib/render/tree.ts`, slug matching `lib/render/slug.ts`.
  */
 import { notFound } from "next/navigation";
@@ -14,7 +15,7 @@ import type { Metadata } from "next";
 import { type LocaleContext, parseJsonColumn } from "@/lib/render/tree";
 import { resolveLocalized } from "@/lib/render/localize";
 import { RenderedPage } from "@/lib/render/render-page";
-import { loadPlan, type RouteParams } from "@/lib/render/resolve-page";
+import { loadPlan, type RouteParams } from "@/lib/render/load-plan";
 import { hreflangAlternates } from "@/lib/render/hreflang";
 import { resolveSiteOrigin } from "@/lib/render/site-origin";
 

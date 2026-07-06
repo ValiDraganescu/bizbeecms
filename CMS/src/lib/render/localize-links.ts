@@ -17,9 +17,10 @@ import type { ElementPlan, LocaleContext } from "./plan-types.ts";
 /**
  * First path segments that are NOT locale-routable pages — Worker/system routes
  * a locale prefix would break. `/media/…` is the R2 asset route (task spec);
- * the rest are the admin/app surfaces the edge-cache wrapper also excludes.
+ * the rest are the admin/app surfaces. Exported as the SINGLE source of truth
+ * shared with the edge-cache entrypoint's excluded-path list (`edge-cache.ts`).
  */
-const SKIP_SEGMENTS = new Set(["media", "api", "admin", "preview", "_next"]);
+export const SKIP_SEGMENTS = new Set(["media", "api", "admin", "preview", "_next"]);
 
 /** The first path segment of an absolute path, decoded + lowercased ("" for "/"). */
 function firstSegment(path: string): string {

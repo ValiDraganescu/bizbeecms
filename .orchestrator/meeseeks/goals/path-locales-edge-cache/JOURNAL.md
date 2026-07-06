@@ -154,3 +154,35 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/pages/page-meta.ts, page-meta.test.ts, page-picker.test.ts,
   CMS/src/db/page-store.ts, CMS/src/components/page-builder/page-settings.tsx,
   CMS/messages/{en,fi,et}.json
+
+## 2026-07-07 02:03 — Custom worker entrypoint stamps Cache-Control + Cache-Tag
+- **Status:** DONE
+- **What I did:** (1) New `CMS/worker.ts` set as wrangler `main` (OpenNext
+  documented pattern): wraps `.open-next/worker.js`'s default handler and
+  re-exports its DO classes (DOQueueHandler/DOShardedTagCache/BucketCachePurge —
+  the build emits them even with dummy caches). After the handler returns, a
+  pure gate (`isEdgeCacheCandidate`) rejects non-GET/non-200/Set-Cookie/system
+  paths for free; survivors get ONE extra D1 lookup (getContentLocales →
+  peelLocaleSegment → resolvePage — the same walk the route uses) and, when
+  `cache_max_age > 0`, the response is re-wrapped with `Cache-Control: public,
+  max-age=<n>, stale-while-revalidate=86400` + `Cache-Tag: pages,page:<id>`.
+  All best-effort (try/catch → untouched response). (2) New pure
+  `lib/render/edge-cache.ts` (pathnameSegments / isEdgeCacheCandidate /
+  edgeCacheHeaders / pageCacheTag / PAGES_CACHE_TAG); SKIP_SEGMENTS now
+  EXPORTED from localize-links.ts — one shared skip list, no drift.
+  (3) Split `resolve-page.ts`: `loadPlan` moved to new `lib/render/load-plan.ts`
+  (React/next-intl/next-headers side); resolve-page.ts is now lean
+  (drizzle + slug only, takes `Db`) so the worker bundle never imports Next
+  internals. page.tsx imports loadPlan from load-plan.
+- **Verified:** 8 new dep-free node --test cases; full `npm test` 1640/0;
+  `npx tsc --noEmit` clean; `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare
+  build` green; `wrangler deploy --dry-run` bundles worker.ts (tsconfig `@/`
+  paths resolve; DO exports + SWR string present in the bundle). LIVE smoke via
+  `wrangler dev` (local D1, home page set cache_max_age=3600): `/` and `/fi` →
+  stamped public,max-age=3600,SWR + `Cache-Tag: pages,page:<home-id>`;
+  opted-out page + 404 + /admin keep Next's no-store. Fixture reset to 0;
+  wrangler dev killed. Real hit/miss (cf-cache-status) remains HITL post-deploy.
+- **Files:** CMS/worker.ts (new), CMS/wrangler.jsonc,
+  CMS/src/lib/render/edge-cache.ts (new), edge-cache.test.ts (new),
+  load-plan.ts (new), resolve-page.ts, localize-links.ts,
+  CMS/src/app/[[...slug]]/page.tsx
