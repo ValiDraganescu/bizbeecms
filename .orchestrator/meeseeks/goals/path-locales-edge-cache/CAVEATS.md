@@ -100,3 +100,8 @@ Read every line before working. Each entry was learned the hard way by a previou
   local D1) — only the real hit/miss/purge behavior (cf-cache-status) needs a deployed site.
 - Live sites get worker.ts only via a new `r-*` release + redeploy (the deployer builds from the
   release tag) — merely landing on main changes nothing deployed.
+- Purge wiring is DELIBERATELY partial: page CREATE and version RESTORE don't purge (nothing
+  cached yet / restore only makes a draft), and page-meta PUT purges only `page:<id>` (a slug
+  change is covered — the tag is by id, not URL). `purgeEdgeTags` (lib/render/purge-edge.ts)
+  is the ONLY CF-coupled purge call site; the pure best-effort logic is `purgeCacheTags` in
+  edge-cache.ts. Don't add a second getCloudflareContext purge path.

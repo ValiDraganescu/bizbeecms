@@ -15,6 +15,8 @@
  */
 import { getSiteIdentity, setSiteIdentity } from "@/db/settings-store";
 import { requireAdmin } from "@/lib/auth/guard";
+import { PAGES_CACHE_TAG } from "@/lib/render/edge-cache";
+import { purgeEdgeTags } from "@/lib/render/purge-edge";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +46,11 @@ export async function PUT(request: Request): Promise<Response> {
   // setSiteIdentity normalizes (trims/clamps/drops unknown keys), so the client
   // adopts the normalized truth from the response.
   try {
-    return Response.json(await setSiteIdentity(body));
+    const saved = await setSiteIdentity(body);
+    // Brand identity feeds published renders (e.g. brand name) — blast the
+    // shared pages tag. Best-effort.
+    await purgeEdgeTags(PAGES_CACHE_TAG);
+    return Response.json(saved);
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to save site identity" },

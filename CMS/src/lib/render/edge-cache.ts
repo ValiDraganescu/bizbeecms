@@ -65,6 +65,29 @@ export function isEdgeCacheCandidate(input: {
   return true;
 }
 
+/** Minimal shape of the Workers Cache handle (`ctx.cache`) that purge needs. */
+export type TagPurger = {
+  purge: (options: { tags: string[] }) => unknown;
+};
+
+/**
+ * Best-effort tag purge: NEVER throws, never rejects. `cache` may be absent
+ * (local dev, plain `next dev`) and `purge` may throw — a purge failure must
+ * never fail the admin write that triggered it (goal requirement). Returns
+ * whether the purge call completed, for tests/logging only.
+ */
+export async function purgeCacheTags(cache: unknown, tags: string[]): Promise<boolean> {
+  if (tags.length === 0) return false;
+  const purge = (cache as Partial<TagPurger> | null | undefined)?.purge;
+  if (typeof purge !== "function") return false;
+  try {
+    await purge.call(cache, { tags });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The headers to stamp for an opted-in page, or null when the page's
  * `cache_max_age` is 0/invalid (0 = never cache, the column default).

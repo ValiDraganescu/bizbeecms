@@ -26,6 +26,8 @@ import {
   setThemeOverridesDark,
 } from "@/db/settings-store";
 import { requireAdmin } from "@/lib/auth/guard";
+import { PAGES_CACHE_TAG } from "@/lib/render/edge-cache";
+import { purgeEdgeTags } from "@/lib/render/purge-edge";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +63,10 @@ export async function PUT(request: Request): Promise<Response> {
   // truth from the response.
   try {
     const write = isDark(request) ? setThemeOverridesDark : setThemeOverrides;
-    return Response.json(await write(body));
+    const saved = await write(body);
+    // Theme colors restyle EVERY published page — blast the shared tag. Best-effort.
+    await purgeEdgeTags(PAGES_CACHE_TAG);
+    return Response.json(saved);
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to save theme overrides" },

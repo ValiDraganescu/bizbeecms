@@ -35,6 +35,8 @@ import {
   parseCss2,
 } from "@/lib/settings/google-fonts";
 import { requireAdmin } from "@/lib/auth/guard";
+import { PAGES_CACHE_TAG } from "@/lib/render/edge-cache";
+import { purgeEdgeTags } from "@/lib/render/purge-edge";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +97,10 @@ export async function PUT(request: Request): Promise<Response> {
     for (const family of families) {
       faces.push(...(await resolveFamilyFaces(family, current.faces)));
     }
-    return Response.json(await setThemeFonts({ slots, faces }));
+    const saved = await setThemeFonts({ slots, faces });
+    // Theme fonts restyle EVERY published page — blast the shared tag. Best-effort.
+    await purgeEdgeTags(PAGES_CACHE_TAG);
+    return Response.json(saved);
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to save theme fonts" },

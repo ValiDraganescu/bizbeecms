@@ -10,6 +10,7 @@ import {
   isEdgeCacheCandidate,
   edgeCacheHeaders,
   pageCacheTag,
+  purgeCacheTags,
   STALE_WHILE_REVALIDATE,
 } from "./edge-cache.ts";
 import { SKIP_SEGMENTS } from "./localize-links.ts";
@@ -73,6 +74,30 @@ test("opted-in page gets public max-age + SWR and the pages,page:<id> tags", () 
     cacheTag: "pages,page:p-1",
   });
   assert.equal(pageCacheTag("p-1"), "page:p-1");
+});
+
+// ── purgeCacheTags ───────────────────────────────────────────────────────────
+
+test("purgeCacheTags calls purge with the tags and reports success", async () => {
+  const calls: string[][] = [];
+  const cache = { purge: (o: { tags: string[] }) => void calls.push(o.tags) };
+  assert.equal(await purgeCacheTags(cache, ["pages", "page:p-1"]), true);
+  assert.deepEqual(calls, [["pages", "page:p-1"]]);
+});
+
+test("purgeCacheTags is best-effort: every failure mode returns false, never throws", async () => {
+  assert.equal(await purgeCacheTags(undefined, ["pages"]), false); // no ctx.cache (local dev)
+  assert.equal(await purgeCacheTags(null, ["pages"]), false);
+  assert.equal(await purgeCacheTags({}, ["pages"]), false); // cache without purge
+  assert.equal(
+    await purgeCacheTags({ purge: () => { throw new Error("boom"); } }, ["pages"]),
+    false,
+  );
+  assert.equal(
+    await purgeCacheTags({ purge: () => Promise.reject(new Error("boom")) }, ["pages"]),
+    false,
+  );
+  assert.equal(await purgeCacheTags({ purge: () => {} }, []), false); // nothing to purge
 });
 
 test("cache_max_age 0 (the default) and invalid values yield null (never cache)", () => {

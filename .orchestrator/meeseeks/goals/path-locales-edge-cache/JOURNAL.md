@@ -186,3 +186,24 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/render/edge-cache.ts (new), edge-cache.test.ts (new),
   load-plan.ts (new), resolve-page.ts, localize-links.ts,
   CMS/src/app/[[...slug]]/page.tsx
+
+## 2026-07-07 02:09 — Purge wiring: writes bust the edge cache (last Edge-caching TODO)
+- **Status:** DONE
+- **What I did:** Added pure `purgeCacheTags(cache, tags)` + `TagPurger` type to
+  `lib/render/edge-cache.ts` (best-effort: missing cache / missing purge / throwing purge /
+  empty tags all → false, never throws) and a CF-coupled wrapper `lib/render/purge-edge.ts`
+  (`purgeEdgeTags(...tags)` → `getCloudflareContext().ctx.cache`, swallows missing-context).
+  Wired 7 routes: per-page tag (`pageCacheTag(id)`) on POST /api/pages/[id]/publish, PUT
+  /api/pages (meta updates incl. the unpublish toggle; creates skipped), DELETE /api/pages;
+  shared `PAGES_CACHE_TAG` on theme colors PUT, theme fonts PUT, brand PUT, content-locales
+  PUT, and component publish (only when `res.published`). Restore route deliberately NOT
+  wired (it only creates a draft). All purges run AFTER the successful write, before the
+  response.
+- **Verified:** 2 new node --test cases for purgeCacheTags; full suite 1642/1642 green;
+  `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` green; `wrangler deploy --dry-run`
+  green. Real tag-purge behavior (cf-cache-status flips MISS after publish) is HITL on a
+  deployed site per CAVEATS.
+- **Files:** CMS/src/lib/render/edge-cache.ts, CMS/src/lib/render/purge-edge.ts (new),
+  CMS/src/lib/render/edge-cache.test.ts, CMS/src/app/api/pages/route.ts,
+  CMS/src/app/api/pages/[id]/publish/route.ts, CMS/src/app/api/components/[name]/route.ts,
+  CMS/src/app/api/settings/{theme,theme/fonts,brand,content-locales}/route.ts

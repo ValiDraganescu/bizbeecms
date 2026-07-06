@@ -23,6 +23,8 @@ import {
   publishComponentDraft,
   discardComponentDraft,
 } from "@/db/component-store";
+import { PAGES_CACHE_TAG } from "@/lib/render/edge-cache";
+import { purgeEdgeTags } from "@/lib/render/purge-edge";
 
 export async function PUT(
   request: Request,
@@ -115,6 +117,9 @@ export async function POST(
   try {
     if (action === "publish") {
       const res = await publishComponentDraft(name);
+      // A published component re-renders every page that uses it — blast the
+      // shared pages tag (only when something actually went live). Best-effort.
+      if (res.published) await purgeEdgeTags(PAGES_CACHE_TAG);
       return Response.json({ action: "publish", published: res.published, name });
     }
     const res = await discardComponentDraft(name);

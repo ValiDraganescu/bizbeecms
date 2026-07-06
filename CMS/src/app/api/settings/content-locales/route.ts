@@ -16,6 +16,8 @@ import { getContentLocales, setContentLocales } from "@/db/settings-store";
 import { listPages } from "@/db/page-store";
 import { localeSlugConflicts, normalizeContentLocales } from "@/lib/render/localize";
 import { requireAdmin } from "@/lib/auth/guard";
+import { PAGES_CACHE_TAG } from "@/lib/render/edge-cache";
+import { purgeEdgeTags } from "@/lib/render/purge-edge";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +68,11 @@ export async function PUT(request: Request): Promise<Response> {
         { status: 409 },
       );
     }
-    return Response.json(await setContentLocales(normalized));
+    const saved = await setContentLocales(normalized);
+    // Locale set changes every page's hreflang alternates + LanguageSwitcher —
+    // blast the shared pages tag. Best-effort.
+    await purgeEdgeTags(PAGES_CACHE_TAG);
+    return Response.json(saved);
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to save content locales" },

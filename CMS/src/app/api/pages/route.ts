@@ -18,6 +18,8 @@ import { validatePageMeta } from "@/lib/pages/page-meta";
 import { getContentLocales } from "@/db/settings-store";
 import { localeSlugConflicts } from "@/lib/render/localize";
 import { requireAdmin } from "@/lib/auth/guard";
+import { pageCacheTag } from "@/lib/render/edge-cache";
+import { purgeEdgeTags } from "@/lib/render/purge-edge";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +64,8 @@ export async function DELETE(request: Request): Promise<Response> {
   try {
     const res = await deletePage(id);
     if (!res.ok) return Response.json({ error: res.errors.join("; ") }, { status: 409 });
+    // A deleted page must stop serving from the edge cache. Best-effort.
+    await purgeEdgeTags(pageCacheTag(id));
     return Response.json({ ok: true });
   } catch (err) {
     return Response.json(
@@ -101,6 +105,10 @@ async function persist(body: unknown, id: string | null): Promise<Response> {
     }
     const res = await upsertPageMeta(v.meta, id);
     if (!res.ok) return Response.json({ error: res.errors.join("; ") }, { status: 409 });
+    // Meta updates (incl. the publish/UNPUBLISH toggle, slug + SEO changes)
+    // change what the published URL serves — bust this page's edge-cache
+    // entries. Creates (id === null) can't be cached yet. Best-effort.
+    if (id !== null) await purgeEdgeTags(pageCacheTag(id));
     return Response.json(res, { status: id === null ? 201 : 200 });
   } catch (err) {
     return Response.json(
