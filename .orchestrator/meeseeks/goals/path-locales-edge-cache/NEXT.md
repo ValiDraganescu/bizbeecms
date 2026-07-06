@@ -1,23 +1,23 @@
 # Note to the next Meeseeks (path-locales-edge-cache)
 
-Run 5 done: internal hrefs now carry the locale prefix on non-default renders.
-Pure post-pass `localizePlanLinks` (lib/render/localize-links.ts, 13 tests) wired as
-the LAST step of `planPage` in tree.ts. Covers all href origins (props, defaults,
-bindings, List rows, static tree hrefs). Skips /media,/api,/admin,/preview,/_next
-(segment-exact), externals, and already-prefixed paths. "/" → "/fi" (no trailing
-slash — avoids a 308).
+Run 6 done: **Stage 1 is COMPLETE.** SEO landed — canonical + hreflang alternates in
+`[[...slug]]/page.tsx` generateMetadata (pure `lib/render/hreflang.ts`, 11 tests) and a
+public `app/sitemap.ts` (published pages × locales, pure `lib/render/sitemap-paths.ts`,
+7 tests). `lib/render/site-origin.ts` resolves the absolute origin (APP_ORIGIN first —
+request host is workers.dev behind the router proxy).
 
-**Take next: the LAST Stage-1 task — SEO.**
-hreflang alternates + canonical in `[[...slug]]/page.tsx` generateMetadata for every
-configured locale (default unprefixed, others /code/...; use getContentLocales +
-the resolved slug chain), PLUS a public `sitemap.ts` emitting published pages ×
-locales (no public sitemap exists — only admin views). Note `localized` metadata
-helper already lives in page.tsx; resolvePage/loadPlan in lib/render/resolve-page.ts.
-Skip `:param` wildcard pages in the sitemap (no enumerable URLs).
+**Take next: first edge-caching task** — enable Workers Cache:
+add `"cache": { "enabled": true }` to CMS/wrangler.jsonc (wrangler 4.101 ≥ 4.69 ok),
+re-run cf-typegen so `ctx.cache` is typed, verify the deploy-gate build, and comment the
+static-asset billing change next to the config key. Small task — consider pairing it with
+the `page.cache_max_age` Drizzle migration task if it stays one clean slice (Drizzle-only:
+edit schema.ts → `npm run db:generate` → `wrangler d1 migrations apply --local`).
 
-After that: edge-caching track, in backlog order (wrangler `"cache"` flag first).
+Then in backlog order: custom worker entrypoint (reuse `resolvePage` from
+lib/render/resolve-page.ts; keep its excluded-path list in sync with localize-links'
+SKIP_SEGMENTS {media,api,admin,preview,_next}), then purge wiring.
 
-Gotchas: deploy gate = `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`, never
-while dev runs. Dev server was NOT running when I woke; I started/killed my own
-(port 3602). Local D1 locales: en(default)/fi/ro-ro/es. /about 404s in BOTH locales
-on local data — dangling operator link, pre-existing, not a bug in prefixing.
+Gotchas: deploy gate = `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`, NEVER while
+dev runs. Dev was NOT running when I woke; started/killed my own (port 3602). sitemap.ts
+needs `dynamic = "force-dynamic"` (already there — don't remove). Edge cache hit/miss is
+only verifiable on a deployed site (cf-cache-status) — assert headers in unit tests.

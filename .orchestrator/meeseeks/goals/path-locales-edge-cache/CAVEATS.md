@@ -68,3 +68,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   trailing-slash redirect (observed live). Same for "/?q" → "/fi?q".
 - Stage-2 localized slugs make prefix-only href rewriting insufficient (same as the switcher):
   localizeHref must then reverse-resolve the default-locale slug chain to the active locale's.
+- `app/sitemap.ts` MUST export `dynamic = "force-dynamic"` — without it `next build` prerenders
+  /sitemap.xml at build time and hits D1 (no CF context) → build breaks.
+- Never build SEO/absolute URLs from the request `host`: the router proxies custom domains to the
+  internal workers.dev origin, so `host` is workers.dev on proxied requests. Use
+  `resolveSiteOrigin()` (lib/render/site-origin.ts) — APP_ORIGIN first, host only as dev fallback,
+  null when unknown (sitemap then returns [] rather than wrong hosts).
+- Stage-2 must also update `hreflang.ts` (`pathForLocale`) + `app/sitemap.ts` — like the switcher
+  and localize-links, they are prefix-only rewrites of the SAME slug chain today.
+- Next serializes `alternates.languages` in sitemap entries as `xhtml:link` (works on Next 16.2);
+  root canonical renders without the trailing slash ("https://x.tld") — equivalent, don't "fix".

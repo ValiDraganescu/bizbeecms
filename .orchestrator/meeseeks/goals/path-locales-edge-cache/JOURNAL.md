@@ -102,3 +102,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` green.
 - **Files:** CMS/src/lib/render/localize-links.ts (new),
   CMS/src/lib/render/localize-links.test.ts (new), CMS/src/lib/render/tree.ts
+
+## 2026-07-07 01:41 — SEO: hreflang alternates + canonical + public sitemap.xml
+- **Status:** DONE (closes Stage 1)
+- **What I did:** New pure `lib/render/hreflang.ts` (`pathForLocale` +
+  `hreflangAlternates`: canonical = the request's own locale variant,
+  languages = every configured code + x-default → default unprefixed path;
+  empty when only one locale; reuses `peelLocaleSegment`; segments normalized
+  decode→re-encode; root → "/" / "/fi" no trailing slash). New pure
+  `lib/render/sitemap-paths.ts` (`publishedPagePaths`: parent-chain walk,
+  leaf-only publish gate matching resolvePage, skips `:param` chains /
+  dangling parents / cycles, top-level HOME_SLUG → root). New
+  `lib/render/site-origin.ts` (`resolveSiteOrigin`: APP_ORIGIN first — request
+  host is workers.dev under the router proxy — fallback to headers in dev,
+  null when unknown). Wired `generateMetadata` in `[[...slug]]/page.tsx`
+  (metadataBase + alternates.canonical/languages) and added
+  `app/sitemap.ts` (`dynamic = "force-dynamic"`, published pages × locales
+  with per-entry xhtml:link alternates, sorted; empty when origin unknown).
+- **Verified:** 18 new dep-free node --test cases; full `npm test` 1627/0;
+  `npx tsc --noEmit` clean; live dev smoke (local D1 en/fi/ro-ro/es):
+  `/` + `/fi` + `/fi/contact` emit correct canonical + 5 hreflang links
+  (x-default = unprefixed), sitemap.xml = 36 urls (9 pages × 4 locales) with
+  xhtml:link alternates, zero `:param` URLs; `CMS_DEV_SUPERADMIN=0 npx
+  opennextjs-cloudflare build` green (started/killed my own dev server).
+- **Files:** CMS/src/lib/render/hreflang.ts (new), hreflang.test.ts (new),
+  sitemap-paths.ts (new), sitemap-paths.test.ts (new), site-origin.ts (new),
+  CMS/src/app/sitemap.ts (new), CMS/src/app/[[...slug]]/page.tsx

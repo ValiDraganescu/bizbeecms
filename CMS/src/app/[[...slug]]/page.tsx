@@ -15,6 +15,8 @@ import { type LocaleContext, parseJsonColumn } from "@/lib/render/tree";
 import { resolveLocalized } from "@/lib/render/localize";
 import { RenderedPage } from "@/lib/render/render-page";
 import { loadPlan, type RouteParams } from "@/lib/render/resolve-page";
+import { hreflangAlternates } from "@/lib/render/hreflang";
+import { resolveSiteOrigin } from "@/lib/render/site-origin";
 
 /** Resolve a per-locale JSON map (e.g. metaTitle) to the active locale w/ fallback. */
 function localized(raw: string, locale: LocaleContext): string | undefined {
@@ -46,14 +48,27 @@ export async function generateMetadata({
   params: Promise<RouteParams>;
   searchParams: Promise<SearchParams>;
 }): Promise<Metadata> {
-  const loaded = await loadPlan(await params, flattenSearchParams(await searchParams));
+  const { slug } = await params;
+  const loaded = await loadPlan({ slug }, flattenSearchParams(await searchParams));
   if (!loaded) return {};
   const title = localized(loaded.page.metaTitle, loaded.locale);
   const description = localized(loaded.page.metaDescription, loaded.locale);
   const image = localized(loaded.page.metaImage, loaded.locale);
+  // SEO (Stage 1): canonical + hreflang alternates across the configured
+  // content locales — same slug chain, default unprefixed, others /<code>/….
+  // metadataBase (APP_ORIGIN) absolutizes them; without a known origin Next
+  // falls back to the request-derived default, fine for local dev.
+  const codes = loaded.locale.available?.map((l) => l.code) ?? [loaded.locale.fallback];
+  const { canonical, languages } = hreflangAlternates(slug, codes, loaded.locale.fallback);
+  const origin = await resolveSiteOrigin();
   return {
     title,
     description,
+    metadataBase: origin ? new URL(origin) : undefined,
+    alternates: {
+      canonical,
+      languages: Object.keys(languages).length > 0 ? languages : undefined,
+    },
     // OpenGraph image, resolved per active locale (falls back like title/desc).
     openGraph: image ? { images: [{ url: image }] } : undefined,
   };
