@@ -20,6 +20,11 @@ import { localeSlugConflicts } from "@/lib/render/localize";
 import { requireAdmin } from "@/lib/auth/guard";
 import { PAGES_CACHE_TAG, pageCacheTag } from "@/lib/render/edge-cache";
 import { purgeEdgeTags } from "@/lib/render/purge-edge";
+import {
+  collectPageUrls,
+  notifyIndexNowForPage,
+  notifyIndexNowUrls,
+} from "@/lib/render/indexnow-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -62,10 +67,15 @@ export async function DELETE(request: Request): Promise<Response> {
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return Response.json({ error: "id query param is required" }, { status: 400 });
   try {
+    // Capture the page's URLs BEFORE deleting — the row (and its path chain) is
+    // gone afterwards. Best-effort; [] on any problem.
+    const urls = await collectPageUrls(id);
     const res = await deletePage(id);
     if (!res.ok) return Response.json({ error: res.errors.join("; ") }, { status: 409 });
     // A deleted page must stop serving from the edge cache. Best-effort.
     await purgeEdgeTags(pageCacheTag(id));
+    // Tell IndexNow the URLs are gone (best-effort, non-blocking).
+    notifyIndexNowUrls(urls);
     return Response.json({ ok: true });
   } catch (err) {
     return Response.json(
@@ -118,6 +128,11 @@ async function persist(body: unknown, id: string | null): Promise<Response> {
       await purgeEdgeTags(
         ...(res.pathChanged ? [PAGES_CACHE_TAG, pageCacheTag(id)] : [pageCacheTag(id)]),
       );
+      // Content/URL of an existing page changed (publish toggle, slug/SEO edit) —
+      // tell IndexNow to recrawl its (possibly new) URLs. Best-effort, non-blocking.
+      // Old URLs on a RENAME are handled later by 301 redirects (backlog); this
+      // submits the new URLs so engines pick up the moved page.
+      await notifyIndexNowForPage(id);
     }
     return Response.json(res, { status: id === null ? 201 : 200 });
   } catch (err) {

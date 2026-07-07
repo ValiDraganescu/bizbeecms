@@ -27,3 +27,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
     bumping any page's updatedAt — inherent to lastmod-per-row, not worth a usage-graph walk.
 - **Verified:** new tests fail before fix, pass after; full `npm test` 1690/1690; `npx tsc --noEmit` clean.
 - **Files:** CMS/src/lib/render/edge-cache.ts, CMS/src/lib/render/edge-cache.test.ts
+
+## 2026-07-07 10:50 — IndexNow notify on content change (Sitemap track #2)
+- **Status:** DONE
+- **What I did:** Best-effort IndexNow submission on page publish/unpublish/delete/rename.
+  - **Pure core** `lib/render/indexnow.ts` (dep-free, node-tested): `isValidIndexNowKey`
+    (8–128 `[a-zA-Z0-9-]`), `generateIndexNowKey` (32 hex via WebCrypto, injectable RNG),
+    `buildSubmission` (POST body `{host,key,keyLocation,urlList}`; dedupes, drops foreign
+    hosts, null on bad key/origin/empty), `pageUrlsAllLocales` (one page's absolute URLs
+    across all content locales via the SAME `pagePathsByLocale`+translator the sitemap uses
+    → URLs match sitemap exactly; [] for wildcard/unreconstructible). `INDEXNOW_KEY_PATH`.
+  - **Key storage** `db/settings-store.ts` `getIndexNowKey`: generate-once-and-persist
+    (settings key `indexnow_key`); invalid stored value → regenerate.
+  - **Key file route** `app/indexnow-key/route.ts` (force-dynamic, text/plain, no-store) —
+    serves the key at the FIXED `/indexnow-key` path. WHY fixed not `/<key>.txt`: Next's
+    root optional-catch-all `(site)/[[...slug]]` owns `/<anything>`, so a dynamic `/[key].txt`
+    route collides. IndexNow spec permits any `keyLocation` on the host → fixed path is fine.
+  - **Best-effort notify** `lib/render/indexnow-notify.ts` (CF-coupled fetch shell, mirrors
+    purge-edge.ts): `submitIndexNowUrls`, `collectPageUrls`, `notifyIndexNowForPage`,
+    `notifyIndexNowUrls`. Uses `ctx.waitUntil` so the POST never blocks the admin response;
+    every failure mode → false/no-op, never throws.
+  - **Wiring:** publish route (after purge), pages PUT (after purge, existing-page updates —
+    unpublish/rename/SEO edit → recrawl new URLs), pages DELETE (capture URLs BEFORE delete).
+  - Did NOT ping Google (retired 2023; caveat). Rename submits NEW URLs; OLD-URL handling is
+    the 301-redirects task (backlog) — noted inline + in NEXT.
+- **Verified:** 9 new pure tests (indexnow.test.ts) pass; full `npm test` 1699/1699 (was 1690);
+  `npx tsc --noEmit` clean. Did NOT run opennext build (heavy pre-commit gate; route mirrors
+  proven sitemap.ts force-dynamic pattern) nor live-submit (needs deployed origin+key — HITL).
+- **Files:** CMS/src/lib/render/indexnow.ts (+ .test.ts), CMS/src/lib/render/indexnow-notify.ts,
+  CMS/src/app/indexnow-key/route.ts, CMS/src/db/settings-store.ts,
+  CMS/src/app/api/pages/route.ts, CMS/src/app/api/pages/[id]/publish/route.ts

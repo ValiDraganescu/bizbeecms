@@ -26,3 +26,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   version-store writes stop bumping without checking the admin pages list; a real fix needs a
   separate live-content timestamp. Component/theme/brand publishes change rendered HTML without
   bumping any page.updatedAt — known lastmod gap, accepted.
+
+- (2026-07-07) The root optional-catch-all `(site)/[[...slug]]/page.tsx` owns `/<anything>`,
+  so you CANNOT add a Next route with a DYNAMIC single top-level segment (e.g. `/[key].txt`) —
+  it conflicts. IndexNow's key file is served at a FIXED path (`INDEXNOW_KEY_PATH` = `/indexnow-key`,
+  `app/indexnow-key/route.ts`); the spec allows any keyLocation on the host. Any future
+  top-level SEO/verification file (Google/Bing verification, `.well-known/*`) must likewise
+  use a FIXED static path, not a dynamic segment.
+- (2026-07-07) IndexNow submit is best-effort via `notifyIndexNowForPage` / `notifyIndexNowUrls`
+  (indexnow-notify.ts, ctx.waitUntil so it never blocks the write) — mirror this for any new
+  content-change hook. DELETE must call `collectPageUrls(id)` BEFORE `deletePage` (the row +
+  its path chain are gone after). Rename currently submits only the NEW URLs (old URLs 404 for
+  crawlers until the 301-redirects task lands and re-notifies the old paths).

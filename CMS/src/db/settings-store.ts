@@ -31,6 +31,7 @@ import {
   normalizeSiteIdentity,
 } from "../lib/settings/site-settings.ts";
 import { DEFAULT_ICON_SET, isValidIconSet } from "../lib/render/icons.ts";
+import { generateIndexNowKey, isValidIndexNowKey } from "../lib/render/indexnow.ts";
 import {
   type ApiCacheVersions,
   normalizeCacheVersions,
@@ -48,6 +49,7 @@ const TRANSLATE_MODEL_KEY = "translate_model";
 const IMAGE_GEN_MODEL_KEY = "image_gen_model";
 const ICON_SET_KEY = "icon_set";
 const API_CACHE_VERSIONS_KEY = "api_cache_versions";
+const INDEXNOW_KEY_KEY = "indexnow_key";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
 async function upsertSetting(
@@ -333,6 +335,28 @@ export async function getImageGenModel(injectedDb?: Db): Promise<string> {
 /** Store the selected image-generation model id. */
 export async function setImageGenModel(id: string, injectedDb?: Db): Promise<void> {
   await upsertSetting(IMAGE_GEN_MODEL_KEY, id, injectedDb);
+}
+
+/**
+ * The per-Site IndexNow key (seo-robots — IndexNow notify). Generated ONCE on
+ * first read and persisted, so `<origin>/<key>.txt` and every submission use a
+ * stable key. A stored-but-invalid value (hand-edited garbage) is regenerated.
+ * Plain string (an opaque hex key). Uses upsertSetting's read-then-write, so a
+ * concurrent first-read race just re-generates — harmless, both are valid keys
+ * and the last write wins; whichever key ends up stored is the one served.
+ */
+export async function getIndexNowKey(injectedDb?: Db): Promise<string> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, INDEXNOW_KEY_KEY))
+    .limit(1);
+  const raw = rows[0]?.value;
+  if (raw && isValidIndexNowKey(raw)) return raw;
+  const key = generateIndexNowKey();
+  await upsertSetting(INDEXNOW_KEY_KEY, key, db);
+  return key;
 }
 
 /**

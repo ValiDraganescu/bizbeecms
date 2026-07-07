@@ -13,6 +13,7 @@ import { publishDraft } from "@/db/page-version-store";
 import { requireAdmin } from "@/lib/auth/guard";
 import { pageCacheTag } from "@/lib/render/edge-cache";
 import { purgeEdgeTags } from "@/lib/render/purge-edge";
+import { notifyIndexNowForPage } from "@/lib/render/indexnow-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,8 @@ export async function POST(
     // Publish must be visible immediately: bust this page's edge-cache entries.
     // Best-effort — a purge failure never fails the publish.
     await purgeEdgeTags(pageCacheTag(id));
+    // Tell IndexNow engines this page's URLs changed (best-effort, non-blocking).
+    await notifyIndexNowForPage(id);
     return Response.json({ ok: true, versionNo: res.published.versionNo });
   } catch (err) {
     return Response.json(
