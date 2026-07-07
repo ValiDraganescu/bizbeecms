@@ -50,6 +50,15 @@ export function pathnameSegments(pathname: string): string[] {
  * Set-Cookie (a cookie-bearing response is per-visitor by definition — and
  * Workers Cache would refuse it regardless), and the first path segment must
  * not be a system route (media/api/admin/preview/_next).
+ *
+ * Dotted ROOT files (/sitemap.xml, /robots.txt, /llms.txt, /favicon.ico, the
+ * IndexNow /<key>.txt) are also rejected: SLUG_RE forbids "." so no real page
+ * lives at a dotted single-segment URL — but a TOP-LEVEL wildcard page
+ * (":param" matches ANY segment) would make worker.ts resolve one and stamp
+ * that page's Cache-Control onto e.g. the sitemap XML, edge-caching a stale
+ * sitemap that no page-publish purge clears (seo-robots audit, 2026-07-07).
+ * Root-level only: deeper dotted segments can be legit wildcard-captured page
+ * URLs and stay cacheable.
  */
 export function isEdgeCacheCandidate(input: {
   method: string;
@@ -60,8 +69,10 @@ export function isEdgeCacheCandidate(input: {
   if (input.method !== "GET") return false;
   if (input.status !== 200) return false;
   if (input.hasSetCookie) return false;
-  const first = pathnameSegments(input.pathname)[0]?.trim().toLowerCase() ?? "";
+  const segments = pathnameSegments(input.pathname);
+  const first = segments[0]?.trim().toLowerCase() ?? "";
   if (SKIP_SEGMENTS.has(first)) return false;
+  if (segments.length === 1 && first.includes(".")) return false;
   return true;
 }
 

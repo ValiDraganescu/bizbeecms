@@ -66,6 +66,30 @@ test("a page slug merely CONTAINING a system word is still a candidate", () => {
   assert.equal(isEdgeCacheCandidate({ ...OK, pathname: "/blog/api" }), true);
 });
 
+// ── reserved root files (sitemap.xml, robots.txt, …) ─────────────────────────
+// seo-robots audit finding: /sitemap.xml passed the gate, and a TOP-LEVEL
+// wildcard page (":param" matches ANY segment) with cache_max_age > 0 made
+// worker.ts stamp THAT page's Cache-Control/Cache-Tag onto the sitemap XML
+// response — an edge-cached stale sitemap that no page-publish purge clears
+// (publish purges page:<publishedId>, not the wildcard's tag). SLUG_RE forbids
+// "." in slugs, so a dotted SINGLE-segment path can never be a real page URL —
+// reject them all (also future-proofs robots.txt, llms.txt, /<indexnow-key>.txt).
+
+test("dotted root files are never cache candidates (stale-sitemap regression)", () => {
+  assert.equal(isEdgeCacheCandidate({ ...OK, pathname: "/sitemap.xml" }), false);
+  assert.equal(isEdgeCacheCandidate({ ...OK, pathname: "/robots.txt" }), false);
+  assert.equal(isEdgeCacheCandidate({ ...OK, pathname: "/llms.txt" }), false);
+  assert.equal(isEdgeCacheCandidate({ ...OK, pathname: "/favicon.ico" }), false);
+  assert.equal(isEdgeCacheCandidate({ ...OK, pathname: "/a1b2c3.txt" }), false); // IndexNow key file
+});
+
+test("dot exclusion is root-files only — deeper wildcard-captured paths stay cacheable", () => {
+  // /fi/sitemap.xml is NOT the metadata route (only /sitemap.xml is) — if a
+  // wildcard page answers it, that's a real page render and may cache.
+  assert.equal(isEdgeCacheCandidate({ ...OK, pathname: "/fi/sitemap.xml" }), true);
+  assert.equal(isEdgeCacheCandidate({ ...OK, pathname: "/products/v2.0" }), true);
+});
+
 // ── query strings ────────────────────────────────────────────────────────────
 // Workers Cache keys by the FULL URL incl. the query string (CAVEATS), so a
 // `?utm=` variant caches SEPARATELY and never cross-serves another page's HTML.
