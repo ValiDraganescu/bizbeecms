@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "1.25.0",
-      "tag": "r-1.25.0",
-      "markdown": "# CMS v1.25.0\n\n_2026-07-07 · changes since r-1.24.0_\n\n## Features\n- Publish-together: when you publish a page that uses components with unpublished draft edits (for example an AI change that hasn't gone live), the CMS now prompts you to publish those draft components alongside the page — so the published page doesn't silently render stale component versions. Draft components are flagged with a badge in the Layers tree and inspector.\n"
+      "version": "1.25.1",
+      "tag": "r-1.25.1",
+      "markdown": "# CMS v1.25.1\n\n_2026-07-07 · changes since r-1.25.0_\n\n## Fixes\n- Chat export (PM-SSO debug tool) now produces a complete, lossless dump of a conversation. Previously it saved only the reduced model-facing view — uploaded images, assistant reasoning, and full tool input/output were dropped. The download now also includes the raw transcript verbatim plus the actual request parameters and metadata (page context, prompt source, model context length).\n"
     },
     {
       "version": "1.24.0",
