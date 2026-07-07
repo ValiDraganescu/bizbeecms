@@ -994,3 +994,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/components/page-builder/binding-panels.tsx, CMS/src/lib/chat/binding-tools.ts,
   CMS/src/lib/chat/tool-dispatch.ts, CMS/src/lib/chat/bind-list-combobox.test.ts,
   CMS/messages/{en,fi,et}.json
+
+## 2026-07-07 15:32 — AI authoring-guide section for JSON-LD (last jsonld backlog item)
+- **Status:** DONE
+- **What I did:** Added an on-demand `get_jsonld_guide` tool (schema.org structured-data
+  authoring playbook) mirroring the shipped `get_data_sources_guide` seam. The AI reads the full
+  jsonld playbook ON DEMAND instead of bloating every system prompt.
+  - New pure module `CMS/src/lib/chat/jsonld-guide.ts` (`GET_JSONLD_GUIDE_TOOL` + `JSONLD_GUIDE`):
+    what a jsonld component IS (kind:'jsonld', html = JSON-LD template not markup), the
+    slot-quoting contract (string slots QUOTED `"name":"{{title}}"`, number/array UNQUOTED
+    `"ratingValue":{{rating}}` — matches validateJsonLdArtifact's `0`-probe), required @context+@type,
+    per-type patterns (Product/Article/FAQPage/Recipe), the AUTOMATIC BreadcrumbList (don't double
+    up), binding for per-URL dynamic data, and the TWO List modes (per-row scripts vs aggregate
+    ItemList via `bind_list itemList:true`), plus WHEN to author jsonld vs plain content.
+  - Wired: tool-dispatch.ts (import + TOOL_SCHEMAS entry + constant handler), tool-scopes.ts
+    (KNOWN_TOOL_NAMES + page-builder/components/pages context arrays + terse pointers in all three
+    context prompts so the model knows the guide exists).
+  - Test `CMS/scripts/jsonld-guide.test.mjs` (4 tests) locks the schema, the shipped surface +
+    quoting facts, no-tool-name-drift, and the scope/prompt registration.
+- **Verified:** `node --test scripts/jsonld-guide.test.mjs` 4/4 pass; data-sources-guide +
+  tool-scopes tests still green; `npx tsc --noEmit` exit 0; full pure suite 1070 pass / 1 fail —
+  the 1 fail is `live-ds-context-chip-check.mjs`, a MANUAL live-Chrome check ("not in the suite",
+  needs dev server on :3602), pre-existing and unrelated to this change.
+- **Files:** CMS/src/lib/chat/jsonld-guide.ts (new), CMS/src/lib/chat/tool-dispatch.ts,
+  CMS/src/lib/chat/tool-scopes.ts, CMS/scripts/jsonld-guide.test.mjs (new)

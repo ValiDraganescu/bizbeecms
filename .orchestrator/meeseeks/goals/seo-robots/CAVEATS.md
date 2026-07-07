@@ -1,6 +1,12 @@
 # Caveats — seo-robots
 Read every line before working. Each entry was learned the hard way by a previous Meeseeks.
 
+- (USER INSTRUCTION 2026-07-07) The opennext deploy-gate build DOES work locally: run it with the
+  superadmin guard off — `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` (env override beats
+  .env.local; never edit .env.local itself). Stop any running dev server first (build corrupts .next
+  under a live dev server). Use this as the pre-commit build gate instead of skipping it as
+  "unverifiable locally".
+
 - (seeded by curator, 2026-07-07) `CMS/worker.ts` ships ONLY via a release tag (r-*) — worker changes
   are invisible on deployed sites until a release is cut. Don't cut releases yourself (release manager
   owns them); note HITL verification as pending instead.
@@ -522,3 +528,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   (because public=preview must be byte-identical) belongs HERE, injected into the iframe DOM, NOT in
   `tree.ts`/`planPage`. Precedent: the invisible-block chip (jsonld) is injected at wire time into
   zero-area `data-block-wrap`s; cleanup removes it. Do NOT add builder-only markup to the render plan.
+
+- (2026-07-07) On-demand AI guides follow ONE seam (get_data_sources_guide, now get_jsonld_guide):
+  a PURE `*-guide.ts` module exporting `GET_*_GUIDE_TOOL` (zero-arg fn) + a `*_GUIDE` string
+  constant, wired in FOUR places — tool-dispatch.ts (import + TOOL_SCHEMAS map entry + a constant
+  handler `async () => ({ ok:true, guide: GUIDE })`), tool-scopes.ts KNOWN_TOOL_NAMES, the relevant
+  context arrays in TOOLS_BY_CONTEXT, and a terse pointer sentence in each CONTEXT_PROMPTS entry so
+  the model knows the guide exists. A `scripts/<name>-guide.test.mjs` locks it. GOTCHA writing the
+  test: it regex-scans the guide for snake_case tokens and asserts each is a KNOWN_TOOL_NAME — so
+  don't put an invented snake_case word in guide prose or the test fails (hyphenated words like
+  `city-slug` are safe; they don't match `[a-z]+(_[a-z]+)+`). Editing CONTEXT_PROMPTS: the
+  page-builder + pages prompts END with the IDENTICAL sentence "Prefer ONE wildcard page bound to a
+  collection over N near-identical static pages." — you CANNOT uniquely Edit on that tail; anchor on
+  each prompt's distinct data-sources-guide pointer clause instead.

@@ -15,9 +15,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   binding-panels.tsx ListSettings layout section (mirrors autoscroll; `list.itemList`/`itemListHint`
   EN/FI/ET). (b) AI `bind_list` tool gained an `itemList` boolean (schema + BindListArgs + validate
   + handleBindList patch). Closes the whole jsonld-List track (render+storage were already done).
-- TODO: AI authoring-guide section for jsonld (tool `kind` param + validation are DONE): schema.org
-  patterns per page type — Product/Article/FAQPage/Recipe — the slot-quoting rules (`"n":{{count}}`
-  unquoted vs `"n":"{{name}}"` quoted), and WHEN to author a jsonld component vs plain content.
+- DONE (2026-07-07): AI authoring-guide section for jsonld — on-demand `get_jsonld_guide` tool
+  (jsonld-guide.ts) mirroring get_data_sources_guide: schema.org per-type patterns
+  (Product/Article/FAQPage/Recipe), slot-quoting rules (string QUOTED / number+array UNQUOTED),
+  automatic-BreadcrumbList warning, the two List modes, and WHEN to author jsonld vs plain content.
+  Wired into tool-dispatch + tool-scopes (page-builder/components/pages contexts + prompts); 4 tests.
+  Closes the LAST jsonld backlog item.
 
 ### Operator SEO tooling (admin) — audit report + AI bulk-meta shipped (see BACKLOG_ARCHIVE)
 - TODO: SEO audit — deep component-tree scan: the current audit only scans raw `page.blocks` prop
