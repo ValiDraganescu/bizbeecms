@@ -653,3 +653,25 @@ Read every line before working. Each entry was learned the hard way by a previou
   peelActiveLocaleFromPath — don't invent a second header or read Accept-Language/cookie (that WOULD
   poison the cache on any surface that CAN be cached). The worker request-clone is cast
   `as typeof request` (clone drops the incoming-`cf` type; OpenNext reads only standard headers/url).
+
+- (2026-07-07) OG-image PUBLISH WIRING: two funcs in `og-image-notify.ts` (the CF-coupled shell,
+  OUT of the pure test harness — pure decision is `planOgScreenshots`/`ogImageKeysForLocales` in
+  og-image.ts). `generateOgImagesForPage(id)` is called from the publish route POST (after IndexNow);
+  `deleteOgImagesForPage(id)` from pages DELETE (before deletePage). Per-locale ABSOLUTE URLs come
+  from `pagePathsByLocale` — the SAME machinery as sitemap.ts + indexnow's `pageUrlsAllLocales`, so
+  the screenshot targets match the sitemap URLs exactly (a wildcard/unreconstructible page → byLocale
+  undefined → no jobs, same as sitemap/IndexNow skip). Manual metaImage per-locale is read from the
+  page row's `meta_image` JSON map (parseImageMap) — a locale with a manual image is NEVER autogen'd
+  AND isn't even R2-probed. R2 existence check uses `storage.get(key)` (the Storage port has NO
+  head/list — only put/get/delete), so a page-DELETE cleanup DERIVES the keys from the configured
+  content locales, NOT a listing. Screenshots run SEQUENTIALLY (Browser Rendering concurrency is a
+  scarce account resource — never parallelize the screenshot loop). Everything best-effort under
+  `ctx.waitUntil` (mirrors indexnow-notify/purge-edge) — a missing origin/binding/R2 error NEVER
+  fails or delays the publish/delete. NO-OP without the BROWSER binding: `screenshotPageToR2` returns
+  no-binding (Free plan / local dev / pre-`npm i @cloudflare/puppeteer`), so on real Free/Pro sites
+  the publish hook harmlessly finds no binding and writes nothing. If you add a THIRD write path that
+  should autogen (e.g. an AI publish tool), call `generateOgImagesForPage` there too — but note the AI
+  hooks are deliberately lighter (see the AI write-path caveat); OG autogen is a fine addition since
+  it's best-effort. The REGENERATE BUTTON (item 4/4, next) must reuse `screenshotPageToR2` +
+  `ogImageKey` but FORCE (skip the existing-key idempotency probe) — it's the explicit "refresh after
+  redesign" path; expose a per-locale API action + a manual/auto badge in the SEO tab, EN/FI/ET.

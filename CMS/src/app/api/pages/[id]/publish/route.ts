@@ -14,6 +14,7 @@ import { requireAdmin } from "@/lib/auth/guard";
 import { pageCacheTag, LLMS_CACHE_TAG, SITEMAP_CACHE_TAG } from "@/lib/render/edge-cache";
 import { purgeEdgeTags } from "@/lib/render/purge-edge";
 import { notifyIndexNowForPage } from "@/lib/render/indexnow-notify";
+import { generateOgImagesForPage } from "@/lib/render/og-image-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,10 @@ export async function POST(
     await purgeEdgeTags(pageCacheTag(id), LLMS_CACHE_TAG, SITEMAP_CACHE_TAG);
     // Tell IndexNow engines this page's URLs changed (best-effort, non-blocking).
     await notifyIndexNowForPage(id);
+    // Best-effort OG-image fallback screenshots for locales lacking a manual
+    // metaImage + an existing auto shot (ctx.waitUntil — never blocks/fails the
+    // publish; no-op without the BROWSER binding / paid plan).
+    await generateOgImagesForPage(id);
     return Response.json({ ok: true, versionNo: res.published.versionNo });
   } catch (err) {
     return Response.json(

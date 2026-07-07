@@ -30,6 +30,7 @@ import {
   notifyIndexNowForPage,
   notifyIndexNowUrls,
 } from "@/lib/render/indexnow-notify";
+import { deleteOgImagesForPage } from "@/lib/render/og-image-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,9 @@ export async function DELETE(request: Request): Promise<Response> {
     // Capture the page's URLs BEFORE deleting — the row (and its path chain) is
     // gone afterwards. Best-effort; [] on any problem.
     const urls = await collectPageUrls(id);
+    // Drop the page's auto OG screenshots (keys derived from configured locales,
+    // not the row — safe to run before/after the delete). Best-effort.
+    await deleteOgImagesForPage(id);
     const res = await deletePage(id);
     if (!res.ok) return Response.json({ error: res.errors.join("; ") }, { status: 409 });
     // A deleted page must stop serving from the edge cache, and drop off

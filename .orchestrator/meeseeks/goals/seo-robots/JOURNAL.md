@@ -1187,3 +1187,28 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Release-gated:** worker.ts + wrangler.jsonc ship ONLY via a release tag (r-*) — invisible on
   deployed Sites until a release is cut. Live 429/Retry-After behavior is HITL (needs a deployed Site +
   a paid plan for the rate-limit binding + a release). Per-site configurable threshold is backlog item 2/2.
+
+## 2026-07-07 16:06 — OG-image autogen publish wiring (OG track item 3/4)
+- **Status:** DONE
+- **What I did:** Wired OG-image fallback screenshots into the page publish + delete lifecycle.
+  - PURE (og-image.ts): `planOgScreenshots({pageId,urlsByLocale,manualImageByLocale,existingKeys})`
+    → one `{locale,pageUrl,key}` job per locale that has (a) a page URL, (b) NO manual metaImage,
+    and (c) NO existing `og/<id>.<loc>.png`. Manual-upload-wins + idempotent baked into the planner.
+    `ogImageKeysForLocales(id,locales)` derives the deduped cleanup key set (Storage has no list).
+  - COUPLED shell (NEW `og-image-notify.ts`, mirrors indexnow-notify.ts): `generateOgImagesForPage(id)`
+    reads page rows + content locales + origin, builds per-locale absolute URLs via
+    `pagePathsByLocale` (SAME machinery as sitemap/IndexNow → URLs match), probes R2 for existing auto
+    keys (only for no-manual locales), plans, then screenshots SEQUENTIALLY (Browser Rendering
+    concurrency is scarce) via `screenshotPageToR2`. `deleteOgImagesForPage(id)` R2-deletes every
+    derived key. BOTH best-effort under `ctx.waitUntil` (or inline w/o CF ctx) — never fail/delay the
+    write. No-op without the BROWSER binding (screenshotPageToR2 returns no-binding; the delete just
+    finds no objects).
+  - Wired: publish route POST → `await generateOgImagesForPage(id)` after IndexNow; pages DELETE →
+    `await deleteOgImagesForPage(id)` before deletePage.
+  - Did NOT touch worker.ts / wrangler.jsonc (parallel Meeseeks owns them this cycle).
+- **Verified:** +6 pure tests in og-image.test.mjs (planner: emits/manual-wins/idempotent/no-url/empty;
+  keys dedup). Full suite 1932 → 1943 pass. `npx tsc --noEmit` clean. Live screenshot round-trip is
+  HITL (needs paid plan + BROWSER binding + `npm i @cloudflare/puppeteer` + deployed R2).
+- **Files:** src/lib/render/og-image.ts (planOgScreenshots + ogImageKeysForLocales),
+  src/lib/render/og-image-notify.ts (NEW), src/app/api/pages/[id]/publish/route.ts,
+  src/app/api/pages/route.ts, scripts/og-image.test.mjs.

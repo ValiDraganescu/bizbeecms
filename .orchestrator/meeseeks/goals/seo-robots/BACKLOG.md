@@ -27,7 +27,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   when there's no manual image (single R2 read, metadata path — NOT the 429 render hot path).
   twitter:card auto-counts the auto image (buildTwitterCard keys off the resolved `image`, no
   social-cards change needed). +8 tests (og-image.test.mjs), suite 1930, tsc clean. Live R2 = HITL.
-- TODO: OG-image autogen publish wiring: on page publish, for each configured locale, IF no manual per-locale metaImage AND no auto screenshot exists yet → best-effort background screenshot via `ctx.waitUntil` (never fails/delays the publish — purge-edge pattern); page delete removes its screenshots; auto image is stored SEPARATELY from user uploads and can never overwrite one.
+- DONE (2026-07-07): OG-image autogen publish wiring. PURE `planOgScreenshots` (og-image.ts) decides
+  one screenshot job per locale that has a page URL AND no manual metaImage AND no existing
+  `og/<id>.<loc>.png` (manual-wins + idempotent). Coupled shell `og-image-notify.ts`
+  (`generateOgImagesForPage`/`deleteOgImagesForPage`, mirrors indexnow-notify.ts): reads pages +
+  content-locales + origin, per-locale absolute URLs via `pagePathsByLocale` (same machinery as
+  sitemap/IndexNow), probes R2 for existing keys, screenshots SEQUENTIALLY (scarce Browser Rendering
+  concurrency), all best-effort under `ctx.waitUntil`. Wired into publish POST + pages DELETE. No-op
+  without the BROWSER binding. +6 tests (suite 1943), tsc clean. Live round-trip HITL (paid plan +
+  `@cloudflare/puppeteer` + BROWSER binding + deployed R2). Did NOT touch worker.ts/wrangler.jsonc.
 - TODO: OG-image regenerate button: per-locale "Generate from page" action in the page-settings SEO tab (API route, stable error codes) that (re)screenshots on demand — the explicit path for refreshing after theme/content redesigns; SEO tab shows the currently effective og:image with a manual/auto badge; localized EN/FI/ET.
 
 ### Edge-cache purge coverage

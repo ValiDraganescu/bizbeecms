@@ -111,6 +111,62 @@ function absolutize(url: string, origin?: string | null): string {
   return origin.replace(/\/+$/, "") + (url.startsWith("/") ? url : "/" + url);
 }
 
+/**
+ * PURE planner for the publish-wiring hook: given a page's per-locale absolute
+ * URLs, its MANUAL per-locale metaImage map, and the set of auto keys that
+ * ALREADY exist in R2, decide which (locale → screenshot job) to run.
+ *
+ * A screenshot job is emitted for a locale ONLY when:
+ *   1. we have an absolute page URL for it (wildcard/unreconstructible → skip),
+ *   2. there is NO manual per-locale metaImage (a manual upload always wins —
+ *      autogen must never run when the operator supplied an image), and
+ *   3. the auto key `og/<id>.<locale>.png` does NOT already exist (idempotent —
+ *      publish regenerates nothing; the explicit regenerate button does that).
+ *
+ * Returns at most one job per locale. PURE — the caller does the R2 existence
+ * probe (to build `existingKeys`) and fires `screenshotPageToR2` per job.
+ */
+export interface OgScreenshotJob {
+  locale: string;
+  pageUrl: string;
+  key: string;
+}
+
+export function planOgScreenshots(input: {
+  pageId: string;
+  urlsByLocale: Record<string, string>;
+  manualImageByLocale: Record<string, string>;
+  existingKeys: Iterable<string>;
+}): OgScreenshotJob[] {
+  const existing = new Set(input.existingKeys);
+  const jobs: OgScreenshotJob[] = [];
+  for (const [locale, pageUrl] of Object.entries(input.urlsByLocale)) {
+    if (!pageUrl) continue;
+    const manual =
+      typeof input.manualImageByLocale[locale] === "string"
+        ? input.manualImageByLocale[locale].trim()
+        : "";
+    if (manual) continue; // a manual upload always wins — never autogen over it.
+    const key = ogImageKey(input.pageId, locale);
+    if (existing.has(key)) continue; // already generated — publish is idempotent.
+    jobs.push({ locale, pageUrl, key });
+  }
+  return jobs;
+}
+
+/** Every auto OG key a page COULD have across `locales` (for delete cleanup). */
+export function ogImageKeysForLocales(pageId: string, locales: Iterable<string>): string[] {
+  const seen = new Set<string>();
+  const keys: string[] = [];
+  for (const locale of locales) {
+    const key = ogImageKey(pageId, locale);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    keys.push(key);
+  }
+  return keys;
+}
+
 export type OgSpikeResult =
   | { ok: true; key: string; bytes: number }
   | { ok: false; reason: "no-binding" | "no-origin" | "error"; detail?: string };
