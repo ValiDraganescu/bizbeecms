@@ -139,6 +139,21 @@ Read every line before working. Each entry was learned the hard way by a previou
   best-effort: `ancestorChain` returns null on a cycle/dangling parent, `buildBreadcrumbData`
   returns null if ANY hop lacks a name or url — no partial/lying trail is ever emitted. If you add
   a 2nd page column to that select, keep the type in `BreadcrumbRow` in sync.
+- (2026-07-07) Search-engine verification tokens live in settings key `site_verification`
+  (getSiteVerification/setSiteVerification), NOT in `site_identity` — kept separate so they
+  don't bloat the AI system prompt. Pure `lib/render/site-verification.ts`:
+  `normalizeSiteVerification` STRIPS every char outside `[A-Za-z0-9._-]` (an operator often
+  pastes the whole `<meta ...>` tag or an injection string — stripping leaves just the token,
+  so no meta-attr breakout in `<head>`). `buildVerificationMeta` maps to Next's
+  `Metadata.verification`: google→`google`, yandex→`yandex`, bing→`other["msvalidate.01"]`
+  (Next has NO first-class Bing field — do NOT invent `verification.bing`, it's ignored; the
+  `other` map is the only way to emit `msvalidate.01`). It returns undefined when empty so no
+  verification meta ships. Wired in `generateMetadata` ((site)/[[...slug]]) as an EXTRA D1 read
+  on the metadata path (fine — that's NOT the 429 render hot path; same placement as the OG
+  brandName read). Visitor-independent (stored tokens, not request). If a FILE-based
+  verification method is ever needed, use a FIXED static path (dynamic top-level segments
+  collide with the catch-all — see the earlier caveat).
+
 - (2026-07-07) OG/Twitter cards: pure builders in `lib/render/social-cards.ts`
   (`buildOpenGraph`/`buildTwitterCard`) fed by `generateMetadata`. brandName comes
   from `getSiteIdentity()` (settings-store) — this is an EXTRA D1 read, deliberately

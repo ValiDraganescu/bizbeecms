@@ -226,6 +226,28 @@
       "chainToIsSource": "See sihttee suunab juba mujale (tekiks ahel)."
     }
   },
+  "verification": {
+    "title": "Otsingumootorite kinnitamine",
+    "subtitle": "Kleebi iga otsingumootori veebihaldusriistadest saadud kinnituskood. See lisatakse meta-sildina igale avaldatud lehele. Jäta tühjaks, et teenusepakkuja vahele jätta.",
+    "google": {
+      "label": "Google Search Console",
+      "hint": "google-site-verification meta-sildi sisu väärtus.",
+      "placeholder": "abcDEF123..."
+    },
+    "bing": {
+      "label": "Bing Webmaster Tools",
+      "hint": "msvalidate.01 meta-sildi sisu väärtus.",
+      "placeholder": "0123ABCD..."
+    },
+    "yandex": {
+      "label": "Yandex Webmaster",
+      "hint": "yandex-verification meta-sildi sisu väärtus.",
+      "placeholder": "0123456789abcdef"
+    },
+    "save": "Salvesta",
+    "saving": "Salvestan...",
+    "saved": "Salvestatud."
+  },
   "settingsNav": {
     "label": "Seadete jaotised",
     "groups": {
@@ -237,6 +259,7 @@
     "contentLocales": "Sisukeeled",
     "robots": "robots.txt",
     "redirects": "Ümbersuunamised",
+    "verification": "Kinnitamine",
     "theme": "Teema",
     "brand": "Bränd ja AI",
     "apiKeys": "MCP",

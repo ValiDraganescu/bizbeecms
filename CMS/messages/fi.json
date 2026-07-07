@@ -226,6 +226,28 @@
       "chainToIsSource": "Tämä kohdepolku ohjaa jo muualle (loisi ketjun)."
     }
   },
+  "verification": {
+    "title": "Hakukoneiden vahvistus",
+    "subtitle": "Liitä vahvistustunnus kunkin hakukoneen webmaster-työkaluista. Se lisätään meta-tunnisteena jokaiselle julkaistulle sivulle. Jätä tyhjäksi ohittaaksesi palveluntarjoajan.",
+    "google": {
+      "label": "Google Search Console",
+      "hint": "google-site-verification-metatunnisteen sisältöarvo.",
+      "placeholder": "abcDEF123..."
+    },
+    "bing": {
+      "label": "Bing Webmaster Tools",
+      "hint": "msvalidate.01-metatunnisteen sisältöarvo.",
+      "placeholder": "0123ABCD..."
+    },
+    "yandex": {
+      "label": "Yandex Webmaster",
+      "hint": "yandex-verification-metatunnisteen sisältöarvo.",
+      "placeholder": "0123456789abcdef"
+    },
+    "save": "Tallenna",
+    "saving": "Tallennetaan...",
+    "saved": "Tallennettu."
+  },
   "settingsNav": {
     "label": "Asetusosiot",
     "groups": {
@@ -237,6 +259,7 @@
     "contentLocales": "Sisältökielet",
     "robots": "robots.txt",
     "redirects": "Uudelleenohjaukset",
+    "verification": "Vahvistus",
     "theme": "Teema",
     "brand": "Brändi ja tekoäly",
     "apiKeys": "MCP",

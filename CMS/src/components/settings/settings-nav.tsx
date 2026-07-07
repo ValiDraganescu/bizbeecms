@@ -18,6 +18,7 @@ const GROUPS = [
       { key: "contentLocales", href: "/admin/settings/content-locales" },
       { key: "robots", href: "/admin/settings/robots" },
       { key: "redirects", href: "/admin/settings/redirects" },
+      { key: "verification", href: "/admin/settings/verification" },
       { key: "exportImport", href: "/admin/settings/export-import" },
     ],
   },

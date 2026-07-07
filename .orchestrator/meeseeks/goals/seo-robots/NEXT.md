@@ -1,38 +1,43 @@
 # Note to the next Meeseeks (seo-robots)
 
-**Auto BreadcrumbList JSON-LD is DONE.** Every published page at depth ≥ 1 now
-emits a schema.org `BreadcrumbList` `<script application/ld+json>`. Pure builder
-`lib/render/breadcrumb.ts` (`ancestorChain` + `buildBreadcrumbData`/`buildBreadcrumbJsonLd`,
-breakout-escaped), wired in `render-page.tsx buildPlanFromPage` (reuses the page-rows
-read, +metaTitle col; active-locale titles + `pagePathsByLocale` paths absolutized via
-`resolveSiteOrigin`). New `RenderPlan.jsonLd` field rendered inert by `RenderedPage`.
-10 unit tests, `npm test` 1750/1750, tsc clean. See CAVEATS for the jsonLd contract.
+**Search-engine verification tokens are DONE.** Per-site Google/Bing/Yandex
+site-verification tokens now emit as `<meta>` verification tags on every
+published page. Pure `lib/render/site-verification.ts` (normalize strips
+non-token chars → no injection; `buildVerificationMeta` → Next
+`Metadata.verification`, bing under `other["msvalidate.01"]`). Store
+`getSiteVerification`/`setSiteVerification` (key `site_verification`). Wired
+in `generateMetadata` ((site)/[[...slug]]). Admin REST + editor + page + nav
+link (Site group) + i18n EN/FI/ET. 7 unit tests, `npm test` 1757/1757, tsc clean.
+See CAVEATS for the token-strip + Next-shape gotchas.
 
 **Take next — pick one, in rough priority order:**
 
-1. **JSON-LD component kind — render path first (tracer)** (the big track): add a
-   `kind` discriminator to custom components (`html` default | `jsonld`); a jsonld
-   artifact renders as `<script type="application/ld+json">` with JSON-string
-   escaping (NOT the HTML escape path — reuse breadcrumb.ts's `escapeForScript`
-   pattern / consider funnelling onto `plan.jsonLd`); builder canvas shows a
-   placeholder chip; draft/publish lifecycle unchanged. One end-to-end proof component.
+1. **JSON-LD component kind — render path first (tracer)** (the big track, still
+   untouched): add a `kind` discriminator to custom components (`html` default |
+   `jsonld`); a jsonld artifact renders as `<script type="application/ld+json">`
+   with JSON-STRING escaping (NOT the HTML escape path — reuse breadcrumb.ts's
+   escaper / consider funnelling onto `plan.jsonLd`); builder canvas shows a
+   placeholder chip; draft/publish lifecycle unchanged. One end-to-end proof
+   component. This is a multi-file track — scope tightly (render path only this run).
 
 2. **Designated branded 404 page** (Page-level SEO controls): site setting picks a
    published page; `(site)` catch-all miss renders it in the active locale with HTTP
-   404 + robots noindex; non-200 never edge-cached (worker gate is GET-200-only).
+   404 + robots noindex; non-200 never edge-cached (worker gate is GET-200-only; assert).
 
-3. **Search-engine verification tokens**: site settings for Google + Bing values,
-   emitted as `verification` meta on published pages (STATIC per site — must NOT vary
-   by visitor; see visitor-independence caveat). FIXED static path if a file-based
-   method is ever needed (dynamic top-level segments conflict with the catch-all —
-   see CAVEATS).
+3. **Serve `/llms.txt`** (AI-crawler surface): site name/description from brand
+   identity + the published-page tree with links to each page's `.md` variant;
+   reuse `publishedPagePaths`; force-dynamic like sitemap/robots; skip when origin
+   unknown. (Pairs with the markdown-page-variants task.)
 
-**Patterns just used (copy):** pure dep-free helper in `lib/render/*.ts` + `.test.ts`
-(`node --test`); best-effort try/catch around plan-time side reads — NEVER fail the
-render. JSON-LD escaping lives in ONE pure place; `plan.jsonLd` carries pre-escaped
-inner JSON, `RenderedPage` wraps it. Keep the (site) path visitor-independent (stored
-data only, no next-intl / request data).
+**Patterns just used (copy):** the SETTINGS-FEATURE recipe is now very stable —
+pure dep-free `lib/render/*.ts` normalizer + `.test.ts` (node --test); settings-store
+`get*/set*` on a `site_settings` key (defensive read → default); force-dynamic REST
+`api/settings/<x>` (requireAdmin, PUT writes-through the normalizer); "use client"
+editor that adopts the server-normalized result; explicit `(admin)/admin/settings/<x>`
+page (beats the catch-all, D1-unbound offline → default); nav link in settings-nav.tsx;
+i18n EN/FI/ET (`settingsNav.<x>` + a `<x>` namespace). Verification, robots, redirects
+all follow it — copy one wholesale.
 
-**HITL pending (note, don't do):** on a DEPLOYED site, validate a nested published
-page's BreadcrumbList in Google's Rich Results Test / Schema validator. No worker.ts
-edit → no r-* release needed for this to ship.
+**HITL pending (note, don't do):** on a DEPLOYED site, paste a real Google/Bing token
+and confirm Search Console / Webmaster Tools verifies. No worker.ts edit → no r-* release
+needed for this to ship.

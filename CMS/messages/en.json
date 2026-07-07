@@ -226,6 +226,28 @@
       "chainToIsSource": "That To path already redirects elsewhere (would create a chain)."
     }
   },
+  "verification": {
+    "title": "Search engine verification",
+    "subtitle": "Paste the verification token from each search engine's webmaster tools. It's emitted as a meta tag on every published page. Leave blank to skip a provider.",
+    "google": {
+      "label": "Google Search Console",
+      "hint": "The content value of the google-site-verification meta tag.",
+      "placeholder": "abcDEF123..."
+    },
+    "bing": {
+      "label": "Bing Webmaster Tools",
+      "hint": "The content value of the msvalidate.01 meta tag.",
+      "placeholder": "0123ABCD..."
+    },
+    "yandex": {
+      "label": "Yandex Webmaster",
+      "hint": "The content value of the yandex-verification meta tag.",
+      "placeholder": "0123456789abcdef"
+    },
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved."
+  },
   "settingsNav": {
     "label": "Settings sections",
     "groups": {
@@ -237,6 +259,7 @@
     "contentLocales": "Content languages",
     "robots": "robots.txt",
     "redirects": "Redirects",
+    "verification": "Verification",
     "theme": "Theme",
     "brand": "Brand & AI",
     "apiKeys": "MCP",

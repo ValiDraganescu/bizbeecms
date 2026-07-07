@@ -42,6 +42,11 @@ import {
   normalizeCacheVersions,
   pruneCounters,
 } from "../lib/data-sources/purge.ts";
+import {
+  type SiteVerification,
+  emptySiteVerification,
+  normalizeSiteVerification,
+} from "../lib/render/site-verification.ts";
 
 const CONTENT_LOCALES_KEY = "content_locales";
 const THEME_OVERRIDES_KEY = "theme_overrides";
@@ -56,6 +61,7 @@ const ICON_SET_KEY = "icon_set";
 const API_CACHE_VERSIONS_KEY = "api_cache_versions";
 const INDEXNOW_KEY_KEY = "indexnow_key";
 const ROBOTS_CONFIG_KEY = "robots_config";
+const SITE_VERIFICATION_KEY = "site_verification";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
 async function upsertSetting(
@@ -393,6 +399,43 @@ export async function setRobotsConfig(
 ): Promise<RobotsConfig> {
   const normalized = normalizeRobotsConfig(config);
   await upsertSetting(ROBOTS_CONFIG_KEY, JSON.stringify(normalized), injectedDb);
+  return normalized;
+}
+
+/**
+ * Read the per-Site search-engine verification tokens (Google/Bing/Yandex), or
+ * an empty set if unset/garbage. Folded into `Metadata.verification` on the
+ * (site) render path. seo-robots track. STATIC per site (visitor-independent).
+ */
+export async function getSiteVerification(
+  injectedDb?: Db,
+): Promise<SiteVerification> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, SITE_VERIFICATION_KEY))
+    .limit(1);
+  const raw = rows[0]?.value;
+  if (!raw) return emptySiteVerification();
+  try {
+    return normalizeSiteVerification(JSON.parse(raw));
+  } catch {
+    return emptySiteVerification();
+  }
+}
+
+/** Upsert the verification tokens (normalized — token charset + length bound). */
+export async function setSiteVerification(
+  input: unknown,
+  injectedDb?: Db,
+): Promise<SiteVerification> {
+  const normalized = normalizeSiteVerification(input);
+  await upsertSetting(
+    SITE_VERIFICATION_KEY,
+    JSON.stringify(normalized),
+    injectedDb,
+  );
   return normalized;
 }
 

@@ -307,3 +307,39 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   nor validate live rich-results (needs deployed origin — HITL).
 - **Files:** CMS/src/lib/render/breadcrumb.ts (+ .test.ts), CMS/src/lib/render/render-page.tsx,
   CMS/src/lib/render/plan-types.ts
+
+## 2026-07-07 11:59 — Search-engine verification tokens
+- **Status:** DONE
+- **What I did:** Per-Site Google/Bing/Yandex site-verification tokens, emitted as
+  `<meta>` verification tags on every published page.
+  - **Pure module** `lib/render/site-verification.ts` (dep-free, node-tested):
+    `SiteVerification` ({google,bing,yandex}), `emptySiteVerification`,
+    `normalizeSiteVerification` (per field: string-coerce, trim, STRIP anything
+    outside `[A-Za-z0-9._-]`, clamp 200 — a pasted whole `<meta>` tag / injection
+    attempt normalizes to just the token, so no meta-attr breakout), `isEmpty…`,
+    `buildVerificationMeta` → Next's `Metadata.verification` shape (google→`google`,
+    yandex→`yandex`, bing→`other["msvalidate.01"]` since Next has no first-class Bing
+    field), undefined when nothing set so Next emits no verification meta.
+  - **Store** `db/settings-store.ts` `getSiteVerification`/`setSiteVerification`
+    (settings key `site_verification`; defensive read → empty on missing/garbage).
+  - **Wiring:** `generateMetadata` in `(site)/[[...slug]]/page.tsx` reads
+    `getSiteVerification()` (ONE extra D1 read, deliberately on the metadata path —
+    NOT the 429-sensitive render hot path, same placement as the OG brandName read)
+    and spreads `verification` into the returned Metadata. Visitor-independent
+    (stored site data, no request) → edge-cache-safe per the (site)-isolation caveat.
+  - **Admin:** REST `api/settings/verification` (force-dynamic; GET/PUT; requireAdmin;
+    PUT writes through setSiteVerification which normalizes — no stable error codes,
+    like the robots PUT). Editor `components/settings/verification-editor.tsx` (three
+    text fields → one PUT → adopt server-normalized result). Page
+    `(admin)/admin/settings/verification/page.tsx` (force-dynamic; explicit route beats
+    catch-all; D1-unbound offline → empty). Nav link in the "Site" group after redirects.
+  - **i18n** EN/FI/ET: `settingsNav.verification` + full `verification` namespace.
+- **Verified:** `node --test site-verification.test.ts` 7/7; full `npm test` 1757/1757
+  (was 1750; +7); `npx tsc --noEmit` exit 0; all 3 message JSONs parse. Did NOT run the
+  opennext build gate (heavy; routes mirror proven force-dynamic patterns) nor live-verify
+  a real token in Search Console (needs a deployed origin + a real Google/Bing account — HITL).
+- **Files:** CMS/src/lib/render/site-verification.ts (+ .test.ts), CMS/src/db/settings-store.ts,
+  CMS/src/app/(site)/[[...slug]]/page.tsx, CMS/src/app/api/settings/verification/route.ts,
+  CMS/src/components/settings/verification-editor.tsx,
+  CMS/src/app/(admin)/admin/settings/verification/page.tsx,
+  CMS/src/components/settings/settings-nav.tsx, CMS/messages/{en,fi,et}.json

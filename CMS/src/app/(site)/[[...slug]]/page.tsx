@@ -19,8 +19,9 @@ import { RenderedPage } from "@/lib/render/render-page";
 import { loadPlan, type RouteParams } from "@/lib/render/load-plan";
 import { hreflangAlternates } from "@/lib/render/hreflang";
 import { resolveSiteOrigin } from "@/lib/render/site-origin";
-import { getSiteIdentity } from "@/db/settings-store";
+import { getSiteIdentity, getSiteVerification } from "@/db/settings-store";
 import { buildOpenGraph, buildTwitterCard } from "@/lib/render/social-cards";
+import { buildVerificationMeta } from "@/lib/render/site-verification";
 
 /** Resolve a per-locale JSON map (e.g. metaTitle) to the active locale w/ fallback. */
 function localized(raw: string, locale: LocaleContext): string | undefined {
@@ -76,6 +77,10 @@ export async function generateMetadata({
   // the (site) page-render path is edge-cached; generateMetadata is not the
   // 429-sensitive hot path). Visitor-independent: stored site data, not request.
   const { brandName } = await getSiteIdentity();
+  // Search-engine verification tokens (seo-robots). Stored site data →
+  // visitor-independent, edge-cache-safe. Off the hot path like the identity
+  // read above (metadata path, not the 429-sensitive render path).
+  const verification = buildVerificationMeta(await getSiteVerification());
   const cardInput = {
     metaTitle: title,
     metaDescription: description,
@@ -96,6 +101,8 @@ export async function generateMetadata({
     // og:locale = active content locale, twitter:card = large-image iff image).
     openGraph: buildOpenGraph(cardInput),
     twitter: buildTwitterCard(cardInput),
+    // Site-verification meta (Google/Bing/Yandex) — omitted when nothing is set.
+    ...(verification ? { verification } : {}),
     // Per-page SEO noindex (seo-robots): visitor-independent (a stored page
     // column, not request-derived) so it's safe on the edge-cached (site) path.
     ...(loaded.page.noindex ? { robots: { index: false, follow: false } } : {}),
