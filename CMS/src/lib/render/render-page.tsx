@@ -160,11 +160,13 @@ function localeLabel(code: string): string {
  * copy. `pickArtifactCols` chooses which set to render.
  */
 type ComponentArtifactRow = {
+  kind: string;
   html: string;
   script: string;
   css: string;
   propsSchema: string | null;
   hasDraft: boolean;
+  draftKind: string | null;
   draftHtml: string | null;
   draftScript: string | null;
   draftCss: string | null;
@@ -180,16 +182,23 @@ type ComponentArtifactRow = {
 function pickArtifactCols(
   row: ComponentArtifactRow,
   preferDraft: boolean,
-): { html: string; script: string; css: string; propsSchema: string | null } {
+): { kind: string; html: string; script: string; css: string; propsSchema: string | null } {
   if (preferDraft && row.hasDraft) {
     return {
+      kind: row.draftKind ?? row.kind ?? "html",
       html: row.draftHtml ?? "",
       script: row.draftScript ?? "",
       css: row.draftCss ?? "",
       propsSchema: row.draftPropsSchema,
     };
   }
-  return { html: row.html, script: row.script, css: row.css, propsSchema: row.propsSchema };
+  return {
+    kind: row.kind ?? "html",
+    html: row.html,
+    script: row.script,
+    css: row.css,
+    propsSchema: row.propsSchema,
+  };
 }
 
 /**
@@ -247,17 +256,25 @@ export async function buildPlanFromPage(
     const next = new Set<string>();
     for (const row of rows) {
       const art = pickArtifactCols(row, preferDraft);
-      const tree = parseHtml(art.html);
+      // A jsonld component's `html` is a JSON template, not markup — don't parse it
+      // as HTML; carry the raw string so planPage funnels it onto plan.jsonLd.
+      const isJsonLd = art.kind === "jsonld";
+      const tree = isJsonLd ? "" : parseHtml(art.html);
       components.set(row.name, {
         name: row.name,
+        kind: isJsonLd ? "jsonld" : "html",
+        jsonTemplate: isJsonLd ? art.html : undefined,
         tree,
         script: art.script || undefined,
         css: art.css || undefined,
         propsSchema: art.propsSchema,
       });
-      // Enqueue nested-component tags referenced inside this tree.
-      for (const tag of collectTreeComponentTags(tree)) {
-        if (!components.has(tag)) next.add(tag);
+      // Enqueue nested-component tags referenced inside this tree (html only —
+      // a jsonld template composes nothing).
+      if (!isJsonLd) {
+        for (const tag of collectTreeComponentTags(tree)) {
+          if (!components.has(tag)) next.add(tag);
+        }
       }
     }
     pending = next;
@@ -341,7 +358,9 @@ export async function buildPlanFromPage(
       routeContext.params,
       locale,
     );
-    if (jsonLd) plan.jsonLd = [jsonLd];
+    // APPEND — planPage may already have populated plan.jsonLd from jsonld-kind
+    // component blocks; the auto breadcrumb rides alongside, never replaces it.
+    if (jsonLd) plan.jsonLd = [...(plan.jsonLd ?? []), jsonLd];
   }
 
   return { plan, locale, routeNotFound: routeMiss.hit };
@@ -518,16 +537,21 @@ export async function buildPlanFromComponent(
       // props also come from the DRAFT propsSchema so the preview matches.
       const art = pickArtifactCols(row, true);
       if (row.name === name) rootRow = { propsSchema: art.propsSchema };
-      const tree = parseHtml(art.html);
+      const isJsonLd = art.kind === "jsonld";
+      const tree = isJsonLd ? "" : parseHtml(art.html);
       components.set(row.name, {
         name: row.name,
+        kind: isJsonLd ? "jsonld" : "html",
+        jsonTemplate: isJsonLd ? art.html : undefined,
         tree,
         script: art.script || undefined,
         css: art.css || undefined,
         propsSchema: art.propsSchema,
       });
-      for (const tag of collectTreeComponentTags(tree)) {
-        if (!components.has(tag)) next.add(tag);
+      if (!isJsonLd) {
+        for (const tag of collectTreeComponentTags(tree)) {
+          if (!components.has(tag)) next.add(tag);
+        }
       }
     }
     pending = next;

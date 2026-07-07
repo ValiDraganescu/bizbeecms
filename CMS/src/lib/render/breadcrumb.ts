@@ -13,6 +13,8 @@
  * safe on the edge-cached (site) render path).
  */
 
+import { escapeJsonForScript } from "./jsonld-component.ts";
+
 /** One breadcrumb hop: the visible name + the item's URL (absolute preferred). */
 export interface BreadcrumbItem {
   name: string;
@@ -52,19 +54,6 @@ export function ancestorChain(
 }
 
 /**
- * JSON-escape for embedding a `JSON.stringify` result inside an inline
- * `<script>`: escape `<` (→ `<`), `>` and `&` too, so no `</script>`,
- * HTML comment, or entity can break out of the script element. JSON.stringify
- * already handles quotes/backslashes/control chars.
- */
-function escapeForScript(json: string): string {
-  return json
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/&/g, "\\u0026");
-}
-
-/**
  * Build the escaped BreadcrumbList JSON payload (the INNER text of an
  * `application/ld+json` script), or `null` when there's nothing worth emitting:
  * - fewer than 2 items (a single-hop / root page — no breadcrumb),
@@ -91,7 +80,7 @@ export function buildBreadcrumbData(items: BreadcrumbItem[]): string | null {
       item: it.url,
     })),
   };
-  return escapeForScript(JSON.stringify(payload));
+  return escapeJsonForScript(JSON.stringify(payload));
 }
 
 /**

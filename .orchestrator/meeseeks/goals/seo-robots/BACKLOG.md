@@ -7,7 +7,18 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### JSON-LD components (kind: jsonld)
-- TODO: JSON-LD component kind — render path first (tracer): add a `kind` discriminator to custom components (`html` default | `jsonld`); a jsonld component's artifact is a JSON template rendered by planPage as `<script type="application/ld+json">` with prop interpolation (JSON-string escaping incl. `</script>` breakout — NOT the HTML escaping path; reuse breadcrumb.ts's escaper / consider funnelling onto `plan.jsonLd`, see CAVEATS); draft/publish lifecycle unchanged; builder canvas shows a placeholder chip (invisible element). One end-to-end proof component.
+- DONE (2026-07-07): JSON-LD component kind — RENDER PATH tracer. `component.kind`
+  ('html'|'jsonld') + `draft_kind` columns (migration 0031); pure `jsonld-component.ts`
+  (shared `escapeJsonForScript`, `bindJsonLdSlots`, `buildJsonLdComponent`); planPage funnels
+  a jsonld block onto `plan.jsonLd` (hidden placeholder in flow); breadcrumb now APPENDS.
+  AUTHORING (create/update component with kind, builder chip, draft/publish of the kind) is
+  the NEXT tasks below — the render path reads kind but nothing WRITES it yet.
+- TODO: JSON-LD authoring surface: create_component/update_component + the Develop editor accept
+  `kind:"jsonld"` and write it to `component.kind`/`draft_kind` (publish copies draft_kind→kind,
+  discard clears it — mirror the existing html/script/css draft columns); the block PUT
+  component-existence check already covers it (jsonld is a normal D1 row). Builder canvas shows
+  an invisible-element CHIP for a jsonld block (it renders no visible HTML — the `data-block-wrap`
+  placeholder is empty). One end-to-end proof component authored + published + rich-results valid.
 - TODO: JSON-LD × bindings: collection/data-source bindings interpolate into jsonld components exactly like HTML content (wildcard `:param` detail pages get per-URL structured data); verify the existing bind machinery passes through or add the minimal seam; unit-test the interpolation escaping.
 - TODO: Teach the AI the jsonld kind: create_component/update_component accept `kind: "jsonld"`, authoring guide section (schema.org patterns, variables), validation that the artifact parses as JSON with a `@context`/`@type` — self-correcting errors naming the exact bad token + fix (per AI error philosophy).
 

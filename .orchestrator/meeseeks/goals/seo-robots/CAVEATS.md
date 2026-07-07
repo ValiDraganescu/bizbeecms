@@ -154,6 +154,22 @@ Read every line before working. Each entry was learned the hard way by a previou
   verification method is ever needed, use a FIXED static path (dynamic top-level segments
   collide with the catch-all — see the earlier caveat).
 
+- (2026-07-07) JSON-LD component KIND: `component.kind` ('html' default | 'jsonld') + `draft_kind`
+  (migration 0031). A jsonld component's `html` COLUMN holds a JSON TEMPLATE (schema.org object
+  with `{{prop}}` slots), NOT markup — the render loops in render-page.tsx DON'T `parseHtml` it;
+  they carry the raw string as `ComponentArtifact.jsonTemplate` (tree = ""). `planPage` (tree.ts)
+  routes a jsonld block to `buildJsonLdComponent` and pushes the payload onto `plan.jsonLd`,
+  rendering a HIDDEN placeholder in the flow (zero visible text). Binding is STRING-level
+  (`bindJsonLdSlots`, NOT the tree walk / NOT bindTree): a string slot gets INNER JSON escaping
+  (a `"` in user content can't break the JSON literal); number/object slots splice their JSON
+  form verbatim (template must OMIT the quotes: `"r":{{rating}}`). Escaping is the SHARED
+  `escapeJsonForScript` in `jsonld-component.ts` — breadcrumb.ts now imports it (ONE escaper).
+  `buildJsonLdComponent` returns null (→ no script) on a blank template OR a bound result that
+  doesn't `JSON.parse` — never ships malformed structured data. render-page's auto-breadcrumb
+  APPENDS to `plan.jsonLd` (was overwrite) so component + breadcrumb JSON-LD coexist. NOTHING
+  WRITES kind yet — the authoring surface (create/update component, Develop editor, canvas chip,
+  draft_kind publish/discord) is the NEXT backlog task. When you add authoring: publish must copy
+  draft_kind→kind + discard must clear it, mirroring the html/script/css draft columns.
 - (2026-07-07) OG/Twitter cards: pure builders in `lib/render/social-cards.ts`
   (`buildOpenGraph`/`buildTwitterCard`) fed by `generateMetadata`. brandName comes
   from `getSiteIdentity()` (settings-store) — this is an EXTRA D1 read, deliberately

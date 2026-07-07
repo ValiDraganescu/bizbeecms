@@ -343,3 +343,42 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/components/settings/verification-editor.tsx,
   CMS/src/app/(admin)/admin/settings/verification/page.tsx,
   CMS/src/components/settings/settings-nav.tsx, CMS/messages/{en,fi,et}.json
+
+## 2026-07-07 12:13 — JSON-LD component kind — RENDER PATH tracer (JSON-LD track #1)
+- **Status:** DONE
+- **What I did:** A custom component can now be `kind:"jsonld"` — its artifact is a JSON
+  template (schema.org object with `{{prop}}` slots) that renders as an
+  `application/ld+json` script (funnelled onto `plan.jsonLd`), NOT visible HTML. Dynamic
+  detail/collection pages get correct per-URL structured data via the same prop-binding
+  machinery as HTML components. TRACER SCOPE = render path only (authoring/AI/canvas-chip
+  are the next backlog tasks — deliberately deferred per NEXT).
+  - **Schema:** `component.kind` TEXT NOT NULL DEFAULT 'html' + `draft_kind` TEXT (drizzle →
+    migration 0031_clean_nightcrawler.sql → applied --local). NULL/'' = 'html' (legacy).
+  - **Pure module** `lib/render/jsonld-component.ts` (dep-free, node-tested):
+    `escapeJsonForScript` (the `<`/`>`/`&`→`\uXXXX` breakout-safe escaper — EXTRACTED from
+    breadcrumb.ts, which now imports it → ONE escaper per the JSON-LD escaping caveat),
+    `bindJsonLdSlots` (STRING-level `{{prop}}` substitution — NOT the tree walk: a string
+    slot gets INNER JSON escaping so a `"` can't break the JSON literal; number/object slots
+    splice their JSON form verbatim so `"r":{{rating}}` works; undeclared slots → "" via the
+    propsSchema allowlist), `buildJsonLdComponent` (bind → JSON.parse validate → re-stringify
+    → escape; null on blank template OR invalid-after-binding JSON → never ships broken data).
+  - **Type:** `ComponentArtifact.kind?: "html"|"jsonld"` + `jsonTemplate?` (the raw JSON
+    template — jsonld binding is string-level, so we DON'T parseHtml it into a tree).
+  - **Render wiring:** `pickArtifactCols` threads kind/draftKind (draft prefers draftKind).
+    Both component-map build loops in render-page.tsx (public + Develop preview) skip
+    parseHtml for jsonld and carry the raw template; skip nested-tag enqueue (a jsonld
+    template composes nothing). `planPage` (tree.ts): a jsonld block binds props (schema
+    defaults merged under block props, locale objects resolved) → `buildJsonLdComponent` →
+    pushes onto a new `jsonLd[]` returned in the plan; the block itself renders a HIDDEN
+    placeholder (occupies its slot, zero visible text). render-page's auto-breadcrumb now
+    APPENDS to `plan.jsonLd` (was overwrite) so component + breadcrumb JSON-LD coexist.
+- **Verified:** `node --test jsonld-component.test.ts jsonld-plan.test.ts` (13 new) + breadcrumb
+  (still green after the escaper extraction); full `npm test` 1770/1770 (was 1757; +13);
+  `npx tsc --noEmit` exit 0; migration applied local. Did NOT run opennext build (heavy gate;
+  pure additive render-path change, tsc covers types) nor live rich-results validation (needs
+  a deployed site with a jsonld component authored — no authoring UI yet, so HITL-blocked until
+  the AUTHORING task lands).
+- **Files:** CMS/src/lib/render/jsonld-component.ts (+ .test.ts), CMS/src/lib/render/jsonld-plan.test.ts,
+  CMS/src/lib/render/breadcrumb.ts, CMS/src/lib/render/plan-types.ts, CMS/src/lib/render/tree.ts,
+  CMS/src/lib/render/render-page.tsx, CMS/src/db/schema.ts,
+  CMS/migrations/0031_clean_nightcrawler.sql, CMS/migrations/meta/*

@@ -1,43 +1,44 @@
 # Note to the next Meeseeks (seo-robots)
 
-**Search-engine verification tokens are DONE.** Per-site Google/Bing/Yandex
-site-verification tokens now emit as `<meta>` verification tags on every
-published page. Pure `lib/render/site-verification.ts` (normalize strips
-non-token chars → no injection; `buildVerificationMeta` → Next
-`Metadata.verification`, bing under `other["msvalidate.01"]`). Store
-`getSiteVerification`/`setSiteVerification` (key `site_verification`). Wired
-in `generateMetadata` ((site)/[[...slug]]). Admin REST + editor + page + nav
-link (Site group) + i18n EN/FI/ET. 7 unit tests, `npm test` 1757/1757, tsc clean.
-See CAVEATS for the token-strip + Next-shape gotchas.
+**JSON-LD component kind — RENDER PATH is DONE (tracer).** A `component.kind`
+('html'|'jsonld') + `draft_kind` (migration 0031) now exists. A jsonld component's
+`html` column is a JSON TEMPLATE with `{{prop}}` slots; `planPage` funnels it onto
+`plan.jsonLd` as an `application/ld+json` script (hidden placeholder in the flow, no
+visible HTML). Pure `lib/render/jsonld-component.ts` (`escapeJsonForScript` — now the
+SHARED escaper breadcrumb.ts imports too — `bindJsonLdSlots`, `buildJsonLdComponent`).
+13 unit tests, `npm test` 1770/1770, tsc clean, migration applied local. See CAVEATS for
+the string-level-binding + template-quote-omission gotchas.
+
+**IMPORTANT: nothing WRITES kind yet.** The render path reads it, but no create/update
+path sets it and there's no way to author a jsonld component. So the render tracer is
+un-exercisable live until the authoring task lands.
 
 **Take next — pick one, in rough priority order:**
 
-1. **JSON-LD component kind — render path first (tracer)** (the big track, still
-   untouched): add a `kind` discriminator to custom components (`html` default |
-   `jsonld`); a jsonld artifact renders as `<script type="application/ld+json">`
-   with JSON-STRING escaping (NOT the HTML escape path — reuse breadcrumb.ts's
-   escaper / consider funnelling onto `plan.jsonLd`); builder canvas shows a
-   placeholder chip; draft/publish lifecycle unchanged. One end-to-end proof
-   component. This is a multi-file track — scope tightly (render path only this run).
+1. **JSON-LD authoring surface** (finishes the JSON-LD track's core value):
+   `create_component`/`update_component` (chat write-tools) + the Develop editor accept
+   `kind:"jsonld"` and write `component.kind`/`draft_kind`. Publish copies `draft_kind→kind`,
+   discard clears it — MIRROR the existing html/script/css draft columns (find where publish/
+   discard copy those and add kind alongside). Builder canvas: a jsonld block renders an EMPTY
+   `data-block-wrap` placeholder — show an invisible-element CHIP so operators can select/delete
+   it. Ship ONE proof jsonld component authored → published → validated in Google Rich Results.
+   (After this, the render tracer is finally exercisable end-to-end.)
 
-2. **Designated branded 404 page** (Page-level SEO controls): site setting picks a
-   published page; `(site)` catch-all miss renders it in the active locale with HTTP
-   404 + robots noindex; non-200 never edge-cached (worker gate is GET-200-only; assert).
+2. **JSON-LD × bindings** (backlog): collection/`:param` bindings interpolate into a jsonld
+   component so wildcard detail pages get per-URL structured data. The bind machinery hydrates
+   `block.props` BEFORE the pure walk (hydrateBlockBindings in render-page.tsx) — a jsonld block
+   reads the SAME `block.props`, so single-item binds likely already pass through; verify + add a
+   unit test for the escaping through a bound value. (Do #1 first — can't test live otherwise.)
 
-3. **Serve `/llms.txt`** (AI-crawler surface): site name/description from brand
-   identity + the published-page tree with links to each page's `.md` variant;
-   reuse `publishedPagePaths`; force-dynamic like sitemap/robots; skip when origin
-   unknown. (Pairs with the markdown-page-variants task.)
+3. **Teach the AI the jsonld kind** (backlog): create/update tools validate the artifact parses
+   as JSON with `@context`/`@type`, authoring-guide section, self-correcting errors naming the
+   bad token. (Needs #1's tool plumbing.)
 
-**Patterns just used (copy):** the SETTINGS-FEATURE recipe is now very stable —
-pure dep-free `lib/render/*.ts` normalizer + `.test.ts` (node --test); settings-store
-`get*/set*` on a `site_settings` key (defensive read → default); force-dynamic REST
-`api/settings/<x>` (requireAdmin, PUT writes-through the normalizer); "use client"
-editor that adopts the server-normalized result; explicit `(admin)/admin/settings/<x>`
-page (beats the catch-all, D1-unbound offline → default); nav link in settings-nav.tsx;
-i18n EN/FI/ET (`settingsNav.<x>` + a `<x>` namespace). Verification, robots, redirects
-all follow it — copy one wholesale.
+**Patterns just used (copy):** shared escaper lives in `jsonld-component.ts`; the SETTINGS-FEATURE
+recipe (still stable) is in the prior NEXT if you pick a settings task instead. Component
+draft/publish uses `draft_*` columns on the row (NOT a version table) — grep `hasDraft`/`draftHtml`
+for the publish/discard copy sites when you add `draft_kind` handling.
 
-**HITL pending (note, don't do):** on a DEPLOYED site, paste a real Google/Bing token
-and confirm Search Console / Webmaster Tools verifies. No worker.ts edit → no r-* release
-needed for this to ship.
+**HITL pending (note, don't do):** the render tracer can't be validated live until authoring
+lands. No worker.ts edit → no r-* release needed. Migration 0031 is applied --local ONLY;
+prod D1 gets it at the next deploy (deployer runs migrations apply --remote).

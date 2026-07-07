@@ -33,9 +33,15 @@ export const component = sqliteTable(
     id: text("id").primaryKey(),
     // Stable identifier the page block tree references (e.g. "PricingCard").
     name: text("name").notNull(),
+    // Component KIND (seo-robots JSON-LD track): "html" (default) renders `html`
+    // as visible markup; "jsonld" treats `html` as a JSON TEMPLATE (schema.org
+    // object with `{{prop}}` slots) emitted as an application/ld+json script — no
+    // visible HTML. See lib/render/jsonld-component.ts. NULL/"" = "html" (legacy).
+    kind: text("kind").notNull().default("html"),
     // Handlebars-style HTML string the Worker parses to an element tree and SSRs
     // via React.createElement (a data walk — never eval'd). `{{prop}}` /
     // `{{t prop}}` slots are bound at render time. See lib/render/parse-html.ts.
+    // For a "jsonld" component this holds the JSON template instead of HTML.
     html: text("html").notNull().default(""),
     // AI-authored client JS shipped to the browser as a <script> string. The
     // Worker forwards it as data; the browser executes it. Empty = static.
@@ -55,6 +61,8 @@ export const component = sqliteTable(
     // edit writes the draft_* columns and sets has_draft=1; PUBLISH copies draft_*
     // → live and clears has_draft; DISCARD clears draft_*. Preview routes read
     // draft_* when has_draft=1 (else live). NULL draft columns = "no pending draft".
+    // Pending-draft copy of `kind` (null = no pending change to the kind).
+    draftKind: text("draft_kind"),
     draftHtml: text("draft_html"),
     draftScript: text("draft_script"),
     draftCss: text("draft_css"),

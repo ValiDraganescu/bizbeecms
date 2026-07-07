@@ -44,6 +44,7 @@ import {
   placeholder,
 } from "./plan-types.ts";
 import { planTree, declaredProps, schemaDefaults, bindTree, type IconMap } from "./plan-tree.ts";
+import { buildJsonLdComponent } from "./jsonld-component.ts";
 import { planSection, planColumn, planRow } from "./plan-section.ts";
 import { planList, LIST_AUTOSCROLL_ASSET_KEY, LIST_AUTOSCROLL_SCRIPT } from "./plan-list.ts";
 import { planForm, FORM_ENHANCE_ASSET_KEY, FORM_ENHANCE_SCRIPT } from "./plan-form.ts";
@@ -171,6 +172,7 @@ export function planPage(
 ): RenderPlan {
   const scripts: string[] = [];
   const styles: string[] = [];
+  const jsonLd: string[] = [];
   const seenAssets = new Set<string>();
 
   // Ship a component's client script + scoped CSS once (first-use order). Shared
@@ -268,6 +270,39 @@ export function planPage(
     if (!artifact) {
       return placeholder(`unknown component "${block.component}"`);
     }
+
+    // JSON-LD component (seo-robots): renders structured data, NOT visible HTML.
+    // Bind the block's declared props (locale-resolved) into its JSON template,
+    // build the escaped ld+json payload, and stash it onto plan.jsonLd. The block
+    // itself renders a hidden placeholder so it still occupies its slot (and the
+    // builder canvas can show a chip). A broken template/interpolation → null → no
+    // script emitted (and a hidden marker naming the skip).
+    if (artifact.kind === "jsonld") {
+      // buildJsonLdComponent applies the propsSchema allowlist itself; we only
+      // merge the schema defaults under the block props + resolve locale objects.
+      const merged = {
+        ...schemaDefaults(artifact.propsSchema),
+        ...(block.props && typeof block.props === "object" ? block.props : {}),
+      };
+      const values = locale
+        ? (resolveLocalized(merged, locale.locale, locale.fallback) as Record<
+            string,
+            unknown
+          >)
+        : merged;
+      const payload = buildJsonLdComponent(
+        artifact.jsonTemplate ?? "",
+        values,
+        artifact.propsSchema,
+      );
+      if (payload) jsonLd.push(payload);
+      return placeholder(
+        payload
+          ? `jsonld component "${block.component}"`
+          : `jsonld component "${block.component}" produced no valid JSON`,
+      );
+    }
+
     // Ship this component's script once.
     collectScript(artifact);
 
@@ -337,6 +372,9 @@ export function planPage(
     root: locale ? localizePlanLinks(root, locale) : root,
     scripts,
     styles,
+    // JSON-LD from jsonld-kind component blocks (first-seen order). The render host
+    // (buildPlanFromPage) may APPEND auto data (e.g. BreadcrumbList) to this array.
+    ...(jsonLd.length > 0 ? { jsonLd } : {}),
   };
 }
 

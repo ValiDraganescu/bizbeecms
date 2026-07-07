@@ -332,9 +332,25 @@ export type Block = {
   formPageId?: string;
 };
 
+/**
+ * Component KIND (seo-robots / JSON-LD track):
+ *  - "html"   — the default: `tree` is an element tree rendered to visible HTML.
+ *  - "jsonld" — a structured-data component: the artifact's `html` column holds a
+ *    JSON TEMPLATE (schema.org object with `{{prop}}` slots), interpolated + emitted
+ *    onto `RenderPlan.jsonLd` as an `application/ld+json` script (NO visible HTML).
+ *    See lib/render/jsonld-component.ts.
+ * Absent = "html" (all legacy components predate the kind column).
+ */
+export type ComponentKind = "html" | "jsonld";
+
 // A component artifact as stored (the fields the renderer needs).
 export type ComponentArtifact = {
   name: string;
+  /** "jsonld" components render onto plan.jsonLd, not the HTML tree. Absent = "html". */
+  kind?: ComponentKind;
+  /** For a jsonld component, the RAW JSON template string (the artifact `html` column,
+   *  unparsed — jsonld binding is string-level, not the tree walk). Empty for html. */
+  jsonTemplate?: string;
   tree: TreeNode;
   script?: string;
   /** Component-scoped CSS (the artifact's `css` column). Shipped once per used
