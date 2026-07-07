@@ -369,3 +369,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   deployed-site HITL check (per CAVEATS).
 - **Files:** CMS/src/lib/pages/page-meta.ts, page-meta.test.ts,
   CMS/src/db/page-store.ts, CMS/src/app/api/pages/route.ts
+
+## 2026-07-07 09:05 — Operator docs: URL locales + edge cache
+- **Status:** DONE
+- **What I did:** Wrote the first user-facing doc for this goal's Stage 1/2
+  (NEXT.md's highest-value remaining slice; backlog was empty of code work, no
+  open bugs). New `CMS/docs/url-locales-and-edge-cache.md` — operator guide
+  covering: URL-path locales (default unprefixed, `/fi/...` for extras), the
+  navigating LanguageSwitcher, auto-translated internal links, the reserved
+  top-level-slug-vs-locale rule, localized slugs (`/fi/meista`, per-locale slug
+  fields, empty=fallback, sibling uniqueness, one canonical URL per locale),
+  SEO (canonical/hreflang/sitemap), and the per-page edge cache (Off/5m/1h/1d
+  opt-in, what's never cached, and the full publish/path-change/site-wide purge
+  matrix). Every factual claim cross-checked against code: CACHE_MAX_AGE_OPTIONS
+  + `page.cacheOption*` strings, and all 8 `purgeEdgeTags` call sites (pages,
+  publish, theme, theme/fonts, brand, content-locales, components). Linked it
+  from `CMS/README.md` under a new "Docs" section.
+- **Verified:** Docs-only change — no code/tests/build touched. Facts verified by
+  grepping the source (page-meta.ts, page-settings.tsx, messages/en.json, the
+  purge call sites). No build needed.
+- **Files:** CMS/docs/url-locales-and-edge-cache.md (new), CMS/README.md

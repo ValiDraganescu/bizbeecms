@@ -6,6 +6,9 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Tasks
 
+### Docs
+- DONE: Operator guide "URL locales + edge cache" (`CMS/docs/url-locales-and-edge-cache.md`, linked from CMS/README.md) — prefixes, localized slugs, cache opt-in, purge behavior. First user-facing doc for Stage 1/2. Facts cross-checked against code.
+
 ### Stage 1 — locale-prefixed routes (do first: kills the Vary: Cookie need before caching ships)
 - DONE: Extract the `resolvePage` tree walk + slug/plan resolution out of `CMS/src/app/[[...slug]]/page.tsx` into a shared lib module (e.g. `src/lib/render/resolve-page.ts`) so the later custom-worker cache wrapper can reuse it; page.tsx becomes a thin caller; all existing tests pass.
 - DONE: Locale-prefix routing: teach the `[[...slug]]` route (via a pure helper in `lib/render/slug.ts`, unit-tested) to peel a leading segment matching a configured NON-default content locale — default locale stays unprefixed, `/` and `/<code>` both resolve HOME_SLUG; `render-page.tsx` takes the active locale from the route instead of the `bb_content_locale` cookie; preview keeps its explicit locale selection.

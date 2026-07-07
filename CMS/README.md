@@ -43,6 +43,12 @@ When the PM provisions a Site it overrides the Worker `name` (e.g.
 `bizbeecms-cms-<site-slug>`) via the Cloudflare API. `name` in `wrangler.jsonc`
 is just the local/default name.
 
+## Docs
+
+- [URL locales + edge cache](docs/url-locales-and-edge-cache.md) — how published
+  pages pick a language from the URL (prefixes, localized slugs) and the per-page
+  edge cache (opt-in + publish-time purge). Operator-facing.
+
 ## Notes
 
 - Run all CMS commands from inside `CMS/` (separate npm package, own `node_modules`).
