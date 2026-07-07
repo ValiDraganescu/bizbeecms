@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "1.25.2",
-      "tag": "r-1.25.2",
-      "markdown": "# CMS v1.25.2\n\n_2026-07-08 · changes since r-1.25.1_\n\n## Fixes\n- Component previews in the Develop workbench, the page-builder rail, and the AI assistant's screenshots now always reflect the latest draft. Previously, after you edited a component the preview could keep showing the old version because a deployed Site was caching preview pages in the browser for up to a year. Previews are no longer browser-cached (only the read-only components gallery still caches, and it busts on every save), and existing stale cache entries are bypassed automatically.\n"
+      "version": "1.25.3",
+      "tag": "r-1.25.3",
+      "markdown": "# CMS v1.25.3\n\n_2026-07-08 · changes since r-1.25.2_\n\n## Fixes\n- Publishing a component no longer leaves a phantom \"unpublished changes\" draft behind. Two things caused the notice to reappear the instant you published: pending edits to prop defaults were saved a moment too late (after the publish) and re-created the draft, and a formatting-only difference between how the Develop editor and the AI write the same markup was mistaken for a real change. Both are fixed — after you publish, the component is genuinely clean.\n"
     },
     {
       "version": "1.24.0",
