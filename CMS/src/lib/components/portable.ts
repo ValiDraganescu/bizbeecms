@@ -217,6 +217,12 @@ export interface ComponentRow {
   tags?: string | null;
   /** Optional human display label (UI only; not part of the portable bundle). */
   label?: string | null;
+  /**
+   * Component kind: 'html' (default) renders visible markup; 'jsonld' emits an
+   * `application/ld+json` script from a JSON template. UI-only (like `label`) —
+   * NOT part of the portable bundle; `serializeComponent` deliberately ignores it.
+   */
+  kind?: string | null;
   /** Last-mutation timestamp (UI cache-busting only; not part of the bundle). */
   updatedAt?: Date | null;
 }

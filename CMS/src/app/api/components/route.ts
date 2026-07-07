@@ -52,6 +52,11 @@ export async function GET(request: Request): Promise<Response> {
           "Content-Type": "application/json",
           // Offer a sensible download filename when fetched directly.
           "Content-Disposition": `attachment; filename="${row.name}.component.json"`,
+          // Kind is UI-only and deliberately NOT in the portable bundle (like
+          // `label`), but the Develop editor needs to know a loaded component's
+          // kind to pick the HTML vs JSON-LD workbench. Ship it out-of-band in a
+          // header so the JSON download stays a clean portable bundle.
+          "X-Component-Kind": row.kind ?? "html",
         },
       });
     }

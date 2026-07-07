@@ -198,8 +198,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   it emits no HTML/JS. The PUT route + tool-dispatch still run `lintComponentScript`/
   `reconcileComponentClasses` over the artifact, but the tree/script/css are empty so those are
   harmless no-ops. Don't add a jsonld-specific guard there; the empty inputs already handle it.
-- (2026-07-07) NOT YET DONE for jsonld authoring: `getComponentByName`/`serializeComponent`/
-  `ComponentRow` do NOT carry `kind` — the export bundle + Develop editor can't tell a loaded
-  component's kind yet. Add `kind`/`draftKind` to that read path when building the editor UI, or a
-  round-trip save from the editor (which omits kind) is fine (preserve-when-absent) but the editor
-  can't SHOW the kind or switch it. The AI + PUT-with-kind can already author jsonld end-to-end.
+- (2026-07-07) jsonld READ path now carries kind: `ComponentRow.kind?: string|null` +
+  `getComponentByName` returns the EFFECTIVE kind (live → `kind`; draft read → `draftKind ?? kind`,
+  matching publishComponentDraft). `kind` is UI-ONLY — `serializeComponent` deliberately EXCLUDES it
+  from the portable bundle (pinned by portable.test.ts); it must never leak into a cross-Site bundle.
+  GET `/api/components?name=` ships it out-of-band in the `X-Component-Kind` response HEADER (default
+  "html") so the Develop editor can read the loaded kind without polluting the bundle JSON — the
+  `?draft=1` refetch returns the draft kind. The editor UI PROPER (kind toggle, JSON-template pane,
+  save PUT kind:jsonld) is still TODO; it reads kind from that header. `listComponents` (the gallery
+  list) still doesn't select kind — add it there if the rail ever needs to badge jsonld components.

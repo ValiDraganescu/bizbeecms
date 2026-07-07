@@ -407,3 +407,25 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (needs binding) and there's still no editor UI to author a jsonld component by hand — see NEXT.
 - **Files:** CMS/src/lib/chat/component-tool.ts, CMS/src/lib/chat/component-tool.test.ts,
   CMS/src/db/component-store.ts, CMS/src/app/api/components/[name]/route.ts
+
+## 2026-07-07 12:26 — JSON-LD READ path surfaces kind (Develop-editor prerequisite)
+- **Status:** DONE
+- **What I did:** The component READ path now carries `kind` so the (upcoming) Develop
+  editor can tell a loaded component's kind. This is step 1 of the NEXT-note editor task —
+  the render + write paths already handle kind; only the read/export path was blind to it.
+  - `ComponentRow.kind?: string | null` (portable.ts) — documented UI-only, like `label`;
+    `serializeComponent` deliberately does NOT put it in the portable bundle.
+  - `getComponentByName` now selects `kind` + `draftKind` and returns the EFFECTIVE kind:
+    live read → `r.kind`; draft read (`preferDraft && hasDraft`) → `r.draftKind ?? r.kind`
+    (mirrors publishComponentDraft's `draftKind ?? kind` fallback — draft_kind is null when
+    no pending kind change, so it correctly falls back to live).
+  - GET `/api/components?name=` ships the kind out-of-band in an `X-Component-Kind` response
+    header (default "html") — keeps the JSON body a clean portable bundle (kind excluded per
+    the caveat) while giving the editor the kind. The `?draft=1` refetch gets the draft kind.
+- **Verified:** 2 new pure tests (serializeComponent excludes kind for jsonld AND html —
+  pins the bundle-exclusion invariant); `node --test portable.test.ts` 2/2; full `npm test`
+  1781/1781 (was 1779; +2); `npx tsc --noEmit` exit 0. Did NOT run opennext build (heavy gate;
+  additive read-path change, tsc covers types) nor live-fetch (needs D1 binding — HITL). The
+  editor UI itself (kind toggle, JSON-template pane, save PUT) is still TODO — see NEXT.
+- **Files:** CMS/src/lib/components/portable.ts (+ .test.ts new),
+  CMS/src/db/component-store.ts, CMS/src/app/api/components/route.ts

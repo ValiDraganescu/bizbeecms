@@ -19,13 +19,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   (staged only on kind change); `publishComponentDraft` copies draft_kind→kind, `discard` clears it;
   PUT `/api/components/<name>` forwards `kind`; CREATE_COMPONENT_TOOL gained `kind` enum (AI dispatch
   passes artifact through unchanged). 9 new tests, 1779/1779.
-- TODO: JSON-LD authoring — Develop editor UI: a kind toggle (HTML | JSON-LD) in the component
-  workbench; when JSON-LD, the code editor edits the JSON template (label it, drop the script/css
-  panes), the standalone preview shows the emitted `<script type=application/ld+json>` inner JSON
-  (or a Google Rich Results deep-link), and the save PUT sends `kind:"jsonld"`. Also surface `kind`
-  in the GET export bundle / getComponentByName so the editor knows a loaded component's kind (today
-  serializeComponent/ComponentRow carry no kind — add it). One proof jsonld component authored via
-  the UI → published → validated in Google Rich Results.
+- DONE (2026-07-07): READ-path prereq for the editor — `ComponentRow.kind` +
+  `getComponentByName` returns the effective kind (draft: `draftKind ?? kind`); GET
+  `/api/components?name=` ships `X-Component-Kind` header (bundle stays kind-free). 2 new tests.
+- TODO: JSON-LD authoring — Develop editor UI PROPER (read-path prereq above is DONE): a kind
+  toggle (HTML | JSON-LD) in the component workbench; when JSON-LD, the code editor edits the JSON
+  template (label it, drop the script/css panes), the standalone preview shows the emitted
+  `<script type=application/ld+json>` inner JSON (or a Google Rich Results deep-link), and the save
+  PUT sends `kind:"jsonld"`. The editor reads the loaded kind from the `X-Component-Kind` header on
+  the GET. One proof jsonld component authored via the UI → published → validated in Google Rich Results.
 - TODO: Builder canvas invisible-element CHIP for a jsonld block (renders no visible HTML — the
   `data-block-wrap` placeholder is empty; show a selectable/deletable chip so operators can manage it).
 - TODO: JSON-LD × bindings: collection/data-source bindings interpolate into jsonld components exactly like HTML content (wildcard `:param` detail pages get per-URL structured data); verify the existing bind machinery passes through or add the minimal seam; unit-test the interpolation escaping.

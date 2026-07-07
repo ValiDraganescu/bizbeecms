@@ -153,6 +153,8 @@ export async function getComponentByName(
       draftCss: schema.component.draftCss,
       draftPropsSchema: schema.component.draftPropsSchema,
       draftLabel: schema.component.draftLabel,
+      kind: schema.component.kind,
+      draftKind: schema.component.draftKind,
     })
     .from(schema.component)
     .where(eq(schema.component.name, name))
@@ -168,6 +170,10 @@ export async function getComponentByName(
     propsSchema: useDraft ? r.draftPropsSchema : r.propsSchema,
     tags: r.tags,
     label: useDraft ? r.draftLabel : r.label,
+    // draft_kind is null when there's no pending kind change, so the draft's
+    // effective kind falls back to live (mirrors publishComponentDraft's
+    // `draftKind ?? kind`). Live read always returns the committed kind.
+    kind: useDraft ? r.draftKind ?? r.kind : r.kind,
   };
 }
 
