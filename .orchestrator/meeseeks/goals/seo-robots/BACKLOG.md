@@ -6,42 +6,21 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Tasks
 
-### JSON-LD components (kind: jsonld)
-- DONE (2026-07-07): JSON-LD component kind — RENDER PATH tracer. `component.kind`
-  ('html'|'jsonld') + `draft_kind` columns (migration 0031); pure `jsonld-component.ts`
-  (shared `escapeJsonForScript`, `bindJsonLdSlots`, `buildJsonLdComponent`); planPage funnels
-  a jsonld block onto `plan.jsonLd` (hidden placeholder in flow); breadcrumb now APPENDS.
-  AUTHORING (create/update component with kind, builder chip, draft/publish of the kind) is
-  the NEXT tasks below — the render path reads kind but nothing WRITES it yet.
-- DONE (2026-07-07): JSON-LD authoring WRITE PATH. `ComponentArtifactInput.kind`/`jsonTemplate`;
-  `validateComponentArtifact` jsonld branch (probe `{{slot}}`→`0`, require JSON object w/ @context+@type,
-  self-correcting errors); `upsertComponent` writes html-col from jsonTemplate + persists kind/draftKind
-  (staged only on kind change); `publishComponentDraft` copies draft_kind→kind, `discard` clears it;
-  PUT `/api/components/<name>` forwards `kind`; CREATE_COMPONENT_TOOL gained `kind` enum (AI dispatch
-  passes artifact through unchanged). 9 new tests, 1779/1779.
-- DONE (2026-07-07): READ-path prereq for the editor — `ComponentRow.kind` +
-  `getComponentByName` returns the effective kind (draft: `draftKind ?? kind`); GET
-  `/api/components?name=` ships `X-Component-Kind` header (bundle stays kind-free). 2 new tests.
-- TODO: JSON-LD authoring — Develop editor UI PROPER (read-path prereq above is DONE): a kind
-  toggle (HTML | JSON-LD) in the component workbench; when JSON-LD, the code editor edits the JSON
-  template (label it, drop the script/css panes), the standalone preview shows the emitted
-  `<script type=application/ld+json>` inner JSON (or a Google Rich Results deep-link), and the save
-  PUT sends `kind:"jsonld"`. The editor reads the loaded kind from the `X-Component-Kind` header on
-  the GET. One proof jsonld component authored via the UI → published → validated in Google Rich Results.
+### JSON-LD components (kind: jsonld) — machinery proven end-to-end; only the authoring SURFACE remains
+- TODO: JSON-LD authoring — Develop editor UI PROPER (render/write/read paths + bindings all DONE,
+  see JOURNAL 2026-07-07): a kind toggle (HTML | JSON-LD) in the component workbench; when JSON-LD,
+  the code editor edits the JSON template (label it, drop the script/css panes), the standalone
+  preview shows the emitted `<script type=application/ld+json>` inner JSON (or a Google Rich Results
+  deep-link), and the save PUT sends `kind:"jsonld"`. The editor reads the loaded kind from the
+  `X-Component-Kind` header on the GET (`?draft=1` refetch returns draft kind). Optional nit while
+  there: `listComponents` doesn't select `kind` — add it if the gallery rail should badge jsonld
+  components. One proof jsonld component authored via the UI → published → validated in Google
+  Rich Results (HITL).
 - TODO: Builder canvas invisible-element CHIP for a jsonld block (renders no visible HTML — the
   `data-block-wrap` placeholder is empty; show a selectable/deletable chip so operators can manage it).
-- DONE (2026-07-07): JSON-LD × bindings — VERIFIED no seam needed. `hydrateBlockBindings`
-  (render-page.tsx) is component-AGNOSTIC: it resolves `block.bindings` (collection query via
-  `hydrateProps`) + route refs (`{param}`/`{query}` via `resolveRouteProps`) INTO `block.props`
-  BEFORE the pure walk; a jsonld block reads that same hydrated `block.props` in planPage exactly
-  like an html component. Regression: `jsonld-bindings.test.ts` (4 tests) drives the real
-  hydrateProps→resolveRouteProps→planPage hand-off — collection-bound row, `:slug` route-param,
-  `</script>` breakout escaped through the full pipeline, unresolved binding → schema default.
-  1785/1785, tsc clean.
-- TODO: Teach the AI the jsonld kind — REMAINING: the tool `kind` param + JSON/@context/@type
-  validation with self-correcting errors are DONE (2026-07-07). Still TODO: an AUTHORING-GUIDE
-  section (schema.org patterns per page type — Product/Article/FAQPage/Recipe — and the slot-quoting
-  rules) so the model knows WHEN to author a jsonld component and how to bind props into it.
+- TODO: AI authoring-guide section for jsonld (tool `kind` param + validation are DONE): schema.org
+  patterns per page type — Product/Article/FAQPage/Recipe — the slot-quoting rules (`"n":{{count}}`
+  unquoted vs `"n":"{{name}}"` quoted), and WHEN to author a jsonld component vs plain content.
 
 ### AI write-path coherence (IndexNow + edge purge)
 - TODO: Notify IndexNow (and purge edge cache) on the AI live-write paths: `handleCreatePage` → `upsertPage` can publish/unpublish or rewrite a PUBLISHED page's live blocks, and `handleTranslate` → translate-store rewrites a published page's live metaTitle/metaDescription — neither calls notifyIndexNowForPage nor purge-edge (the REST pages/publish routes do both). Add the same best-effort post-write block (ctx.waitUntil, never fails the tool result) after successful upsertPage/applyTranslation in tool-dispatch. — queued by scrub: AI authoring is a first-class write path; today an AI publish never pings IndexNow and an AI edit of a cached published page (cache_max_age>0) leaves the edge stale until TTL.

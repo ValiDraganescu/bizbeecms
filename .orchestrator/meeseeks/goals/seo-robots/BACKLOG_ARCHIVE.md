@@ -14,3 +14,7 @@ The full record lives in JOURNAL.md; this is the trimmed backlog trace.
 - 2026-07-07 IndexNow notify on noindex OFF→ON: pre-captured URLs before meta write, pure transition helper, best-effort.
 - 2026-07-07 Auto BreadcrumbList JSON-LD at plan time for depth≥1 pages; cycle-safe ancestor chain, breakout-safe escaping, RenderPlan.jsonLd.
 - 2026-07-07 Per-site Google/Bing/Yandex verification tokens: settings + REST + editor, emitted via Metadata.verification, injection-stripping normalizer.
+- 2026-07-07 JSON-LD component kind render tracer: kind/draft_kind columns, string-level slot binder, planPage funnels payload onto plan.jsonLd.
+- 2026-07-07 JSON-LD authoring write path: template probe validation, upsert/publish/discard kind handling, PUT + AI tool kind param.
+- 2026-07-07 JSON-LD read path: getComponentByName effective kind, X-Component-Kind header for the editor; portable bundle stays kind-free.
+- 2026-07-07 JSON-LD × bindings verified seamless: hydrated block.props feeds jsonld templates; regression tests incl. escaping, route params.
