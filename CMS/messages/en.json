@@ -667,6 +667,8 @@
       "maxSizeHint": "Content past this scrolls.",
       "autoscroll": "Auto-scroll",
       "autoscrollSpeed": "Speed",
+      "itemList": "Emit ItemList JSON-LD",
+      "itemListHint": "Aggregates the rows into one schema.org ItemList for search engines. Needs a JSON-LD component as the list template.",
       "speedSlow": "Slow",
       "speedNormal": "Normal",
       "speedFast": "Fast",

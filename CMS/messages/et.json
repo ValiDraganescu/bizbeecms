@@ -667,6 +667,8 @@
       "maxSizeHint": "Sellest suurem sisu keritakse.",
       "autoscroll": "Automaatkerimine",
       "autoscrollSpeed": "Kiirus",
+      "itemList": "Väljasta ItemList JSON-LD",
+      "itemListHint": "Koondab read üheks schema.org ItemList-struktuuriks otsingumootoritele. Vajab JSON-LD-komponenti loendi mallina.",
       "speedSlow": "Aeglane",
       "speedNormal": "Tavaline",
       "speedFast": "Kiire",

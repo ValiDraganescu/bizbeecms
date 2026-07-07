@@ -741,6 +741,7 @@ export function ListSettings({
     maxSizeUnit: source?.maxSizeUnit,
     autoscroll: source?.autoscroll,
     autoscrollSpeed: source?.autoscrollSpeed,
+    itemList: source?.itemList,
   };
   // Carry the combobox config through edits (emitSource rebuilds `src` fresh).
   const cb = {
@@ -807,6 +808,7 @@ export function ListSettings({
       if (l.maxSizeUnit === "rem") src.maxSizeUnit = "rem";
       if (l.autoscroll) src.autoscroll = true;
       if (l.autoscrollSpeed && l.autoscrollSpeed !== "normal") src.autoscrollSpeed = l.autoscrollSpeed;
+      if (l.itemList) src.itemList = true;
     }
     // Persist presentation + combobox config only in combobox mode (keeps plain
     // Lists byte-identical to before). Each field carries over unless overridden.
@@ -1109,6 +1111,17 @@ export function ListSettings({
                   </select>
                 </label>
               )}
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={layout.itemList === true}
+                  aria-label={t("list.itemList")}
+                  onChange={(e) => emitSource({ itemList: e.target.checked || undefined })}
+                />
+                <span className={ctlLabel}>{t("list.itemList")}</span>
+              </label>
+              <span className="text-xs text-foreground-muted">{t("list.itemListHint")}</span>
             </div>
           )}
 

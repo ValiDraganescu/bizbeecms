@@ -362,6 +362,13 @@ export const BIND_LIST_TOOL = {
           enum: ["slow", "normal", "fast"],
           description: "list: auto-scroll speed (default 'normal').",
         },
+        itemList: {
+          type: "boolean",
+          description:
+            "list SEO: when true, emit ONE schema.org ItemList JSON-LD aggregating the rows " +
+            "(instead of a separate per-row script). Only meaningful when the list `template` " +
+            "is a JSON-LD-kind component (kind:'jsonld'); with a plain HTML template it does nothing.",
+        },
         select: {
           type: "string",
           enum: ["single", "multiple"],
@@ -571,6 +578,8 @@ export interface BindListArgs {
   maxSize?: number;
   autoscroll?: boolean;
   autoscrollSpeed?: "slow" | "normal" | "fast";
+  /** Emit ONE schema.org ItemList JSON-LD over the rows (needs a jsonld template). */
+  itemList?: boolean;
   select?: "single" | "multiple";
   min?: number;
   max?: number;
@@ -658,6 +667,7 @@ export function validateBindList(args: unknown): ArgResult<BindListArgs> {
   const autoscrollSpeed = str(rec, "autoscrollSpeed");
   if (autoscrollSpeed === "slow" || autoscrollSpeed === "normal" || autoscrollSpeed === "fast") out.autoscrollSpeed = autoscrollSpeed;
   else if (autoscrollSpeed) return { ok: false, error: 'autoscrollSpeed must be "slow", "normal", or "fast"' };
+  if (typeof rec.itemList === "boolean") out.itemList = rec.itemList;
   const select = str(rec, "select");
   if (select === "single" || select === "multiple") out.select = select;
   else if (select) return { ok: false, error: 'select must be "single" or "multiple"' };

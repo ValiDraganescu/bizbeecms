@@ -114,3 +114,20 @@ test("bind_list: bad direction / autoscrollSpeed enums are rejected", () => {
   assert.equal(validateBindList({ page: "p", block: "b", direction: "diagonal" }).ok, false);
   assert.equal(validateBindList({ page: "p", block: "b", autoscrollSpeed: "warp" }).ok, false);
 });
+
+test("bind_list: itemList JSON-LD toggle parses through (on and off)", () => {
+  const on = validateBindList({ page: "p", block: "b", itemList: true });
+  assert.ok(on.ok);
+  assert.equal(on.value.itemList, true);
+  const off = validateBindList({ page: "p", block: "b", itemList: false });
+  assert.ok(off.ok);
+  assert.equal(off.value.itemList, false, "false must survive so the AI can turn it OFF");
+  // Absent = untouched (preserve-when-absent, no invented default).
+  const absent = validateBindList({ page: "p", block: "b" });
+  assert.ok(absent.ok);
+  assert.equal(absent.value.itemList, undefined);
+  // A non-boolean is ignored, not accepted.
+  const bad = validateBindList({ page: "p", block: "b", itemList: "yes" });
+  assert.ok(bad.ok);
+  assert.equal(bad.value.itemList, undefined);
+});

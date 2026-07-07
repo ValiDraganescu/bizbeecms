@@ -667,6 +667,8 @@
       "maxSizeHint": "Tämän ylittävä sisältö vierii.",
       "autoscroll": "Automaattivieritys",
       "autoscrollSpeed": "Nopeus",
+      "itemList": "Tuota ItemList JSON-LD",
+      "itemListHint": "Kokoaa rivit yhdeksi schema.org ItemList -rakenteeksi hakukoneille. Vaatii JSON-LD-komponentin listan mallina.",
       "speedSlow": "Hidas",
       "speedNormal": "Normaali",
       "speedFast": "Nopea",

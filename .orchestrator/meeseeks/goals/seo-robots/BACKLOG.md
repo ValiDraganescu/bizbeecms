@@ -11,12 +11,10 @@ Task states: TODO | DOING | DONE | BLOCKED.
   shipped: per-row Product/Article already worked via composition (jsonld component as List
   template child → per-row scripts); added the AGGREGATE `ItemList` path via
   `listSource.itemList:true` + `buildItemListJsonLd` + planList/emitItemList (4 tests).
-- TODO: ItemList AUTHORING surface (follow-up to the render machinery above): (a) a List
-  settings-panel toggle "Emit ItemList JSON-LD" writing `listSource.itemList` (mirror the
-  `autoscroll` checkbox in binding-panels.tsx ListSettings `layout` reducer), localized EN/FI/ET;
-  (b) let the AI set it (the create-list / update-list tool path in tool-dispatch.ts builds
-  `listSource` — add `itemList` there). The RENDER + STORAGE round-trip is done; this is just the
-  operator/AI knob to turn it on.
+- DONE (2026-07-07): ItemList AUTHORING surface. (a) Builder checkbox "Emit ItemList JSON-LD" in
+  binding-panels.tsx ListSettings layout section (mirrors autoscroll; `list.itemList`/`itemListHint`
+  EN/FI/ET). (b) AI `bind_list` tool gained an `itemList` boolean (schema + BindListArgs + validate
+  + handleBindList patch). Closes the whole jsonld-List track (render+storage were already done).
 - TODO: AI authoring-guide section for jsonld (tool `kind` param + validation are DONE): schema.org
   patterns per page type — Product/Article/FAQPage/Recipe — the slot-quoting rules (`"n":{{count}}`
   unquoted vs `"n":"{{name}}"` quoted), and WHEN to author a jsonld component vs plain content.

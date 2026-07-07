@@ -971,3 +971,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   --noEmit` clean. Throwaway per-row composition test confirmed the existing path (deleted).
 - **Files:** CMS/src/lib/render/jsonld-component.ts, plan-types.ts, tree.ts, plan-list.ts,
   CMS/src/lib/render/jsonld-itemlist.test.ts
+
+## 2026-07-07 15:25 — ItemList JSON-LD authoring toggle (operator + AI knob)
+- **Status:** DONE
+- **What I did:** Closed the jsonld-List track by adding the KNOB to turn on the (already-shipped)
+  aggregate `ItemList` render. Two surfaces, both write `listSource.itemList:true`:
+  - **Builder** (`binding-panels.tsx` ListSettings): a checkbox "Emit ItemList JSON-LD" + hint,
+    placed in the plain-list layout section right after autoscroll. Carried through edits by adding
+    `itemList` to the `layout` object + persisting it in the `pres !== "combobox"` branch of
+    `emitSource` (mirrors the `autoscroll` field). Localized EN/FI/ET (`list.itemList` /
+    `list.itemListHint`).
+  - **AI** (`bind_list` tool): added an `itemList` boolean to `BIND_LIST_TOOL` schema + `BindListArgs`
+    + `validateBindList` (`typeof === "boolean"` gate, false survives so the AI can turn it OFF) +
+    the `handleBindList` patch application (`if (v.itemList !== undefined) patch.itemList = v.itemList`).
+    Chose `bind_list` (PATCH) over `create_list` — itemList is a config toggle on an existing list;
+    the AI creates the list, binds a jsonld template, then flips this on. `create_list` left alone
+    (it builds a fresh list; the toggle rides bind_list's reconfigure path).
+- **Verified:** full `npm test` suite 1903 pass (was 1902; +1 in bind-list-combobox.test.ts:
+  on/off/absent/non-boolean). `tsc --noEmit` clean. All 3 message JSONs parse. Builder checkbox is
+  UNVERIFIED live (dev not run this session) — HITL to eyeball it on the canvas; render already
+  proven by jsonld-itemlist.test.ts.
+- **Files:** CMS/src/components/page-builder/binding-panels.tsx, CMS/src/lib/chat/binding-tools.ts,
+  CMS/src/lib/chat/tool-dispatch.ts, CMS/src/lib/chat/bind-list-combobox.test.ts,
+  CMS/messages/{en,fi,et}.json

@@ -504,6 +504,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   file HEADER only (PNG/JPEG/GIF/WebP), no decode, node-testable. Returns null for unknown/truncated →
   store null (same as before). Don't try to bring a decoder onto Workers for this.
 
+- (2026-07-07) ItemList JSON-LD toggle (`listSource.itemList`) authoring: TWO write surfaces, both
+  set `itemList:true`. (1) Builder — a checkbox in `binding-panels.tsx` ListSettings, wired the SAME
+  way as `autoscroll`: field added to the `layout` carry object AND persisted in the `pres !==
+  "combobox"` branch of `emitSource` (`if (l.itemList) src.itemList = true;`) — persisting outside
+  that branch would leak it onto comboboxes (a combobox emits no page structured data). (2) AI —
+  `bind_list` (NOT `create_list`): `itemList` is a config PATCH on an existing list; `handleBindList`
+  applies it via `patch.itemList`, and `{...base,...patch}` means an explicit `false` OVERRIDES a
+  prior stored `true` (so the AI/operator can turn it OFF). `validateBindList` only accepts a real
+  boolean (a string "yes" is ignored, not coerced). The toggle only DOES anything when the list
+  template is a jsonld-kind component — with a plain HTML template it's a harmless no-op (documented
+  in the tool schema). Render was already proven by jsonld-itemlist.test.ts; this run only added the
+  knob (+1 test in bind-list-combobox.test.ts). Builder checkbox UNVERIFIED live (HITL).
+
 - (2026-07-07) The Preview canvas overlay (`preview-overlay.ts`) is PREVIEW-ONLY chrome — the parent
   reaches into the same-origin iframe DOM. Any block-management affordance the render plan can't carry
   (because public=preview must be byte-identical) belongs HERE, injected into the iframe DOM, NOT in

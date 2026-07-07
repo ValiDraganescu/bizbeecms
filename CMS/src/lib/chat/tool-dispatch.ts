@@ -1482,6 +1482,7 @@ async function handleBindList(args: unknown): Promise<Record<string, unknown>> {
     if (v.maxSize !== undefined) patch.maxSize = v.maxSize;
     if (v.autoscroll !== undefined) patch.autoscroll = v.autoscroll;
     if (v.autoscrollSpeed !== undefined) patch.autoscrollSpeed = v.autoscrollSpeed;
+    if (v.itemList !== undefined) patch.itemList = v.itemList;
     if (v.select !== undefined) patch.select = v.select;
     if (v.min !== undefined) patch.min = v.min;
     if (v.max !== undefined) patch.max = v.max;
