@@ -40,7 +40,7 @@ You are a **thin spawner**, not a tree manager. **All structure belongs to `/orc
 
 If a worker's `result` reports it found work that's really its own track, **don't carve a subgoal** — relay it to the user in one line and suggest they run `/orc-meeseeks-curator` to create it. Keep driving your current `GOAL` meanwhile.
 
-The only project file you write is **bug intake** into a goal's `BACKLOG.md` (below) — the loop is the human's live contact during a session, so a reported bug goes straight to the queue without leaving the loop. Everything else structural is the curator's.
+The only project file you write is **bug intake** into a goal's `BACKLOG.md` (below) — the loop is the human's live contact during a session, so a reported bug goes straight to the queue without leaving the loop. Everything else structural is the curator's — including the periodic **scrub cycle** (below), where you *spawn* a curator terminal to do backlog hygiene. That's the curator doing curator work in your one-terminal slot, not you managing the tree.
 
 ## Operating rules
 
@@ -50,6 +50,7 @@ The only project file you write is **bug intake** into a goal's `BACKLOG.md` (be
 - **Never stop on your own.** There is always meaningful work toward a standing goal. Keep the loop running until the **user** tells you to stop.
 - **You don't do task work and you don't manage structure.** You spawn, wait, close, repeat. The only file you write is bug intake into a goal's `BACKLOG.md`. Never code, never the worker's diffs, never the tree.
 - **Thin spawner.** Keep your own context lean: don't read the worker's diffs or the whole journal each cycle. A one-line peek at the goal's `NEXT.md` between cycles is enough to narrate progress.
+- **Scrub cadence.** Count your cycles. Every **5th** cycle — or immediately after a worker's `result` says the backlog was empty and it had to invent work — run a **scrub cycle** (below) instead of a worker cycle, then resume. You never scrub the backlog yourself; you summon a curator for it.
 
 ## Bug intake — the user reports, you queue, Meeseeks fix first
 
@@ -138,7 +139,32 @@ Never reuse a worker across tasks — a fresh clean context every time is the en
 Relay what that Meeseeks did (from its `result`) and optionally peek the goal's `NEXT.md`. One or two lines — don't dump the journal.
 
 ### 6. Go to step 1
-Summon the next Meeseeks for the same `GOAL`. Keep going until the user interrupts / stops the loop.
+Summon the next Meeseeks for the same `GOAL` — unless the scrub cadence says this is a scrub cycle (every 5th, or a worker just reported inventing work off an empty backlog), in which case run one scrub cycle first. Keep going until the user interrupts / stops the loop.
+
+## Scrub cycles — periodic backlog hygiene
+
+As the loop eats the backlog it goes stale: `DONE` lines pile up, a dead worker's `DOING` lingers, priorities drift from the repo's real state, and missed angles never get queued. A **scrub cycle** fixes that. It runs in the same one-terminal-at-a-time slot with the same summon → wait → close rhythm; the only differences are who you summon and what you say. You still write nothing yourself.
+
+1. Stamp the time (step 0 as usual).
+2. Summon a **plain** Claude terminal — no `agent` key; there is no curator subagent, the curator is a skill the spawned Claude loads:
+   ```
+   new_claude_terminal({
+     name: "curator-scrub-<GOAL>",
+     parent_is_self: true,
+     model: "<MODEL>"        // same rule as workers: only when MODEL is set
+   })
+   ```
+3. Wait for `has_subscriber: true` (same ~20s bail-out as a worker), then nudge:
+   ```
+   send_message({
+     to: "<uuid>",
+     type: "task",
+     content: "Load the orc-meeseeks-curator skill and run its AUTONOMOUS SCRUB MODE for goal: <GOAL>. No human is present — do not ask questions. When done, send a result-typed channel message to this address summarizing the scrub."
+   })
+   ```
+4. Wait for its `result` exactly like a worker's (same silent-completion safety net, no timers), then `close_terminal`, narrate one line (flipped/archived/added counts + any flags), reset the cycle counter, and go back to summoning workers.
+
+A scrub curator obeys the same boundary you do: it never creates, renames, or archives subgoals. Anything structural it spots lands in the `Flags:` part of its `result` — relay that to the user exactly like a worker's new-track flag, and keep driving.
 
 ## On worker `result` that says BLOCKED
 
