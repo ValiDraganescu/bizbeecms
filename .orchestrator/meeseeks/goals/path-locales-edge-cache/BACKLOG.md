@@ -6,6 +6,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Tasks
 
+- DONE: USER-DIRECTED defect fix: published responses no longer contain ANY Accept-Language/cookie-varying bytes. The shared root layout's NextIntlClientProvider serialized the whole admin messages catalog (~47KB) + locale into the published flight payload, and root generateMetadata leaked a visitor-localized description. Structural fix: multiple root layouts — admin routes under `(admin)/` (next-intl intact), `[[...slug]]` under `(site)/` with a next-intl-free root layout (static EN metadata fallback; html lang = site default content locale, worker rewrite still corrects prefixed URLs). Fence: site-layout-isolation.test.ts. Verified byte-identical / and 404 under differing Accept-Language through the built worker.
 - DONE: Defect fix (self-found): published `<html lang>` came from the root layout's `getLocale()` (NEXT_LOCALE cookie / Accept-Language admin-UI resolver), NOT the URL content locale — wrong SEO lang on every published page AND the first visitor's Accept-Language got baked into edge-cached HTML. Fix: worker.ts rewrites `html[lang]` to the peeled content locale via HTMLRewriter on resolved published-page HTML responses (pure `isHtmlContentType` gate; RSC flight/JSON untouched); live-verified via wrangler dev incl. coexistence with the cache-header stamps.
 
 ### Docs

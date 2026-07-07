@@ -479,3 +479,37 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   Real cached-copy behavior stays HITL on a deployed site.
 - **Files:** CMS/worker.ts, CMS/src/lib/render/edge-cache.ts,
   CMS/src/lib/render/edge-cache.test.ts
+
+## 2026-07-07 09:58 — Structural fix: published pages no longer consume the admin locale context (route-group root layouts)
+- **Status:** DONE
+- **What I did:** USER-DIRECTED hunt for remaining Accept-Language/cookie-varying
+  bytes in published responses (same poisoning class as the html[lang] fix).
+  Reproduced BIG: the shared root layout's `NextIntlClientProvider` serialized
+  the ENTIRE admin messages catalog (chat widget, model picker, all of it —
+  ~47KB, en=360896B vs fi=365468B) plus `"locale":"…"`/`{"lang":"…"}` into the
+  published flight payload, and the root `generateMetadata` getTranslations()
+  fallback leaked a visitor-localized meta description — all keyed off
+  NEXT_LOCALE cookie → Accept-Language. HTMLRewriter couldn't fix this (it's
+  inside inline `__next_f` script data, not element attrs). Structural fix via
+  Next's multiple-root-layouts pattern: app/layout.tsx moved to
+  `app/(admin)/layout.tsx` (unchanged: next-intl provider + localized
+  metadata) with admin/preview/forgot/invite/reset moved under `(admin)/`;
+  `[[...slug]]` moved to a new `(site)/` group whose own root layout has ZERO
+  next-intl — static English metadata fallback (messages/en.json app.*), and
+  `<html lang>` stamped with the site DEFAULT content locale via
+  getContentLocales() (site config = byte-stable; worker.ts HTMLRewriter still
+  corrects non-default locale URLs). api/media/mcp/sitemap stay at app root
+  (route handlers, no layout). Regression fence:
+  site-layout-isolation.test.ts (2 tests — (site)/layout.tsx must exist; no
+  file under (site)/ may import next-intl).
+- **Verified:** dev repro before/after (fi-header leak markers → 0; page
+  −47KB); prod build via wrangler dev: `/` and 404 BYTE-IDENTICAL under en vs
+  fi Accept-Language; lang rewrite intact (/ → "en", /fi → "fi", /ro-ro →
+  "ro-ro"); /admin still localized (lang="fi" + Finnish strings under fi
+  header). npm test 1688/1688 (+2); tsc clean (after deploy-gate rebuild —
+  stale .next/types/validator.ts references old paths until a build);
+  `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` + `wrangler deploy
+  --dry-run` green. Real cached-copy behavior stays HITL on a deployed site.
+- **Files:** CMS/src/app/(site)/layout.tsx (new), CMS/src/app/(admin)/layout.tsx
+  (moved root layout, css path fix), route moves admin/preview/forgot/invite/
+  reset → (admin)/, [[...slug]] → (site)/, CMS/src/lib/render/site-layout-isolation.test.ts

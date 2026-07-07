@@ -167,3 +167,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   and wildcard-ancestor-with-deeper-override all resolve. Don't re-hunt this angle —
   the walk is segment-by-segment against DEFAULT slugs, re-emitting effectiveSlug
   per level; it composes to any depth. No defect exists here.
+- Route groups (2026-07-07): `(admin)/` owns the next-intl root layout (admin, preview,
+  forgot, invite, reset); `(site)/` owns the published `[[...slug]]` with a next-intl-FREE
+  root layout. NEVER import next-intl in any file under `(site)/` — the admin locale
+  resolver (NEXT_LOCALE cookie → Accept-Language) would make published bytes visitor-varying
+  and poison the edge cache (fenced by site-layout-isolation.test.ts). render-page.tsx's
+  `getLocale` import is fine — published passes explicitLocale so the intl path never runs.
+- The (site) layout stamps `<html lang>` = the site DEFAULT content locale (one D1
+  getContentLocales read; byte-stable). worker.ts's HTMLRewriter still owns correcting it to
+  the peeled locale on /fi/… etc. Both layers are needed — don't remove either.
+- After moving/renaming app routes, `npx tsc --noEmit` fails on stale
+  `.next/types/validator.ts` (old paths) until the next build regenerates it — not a real
+  type error; run the deploy-gate build first, then tsc.
+- Published-page byte-diffing is only meaningful on a PRODUCTION build (wrangler dev):
+  `next dev` renumbers RSC flight chunk ids per request (en-vs-en diffs too). Don't chase
+  dev-mode flight diffs.
