@@ -6,43 +6,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Tasks
 
-### llms.txt + markdown page variants (AI-crawler surface, per llmstxt.org)
-- DONE (2026-07-07): Markdown page variants — pure `planToMarkdown` serializer
-  (element-to-markdown.ts) + internal `/api/md/[...slug]` route + release-gated worker.ts rewrite
-  of `/<path>.md`→`/api/md/<path>.md`. The `(site)` optional catch-all shadows every non-`/api`
-  sibling route AND a page component can't return a non-HTML Response (both PROVEN this run), so
-  the serving lives under `/api` (edge-cache-excluded → no wildcard cache-tag risk) reached via the
-  worker rewrite. 404 for unpublished/route-miss/noindex. Public `/<path>.md` needs a release.
-
-### Performance — Core Web Vitals (images ship raw R2 bytes today)
-- DONE (2026-07-07): Image hygiene post-pass — pure `applyImageHygiene` (image-hygiene.ts, 10 tests)
-  wired into `tree.ts planPage` after `localizePlanLinks`. Adds `loading="lazy"`+`decoding="async"`
-  to every `<img>` EXCEPT the first (LCP candidate; it still gets `decoding="async"`); when the
-  author-set numeric width+height are BOTH known, mirrors them into an inline `aspectRatio` style to
-  kill CLS. Never invents dimensions, never clobbers an author `loading`/`decoding`/existing
-  aspect-ratio/string style. FOLLOW-UP (below): capture asset pixel dims at upload so CLS applies to
-  images that don't carry explicit width/height.
-- DONE (2026-07-07): Capture asset pixel dimensions at upload — nullable `asset.width`/`height`
-  INTEGER columns (migration 0032), captured client-side via `readImageDimensions` (image-thumb.ts,
-  reuses createImageBitmap), sent as form fields, hardened through pure `parseAssetDimension`
-  (asset.ts — clamps to 1..MAX_ASSET_DIMENSION, floors, rejects garbage → null) and written by
-  `putAsset`. GET/POST responses already spread the row so `width`/`height` surface to clients.
-  FOLLOW-UP (below): thread stored dims into the render `<img>` props so applyImageHygiene sets
-  aspect-ratio on gallery images lacking author width/height (has render-hot-path implications — a
-  dims lookup keyed by asset URL; the caveats forbid a new per-request D1 read on the render path).
-- DONE (2026-07-07): Thread stored asset dims into render `<img>` props (image-hygiene CLS coverage
-  for gallery images). Chose approach (a) — authoring-time, ZERO render-time D1: the picker bakes the
-  asset's intrinsic dims onto the URL as `?w=&h=` (`withAssetDims`, pure), and `applyImageHygiene`
-  reads them off `src` (`readAssetDims`, pure) as a FALLBACK when author width/height props are
-  absent. The `/media/[...key]` serve route ignores the query (keys off the path), so the params are
-  inert for serving. `GalleryAsset` gained `width?`/`height?`. 7 new asserts (asset-dims.test.ts +
-  image-hygiene.test.ts). No worker.ts change → ships on the next normal CMS build (no r-* release).
-- TODO: INVESTIGATION (design note, not code): responsive image variants for `/media/[...key]` R2 assets on per-site Workers — evaluate Cloudflare Images API upload-time variants vs zone Image Resizing (custom-domain sites only; workers.dev sites can't) vs in-Worker resizing (no native codecs on Workers — likely dead end); deliverable = chosen path + cost/constraints written to this goal's JOURNAL + CAVEATS, and implementation tasks filed accordingly.
-- BLOCKED (on the investigation above): implement responsive images — srcset/sizes + modern format (WebP/AVIF) for asset images in published pages per the chosen design.
-
 ### Operator SEO tooling (admin)
 - TODO: SEO audit view in the CMS admin: one report page listing orphan pages (no inbound internal links), broken internal links (hrefs resolving to deleted/unpublished pages), pages missing per-locale meta title/description, images missing alt text — pure analyzers over page rows + plan trees (dep-free, unit-tested), rendered in a localized EN/FI/ET admin page. Read-only report; no auto-fix.
 - TODO: AI bulk-meta assistant tool: tool(s) letting the AI list pages/locales with missing meta title/description (and images missing alt), then write generated values through the existing upsertPageMeta validation path (per-locale maps, purge semantics intact); self-correcting errors naming exact page+locale; authoring-guide section so the AI knows the workflow.
+
+### Performance — Core Web Vitals
+- TODO: INVESTIGATION (design note, not code): responsive image variants for `/media/[...key]` R2 assets on per-site Workers — evaluate Cloudflare Images API upload-time variants vs zone Image Resizing (custom-domain sites only; workers.dev sites can't) vs in-Worker resizing (no native codecs on Workers — likely dead end); deliverable = chosen path + cost/constraints written to this goal's JOURNAL + CAVEATS, and implementation tasks filed accordingly. NOTE: dims now ride asset URLs as `?w=&h=` — a responsive path could reuse that query carrier for width hints.
+- BLOCKED (on the investigation above): implement responsive images — srcset/sizes + modern format (WebP/AVIF) for asset images in published pages per the chosen design.
+- TODO: Stamp `?w=&h=` dims on asset URLs the AI inserts (list_assets / generate_image tool responses carry dims-stamped URLs via the existing `withAssetDims`), so AI-authored pages get the CLS aspect-ratio box too — today only the ImagePicker stamps dims (see the asset-dims caveat). Authoring-time only, zero render cost. — queued by scrub: AI page authoring is a first-class path; its images currently get no CLS box.
 
 ### Page-level SEO controls
 - TODO: Per-URL-locale branded 404 (follow-up to the shipped default-locale branded 404): make the

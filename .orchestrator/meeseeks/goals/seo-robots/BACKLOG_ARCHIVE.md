@@ -22,3 +22,7 @@ The full record lives in JOURNAL.md; this is the trimmed backlog trace.
 - 2026-07-07 AI create_page/translate now purge edge cache + ping IndexNow; pure page-write-hooks purge decision, best-effort.
 - 2026-07-07 Designated branded 404: not_found_page setting, not-found.tsx renders published page plan (default locale), admin editor, EN/FI/ET.
 - 2026-07-07 /llms.txt AI-crawler index: brand header + published-page list linking .md variants, pure buildLlmsTxt, default locale.
+- 2026-07-07 Markdown page variants: planToMarkdown serializer, /api/md route, release-gated worker rewrite of /<path>.md; 404s noindex.
+- 2026-07-07 Image hygiene post-pass: lazy/decoding on non-LCP imgs, aspect-ratio CLS box from author dims, author props win.
+- 2026-07-07 Asset pixel dims captured at upload: nullable width/height columns, client createImageBitmap read, trust-boundary clamp parse.
+- 2026-07-07 Asset dims threaded to render imgs via ?w=&h= URL params stamped at pick time; zero render-time D1.

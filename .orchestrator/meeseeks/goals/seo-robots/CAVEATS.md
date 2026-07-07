@@ -320,7 +320,8 @@ Read every line before working. Each entry was learned the hard way by a previou
   at render: threading them into `<img>` props for applyImageHygiene's CLS aspect-ratio is a FILED
   TODO, and it must NOT add a per-request D1 read on the edge-cached/429-sensitive render hot path —
   the recommended path is to bake dims onto the block prop when the image PICKER inserts the asset
-  (authoring-time), not a render-time lookup. (builds
+  (authoring-time), not a render-time lookup.
+- (2026-07-07) Markdown page variants: served by the internal route `app/api/md/[...slug]/route.ts` (builds
   the plan via `loadPlan` — pulls next-intl/React, so it CAN'T live in the lean worker.ts) + a
   release-gated `worker.ts` rewrite of public `/<path>.md`→`/api/md/<path>.md` (pure
   `markdownVariantRewrite` in edge-cache.ts). Placed under `/api` on purpose: `api` is in
