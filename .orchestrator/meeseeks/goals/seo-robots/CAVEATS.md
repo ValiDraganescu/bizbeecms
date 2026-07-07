@@ -279,3 +279,25 @@ Read every line before working. Each entry was learned the hard way by a previou
   OBJECT (empty {} isn't a locale object), so String() it → `[object Object]`.
   The route guards with a `typeof v === "string"` check — do the same anywhere
   you String()-ify a resolveLocalized result of a possibly-empty JSON column.
+
+- (2026-07-07) ROUTING FACT (proven this run, two throwaway dev tests): the `(site)` OPTIONAL
+  catch-all `[[...slug]]/page.tsx` shadows EVERY sibling route — even a more-specific LITERAL
+  segment like `app/_mdtest/[...slug]/route.ts` lost to it (`/_mdtest/about` rendered the catch-all
+  PublicPage, not the handler). ONLY fixed SYSTEM prefixes survive (`api`/`media`/`_next` — the
+  SKIP_SEGMENTS set; `/api/mdtest2/about` DID reach its handler). ALSO proven: a page component
+  CANNOT return a `Response` (Next tries to render it as an element → error page). Consequence: any
+  new non-HTML surface at an ARBITRARY page path must live under `/api/*` (or media/_next) and be
+  reached via a worker.ts URL rewrite — you cannot add it as a normal app route/page.
+- (2026-07-07) Markdown variants: served by INTERNAL route `app/api/md/[...slug]/route.ts` (builds
+  the plan via `loadPlan` — pulls next-intl/React, so it CAN'T live in the lean worker.ts) + a
+  release-gated `worker.ts` rewrite of public `/<path>.md`→`/api/md/<path>.md` (pure
+  `markdownVariantRewrite` in edge-cache.ts). Placed under `/api` on purpose: `api` is in
+  SKIP_SEGMENTS so `isEdgeCacheCandidate` rejects it — a deep `/products/item.md` can NEVER get a
+  wildcard `:param` page's Cache-Tag stamped on it (the sitemap-staleness precedent is sidestepped
+  structurally, no special-casing needed). The route 404s unpublished/route-miss/**noindex** (4th
+  crawler-hide gate alongside generateMetadata/sitemap-skip/IndexNow-skip — keep in sync). The pure
+  serializer `planToMarkdown` walks the ALREADY-BUILT ElementPlan (visitor-independent, no
+  request/next-intl reads → edge-safe philosophy preserved). The worker rewrite only fires on GET.
+  Home `/` has NO `.md` variant (llms.txt links root to `/`, not `/.md`) and `/api/md/` 308s (Next
+  trailing-slash) — fine. Public `/<path>.md` is UNVERIFIED until a release cuts worker.ts; the
+  internal route is dev-verified.

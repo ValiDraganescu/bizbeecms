@@ -13,6 +13,7 @@ import {
   purgeCacheTags,
   isHtmlContentType,
   STALE_WHILE_REVALIDATE,
+  markdownVariantRewrite,
 } from "./edge-cache.ts";
 import { SKIP_SEGMENTS } from "./localize-links.ts";
 
@@ -176,4 +177,49 @@ test("non-document responses pass through untouched (RSC flight, JSON, absent)",
   assert.equal(isHtmlContentType(""), false);
   assert.equal(isHtmlContentType(null), false);
   assert.equal(isHtmlContentType(undefined), false);
+});
+
+// ── markdownVariantRewrite (seo-robots .md page variants) ────────────────────
+
+test("rewrites a .md page path to the internal /api/md route", () => {
+  assert.equal(
+    markdownVariantRewrite("https://x.com/about.md"),
+    "https://x.com/api/md/about.md",
+  );
+  assert.equal(
+    markdownVariantRewrite("https://x.com/blog/hello.md?ref=1"),
+    "https://x.com/api/md/blog/hello.md?ref=1",
+  );
+});
+
+test("locale-prefixed .md variants rewrite (locale peeled by the internal route)", () => {
+  assert.equal(
+    markdownVariantRewrite("https://x.com/fi/tietoa.md"),
+    "https://x.com/api/md/fi/tietoa.md",
+  );
+});
+
+test("non-.md paths are not rewritten", () => {
+  assert.equal(markdownVariantRewrite("https://x.com/about"), null);
+  assert.equal(markdownVariantRewrite("https://x.com/"), null);
+  assert.equal(markdownVariantRewrite("https://x.com/blog/hello"), null);
+});
+
+test("system-prefixed and dotted-root paths are never rewritten", () => {
+  assert.equal(markdownVariantRewrite("https://x.com/api/md/about.md"), null);
+  assert.equal(markdownVariantRewrite("https://x.com/media/x.md"), null);
+  assert.equal(markdownVariantRewrite("https://x.com/admin/x.md"), null);
+  assert.equal(markdownVariantRewrite("https://x.com/sitemap.xml"), null);
+  assert.equal(markdownVariantRewrite("https://x.com/.md"), null);
+});
+
+test("case-insensitive suffix; query preserved", () => {
+  assert.equal(
+    markdownVariantRewrite("https://x.com/About.MD?a=1&b=2"),
+    "https://x.com/api/md/About.MD?a=1&b=2",
+  );
+});
+
+test("garbage input returns null (best-effort)", () => {
+  assert.equal(markdownVariantRewrite("not a url"), null);
 });

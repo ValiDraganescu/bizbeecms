@@ -557,3 +557,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   excluded by the worker dot gate.
 - **Files:** CMS/src/lib/render/llms-txt.ts (new) + .test.ts (new),
   CMS/src/app/llms.txt/route.ts (new), CMS/src/lib/render/sitemap-paths.ts (added id)
+
+## 2026-07-07 13:20 — Markdown page variants (.md AI-crawler surface) — closes the llms.txt loop
+- **Status:** DONE
+- **What I did:** Shipped the `<path>.md` markdown-variant surface the `/llms.txt` links point at.
+  - **Pure serializer** `lib/render/element-to-markdown.ts`: `planToMarkdown(root, {title,description})`
+    walks a built `RenderPlan.root` (ElementPlan[]) → Markdown — headings, paragraphs, links
+    (`[text](href)`), images (`![alt](src)`), ordered/nested/unordered lists, blockquote, hr, `<pre>`
+    fences, GFM tables, emphasis (strong/em/del/code). Chrome dropped (script/style/nav/svg/form
+    controls/iframe). Transparent wrappers (div/section/span) flow children through. Text escaped for
+    Markdown-special chars. Also exports `peelMarkdownSuffix(segments)`. PURE / dep-free / 16 unit tests.
+  - **Internal route** `app/api/md/[...slug]/route.ts`: resolves the SAME `loadPlan` slug/publish/locale
+    walk the HTML route uses, then serializes → `text/markdown`. 404 for unpublished / route-miss /
+    **noindex** (same crawler-hide gate as sitemap/IndexNow). Under `/api` on purpose (see caveat).
+  - **Worker rewrite** (release-gated, r-*) `worker.ts` + pure `markdownVariantRewrite` in edge-cache.ts:
+    a public GET `/<path>.md` is rewritten to `/api/md/<path>.md` BEFORE OpenNext (cheap string gate, no
+    D1). System prefixes / dotted-root / bare `.md` never rewrite. 6 unit tests.
+- **Verified:** 311 render unit tests pass (16 new mdserializer + 6 new rewrite). `tsc --noEmit` clean.
+  LIVE in `next dev`: `/api/md/contact` and `/api/md/for-restaurants.md` return correct Markdown off
+  the real seeded D1 (title/desc head, headings, links, images, lists all right); `/api/md/nope` → 404.
+  COULD NOT verify the public `/<path>.md` URL end-to-end — the worker rewrite ships ONLY via a release
+  (r-*); the internal route is what dev exercises.
+- **Files:** CMS/src/lib/render/element-to-markdown.ts (+.test.ts),
+  CMS/src/app/api/md/[...slug]/route.ts, CMS/src/lib/render/edge-cache.ts (+.test.ts append),
+  CMS/worker.ts.

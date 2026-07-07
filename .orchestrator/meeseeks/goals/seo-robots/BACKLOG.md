@@ -7,15 +7,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### llms.txt + markdown page variants (AI-crawler surface, per llmstxt.org)
-- TODO: Markdown page variants: serve `<page-path>.md` — a pure ElementPlan→markdown serializer
-  (headings, paragraphs, lists, links, images as alt+URL; skip script/style/nav chrome), unit-tested;
-  the `(site)` catch-all resolves the same slug walk then serializes instead of rendering HTML
-  (peel the `.md` suffix in the slug resolver — do NOT add a conflicting dynamic top-level route,
-  see the fixed-path caveat); 404 for unpublished/noindex; closes the loop for the `/llms.txt`
-  links that currently 404. CAUTION: only ROOT-level dotted paths are edge-cache-excluded — a
-  deeper `/products/item.md` is cache-eligible and a wildcard `:param` page matches any segment
-  (the sitemap-staleness defect precedent); make sure a .md response never gets a wildcard page's
-  cache tag stamped on it.
+- DONE (2026-07-07): Markdown page variants — pure `planToMarkdown` serializer
+  (element-to-markdown.ts) + internal `/api/md/[...slug]` route + release-gated worker.ts rewrite
+  of `/<path>.md`→`/api/md/<path>.md`. The `(site)` optional catch-all shadows every non-`/api`
+  sibling route AND a page component can't return a non-HTML Response (both PROVEN this run), so
+  the serving lives under `/api` (edge-cache-excluded → no wildcard cache-tag risk) reached via the
+  worker rewrite. 404 for unpublished/route-miss/noindex. Public `/<path>.md` needs a release.
 
 ### Performance — Core Web Vitals (images ship raw R2 bytes today)
 - TODO: Image hygiene post-pass over the finished ElementPlan (same pattern as localize-links): `loading="lazy"` + `decoding="async"` on images (skip the first/LCP-candidate image), width/height or aspect-ratio to kill CLS where dimensions are known — if asset dimensions aren't stored, capture them at upload in the assets API (new columns) and backfill lazily; pure post-pass unit-tested.

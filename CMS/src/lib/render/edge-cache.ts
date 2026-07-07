@@ -77,6 +77,38 @@ export function isEdgeCacheCandidate(input: {
 }
 
 /**
+ * Markdown page-variant rewrite (seo-robots): a public GET for `/<path>.md`
+ * (any depth) is served by the INTERNAL `/api/md/<path>` route — the plan build
+ * + serialize can't run in the lean worker, and the `(site)` optional catch-all
+ * shadows every non-`/api` sibling route. Given a full request URL, returns the
+ * rewritten URL (query preserved) when it's a `.md` variant, else null.
+ *
+ * Only rewrites a REAL page path: never `/sitemap.xml`, never a system prefix
+ * (`api`/`media`/`admin`/`preview`/`_next`), never a bare `/.md`. The suffix
+ * match is case-insensitive on the LAST segment; the target keeps the `.md`
+ * (the internal route peels it defensively) so `/api/md` never collides with a
+ * real slug called "md".
+ */
+export function markdownVariantRewrite(requestUrl: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return null;
+  }
+  const segments = pathnameSegments(url.pathname);
+  if (segments.length === 0) return null;
+  const first = segments[0].trim().toLowerCase();
+  if (SKIP_SEGMENTS.has(first)) return null;
+  const last = segments[segments.length - 1];
+  if (!last.toLowerCase().endsWith(".md")) return null;
+  if (last.length <= 3) return null; // bare ".md" — not a variant
+  const target = new URL(url.toString());
+  target.pathname = "/api/md/" + segments.map((s) => encodeURIComponent(s)).join("/");
+  return target.toString();
+}
+
+/**
  * Is this a rewritable HTML document response? Gates the worker's `<html lang>`
  * correction (the root layout stamps the visitor's ADMIN-UI locale — a
  * cookie/Accept-Language value that would poison cached published HTML and

@@ -31,10 +31,22 @@ import {
   pathnameSegments,
   edgeCacheHeaders,
   isHtmlContentType,
+  markdownVariantRewrite,
 } from "./src/lib/render/edge-cache";
 
 export default {
   async fetch(request, env, ctx) {
+    // Markdown page variants (seo-robots): a public `/<path>.md` GET is served by
+    // the internal `/api/md/<path>` route (which builds the plan + serializes —
+    // that stack can't live here in the lean worker). Rewrite the URL BEFORE
+    // OpenNext so the internal route runs; the response's `.md` URL is what the
+    // caller sees. Cheap string gate, no D1 on the hot path. `/api/*` is
+    // edge-cache-excluded, so the rewritten request never gets a page Cache-Tag.
+    const mdUrl =
+      request.method === "GET" ? markdownVariantRewrite(request.url) : null;
+    if (mdUrl) {
+      return handler.fetch(new Request(mdUrl, request), env, ctx);
+    }
     const response: Response = await handler.fetch(request, env, ctx);
     try {
       if (
