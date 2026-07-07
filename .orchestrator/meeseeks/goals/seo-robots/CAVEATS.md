@@ -33,6 +33,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   `app/indexnow-key/route.ts`); the spec allows any keyLocation on the host. Any future
   top-level SEO/verification file (Google/Bing verification, `.well-known/*`) must likewise
   use a FIXED static path, not a dynamic segment.
+- (2026-07-07) robots.txt is served by a ROUTE HANDLER `app/robots.txt/route.ts`, NOT the
+  Next `robots.ts` metadata convention — the free-text override must be served verbatim, which
+  the structured `MetadataRoute.Robots` shape can't represent. Config lives in D1 settings key
+  `robots_config` (getRobotsConfig/setRobotsConfig). Pure builder + hardening in
+  `lib/render/robots-txt.ts` (normalizeRobotsConfig strips CR/LF/`:` injection — the format is
+  line-oriented, so an un-sanitized path/UA could forge rules). If you add the robots settings
+  UI (backlog task 2), write through setRobotsConfig (it normalizes) and don't re-invent the
+  shape. `Sitemap:` pointer is auto-appended by buildRobotsTxt — the UI must NOT add its own.
 - (2026-07-07) IndexNow submit is best-effort via `notifyIndexNowForPage` / `notifyIndexNowUrls`
   (indexnow-notify.ts, ctx.waitUntil so it never blocks the write) — mirror this for any new
   content-change hook. DELETE must call `collectPageUrls(id)` BEFORE `deletePage` (the row +

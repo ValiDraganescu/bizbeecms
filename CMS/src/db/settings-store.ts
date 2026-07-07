@@ -33,6 +33,11 @@ import {
 import { DEFAULT_ICON_SET, isValidIconSet } from "../lib/render/icons.ts";
 import { generateIndexNowKey, isValidIndexNowKey } from "../lib/render/indexnow.ts";
 import {
+  type RobotsConfig,
+  defaultRobotsConfig,
+  normalizeRobotsConfig,
+} from "../lib/render/robots-txt.ts";
+import {
   type ApiCacheVersions,
   normalizeCacheVersions,
   pruneCounters,
@@ -50,6 +55,7 @@ const IMAGE_GEN_MODEL_KEY = "image_gen_model";
 const ICON_SET_KEY = "icon_set";
 const API_CACHE_VERSIONS_KEY = "api_cache_versions";
 const INDEXNOW_KEY_KEY = "indexnow_key";
+const ROBOTS_CONFIG_KEY = "robots_config";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
 async function upsertSetting(
@@ -357,6 +363,37 @@ export async function getIndexNowKey(injectedDb?: Db): Promise<string> {
   const key = generateIndexNowKey();
   await upsertSetting(INDEXNOW_KEY_KEY, key, db);
   return key;
+}
+
+/**
+ * Read the per-Site robots.txt config (structured rules + free-text override),
+ * or the seeded default (allow all, disallow /admin /api /preview) if unset or
+ * garbage. Served by `app/robots.ts` via `buildRobotsTxt`. seo-robots track #3.
+ */
+export async function getRobotsConfig(injectedDb?: Db): Promise<RobotsConfig> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, ROBOTS_CONFIG_KEY))
+    .limit(1);
+  const raw = rows[0]?.value;
+  if (!raw) return defaultRobotsConfig();
+  try {
+    return normalizeRobotsConfig(JSON.parse(raw));
+  } catch {
+    return defaultRobotsConfig();
+  }
+}
+
+/** Upsert the robots.txt config (normalized before write). */
+export async function setRobotsConfig(
+  config: unknown,
+  injectedDb?: Db,
+): Promise<RobotsConfig> {
+  const normalized = normalizeRobotsConfig(config);
+  await upsertSetting(ROBOTS_CONFIG_KEY, JSON.stringify(normalized), injectedDb);
+  return normalized;
 }
 
 /**

@@ -57,3 +57,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/render/indexnow.ts (+ .test.ts), CMS/src/lib/render/indexnow-notify.ts,
   CMS/src/app/indexnow-key/route.ts, CMS/src/db/settings-store.ts,
   CMS/src/app/api/pages/route.ts, CMS/src/app/api/pages/[id]/publish/route.ts
+
+## 2026-07-07 10:55 — Serve per-Site robots.txt (robots.txt track, task 1)
+- **Status:** DONE
+- **What I did:** per-Site robots.txt now served from D1, unlocking the `Sitemap:` pointer.
+  - **Pure builder** `lib/render/robots-txt.ts` (dep-free, node-testable): `RobotsConfig`
+    ({ groups: {userAgent, disallow[], allow[]}[], freeText }), `defaultRobotsConfig` (allow
+    all, disallow /admin /api /preview — matches the worker private-surface paths),
+    `normalizeRobotsConfig` (defensive: garbage → default; drops non-`/` paths, CR/LF/`:`
+    injection in UAs/paths — line-oriented format so newline injection would forge rules),
+    `buildRobotsTxt(config, origin|null)`. Free-text override served VERBATIM when non-blank
+    (structured rules ignored); `Sitemap: <origin>/sitemap.xml` appended unless origin unknown
+    OR the override already has its own `Sitemap:` line (case-insensitive, no double-add).
+  - **Store** `db/settings-store.ts` `getRobotsConfig`/`setRobotsConfig` (settings key
+    `robots_config`, mirrors getContentLocales — defensive read → default on missing/garbage).
+  - **Route** `app/robots.txt/route.ts` (route handler, NOT the `robots.ts` metadata
+    convention — free-text override needs verbatim text the structured MetadataRoute.Robots
+    can't represent). force-dynamic (per-request D1, build prerender can't — same trap
+    sitemap.ts/indexnow-key hit); text/plain, no-store. `/robots.txt` is a dotted-root file →
+    already edge-cache-excluded by the worker dot gate, no worker.ts change.
+- **Verified:** 11 new pure tests (robots-txt.test.ts) pass; full `npm test` 1710/1710 (was
+  1699); `npx tsc --noEmit` clean on touched files. Did NOT run opennext build (heavy gate;
+  route mirrors proven force-dynamic pattern) nor live-fetch (needs deployed origin — HITL).
+- **Files:** CMS/src/lib/render/robots-txt.ts (+ .test.ts), CMS/src/db/settings-store.ts,
+  CMS/src/app/robots.txt/route.ts
