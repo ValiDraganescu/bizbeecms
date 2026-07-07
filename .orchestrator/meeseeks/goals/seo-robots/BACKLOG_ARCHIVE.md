@@ -18,3 +18,7 @@ The full record lives in JOURNAL.md; this is the trimmed backlog trace.
 - 2026-07-07 JSON-LD authoring write path: template probe validation, upsert/publish/discard kind handling, PUT + AI tool kind param.
 - 2026-07-07 JSON-LD read path: getComponentByName effective kind, X-Component-Kind header for the editor; portable bundle stays kind-free.
 - 2026-07-07 JSON-LD × bindings verified seamless: hydrated block.props feeds jsonld templates; regression tests incl. escaping, route params.
+- 2026-07-07 JSON-LD Develop editor: kind toggle, single JSON-template pane, emitted-data preview + Rich Results link, base64 template header.
+- 2026-07-07 AI create_page/translate now purge edge cache + ping IndexNow; pure page-write-hooks purge decision, best-effort.
+- 2026-07-07 Designated branded 404: not_found_page setting, not-found.tsx renders published page plan (default locale), admin editor, EN/FI/ET.
+- 2026-07-07 /llms.txt AI-crawler index: brand header + published-page list linking .md variants, pure buildLlmsTxt, default locale.
