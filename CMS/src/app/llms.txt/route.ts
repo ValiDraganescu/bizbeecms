@@ -17,14 +17,26 @@
  */
 import { getDb } from "@/db";
 import { page as pageTable } from "@/db/schema";
-import { getContentLocales, getSiteIdentity } from "@/db/settings-store";
+import {
+  getContentLocales,
+  getSiteIdentity,
+  getLlmsTemplate,
+} from "@/db/settings-store";
 import { publishedPagePaths } from "@/lib/render/sitemap-paths";
 import { pathForLocale } from "@/lib/render/hreflang";
 import { createPathTranslator } from "@/lib/render/localize-paths";
 import { resolveLocalized } from "@/lib/render/localize";
 import { parseJsonColumn } from "@/lib/render/tree";
 import { resolveSiteOrigin } from "@/lib/render/site-origin";
-import { buildLlmsTxt, type LlmsPageEntry } from "@/lib/render/llms-txt";
+import {
+  buildLlmsTxt,
+  buildLlmsPageList,
+  type LlmsPageEntry,
+} from "@/lib/render/llms-txt";
+import {
+  renderLlmsTemplate,
+  type LlmsTemplateVars,
+} from "@/lib/render/llms-template";
 
 export const dynamic = "force-dynamic";
 
@@ -34,9 +46,10 @@ function mdPath(path: string): string {
 }
 
 export async function GET(): Promise<Response> {
-  const [origin, identity] = await Promise.all([
+  const [origin, identity, template] = await Promise.all([
     resolveSiteOrigin(),
     getSiteIdentity(),
+    getLlmsTemplate(),
   ]);
   const empty = () =>
     new Response(buildLlmsTxt({ name: identity.brandName }, []), {
@@ -94,10 +107,21 @@ export async function GET(): Promise<Response> {
     });
   }
 
-  const body = buildLlmsTxt(
-    { name: identity.brandName, tagline: identity.tagline },
-    entries,
-  );
+  // A stored template (with {{slot}} placeholders) wins; blank → auto output.
+  // pageTree = the exact same "## Pages" list the auto builder emits.
+  const body = template.trim()
+    ? renderLlmsTemplate(template, {
+        brandName: identity.brandName ?? "",
+        tagline: identity.tagline ?? "",
+        origin,
+        defaultLocale: def,
+        locales: contentLocales.locales.join(", "),
+        pageTree: buildLlmsPageList(entries),
+      } satisfies LlmsTemplateVars)
+    : buildLlmsTxt(
+        { name: identity.brandName, tagline: identity.tagline },
+        entries,
+      );
   return new Response(body, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",

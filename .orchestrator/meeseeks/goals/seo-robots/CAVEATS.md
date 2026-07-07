@@ -366,3 +366,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   lives in block props / component markup, not the page-meta title/desc fields. Don't try to bolt alt
   onto set_page_meta; it'd need set_block_props (see the filed follow-up). audit_meta returns ONLY
   the `missingMeta` slice on purpose.
+
+- (2026-07-07) Editable llms.txt template (`lib/render/llms-template.ts`): `LLMS_TEMPLATE_VARS` is
+  the SINGLE source of truth for BOTH the runtime substitution allowlist AND the settings-UI side
+  panel (each entry = slot + description + example). Add a new placeholder there and it's
+  automatically substitutable, validatable, AND documented — don't maintain a second list. The
+  syntax is the SHARED component `SLOT_RE` (imported from plan-tree.ts), so `{{slot}}` and
+  `{{ t slot }}` both work — do NOT invent a parallel regex (USER REQUIREMENT). VALIDATION SPLIT:
+  `unknownSlots(template)` names bad tokens but the ROUTE does NOT reject — it substitutes unknowns
+  to "" (a template can't 500 the public /llms.txt). The on-save HARD reject (like the redirect
+  admin, NOT the robots normalize-silently path) belongs to the settings UI/PUT (next task): call
+  `unknownSlots` there, 400 with the names. Template is stored VERBATIM (getLlmsTemplate/
+  setLlmsTemplate, key `llms_template`) — NOT JSON, it's free text. `{{pageTree}}` = the exact auto
+  "## Pages" list via `buildLlmsPageList` (extracted from buildLlmsTxt); a blank stored template
+  falls back to the full auto output. CACHING: still no-store (the caching task is separate) —
+  don't add Cache-Control here; the dot-gate already edge-excludes /llms.txt.

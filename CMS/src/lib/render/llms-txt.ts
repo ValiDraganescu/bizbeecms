@@ -36,6 +36,25 @@ function oneLine(s: string): string {
 }
 
 /**
+ * Build just the `## Pages` Markdown section (header line + one link per entry),
+ * or "" when no entry survives. Reused by `buildLlmsTxt` AND exposed as the
+ * `{{pageTree}}` placeholder value for the editable-template path (llms-template.ts)
+ * so a custom template renders the exact same page list.
+ */
+export function buildLlmsPageList(entries: LlmsPageEntry[]): string {
+  const clean = entries.filter((e) => oneLine(e.title) && oneLine(e.mdUrl));
+  if (clean.length === 0) return "";
+  const lines = ["## Pages"];
+  for (const e of clean) {
+    const title = oneLine(e.title);
+    const url = oneLine(e.mdUrl);
+    const desc = oneLine(e.description ?? "");
+    lines.push(desc ? `- [${title}](${url}): ${desc}` : `- [${title}](${url})`);
+  }
+  return lines.join("\n");
+}
+
+/**
  * Build the `/llms.txt` body. `entries` are already ordered by the caller
  * (sitemap order) and carry absolute `.md` URLs. Entries with a blank title or
  * URL are dropped defensively.
@@ -50,16 +69,8 @@ export function buildLlmsTxt(
   const tagline = oneLine(header.tagline ?? "");
   if (tagline) lines.push("", `> ${tagline}`);
 
-  const clean = entries.filter((e) => oneLine(e.title) && oneLine(e.mdUrl));
-  if (clean.length > 0) {
-    lines.push("", "## Pages");
-    for (const e of clean) {
-      const title = oneLine(e.title);
-      const url = oneLine(e.mdUrl);
-      const desc = oneLine(e.description ?? "");
-      lines.push(desc ? `- [${title}](${url}): ${desc}` : `- [${title}](${url})`);
-    }
-  }
+  const pages = buildLlmsPageList(entries);
+  if (pages) lines.push("", pages);
 
   return lines.join("\n") + "\n";
 }

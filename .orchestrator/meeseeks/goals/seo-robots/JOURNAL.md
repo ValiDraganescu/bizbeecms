@@ -724,3 +724,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   automatically via `allToolSchemas()`. No worker.ts change → ships on next normal CMS build.
 - **Files:** CMS/src/lib/chat/meta-tools.ts (+.test.ts), CMS/src/lib/chat/tool-dispatch.ts,
   CMS/src/lib/chat/tool-scopes.ts
+
+## 2026-07-07 14:03 — Editable llms.txt template (USER-QUEUED task 1/4)
+- **Status:** DONE
+- **What I did:** New pure `lib/render/llms-template.ts` — `LLMS_TEMPLATE_VARS` (the slot allowlist
+  AND the settings-UI side-panel docs, one source of truth), `renderLlmsTemplate` (substitutes
+  `{{slot}}` via the SHARED `SLOT_RE` imported from plan-tree.ts — same convention components use,
+  per the USER REQUIREMENT; unknown slots → "", one trailing newline), `templateSlots` +
+  `unknownSlots` (self-correcting validation: names the bad tokens, sorted/distinct; blank template
+  is valid). Slots surveyed & documented: brandName, tagline, origin, defaultLocale, locales,
+  pageTree. Extracted `buildLlmsPageList` from `buildLlmsTxt` (llms-txt.ts) so `{{pageTree}}` = the
+  EXACT auto "## Pages" list. Store getter/setter `getLlmsTemplate`/`setLlmsTemplate` (settings key
+  `llms_template`, stored VERBATIM — it's free text, not JSON). Wired the `/llms.txt` route: a
+  non-blank stored template renders with the vars bag, else today's auto output.
+- **Verified:** `node --test` 12/12 (7 new template tests + 5 existing llms-txt, incl. the new
+  buildLlmsPageList path). `npx tsc --noEmit` clean. Did NOT run opennext build (pure logic + light
+  route wiring; tsc+tests cover it). Did NOT live-fetch /llms.txt (needs live D1 + a stored
+  template — HITL). No worker.ts change → ships on next normal CMS build.
+- **Files:** CMS/src/lib/render/llms-template.ts (+.test.ts), CMS/src/lib/render/llms-txt.ts,
+  CMS/src/db/settings-store.ts, CMS/src/app/llms.txt/route.ts

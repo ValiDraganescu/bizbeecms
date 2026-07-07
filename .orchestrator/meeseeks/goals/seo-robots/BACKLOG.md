@@ -7,16 +7,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### USER-QUEUED (2026-07-07): editable llms.txt + caching for llms.txt and .md variants
-- TODO: Editable llms.txt template with placeholders: store a free-text llms.txt template in site
-  settings (D1). When set, /llms.txt renders it with placeholder substitution; when empty, fall back
-  to today's auto-generated output. Placeholders (pure, unit-tested substitution): at minimum
-  `{{brandName}}`, `{{tagline}}`, `{{pageTree}}` (the published-page tree with .md links — exactly
-  today's auto output) — plus whatever other system data is cheaply available and interesting for AI
-  agents (locales list, site origin, …; survey and document each). USER REQUIREMENT: the placeholder
-  syntax MUST be the same `{{slot}}` format components use for prop interpolation — reuse the
-  existing component slot-binding convention/helper (see jsonld-component.ts string-level `{{prop}}`
-  binding) rather than inventing a new format. Unknown placeholders → self-correcting validation
-  error on save naming the bad token (AI error philosophy).
+- DONE (2026-07-07): Editable llms.txt template with placeholders. Pure `lib/render/llms-template.ts`
+  (7 tests): `LLMS_TEMPLATE_VARS` (single source of truth for slots + UI side-panel docs),
+  `renderLlmsTemplate` (substitution via the SHARED `SLOT_RE` from plan-tree.ts — same `{{slot}}` /
+  `{{ t slot }}` convention as components), `unknownSlots` (names bad tokens for self-correcting
+  save-time validation). Slots: `brandName`, `tagline`, `origin`, `defaultLocale`, `locales`,
+  `pageTree`. Store: `getLlmsTemplate`/`setLlmsTemplate` (key `llms_template`, stored VERBATIM not
+  JSON). Route `/llms.txt` renders the template when set, else auto output; `pageTree` = the exact
+  auto "## Pages" list via new exported `buildLlmsPageList` (llms-txt.ts). NOTE: the settings UI
+  (next task) owns the on-save `unknownSlots` reject — the route substitutes unknowns to "".
 - TODO: llms.txt settings editor UI: admin settings page with the template editor and a SIDE PANEL
   to the RIGHT of the editor listing all available variables (name + one-line description + example
   value; click-to-insert preferred). REST GET/PUT with stable error codes (mirror the robots.txt

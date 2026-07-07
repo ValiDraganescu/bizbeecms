@@ -63,6 +63,7 @@ const API_CACHE_VERSIONS_KEY = "api_cache_versions";
 const INDEXNOW_KEY_KEY = "indexnow_key";
 const ROBOTS_CONFIG_KEY = "robots_config";
 const SITE_VERIFICATION_KEY = "site_verification";
+const LLMS_TEMPLATE_KEY = "llms_template";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
 async function upsertSetting(
@@ -459,6 +460,30 @@ export async function setSiteVerification(
     injectedDb,
   );
   return normalized;
+}
+
+/**
+ * Read the editable /llms.txt template (raw text with `{{slot}}` placeholders),
+ * or "" if unset. Stored VERBATIM (not JSON) — it's free text; a blank template
+ * means the /llms.txt route falls back to its auto-generated output. seo-robots.
+ */
+export async function getLlmsTemplate(injectedDb?: Db): Promise<string> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, LLMS_TEMPLATE_KEY))
+    .limit(1);
+  return rows[0]?.value ?? "";
+}
+
+/** Upsert the llms.txt template (stored verbatim). Validation of unknown
+ *  `{{slot}}` tokens is the route's job (unknownSlots) BEFORE calling this. */
+export async function setLlmsTemplate(
+  template: string,
+  injectedDb?: Db,
+): Promise<void> {
+  await upsertSetting(LLMS_TEMPLATE_KEY, template, injectedDb);
 }
 
 /**
