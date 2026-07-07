@@ -424,6 +424,12 @@ export function ComponentDevelop({
       if (action === "publish" && saveStateRef.current === "dirty" && draft) {
         await saveDraft(name, draft);
       }
+      // Pending prop-default edits are part of "what you see" too: without this
+      // flush their debounce fires AFTER the POST and re-creates the draft the
+      // publish just consumed (the bar comes straight back).
+      if (action === "publish" && propsDirtyRef.current && draft) {
+        await savePropDefaults(name, draft);
+      }
       const res = await fetch(`/api/components/${encodeURIComponent(name)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -471,46 +477,50 @@ export function ComponentDevelop({
     setPropsDirty(true);
   }
 
-  // Debounced persist of edited placeholder defaults: rewrite the propsSchema's
-  // `default`s and PUT the full artifact (html/script/css unchanged) so the gate
-  // re-validates, then reload the preview to show the new defaults bound in.
+  // Persist edited placeholder defaults: rewrite the propsSchema's `default`s
+  // and PUT the full artifact (html/script/css unchanged) so the gate
+  // re-validates. Shared by the debounce below AND the publish flush.
+  async function savePropDefaults(name: string, d: Draft) {
+    const nextSchema = applyDefaults(propsSchemaStr, propValues);
+    await runExclusive(async () => {
+      setSaveState("saving");
+      setSaveError(null);
+      try {
+        const res = await fetch(`/api/components/${encodeURIComponent(name)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            html: d.html,
+            script: d.script,
+            css: d.css,
+            propsSchema: nextSchema,
+            kind,
+          }),
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as
+            | { error?: string; errors?: string[] }
+            | null;
+          setSaveState("error");
+          setSaveError(body?.errors?.join("; ") || body?.error || `HTTP ${res.status}`);
+          return;
+        }
+        setPropsSchemaStr(nextSchema);
+        setPropsDirty(false);
+        setSaveState("saved");
+        setReloadKey((k) => k + 1);
+      } catch (err) {
+        setSaveState("error");
+        setSaveError((err as Error).message);
+      }
+    });
+  }
+
+  // Debounced persist of edited placeholder defaults (~800ms after last edit),
+  // then reload the preview to show the new defaults bound in.
   useEffect(() => {
     if (!selected || !draft || !propsDirty) return;
-    const tid = setTimeout(() => {
-      const nextSchema = applyDefaults(propsSchemaStr, propValues);
-      void runExclusive(async () => {
-        setSaveState("saving");
-        setSaveError(null);
-        try {
-          const res = await fetch(`/api/components/${encodeURIComponent(selected)}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              html: draft.html,
-              script: draft.script,
-              css: draft.css,
-              propsSchema: nextSchema,
-              kind,
-            }),
-          });
-          if (!res.ok) {
-            const body = (await res.json().catch(() => null)) as
-              | { error?: string; errors?: string[] }
-              | null;
-            setSaveState("error");
-            setSaveError(body?.errors?.join("; ") || body?.error || `HTTP ${res.status}`);
-            return;
-          }
-          setPropsSchemaStr(nextSchema);
-          setPropsDirty(false);
-          setSaveState("saved");
-          setReloadKey((k) => k + 1);
-        } catch (err) {
-          setSaveState("error");
-          setSaveError((err as Error).message);
-        }
-      });
-    }, 800);
+    const tid = setTimeout(() => void savePropDefaults(selected, draft), 800);
     return () => clearTimeout(tid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propValues, propsDirty, selected]);

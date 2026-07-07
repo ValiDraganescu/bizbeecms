@@ -27,3 +27,31 @@ test("null props/label match null (no spurious change when both empty)", () => {
   assert.equal(artifactUnchanged(bare, { ...bare }), true);
   assert.equal(artifactUnchanged(bare, { ...bare, label: "X" }), false);
 });
+
+// ── html equivalence is by PARSED TREE, not raw string ──────────────────────
+// The Develop editor round-trips through formatHtml (pretty-printed) while the
+// AI's edit_text writes compact markup: a raw compare let those echoes create
+// a phantom "unpublished changes" draft right after publish (restovista,
+// 2026-07-08). Same tree = unchanged, whatever the formatting.
+
+test("formatting-only html differences are unchanged (editor/AI echo)", () => {
+  const compact =
+    '<header class="w-full"><div class="flex gap-2"><span>Hi</span><a href="/x">Go</a></div></header>';
+  const pretty =
+    '<header class="w-full">\n  <div class="flex gap-2">\n    <span>Hi</span>\n    <a href="/x">Go</a>\n  </div>\n</header>';
+  assert.equal(artifactUnchanged({ ...live, html: compact }, { ...live, html: pretty }), true);
+});
+
+test("a REAL html change is still a change, however small", () => {
+  assert.equal(
+    artifactUnchanged(
+      { ...live, html: '<div class="a">Hi</div>' },
+      { ...live, html: '<div class="b">Hi</div>' },
+    ),
+    false,
+  );
+  assert.equal(
+    artifactUnchanged({ ...live, html: "<div>Hi</div>" }, { ...live, html: "<div>Hi!</div>" }),
+    false,
+  );
+});
