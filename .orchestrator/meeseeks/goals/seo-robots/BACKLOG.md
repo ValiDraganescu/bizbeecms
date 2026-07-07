@@ -18,11 +18,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
   derived via new `mediaKeyFromSrc` (asset.ts — strips /media/ + query, validates isValidAssetKey).
   React casing fix: `srcset`→`srcSet` mapped in react-props.ts (lowercase warns + drops). Tests:
   image-hygiene +6, react-props +1, asset +2 (27/27); tsc clean. Live resize is deploy-only (HITL).
-- TODO: dims for `generate_image` assets — AI-generated images store NULL width/height (no
-  server-side decode on Workers) so they never get the CLS box or (future) srcset. Add a client-side
-  `createImageBitmap` re-decode after generation (mirror the media-uploader capture path) or stamp
-  dims at insert time; never a render-time D1 read. — queued by scrub: journal 14:27 said
-  "filed as its own concern" but no task was ever filed.
+- DONE: dims for `generate_image` assets — new pure `imageDimensionsFromBytes`
+  (lib/media/image-dimensions.ts) reads intrinsic dims from the FILE HEADER (PNG/JPEG/GIF/WebP, no
+  decode → Workers-safe) since the tool runs server-side with no browser; stamped into the existing
+  `putAsset` call in `handleGenerateImage`. null→null (never breaks an asset). AI images now get the
+  CLS box + srcset. 7 header-parse tests; suite 1895; tsc clean. Live gen round-trip is HITL.
 
 ### Operator SEO tooling (admin) — audit report + AI bulk-meta shipped (see BACKLOG_ARCHIVE)
 - TODO: SEO audit — deep component-tree scan: the current audit only scans raw `page.blocks` prop

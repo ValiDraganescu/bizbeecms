@@ -910,3 +910,18 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `npx tsc --noEmit` clean. Could NOT verify live resized bytes/srcset selection in a browser — the
   IMAGES binding transform is deploy-only (getImages returns null in dev → original served); HITL.
 - **Files:** CMS/src/lib/render/image-hygiene.ts, asset.ts, react-props.ts + their 3 test files.
+
+## 2026-07-07 15:02 — dims for generate_image assets (CLS box + srcset for AI images)
+- **Status:** DONE
+- **What I did:** AI-generated images (`generate_image` tool) stored NULL width/height because the
+  handler runs SERVER-SIDE on the Worker — no browser to run the client-side `readImageDimensions`
+  (image-thumb.ts). New pure `imageDimensionsFromBytes` (CMS/src/lib/media/image-dimensions.ts) reads
+  intrinsic dims straight from the FILE HEADER (no decode/canvas — Workers-safe): PNG IHDR, GIF LSD,
+  JPEG SOFn scan, WebP VP8/VP8L/VP8X. Wired into `handleGenerateImage` (tool-dispatch.ts): stamp
+  `width`/`height` into the existing `putAsset` call (which already accepted them); null → stored null
+  exactly as before, so it can only ADD dims. Closes the last CWV image gap — AI images now get the
+  anti-CLS box AND the srcset from impl 2/2.
+- **Verified:** new node --test image-dimensions.test.ts 7/7 (real byte fixtures per format incl. the
+  1x1 PNG, truncated→null, zero-dim→null); full suite 1895/1895; `npx tsc --noEmit` clean. Could NOT
+  verify a live AI generation round-trip (needs an OpenRouter key + deployed origin) — HITL.
+- **Files:** CMS/src/lib/media/image-dimensions.ts (+ .test.ts), CMS/src/lib/chat/tool-dispatch.ts

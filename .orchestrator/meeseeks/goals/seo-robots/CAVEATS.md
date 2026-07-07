@@ -485,3 +485,10 @@ Read every line before working. Each entry was learned the hard way by a previou
   attrToReactName maps `srcset`→`srcSet` (it has no hyphen so the camelCase pass missed it). If you emit
   any other non-hyphen React-cased attr from a plan (rare), add it there too. Live resize is DEPLOY-ONLY
   (IMAGES binding null in dev) — the srcset URLs render, but the bytes resize only on a deployed site (HITL).
+
+- (2026-07-07) Server-side image dims: `generate_image` runs ON THE WORKER — there is NO
+  `createImageBitmap`/`Image`/canvas there, so the client-side `readImageDimensions` (image-thumb.ts,
+  used by the media-library UPLOADER) can't be reused. To get dims for any bytes we produce/receive
+  server-side, use pure `imageDimensionsFromBytes` (lib/media/image-dimensions.ts) — it parses the
+  file HEADER only (PNG/JPEG/GIF/WebP), no decode, node-testable. Returns null for unknown/truncated →
+  store null (same as before). Don't try to bring a decoder onto Workers for this.

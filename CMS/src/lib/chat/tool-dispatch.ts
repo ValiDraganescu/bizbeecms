@@ -143,6 +143,7 @@ import {
 import { EDIT_TEXT_TOOL, validateEditText } from "./edit-text-tool";
 import { GENERATE_IMAGE_TOOL, validateGenerateImage } from "./generate-image-tool";
 import { generateImage } from "./generate-image";
+import { imageDimensionsFromBytes } from "../media/image-dimensions";
 import { withWhiteBackgroundInstruction } from "./cutout";
 import { removeBackgroundFromPng } from "./png-cutout";
 import { describeImage } from "./describe-image";
@@ -720,12 +721,18 @@ async function handleGenerateImage(args: unknown): Promise<Record<string, unknow
       image.contentType.split("/")[1] ?? "png",
     );
     const assetKey = buildAssetKey(filename, image.contentType, crypto.randomUUID().slice(0, 8));
+    // Stamp intrinsic dims from the file header so the AI image gets the CLS box +
+    // srcset like uploads do — there's no browser here to run readImageDimensions,
+    // so parse the bytes (imageDimensionsFromBytes; null → stored null, as before).
+    const dims = imageDimensionsFromBytes(image.bytes);
     const row = await putAsset({
       key: assetKey,
       filename,
       contentType: image.contentType,
       bytes: image.bytes,
       description,
+      width: dims?.width ?? null,
+      height: dims?.height ?? null,
     });
     // Apply the model's tags (best-effort; the asset already exists either way).
     if (valid.tags.length > 0) {
