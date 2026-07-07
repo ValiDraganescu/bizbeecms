@@ -1287,3 +1287,24 @@ hot path (no per-request D1 read on the render gate), localized EN/FI/ET.
 - **Verified:** `npx tsc --noEmit` clean. Purge is best-effort (`purge-edge.ts` swallows). Live
   cache-bust = HITL (release-gated worker carve-outs serve /sitemap.xml + /llms.txt).
 - **Files:** CMS/src/app/api/settings/content-locales/route.ts, goals/seo-robots/CAVEATS.md
+
+---
+
+## 2026-07-07 16:? — AI "fix missing alt" path (audit_alt tool + guide)
+- **Status:** DONE
+- **What I did:** Added the `audit_alt` AI read tool — the chat-side companion to the admin
+  SEO-audit's missing-alt findings. `AUDIT_ALT_TOOL` (no-arg schema) in `meta-tools.ts`; dispatcher
+  `handleAuditAlt` runs `auditSeo(listPagesForAudit(), getContentLocales(),
+  buildComponentSeoIndex(listComponents()))` — same deep-scan as the admin page, so component-internal
+  <img> gaps are caught alongside block-prop images — dedups findings by slug+src and returns them
+  with a fix `hint`. Registered in tool-scopes `KNOWN_TOOL_NAMES`, the `TOOL_BY_NAME` registry, the
+  `HANDLERS` map, and the `page-builder` + `pages` scopes. Added a guide line to BOTH the page-builder
+  and pages system prompts: call audit_alt, then fix a block-prop image with `set_block_props` (patch
+  alt/altText) or a component-markup image with `update_component` (re-author html with a real alt=).
+- **Verified:** `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` green; full pure suite `npm test`
+  1955 pass (was 1955 — no new pure logic needing a test: dedup is a trivial Set filter, the
+  missing-alt extraction is already covered by seo-audit.test.ts, the schema is a static object).
+  `tsc --noEmit` clean for my three files (the 4 remaining `CloudflareEnv.DB` errors are the
+  PRE-EXISTING typegen drift, unchanged by this run).
+- **Files:** CMS/src/lib/chat/meta-tools.ts, CMS/src/lib/chat/tool-dispatch.ts,
+  CMS/src/lib/chat/tool-scopes.ts.

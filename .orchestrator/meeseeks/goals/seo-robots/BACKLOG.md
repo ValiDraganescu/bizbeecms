@@ -12,8 +12,10 @@ Task states: TODO | DOING | DONE | BLOCKED.
   CAVEATs' purge-coverage lists updated (SITEMAP → 5 sites, LLMS → 7 sites).
 
 ### Lower-value follow-ups
-- TODO (follow-up to the AI bulk-meta tool): AI "fix missing alt" path — audit_meta covers only the
-  meta title/description gaps; missing image alt (`auditSeo.missingAlt`) is authored inside block
-  props, so fixing it needs `set_block_props` (already exists) driven by an alt audit. Consider an
-  `audit_alt` read tool (returns missingAlt) + a guide line so the AI knows to set_block_props the
-  alt. Lower value than meta (alt is per-image, harder to auto-generate well).
+- DONE (2026-07-07): AI "fix missing alt" path — `audit_alt` read tool (no args) in meta-tools.ts,
+  dispatched via `handleAuditAlt` (listPagesForAudit + getContentLocales + listComponents →
+  `auditSeo(…, buildComponentSeoIndex(components))`, so it deep-scans component-internal <img> too;
+  dedup by slug+src; returns findings + a fix `hint`). Registered in tool-scopes KNOWN_TOOL_NAMES +
+  page-builder & pages scopes; guide lines added to both prompts so the AI drives `set_block_props`
+  (block-prop images) / `update_component` (component-markup images) from the audit. Build gate green
+  (`CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build`); full pure suite 1955 pass.
