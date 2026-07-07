@@ -6,6 +6,33 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Tasks
 
+### USER-QUEUED (2026-07-07): editable llms.txt + caching for llms.txt and .md variants
+- TODO: Editable llms.txt template with placeholders: store a free-text llms.txt template in site
+  settings (D1). When set, /llms.txt renders it with placeholder substitution; when empty, fall back
+  to today's auto-generated output. Placeholders (pure, unit-tested substitution): at minimum
+  `{{brandName}}`, `{{tagline}}`, `{{pageTree}}` (the published-page tree with .md links — exactly
+  today's auto output) — plus whatever other system data is cheaply available and interesting for AI
+  agents (locales list, site origin, …; survey and document each). USER REQUIREMENT: the placeholder
+  syntax MUST be the same `{{slot}}` format components use for prop interpolation — reuse the
+  existing component slot-binding convention/helper (see jsonld-component.ts string-level `{{prop}}`
+  binding) rather than inventing a new format. Unknown placeholders → self-correcting validation
+  error on save naming the bad token (AI error philosophy).
+- TODO: llms.txt settings editor UI: admin settings page with the template editor and a SIDE PANEL
+  to the RIGHT of the editor listing all available variables (name + one-line description + example
+  value; click-to-insert preferred). REST GET/PUT with stable error codes (mirror the robots.txt
+  settings pattern). Localized EN/FI/ET.
+- TODO: Cache /llms.txt: today force-dynamic + no-store + rejected by the edge-cache dot gate
+  (deliberate, after the wildcard cache-tag sitemap bug). Add caching WITH explicit purge coverage:
+  own cache tag, purged on page publish/unpublish/delete/rename, brand-identity save, AND llms
+  template save. Must NOT reopen the wildcard-page cache-stamping hole — explicit carve-out for
+  exactly /llms.txt, never a general loosening of the dot gate. Any worker.ts change is
+  release-gated (r-*).
+- TODO: Cache .md page variants: /api/md/[...slug] currently sets no Cache-Control (recomputed every
+  request; the worker rewrite exits BEFORE the edge-cache gate). Add edge caching keyed on the
+  PUBLIC /<path>.md URL or the api route with the page's existing cache tag (pageCacheTag) so
+  publish/unpublish/rename purges cover it; noindex flips must purge too. Honor the CAVEATS wildcard
+  cache-tag caution. Worker.ts changes, if needed, are release-gated (r-*).
+
 ### Operator SEO tooling (admin)
 - DONE: SEO audit view in the CMS admin (`/admin/settings/seo-audit`) — orphans, broken internal
   links, missing per-locale meta title/desc, images missing alt. Pure `auditSeo` (seo-audit.ts,
@@ -17,7 +44,18 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collect `<a href>` + `<img src/alt>` from component markup too. Needs the D1 component resolver
   (not a pure input) — decide: build the plan (heavy, next-intl) vs a dep-light component-tree
   href/img extractor fed the resolved component rows. Then feed those into the same auditSeo shape.
-- TODO: AI bulk-meta assistant tool: tool(s) letting the AI list pages/locales with missing meta title/description (and images missing alt), then write generated values through the existing upsertPageMeta validation path (per-locale maps, purge semantics intact); self-correcting errors naming exact page+locale; authoring-guide section so the AI knows the workflow.
+- DONE (2026-07-07): AI bulk-meta assistant tools — `audit_meta` (returns auditSeo's missingMeta
+  page×locale gaps) + `set_page_meta` (per-locale metaTitle/metaDescription MERGE via upsertPageMeta
+  + light purge/IndexNow hook). Pure `lib/chat/meta-tools.ts` (8 tests). Wired into tool-dispatch,
+  tool-scopes (pages + page-builder), pages context prompt. SCOPE: writes ONLY title/desc — never
+  moves URLs / flips noindex / blanks metaImage, so no rename/noindex pre-capture needed. NOTE: the
+  "images missing alt" WRITE half is NOT included (alt lives in block props / component markup, not a
+  page-meta field — would need a block-prop edit); filed as the follow-up below.
+- TODO (follow-up to the AI bulk-meta tool): AI "fix missing alt" path — audit_meta covers only the
+  meta title/description gaps; missing image alt (`auditSeo.missingAlt`) is authored inside block
+  props, so fixing it needs `set_block_props` (already exists) driven by an alt audit. Consider an
+  `audit_alt` read tool (returns missingAlt) + a guide line so the AI knows to set_block_props the
+  alt. Lower value than meta (alt is per-image, harder to auto-generate well).
 
 ### Performance — Core Web Vitals
 - TODO: INVESTIGATION (design note, not code): responsive image variants for `/media/[...key]` R2 assets on per-site Workers — evaluate Cloudflare Images API upload-time variants vs zone Image Resizing (custom-domain sites only; workers.dev sites can't) vs in-Worker resizing (no native codecs on Workers — likely dead end); deliverable = chosen path + cost/constraints written to this goal's JOURNAL + CAVEATS, and implementation tasks filed accordingly. NOTE: dims now ride asset URLs as `?w=&h=` — a responsive path could reuse that query carrier for width hints.

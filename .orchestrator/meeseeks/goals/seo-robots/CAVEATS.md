@@ -348,3 +348,21 @@ Read every line before working. Each entry was learned the hard way by a previou
   URLs are un-enumerable — never flag them). Image detection is prop-NAME-based
   (src/image/imageUrl/imageSrc/backgroundImage + looksLikeImage), so a custom image prop name
   authored by the AI would be missed — extend IMAGE_SRC_KEYS if a new convention appears.
+
+- (2026-07-07) AI bulk-meta tools: `audit_meta` (read) + `set_page_meta` (write) in
+  `lib/chat/meta-tools.ts` (pure schemas + `validateSetPageMeta` + `mergePageMeta`). GOTCHA that
+  drove the design: in `upsertPageMeta`, `metaImage` is NOT preserve-when-absent — it ALWAYS writes
+  `JSON.stringify(meta.metaImage)`. So any partial meta write (like this tool, which edits only
+  title/desc) MUST carry the page's EXISTING metaImage forward or it blanks the OG image.
+  `mergePageMeta` does exactly this (required `existing.metaImage`), AND omits
+  noindex/localizedSlugs/cacheMaxAge (those ARE preserve-when-absent). Because a meta-only write can
+  never move a URL / flip noindex, the LIGHT AI hook is correct (purge pageCacheTag +
+  notifyIndexNowForPage, same as handleCreatePage) — no rename-301 / noindex pre-capture. If you ever
+  add slug/parent/publish/noindex to this tool, you MUST add the REST route's rename+noindex
+  pre-capture trio (see the AI write-path caveat). The tool addresses pages by SLUG (+optional
+  parentSlug) via `listPages()` match — there is NO getPageBySlug store helper; add one if this
+  match-scan ever shows up hot (it won't — it's an authoring-time path).
+- (2026-07-07) auditSeo's `missingAlt` findings are NOT writable by the bulk-meta tool — alt text
+  lives in block props / component markup, not the page-meta title/desc fields. Don't try to bolt alt
+  onto set_page_meta; it'd need set_block_props (see the filed follow-up). audit_meta returns ONLY
+  the `missingMeta` slice on purpose.

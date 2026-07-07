@@ -696,3 +696,31 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/render/seo-audit.ts (+.test.ts), CMS/src/db/page-store.ts (listPagesForAudit),
   CMS/src/app/(admin)/admin/settings/seo-audit/page.tsx, CMS/src/components/settings/settings-nav.tsx,
   CMS/messages/{en,fi,et}.json
+
+## 2026-07-07 13:56 — AI bulk-meta assistant tools (audit_meta + set_page_meta)
+- **Status:** DONE
+- **What I did:** Added the chat-side pair for the SEO-audit report — two AI tools so the assistant
+  can FIND and FILL missing per-locale SEO meta:
+  - `audit_meta` (read, no args) → runs `listPagesForAudit()` + `auditSeo`, returns ONLY the
+    `missingMeta` findings (`{slug, locale, missing:["title"|"description"]}`) + a `total`; empty
+    → a `note`. Reuses the exact analyzer the admin report uses — no new data path.
+  - `set_page_meta` (write) → addresses a page by `slug` (+ optional `parentSlug`), writes a
+    per-locale `metaTitle`/`metaDescription` MERGE through the SAME `upsertPageMeta` store path the
+    REST SEO tab uses, then runs the LIGHT AI hook (purge `pageCacheTag` + `notifyIndexNowForPage`,
+    exactly like `handleCreatePage`). Self-correcting errors name the exact bad slug/locale.
+  - Pure module `lib/chat/meta-tools.ts` (tool schemas + `validateSetPageMeta` + `mergePageMeta`) —
+    node-testable, no React/D1/CF imports. `mergePageMeta` is the crux: it carries the page's
+    existing slug/parent/publishStatus/**metaImage** through UNCHANGED and OMITS
+    noindex/localizedSlugs/cacheMaxAge (preserve-when-absent) — so a meta write can NEVER move a
+    URL, flip noindex, or blank the OG image. That's why no rename-301 / noindex pre-capture is
+    needed (per the AI write-path IndexNow caveat) — the light hook is correct.
+  - Wired both into tool-dispatch (`TOOL_BY_NAME` + `HANDLERS`), tool-scopes (`KNOWN_TOOL_NAMES` +
+    the `pages` and `page-builder` contexts) and added an SEO-housekeeping sentence to the `pages`
+    context prompt (title ~50-60 / desc ~140-160 chars).
+- **Verified:** `node --test meta-tools.test.ts` 8/8 (slug/no-op/non-string reject + merge preserves
+  metaImage & omits noindex + empty-string clears); full `npm test` 1861/1861 (was 1853; +8);
+  `npx tsc --noEmit` exit 0. Did NOT run opennext build (pure logic + wiring; tsc+tests cover it) nor
+  live-exercise the tool (needs live D1 + a chat session — HITL). MCP surface picks the tools up
+  automatically via `allToolSchemas()`. No worker.ts change → ships on next normal CMS build.
+- **Files:** CMS/src/lib/chat/meta-tools.ts (+.test.ts), CMS/src/lib/chat/tool-dispatch.ts,
+  CMS/src/lib/chat/tool-scopes.ts

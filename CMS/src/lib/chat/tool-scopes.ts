@@ -41,6 +41,8 @@ const KNOWN_CONTEXTS: AdminPageContext[] = [
 export const KNOWN_TOOL_NAMES = [
   "create_component",
   "create_page",
+  "audit_meta",
+  "set_page_meta",
   "translate",
   "list_assets",
   // Slice 3 read-only discovery tools.
@@ -163,6 +165,8 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "update_component",
     "update_page_blocks",
     "set_block_props",
+    "audit_meta",
+    "set_page_meta",
     "list_assets",
     "list_components",
     "get_component",
@@ -206,6 +210,8 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "create_page",
     "update_page_blocks",
     "set_block_props",
+    "audit_meta",
+    "set_page_meta",
     "translate",
     "list_assets",
     "list_pages",
@@ -274,7 +280,7 @@ const CONTEXT_PROMPTS: Record<AdminPageContext, string> = {
 
   components: `You are in the Component library. Act only on a clear request — never inspect or redesign anything off a greeting or an unclear message. When the operator DOES ask for work: discover existing components first (list_components, get_component) so you reuse/update instead of duplicating. To edit one: call get_component and WAIT for its result, THEN update_component with the FULL new artifact (existing html + your change). update REPLACES, not merges — never send partial or empty html, and never call update_component in the same batch as get_component (you won't have the html yet). Match the brand/palette (get_brand_identity, get_theme). Create new components with create_component. Reference real uploaded media via list_assets.`,
 
-  pages: `You are on the Pages list. Act only on a clear request — never inspect or change anything off a greeting or an unclear message. When the operator DOES ask for work: discover existing pages first (list_pages, get_page). Compose new pages from existing components (create_page); to change an existing page's layout, get_page then update_page_blocks with the FULL new block tree (it replaces, not merges; use 'Section' from list_builtin_types for layout). Translate page content into the site's other content locales (translate); check list_locales for the targets. Show real collection DATA on a page: bind_component (one block ← first matching item) or create_list/bind_list (repeat a template per item inside a Section); discover collection tables + fields with query_collection. Blocks can also show EXTERNAL API data: list_data_sources → test_data_source (see the response's dot-paths) → bind_component / create_list / bind_list with source+request and a prop → dot-path map; create_data_source defines a new API source. Visitor forms: create_form / bind_form target an api saved request or an opted-in collection; pass an existing input component's name as create_form's \`child\` to place it in the same call, and match its <input name=…> to the field names the tool result lists. Before any non-trivial data-source/binding/form work, call get_data_sources_guide for the full playbook. Dynamic pages: a create_page slug segment like ':city-slug' is a WILDCARD; filters/search/props can read its match via { "param": "city-slug" } or a URL query param via { "query": "q" } instead of a literal (details in get_data_sources_guide). Prefer ONE wildcard page bound to a collection over N near-identical static pages.`,
+  pages: `You are on the Pages list. Act only on a clear request — never inspect or change anything off a greeting or an unclear message. When the operator DOES ask for work: discover existing pages first (list_pages, get_page). Compose new pages from existing components (create_page); to change an existing page's layout, get_page then update_page_blocks with the FULL new block tree (it replaces, not merges; use 'Section' from list_builtin_types for layout). Translate page content into the site's other content locales (translate); check list_locales for the targets. For SEO housekeeping: call audit_meta to find published pages missing a per-locale meta title/description, then write good values with set_page_meta (address the page by slug, pass per-locale maps; it merges — omitted locales keep their value, and it never changes the page's URL/publish/noindex). Write a concise unique title (~50-60 chars) and description (~140-160 chars) per locale. Show real collection DATA on a page: bind_component (one block ← first matching item) or create_list/bind_list (repeat a template per item inside a Section); discover collection tables + fields with query_collection. Blocks can also show EXTERNAL API data: list_data_sources → test_data_source (see the response's dot-paths) → bind_component / create_list / bind_list with source+request and a prop → dot-path map; create_data_source defines a new API source. Visitor forms: create_form / bind_form target an api saved request or an opted-in collection; pass an existing input component's name as create_form's \`child\` to place it in the same call, and match its <input name=…> to the field names the tool result lists. Before any non-trivial data-source/binding/form work, call get_data_sources_guide for the full playbook. Dynamic pages: a create_page slug segment like ':city-slug' is a WILDCARD; filters/search/props can read its match via { "param": "city-slug" } or a URL query param via { "query": "q" } instead of a literal (details in get_data_sources_guide). Prefer ONE wildcard page bound to a collection over N near-identical static pages.`,
 
   settings: `You are on the Settings page. Read the current configuration first (get_brand_identity, get_theme, list_locales). You can UPDATE the brand identity (update_brand_identity — read it first, then pass the full object) and the theme colors (update_theme — pass light and/or dark token→color maps). You can also translate existing content into the site's content locales (translate).`,
 

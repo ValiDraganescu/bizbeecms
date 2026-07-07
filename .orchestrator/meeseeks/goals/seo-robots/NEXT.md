@@ -1,44 +1,45 @@
 # Note to the next Meeseeks (seo-robots)
 
-**This run shipped: the SEO-audit admin report** (`/admin/settings/seo-audit`).
-- Pure `lib/render/seo-audit.ts auditSeo(pages, contentLocales)` (12 tests): orphans, broken
-  internal links, missing per-locale meta title/desc, images missing alt. Store read
-  `listPagesForAudit()`. Read-only localized EN/FI/ET server page + settings-nav item under "Site".
-- SCOPE CAVEAT (read it): it scans RAW `page.blocks` props ONLY, not resolved component trees —
-  links/images authored inside component markup aren't checked. Deep component-tree scan is a
-  filed follow-up TODO. No worker.ts change → ships on next normal CMS build.
+**This run shipped: the AI bulk-meta assistant tools** (`audit_meta` + `set_page_meta`).
+- Pure `lib/chat/meta-tools.ts` (8 tests): `validateSetPageMeta` + `mergePageMeta`. `audit_meta`
+  (no args) returns auditSeo's missingMeta page×locale gaps; `set_page_meta` MERGES a per-locale
+  metaTitle/metaDescription onto ONE page (addressed by slug) via `upsertPageMeta` + the LIGHT AI
+  hook (purge pageCacheTag + IndexNow, like create_page). Wired into tool-dispatch, tool-scopes
+  (pages + page-builder), and the pages context prompt.
+- READ THE NEW CAVEAT: `metaImage` is NOT preserve-when-absent in upsertPageMeta — mergePageMeta
+  carries the existing metaImage forward so a meta edit can't blank the OG image. Meta-only write
+  can't move URLs / flip noindex → no rename/noindex pre-capture needed (that's why the light hook
+  is right). No worker.ts change → ships on next normal CMS build.
 
 **Take next — pick one, rough priority:**
 
-1. **AI bulk-meta assistant tool** (pairs naturally with the audit just shipped) — tool(s) letting
-   the AI list pages/locales missing meta title/desc (reuse `listPagesForAudit` + auditSeo's
-   `missingMeta`), then WRITE generated values through the existing `upsertPageMeta` validation path
-   (per-locale maps, purge/IndexNow semantics intact). MUST run the noindex/rename pre-capture trio
-   IF it can flip those — but a pure meta write can't, so the lighter AI-hook path is fine (see the
-   AI write-path IndexNow caveat). Self-correcting errors naming exact page+locale.
-
-2. **Responsive-images INVESTIGATION** (design note, not code) — Cloudflare Images API upload-time
+1. **Responsive-images INVESTIGATION** (design note, not code) — Cloudflare Images API upload-time
    variants vs zone Image Resizing (custom-domain only; workers.dev can't) vs in-Worker (no native
    codecs — likely dead end). Deliverable = chosen path + constraints to JOURNAL/CAVEATS + filed
-   impl tasks. Unblocks the BLOCKED srcset/WebP task. Dims already ride URLs as `?w=&h=` — reuse
-   that query carrier for width hints.
+   impl tasks. Unblocks the BLOCKED srcset/WebP task. Dims already ride URLs as `?w=&h=`.
 
-3. **SEO-audit deep component-tree scan** (follow-up to this run) — extend the audit to also check
-   links/images/alt authored inside referenced component trees (needs the D1 component resolver;
-   see the new caveat + the filed BACKLOG TODO for the design fork).
+2. **Stamp `?w=&h=` dims on AI-inserted asset URLs** (list_assets / generate_image responses) via
+   `withAssetDims`, so AI-authored pages get the CLS aspect-ratio box too (today only ImagePicker
+   stamps dims). Authoring-time only, zero render cost. Pairs with the AI tooling just shipped.
 
-4. **Per-URL-locale branded 404** (needs a release) — render the branded 404 in the visitor's URL
-   locale via a worker.ts-injected request-path header read in not-found.tsx (`peelActiveLocale`
-   already exported). Lower priority — default-locale 404 works.
+3. **AI "fix missing alt" follow-up** (filed this run) — audit_alt read tool over auditSeo.missingAlt
+   + a guide line so the AI knows to set_block_props the alt. Lower value (alt is per-image).
 
-**jsonld polish (lower):** builder-canvas invisible-element CHIP for jsonld; AI authoring-guide
-section for jsonld; per-row/ItemList JSON-LD for List blocks.
+4. **SEO-audit deep component-tree scan** — extend the audit to links/images/alt authored INSIDE
+   referenced component trees (needs the D1 component resolver; see the design-fork BACKLOG TODO).
+
+5. **NEW USER-QUEUED (top of BACKLOG): editable llms.txt template + settings UI + caching for
+   llms.txt and .md variants** — 4 tasks a curator added this session. The template MUST reuse the
+   component `{{slot}}` binding convention (jsonld-component.ts string-level bind), not a new format.
+
+**jsonld polish (lower):** builder-canvas invisible-element CHIP; AI authoring-guide section for
+jsonld; per-row/ItemList JSON-LD for List blocks.
 
 **OG-image autogen track** (4 BACKLOG tasks) — starts with a Browser Rendering tracer/decision spike.
 
 **Naughty-robot rate limiting** (2 tasks, needs worker.ts + release) — last untouched GOAL track.
 
-**HITL / release-pending:** live-render the new SEO-audit admin page (needs live D1 + admin
-session); live Lighthouse/CWV for the CLS aspect-ratio; live upload dims persist; public
-`/<path>.md` fetch (worker rewrite via release); live 404 render; live Google Rich Results
+**HITL / release-pending:** live-exercise audit_meta/set_page_meta in a chat session (needs live D1 +
+admin session); live-render the SEO-audit admin page; live Lighthouse/CWV; live upload dims persist;
+public `/<path>.md` fetch (worker rewrite via release); live 404 render; live Google Rich Results
 validation of a jsonld component; live IndexNow/edge-purge.

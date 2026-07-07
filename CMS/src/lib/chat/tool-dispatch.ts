@@ -22,6 +22,12 @@ import {
 } from "./component-tool";
 import { CREATE_PAGE_TOOL, validatePageInput } from "./page-tool";
 import {
+  AUDIT_META_TOOL,
+  SET_PAGE_META_TOOL,
+  validateSetPageMeta,
+  mergePageMeta,
+} from "./meta-tools";
+import {
   CREATE_TRANSLATION_TOOL,
   validateTranslationInput,
 } from "./translate-tool";
@@ -190,8 +196,11 @@ import {
   missingComponents,
   upsertPage,
   listPages,
+  listPagesForAudit,
   getPageById,
+  upsertPageMeta,
 } from "@/db/page-store";
+import { auditSeo } from "@/lib/render/seo-audit";
 import { getDraft, saveDraftBlocks } from "@/db/page-version-store";
 import { getCollection, listCollections, rebuildCollectionSchema } from "@/db/collection-store";
 import { applyTranslation } from "@/db/translate-store";
@@ -239,6 +248,8 @@ export type { DispatchResult } from "./tool-dispatch-core";
 export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   create_component: CREATE_COMPONENT_TOOL,
   create_page: CREATE_PAGE_TOOL,
+  audit_meta: AUDIT_META_TOOL,
+  set_page_meta: SET_PAGE_META_TOOL,
   translate: CREATE_TRANSLATION_TOOL,
   list_assets: LIST_ASSETS_TOOL,
   list_components: LIST_COMPONENTS_TOOL,
@@ -386,6 +397,69 @@ async function handleTranslate(args: unknown): Promise<Record<string, unknown>> 
     return { ok: true, action: res.action, target: res.target, fields: res.fields };
   } catch (err) {
     return { ok: false, errors: [`failed to translate: ${(err as Error).message}`] };
+  }
+}
+
+async function handleAuditMeta(): Promise<Record<string, unknown>> {
+  try {
+    const [pages, locales] = await Promise.all([listPagesForAudit(), getContentLocales()]);
+    const report = auditSeo(pages, locales);
+    // Only the meta gaps matter for this tool; each finding names page + locale.
+    const findings = report.missingMeta.map((m) => ({
+      slug: m.slug,
+      locale: m.locale,
+      missing: m.missing,
+    }));
+    return {
+      ok: true,
+      total: findings.length,
+      findings,
+      ...(findings.length === 0
+        ? { note: "No published page is missing a meta title or description." }
+        : {}),
+    };
+  } catch (err) {
+    return { ok: false, errors: [`failed to audit meta: ${(err as Error).message}`] };
+  }
+}
+
+async function handleSetPageMeta(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateSetPageMeta(args);
+  if (!valid.ok) return { ok: false, errors: valid.errors };
+  const { patch } = valid;
+  try {
+    // Address by slug (+ optional parentSlug) — the model doesn't know page ids.
+    const pages = await listPages();
+    const match = pages.find(
+      (p) => p.slug === patch.slug && (p.parentSlug ?? null) === patch.parentSlug,
+    );
+    if (!match) {
+      const where = patch.parentSlug ? ` under parent "${patch.parentSlug}"` : "";
+      return {
+        ok: false,
+        errors: [
+          `no page with slug "${patch.slug}"${where} — call list_pages or audit_meta to see real slugs`,
+        ],
+      };
+    }
+    // Merge into current meta, preserving slug/parent/publish/OG-image/noindex.
+    const meta = mergePageMeta(match, patch);
+    const res = await upsertPageMeta(meta, match.id);
+    if (!res.ok) return { ok: false, errors: res.errors };
+    // Meta-only edit can't move URLs or flip noindex, so the light AI hook is
+    // correct: purge this page's cache tag + ping IndexNow (mirrors create_page;
+    // no rename/noindex pre-capture needed — see the AI write-path caveat).
+    const tags = purgeTagsForPageWrite(res.action, res.id);
+    if (tags.length > 0) await purgeEdgeTags(...tags);
+    await notifyIndexNowForPage(res.id);
+    return {
+      ok: true,
+      page: match.slug,
+      wroteTitleLocales: Object.keys(patch.metaTitle).filter((l) => patch.metaTitle[l] !== undefined),
+      wroteDescriptionLocales: Object.keys(patch.metaDescription),
+    };
+  } catch (err) {
+    return { ok: false, errors: [`failed to set page meta: ${(err as Error).message}`] };
   }
 }
 
@@ -1812,6 +1886,8 @@ function newListId(before: Block[], after: Block[]): string {
 const HANDLERS: Record<ToolName, ToolHandler> = {
   create_component: handleCreateComponent,
   create_page: handleCreatePage,
+  audit_meta: () => handleAuditMeta(),
+  set_page_meta: handleSetPageMeta,
   translate: handleTranslate,
   list_assets: handleListAssets,
   list_components: handleListComponents,
