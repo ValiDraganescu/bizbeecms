@@ -48,12 +48,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
 - TODO: Per-site rate-limit threshold: D1 setting + site-settings UI (Off / presets), read by worker.ts WITHOUT a per-request D1 read on the hot path (in-isolate cache with TTL, or piggyback an existing lookup — the edge-cache task's "extra D1 only on cache miss" precedent); localized EN/FI/ET.
 
 ### Lower-value follow-ups
-- TODO: Edge-cache /sitemap.xml with its own tag (mirror the /llms.txt carve-out): fixed-path
-  `pathname === "/sitemap.xml"` worker carve-out (release-gated r-*) + own `sitemap` Cache-Tag,
-  purged everywhere LLMS_CACHE_TAG is purged (page/brand writes change both files). Sitemap is
-  crawler-hammered and does a per-request D1 read today; llms caveat explicitly says give each
-  dotted-root cacheable file its OWN carve-out fn + tag, never widen the dot gate.
-  — queued by scrub: same per-request-D1 cost llms.txt had; the shipped llms pattern makes this cheap.
+- DONE (2026-07-07): Edge-cache /sitemap.xml with its own `sitemap` Cache-Tag, mirroring the
+  /llms.txt carve-out. `sitemapXmlCacheHeaders` (fixed `pathname === "/sitemap.xml"`) + worker.ts
+  carve-out (release-gated r-*, folded into the SAME dot-file block as llms via `?? `). Purge sites:
+  page publish, api/pages PUT (path-changed + normal) + DELETE, AND the AI page-write-hooks path —
+  NOT brand save / NOT llms-template save (neither is sitemap content). 4 tests (2 edge-cache carve-out
+  + 3 rewritten page-write-hooks). tsc clean (only fresh-worktree CF-ambient noise), suite 1909.
 - TODO (follow-up to the AI bulk-meta tool): AI "fix missing alt" path — audit_meta covers only the
   meta title/description gaps; missing image alt (`auditSeo.missingAlt`) is authored inside block
   props, so fixing it needs `set_block_props` (already exists) driven by an alt audit. Consider an

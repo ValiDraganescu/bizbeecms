@@ -12,14 +12,18 @@
  * per-page tag. EITHER way the write changes /llms.txt (a create ADDS a page to
  * the index; an update changes its title/desc), so ALWAYS purge LLMS_CACHE_TAG.
  * IndexNow is always pinged (collectPageUrls no-ops for noindexed/unpublished).
+ *
+ * The write also changes /sitemap.xml (a create ADDS a published URL; an
+ * update/translate may change lastmod or a localized slug) — ALWAYS purge
+ * SITEMAP_CACHE_TAG too, same reasoning as LLMS_CACHE_TAG.
  */
-import { pageCacheTag, LLMS_CACHE_TAG } from "./edge-cache.ts";
+import { pageCacheTag, LLMS_CACHE_TAG, SITEMAP_CACHE_TAG } from "./edge-cache.ts";
 
 export function purgeTagsForPageWrite(
   action: "created" | "updated" | "translated",
   pageId: string,
 ): string[] {
   return action === "created"
-    ? [LLMS_CACHE_TAG]
-    : [pageCacheTag(pageId), LLMS_CACHE_TAG];
+    ? [LLMS_CACHE_TAG, SITEMAP_CACHE_TAG]
+    : [pageCacheTag(pageId), LLMS_CACHE_TAG, SITEMAP_CACHE_TAG];
 }

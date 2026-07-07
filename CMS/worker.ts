@@ -33,6 +33,7 @@ import {
   isHtmlContentType,
   markdownVariantRewrite,
   llmsTxtCacheHeaders,
+  sitemapXmlCacheHeaders,
 } from "./src/lib/render/edge-cache";
 
 export default {
@@ -56,11 +57,17 @@ export default {
       // gate. Purge coverage (page write/publish/delete/rename, brand save, llms
       // template save) clears LLMS_CACHE_TAG. GET 200 only; no per-request D1.
       if (request.method === "GET" && response.status === 200) {
-        const llms = llmsTxtCacheHeaders(new URL(request.url).pathname);
-        if (llms) {
+        const pathname = new URL(request.url).pathname;
+        // Each dotted-root cacheable file gets its OWN carve-out fn + tag (never
+        // widen the dot gate — CAVEATS). /sitemap.xml is crawler-hammered and
+        // does a per-request D1 read today; this edge-caches it under `sitemap`,
+        // purged by every page-write site (publish/unpublish/delete/rename).
+        const dotFile =
+          llmsTxtCacheHeaders(pathname) ?? sitemapXmlCacheHeaders(pathname);
+        if (dotFile) {
           const out = new Response(response.body, response);
-          out.headers.set("Cache-Control", llms.cacheControl);
-          out.headers.set("Cache-Tag", llms.cacheTag);
+          out.headers.set("Cache-Control", dotFile.cacheControl);
+          out.headers.set("Cache-Tag", dotFile.cacheTag);
           return out;
         }
       }

@@ -529,6 +529,25 @@ Read every line before working. Each entry was learned the hard way by a previou
   `tree.ts`/`planPage`. Precedent: the invisible-block chip (jsonld) is injected at wire time into
   zero-area `data-block-wrap`s; cleanup removes it. Do NOT add builder-only markup to the render plan.
 
+- (2026-07-07) /sitemap.xml edge caching: `SITEMAP_CACHE_TAG="sitemap"` is the file's OWN tag (NOT
+  `pages`, NOT `llms`). worker.ts opts /sitemap.xml back in via `sitemapXmlCacheHeaders(pathname)` —
+  a FIXED `pathname === "/sitemap.xml"` match, folded into the SAME dot-file block as /llms.txt
+  (`llmsTxtCacheHeaders(p) ?? sitemapXmlCacheHeaders(p)`) BEFORE the general edge-cache gate. Each
+  dotted-root file keeps its OWN carve-out fn + tag — the `??` chain does NOT widen the dot gate, so
+  a top-level wildcard page can never match `/sitemap.xml` and get its tag stamped (the whole point
+  of this task — /sitemap.xml did a per-request D1 read + risked the wildcard-cache-tag stale hole).
+  PURGE COVERAGE for SITEMAP_CACHE_TAG is a SUBSET of the llms sites — ONLY the page-content ones:
+  (1) publish route, (2) api/pages persist (update/unpublish/rename — both pathChanged branches),
+  (3) api/pages DELETE, (4) `purgeTagsForPageWrite` (AI path — created+updated+translated). It is
+  DELIBERATELY NOT purged by (a) settings/brand PUT or (b) settings/llms PUT — brand identity and the
+  llms template are NOT sitemap content (the sitemap is just URL + lastmod). If you add a NEW
+  page-mutating path, purge sitemap alongside llms; if it's brand/content-index only, do NOT. Pre-
+  release the route stays uncached: sitemap.ts is `dynamic="force-dynamic"` (Next → no-store), and the
+  worker header only lands once a release cuts worker.ts — never stale-cached before that (HITL).
+  NOTE: page.noindex flip already purges via pageCacheTag(id)+SITEMAP path in api/pages PUT, so the
+  sitemap-skip of noindexed pages busts correctly. Component/theme/brand publishes don't change the
+  sitemap (URL/lastmod only) so their omission is correct, not a gap.
+
 - (2026-07-07) On-demand AI guides follow ONE seam (get_data_sources_guide, now get_jsonld_guide):
   a PURE `*-guide.ts` module exporting `GET_*_GUIDE_TOOL` (zero-arg fn) + a `*_GUIDE` string
   constant, wired in FOUR places — tool-dispatch.ts (import + TOOL_SCHEMAS map entry + a constant

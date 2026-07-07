@@ -1018,3 +1018,32 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   needs dev server on :3602), pre-existing and unrelated to this change.
 - **Files:** CMS/src/lib/chat/jsonld-guide.ts (new), CMS/src/lib/chat/tool-dispatch.ts,
   CMS/src/lib/chat/tool-scopes.ts, CMS/scripts/jsonld-guide.test.mjs (new)
+
+---
+
+## 2026-07-07 — Edge-cache /sitemap.xml with its OWN `sitemap` Cache-Tag (mirror the /llms.txt carve-out)
+- **Task:** the lower-value follow-up. /sitemap.xml is crawler-hammered and did a per-request D1 read
+  today (dot-gated OUT of edge caching by isEdgeCacheCandidate). Give it its own carve-out fn + tag,
+  never widen the dot gate (llms precedent).
+- **Shipped (all pure + release-gated worker):**
+  - `SITEMAP_CACHE_TAG="sitemap"` + `SITEMAP_MAX_AGE=3600` + `sitemapXmlCacheHeaders(pathname)` (fixed
+    `pathname === "/sitemap.xml"`) in `CMS/src/lib/render/edge-cache.ts` — a straight copy of the
+    llms carve-out, DISTINCT tag.
+  - `CMS/worker.ts`: folded into the SAME dot-file block as llms via
+    `llmsTxtCacheHeaders(p) ?? sitemapXmlCacheHeaders(p)` (one Response rebuild, one return) — NOT a
+    dot-gate loosening, so a top-level wildcard page can never match `/sitemap.xml` and stamp its tag.
+  - Purge coverage (page-CONTENT sites ONLY, a SUBSET of the llms sites): publish route,
+    api/pages PUT (both pathChanged branches) + DELETE, and `purgeTagsForPageWrite` (AI path,
+    created+updated+translated). DELIBERATELY NOT brand PUT / llms-template PUT — neither is sitemap
+    content (sitemap = URL + lastmod only).
+- **Verified:** `node --test edge-cache.test.ts page-write-hooks.test.ts` — added 2 edge-cache carve-out
+  tests (own-tag + distinct-from-llms; FIXED-single-path rejects /robots.txt /llms.txt /fi/sitemap.xml
+  /sitemap-index.xml etc.) and rewrote the 3 page-write-hooks tests to assert SITEMAP_CACHE_TAG. Full
+  project runner `npm test`: **1909 pass / 0 fail**. `npx tsc --noEmit`: only fresh-worktree
+  CF-ambient errors (D1Database/R2Bucket/HTMLRewriter/ExportedHandler + env.DB) — resolve after
+  `npx wrangler types` + the real build env; ZERO errors in any file I touched.
+- **HITL:** release-gated (worker.ts, r-*) — verify `cf-cache-status: HIT` + publish-busts on a
+  deployed site. Pre-release sitemap.ts `force-dynamic` keeps it no-store (never stale-cached).
+- **Files:** CMS/src/lib/render/edge-cache.ts, CMS/worker.ts, CMS/src/app/api/pages/route.ts,
+  CMS/src/app/api/pages/[id]/publish/route.ts, CMS/src/lib/render/page-write-hooks.ts,
+  CMS/src/lib/render/edge-cache.test.ts, CMS/src/lib/render/page-write-hooks.test.ts
