@@ -116,6 +116,56 @@ export function redirectsForRename(
   return pairs;
 }
 
+/** A redirect validation failure — a stable code the admin UI localizes. */
+export type RedirectValidationError =
+  | "fromRequired"
+  | "toRequired"
+  | "fromShape"
+  | "toShape"
+  | "selfLoop"
+  | "duplicate"
+  | "chainFromIsTarget"
+  | "chainToIsSource";
+
+/**
+ * Validate a manual redirect (admin add) against the existing rows. PURE.
+ *
+ * Rejects, with a stable code, anything the auto-capture path would never
+ * produce and that a human could fumble:
+ *   - empty from/to (`fromRequired`/`toRequired`),
+ *   - a path not starting with `/` after normalization (`fromShape`/`toShape`),
+ *   - a self-loop from === to (`selfLoop`),
+ *   - a `from` that already has a redirect (`duplicate` — upsert would silently
+ *     overwrite; make the operator delete first so it's explicit),
+ *   - CHAINS: `from` equals some existing redirect's target (`chainFromIsTarget`
+ *     — a→b then from=b would chain b→c), or `to` equals some existing source
+ *     (`chainToIsSource` — to=x where x→y exists chains this→x→y).
+ *
+ * `existing` is the current redirect list; `excludeId` skips one row (unused for
+ * add-only, reserved for a future edit). Returns null when the redirect is OK to
+ * store. Paths are compared normalized so the check matches what gets written.
+ */
+export function validateManualRedirect(
+  input: { fromPath: string; toPath: string },
+  existing: { id: string; fromPath: string; toPath: string }[],
+  excludeId?: string,
+): RedirectValidationError | null {
+  if (typeof input.fromPath !== "string" || input.fromPath.trim() === "") return "fromRequired";
+  if (typeof input.toPath !== "string" || input.toPath.trim() === "") return "toRequired";
+  const from = normalizeRedirectPath(input.fromPath);
+  const to = normalizeRedirectPath(input.toPath);
+  if (!from.startsWith("/")) return "fromShape";
+  if (!to.startsWith("/")) return "toShape";
+  if (from === to) return "selfLoop";
+  const rows = existing.filter((r) => r.id !== excludeId);
+  const sources = new Set(rows.map((r) => normalizeRedirectPath(r.fromPath)));
+  const targets = new Set(rows.map((r) => normalizeRedirectPath(r.toPath)));
+  if (sources.has(from)) return "duplicate";
+  if (targets.has(from)) return "chainFromIsTarget";
+  if (sources.has(to)) return "chainToIsSource";
+  return null;
+}
+
 /**
  * Look up a redirect for an already-normalized request path.
  *

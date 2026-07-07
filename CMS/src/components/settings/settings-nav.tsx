@@ -17,6 +17,7 @@ const GROUPS = [
     items: [
       { key: "contentLocales", href: "/admin/settings/content-locales" },
       { key: "robots", href: "/admin/settings/robots" },
+      { key: "redirects", href: "/admin/settings/redirects" },
       { key: "exportImport", href: "/admin/settings/export-import" },
     ],
   },

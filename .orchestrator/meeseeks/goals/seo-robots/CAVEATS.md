@@ -74,6 +74,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   pointing at an old path) — don't add a second chain-guard elsewhere. If you add a rename
   path OUTSIDE this route (e.g. an AI rename tool), it must call the same trio or renames
   there silently 404 inbound links.
+- (2026-07-07) Manual redirect admin validation is a HARD reject in the ROUTE
+  (`api/settings/redirects` POST) via pure `validateManualRedirect` — UNLIKE the
+  robots PUT which normalizes silently. Chains/loops/duplicates are operator
+  mistakes worth surfacing. It returns a stable `code` (8 codes) the editor maps
+  to `redirects.errors.<code>`; the store's `upsertRedirect` still normalizes +
+  drops self-loops as a belt-and-braces layer. `duplicate` fires when `from` is
+  already a source (upsert would silently OVERWRITE — the check forces an explicit
+  delete-first). Editor POST-then-RE-READS the list (no optimistic add) because
+  rename auto-capture may add rows concurrently. If you add an EDIT (not just
+  add/delete) later, pass `excludeId` so a row doesn't flag itself as duplicate.
 - (2026-07-07) Redirect path NORMALIZATION is case-SENSITIVE and lives in ONE
   place (`normalizeRedirectPath`) used at BOTH insert (store) and lookup so the
   unique index `redirect_from_path_unique` and the matcher agree. When you build

@@ -162,3 +162,40 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** `src/lib/render/redirects.ts`, `src/lib/render/localize-paths.ts`,
   `src/db/redirect-store.ts`, `src/db/page-store.ts`, `src/app/api/pages/route.ts`,
   `src/lib/render/redirects.test.ts`
+
+## 2026-07-07 11:22 — 301 redirects task 3: manual redirects admin UI (track CLOSED)
+- **Status:** DONE
+- **What I did:** List/add/delete manual redirects in the CMS admin, mirroring the
+  robots settings pattern — but with HARD rejects (robots normalizes silently; a
+  chain/loop is an operator mistake worth surfacing, per the robots caveat "add
+  hard rejects in the route before the store").
+  - **Pure validator** `validateManualRedirect(input, existing, excludeId?)` in
+    `lib/render/redirects.ts` → stable code union `RedirectValidationError`
+    (`fromRequired`/`toRequired`/`fromShape`/`toShape`/`selfLoop`/`duplicate`/
+    `chainFromIsTarget`/`chainToIsSource`) or null. Compares NORMALIZED paths
+    (via `normalizeRedirectPath`) so it agrees with what the store writes. Chain
+    guard: reject if `from` is any existing target, or `to` is any existing source.
+    `duplicate` = `from` already a source (upsert would silently overwrite → make
+    the operator delete first).
+  - **REST** `app/api/settings/redirects/route.ts` (force-dynamic; requireAdmin):
+    GET listRedirects, POST validate→upsertRedirect (201, or 400 `{error,code}`),
+    DELETE by `?id=`. Mirrors robots route auth/shape.
+  - **Editor** `components/settings/redirects-editor.tsx` ("use client"): add form
+    + list with delete; POST then RE-READS the list (no optimistic add — rename
+    auto-capture may add rows concurrently, so re-read = truth). Maps the stable
+    `code` to localized `redirects.errors.<code>` copy.
+  - **Page** `app/(admin)/admin/settings/redirects/page.tsx` (force-dynamic;
+    explicit route beats catch-all; D1-unbound offline → empty list).
+  - **Nav** `settings-nav.tsx`: redirects link in the "Site" group after robots.
+  - **i18n** EN/FI/ET: `settingsNav.redirects` label + full `redirects` namespace
+    (incl. all 8 error codes).
+- **Verified:** 5 new pure tests (validateManualRedirect: happy/required/self-loop/
+  duplicate/chain) pass; full `npm test` 1732/1732 (was 1727); `npx tsc --noEmit`
+  clean. Did NOT run opennext build (heavy gate; routes mirror proven force-dynamic
+  patterns) nor click-test (needs live D1 — HITL).
+- **Files:** CMS/src/lib/render/redirects.ts (+ .test.ts),
+  CMS/src/app/api/settings/redirects/route.ts,
+  CMS/src/components/settings/redirects-editor.tsx,
+  CMS/src/app/(admin)/admin/settings/redirects/page.tsx,
+  CMS/src/components/settings/settings-nav.tsx,
+  CMS/messages/{en,fi,et}.json

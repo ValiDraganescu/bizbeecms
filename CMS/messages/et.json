@@ -204,6 +204,28 @@
     "saving": "Salvestamine…",
     "saved": "robots.txt salvestatud."
   },
+  "redirects": {
+    "title": "Ümbersuunamised",
+    "subtitle": "301/302 URL-i ümbersuunamised. Slug-nime muutmisel lisatakse need automaatselt; lisa või eemalda oma siin.",
+    "addTitle": "Lisa ümbersuunamine",
+    "from": "Lähtetee",
+    "to": "Sihttee",
+    "add": "Lisa",
+    "addHelp": "Mõlemad peavad algama märgiga /. Ei silmuseid ega ahelaid — Lähtetee ei saa juba olla siht ja Sihttee ei saa juba olla lähe.",
+    "listTitle": "Ümbersuunamised ({count})",
+    "empty": "Ümbersuunamisi veel pole.",
+    "delete": "Kustuta",
+    "errors": {
+      "fromRequired": "Lähtetee on nõutav.",
+      "toRequired": "Sihttee on nõutav.",
+      "fromShape": "Lähtetee peab algama märgiga /.",
+      "toShape": "Sihttee peab algama märgiga /.",
+      "selfLoop": "Lähte- ja sihttee ei saa olla samad.",
+      "duplicate": "Ümbersuunamine sellelt teelt on juba olemas — kustuta see esmalt.",
+      "chainFromIsTarget": "See lähtetee on juba teise ümbersuunamise siht (tekiks ahel).",
+      "chainToIsSource": "See sihttee suunab juba mujale (tekiks ahel)."
+    }
+  },
   "settingsNav": {
     "label": "Seadete jaotised",
     "groups": {
@@ -214,6 +236,7 @@
     },
     "contentLocales": "Sisukeeled",
     "robots": "robots.txt",
+    "redirects": "Ümbersuunamised",
     "theme": "Teema",
     "brand": "Bränd ja AI",
     "apiKeys": "MCP",

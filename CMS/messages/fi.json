@@ -204,6 +204,28 @@
     "saving": "Tallennetaan…",
     "saved": "robots.txt tallennettu."
   },
+  "redirects": {
+    "title": "Uudelleenohjaukset",
+    "subtitle": "301/302-URL-uudelleenohjaukset. Slug-nimen muutokset lisäävät nämä automaattisesti; lisää tai poista omat tästä.",
+    "addTitle": "Lisää uudelleenohjaus",
+    "from": "Lähtöpolku",
+    "to": "Kohdepolku",
+    "add": "Lisää",
+    "addHelp": "Molempien on alettava merkillä /. Ei silmukoita tai ketjuja — Lähtöpolku ei voi jo olla kohde, eikä Kohdepolku voi jo olla lähde.",
+    "listTitle": "Uudelleenohjaukset ({count})",
+    "empty": "Ei uudelleenohjauksia vielä.",
+    "delete": "Poista",
+    "errors": {
+      "fromRequired": "Lähtöpolku vaaditaan.",
+      "toRequired": "Kohdepolku vaaditaan.",
+      "fromShape": "Lähtöpolun on alettava merkillä /.",
+      "toShape": "Kohdepolun on alettava merkillä /.",
+      "selfLoop": "Lähtö- ja kohdepolku eivät voi olla samat.",
+      "duplicate": "Uudelleenohjaus tuosta polusta on jo olemassa — poista se ensin.",
+      "chainFromIsTarget": "Tämä lähtöpolku on jo toisen uudelleenohjauksen kohde (loisi ketjun).",
+      "chainToIsSource": "Tämä kohdepolku ohjaa jo muualle (loisi ketjun)."
+    }
+  },
   "settingsNav": {
     "label": "Asetusosiot",
     "groups": {
@@ -214,6 +236,7 @@
     },
     "contentLocales": "Sisältökielet",
     "robots": "robots.txt",
+    "redirects": "Uudelleenohjaukset",
     "theme": "Teema",
     "brand": "Brändi ja tekoäly",
     "apiKeys": "MCP",

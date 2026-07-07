@@ -204,6 +204,28 @@
     "saving": "Saving…",
     "saved": "robots.txt saved."
   },
+  "redirects": {
+    "title": "Redirects",
+    "subtitle": "301/302 URL redirects. Slug renames add these automatically; add or remove your own here.",
+    "addTitle": "Add a redirect",
+    "from": "From path",
+    "to": "To path",
+    "add": "Add",
+    "addHelp": "Both must start with /. No self-loops or chains — a From can't already be a target, and a To can't already be a source.",
+    "listTitle": "Redirects ({count})",
+    "empty": "No redirects yet.",
+    "delete": "Delete",
+    "errors": {
+      "fromRequired": "From path is required.",
+      "toRequired": "To path is required.",
+      "fromShape": "From path must start with /.",
+      "toShape": "To path must start with /.",
+      "selfLoop": "From and To can't be the same path.",
+      "duplicate": "A redirect from that path already exists — delete it first.",
+      "chainFromIsTarget": "That From path is already the target of another redirect (would create a chain).",
+      "chainToIsSource": "That To path already redirects elsewhere (would create a chain)."
+    }
+  },
   "settingsNav": {
     "label": "Settings sections",
     "groups": {
@@ -214,6 +236,7 @@
     },
     "contentLocales": "Content languages",
     "robots": "robots.txt",
+    "redirects": "Redirects",
     "theme": "Theme",
     "brand": "Brand & AI",
     "apiKeys": "MCP",

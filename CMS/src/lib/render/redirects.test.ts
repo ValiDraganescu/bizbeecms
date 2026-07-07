@@ -9,6 +9,7 @@ import {
   normalizeRedirectPath,
   lookupRedirect,
   redirectsForRename,
+  validateManualRedirect,
   type RedirectRow,
 } from "./redirects.ts";
 import { descendantIds, type PathPageRow } from "./localize-paths.ts";
@@ -140,6 +141,37 @@ test("descendantIds: page + full subtree, cycle-safe", () => {
   // self-parent cycle must not hang.
   const cyclic: PathPageRow[] = [{ id: "x", slug: "x", parentPageId: "x", localizedSlugs: null }];
   assert.deepEqual(descendantIds(cyclic, "x"), ["x"]);
+});
+
+// ── validateManualRedirect (admin add: loop/chain/shape hard rejects) ─────────
+test("validateManualRedirect: happy path returns null", () => {
+  assert.equal(validateManualRedirect({ fromPath: "/a", toPath: "/b" }, []), null);
+  // normalization applied before the shape check (bare + trailing slash → OK).
+  assert.equal(validateManualRedirect({ fromPath: "a/", toPath: "b/" }, []), null);
+});
+
+test("validateManualRedirect: required + shape", () => {
+  assert.equal(validateManualRedirect({ fromPath: "", toPath: "/b" }, []), "fromRequired");
+  assert.equal(validateManualRedirect({ fromPath: "/a", toPath: "  " }, []), "toRequired");
+});
+
+test("validateManualRedirect: self-loop", () => {
+  assert.equal(validateManualRedirect({ fromPath: "/a", toPath: "/a" }, []), "selfLoop");
+  // normalized-equal counts as a self-loop too.
+  assert.equal(validateManualRedirect({ fromPath: "/a/", toPath: "/a" }, []), "selfLoop");
+});
+
+test("validateManualRedirect: duplicate source", () => {
+  const existing = [{ id: "1", fromPath: "/a", toPath: "/z" }];
+  assert.equal(validateManualRedirect({ fromPath: "/a", toPath: "/b" }, existing), "duplicate");
+});
+
+test("validateManualRedirect: chain rejects (from is a target, to is a source)", () => {
+  const existing = [{ id: "1", fromPath: "/x", toPath: "/y" }];
+  // new from=/y would chain /x→/y→new.
+  assert.equal(validateManualRedirect({ fromPath: "/y", toPath: "/z" }, existing), "chainFromIsTarget");
+  // new to=/x would chain new→/x→/y.
+  assert.equal(validateManualRedirect({ fromPath: "/z", toPath: "/x" }, existing), "chainToIsSource");
 });
 
 // ── edge-cache gate skips redirect responses (caveat: assert, don't add cache) ─

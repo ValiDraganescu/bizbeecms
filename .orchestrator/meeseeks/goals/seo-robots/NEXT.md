@@ -1,32 +1,32 @@
 # Note to the next Meeseeks (seo-robots)
 
-301 redirects task 2 (auto-capture on rename) is DONE this run: renames now
-create old→new 301s for the page + subtree in every locale, re-notify IndexNow
-with the OLD URLs, and rewrite existing redirects to avoid chains. Pure
-`redirectsForRename` + `descendantIds` + store `applyRenameRedirects`; wired
-into `api/pages/route.ts` (best-effort). 5 tests, suite 1722→1727.
+**301-redirects track is now FULLY CLOSED** (data model, serving, auto-capture
+on rename, and this run's manual admin UI). Manual redirects: list/add/delete at
+`/admin/settings/redirects`; pure `validateManualRedirect` hard-rejects
+loops/chains/duplicates in the POST route with stable error codes (EN/FI/ET).
+5 tests, suite 1727→1732.
 
-**Take next — 301 redirects task 3: manual redirects admin UI** (backlog:
-"Manual redirects admin UI"). This finishes the redirects track:
-- List / add / delete redirects in the CMS admin (from-path, to-path).
-- Mirror the robots pattern: page `admin/settings/robots/page.tsx` +
-  REST route `api/settings/robots` (see robots caveats — that PUT validates by
-  NORMALIZING, not rejecting; but redirects DO want hard rejects for loops/chains).
-- Validation: path shape (must start with `/`), NO self-loop (from===to), NO
-  chains (to-path must not equal any existing from-path, and vice-versa) — the
-  store already normalizes + drops self-redirects, but the UI should reject
-  chains up front with a stable error code (loop detection is a hard reject, so
-  add it in the ROUTE before `upsertRedirect`, per the robots-caveat pattern).
-- Localized EN/FI/ET. Reuse `listRedirects`/`upsertRedirect`/`deleteRedirect`
-  (all already in redirect-store; `deleteRedirect` takes an id).
+**Take next — Per-page noindex** (backlog "Page-level SEO controls", first item).
+It's the next-highest ranking lever and self-contained:
+- Add `page.noindex` column (default 0) — Drizzle ONLY: edit `src/db/schema.ts`,
+  `npm run db:generate`, `npx wrangler d1 migrations apply bizbeecms-cms --local`
+  (see CMS/CLAUDE.md; NEVER hand-write migration SQL).
+- Toggle in the page-settings SEO tab.
+- `generateMetadata` in `(site)/[[...slug]]/page.tsx` emits `robots:{index:false}`
+  when set (data already loaded on that path — no new D1 read; keep visitor-independent
+  per the CAVEATS about the (site) render path).
+- Sitemap excludes noindexed pages (extend `publishedPagePaths` or filter in
+  sitemap.ts — coordinate with the sitemap machinery).
+- IndexNow must NOT submit noindexed URLs.
 
-Then the redirects track is fully closed; move to Page-level SEO controls
-(per-page noindex is the next-highest ranking lever) or JSON-LD components.
+Alternatively, JSON-LD components (kind: jsonld) is the other big track — start
+with "JSON-LD component kind — render path first (tracer)".
 
-**Patterns:** upsert ALWAYS via `redirect-store.upsertRedirect` /
-`applyRenameRedirects` (they normalize + guard self/chains). Serving =
-`getRedirect` (indexed exact match). Pure path logic in `lib/render/redirects.ts`.
+**Patterns for settings UIs:** copy the robots/redirects trio — page
+(`admin/settings/<x>/page.tsx`, force-dynamic, D1-unbound→sane default) +
+REST route (`api/settings/<x>`, requireAdmin) + "use client" editor + nav link
+in `settings-nav.tsx` + `settingsNav.<x>` label + a `<x>` i18n namespace ×3.
 
-HITL pending (note, don't do): on a DEPLOYED site with real D1 + reachable
-origin — rename a page, then fetch an OLD URL and confirm 308→new; check the
-`redirect` table got the rows. No worker.ts edit this run → no r-* release needed.
+HITL pending (note, don't do): on a DEPLOYED site with real D1 — add a manual
+redirect via the UI, fetch the old URL, confirm 308→new; try a chain/loop and
+confirm the localized rejection. No worker.ts edit this run → no r-* release.
