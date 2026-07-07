@@ -43,6 +43,24 @@ export const AUDIT_META_TOOL = {
   },
 } as const;
 
+export const AUDIT_ALT_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "audit_alt",
+    description:
+      "List images on published pages that have NO alt text (an accessibility " +
+      "and image-SEO gap). Call this to discover which page × image needs alt, " +
+      "then WRITE good, concise alt for each: if the image lives in a page block " +
+      "(get_page shows it as a block prop), fix it with set_block_props (patch " +
+      "the block's alt/altText prop); if it lives inside a reusable component's " +
+      "markup (get_component shows the <img> with no alt=), fix it with " +
+      "update_component (re-author the full html, adding a real alt=). Alt text " +
+      "should briefly describe the image's content/purpose (~5-12 words), not " +
+      "repeat the filename. Returns one finding per image, grouped by page slug.",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+} as const;
+
 export const SET_PAGE_META_TOOL = {
   type: "function" as const,
   function: {

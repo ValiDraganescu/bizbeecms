@@ -23,6 +23,7 @@ import {
 import { CREATE_PAGE_TOOL, validatePageInput } from "./page-tool";
 import {
   AUDIT_META_TOOL,
+  AUDIT_ALT_TOOL,
   SET_PAGE_META_TOOL,
   validateSetPageMeta,
   mergePageMeta,
@@ -202,7 +203,7 @@ import {
   getPageById,
   upsertPageMeta,
 } from "@/db/page-store";
-import { auditSeo } from "@/lib/render/seo-audit";
+import { auditSeo, buildComponentSeoIndex } from "@/lib/render/seo-audit";
 import { getDraft, saveDraftBlocks } from "@/db/page-version-store";
 import { getCollection, listCollections, rebuildCollectionSchema } from "@/db/collection-store";
 import { applyTranslation } from "@/db/translate-store";
@@ -251,6 +252,7 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   create_component: CREATE_COMPONENT_TOOL,
   create_page: CREATE_PAGE_TOOL,
   audit_meta: AUDIT_META_TOOL,
+  audit_alt: AUDIT_ALT_TOOL,
   set_page_meta: SET_PAGE_META_TOOL,
   translate: CREATE_TRANSLATION_TOOL,
   list_assets: LIST_ASSETS_TOOL,
@@ -423,6 +425,44 @@ async function handleAuditMeta(): Promise<Record<string, unknown>> {
     };
   } catch (err) {
     return { ok: false, errors: [`failed to audit meta: ${(err as Error).message}`] };
+  }
+}
+
+async function handleAuditAlt(): Promise<Record<string, unknown>> {
+  try {
+    // Deep-scan: fold in component-internal <img> markup (index built like the
+    // admin SEO-audit page) so images inside reusable components are caught too.
+    const [pages, locales, components] = await Promise.all([
+      listPagesForAudit(),
+      getContentLocales(),
+      listComponents().catch(() => [] as Awaited<ReturnType<typeof listComponents>>),
+    ]);
+    const report = auditSeo(pages, locales, buildComponentSeoIndex(components));
+    // De-dup by page slug + src (a component reused on N blocks can repeat).
+    const seen = new Set<string>();
+    const findings: Array<{ slug: string; src: string }> = [];
+    for (const m of report.missingAlt) {
+      const key = `${m.slug} ${m.src}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      findings.push({ slug: m.slug, src: m.src });
+    }
+    return {
+      ok: true,
+      total: findings.length,
+      findings,
+      ...(findings.length === 0
+        ? { note: "No published-page image is missing alt text." }
+        : {
+            hint:
+              "For each finding: open the page (get_page) — if the image is a " +
+              "block prop, patch its alt with set_block_props; if it's inside a " +
+              "component (get_component shows an <img> with no alt=), fix it with " +
+              "update_component. Write concise, descriptive alt per image.",
+          }),
+    };
+  } catch (err) {
+    return { ok: false, errors: [`failed to audit alt: ${(err as Error).message}`] };
   }
 }
 
@@ -1897,6 +1937,7 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   create_component: handleCreateComponent,
   create_page: handleCreatePage,
   audit_meta: () => handleAuditMeta(),
+  audit_alt: () => handleAuditAlt(),
   set_page_meta: handleSetPageMeta,
   translate: handleTranslate,
   list_assets: handleListAssets,

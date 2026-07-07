@@ -716,3 +716,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   deployed Sites until a release cut; live 429 tuning is HITL (deployed Site + paid plan for the
   binding). If you raise the STRICT_LIMIT or the binding cap, keep RATE_LIMIT_RETRY_AFTER (=period)
   and the UI help text (messages.rateLimit.preset.*.help, ~100 / ~40) in sync.
+
+- (2026-07-07) The impeccable design hook flags `broken-image` on ANY literal `<img>` substring —
+  including one inside a tool DESCRIPTION/hint string (e.g. audit_alt's guidance mentions "<img> with
+  no alt="). These are prose, not rendered markup → FALSE POSITIVES; leave them, don't add ignore
+  comments (they don't suppress and pollute code). If a run ever needs it silenced permanently, that's
+  a user-confirmed `/impeccable hooks ignore-file` — not a code edit.
+- (2026-07-07) `audit_alt` is a no-arg READ tool paired with `set_block_props`/`update_component` as
+  its writers (like audit_meta↔set_page_meta). It deep-scans via `buildComponentSeoIndex(listComponents())`
+  so component-internal images ARE flagged — but the missingAlt finding only carries {slug, src}, NOT
+  which fix path applies (block prop vs component markup). That's deliberate: the AI runs get_page /
+  get_component to locate the image and picks the writer. The `pages` scope lacks update_component, so
+  there the AI can only fix block-prop images (its guide line says component images need the builder).
