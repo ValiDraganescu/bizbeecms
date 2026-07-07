@@ -653,3 +653,28 @@ Read every line before working. Each entry was learned the hard way by a previou
   peelActiveLocaleFromPath — don't invent a second header or read Accept-Language/cookie (that WOULD
   poison the cache on any surface that CAN be cached). The worker request-clone is cast
   `as typeof request` (clone drops the incoming-`cf` type; OpenNext reads only standard headers/url).
+
+- (2026-07-07) Per-site rate-limit THRESHOLD (rate-limit 2/2): the wrangler `unsafe.bindings`
+  rate limiter is FIXED at deploy time (100/60s) — you CANNOT reprogram its period/limit at runtime.
+  So the per-site D1 knob (`rate_limit_preset`, settings key) only does what a single fixed binding
+  allows WITHOUT a second counter: `off` (worker skips `limiter.limit()` entirely), `normal`
+  (binding as-is), `strict` (binding PLUS an in-isolate sliding counter at STRICT_LIMIT=40/60s per
+  key). There is NO "relaxed/looser than 100" preset — the binding is the ceiling, you can only tune
+  DOWN or OFF; a truly-lower cross-isolate cap would need a Durable Object / KV counter (not worth it
+  for bot defence). The strict counter (`strictHits` Map, module scope in worker.ts,
+  `strictCounterOverLimit` in rate-limit-config.ts) is PER-ISOLATE + resets on isolate recycle — a
+  best-effort TIGHTENING on top of the real (cross-isolate) binding, NEVER the sole gate; don't rely
+  on it as a hard limit. Pure config lives in `lib/render/rate-limit-config.ts` (normalize/
+  usesBindingLimiter/strictCounterOverLimit), NOT edge-cache.ts.
+- (2026-07-07) worker.ts reads the preset via `getRateLimitPresetCached(cfDb(env.DB))` — a 30s
+  in-isolate TTL cache (`rateLimitPresetCache` module var in settings-store.ts), so a bot storming a
+  site triggers AT MOST one D1 read per 30s per isolate (the edge-cache "extra D1 only on cache miss"
+  precedent — NOT a per-request read on the render gate). `setRateLimitPreset` invalidates the cache
+  in THIS isolate immediately; a write in ANOTHER isolate propagates within the TTL (a ≤30s stale
+  window on the coarse bot knob is acceptable). `getRateLimitPresetCached` FAILS SAFE to `normal` on
+  any D1 error and does NOT poison the cache. The D1 read is placed INSIDE the existing
+  `isRateLimitCandidate && !isVerifiedCrawler` guard, so non-page/system/verified-crawler traffic
+  never pays it. RELEASE-GATED (worker.ts, r-*) — the off-skip/strict behaviour is invisible on
+  deployed Sites until a release cut; live 429 tuning is HITL (deployed Site + paid plan for the
+  binding). If you raise the STRICT_LIMIT or the binding cap, keep RATE_LIMIT_RETRY_AFTER (=period)
+  and the UI help text (messages.rateLimit.preset.*.help, ~100 / ~40) in sync.

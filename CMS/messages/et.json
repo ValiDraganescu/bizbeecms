@@ -248,6 +248,29 @@
     "saving": "Salvestan...",
     "saved": "Salvestatud."
   },
+  "rateLimit": {
+    "title": "Bottide kiiruspiirang",
+    "subtitle": "Reguleeri, kui agressiivselt sait piirab botte ja kraapijaid, kes koormavad su avalikke lehti. Päris külastajaid ja kinnitatud otsingurobotid see ei mõjuta; piirangu ületamisel tuleb HTTP 429 koos kordusvihjega. Admin- ja API-liiklust ei piirata kunagi.",
+    "legend": "Piirangu tase",
+    "preset": {
+      "off": {
+        "label": "Väljas",
+        "help": "Kiiruspiirangut ei ole. Iga päring teenindatakse — kasuta ainult siis, kui ees olev vahendaja juba tegeleb kuritarvitustega."
+      },
+      "normal": {
+        "label": "Tavaline",
+        "help": "Vaikeväärtus. Piirab iga IP-d 100 lehepäringuga minutis — piisav igale inimesele või seaduslikule robotile."
+      },
+      "strict": {
+        "label": "Range",
+        "help": "Katkestab kuritarvitavad IP-d varem (umbes 40 lehepäringut minutis). Vali see, kui kraapija pääseb tavalisest piirist läbi."
+      }
+    },
+    "save": "Salvesta",
+    "saving": "Salvestan...",
+    "saved": "Salvestatud.",
+    "note": "Jõustub avaldatud saidil pärast järgmist väljalaset ja levimine servavõrku võib võtta kuni 30 sekundit."
+  },
   "notFoundPage": {
     "title": "404 leht",
     "subtitle": "Vali avaldatud leht, mida serveerida selle saidi brändi 404 (ei leitud) lehena. Külastajad, kes satuvad puuduvale või ümbernimetatud aadressile, näevad seda HTTP 404 staatusega ja otsingumootoritel palutakse seda mitte indekseerida. Jäta vaikeväärtuseks tavaline 404.",
@@ -302,6 +325,7 @@
     },
     "contentLocales": "Sisukeeled",
     "robots": "robots.txt",
+    "rateLimit": "Bottide kiiruspiirang",
     "redirects": "Ümbersuunamised",
     "seoAudit": "SEO audit",
     "verification": "Kinnitamine",

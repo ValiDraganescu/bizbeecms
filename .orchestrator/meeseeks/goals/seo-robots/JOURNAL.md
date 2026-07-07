@@ -1187,3 +1187,35 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Release-gated:** worker.ts + wrangler.jsonc ship ONLY via a release tag (r-*) — invisible on
   deployed Sites until a release is cut. Live 429/Retry-After behavior is HITL (needs a deployed Site +
   a paid plan for the rate-limit binding + a release). Per-site configurable threshold is backlog item 2/2.
+
+## 2026-07-07 — Per-site rate-limit THRESHOLD (rate-limit track 2/2, DONE) [lane-B worktree]
+Finished the rate-limit track: a per-Site configurable throttle preset, read by worker.ts OFF the
+hot path (no per-request D1 read on the render gate), localized EN/FI/ET.
+- **Design constraint honored:** the wrangler `unsafe.bindings` limiter is FIXED at deploy time
+  (100/60s) — un-reprogrammable at runtime. So the D1 knob only does what a single fixed binding
+  allows without a second counter store: `off` (skip `limiter.limit()` entirely), `normal` (binding
+  as-is), `strict` (binding PLUS an in-isolate 40/60s sliding counter). NO "looser than 100" preset —
+  the binding is the ceiling; sites tune DOWN or OFF. A truly-lower cross-isolate cap would need a
+  DO/KV counter (rejected — not worth it for bot defence).
+- **`lib/render/rate-limit-config.ts`** (pure, node-testable): `RATE_LIMIT_PRESETS`,
+  `DEFAULT_RATE_LIMIT_PRESET="normal"`, `STRICT_LIMIT=40`, `normalizeRateLimitPreset` (garbage/absent →
+  normal), `usesBindingLimiter` (only off = false), `strictCounterOverLimit(store,key,now,...)` (per-key
+  sliding-window Map, lazy per-key TTL prune). +6 tests.
+- **`settings-store.ts`:** `getRateLimitPreset`/`setRateLimitPreset` (key `rate_limit_preset`, stored
+  verbatim, normalized) + `getRateLimitPresetCached(db,now)` — a 30s in-isolate TTL cache
+  (`rateLimitPresetCache` module var). setRateLimitPreset invalidates this isolate's cache immediately;
+  another isolate propagates within TTL. Fails SAFE to `normal` on D1 error, never poisons the cache.
+- **worker.ts** (I own it this cycle): inside the existing `isRateLimitCandidate &&
+  !isVerifiedCrawler` guard → `getRateLimitPresetCached(cfDb(env.DB))`; `usesBindingLimiter` gates the
+  `limit()` call; `strict` additionally runs `strictCounterOverLimit(strictHits, key, Date.now())`
+  (module-scope `strictHits` Map, per-isolate). Still best-effort try/catch → fails open.
+- **API + UI:** `api/settings/rate-limit/route.ts` (GET/PUT, requireAdmin, normalize-on-write like the
+  robots PUT), `components/settings/rate-limit-editor.tsx` (radio group), page at
+  `/admin/settings/rate-limit`, nav link, and `rateLimit` i18n block + `settingsNav.rateLimit` in
+  en/fi/et.json.
+- **No migration:** stored in the existing `site_settings` key/value table.
+- **Tests:** +6 (rate-limit-config.test.ts). Full suite 1943, all pass.
+- **tsc:** clean re: my change — only the PRE-EXISTING `CloudflareEnv.DB` misses (verified identical on
+  the stashed base; worktree lacks the OpenNext-generated env types; `wrangler types` didn't add DB).
+- **Release-gated:** worker.ts ships via r-* only; the off-skip/strict behaviour + 30s cache
+  propagation is HITL on a deployed Site + paid plan for the binding.

@@ -47,6 +47,11 @@ import {
   emptySiteVerification,
   normalizeSiteVerification,
 } from "../lib/render/site-verification.ts";
+import {
+  type RateLimitPreset,
+  DEFAULT_RATE_LIMIT_PRESET,
+  normalizeRateLimitPreset,
+} from "../lib/render/rate-limit-config.ts";
 
 const CONTENT_LOCALES_KEY = "content_locales";
 const THEME_OVERRIDES_KEY = "theme_overrides";
@@ -64,6 +69,7 @@ const INDEXNOW_KEY_KEY = "indexnow_key";
 const ROBOTS_CONFIG_KEY = "robots_config";
 const SITE_VERIFICATION_KEY = "site_verification";
 const LLMS_TEMPLATE_KEY = "llms_template";
+const RATE_LIMIT_PRESET_KEY = "rate_limit_preset";
 
 /** Upsert one settings row (key→JSON value). Shared by the typed accessors. */
 async function upsertSetting(
@@ -538,5 +544,64 @@ export async function pruneApiCacheVersions(
     if (pruned !== versions) await setApiCacheVersions(pruned, injectedDb);
   } catch {
     // ponytail: never fail a completed delete over counter housekeeping.
+  }
+}
+
+/**
+ * Read the per-Site naughty-robot rate-limit preset (`off`|`normal`|`strict`),
+ * or the default (`normal`) if unset/garbage. seo-robots rate-limit track 2/2.
+ * Used by the settings UI/route (uncached path). worker.ts reads it via the
+ * CACHED variant below (never a per-request D1 read on the hot gate).
+ */
+export async function getRateLimitPreset(
+  injectedDb?: Db,
+): Promise<RateLimitPreset> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, RATE_LIMIT_PRESET_KEY))
+    .limit(1);
+  return normalizeRateLimitPreset(rows[0]?.value);
+}
+
+/** Upsert the rate-limit preset (normalized → always a valid preset). Bumps the
+ *  in-isolate cache epoch so the worker's cached read refreshes promptly. */
+export async function setRateLimitPreset(
+  value: unknown,
+  injectedDb?: Db,
+): Promise<RateLimitPreset> {
+  const preset = normalizeRateLimitPreset(value);
+  await upsertSetting(RATE_LIMIT_PRESET_KEY, preset, injectedDb);
+  rateLimitPresetCache = null; // invalidate this isolate's cached read
+  return preset;
+}
+
+/**
+ * worker.ts hot-path read of the rate-limit preset, with a short-TTL IN-ISOLATE
+ * cache so a bot storming a site does NOT trigger a per-request D1 read on the
+ * render gate (CAVEAT: the edge-cache "extra D1 only on cache miss" precedent).
+ * A stale window of RATE_LIMIT_CACHE_TTL_MS after an operator changes the preset
+ * is acceptable — the setting is a coarse bot-defence knob, not per-request state.
+ * A write in THIS isolate invalidates immediately (see setRateLimitPreset); a
+ * write in another isolate propagates within the TTL. Fails safe: on any D1 error
+ * it returns the default (`normal`) and does NOT poison the cache.
+ */
+const RATE_LIMIT_CACHE_TTL_MS = 30_000;
+let rateLimitPresetCache: { preset: RateLimitPreset; at: number } | null = null;
+
+export async function getRateLimitPresetCached(
+  db: Db,
+  now: number = Date.now(),
+): Promise<RateLimitPreset> {
+  if (rateLimitPresetCache && now - rateLimitPresetCache.at < RATE_LIMIT_CACHE_TTL_MS) {
+    return rateLimitPresetCache.preset;
+  }
+  try {
+    const preset = await getRateLimitPreset(db);
+    rateLimitPresetCache = { preset, at: now };
+    return preset;
+  } catch {
+    return DEFAULT_RATE_LIMIT_PRESET;
   }
 }

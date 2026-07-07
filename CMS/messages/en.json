@@ -248,6 +248,29 @@
     "saving": "Saving...",
     "saved": "Saved."
   },
+  "rateLimit": {
+    "title": "Bot rate limiting",
+    "subtitle": "Control how aggressively the site throttles bots and scrapers that hammer your public pages. Real visitors and verified search crawlers are unaffected; over the limit gets an HTTP 429 with a retry hint. Admin and API traffic is never throttled.",
+    "legend": "Throttle level",
+    "preset": {
+      "off": {
+        "label": "Off",
+        "help": "No rate limiting. Every request is served — use only if a proxy in front already handles abuse."
+      },
+      "normal": {
+        "label": "Normal",
+        "help": "The default. Caps each IP at 100 page requests per minute — generous enough for any human or legitimate crawler."
+      },
+      "strict": {
+        "label": "Strict",
+        "help": "Cuts abusive IPs off sooner (about 40 page requests per minute). Pick this if a scraper is getting through the normal cap."
+      }
+    },
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved.",
+    "note": "Takes effect on the deployed site after the next release, and may take up to 30 seconds to propagate across the edge."
+  },
   "notFoundPage": {
     "title": "404 page",
     "subtitle": "Choose a published page to serve as this site's branded 404 (not-found) page. Visitors who hit a missing or renamed URL see it, with an HTTP 404 status and search engines told not to index it. Leave as the default for a plain 404.",
@@ -302,6 +325,7 @@
     },
     "contentLocales": "Content languages",
     "robots": "robots.txt",
+    "rateLimit": "Bot rate limiting",
     "redirects": "Redirects",
     "seoAudit": "SEO audit",
     "verification": "Verification",
