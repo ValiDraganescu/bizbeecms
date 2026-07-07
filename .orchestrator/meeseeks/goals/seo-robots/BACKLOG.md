@@ -13,14 +13,26 @@ Task states: TODO | DOING | DONE | BLOCKED.
   a jsonld block onto `plan.jsonLd` (hidden placeholder in flow); breadcrumb now APPENDS.
   AUTHORING (create/update component with kind, builder chip, draft/publish of the kind) is
   the NEXT tasks below — the render path reads kind but nothing WRITES it yet.
-- TODO: JSON-LD authoring surface: create_component/update_component + the Develop editor accept
-  `kind:"jsonld"` and write it to `component.kind`/`draft_kind` (publish copies draft_kind→kind,
-  discard clears it — mirror the existing html/script/css draft columns); the block PUT
-  component-existence check already covers it (jsonld is a normal D1 row). Builder canvas shows
-  an invisible-element CHIP for a jsonld block (it renders no visible HTML — the `data-block-wrap`
-  placeholder is empty). One end-to-end proof component authored + published + rich-results valid.
+- DONE (2026-07-07): JSON-LD authoring WRITE PATH. `ComponentArtifactInput.kind`/`jsonTemplate`;
+  `validateComponentArtifact` jsonld branch (probe `{{slot}}`→`0`, require JSON object w/ @context+@type,
+  self-correcting errors); `upsertComponent` writes html-col from jsonTemplate + persists kind/draftKind
+  (staged only on kind change); `publishComponentDraft` copies draft_kind→kind, `discard` clears it;
+  PUT `/api/components/<name>` forwards `kind`; CREATE_COMPONENT_TOOL gained `kind` enum (AI dispatch
+  passes artifact through unchanged). 9 new tests, 1779/1779.
+- TODO: JSON-LD authoring — Develop editor UI: a kind toggle (HTML | JSON-LD) in the component
+  workbench; when JSON-LD, the code editor edits the JSON template (label it, drop the script/css
+  panes), the standalone preview shows the emitted `<script type=application/ld+json>` inner JSON
+  (or a Google Rich Results deep-link), and the save PUT sends `kind:"jsonld"`. Also surface `kind`
+  in the GET export bundle / getComponentByName so the editor knows a loaded component's kind (today
+  serializeComponent/ComponentRow carry no kind — add it). One proof jsonld component authored via
+  the UI → published → validated in Google Rich Results.
+- TODO: Builder canvas invisible-element CHIP for a jsonld block (renders no visible HTML — the
+  `data-block-wrap` placeholder is empty; show a selectable/deletable chip so operators can manage it).
 - TODO: JSON-LD × bindings: collection/data-source bindings interpolate into jsonld components exactly like HTML content (wildcard `:param` detail pages get per-URL structured data); verify the existing bind machinery passes through or add the minimal seam; unit-test the interpolation escaping.
-- TODO: Teach the AI the jsonld kind: create_component/update_component accept `kind: "jsonld"`, authoring guide section (schema.org patterns, variables), validation that the artifact parses as JSON with a `@context`/`@type` — self-correcting errors naming the exact bad token + fix (per AI error philosophy).
+- TODO: Teach the AI the jsonld kind — REMAINING: the tool `kind` param + JSON/@context/@type
+  validation with self-correcting errors are DONE (2026-07-07). Still TODO: an AUTHORING-GUIDE
+  section (schema.org patterns per page type — Product/Article/FAQPage/Recipe — and the slot-quoting
+  rules) so the model knows WHEN to author a jsonld component and how to bind props into it.
 
 ### AI write-path coherence (IndexNow + edge purge)
 - TODO: Notify IndexNow (and purge edge cache) on the AI live-write paths: `handleCreatePage` → `upsertPage` can publish/unpublish or rewrite a PUBLISHED page's live blocks, and `handleTranslate` → translate-store rewrites a published page's live metaTitle/metaDescription — neither calls notifyIndexNowForPage nor purge-edge (the REST pages/publish routes do both). Add the same best-effort post-write block (ctx.waitUntil, never fails the tool result) after successful upsertPage/applyTranslation in tool-dispatch. — queued by scrub: AI authoring is a first-class write path; today an AI publish never pings IndexNow and an AI edit of a cached published page (cache_max_age>0) leaves the edge stale until TTL.

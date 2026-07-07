@@ -46,17 +46,22 @@ export async function PUT(
     script?: unknown;
     css?: unknown;
     propsSchema?: unknown;
+    kind?: unknown;
   };
 
   // Validate exactly like update_component: name from the path, code from the body.
   // propsSchema is only forwarded when present (object/JSON string) so the code
-  // editor's html-only save doesn't clobber the prop declarations.
+  // editor's html-only save doesn't clobber the prop declarations. `kind` is only
+  // forwarded when present so an html-only save doesn't reset the stored kind — for
+  // a jsonld component the `html` field carries the JSON-LD template (see
+  // validateComponentArtifact's jsonld path).
   const valid = validateComponentArtifact({
     name,
     html: typeof b.html === "string" ? b.html : "",
     script: typeof b.script === "string" ? b.script : "",
     css: typeof b.css === "string" ? b.css : "",
     ...(b.propsSchema !== undefined ? { propsSchema: b.propsSchema } : {}),
+    ...(b.kind !== undefined ? { kind: b.kind } : {}),
   });
   if (!valid.ok) {
     return Response.json({ error: "invalid component", errors: valid.errors }, { status: 400 });

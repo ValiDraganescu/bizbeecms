@@ -177,3 +177,29 @@ Read every line before working. Each entry was learned the hard way by a previou
   page RENDER path via worker.ts). If you add more metadata site-settings reads,
   keep them here, not in the render/worker hot path. twitter:card =
   summary_large_image ONLY when a per-locale metaImage resolves, else summary.
+
+- (2026-07-07) JSON-LD authoring WRITE PATH: `ComponentArtifactInput` now carries `kind?`
+  ('html'|'jsonld') + `jsonTemplate?` (the raw JSON-LD template string). For a jsonld artifact
+  `tree` is the EMPTY tree (`parseHtml("")`) and the raw template lives in `jsonTemplate` — because
+  JSON-LD isn't HTML, `upsertComponent` writes the `html`/`draft_html` COLUMN from `jsonTemplate`
+  (NOT `treeToHtml(tree)`). So the `html` column of a jsonld component is a JSON template, exactly
+  what the render tracer (render-page.tsx) expects. `kind` is OMITTED (undefined) unless the caller
+  passes one, so an html-only edit/save NEVER resets the stored kind (same preserve-when-absent
+  contract as propsSchema/label). `draft_kind` is staged ONLY when the incoming kind DIFFERS from
+  live (else null) — publish copies `draft_kind→kind` only when non-null, else keeps live kind.
+- (2026-07-07) Validating a jsonld TEMPLATE (which isn't valid JSON on its own because of unquoted
+  slots like `"count":{{n}}`): `validateJsonLdArtifact` replaces every `{{slot}}` with the literal
+  `0` before `JSON.parse` — `0` is a legal JSON token in BOTH quoted (`"x":"0"`) and unquoted
+  (`"x":0`) positions, so the probe parses regardless of slot position. Do NOT probe-replace with
+  `""` (breaks a quoted string slot → `"x":""""`). The probe validates SHAPE only (object + @context
+  + @type); the ACTUAL bound-value JSON validity is re-checked at render time by `buildJsonLdComponent`
+  (returns null on a bound result that doesn't parse — never ships malformed structured data).
+- (2026-07-07) A jsonld component's `script`/`css` are IGNORED at validate time (blanked to "") —
+  it emits no HTML/JS. The PUT route + tool-dispatch still run `lintComponentScript`/
+  `reconcileComponentClasses` over the artifact, but the tree/script/css are empty so those are
+  harmless no-ops. Don't add a jsonld-specific guard there; the empty inputs already handle it.
+- (2026-07-07) NOT YET DONE for jsonld authoring: `getComponentByName`/`serializeComponent`/
+  `ComponentRow` do NOT carry `kind` — the export bundle + Develop editor can't tell a loaded
+  component's kind yet. Add `kind`/`draftKind` to that read path when building the editor UI, or a
+  round-trip save from the editor (which omits kind) is fine (preserve-when-absent) but the editor
+  can't SHOW the kind or switch it. The AI + PUT-with-kind can already author jsonld end-to-end.

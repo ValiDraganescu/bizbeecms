@@ -252,6 +252,13 @@ export async function upsertComponent(
   const db = injectedDb ?? (await getDb());
   const now = new Date();
 
+  // The `html` column holds the JSON template verbatim for a jsonld component, or
+  // the serialized tree for an html component. `kind` is undefined when the caller
+  // didn't specify one (an update leaves the stored kind alone; a create defaults
+  // to "html" via the column default).
+  const artifactHtml =
+    artifact.kind === "jsonld" ? artifact.jsonTemplate ?? "" : treeToHtml(artifact.tree);
+
   const existing = await db
     .select({
       id: schema.component.id,
@@ -260,6 +267,7 @@ export async function upsertComponent(
       css: schema.component.css,
       propsSchema: schema.component.propsSchema,
       label: schema.component.label,
+      kind: schema.component.kind,
       hasDraft: schema.component.hasDraft,
     })
     .from(schema.component)
@@ -287,20 +295,26 @@ export async function upsertComponent(
     // inherits the LIVE value (not null) — same "omit → keep" semantics the live
     // upsert had, applied to the draft copy.
     const cur = existing[0];
-    const nextHtml = treeToHtml(artifact.tree);
+    const nextHtml = artifactHtml;
     const nextPropsSchema =
       artifact.propsSchema !== undefined ? propsSchema : cur.propsSchema;
     const nextLabel = label !== undefined ? label : cur.label;
+    // kind: omit → keep the live kind (an html-only edit never flips kind); a
+    // supplied kind (e.g. switching a component to jsonld) becomes the draft kind.
+    const curKind = cur.kind ?? "html";
+    const nextKind = artifact.kind ?? curKind;
 
     // NO-OP GUARD: if the incoming artifact is byte-identical to the LIVE one,
     // don't create a draft (and don't set has_draft). Merely OPENING a component
     // round-trips its html through the editor and autosaves — that must not show
     // "unpublished changes" when nothing actually changed. Tags may still update
     // (they're live metadata, not part of the rendered/publishable artifact).
-    const unchanged = artifactUnchanged(
-      { html: cur.html, script: cur.script, css: cur.css, propsSchema: cur.propsSchema, label: cur.label },
-      { html: nextHtml, script: artifact.script, css: artifact.css, propsSchema: nextPropsSchema, label: nextLabel },
-    );
+    const unchanged =
+      nextKind === curKind &&
+      artifactUnchanged(
+        { html: cur.html, script: cur.script, css: cur.css, propsSchema: cur.propsSchema, label: cur.label },
+        { html: nextHtml, script: artifact.script, css: artifact.css, propsSchema: nextPropsSchema, label: nextLabel },
+      );
 
     if (unchanged) {
       if (tags !== undefined) {
@@ -320,6 +334,9 @@ export async function upsertComponent(
         draftCss: artifact.css,
         draftPropsSchema: nextPropsSchema,
         draftLabel: nextLabel,
+        // Only stage a draft kind when it differs from live (else null = no pending
+        // kind change) so publish/discard's draft_kind handling stays meaningful.
+        draftKind: nextKind === curKind ? null : nextKind,
         hasDraft: true,
         ...(tags !== undefined ? { tags } : {}),
         updatedAt: now,
@@ -331,10 +348,12 @@ export async function upsertComponent(
   await db.insert(schema.component).values({
     id: crypto.randomUUID(),
     name: artifact.name,
-    html: treeToHtml(artifact.tree),
+    html: artifactHtml,
     script: artifact.script,
     css: artifact.css,
     propsSchema,
+    // Default "html" via the column default when the caller didn't specify.
+    ...(artifact.kind ? { kind: artifact.kind } : {}),
     ...(tags !== undefined ? { tags } : {}),
     ...(label !== undefined ? { label } : {}),
     createdAt: now,
@@ -362,6 +381,8 @@ export async function publishComponentDraft(
       draftCss: schema.component.draftCss,
       draftPropsSchema: schema.component.draftPropsSchema,
       draftLabel: schema.component.draftLabel,
+      draftKind: schema.component.draftKind,
+      kind: schema.component.kind,
     })
     .from(schema.component)
     .where(eq(schema.component.name, name))
@@ -380,6 +401,9 @@ export async function publishComponentDraft(
       css: row.draftCss ?? "",
       propsSchema: row.draftPropsSchema,
       label: row.draftLabel,
+      // draft_kind is only set when the edit CHANGED the kind (else null = no
+      // pending change), so publish only overrides live kind when a draft kind exists.
+      kind: row.draftKind ?? row.kind ?? "html",
       // Clear the draft.
       hasDraft: false,
       draftHtml: null,
@@ -387,6 +411,7 @@ export async function publishComponentDraft(
       draftCss: null,
       draftPropsSchema: null,
       draftLabel: null,
+      draftKind: null,
       updatedAt: new Date(),
     })
     .where(eq(schema.component.name, name));
@@ -418,6 +443,7 @@ export async function discardComponentDraft(
       draftCss: null,
       draftPropsSchema: null,
       draftLabel: null,
+      draftKind: null,
       updatedAt: new Date(),
     })
     .where(eq(schema.component.name, name));

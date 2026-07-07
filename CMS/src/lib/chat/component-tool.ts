@@ -30,8 +30,18 @@
 // (the dep-free `node --test` convention can't resolve the @/ alias; see CAVEATS).
 import { planTree, type TreeNode } from "../render/tree.ts";
 import { parseHtml } from "../render/parse-html.ts";
+import { SLOT_RE } from "../render/plan-tree.ts";
 import { normalizeTags } from "../components/tags.ts";
 import { lintComponentHtml, lintSlotsDeclared } from "./lint-component-html.ts";
+
+// A jsonld component renders no HTML, so its `tree` is the empty tree parseHtml("")
+// produces — reused rather than hand-building a literal that could drift from the shape.
+const EMPTY_TREE: TreeNode = parseHtml("");
+
+/** The two component kinds (seo-robots JSON-LD track). "html" (default) renders
+ *  the artifact as visible markup; "jsonld" treats it as a JSON template emitted
+ *  as an application/ld+json script (no visible HTML). */
+export type ComponentKind = "html" | "jsonld";
 
 /** The validated, ready-to-persist component artifact. */
 export interface ComponentArtifactInput {
@@ -39,6 +49,15 @@ export interface ComponentArtifactInput {
   tree: TreeNode;
   script: string;
   css: string;
+  // Component kind (JSON-LD track). Absent → undefined (an update leaves the
+  // stored kind untouched; a create defaults to "html" in the store). For a
+  // "jsonld" component `tree` is the empty tree — the raw JSON template lives in
+  // `jsonTemplate` because it isn't HTML markup.
+  kind?: ComponentKind;
+  // For a jsonld component: the raw JSON-LD TEMPLATE string (a schema.org object
+  // with `{{prop}}` slots) that goes verbatim into the `html`/`draft_html` column.
+  // Undefined for an html component (its markup lives in `tree`).
+  jsonTemplate?: string;
   // JSON string `{ propName: { type, default } }`. The `default` doubles as the
   // PLACEHOLDER value the standalone preview binds into the `{{prop}}` slots, so
   // a component renders with realistic sample data outside any page. Omitted/""
@@ -85,15 +104,29 @@ export const CREATE_COMPONENT_TOOL = {
             "PascalCase component name the page references, e.g. 'PricingCard'. " +
             "Re-using an existing name updates that component.",
         },
+        kind: {
+          type: "string",
+          enum: ["html", "jsonld"],
+          description:
+            "Component kind. Omit or 'html' for a normal visible UI component. " +
+            "'jsonld' makes an INVISIBLE structured-data component: `html` then holds " +
+            "a JSON-LD template (a schema.org object with `{{slot}}`s and a @context + " +
+            "@type) rendered as an application/ld+json script — used for SEO rich " +
+            "results on pages (Product, Article, FAQPage, BreadcrumbList, etc.). " +
+            "Wrap string slots in quotes (\"name\": \"{{title}}\"); leave numeric/array " +
+            "slots unquoted (\"count\": {{n}}). script/css are ignored for jsonld.",
+        },
         html: {
           type: "string",
           description:
-            "The component markup as a Handlebars-style HTML string, e.g. " +
+            "For an html component: the markup as a Handlebars-style HTML string, e.g. " +
             '`<div class="p-4"><h2>{{t title}}</h2><p>{{body}}</p></div>`. Use ' +
             "`{{prop}}` for a plain value and `{{t prop}}` for a translatable " +
             "value; declare every slot in propsSchema. Use `class` with allowed " +
             "Tailwind utilities. Reference another component by its PascalCase " +
-            "tag, e.g. `<AuthorCard name=\"{{author}}\"></AuthorCard>`.",
+            "tag, e.g. `<AuthorCard name=\"{{author}}\"></AuthorCard>`. " +
+            'For a jsonld component this is the JSON-LD TEMPLATE instead, e.g. ' +
+            '`{"@context":"https://schema.org","@type":"Product","name":"{{title}}"}`.',
         },
         script: {
           type: "string",
@@ -164,6 +197,22 @@ export function validateComponentArtifact(
     errors.push(
       "name must match /^[A-Za-z][A-Za-z0-9_-]{0,63}$/ (a PascalCase-ish identifier)",
     );
+  }
+
+  // ── kind ── (JSON-LD track). Absent → undefined (update leaves stored kind
+  // alone; create defaults to "html"). A jsonld component's `html` field is a
+  // JSON TEMPLATE, not markup — it takes a wholly different validation path.
+  const rawKind = a.kind;
+  if (rawKind !== undefined && rawKind !== "html" && rawKind !== "jsonld") {
+    return {
+      ok: false,
+      errors: [`kind must be "html" or "jsonld" (got ${JSON.stringify(rawKind)})`],
+    };
+  }
+  const kind = rawKind as ComponentKind | undefined;
+
+  if (kind === "jsonld") {
+    return validateJsonLdArtifact(name, a, errors);
   }
 
   // ── html ── (Handlebars-HTML string → element tree via the renderer's parser)
@@ -242,6 +291,90 @@ export function validateComponentArtifact(
       tree: tree as TreeNode,
       script,
       css,
+      // Explicit html kind only when the caller passed one — an omitted kind stays
+      // undefined so an update to an existing component leaves its stored kind alone.
+      ...(kind ? { kind } : {}),
+      ...(schemaStr ? { propsSchema: schemaStr } : {}),
+      ...(tags !== undefined ? { tags } : {}),
+      ...(label !== undefined ? { label } : {}),
+    },
+  };
+}
+
+/**
+ * Validate a `kind:"jsonld"` artifact. A jsonld component's `html` field is a
+ * JSON-LD TEMPLATE (a schema.org object with `{{prop}}` slots), NOT markup — so
+ * we do NOT parse it as HTML or lint the tree. Instead we require it to parse as a
+ * JSON OBJECT once slots are stripped (a template like `"n": {{count}}` isn't valid
+ * JSON on its own, so we blank the slots first), and to carry `@context` + `@type`.
+ * Self-correcting errors name the exact problem + the fix (per the AI error philosophy).
+ * The raw template goes to `jsonTemplate` (stored verbatim in the `html` column);
+ * `tree` is the empty tree so the html render path never touches it.
+ */
+function validateJsonLdArtifact(
+  name: string,
+  a: Record<string, unknown>,
+  errors: string[],
+): { ok: true; artifact: ComponentArtifactInput } | { ok: false; errors: string[] } {
+  const template = typeof a.html === "string" ? a.html : "";
+  if (template.trim() === "") {
+    errors.push(
+      "html is empty — a jsonld component's html is its JSON-LD TEMPLATE (a " +
+        "schema.org object). update_component REPLACES it, so empty html would " +
+        "erase it. Re-pass the COMPLETE JSON-LD template.",
+    );
+  } else {
+    // Replace every {{slot}} with `0` so the bare template parses regardless of
+    // whether the slot sits inside quotes (`"name":"{{t}}"` → `"name":"0"`) or is
+    // an unquoted value (`"count":{{n}}` → `"count":0`) — we validate the SHAPE,
+    // not a bound value. `0` is a legal JSON token in both positions.
+    const probe = template.replace(SLOT_RE, "0");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(probe);
+    } catch (err) {
+      errors.push(
+        `jsonld template is not valid JSON: ${(err as Error).message}. It must be a ` +
+          `JSON object; use {{slot}} where a value should be interpolated (wrap string ` +
+          `slots in quotes: "name": "{{title}}"; leave numeric/array slots unquoted: "count": {{n}}).`,
+      );
+    }
+    if (parsed !== undefined) {
+      if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        errors.push("jsonld template must be a JSON OBJECT (the schema.org node), not an array or scalar");
+      } else {
+        const obj = parsed as Record<string, unknown>;
+        if (!("@context" in obj)) {
+          errors.push('jsonld template is missing "@context" (e.g. "https://schema.org")');
+        }
+        if (!("@type" in obj)) {
+          errors.push('jsonld template is missing "@type" (e.g. "Product", "Article", "BreadcrumbList")');
+        }
+      }
+    }
+  }
+
+  // script/css are irrelevant to a jsonld component (it emits no HTML/JS) — ignore
+  // any that come in. propsSchema/tags/label carry over exactly like the html path.
+  const propsSchema = coercePropsSchema(a.propsSchema);
+  if (propsSchema === "invalid") {
+    errors.push("propsSchema must be an object { propName: { type, default } } (or a JSON string of one)");
+  }
+  const tags = a.tags === undefined ? undefined : normalizeTags(a.tags);
+  const label =
+    a.label === undefined ? undefined : typeof a.label === "string" ? a.label.trim().slice(0, MAX_LABEL_LEN) : undefined;
+
+  if (errors.length > 0) return { ok: false, errors };
+  const schemaStr = typeof propsSchema === "string" && propsSchema !== "invalid" ? propsSchema : undefined;
+  return {
+    ok: true,
+    artifact: {
+      name,
+      tree: EMPTY_TREE,
+      script: "",
+      css: "",
+      kind: "jsonld",
+      jsonTemplate: template,
       ...(schemaStr ? { propsSchema: schemaStr } : {}),
       ...(tags !== undefined ? { tags } : {}),
       ...(label !== undefined ? { label } : {}),

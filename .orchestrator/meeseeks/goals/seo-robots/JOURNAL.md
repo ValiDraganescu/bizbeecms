@@ -382,3 +382,28 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/render/breadcrumb.ts, CMS/src/lib/render/plan-types.ts, CMS/src/lib/render/tree.ts,
   CMS/src/lib/render/render-page.tsx, CMS/src/db/schema.ts,
   CMS/migrations/0031_clean_nightcrawler.sql, CMS/migrations/meta/*
+
+## 2026-07-07 12:20 — JSON-LD authoring WRITE PATH (validate/upsert/publish/discard/PUT)
+- **Status:** DONE
+- **What I did:** Made the component write path accept `kind:"jsonld"` (the render tracer read
+  it but nothing wrote it). `ComponentArtifactInput` gained `kind?: "html"|"jsonld"` +
+  `jsonTemplate?` (raw JSON-LD template). `validateComponentArtifact` branches: jsonld path
+  (`validateJsonLdArtifact`) skips the HTML-tree render lint and instead probes the template —
+  replaces every `{{slot}}` with `0` (legal JSON token in both quoted and unquoted positions),
+  `JSON.parse`s the probe, requires a JSON OBJECT carrying `@context` + `@type`, self-correcting
+  errors naming the exact miss + the quote-the-string-slots fix. jsonld blanks script/css, sets
+  `tree = parseHtml("")` (EMPTY_TREE), stores the raw template in `jsonTemplate`. `upsertComponent`
+  now writes the `html` column from `jsonTemplate` for jsonld (else `treeToHtml(tree)`), persists
+  `kind` on create, and stages `draftKind` on update ONLY when kind changed (else null = no pending
+  kind change; kind included in the no-op guard). `publishComponentDraft` copies `draft_kind→kind`
+  (falls back to live kind when null); `discardComponentDraft` clears `draft_kind`. PUT
+  `/api/components/<name>` forwards `kind` from the body (omit → keep stored kind). Tool schema
+  `CREATE_COMPONENT_TOOL` gained a `kind` enum param so the AI can author jsonld. The AI dispatch
+  (tool-dispatch.ts) needed NO change — it passes `valid.artifact` straight to `upsertComponent`,
+  and the script/class lints run harmlessly over the empty tree.
+- **Verified:** `npx tsc --noEmit` clean; `npm test` 1779/1779 (was 1770 + 9 new jsonld validation
+  tests: template stored, script/css blanked, unquoted numeric/array slots pass, missing @context/
+  @type/JSON/array/empty rejected, bad kind rejected). NOT verified live: no D1 write ran here
+  (needs binding) and there's still no editor UI to author a jsonld component by hand — see NEXT.
+- **Files:** CMS/src/lib/chat/component-tool.ts, CMS/src/lib/chat/component-tool.test.ts,
+  CMS/src/db/component-store.ts, CMS/src/app/api/components/[name]/route.ts
