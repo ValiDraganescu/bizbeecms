@@ -78,8 +78,11 @@ async function captureOne(
   const iframe = document.createElement("iframe");
   // Offscreen, but a real layout box (display:none would zero-size the render).
   iframe.style.cssText = `position:fixed;left:-10000px;top:0;width:${vp.width}px;height:900px;border:0;background:#fff;`;
-  const themeQuery = theme ? `?theme=${theme}` : "";
-  iframe.src = `/preview/component/${encodeURIComponent(component)}${themeQuery}`;
+  // `r` cache-busts so the AI always screenshots the CURRENT draft — never a
+  // browser-cached copy (a pre-fix release stamped year-long Cache-Control on
+  // version-less preview URLs, and those entries linger until busted).
+  const themeQuery = theme ? `&theme=${theme}` : "";
+  iframe.src = `/preview/component/${encodeURIComponent(component)}?r=${Date.now()}${themeQuery}`;
 
   const done = new Promise<void>((resolve, reject) => {
     const onLoad = () => resolve();

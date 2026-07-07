@@ -8,22 +8,11 @@ const nextConfig: NextConfig = {
   // Cloudflare Workers (OpenNext) — see open-next.config.ts and wrangler.jsonc.
   // Expose the CMS release version to the client so the sidebar can show it.
   env: { NEXT_PUBLIC_CMS_VERSION: cmsVersion },
-  async headers() {
-    return [
-      {
-        // Component previews requested WITH a `?v=<updatedAt>` version are
-        // immutable in the browser cache: the gallery busts by changing `v`
-        // whenever a component row is saved (any mutation bumps updatedAt).
-        // `private` — admin-gated content, browser cache only. Version-less
-        // preview URLs (Develop workbench) keep Next's no-cache default.
-        source: "/preview/component/:name",
-        has: [{ type: "query", key: "v" }],
-        headers: [
-          { key: "Cache-Control", value: "private, max-age=31536000, immutable" },
-        ],
-      },
-    ];
-  },
+  // NOTE: no `headers()` rule for /preview/component here — the deployed
+  // OpenNext worker ignores `has` matchers, which stamped the gallery's
+  // year-long immutable Cache-Control on EVERY preview (stale Develop iframe
+  // on deployed Sites). worker.ts stamps it instead, via
+  // componentPreviewCacheControl (edge-cache.ts).
 };
 
 export default withNextIntl(nextConfig);

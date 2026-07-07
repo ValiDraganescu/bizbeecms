@@ -38,6 +38,7 @@ import {
   markdownVariantRewrite,
   llmsTxtCacheHeaders,
   sitemapXmlCacheHeaders,
+  componentPreviewCacheControl,
   REQUEST_PATH_HEADER,
   isRateLimitCandidate,
   rateLimitKey,
@@ -116,6 +117,24 @@ export default {
     }
     const response: Response = await handler.fetch(handledRequest, env, ctx);
     try {
+      // Component-preview Cache-Control (/preview/component/<name>): gallery
+      // requests (?v=<updatedAt>) cache immutable in the browser; version-less
+      // (Develop iframe, page-builder rail, AI capture) are ALWAYS no-store —
+      // they render the current draft. Stamped here because the deployed
+      // OpenNext worker ignores next.config `headers()` `has` matchers.
+      if (request.method === "GET") {
+        const url = new URL(request.url);
+        const previewCc = componentPreviewCacheControl({
+          pathname: url.pathname,
+          hasVersion: url.searchParams.has("v"),
+          status: response.status,
+        });
+        if (previewCc) {
+          const out = new Response(response.body, response);
+          out.headers.set("Cache-Control", previewCc);
+          return out;
+        }
+      }
       // /llms.txt explicit carve-out (seo-robots): the dot gate excludes it
       // (isEdgeCacheCandidate rejects dotted root paths), so opt it back in with
       // its OWN tag here — a FIXED /llms.txt match, never a loosening of the dot

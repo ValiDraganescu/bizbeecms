@@ -106,6 +106,37 @@ export function pageCacheTag(pageId: string): string {
   return `page:${pageId}`;
 }
 
+/**
+ * Cache-Control for the admin component-preview route
+ * (`/preview/component/<name>`), or null for any other path.
+ *
+ * The gallery requests previews WITH `?v=<updatedAt>` and busts by changing
+ * `v`, so those are safe to cache immutable in the BROWSER (`private` — the
+ * route is admin-gated, never shared caches). Version-less preview URLs (the
+ * Develop workbench iframe, the page-builder rail, the AI capture-preview)
+ * must NEVER be cached: they render the current DRAFT, and a cached copy
+ * shows stale code after every edit.
+ *
+ * Stamped by worker.ts, NOT next.config `headers()`: the deployed OpenNext
+ * worker ignores the `has: [{type:"query"}]` matcher and stamped the
+ * year-long immutable header on EVERY preview response — the Develop iframe
+ * then served a stale draft from browser cache (restovista, 2026-07-07).
+ * Only a 200 earns the immutable header; anything else is no-store.
+ */
+export function componentPreviewCacheControl(input: {
+  pathname: string;
+  hasVersion: boolean;
+  status: number;
+}): string | null {
+  const segments = pathnameSegments(input.pathname);
+  if (segments.length !== 3 || segments[0] !== "preview" || segments[1] !== "component") {
+    return null;
+  }
+  return input.hasVersion && input.status === 200
+    ? "private, max-age=31536000, immutable"
+    : "no-store";
+}
+
 /** Markdown page-variant (`/api/md/…`) fresh window (seconds). */
 export const MD_MAX_AGE = 3600;
 

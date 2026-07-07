@@ -28,6 +28,7 @@ import {
   rateLimitedResponse,
   isVerifiedCrawler,
   RATE_LIMIT_RETRY_AFTER,
+  componentPreviewCacheControl,
 } from "./edge-cache.ts";
 import { peelLocaleSegment } from "./slug.ts";
 import { SKIP_SEGMENTS } from "./localize-links.ts";
@@ -397,4 +398,35 @@ test("isVerifiedCrawler exempts only when the cf signal is present", () => {
   assert.equal(isVerifiedCrawler({ verifiedBotCategory: "Search Engine Crawler" }), true);
   assert.equal(isVerifiedCrawler({ botManagement: { verifiedBot: true } }), true);
   assert.equal(isVerifiedCrawler({ botManagement: { verifiedBot: false } }), false);
+});
+
+test("componentPreviewCacheControl: version-less previews are never cached", () => {
+  const p = "/preview/component/SiteHeader";
+  // Develop iframe / rail / AI capture — no ?v → no-store, regardless of status
+  assert.equal(componentPreviewCacheControl({ pathname: p, hasVersion: false, status: 200 }), "no-store");
+  assert.equal(componentPreviewCacheControl({ pathname: p, hasVersion: false, status: 404 }), "no-store");
+  // gallery (?v=<updatedAt>) — immutable browser cache, but only on a 200
+  assert.equal(
+    componentPreviewCacheControl({ pathname: p, hasVersion: true, status: 200 }),
+    "private, max-age=31536000, immutable",
+  );
+  assert.equal(componentPreviewCacheControl({ pathname: p, hasVersion: true, status: 404 }), "no-store");
+  // encoded component names still match
+  assert.equal(
+    componentPreviewCacheControl({ pathname: "/preview/component/Site%20Header", hasVersion: false, status: 200 }),
+    "no-store",
+  );
+});
+
+test("componentPreviewCacheControl leaves every other path alone", () => {
+  for (const pathname of [
+    "/preview/86e95f31-0000",              // page preview — different route
+    "/preview/component",                  // no name segment
+    "/preview/component/A/extra",          // too deep
+    "/",
+    "/admin/components/develop",
+    "/api/components/palette",
+  ]) {
+    assert.equal(componentPreviewCacheControl({ pathname, hasVersion: true, status: 200 }), null);
+  }
 });

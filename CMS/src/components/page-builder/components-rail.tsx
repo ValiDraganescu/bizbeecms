@@ -234,7 +234,11 @@ function ComponentPreview({
   theme: "system" | "light" | "dark";
 }) {
   const t = useTranslations("pageBuilder");
-  const qs = theme === "system" ? "" : `?theme=${theme}`;
+  // `r` cache-busts per mount: hover previews render the current DRAFT, and a
+  // pre-fix release stamped year-long Cache-Control on version-less preview
+  // URLs — those browser-cache entries linger until the URL changes.
+  const nonceRef = useRef(Date.now());
+  const qs = `?r=${nonceRef.current}${theme === "system" ? "" : `&theme=${theme}`}`;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   // Measured natural content size of the rendered component (desktop px).
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);

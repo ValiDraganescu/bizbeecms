@@ -1003,7 +1003,11 @@ export function ComponentDevelop({
                   key={`${current.name}-${reloadKey}-${viewport}-${viewport === "mobile" ? deviceIdx : ""}`}
                   title={t("previewTitle", { name: current.name })}
                   className="h-full w-full border-0 bg-white"
-                  src={`/preview/component/${encodeURIComponent(current.name)}`}
+                  // `r` cache-busts: browser caches key by full URL, so bumping
+                  // reloadKey guarantees a fresh fetch even if a (pre-fix
+                  // release) year-long Cache-Control entry for the bare URL is
+                  // still sitting in the operator's browser cache.
+                  src={`/preview/component/${encodeURIComponent(current.name)}?r=${reloadKey}`}
                 />
               </div>
             </div>
