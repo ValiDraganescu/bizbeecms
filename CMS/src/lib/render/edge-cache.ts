@@ -57,6 +57,41 @@ export function llmsTxtCacheHeaders(
 /** llms.txt fresh window (seconds). Purge covers correctness; this bounds drift. */
 export const LLMS_MAX_AGE = 3600;
 
+/**
+ * Cache-Tag for the single `/sitemap.xml` file. Its content is EVERY published
+ * page's URL × content-locale + per-page lastmod, so it changes on any page
+ * publish/unpublish/delete/slug-rename/noindex-flip — every page-write purge
+ * site also purges THIS tag. Its own tag (NOT `pages`) because a per-page purge
+ * (`page:<id>`) can't clear a global file, and blasting `pages` on every write
+ * would needlessly re-render every cached page. Brand-identity and the llms
+ * template are NOT sitemap content — those purge sites do NOT touch this tag.
+ *
+ * `/sitemap.xml` is dot-gated out of `isEdgeCacheCandidate` (like llms/robots);
+ * worker.ts opts it back in with an EXPLICIT carve-out stamping exactly this tag
+ * — never a general loosening of the dot gate (mirrors the /llms.txt precedent).
+ */
+export const SITEMAP_CACHE_TAG = "sitemap";
+
+/** sitemap.xml fresh window (seconds). Purge covers correctness; bounds drift. */
+export const SITEMAP_MAX_AGE = 3600;
+
+/**
+ * The `/sitemap.xml` edge-cache carve-out: exactly the dotted-root path
+ * `/sitemap.xml`. Returns the headers to stamp, or null for anything else.
+ * A FIXED single-path match, NOT a loosening of the dot gate — a top-level
+ * wildcard page can never match `/sitemap.xml`, so it can't get a page's
+ * Cache-Tag stamped on the file (the sitemap-staleness precedent this fixes).
+ */
+export function sitemapXmlCacheHeaders(
+  pathname: string,
+): { cacheControl: string; cacheTag: string } | null {
+  if (pathname !== "/sitemap.xml") return null;
+  return {
+    cacheControl: `public, max-age=${SITEMAP_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+    cacheTag: SITEMAP_CACHE_TAG,
+  };
+}
+
 /** The per-page Cache-Tag (`page:<id>`) — publish/unpublish/delete purge it. */
 export function pageCacheTag(pageId: string): string {
   return `page:${pageId}`;

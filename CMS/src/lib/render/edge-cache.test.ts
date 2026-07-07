@@ -17,6 +17,9 @@ import {
   llmsTxtCacheHeaders,
   LLMS_CACHE_TAG,
   LLMS_MAX_AGE,
+  sitemapXmlCacheHeaders,
+  SITEMAP_CACHE_TAG,
+  SITEMAP_MAX_AGE,
   mdVariantCacheHeaders,
   MD_MAX_AGE,
 } from "./edge-cache.ts";
@@ -253,6 +256,34 @@ test("the /llms.txt carve-out is a FIXED single path — nothing else opts in", 
     "/about",
   ]) {
     assert.equal(llmsTxtCacheHeaders(p), null, p);
+  }
+});
+
+test("/sitemap.xml gets an explicit cache carve-out with its OWN tag", () => {
+  const h = sitemapXmlCacheHeaders("/sitemap.xml");
+  assert.ok(h);
+  assert.equal(h.cacheTag, SITEMAP_CACHE_TAG);
+  assert.notEqual(SITEMAP_CACHE_TAG, LLMS_CACHE_TAG); // distinct tags
+  assert.equal(
+    h.cacheControl,
+    `public, max-age=${SITEMAP_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+  );
+});
+
+test("the /sitemap.xml carve-out is a FIXED single path — nothing else opts in", () => {
+  // Same reasoning as the llms carve-out: NOT a dot-gate loosening, so a
+  // top-level wildcard-like path a page could occupy must never match.
+  for (const p of [
+    "/robots.txt",
+    "/llms.txt",
+    "/sitemap.xml/",
+    "/fi/sitemap.xml",
+    "/sitemap-index.xml",
+    "/anything.xml",
+    "/",
+    "/about",
+  ]) {
+    assert.equal(sitemapXmlCacheHeaders(p), null, p);
   }
 });
 
