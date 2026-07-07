@@ -22,7 +22,9 @@ import {
   SITEMAP_MAX_AGE,
   mdVariantCacheHeaders,
   MD_MAX_AGE,
+  REQUEST_PATH_HEADER,
 } from "./edge-cache.ts";
+import { peelLocaleSegment } from "./slug.ts";
 import { SKIP_SEGMENTS } from "./localize-links.ts";
 
 // ── pathnameSegments ─────────────────────────────────────────────────────────
@@ -304,4 +306,31 @@ test(".md variant tag matches the tag the page-write purges already clear", () =
   // Regression: publish/unpublish/rename/delete/noindex all purge pageCacheTag(id);
   // the cached .md must carry EXACTLY that tag or those purges miss it.
   assert.equal(mdVariantCacheHeaders("abc").cacheTag, pageCacheTag("abc"));
+});
+
+// ── branded 404 URL-locale (REQUEST_PATH_HEADER) ─────────────────────────────
+// The worker injects the incoming pathname under REQUEST_PATH_HEADER; not-found.tsx
+// peels the content locale from it via pathnameSegments + peelLocaleSegment. These
+// pin the exact composition those two files depend on (real peel is D1-bound).
+
+const LOCALES = ["en", "fi", "et"];
+const peelPath = (p: string | null) =>
+  peelLocaleSegment(pathnameSegments(p ?? ""), LOCALES, "en").locale;
+
+test("REQUEST_PATH_HEADER is a fixed lowercase custom header", () => {
+  assert.equal(REQUEST_PATH_HEADER, "x-bizbee-path");
+  assert.equal(REQUEST_PATH_HEADER, REQUEST_PATH_HEADER.toLowerCase());
+});
+
+test("branded 404 renders in the visitor's URL locale (/fi/missing → fi)", () => {
+  assert.equal(peelPath("/fi/missing"), "fi");
+  assert.equal(peelPath("/et/no/such/page"), "et");
+});
+
+test("branded 404 falls back to site default for default-locale & absent paths", () => {
+  assert.equal(peelPath("/missing"), "en"); // default locale, no prefix
+  assert.equal(peelPath("/en/missing"), "en"); // explicit default prefix
+  assert.equal(peelPath("/"), "en"); // root
+  assert.equal(peelPath(""), "en"); // header absent (pre-release worker)
+  assert.equal(peelPath(null), "en");
 });

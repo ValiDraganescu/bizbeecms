@@ -7,11 +7,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### Page-level SEO controls
-- TODO: Per-URL-locale branded 404 (follow-up to the shipped default-locale branded 404): make the
-  branded 404 render in the VISITOR's URL locale (`/fi/missing` → 404 in fi) instead of the site
-  default. Needs the request path available in `not-found.tsx` — inject it as a header in
-  `worker.ts` (release-gated, r-*) and read it via `next/headers` + `peelActiveLocale` (already
-  exported from load-plan.ts). A 404 is never edge-cached so reading the request header here is safe.
+- DONE (2026-07-07): Per-URL-locale branded 404. worker.ts injects the incoming pathname as request
+  header `REQUEST_PATH_HEADER` (`x-bizbee-path`, GET only, overwrite-not-append so it can't be
+  spoofed) BEFORE the OpenNext handler; `not-found.tsx` reads it via `next/headers` and peels the
+  content locale with new `peelActiveLocaleFromPath(pathname)` (load-plan.ts, sibling to
+  peelActiveLocale but from a raw path string) → renders the designated 404 page in the visitor's URL
+  locale (`/fi/missing` → fi). Absent header (pre-release worker / non-worker path) degrades to the
+  site default locale = the old behavior. Safe despite the (site) cache-poison guard because a 404 is
+  NEVER edge-cached (worker gate GET-200-only). +5 tests (edge-cache.test.ts branded-404 locale
+  composition), suite 1919, tsc clean. Release-gated (worker.ts, r-*) — live HITL pending.
 
 ### OG-image autogen (fallback og:image via Browser Rendering — tracer/decision DONE, 3 impl items in order)
 - TODO: OG-image fallback serving + metadata precedence (do FIRST — lowest-risk, needs no paid

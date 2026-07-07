@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import { page as pageTable, type Page } from "@/db/schema";
 import { resolvePage, type RouteParams } from "@/lib/render/resolve-page";
 import { resolveSlugPath, peelLocaleSegment } from "@/lib/render/slug";
+import { pathnameSegments } from "@/lib/render/edge-cache";
 import { buildPlanFromPage } from "@/lib/render/render-page";
 import { getContentLocales } from "@/db/settings-store";
 import { getVersion } from "@/db/page-version-store";
@@ -107,6 +108,27 @@ export async function peelActiveLocale(params: RouteParams): Promise<string> {
   const contentLocales = await getContentLocales(db);
   const { locale } = peelLocaleSegment(
     params.slug,
+    contentLocales.locales,
+    contentLocales.default,
+  );
+  return locale;
+}
+
+/**
+ * Like `peelActiveLocale` but from a raw request PATHNAME string (not route
+ * params) — used by the branded 404 (`not-found.tsx`), which Next gives no
+ * params/pathname, so the worker injects the request path as a header
+ * (release-gated). A 404 is never edge-cached, so reading the request header
+ * there can't poison a cached page (see CAVEATS). Falls back to the site
+ * default locale when `pathname` is blank/absent.
+ */
+export async function peelActiveLocaleFromPath(
+  pathname: string | null | undefined,
+): Promise<string> {
+  const db = await getDb();
+  const contentLocales = await getContentLocales(db);
+  const { locale } = peelLocaleSegment(
+    pathnameSegments(pathname ?? ""),
     contentLocales.locales,
     contentLocales.default,
   );

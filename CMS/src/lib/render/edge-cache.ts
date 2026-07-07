@@ -17,6 +17,15 @@ import { SKIP_SEGMENTS } from "./localize-links.ts";
 /** Serve-stale window (seconds) appended to every opted-in Cache-Control. */
 export const STALE_WHILE_REVALIDATE = 86400;
 
+/**
+ * Request header the worker injects with the incoming pathname so the branded
+ * 404 (`not-found.tsx`, which Next gives no params/pathname) can render in the
+ * VISITOR's URL locale (`/fi/missing` → 404 in fi). A 404 is never edge-cached
+ * (the worker gate is GET-200-only), so this request header can never poison a
+ * cached published page — the one place it's safe to read a request path.
+ */
+export const REQUEST_PATH_HEADER = "x-bizbee-path";
+
 /** Cache-Tag shared by ALL published pages — global-blast writes purge this. */
 export const PAGES_CACHE_TAG = "pages";
 
