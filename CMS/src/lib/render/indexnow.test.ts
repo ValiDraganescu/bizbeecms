@@ -6,6 +6,7 @@ import {
   generateIndexNowKey,
   buildSubmission,
   pageUrlsAllLocales,
+  noindexTurnedOn,
 } from "./indexnow.ts";
 import type { PathPageRow } from "./localize-paths.ts";
 
@@ -83,4 +84,13 @@ test("pageUrlsAllLocales: single-locale site emits one URL", () => {
   assert.deepEqual(pageUrlsAllLocales("https://ex.com/", rows, "about", "en", ["en"]), [
     "https://ex.com/about",
   ]);
+});
+
+test("noindexTurnedOn: only false→true fires (absent/no-op cases don't)", () => {
+  assert.equal(noindexTurnedOn(false, true), true); // the transition we ping on
+  assert.equal(noindexTurnedOn(false, false), false); // stayed indexable
+  assert.equal(noindexTurnedOn(true, true), false); // already noindexed
+  assert.equal(noindexTurnedOn(true, false), false); // turned back ON (indexable)
+  assert.equal(noindexTurnedOn(false, undefined), false); // preserve-when-absent → no change
+  assert.equal(noindexTurnedOn(true, undefined), false); // preserve-when-absent → no change
 });

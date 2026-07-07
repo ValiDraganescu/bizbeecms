@@ -115,6 +115,18 @@ export function buildSubmission(
  * exactly. Returns [] for wildcard `:param` pages (no enumerable URL — same as
  * the sitemap) or when the path isn't reconstructible. PURE.
  */
+/**
+ * Did a page-meta update flip SEO `noindex` from off to on? Only this
+ * transition matters for IndexNow: once a page becomes noindex, its URLs must
+ * be RE-submitted so participating engines recrawl and see the `robots:noindex`
+ * (they'd otherwise drop the URL only on a natural recrawl). `after` is the
+ * OPTIONAL validated body value — absent (preserve-when-absent contract) means
+ * noindex didn't change, so no transition. PURE.
+ */
+export function noindexTurnedOn(before: boolean, after: boolean | undefined): boolean {
+  return after === true && before === false;
+}
+
 export function pageUrlsAllLocales(
   origin: string,
   rows: PathPageRow[],

@@ -258,3 +258,23 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   nor live-verify tags (HITL).
 - **Files:** CMS/src/lib/render/social-cards.ts (+ .test.ts),
   CMS/src/app/(site)/[[...slug]]/page.tsx
+
+## 2026-07-07 11:44 — IndexNow notify on noindex OFF→ON transition
+- **Status:** DONE
+- **What I did:** The one content-visibility change that never pinged IndexNow now does.
+  When a page-meta PUT flips SEO `noindex` false→true, engines are told to recrawl so they
+  see `robots:noindex` (previously they only dropped the URL on natural recrawl).
+  - **Pure helper** `noindexTurnedOn(before, after)` in `lib/render/indexnow.ts`: true ONLY
+    for `before===false && after===true`. `after` is the OPTIONAL validated body value —
+    absent (preserve-when-absent contract) = no change = false. 6-case unit test.
+  - **Wiring** in `api/pages/route.ts` persist(): BEFORE the write (id!==null) capture both
+    the OLD noindex (`getPageById(id)`) and the page URLs (`collectPageUrls(id)`) — must grab
+    URLs WHILE STILL INDEXABLE because collectPageUrls returns [] once noindexed (the same
+    reason DELETE captures URLs pre-delete). After the write, if `noindexTurnedOn` →
+    `notifyIndexNowUrls(preUrls)` (best-effort, ctx.waitUntil, never fails the save).
+    notifyIndexNowForPage(id) still fires but is a no-op for the now-noindexed page.
+  - Whole pre-read block is try/catch best-effort; a failed pre-read just skips the ping.
+- **Verified:** `node --test indexnow.test.ts` 10/10; full `npm test` 1740/1740 (was 1739;
+  +1); `npx tsc --noEmit` clean. Did NOT run opennext build (heavy gate; route already
+  force-dynamic) nor live-submit (needs deployed origin+key — HITL).
+- **Files:** CMS/src/lib/render/indexnow.ts (+ .test.ts), CMS/src/app/api/pages/route.ts

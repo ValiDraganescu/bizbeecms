@@ -13,14 +13,14 @@
  * OpenNext/Workers). Pure validation in `lib/pages/page-meta.ts`; D1 in
  * `db/page-store.ts`. Live D1 needs a real binding (HITL).
  */
-import { deletePage, getPathRows, listPages, upsertPageMeta } from "@/db/page-store";
+import { deletePage, getPageById, getPathRows, listPages, upsertPageMeta } from "@/db/page-store";
 import { applyRenameRedirects } from "@/db/redirect-store";
 import { validatePageMeta } from "@/lib/pages/page-meta";
 import { getContentLocales } from "@/db/settings-store";
 import { localeSlugConflicts } from "@/lib/render/localize";
 import { redirectsForRename } from "@/lib/render/redirects";
 import { descendantIds, type PathPageRow } from "@/lib/render/localize-paths";
-import { pageUrlsAllLocales } from "@/lib/render/indexnow";
+import { noindexTurnedOn, pageUrlsAllLocales } from "@/lib/render/indexnow";
 import { resolveSiteOrigin } from "@/lib/render/site-origin";
 import { requireAdmin } from "@/lib/auth/guard";
 import { PAGES_CACHE_TAG, pageCacheTag } from "@/lib/render/edge-cache";
@@ -125,11 +125,23 @@ async function persist(body: unknown, id: string | null): Promise<Response> {
     // URLs and auto-capture 301 redirects. Only needed on an UPDATE (creates
     // can't move anything). Best-effort — an empty snapshot just skips capture.
     let oldRows: PathPageRow[] = [];
+    // Capture noindex + URLs BEFORE the write to detect a false→true transition:
+    // once the page is noindexed, collectPageUrls returns [] (it's crawler-
+    // hidden), so the URLs to re-submit must be grabbed while still indexable.
+    let oldNoindex = false;
+    let preUrls: string[] = [];
     if (id !== null) {
       try {
         oldRows = (await getPathRows()) as PathPageRow[];
       } catch {
         oldRows = [];
+      }
+      try {
+        const [before, urls] = await Promise.all([getPageById(id), collectPageUrls(id)]);
+        oldNoindex = before?.noindex ?? false;
+        preUrls = urls;
+      } catch {
+        // Best-effort — a failed pre-read just skips the noindex-transition ping.
       }
     }
     const res = await upsertPageMeta(v.meta, id);
@@ -176,7 +188,16 @@ async function persist(body: unknown, id: string | null): Promise<Response> {
       }
       // Content/URL of an existing page changed (publish toggle, slug/SEO edit) —
       // tell IndexNow to recrawl its (possibly new) URLs. Best-effort, non-blocking.
+      // (When noindex just turned ON, notifyIndexNowForPage is a no-op here:
+      // collectPageUrls now returns [] for the noindexed page — hence the
+      // pre-captured preUrls below.)
       await notifyIndexNowForPage(id);
+      // noindex OFF→ON is the one content-visibility change that otherwise never
+      // pings IndexNow: re-submit the URLs captured while still indexable so
+      // engines recrawl and pick up the robots noindex. Best-effort, non-blocking.
+      if (noindexTurnedOn(oldNoindex, v.meta.noindex) && preUrls.length > 0) {
+        notifyIndexNowUrls(preUrls);
+      }
     }
     return Response.json(res, { status: id === null ? 201 : 200 });
   } catch (err) {

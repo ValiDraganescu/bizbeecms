@@ -109,6 +109,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   `generateMetadata` IS the resolved metaTitle. Don't look for a `page.title`
   fallback (an earlier NEXT note implied one existed); OG/Twitter titles fall back
   to metaTitle and nothing more.
+- (2026-07-07) IndexNow noindex-transition: the PUT persist() in `api/pages/route.ts`
+  pre-reads BOTH the OLD noindex (`getPageById`) AND the page URLs (`collectPageUrls`)
+  BEFORE `upsertPageMeta`, because once noindex flips ON `collectPageUrls` returns []
+  (crawler-hidden) — same "capture before it's gone" reason DELETE captures URLs pre-delete.
+  Transition gate is pure `noindexTurnedOn(before, after)` in indexnow.ts (true ONLY for
+  false→true; `after===undefined` = preserve-when-absent = no change). All best-effort try/
+  catch. When you add ANOTHER path that can flip noindex (e.g. an AI SEO tool), it must do
+  the same pre-capture or the noindex-ON recrawl ping is silently skipped. Note: on
+  noindex-ON, `notifyIndexNowForPage(id)` is a no-op (page is now noindexed) — the ping
+  rides entirely on the pre-captured `preUrls` via `notifyIndexNowUrls`.
+
 - (2026-07-07) OG/Twitter cards: pure builders in `lib/render/social-cards.ts`
   (`buildOpenGraph`/`buildTwitterCard`) fed by `generateMetadata`. brandName comes
   from `getSiteIdentity()` (settings-store) — this is an EXTRA D1 read, deliberately
