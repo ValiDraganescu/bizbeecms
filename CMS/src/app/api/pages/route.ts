@@ -18,7 +18,7 @@ import { validatePageMeta } from "@/lib/pages/page-meta";
 import { getContentLocales } from "@/db/settings-store";
 import { localeSlugConflicts } from "@/lib/render/localize";
 import { requireAdmin } from "@/lib/auth/guard";
-import { pageCacheTag } from "@/lib/render/edge-cache";
+import { PAGES_CACHE_TAG, pageCacheTag } from "@/lib/render/edge-cache";
 import { purgeEdgeTags } from "@/lib/render/purge-edge";
 
 export const dynamic = "force-dynamic";
@@ -110,8 +110,15 @@ async function persist(body: unknown, id: string | null): Promise<Response> {
     if (!res.ok) return Response.json({ error: res.errors.join("; ") }, { status: 409 });
     // Meta updates (incl. the publish/UNPUBLISH toggle, slug + SEO changes)
     // change what the published URL serves — bust this page's edge-cache
-    // entries. Creates (id === null) can't be cached yet. Best-effort.
-    if (id !== null) await purgeEdgeTags(pageCacheTag(id));
+    // entries. A PATH change (slug/parent/localized overrides) additionally
+    // blasts the shared `pages` tag: other cached pages embed reverse-resolved
+    // links to this page and would serve now-404 hrefs until expiry.
+    // Creates (id === null) can't be cached yet. Best-effort.
+    if (id !== null) {
+      await purgeEdgeTags(
+        ...(res.pathChanged ? [PAGES_CACHE_TAG, pageCacheTag(id)] : [pageCacheTag(id)]),
+      );
+    }
     return Response.json(res, { status: id === null ? 201 : 200 });
   } catch (err) {
     return Response.json(

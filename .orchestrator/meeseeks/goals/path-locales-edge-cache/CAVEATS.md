@@ -143,3 +143,8 @@ Read every line before working. Each entry was learned the hard way by a previou
   keep BOTH paths working; don't remove the rewrite fn.
 - Path translation matches by DEFAULT slugs only (unique among siblings → unambiguous).
   A locale-URL → default-URL reverse direction is NOT needed anywhere; don't build it.
+- `pagePathInputsChanged` (page-meta.ts) makes a PUT that changes slug/parent/
+  localized_slugs blast the shared `pages` tag (inbound reverse-resolved links in
+  OTHER cached pages go 404 otherwise). CREATE/DELETE/publish deliberately do NOT
+  blast: the path translator ignores publish status, and before-create/after-delete
+  the inbound href 404s either way — no correctness delta, don't "complete" it.

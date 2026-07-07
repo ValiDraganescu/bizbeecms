@@ -216,6 +216,29 @@ export function newPageSiblingSlugConflicts(
   return localizedSlugSiblingConflicts({ id: null, slug, localizedSlugs: {} }, parsed);
 }
 
+/**
+ * Did a page-meta update change any input of the page's URL path(s)?
+ * True when the default slug, the parent, or the per-locale slug overrides
+ * changed. Other cached pages embed reverse-resolved links to this page
+ * (localize-paths translates via the full page table), so a path change must
+ * blast the shared `pages` cache tag — purging only `page:<id>` leaves every
+ * OTHER cached page serving now-404 hrefs until expiry. `localizedSlugs`
+ * absent in the update = preserve-stored contract → not a change. PURE.
+ */
+export function pagePathInputsChanged(
+  before: { slug: string; parentPageId: string | null; localizedSlugs: Record<string, string> },
+  after: { slug: string; parentPageId: string | null; localizedSlugs?: Record<string, string> },
+): boolean {
+  if (before.slug !== after.slug) return true;
+  if (before.parentPageId !== after.parentPageId) return true;
+  if (after.localizedSlugs === undefined) return false;
+  const keys = new Set([...Object.keys(before.localizedSlugs), ...Object.keys(after.localizedSlugs)]);
+  for (const k of keys) {
+    if (before.localizedSlugs[k] !== after.localizedSlugs[k]) return true;
+  }
+  return false;
+}
+
 function parseSlugMap(json: string | null): Record<string, string> {
   if (!json) return {};
   try {

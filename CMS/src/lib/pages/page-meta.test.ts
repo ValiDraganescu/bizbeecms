@@ -15,6 +15,7 @@ import {
   CACHE_MAX_AGE_OPTIONS,
   localizedSlugSiblingConflicts,
   newPageSiblingSlugConflicts,
+  pagePathInputsChanged,
   validatePageMeta,
 } from "./page-meta.ts";
 
@@ -291,4 +292,43 @@ test("publish/SEO bodies omit localizedSlugs so a save can't reset the overrides
   };
   assert.equal("localizedSlugs" in buildPublishToggleBody(page), false);
   assert.equal("localizedSlugs" in buildSeoMetaBody(page, {}, {}, {}), false);
+});
+
+// Regression (locale peel × edge cache): a slug/parent/localized-slug change
+// must blast the shared `pages` tag — other cached pages embed reverse-resolved
+// links to this page and would serve now-404 hrefs until expiry.
+test("pagePathInputsChanged: detects slug, parent, and override changes", () => {
+  const before = { slug: "terms", parentPageId: null, localizedSlugs: { fi: "ehdot" } };
+  assert.equal(
+    pagePathInputsChanged(before, { slug: "tos", parentPageId: null, localizedSlugs: { fi: "ehdot" } }),
+    true,
+  );
+  assert.equal(
+    pagePathInputsChanged(before, { slug: "terms", parentPageId: "p9", localizedSlugs: { fi: "ehdot" } }),
+    true,
+  );
+  assert.equal(
+    pagePathInputsChanged(before, { slug: "terms", parentPageId: null, localizedSlugs: { fi: "sopimusehdot" } }),
+    true,
+  );
+  // Removing and adding an override are both path changes.
+  assert.equal(pagePathInputsChanged(before, { slug: "terms", parentPageId: null, localizedSlugs: {} }), true);
+  assert.equal(
+    pagePathInputsChanged(before, {
+      slug: "terms",
+      parentPageId: null,
+      localizedSlugs: { fi: "ehdot", et: "tingimused" },
+    }),
+    true,
+  );
+});
+
+test("pagePathInputsChanged: identical inputs and absent-map preserve contract are NOT changes", () => {
+  const before = { slug: "terms", parentPageId: null, localizedSlugs: { fi: "ehdot" } };
+  assert.equal(
+    pagePathInputsChanged(before, { slug: "terms", parentPageId: null, localizedSlugs: { fi: "ehdot" } }),
+    false,
+  );
+  // Absent localizedSlugs = preserve the stored map (publish/SEO/cache bodies omit it).
+  assert.equal(pagePathInputsChanged(before, { slug: "terms", parentPageId: null }), false);
 });

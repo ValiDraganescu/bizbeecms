@@ -346,3 +346,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   a typed one-select + pure-call path.
 - **Files:** CMS/src/lib/pages/page-meta.ts, page-meta.test.ts,
   CMS/src/db/page-store.ts
+
+## 2026-07-07 09:02 — Defect fix: path change now blasts the shared `pages` tag (stale inbound links)
+- **Status:** DONE
+- **What I did:** Defect hunt (NEXT.md option 1) found a real gap: page A's
+  cached HTML embeds reverse-resolved links to page B (localize-paths reads the
+  FULL page table, no publish filter), but a PUT changing B's slug / parent /
+  localized_slugs purged only `page:<B>` — every other cached page kept serving
+  now-404 hrefs for up to max-age + SWR (≤2 days). Fix: (1) pure
+  `pagePathInputsChanged(before, after)` in `lib/pages/page-meta.ts` (slug,
+  parentPageId, localizedSlugs compare; absent map = preserve contract → not a
+  change). (2) `upsertPageMeta`'s update branch extends its existing-row select
+  to slug+parentPageId and returns optional `pathChanged`. (3) /api/pages PUT
+  purges `[PAGES_CACHE_TAG, page:<id>]` when pathChanged, else `page:<id>` as
+  before. Publish/unpublish/delete/create deliberately unchanged: the
+  translator ignores publish status, and before-create/after-delete the inbound
+  href 404s either way — no correctness delta.
+- **Verified:** 2 new regression tests (change detection incl. override
+  add/remove; identical + absent-map non-changes); full `npm test` 1679/1679;
+  `npx tsc --noEmit` clean; `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare
+  build` + `wrangler deploy --dry-run` green. Real purge behavior remains a
+  deployed-site HITL check (per CAVEATS).
+- **Files:** CMS/src/lib/pages/page-meta.ts, page-meta.test.ts,
+  CMS/src/db/page-store.ts, CMS/src/app/api/pages/route.ts

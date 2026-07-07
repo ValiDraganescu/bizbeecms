@@ -17,6 +17,7 @@ import type { PageInput } from "@/lib/chat/page-tool";
 import {
   localizedSlugSiblingConflicts,
   newPageSiblingSlugConflicts,
+  pagePathInputsChanged,
   type PageMetaInput,
 } from "../lib/pages/page-meta.ts";
 import { parseJsonColumn, type Block } from "../lib/render/tree.ts";
@@ -221,7 +222,10 @@ export async function getPageById(id: string): Promise<PageSummary | null> {
 export async function upsertPageMeta(
   meta: PageMetaInput,
   id: string | null,
-): Promise<{ ok: true; id: string; action: "created" | "updated" } | { ok: false; errors: string[] }> {
+): Promise<
+  | { ok: true; id: string; action: "created" | "updated"; pathChanged?: boolean }
+  | { ok: false; errors: string[] }
+> {
   const db = await getDb();
   const now = new Date();
 
@@ -261,14 +265,21 @@ export async function upsertPageMeta(
   }
 
   let existingLocalized: Record<string, string> = {};
+  let existingPath: { slug: string; parentPageId: string | null } | null = null;
   if (id !== null) {
     const existing = await db
-      .select({ id: schema.page.id, localizedSlugs: schema.page.localizedSlugs })
+      .select({
+        id: schema.page.id,
+        slug: schema.page.slug,
+        parentPageId: schema.page.parentPageId,
+        localizedSlugs: schema.page.localizedSlugs,
+      })
       .from(schema.page)
       .where(eq(schema.page.id, id))
       .limit(1);
     if (existing.length === 0) return { ok: false, errors: ["page not found"] };
     existingLocalized = parseMap(existing[0].localizedSlugs);
+    existingPath = { slug: existing[0].slug, parentPageId: existing[0].parentPageId };
   }
 
   // Per-locale sibling uniqueness (Stage 2 localized slugs): a page's effective
@@ -313,7 +324,16 @@ export async function upsertPageMeta(
         updatedAt: now,
       })
       .where(eq(schema.page.id, id));
-    return { ok: true, id, action: "updated" };
+    // Path-input change (slug/parent/localized overrides) → the caller must
+    // blast the shared `pages` cache tag: other cached pages embed
+    // reverse-resolved links to this page (see pagePathInputsChanged).
+    const pathChanged =
+      existingPath !== null &&
+      pagePathInputsChanged(
+        { ...existingPath, localizedSlugs: existingLocalized },
+        { slug: meta.slug, parentPageId, localizedSlugs: meta.localizedSlugs },
+      );
+    return { ok: true, id, action: "updated", pathChanged };
   }
 
   const newId = crypto.randomUUID();
