@@ -492,3 +492,9 @@ Read every line before working. Each entry was learned the hard way by a previou
   server-side, use pure `imageDimensionsFromBytes` (lib/media/image-dimensions.ts) — it parses the
   file HEADER only (PNG/JPEG/GIF/WebP), no decode, node-testable. Returns null for unknown/truncated →
   store null (same as before). Don't try to bring a decoder onto Workers for this.
+
+- (2026-07-07) The Preview canvas overlay (`preview-overlay.ts`) is PREVIEW-ONLY chrome — the parent
+  reaches into the same-origin iframe DOM. Any block-management affordance the render plan can't carry
+  (because public=preview must be byte-identical) belongs HERE, injected into the iframe DOM, NOT in
+  `tree.ts`/`planPage`. Precedent: the invisible-block chip (jsonld) is injected at wire time into
+  zero-area `data-block-wrap`s; cleanup removes it. Do NOT add builder-only markup to the render plan.

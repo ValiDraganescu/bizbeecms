@@ -925,3 +925,21 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   1x1 PNG, truncated→null, zero-dim→null); full suite 1895/1895; `npx tsc --noEmit` clean. Could NOT
   verify a live AI generation round-trip (needs an OpenRouter key + deployed origin) — HITL.
 - **Files:** CMS/src/lib/media/image-dimensions.ts (+ .test.ts), CMS/src/lib/chat/tool-dispatch.ts
+
+## 2026-07-07 15:07 — Builder canvas chip for invisible (jsonld) blocks
+- **Status:** DONE
+- **What I did:** A jsonld-kind component block renders only a `display:none` placeholder (its ld+json
+  is funnelled onto `RenderPlan.jsonLd`, not into the DOM), so its `data-block-wrap` div collapses to
+  ZERO height — nothing to hover/click/select on the Preview canvas, so operators couldn't manage the
+  block. Fixed in the PREVIEW-ONLY overlay (`preview-overlay.ts`), never the render plan (public =
+  preview must stay byte-identical): at wire time `injectInvisibleChips()` scans every
+  `data-block-wrap`, and for any whose `getBoundingClientRect()` has no area, injects a visible dashed
+  `◇ <component-name>` chip (`data-bb-invisible-chip`) as an appended child. The chip gives the wrap a
+  real box, so the EXISTING hover-label / click-select / markSelected machinery works unchanged. Chip
+  label comes from the same `labelFor` (previewLabels already maps a jsonld leaf id→component name).
+  New pure `isVisuallyEmptyRect({width,height})` (exported, unit-tested) is the inject decision. Chips
+  are removed on overlay cleanup and re-injected on each iframe reload; injection is idempotent per wrap.
+- **Verified:** new preview-overlay.test.ts 3/3 (zero-area→chip, real box→skip, NaN/negative→empty so
+  we never inject on bad rects); full suite 1898/1898; `npx tsc --noEmit` clean. Could NOT verify the
+  visual chip live in a browser (needs a jsonld component on a page + the running builder) — HITL.
+- **Files:** CMS/src/lib/page-builder/preview-overlay.ts (+ new preview-overlay.test.ts)

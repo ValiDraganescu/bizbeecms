@@ -15,6 +15,22 @@
 const STYLE_ID = "bb-preview-overlay-style";
 const SELECTED_ATTR = "data-bb-selected";
 const LABEL_ID = "bb-preview-hover-label";
+// Marks a chip we injected into an otherwise-invisible block (e.g. a jsonld
+// component, which renders a `display:none` placeholder → a zero-height wrap).
+// Injected DOM only — never part of the published render plan.
+const CHIP_ATTR = "data-bb-invisible-chip";
+
+/**
+ * Should this block get a visible builder chip? A block whose element renders no
+ * visible box (a jsonld component, or any component that emits only a hidden
+ * placeholder) collapses to zero height, so there's nothing to hover / click /
+ * select on the canvas — the operator can't manage it. We give it a chip when its
+ * rendered box has no area. PURE (rect in, decision out) so it's unit-testable
+ * without a DOM. Excludes negative/NaN just in case a layout engine hands one back.
+ */
+export function isVisuallyEmptyRect(rect: { width: number; height: number }): boolean {
+  return !(rect.width > 0 && rect.height > 0);
+}
 
 // Attributes that mark a selectable block, most specific first. A click finds
 // the NEAREST of these so a click on a leaf component selects the component, not
@@ -36,6 +52,23 @@ const OVERLAY_CSS = `
   outline: 2px solid var(--color-primary, #2563eb) !important;
   outline-offset: -2px !important;
 }
+/* Chip standing in for an invisible block (jsonld etc.) so it's hover/click/
+   selectable. A real inline-flex box gives the overlay something to outline. */
+[${CHIP_ATTR}] {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  margin: 2px 0;
+  font: 500 11px/1.4 ui-sans-serif, system-ui, sans-serif;
+  color: var(--color-primary, #2563eb);
+  background: color-mix(in srgb, var(--color-primary, #2563eb) 10%, transparent);
+  border: 1px dashed var(--color-primary, #2563eb);
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+[${CHIP_ATTR}]::before { content: "◇"; opacity: 0.7; }
 #${LABEL_ID} {
   position: fixed;
   z-index: 2147483647;
@@ -133,11 +166,30 @@ export function wirePreviewOverlay(
   };
   doc.addEventListener("click", onClick, true);
 
+  // Give invisible blocks (jsonld components render only a `display:none`
+  // placeholder → a zero-height wrap) a visible chip so they can be
+  // hovered/selected/deleted from the canvas. Injected preview-only DOM; the
+  // published render plan is untouched. Idempotent — skip a wrap that already
+  // has one (re-wire on iframe reload rebuilds from scratch anyway).
+  const injectInvisibleChips = () => {
+    doc.querySelectorAll("[data-block-wrap]").forEach((wrap) => {
+      if (wrap.querySelector(`:scope > [${CHIP_ATTR}]`)) return;
+      if (!isVisuallyEmptyRect(wrap.getBoundingClientRect())) return;
+      const id = wrap.getAttribute("data-block-wrap");
+      const chip = doc.createElement("span");
+      chip.setAttribute(CHIP_ATTR, "");
+      chip.textContent = (id && labelFor?.(id)) || "component";
+      wrap.appendChild(chip);
+    });
+  };
+  injectInvisibleChips();
+
   return () => {
     doc.removeEventListener("click", onClick, true);
     doc.removeEventListener("mousemove", onMove, true);
     doc.removeEventListener("mouseleave", onLeave, true);
     labelEl.remove();
+    doc.querySelectorAll(`[${CHIP_ATTR}]`).forEach((c) => c.remove());
   };
 }
 

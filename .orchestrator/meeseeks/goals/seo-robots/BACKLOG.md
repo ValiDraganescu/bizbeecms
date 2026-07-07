@@ -42,8 +42,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
   jsonld component kind can't ride today — a List block's rows should be able to emit a schema.org
   ItemList (or per-row items, e.g. Product/Article per row) into plan.jsonLd. See CAVEATS note from
   the jsonld-bindings run for the seam analysis.
-- TODO: Builder canvas invisible-element CHIP for a jsonld block (renders no visible HTML — the
-  `data-block-wrap` placeholder is empty; show a selectable/deletable chip so operators can manage it).
+- DONE: Builder canvas invisible-element CHIP for a jsonld block — PREVIEW-ONLY overlay
+  (`preview-overlay.ts`) injects a visible dashed `◇ <name>` chip (`data-bb-invisible-chip`) into any
+  zero-area `data-block-wrap` at wire time, so the existing hover/select/delete machinery works on
+  otherwise-invisible blocks. Render plan untouched (public=preview stays byte-identical). Pure
+  `isVisuallyEmptyRect` gate, 3 tests; suite 1898; tsc clean. Live visual check is HITL.
 - TODO: AI authoring-guide section for jsonld (tool `kind` param + validation are DONE): schema.org
   patterns per page type — Product/Article/FAQPage/Recipe — the slot-quoting rules (`"n":{{count}}`
   unquoted vs `"n":"{{name}}"` quoted), and WHEN to author a jsonld component vs plain content.
