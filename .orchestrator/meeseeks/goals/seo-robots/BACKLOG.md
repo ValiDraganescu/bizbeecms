@@ -15,7 +15,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
   worker rewrite. 404 for unpublished/route-miss/noindex. Public `/<path>.md` needs a release.
 
 ### Performance — Core Web Vitals (images ship raw R2 bytes today)
-- TODO: Image hygiene post-pass over the finished ElementPlan (same pattern as localize-links): `loading="lazy"` + `decoding="async"` on images (skip the first/LCP-candidate image), width/height or aspect-ratio to kill CLS where dimensions are known — if asset dimensions aren't stored, capture them at upload in the assets API (new columns) and backfill lazily; pure post-pass unit-tested.
+- DONE (2026-07-07): Image hygiene post-pass — pure `applyImageHygiene` (image-hygiene.ts, 10 tests)
+  wired into `tree.ts planPage` after `localizePlanLinks`. Adds `loading="lazy"`+`decoding="async"`
+  to every `<img>` EXCEPT the first (LCP candidate; it still gets `decoding="async"`); when the
+  author-set numeric width+height are BOTH known, mirrors them into an inline `aspectRatio` style to
+  kill CLS. Never invents dimensions, never clobbers an author `loading`/`decoding`/existing
+  aspect-ratio/string style. FOLLOW-UP (below): capture asset pixel dims at upload so CLS applies to
+  images that don't carry explicit width/height.
+- TODO: Capture asset pixel dimensions at upload (assets API + new `width`/`height` columns) and
+  surface them so `applyImageHygiene` can set aspect-ratio on images WITHOUT author-set width/height
+  (today CLS only fires when the author already set both dims). Backfill lazily. Then the image
+  hygiene pass covers gallery-inserted images too, not just explicitly-sized ones.
 - TODO: INVESTIGATION (design note, not code): responsive image variants for `/media/[...key]` R2 assets on per-site Workers — evaluate Cloudflare Images API upload-time variants vs zone Image Resizing (custom-domain sites only; workers.dev sites can't) vs in-Worker resizing (no native codecs on Workers — likely dead end); deliverable = chosen path + cost/constraints written to this goal's JOURNAL + CAVEATS, and implementation tasks filed accordingly.
 - BLOCKED (on the investigation above): implement responsive images — srcset/sizes + modern format (WebP/AVIF) for asset images in published pages per the chosen design.
 
@@ -30,7 +40,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `worker.ts` (release-gated, r-*) and read it via `next/headers` + `peelActiveLocale` (already
   exported from load-plan.ts). A 404 is never edge-cached so reading the request header here is safe.
 
-### JSON-LD components (kind: jsonld) — machinery + authoring shipped; two polish items remain
+### JSON-LD components (kind: jsonld) — machinery + authoring shipped; polish items remain
+- TODO: Per-row/ItemList JSON-LD for List blocks (user-queued 2026-07-07): the one binding case the
+  jsonld component kind can't ride today — a List block's rows should be able to emit a schema.org
+  ItemList (or per-row items, e.g. Product/Article per row) into plan.jsonLd. See CAVEATS note from
+  the jsonld-bindings run for the seam analysis.
 - TODO: Builder canvas invisible-element CHIP for a jsonld block (renders no visible HTML — the
   `data-block-wrap` placeholder is empty; show a selectable/deletable chip so operators can manage it).
 - TODO: AI authoring-guide section for jsonld (tool `kind` param + validation are DONE): schema.org

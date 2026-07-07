@@ -55,6 +55,7 @@ import {
 } from "./plan-language-switcher.ts";
 import { resolveLocalized } from "./localize.ts";
 import { localizePlanLinks } from "./localize-links.ts";
+import { applyImageHygiene } from "./image-hygiene.ts";
 
 // Re-export the full public surface so `@/lib/render/tree` stays the one import
 // path the renderer, editor, chat tools, and tests already use.
@@ -367,7 +368,11 @@ export function planPage(
   // Stage-1 locale-prefix routing: on a non-default-locale render, rewrite every
   // internal href in the finished plan to carry the locale prefix (pure post-pass;
   // identity no-op on default-locale renders). See localize-links.ts.
-  const root = blocks.map(planTopBlock);
+  // Core-Web-Vitals image hygiene: lazy/decoding + CLS aspect-ratio as a pure
+  // post-pass over the finished plan (skips the first/LCP image). See
+  // image-hygiene.ts. Runs after locale link-rewriting; order is irrelevant
+  // (they touch disjoint props) but keeps both post-passes side-by-side.
+  const root = applyImageHygiene(blocks.map(planTopBlock));
   return {
     root: locale ? localizePlanLinks(root, locale) : root,
     scripts,

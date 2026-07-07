@@ -288,6 +288,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   CANNOT return a `Response` (Next tries to render it as an element → error page). Consequence: any
   new non-HTML surface at an ARBITRARY page path must live under `/api/*` (or media/_next) and be
   reached via a worker.ts URL rewrite — you cannot add it as a normal app route/page.
+- (2026-07-07) Image hygiene (`lib/render/image-hygiene.ts applyImageHygiene`) is a PURE post-pass
+  wired into `tree.ts planPage` right AFTER `localizePlanLinks` (disjoint props, order irrelevant).
+  The FIRST `<img>` in DOCUMENT ORDER is treated as the LCP candidate and deliberately NOT
+  lazy-loaded — do NOT "fix" that to lazy-load everything (lazy on the above-fold hero image hurts
+  LCP). Author-set `loading`/`decoding` always win (only ABSENT props filled). CLS `aspectRatio` is
+  set ONLY when BOTH author width+height are known — it NEVER invents dimensions, because asset pixel
+  sizes aren't stored (filed follow-up: capture at upload → then CLS covers gallery images). It won't
+  clobber an existing aspect-ratio and leaves a non-object (string) `style` untouched (parse-html
+  always emits object styles, but string-safe regardless). `style` is a React OBJECT with camelCase
+  `aspectRatio` — correct for the createElement adapter (htmlPropsToReact passes style objects
+  verbatim). Visitor-independent (reads only the built plan) → edge-cache-safe.
 - (2026-07-07) Markdown variants: served by INTERNAL route `app/api/md/[...slug]/route.ts` (builds
   the plan via `loadPlan` — pulls next-intl/React, so it CAN'T live in the lean worker.ts) + a
   release-gated `worker.ts` rewrite of public `/<path>.md`→`/api/md/<path>.md` (pure

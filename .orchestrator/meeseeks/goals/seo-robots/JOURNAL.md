@@ -558,6 +558,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/render/llms-txt.ts (new) + .test.ts (new),
   CMS/src/app/llms.txt/route.ts (new), CMS/src/lib/render/sitemap-paths.ts (added id)
 
+## 2026-07-07 13:35 — Image hygiene post-pass (Core Web Vitals — lazy/decoding/CLS)
+- **Status:** DONE
+- **What I did:** Pure `applyImageHygiene(plans)` in `lib/render/image-hygiene.ts` — a post-pass
+  over the FINISHED ElementPlan, same seam as `localizePlanLinks` (wired into `tree.ts planPage`
+  right after `blocks.map(planTopBlock)`, so it covers every `<img>` regardless of how it got there:
+  component tree, block prop, binding hydration, List row stamp).
+  - Walks in DOCUMENT ORDER; the FIRST `<img>` = LCP candidate → NOT lazy-loaded (lazy on the
+    largest above-fold image hurts LCP). Every other `<img>` gets `loading="lazy"`+`decoding="async"`.
+    The LCP image still gets `decoding="async"` (eager decode helps it). Author-set
+    `loading`/`decoding` ALWAYS win — only ABSENT props are filled.
+  - CLS: when author-set numeric `width`+`height` are BOTH known (number or numeric string), mirrors
+    them into an inline `aspectRatio` style so the browser reserves the box before bytes arrive.
+    NEVER invents dimensions (asset pixel sizes aren't stored yet — that's the filed follow-up), so
+    an unsized image gets the lazy/decoding win only, no CLS guess. Won't clobber an existing
+    aspect-ratio, merges into an existing style OBJECT, and LEAVES a rare string style alone
+    (parse-html always emits style objects, but string-safe anyway). Returns the SAME array/nodes on
+    image-free pages (cheap identity no-op).
+  - `style` set as a React style OBJECT (`aspectRatio` camelCase) — correct for the createElement
+    adapter (htmlPropsToReact passes style objects through verbatim).
+- **Verified:** `node --test image-hygiene.test.ts` 10/10 (LCP skip, lazy on 2nd+, doc-order across
+  nested trees, author-wins, aspect-ratio from number+string dims, no-CLS on missing/zero dim,
+  don't-overwrite existing aspect-ratio, merge into style, non-img untouched/identity no-op). Full
+  `npm test` 1831/1831; `npx tsc --noEmit` exit 0. Did NOT run opennext build (pure additive
+  render-path post-pass, tsc+tests cover it) nor live-verify Lighthouse (needs a deployed Site —
+  HITL). No worker.ts/D1 change → no r-* release.
+- **Files:** CMS/src/lib/render/image-hygiene.ts (+ .test.ts), CMS/src/lib/render/tree.ts
+
 ## 2026-07-07 13:20 — Markdown page variants (.md AI-crawler surface) — closes the llms.txt loop
 - **Status:** DONE
 - **What I did:** Shipped the `<path>.md` markdown-variant surface the `/llms.txt` links point at.
