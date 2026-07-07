@@ -37,6 +37,7 @@ export function SeoForm({
   const [metaImage, setMetaImage] = useState<Record<string, string>>({
     ...page.metaImage,
   });
+  const [noindex, setNoindex] = useState<boolean>(page.noindex);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -48,7 +49,7 @@ export function SeoForm({
     setSaved(false);
     setBusy(true);
     try {
-      const body = buildSeoMetaBody(page, metaTitle, metaDescription, metaImage);
+      const body = buildSeoMetaBody(page, metaTitle, metaDescription, metaImage, noindex);
       const res = await fetch("/api/pages", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -113,6 +114,19 @@ export function SeoForm({
           />
         </div>
       </fieldset>
+
+      <label className="flex items-start gap-2 border-t border-border pt-3">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={noindex}
+          onChange={(e) => setNoindex(e.target.checked)}
+        />
+        <span className="flex flex-col gap-0.5">
+          <span className="text-sm text-foreground">{t("seoNoindex")}</span>
+          <span className="text-xs text-foreground-muted">{t("seoNoindexHint")}</span>
+        </span>
+      </label>
 
       {error && (
         <p role="alert" className="text-xs text-danger">

@@ -1,32 +1,32 @@
 # Note to the next Meeseeks (seo-robots)
 
-**301-redirects track is now FULLY CLOSED** (data model, serving, auto-capture
-on rename, and this run's manual admin UI). Manual redirects: list/add/delete at
-`/admin/settings/redirects`; pure `validateManualRedirect` hard-rejects
-loops/chains/duplicates in the POST route with stable error codes (EN/FI/ET).
-5 tests, suite 1727→1732.
+**Per-page noindex is DONE** (schema col + SEO-tab checkbox + robots meta +
+sitemap skip + IndexNow skip; preserve-when-absent so publish/slug edits don't
+clobber it). Migration `0030_misty_hydra.sql` applied --local. +3 tests → 1735.
 
-**Take next — Per-page noindex** (backlog "Page-level SEO controls", first item).
-It's the next-highest ranking lever and self-contained:
-- Add `page.noindex` column (default 0) — Drizzle ONLY: edit `src/db/schema.ts`,
-  `npm run db:generate`, `npx wrangler d1 migrations apply bizbeecms-cms --local`
-  (see CMS/CLAUDE.md; NEVER hand-write migration SQL).
-- Toggle in the page-settings SEO tab.
-- `generateMetadata` in `(site)/[[...slug]]/page.tsx` emits `robots:{index:false}`
-  when set (data already loaded on that path — no new D1 read; keep visitor-independent
-  per the CAVEATS about the (site) render path).
-- Sitemap excludes noindexed pages (extend `publishedPagePaths` or filter in
-  sitemap.ts — coordinate with the sitemap machinery).
-- IndexNow must NOT submit noindexed URLs.
+**Take next — Full OG/Twitter cards** (backlog "Page-level SEO controls", 2nd item).
+Self-contained, no schema, no new D1 read (all data already loaded in
+`generateMetadata` at `(site)/[[...slug]]/page.tsx`):
+- og:title + og:description from the per-locale meta (fallback: page `title`).
+- og:site_name from brand identity (check how robots/sitemap read brand — likely
+  `getBrandIdentity`/settings-store; it's already read elsewhere — confirm no NEW
+  D1 read on the (site) path, or accept it's off the hot path like the origin read).
+- og:locale = active content locale (`loaded.locale`), og:type "website".
+- twitter:card = summary_large_image when a meta image exists, else summary.
+- Keep it visitor-independent (see CAVEATS: no next-intl / next/headers on (site)).
+- Extend `openGraph`/add `twitter` in the SAME return object; the image is already
+  wired. A pure "pick twitter card kind from hasImage" helper is easily unit-tested.
 
-Alternatively, JSON-LD components (kind: jsonld) is the other big track — start
-with "JSON-LD component kind — render path first (tracer)".
+Alternatively: **JSON-LD component kind** (kind: jsonld) — the other big track,
+start with "render path first (tracer)"; or **Auto breadcrumb JSON-LD** (smaller,
+independent of the component kind).
 
-**Patterns for settings UIs:** copy the robots/redirects trio — page
-(`admin/settings/<x>/page.tsx`, force-dynamic, D1-unbound→sane default) +
-REST route (`api/settings/<x>`, requireAdmin) + "use client" editor + nav link
-in `settings-nav.tsx` + `settingsNav.<x>` label + a `<x>` i18n namespace ×3.
+**Patterns just used (copy them):** page-level (non-per-locale) SEO fields ride the
+cacheMaxAge "preserve-when-absent" contract — add to `PageMetaInput` as optional,
+thread ONLY through the body builder that edits it, guard the update `set` with
+`meta.x !== undefined`. SEO enforcement gates live in 3 places (metadata / sitemap /
+indexnow) — keep in sync (see CAVEATS).
 
-HITL pending (note, don't do): on a DEPLOYED site with real D1 — add a manual
-redirect via the UI, fetch the old URL, confirm 308→new; try a chain/loop and
-confirm the localized rejection. No worker.ts edit this run → no r-* release.
+HITL pending (note, don't do): on a DEPLOYED site — toggle noindex on a published
+page, confirm `<meta name="robots" content="noindex,nofollow">` on the page, the URL
+gone from /sitemap.xml, and no IndexNow submit. No worker.ts edit → no r-* release.

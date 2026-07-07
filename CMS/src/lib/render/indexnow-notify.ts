@@ -67,12 +67,15 @@ export async function collectPageUrls(pageId: string): Promise<string[]> {
           slug: pageTable.slug,
           parentPageId: pageTable.parentPageId,
           localizedSlugs: pageTable.localizedSlugs,
+          noindex: pageTable.noindex,
         })
         .from(pageTable),
       getContentLocales(db),
       resolveSiteOrigin(),
     ]);
     if (!origin) return [];
+    // A noindexed page must never be submitted to IndexNow (seo-robots).
+    if (rows.find((r) => r.id === pageId)?.noindex === 1) return [];
     return pageUrlsAllLocales(
       origin,
       rows as PathPageRow[],

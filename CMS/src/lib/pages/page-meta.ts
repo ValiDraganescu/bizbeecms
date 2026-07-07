@@ -29,6 +29,12 @@ export interface PageMetaInput {
    */
   cacheMaxAge?: number;
   /**
+   * Per-page SEO noindex (seo-robots). OPTIONAL, same preserve-when-absent
+   * contract as cacheMaxAge: absent = leave the stored value untouched, so an
+   * SEO title/description save doesn't clobber the noindex flag.
+   */
+  noindex?: boolean;
+  /**
    * Per-locale slug overrides (Stage 2 localized slugs), e.g. { fi: "meista" }.
    * `slug` stays the DEFAULT-locale slug; a missing key falls back to it.
    * OPTIONAL like cacheMaxAge: absent = preserve the stored map (SEO/publish
@@ -116,6 +122,12 @@ export function validatePageMeta(
     }
   }
 
+  let noindex: boolean | undefined;
+  if (a.noindex != null) {
+    if (typeof a.noindex === "boolean") noindex = a.noindex;
+    else errors.push("noindex must be a boolean");
+  }
+
   let localizedSlugs: Record<string, string> | undefined;
   if (a.localizedSlugs != null) {
     const raw = coerceStringMap(a.localizedSlugs);
@@ -148,6 +160,7 @@ export function validatePageMeta(
       metaDescription: metaDescription as Record<string, string>,
       metaImage: metaImage as Record<string, string>,
       ...(cacheMaxAge !== undefined ? { cacheMaxAge } : {}),
+      ...(noindex !== undefined ? { noindex } : {}),
       ...(localizedSlugs !== undefined ? { localizedSlugs } : {}),
     },
   };
@@ -292,6 +305,7 @@ export function buildSeoMetaBody(
   metaTitle: Record<string, string>,
   metaDescription: Record<string, string>,
   metaImage: Record<string, string>,
+  noindex?: boolean,
 ): { id: string } & PageMetaInput {
   return {
     id: page.id,
@@ -301,6 +315,7 @@ export function buildSeoMetaBody(
     metaTitle,
     metaDescription,
     metaImage,
+    ...(noindex !== undefined ? { noindex } : {}),
   };
 }
 

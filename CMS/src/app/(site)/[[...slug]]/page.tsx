@@ -80,6 +80,9 @@ export async function generateMetadata({
     },
     // OpenGraph image, resolved per active locale (falls back like title/desc).
     openGraph: image ? { images: [{ url: image }] } : undefined,
+    // Per-page SEO noindex (seo-robots): visitor-independent (a stored page
+    // column, not request-derived) so it's safe on the edge-cached (site) path.
+    ...(loaded.page.noindex ? { robots: { index: false, follow: false } } : {}),
   };
 }
 

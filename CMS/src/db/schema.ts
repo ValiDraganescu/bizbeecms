@@ -125,6 +125,10 @@ export const page = sqliteTable(
     // Workers Cache Cache-Control header on this page's public responses.
     // 0 = never cache (the default — live-data pages stay uncached).
     cacheMaxAge: integer("cache_max_age").notNull().default(0),
+    // Per-page SEO noindex (seo-robots): 1 = exclude from crawlers. Emits
+    // robots: { index:false } in generateMetadata, and the page is dropped from
+    // the sitemap + never submitted to IndexNow. 0 = normal (indexable).
+    noindex: integer("noindex").notNull().default(0),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

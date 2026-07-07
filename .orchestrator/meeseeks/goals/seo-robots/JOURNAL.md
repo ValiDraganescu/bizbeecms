@@ -199,3 +199,37 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/(admin)/admin/settings/redirects/page.tsx,
   CMS/src/components/settings/settings-nav.tsx,
   CMS/messages/{en,fi,et}.json
+
+## 2026-07-07 11:30 — Per-page noindex
+- **Status:** DONE
+- **What I did:** Added a per-page SEO noindex flag end-to-end.
+  - **Schema/migration:** `page.noindex` INTEGER NOT NULL DEFAULT 0 (Drizzle:
+    schema.ts → `db:generate` → migration `0030_misty_hydra.sql` → applied --local).
+  - **Validation/model:** `PageMetaInput.noindex?: boolean` (preserve-when-absent,
+    same contract as cacheMaxAge — SEO/publish/localized/cache bodies never carry
+    it so they can't clobber it). `validatePageMeta` accepts booleans, rejects
+    non-booleans, omits key when absent. `buildSeoMetaBody` gained an optional
+    `noindex` 5th arg (only the SEO tab edits it). `PageSummary.noindex: boolean`
+    (toSummary `row.noindex===1`); upsertPageMeta writes `noindex?1:0` on update
+    (guarded) + insert.
+  - **generateMetadata** ((site)/[[...slug]]): emits `robots:{index:false,follow:false}`
+    when `loaded.page.noindex` — visitor-independent (stored column, not request-
+    derived) so it's edge-cache-safe per the (site)-isolation caveat. No new D1 read
+    (page row already loaded).
+  - **Sitemap:** `SitemapPageRow.noindex` + `publishedPagePaths` skips the noindexed
+    LEAF only (a noindexed ancestor still lets an indexable descendant through, like
+    the unpublished-ancestor leaf-only gate). sitemap.ts selects the column.
+  - **IndexNow:** `collectPageUrls` selects `noindex` and returns `[]` when the target
+    page is noindexed → never submitted on publish/rename.
+  - **UI:** SEO tab checkbox (page-level, outside the per-locale fieldset) +
+    `seoNoindex`/`seoNoindexHint` i18n EN/FI/ET.
+- **Verified:** full `npm test` 1735/1735 (was 1732; +3 tests: page-meta validate/
+  build noindex, sitemap-paths leaf-vs-ancestor). `npx tsc --noEmit` clean. Migration
+  applied to local D1. Did NOT run opennext build (heavy gate) nor live-click (HITL).
+- **Files:** CMS/src/db/schema.ts, CMS/migrations/0030_misty_hydra.sql,
+  CMS/migrations/meta/*, CMS/src/lib/pages/page-meta.ts (+ .test.ts),
+  CMS/src/db/page-store.ts, CMS/src/app/(site)/[[...slug]]/page.tsx,
+  CMS/src/lib/render/sitemap-paths.ts (+ .test.ts), CMS/src/app/sitemap.ts,
+  CMS/src/lib/render/indexnow-notify.ts,
+  CMS/src/components/page-builder/seo-form.tsx, CMS/src/lib/pages/page-picker.test.ts,
+  CMS/messages/{en,fi,et}.json

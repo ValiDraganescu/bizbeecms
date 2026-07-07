@@ -61,6 +61,17 @@ test("parent cycles do not loop forever", () => {
   assert.deepEqual(segs(rows), []);
 });
 
+test("noindex excludes the LEAF but not an indexable descendant of a noindexed parent", () => {
+  const rows = [
+    // noindexed leaf — dropped
+    row({ id: "1", slug: "secret", noindex: 1 }),
+    // noindexed parent, but the published child stays (leaf-only gate)
+    row({ id: "2", slug: "blog", noindex: true }),
+    row({ id: "3", slug: "hello", parentPageId: "2" }),
+  ];
+  assert.deepEqual(segs(rows), [["blog", "hello"]]);
+});
+
 test("lastModified passes through from updatedAt", () => {
   const when = new Date("2026-07-07T00:00:00Z");
   const out = publishedPagePaths([row({ id: "1", slug: "about", updatedAt: when })]);

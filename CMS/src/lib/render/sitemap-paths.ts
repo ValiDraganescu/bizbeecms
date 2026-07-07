@@ -24,6 +24,8 @@ export interface SitemapPageRow {
   slug: string;
   parentPageId: string | null;
   publishStatus: string;
+  /** Per-page SEO noindex (1/true = excluded from the sitemap). */
+  noindex?: number | boolean | null;
   updatedAt?: Date | null;
 }
 
@@ -36,6 +38,10 @@ export function publishedPagePaths(
 
   for (const row of rows) {
     if (row.publishStatus !== "published") continue;
+    // Per-page noindex excludes only the LEAF from the sitemap — a noindexed
+    // ancestor still lets an indexable descendant through (same as an
+    // unpublished ancestor in resolvePage).
+    if (row.noindex === 1 || row.noindex === true) continue;
 
     const segments: string[] = [];
     const seen = new Set<string>();

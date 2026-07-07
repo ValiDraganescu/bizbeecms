@@ -34,6 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         parentPageId: pageTable.parentPageId,
         localizedSlugs: pageTable.localizedSlugs,
         publishStatus: pageTable.publishStatus,
+        noindex: pageTable.noindex,
         updatedAt: pageTable.updatedAt,
       })
       .from(pageTable),

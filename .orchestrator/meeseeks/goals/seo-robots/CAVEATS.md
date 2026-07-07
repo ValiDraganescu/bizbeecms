@@ -91,3 +91,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   upsert (it normalizes + drops self-redirects) — never write raw paths, or the
   index and the lookup diverge. The `getRedirect` hot read matches the
   already-normalized fromPath directly (indexed), so no full-table scan.
+
+- (2026-07-07) Per-page `noindex` is page-level (single boolean), NOT per-locale —
+  the SEO tab checkbox lives OUTSIDE the per-locale fieldset. It follows the
+  cacheMaxAge "preserve-when-absent" contract: `PageMetaInput.noindex?` is absent
+  in the publish-toggle / localized-slugs / cache bodies, so ONLY `buildSeoMetaBody`
+  (the SEO tab) carries it — a publish flip or slug edit must NEVER clobber noindex.
+  Enforcement is in THREE places, keep them in sync if you add a 4th surface:
+  (1) `generateMetadata` robots:{index:false}, (2) `publishedPagePaths` sitemap
+  skip, (3) `collectPageUrls` IndexNow skip. The sitemap/render gates are LEAF-only
+  (a noindexed parent still lets an indexable child through — mirrors the
+  unpublished-ancestor gate). `page.noindex` is INTEGER 0/1 in D1 (Drizzle `number`);
+  `PageSummary.noindex` is the coerced `boolean`.

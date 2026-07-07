@@ -759,6 +759,8 @@
     "seoMetaImageRemove": "Eemalda",
     "seoMetaImageGalleryEmpty": "Meediakogus pole veel pilte.",
     "loading": "Laadimine…",
+    "seoNoindex": "Peida otsingumootorite eest (noindex)",
+    "seoNoindexHint": "Lisab noindex-märgendi ning jätab selle lehe välja saidikaardist ja otsingumootorite teavitustest.",
     "seoSave": "Salvesta SEO",
     "seoSaved": "SEO salvestatud.",
     "sectionSettings": "Sektsioon",

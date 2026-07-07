@@ -15,6 +15,7 @@ function page(over: Partial<PageSummary>): PageSummary {
     metaImage: over.metaImage ?? {},
     localizedSlugs: over.localizedSlugs ?? {},
     cacheMaxAge: over.cacheMaxAge ?? 0,
+    noindex: over.noindex ?? false,
     updatedAt: over.updatedAt ?? 0,
   };
 }

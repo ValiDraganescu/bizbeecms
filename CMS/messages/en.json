@@ -759,6 +759,8 @@
     "seoMetaImageRemove": "Remove",
     "seoMetaImageGalleryEmpty": "No images in the media library yet.",
     "loading": "Loading…",
+    "seoNoindex": "Hide from search engines (noindex)",
+    "seoNoindexHint": "Adds a noindex tag and excludes this page from the sitemap and search-engine notifications.",
     "seoSave": "Save SEO",
     "seoSaved": "SEO saved.",
     "sectionSettings": "Section",

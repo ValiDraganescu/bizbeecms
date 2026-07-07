@@ -759,6 +759,8 @@
     "seoMetaImageRemove": "Poista",
     "seoMetaImageGalleryEmpty": "Mediakirjastossa ei ole vielä kuvia.",
     "loading": "Ladataan…",
+    "seoNoindex": "Piilota hakukoneilta (noindex)",
+    "seoNoindexHint": "Lisää noindex-tunnisteen ja jättää tämän sivun pois sivukartasta ja hakukoneilmoituksista.",
     "seoSave": "Tallenna SEO",
     "seoSaved": "SEO tallennettu.",
     "sectionSettings": "Osio",

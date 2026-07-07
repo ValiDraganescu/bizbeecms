@@ -83,6 +83,29 @@ test("buildSeoMetaBody keeps identity, swaps SEO maps, round-trips through valid
   if (v.ok) assert.deepEqual(v.meta.metaImage, { en: "https://cdn.example/og.png" });
 });
 
+test("noindex: validate accepts booleans, rejects non-booleans, omits when absent", () => {
+  const base = { slug: "a", metaTitle: {}, metaDescription: {}, metaImage: {} };
+  const on = validatePageMeta({ ...base, noindex: true });
+  assert.equal(on.ok, true);
+  if (on.ok) assert.equal(on.meta.noindex, true);
+
+  // Absent noindex => preserve-when-absent (key omitted, not `false`).
+  const absent = validatePageMeta(base);
+  assert.equal(absent.ok, true);
+  if (absent.ok) assert.equal("noindex" in absent.meta, false);
+
+  const bad = validatePageMeta({ ...base, noindex: "yes" });
+  assert.equal(bad.ok, false);
+  if (!bad.ok) assert.ok(bad.errors.some((e) => e.includes("noindex")));
+});
+
+test("buildSeoMetaBody threads noindex only when passed (preserve-when-absent)", () => {
+  const page = { id: "p", slug: "a", parentSlug: null, publishStatus: "draft" };
+  assert.equal("noindex" in buildSeoMetaBody(page, {}, {}, {}), false);
+  assert.equal(buildSeoMetaBody(page, {}, {}, {}, true).noindex, true);
+  assert.equal(buildSeoMetaBody(page, {}, {}, {}, false).noindex, false);
+});
+
 test("buildSeoMetaBody normalizes a non-published status to draft", () => {
   const body = buildSeoMetaBody(
     { id: "p2", slug: "blog", parentSlug: "root", publishStatus: "weird" },

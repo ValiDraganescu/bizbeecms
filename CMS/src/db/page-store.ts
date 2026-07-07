@@ -152,6 +152,8 @@ export interface PageSummary {
   localizedSlugs: Record<string, string>;
   /** Edge-cache max-age seconds (0 = never cache). */
   cacheMaxAge: number;
+  /** Per-page SEO noindex (true = excluded from crawlers/sitemap/IndexNow). */
+  noindex: boolean;
   updatedAt: number;
 }
 
@@ -181,6 +183,7 @@ function toSummary(row: Page, idToSlug: Map<string, string>): PageSummary {
     metaImage: parseMap(row.metaImage),
     localizedSlugs: parseMap(row.localizedSlugs),
     cacheMaxAge: row.cacheMaxAge,
+    noindex: row.noindex === 1,
     updatedAt: row.updatedAt.getTime(),
   };
 }
@@ -338,6 +341,8 @@ export async function upsertPageMeta(
         // Absent cacheMaxAge = preserve the stored opt-in (SEO/publish bodies
         // don't carry it); only an explicit value writes.
         ...(meta.cacheMaxAge !== undefined ? { cacheMaxAge: meta.cacheMaxAge } : {}),
+        // Same preserve-when-absent contract for the SEO noindex flag.
+        ...(meta.noindex !== undefined ? { noindex: meta.noindex ? 1 : 0 } : {}),
         // Same preserve-when-absent contract for the per-locale slug overrides.
         ...(meta.localizedSlugs !== undefined
           ? { localizedSlugs: JSON.stringify(meta.localizedSlugs) }
@@ -369,6 +374,7 @@ export async function upsertPageMeta(
     metaImage,
     localizedSlugs: JSON.stringify(meta.localizedSlugs ?? {}),
     cacheMaxAge: meta.cacheMaxAge ?? 0,
+    noindex: meta.noindex ? 1 : 0,
     createdAt: now,
     updatedAt: now,
   });
