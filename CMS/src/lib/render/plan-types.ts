@@ -221,6 +221,14 @@ export type ListSource = {
   autoscroll?: boolean;
   /** Auto-scroll speed. Default "normal". */
   autoscrollSpeed?: "slow" | "normal" | "fast";
+  /**
+   * Emit a single schema.org `ItemList` JSON-LD document aggregating the rows,
+   * instead of one JSON-LD script per row. Requires a jsonld-kind component as a
+   * List template child: each row's bound object becomes a `ListItem` under
+   * `itemListElement`. The VISIBLE row stamping is unaffected (the jsonld child
+   * renders nothing either way — it only contributes structured data). Default off.
+   */
+  itemList?: boolean;
   // ── "combobox" presentation config (ignored for "list") ───────────────────
   /** single = pick one (closes on select); multiple = pick many. Default multiple. */
   select?: "single" | "multiple";

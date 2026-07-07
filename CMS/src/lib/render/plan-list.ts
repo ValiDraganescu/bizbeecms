@@ -111,12 +111,30 @@ export function planList(
   planBlock: (b: Block) => ElementPlan,
   useComboboxAssets?: () => void,
   useAutoscrollAssets?: () => void,
+  emitItemList?: (
+    template: Block[],
+    rows: Array<Record<string, unknown>>,
+    map: Record<string, string>,
+  ) => string[],
 ): ElementPlan {
   const children = block.children ?? [];
-  const template = children.filter((c) => c.listRole !== "empty");
+  let template = children.filter((c) => c.listRole !== "empty");
   const emptySlot = children.filter((c) => c.listRole === "empty");
   const rows = Array.isArray(block.listRows) ? block.listRows : [];
   const map = block.listMap ?? {};
+
+  // ItemList aggregation (seo-robots): emit ONE schema.org ItemList JSON-LD over the
+  // rows instead of per-row scripts. The host closure (which has the component map /
+  // locale) identifies the jsonld template children, computes each row's payload, and
+  // pushes ONE aggregate — returning the jsonld component names it handled. We then
+  // DROP those from visible stamping so planBlock's per-row jsonld branch doesn't also
+  // fire (which would double-emit). Non-jsonld template children stamp as normal.
+  if (block.listSource?.itemList === true && emitItemList) {
+    const handled = emitItemList(template, rows, map);
+    if (handled.length > 0) {
+      template = template.filter((t) => !handled.includes(t.component));
+    }
+  }
 
   // Empty / dead / un-hydrated result → the empty-state slot if authored, else
   // nothing (an empty container). NEVER a throw — mirrors Section's graceful path.

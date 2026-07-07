@@ -231,13 +231,24 @@ Read every line before working. Each entry was learned the hard way by a previou
 
 - (2026-07-07) JSON-LD × bindings needs NO special seam — `hydrateBlockBindings`
   (render-page.tsx) resolves `block.bindings` + route `{param}`/`{query}` refs INTO
-  `block.props` BEFORE planPage, and the jsonld branch in tree.ts (~line 285) reads that
+  `block.props` BEFORE planPage, and the jsonld branch in tree.ts reads that
   SAME hydrated `block.props`, so bound/route values flow into the JSON template exactly
-  like html content (fenced by `jsonld-bindings.test.ts`). LIST-kind blocks are the ONLY
-  binding path a jsonld component can't ride: planPage's jsonld branch handles a SINGLE
-  component instance, not the per-row List repeat — a "one JSON-LD script per collection
-  row" (ItemList) use case would need new work in planList, not hydrateProps. Single-item
-  binding + wildcard `:param` detail pages (the stated goal) are fully covered.
+  like html content (fenced by `jsonld-bindings.test.ts`). Single-item binding + wildcard
+  `:param` detail pages (the stated goal) are fully covered.
+- (2026-07-07) List × JSON-LD — BOTH modes now work; the OLD caveat "planList can't ride a
+  jsonld component" was WRONG for the per-row case: (1) PER-ROW (default) — a jsonld component as
+  a List TEMPLATE CHILD already emits N separate Product/Article scripts, because planList stamps
+  each row via `planBlock(stampRow(t,row,map))` and that fires the jsonld branch per row (proved
+  end-to-end). NOTHING special needed. (2) AGGREGATE ItemList — opt-in `listSource.itemList:true`
+  emits ONE `ItemList` over the rows instead of per-row scripts. Wiring: `tree.ts`'s `emitItemList`
+  closure (handed to `planList`) identifies jsonld template children, stamps+binds each row via the
+  SHARED `jsonLdValues` + `bindJsonLdObject`, and `buildItemListJsonLd` wraps them; planList then
+  DROPS the handled jsonld children from visible stamping so per-row scripts don't ALSO emit (the
+  no-double-emit contract — a test pins it). `bindJsonLdObject` returns the parsed object (null on
+  invalid) so a bad row is skipped but valid rows still list; empty→no script (never an empty
+  ItemList). Keep the ONE escaper (`escapeJsonForScript`) — buildItemListJsonLd escapes ONCE at the
+  end, not per item. Render+storage (`listSource` stored verbatim, no field allowlist) done; the
+  operator/AI TOGGLE to set `itemList:true` is a filed follow-up (ListSettings checkbox + AI tool).
 
 - (2026-07-07) Branded 404: the site's 404 page renders via `(site)/not-found.tsx`, reached when
   the catch-all `[[...slug]]/page.tsx` calls `notFound()` (a Server Component CANNOT set an

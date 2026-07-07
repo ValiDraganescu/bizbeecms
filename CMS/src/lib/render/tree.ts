@@ -44,7 +44,7 @@ import {
   placeholder,
 } from "./plan-types.ts";
 import { planTree, declaredProps, schemaDefaults, bindTree, type IconMap } from "./plan-tree.ts";
-import { buildJsonLdComponent } from "./jsonld-component.ts";
+import { buildJsonLdComponent, bindJsonLdObject, buildItemListJsonLd } from "./jsonld-component.ts";
 import { planSection, planColumn, planRow } from "./plan-section.ts";
 import { planList, LIST_AUTOSCROLL_ASSET_KEY, LIST_AUTOSCROLL_SCRIPT } from "./plan-list.ts";
 import { planForm, FORM_ENHANCE_ASSET_KEY, FORM_ENHANCE_SCRIPT } from "./plan-form.ts";
@@ -229,6 +229,61 @@ export function planPage(
     return null;
   }
 
+  // Merge a jsonld component's schema defaults under the given props and resolve any
+  // locale objects to the active locale — the value map fed to the JSON template.
+  // Shared by the single-instance jsonld branch and the List ItemList aggregator so
+  // both bind identically.
+  function jsonLdValues(
+    artifact: ComponentArtifact,
+    props: unknown,
+  ): Record<string, unknown> {
+    const merged = {
+      ...schemaDefaults(artifact.propsSchema),
+      ...(props && typeof props === "object" ? props : {}),
+    };
+    return locale
+      ? (resolveLocalized(merged, locale.locale, locale.fallback) as Record<string, unknown>)
+      : merged;
+  }
+
+  // ItemList aggregator handed to planList: for each jsonld-kind template child,
+  // build ONE schema.org ItemList over the rows (each row's mapped fields stamped
+  // onto the child's props, then bound to its JSON template) and push it onto
+  // plan.jsonLd. Returns the jsonld component names handled so planList drops them
+  // from per-row visible stamping (they'd otherwise re-emit per-row scripts).
+  function emitItemList(
+    template: Block[],
+    rows: Array<Record<string, unknown>>,
+    map: Record<string, string>,
+  ): string[] {
+    const handled: string[] = [];
+    for (const child of template) {
+      const artifact = components.get(child.component);
+      if (!artifact || artifact.kind !== "jsonld") continue;
+      const items = rows.map((row) => {
+        // Stamp the row's mapped fields onto the child's props (same rule as
+        // stampRow: a present field overwrites; missing leaves the author default).
+        const props: Record<string, unknown> = {
+          ...(child.props && typeof child.props === "object" ? child.props : {}),
+        };
+        for (const [propName, fieldName] of Object.entries(map)) {
+          if (Object.prototype.hasOwnProperty.call(row, fieldName)) {
+            props[propName] = row[fieldName];
+          }
+        }
+        return bindJsonLdObject(
+          artifact.jsonTemplate ?? "",
+          jsonLdValues(artifact, props),
+          artifact.propsSchema,
+        );
+      });
+      const payload = buildItemListJsonLd(items);
+      if (payload) jsonLd.push(payload);
+      handled.push(child.component);
+    }
+    return handled;
+  }
+
   function planBlock(block: Block): ElementPlan {
     // A Section is a built-in layout container rendered as a CSS grid of
     // COLUMN children (the aicms Section→Columns model). No D1 lookup — it's a
@@ -251,7 +306,13 @@ export function planPage(
     // rows were hydrated into `block.listRows` by buildPlanFromPage; planList
     // stamps + binds per row and delegates each stamped block back to planBlock.
     if (block.component === LIST_COMPONENT) {
-      return planList(block, planBlock, useBuiltinComboboxAssets, useListAutoscrollAssets);
+      return planList(
+        block,
+        planBlock,
+        useBuiltinComboboxAssets,
+        useListAutoscrollAssets,
+        emitItemList,
+      );
     }
     // A Form wraps its children in a real <form> posting to the Worker's submit
     // endpoint (external-data-sources Form slice). The page id was stamped onto
@@ -279,18 +340,7 @@ export function planPage(
     // builder canvas can show a chip). A broken template/interpolation → null → no
     // script emitted (and a hidden marker naming the skip).
     if (artifact.kind === "jsonld") {
-      // buildJsonLdComponent applies the propsSchema allowlist itself; we only
-      // merge the schema defaults under the block props + resolve locale objects.
-      const merged = {
-        ...schemaDefaults(artifact.propsSchema),
-        ...(block.props && typeof block.props === "object" ? block.props : {}),
-      };
-      const values = locale
-        ? (resolveLocalized(merged, locale.locale, locale.fallback) as Record<
-            string,
-            unknown
-          >)
-        : merged;
+      const values = jsonLdValues(artifact, block.props);
       const payload = buildJsonLdComponent(
         artifact.jsonTemplate ?? "",
         values,

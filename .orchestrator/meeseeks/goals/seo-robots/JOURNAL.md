@@ -943,3 +943,31 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   we never inject on bad rects); full suite 1898/1898; `npx tsc --noEmit` clean. Could NOT verify the
   visual chip live in a browser (needs a jsonld component on a page + the running builder) — HITL.
 - **Files:** CMS/src/lib/page-builder/preview-overlay.ts (+ new preview-overlay.test.ts)
+
+## 2026-07-07 15:19 — List → schema.org ItemList JSON-LD (user-queued backlog task 1)
+- **Status:** DONE
+- **What I did:** The one binding case a SINGLE jsonld component instance couldn't ride —
+  aggregating a List's rows into ONE schema.org `ItemList` (rich-result carousels / category
+  pages). DISCOVERY first: per-row Product/Article JSON-LD ALREADY works today via composition
+  (a jsonld component as a List template child → planList's `planBlock(stampRow(...))` fires the
+  jsonld branch per row → N separate scripts; proved with a throwaway test, 2 rows → 2 scripts).
+  So the CAVEATS "planList needs new work" note was over-pessimistic for the per-row case; the
+  genuine gap was the AGGREGATE ItemList document. Implemented:
+  - `jsonld-component.ts`: split `bindJsonLdComponent` into a reusable `bindJsonLdObject`
+    (bind+parse→object|null) + added `buildItemListJsonLd(items)` — wraps valid row objects as
+    positioned `ListItem`s under `itemListElement`, ONE `escapeJsonForScript` (shared escaper),
+    returns null on zero valid items (never an empty ItemList). Invalid rows drop, valid ones list.
+  - `plan-types.ts`: `ListSource.itemList?: boolean` (opt-in; stored verbatim in listSource JSON —
+    round-trips through setBlockField with no field allowlist, confirmed).
+  - `tree.ts`: factored the jsonld prop-merge into `jsonLdValues(artifact, props)` (shared by the
+    single-instance branch + the aggregator). New `emitItemList` closure (has components/locale/
+    jsonLd) handed to planList: for each jsonld template child, stamp each row's mapped fields →
+    bind → collect → push ONE ItemList; returns the handled component names.
+  - `plan-list.ts`: `planList` takes an optional `emitItemList`; when `listSource.itemList===true`
+    it calls it and DROPS the handled jsonld children from per-row visible stamping (so no
+    double-emit of per-row scripts alongside the aggregate). Non-jsonld children stamp as normal.
+- **Verified:** `node --test` full suite 1902 pass (was 1898; +4 new in jsonld-itemlist.test.ts:
+  aggregate-one-script, default-off-still-per-row, empty→nothing, invalid-row-skipped). `tsc
+  --noEmit` clean. Throwaway per-row composition test confirmed the existing path (deleted).
+- **Files:** CMS/src/lib/render/jsonld-component.ts, plan-types.ts, tree.ts, plan-list.ts,
+  CMS/src/lib/render/jsonld-itemlist.test.ts

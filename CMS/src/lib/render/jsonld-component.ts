@@ -97,6 +97,22 @@ export function buildJsonLdComponent(
   props: Record<string, unknown>,
   propsSchema: string | null | undefined,
 ): string | null {
+  const obj = bindJsonLdObject(template, props, propsSchema);
+  return obj == null ? null : escapeJsonForScript(JSON.stringify(obj));
+}
+
+/**
+ * Same bind-and-parse as `buildJsonLdComponent` but returns the PARSED object (or
+ * null on blank/invalid), NOT the escaped script string. Used by the List ItemList
+ * aggregator, which needs each row's object to nest under `itemListElement` before
+ * escaping ONCE at the end. Keeping one bind/parse path means per-row scripts and the
+ * ItemList wrapper apply identical slot-binding + validity rules.
+ */
+export function bindJsonLdObject(
+  template: string,
+  props: Record<string, unknown>,
+  propsSchema: string | null | undefined,
+): Record<string, unknown> | null {
   const raw = (template ?? "").trim();
   if (raw === "") return null;
   const bound = bindJsonLdSlots(raw, props, declaredProps(propsSchema));
@@ -104,8 +120,37 @@ export function buildJsonLdComponent(
   try {
     parsed = JSON.parse(bound);
   } catch {
-    return null; // interpolation produced invalid JSON — don't emit a broken script
+    return null; // interpolation produced invalid JSON — don't emit a broken item
   }
   if (parsed == null || typeof parsed !== "object") return null;
-  return escapeJsonForScript(JSON.stringify(parsed));
+  return parsed as Record<string, unknown>;
+}
+
+/**
+ * Wrap a List's per-row JSON-LD item objects into ONE schema.org `ItemList`
+ * document (the escaped inner text of one `application/ld+json` script). Each row's
+ * bound object becomes a `ListItem` with a 1-based `position`; the row object rides
+ * verbatim under `item`. Returns null when there are no valid items (never emits an
+ * empty ItemList). Escaping is the shared `escapeJsonForScript` — ONE escaper.
+ *
+ * WHY aggregate: per-row jsonld template children already emit N separate Product/
+ * Article scripts (composition works today). An `ItemList` instead expresses the
+ * COLLECTION itself as a single ordered list (rich-result carousels, category pages)
+ * — the one binding case a single jsonld component instance couldn't express.
+ */
+export function buildItemListJsonLd(
+  items: Array<Record<string, unknown> | null>,
+): string | null {
+  const valid = items.filter((i): i is Record<string, unknown> => i != null);
+  if (valid.length === 0) return null;
+  const doc = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: valid.map((item, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      item,
+    })),
+  };
+  return escapeJsonForScript(JSON.stringify(doc));
 }
