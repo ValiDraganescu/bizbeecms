@@ -38,3 +38,9 @@ The full record lives in JOURNAL.md; this is the trimmed backlog trace.
 - 2026-07-07 Render srcset/sizes: pure srcsetFor emits allowlist variants ≤ intrinsic width; srcset→srcSet React casing fix.
 - 2026-07-07 generate_image assets get intrinsic dims via pure header-parse imageDimensionsFromBytes (PNG/JPEG/GIF/WebP), Workers-safe.
 - 2026-07-07 Builder canvas chip: preview-only overlay injects ◇ name chip into zero-area jsonld block wraps, making them selectable.
+- 2026-07-07 Aggregate ItemList JSON-LD for Lists via listSource.itemList; per-row scripts already worked through composition.
+- 2026-07-07 ItemList authoring knob: builder checkbox in ListSettings + AI bind_list itemList boolean; jsonld-List track closed.
+- 2026-07-07 On-demand get_jsonld_guide AI tool: schema.org patterns, slot-quoting rules, List modes; last jsonld item.
+- 2026-07-07 SEO audit deep scan: component-tree hrefs/images folded into broken-link/missing-alt checks, cycle-safe, jsonld skipped.
+- 2026-07-07 /sitemap.xml edge-cached under its own sitemap tag, worker carve-out beside llms, purged on page-content writes only.
+- 2026-07-07 OG-image autogen decision: browser binding over REST API; og/ R2 key scheme + best-effort screenshot spike.
