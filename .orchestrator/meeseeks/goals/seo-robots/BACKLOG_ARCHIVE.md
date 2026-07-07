@@ -44,3 +44,9 @@ The full record lives in JOURNAL.md; this is the trimmed backlog trace.
 - 2026-07-07 SEO audit deep scan: component-tree hrefs/images folded into broken-link/missing-alt checks, cycle-safe, jsonld skipped.
 - 2026-07-07 /sitemap.xml edge-cached under its own sitemap tag, worker carve-out beside llms, purged on page-content writes only.
 - 2026-07-07 OG-image autogen decision: browser binding over REST API; og/ R2 key scheme + best-effort screenshot spike.
+- 2026-07-07 Per-URL-locale branded 404: worker injects x-bizbee-path header, not-found.tsx peels locale, renders visitor-locale 404.
+- 2026-07-07 OG-image fallback serving + precedence: manual metaImage wins, else auto R2 png; /api/og serve route, twitter:card upgrade.
+- 2026-07-07 OG-image publish wiring: planOgScreenshots per locale, idempotent best-effort waitUntil screenshots on publish, cleanup on delete.
+- 2026-07-07 OG-image regenerate button: force sync screenshot route + SEO-tab badge/button, manual-wins guard, stable error codes; OG track closed.
+- 2026-07-07 Worker per-IP rate limit on public paths: 100/60s binding, 429 Retry-After, verified-crawler exemption, fails open.
+- 2026-07-07 Per-site rate-limit preset off/normal/strict: D1 setting, 30s in-isolate cache, strict layers 40/60s counter; track closed.
