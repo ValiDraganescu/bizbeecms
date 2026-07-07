@@ -381,3 +381,20 @@ Read every line before working. Each entry was learned the hard way by a previou
   "## Pages" list via `buildLlmsPageList` (extracted from buildLlmsTxt); a blank stored template
   falls back to the full auto output. CACHING: still no-store (the caching task is separate) —
   don't add Cache-Control here; the dot-gate already edge-excludes /llms.txt.
+
+- (2026-07-07) llms.txt settings UI: route `api/settings/llms` PUT HARD-rejects unknown `{{slot}}`
+  tokens (`code:"unknownSlots"`, `slots:[names]`) via `unknownSlots` — DIFFERENT from the robots PUT
+  (silent-normalize) and DIFFERENT from the /llms.txt RENDER route (substitutes unknowns to "", never
+  500s the public file). Deliberate: the UI is the ONE place an operator sees & fixes a typo; the
+  public route must never fail. Editor is `components/settings/llms-editor.tsx`; the right-side
+  variables panel is DATA-DRIVEN off `LLMS_TEMPLATE_VARS` (add a slot there → auto-appears in the
+  panel AND the substitution allowlist AND validation). The per-slot DESCRIPTION shown is an i18n key
+  `llms.vars.<slot>` (NOT the pure module's English `description`) — keep BOTH in sync when you add a
+  slot, or the panel throws a missing-message error. Click-to-insert uses uncontrolled
+  selectionStart/End + requestAnimationFrame to restore the caret after the React state flush.
+- (2026-07-07) BUILD-GATE BLOCKER (env, not code): `.env.local` here sets `CMS_DEV_SUPERADMIN=1` (dev
+  auth backdoor). The prod-build guard FATALs page-data collection ("must never ship"), so
+  `npx opennextjs-cloudflare build` / `npm run build` CANNOT complete in THIS local checkout — Next
+  loads `.env.local` even when you `env -u` the var. The COMPILE + TypeScript stages run BEFORE the
+  guard, so a green "✓ Compiled successfully / Finished TypeScript" + a clean `npx tsc --noEmit` +
+  live dev verification is the achievable pre-commit bar here. Don't burn a run chasing the build gate.

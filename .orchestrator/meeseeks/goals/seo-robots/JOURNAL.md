@@ -743,3 +743,35 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   template — HITL). No worker.ts change → ships on next normal CMS build.
 - **Files:** CMS/src/lib/render/llms-template.ts (+.test.ts), CMS/src/lib/render/llms-txt.ts,
   CMS/src/db/settings-store.ts, CMS/src/app/llms.txt/route.ts
+
+## 2026-07-07 11:09 — llms.txt settings editor UI (USER-QUEUED task 2/4)
+- **Status:** DONE
+- **What I did:** The admin editor for the editable-llms.txt template (task 1/4's pure engine).
+  - **REST route** `app/api/settings/llms/route.ts` — GET `{ template }` (""=auto fallback), PUT
+    saves after a HARD reject of unknown `{{slot}}` tokens via `unknownSlots` (stable
+    `code:"unknownSlots"` + `slots:[...]` names the offenders — like the redirect admin, NOT robots'
+    silent-normalize; a typo'd slot would otherwise vanish to "" in the served file). Writes via
+    `setLlmsTemplate` (stores verbatim). requireAdmin-guarded, force-dynamic, REST-only.
+  - **Editor** `components/settings/llms-editor.tsx` — template textarea on the LEFT, a VARIABLES
+    reference panel on the RIGHT (per the user requirement) rendering every `LLMS_TEMPLATE_VARS`
+    entry (name + one-line description from i18n + example). Each var is a click-to-insert button
+    that splices `{{slot}}` at the caret (uncontrolled selectionStart/End + requestAnimationFrame
+    to restore focus/caret). unknownSlots 400 shown inline naming the bad token(s).
+  - **Page** `(admin)/admin/settings/llms/page.tsx` — explicit route (beats the `[[...slug]]`
+    catch-all), reads the stored template, degrades to "" when D1 unbound.
+  - **Nav + i18n** — `settings-nav.tsx` gets an `llms` item under Site (after Redirects); full
+    `llms` message block + `settingsNav.llms` added to EN/FI/ET.
+- **Verified (live, dev server on :3602):** GET→200 `{"template":""}`; PUT bad slot→400
+  `{"code":"unknownSlots","slots":["pgTree"]}`; PUT valid→200; GET roundtrips; **`/llms.txt` renders
+  the stored template** (real brand/tagline/pageTree substitution) then falls back to auto after I
+  reset the stored template to "". Admin page→200 (title/editor/Variables panel present).
+  `npx tsc --noEmit` clean; `node --test llms-template.test.ts` 7/7; route reject logic re-checked via
+  an inline assert (existing unknownSlots tests already fence it — no new test file, pure fn unchanged).
+- **NOT done / caveat:** the full `opennextjs-cloudflare build` deploy-gate could NOT complete in this
+  local env — `.env.local` sets `CMS_DEV_SUPERADMIN=1` and the prod-build guard FATALs on it (a
+  pre-existing local-env condition, unrelated to this change). The Next `next build` COMPILE + the
+  TypeScript pass both succeeded before that guard fired; combined with clean `tsc --noEmit` + live
+  dev verification, the change is sound. No worker.ts change → ships on next normal CMS build.
+- **Files:** CMS/src/app/api/settings/llms/route.ts, CMS/src/components/settings/llms-editor.tsx,
+  CMS/src/app/(admin)/admin/settings/llms/page.tsx, CMS/src/components/settings/settings-nav.tsx,
+  CMS/messages/{en,fi,et}.json

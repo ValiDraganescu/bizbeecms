@@ -314,7 +314,8 @@
     "openrouterKey": "OpenRouteri võti",
     "media": "AI mudelid",
     "iconSet": "Ikoonid",
-    "exportImport": "Eksport / Import"
+    "exportImport": "Eksport / Import",
+    "llms": "llms.txt"
   },
   "theme": {
     "title": "Teema",
@@ -1365,5 +1366,27 @@
     "uploadFailures": "{count} faili üleslaadimine ebaõnnestus",
     "secretsReminder": "Ära unusta andmeallikate saladusi lehel Andmeallikad uuesti sisestada.",
     "importAnother": "Impordi teine fail"
+  },
+  "llms": {
+    "title": "llms.txt",
+    "subtitle": "Muuda /llms.txt aadressil AI-roomajatele serveeritavat malli. Jäta tühjaks, et kasutada automaatselt loodud lehtede loendit.",
+    "templateLabel": "Mall",
+    "templatePlaceholder": "# {{brandName}}\n\n{{tagline}}\n\n{{pageTree}}",
+    "emptyHint": "Jäta mall tühjaks, et serveerida automaatselt loodud /llms.txt (brändipäis + lehtede loend).",
+    "varsTitle": "Muutujad",
+    "varsHelp": "Klõpsa muutujal, et see kursorile lisada. Sama {{slot}} süntaks nagu komponentidel.",
+    "insertVar": "Lisa kursorile",
+    "unknownSlots": "Tundmatu(d) muutuja(d): {slots}. Eemalda need või kasuta loendist muutujat.",
+    "save": "Salvesta",
+    "saving": "Salvestamine…",
+    "saved": "llms.txt mall salvestatud.",
+    "vars": {
+      "brandName": "Saidi brändi-/kuvanimi.",
+      "tagline": "Saidi ühe rea loosung.",
+      "origin": "Saidi avalik päritolu (skeem + host, ilma lõpukaldkriipsuta).",
+      "defaultLocale": "Saidi vaikimisi sisukeele kood.",
+      "locales": "Kõik sisukeele koodid komadega eraldatult.",
+      "pageTree": "Avaldatud lehed Markdown-linkidena iga lehe .md-variandile."
+    }
   }
 }

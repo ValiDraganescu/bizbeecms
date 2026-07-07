@@ -314,7 +314,8 @@
     "openrouterKey": "OpenRouter key",
     "media": "AI models",
     "iconSet": "Icons",
-    "exportImport": "Export / Import"
+    "exportImport": "Export / Import",
+    "llms": "llms.txt"
   },
   "theme": {
     "title": "Theme",
@@ -1365,5 +1366,27 @@
     "uploadFailures": "{count} file(s) failed to upload",
     "secretsReminder": "Remember to re-enter data source secrets in Data sources.",
     "importAnother": "Import another file"
+  },
+  "llms": {
+    "title": "llms.txt",
+    "subtitle": "Edit the template served at /llms.txt for AI crawlers. Leave empty to use the auto-generated page list.",
+    "templateLabel": "Template",
+    "templatePlaceholder": "# {{brandName}}\n\n{{tagline}}\n\n{{pageTree}}",
+    "emptyHint": "Leave the template empty to serve the auto-generated /llms.txt (brand header + page list).",
+    "varsTitle": "Variables",
+    "varsHelp": "Click a variable to insert it at the cursor. Same {{slot}} syntax as components.",
+    "insertVar": "Insert at cursor",
+    "unknownSlots": "Unknown variable(s): {slots}. Remove them or use a variable from the list.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "llms.txt template saved.",
+    "vars": {
+      "brandName": "The site's brand / display name.",
+      "tagline": "The site's one-line tagline.",
+      "origin": "The site's public origin (scheme + host, no trailing slash).",
+      "defaultLocale": "The site's default content locale code.",
+      "locales": "All content locale codes, comma-separated.",
+      "pageTree": "The published-page list as Markdown links to each page's .md variant."
+    }
   }
 }

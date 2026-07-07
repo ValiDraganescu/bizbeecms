@@ -18,6 +18,7 @@ const GROUPS = [
       { key: "contentLocales", href: "/admin/settings/content-locales" },
       { key: "robots", href: "/admin/settings/robots" },
       { key: "redirects", href: "/admin/settings/redirects" },
+      { key: "llms", href: "/admin/settings/llms" },
       { key: "seoAudit", href: "/admin/settings/seo-audit" },
       { key: "verification", href: "/admin/settings/verification" },
       { key: "notFoundPage", href: "/admin/settings/not-found-page" },

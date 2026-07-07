@@ -314,7 +314,8 @@
     "openrouterKey": "OpenRouter-avain",
     "media": "AI-mallit",
     "iconSet": "Kuvakkeet",
-    "exportImport": "Vienti / Tuonti"
+    "exportImport": "Vienti / Tuonti",
+    "llms": "llms.txt"
   },
   "theme": {
     "title": "Teema",
@@ -1365,5 +1366,27 @@
     "uploadFailures": "{count} tiedoston lataus epäonnistui",
     "secretsReminder": "Muista syöttää datalähteiden salaisuudet uudelleen Datalähteet-sivulla.",
     "importAnother": "Tuo toinen tiedosto"
+  },
+  "llms": {
+    "title": "llms.txt",
+    "subtitle": "Muokkaa /llms.txt-osoitteessa tekoälyindeksoijille tarjoiltavaa mallia. Jätä tyhjäksi käyttääksesi automaattisesti luotua sivulistaa.",
+    "templateLabel": "Malli",
+    "templatePlaceholder": "# {{brandName}}\n\n{{tagline}}\n\n{{pageTree}}",
+    "emptyHint": "Jätä malli tyhjäksi tarjotaksesi automaattisesti luodun /llms.txt-tiedoston (brändiotsikko + sivulista).",
+    "varsTitle": "Muuttujat",
+    "varsHelp": "Napsauta muuttujaa lisätäksesi sen kohdistimeen. Sama {{slot}}-syntaksi kuin komponenteissa.",
+    "insertVar": "Lisää kohdistimeen",
+    "unknownSlots": "Tuntematon muuttuja(t): {slots}. Poista ne tai käytä listan muuttujaa.",
+    "save": "Tallenna",
+    "saving": "Tallennetaan…",
+    "saved": "llms.txt-malli tallennettu.",
+    "vars": {
+      "brandName": "Sivuston brändi-/näyttönimi.",
+      "tagline": "Sivuston yhden rivin iskulause.",
+      "origin": "Sivuston julkinen alkuperä (skeema + isäntä, ei lopun kauttaviivaa).",
+      "defaultLocale": "Sivuston oletussisältökielikoodi.",
+      "locales": "Kaikki sisältökielikoodit pilkuin eroteltuna.",
+      "pageTree": "Julkaistut sivut Markdown-linkkeinä kunkin sivun .md-versioon."
+    }
   }
 }

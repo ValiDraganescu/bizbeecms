@@ -16,10 +16,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   JSON). Route `/llms.txt` renders the template when set, else auto output; `pageTree` = the exact
   auto "## Pages" list via new exported `buildLlmsPageList` (llms-txt.ts). NOTE: the settings UI
   (next task) owns the on-save `unknownSlots` reject — the route substitutes unknowns to "".
-- TODO: llms.txt settings editor UI: admin settings page with the template editor and a SIDE PANEL
-  to the RIGHT of the editor listing all available variables (name + one-line description + example
-  value; click-to-insert preferred). REST GET/PUT with stable error codes (mirror the robots.txt
-  settings pattern). Localized EN/FI/ET.
+- DONE (2026-07-07): llms.txt settings editor UI. Route `api/settings/llms` (GET `{template}` / PUT
+  with HARD reject of unknown slots → `code:"unknownSlots"` + `slots[]`). Editor
+  `components/settings/llms-editor.tsx` (template textarea LEFT, variables reference panel RIGHT with
+  click-to-insert `{{slot}}` at caret, driven by `LLMS_TEMPLATE_VARS`). Page
+  `(admin)/admin/settings/llms`. Nav item + EN/FI/ET `llms` messages. Live-verified on dev :3602
+  (reject/save/roundtrip + `/llms.txt` renders the stored template). NOTE: opennext deploy-gate build
+  can't run locally (`.env.local` CMS_DEV_SUPERADMIN prod-guard FATAL — pre-existing); compile+tsc passed.
 - TODO: Cache /llms.txt: today force-dynamic + no-store + rejected by the edge-cache dot gate
   (deliberate, after the wildcard cache-tag sitemap bug). Add caching WITH explicit purge coverage:
   own cache tag, purged on page publish/unpublish/delete/rename, brand-identity save, AND llms
