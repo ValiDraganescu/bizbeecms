@@ -450,3 +450,32 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   (route-mock would prove nothing the mechanism fence doesn't). Real
   hit/miss/purge behavior stays HITL on a deployed site.
 - **Files:** CMS/src/app/api/settings/icon-set/route.ts
+
+## 2026-07-07 09:24 — Defect fix: published `<html lang>` now the URL content locale (was Accept-Language cache poison)
+- **Status:** DONE
+- **What I did:** Self-found defect: the root layout stamps `<html lang={await
+  getLocale()}>` — the ADMIN-UI locale resolver (NEXT_LOCALE cookie →
+  Accept-Language → default). On published pages that (a) mislabels content
+  for SEO (`/fi/meista` said lang="en" for an English browser) and (b) lets
+  the FIRST visitor's browser language get baked into edge-cached HTML —
+  violating the GOAL's "URL alone fully determines published HTML". An RSC
+  layout can't see the pathname, so the fix lives in the worker seam where
+  cached HTML is minted: `CMS/worker.ts` now, for RESOLVED published pages
+  with an HTML content type, rewrites `html[lang]` to the peeled content
+  locale via HTMLRewriter (streaming, headers carry over) — after the
+  cache-header stamp so cached copies store the corrected lang. New pure
+  `isHtmlContentType` gate in edge-cache.ts (RSC flight `text/x-component`,
+  JSON, absent → untouched). Non-page/skipped/404 responses pass through.
+- **Verified:** 2 new node --test cases (isHtmlContentType matrix); render
+  suite 191/191; full `npm test` 1686/1686; `npx tsc --noEmit` clean
+  (HTMLRewriter handler needs `void el.setAttribute(...)` — returns Element);
+  `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` + `wrangler deploy
+  --dry-run` green. LIVE smoke via wrangler dev (local D1 en/fi/ro-ro/es):
+  `/` with `Accept-Language: fi` → lang="en" (poison repro fixed), `/fi` →
+  lang="fi", `/ro-ro` → lang="ro-ro"; fail-before evidence: `/admin` (skipped
+  path, same layout) still varies → lang="fi" under that header; opted-in
+  home (cache_max_age=3600) gets Cache-Control + Cache-Tag AND corrected lang
+  together (HTMLRewriter preserves the stamps). Fixture reset, dev killed.
+  Real cached-copy behavior stays HITL on a deployed site.
+- **Files:** CMS/worker.ts, CMS/src/lib/render/edge-cache.ts,
+  CMS/src/lib/render/edge-cache.test.ts

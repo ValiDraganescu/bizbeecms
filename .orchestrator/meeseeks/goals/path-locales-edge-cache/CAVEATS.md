@@ -156,6 +156,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   (google/openrouter-key/image-model/image-gen-model/translate-model) are
   AI/integration config — they do NOT change published HTML, so they correctly
   do NOT purge. Don't add purges there. Don't re-hunt this audit.
+- Published `<html lang>` is corrected in CMS/worker.ts (HTMLRewriter → the URL's peeled
+  content locale), NOT in the Next layout — an RSC root layout can't see the pathname, so
+  `next dev` still shows the visitor's admin-UI lang on published pages. That's expected;
+  verify via `wrangler dev`. Don't "fix" it in layout.tsx, and keep the rewrite AFTER the
+  cache-header stamp (the cached copy must store the corrected lang). HTMLRewriter element
+  handlers must return void: write `void el.setAttribute(...)` or tsc fails (returns Element).
 - Deeply-nested localized-slug translation is VERIFIED CORRECT + regression-fenced
   (localize-paths.test.ts "sitemap: 3-level chain…"): every-segment, mid-chain-gap,
   and wildcard-ancestor-with-deeper-override all resolve. Don't re-hunt this angle —

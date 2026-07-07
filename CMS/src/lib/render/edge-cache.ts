@@ -65,6 +65,18 @@ export function isEdgeCacheCandidate(input: {
   return true;
 }
 
+/**
+ * Is this a rewritable HTML document response? Gates the worker's `<html lang>`
+ * correction (the root layout stamps the visitor's ADMIN-UI locale — a
+ * cookie/Accept-Language value that would poison cached published HTML and
+ * mislabel content for SEO; the worker rewrites it to the URL's content
+ * locale). RSC flight responses (`text/x-component`), JSON, etc. must pass
+ * through untouched.
+ */
+export function isHtmlContentType(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim().toLowerCase().startsWith("text/html");
+}
+
 /** Minimal shape of the Workers Cache handle (`ctx.cache`) that purge needs. */
 export type TagPurger = {
   purge: (options: { tags: string[] }) => unknown;

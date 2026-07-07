@@ -11,6 +11,7 @@ import {
   edgeCacheHeaders,
   pageCacheTag,
   purgeCacheTags,
+  isHtmlContentType,
   STALE_WHILE_REVALIDATE,
 } from "./edge-cache.ts";
 import { SKIP_SEGMENTS } from "./localize-links.ts";
@@ -134,4 +135,21 @@ test("cache_max_age 0 (the default) and invalid values yield null (never cache)"
   assert.equal(edgeCacheHeaders(-300, "p-1"), null);
   assert.equal(edgeCacheHeaders(NaN, "p-1"), null);
   assert.equal(edgeCacheHeaders(300.5, "p-1"), null);
+});
+
+// ── isHtmlContentType (gates the worker's <html lang> rewrite) ──────────────
+
+test("HTML documents (with charset/case/whitespace variants) are rewritable", () => {
+  assert.equal(isHtmlContentType("text/html"), true);
+  assert.equal(isHtmlContentType("text/html; charset=utf-8"), true);
+  assert.equal(isHtmlContentType("  Text/HTML; charset=UTF-8"), true);
+});
+
+test("non-document responses pass through untouched (RSC flight, JSON, absent)", () => {
+  assert.equal(isHtmlContentType("text/x-component"), false); // RSC flight payload
+  assert.equal(isHtmlContentType("application/json"), false);
+  assert.equal(isHtmlContentType("text/plain"), false);
+  assert.equal(isHtmlContentType(""), false);
+  assert.equal(isHtmlContentType(null), false);
+  assert.equal(isHtmlContentType(undefined), false);
 });

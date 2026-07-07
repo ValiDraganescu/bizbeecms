@@ -6,6 +6,8 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Tasks
 
+- DONE: Defect fix (self-found): published `<html lang>` came from the root layout's `getLocale()` (NEXT_LOCALE cookie / Accept-Language admin-UI resolver), NOT the URL content locale — wrong SEO lang on every published page AND the first visitor's Accept-Language got baked into edge-cached HTML. Fix: worker.ts rewrites `html[lang]` to the peeled content locale via HTMLRewriter on resolved published-page HTML responses (pure `isHtmlContentType` gate; RSC flight/JSON untouched); live-verified via wrangler dev incl. coexistence with the cache-header stamps.
+
 ### Docs
 - DONE: Purge gap fix — `PATCH /api/settings/icon-set` now blasts the shared `pages` tag. The site-wide Iconify prefix resolves every `{{icon "x"}}` slot in published-page HTML (render-page.tsx getIconSet), so it's a global-blast write per the GOAL spec but was the ONE such write missing its purge. Mirrors the brand route (best-effort). All other GOAL-listed global-blast writes already wired; partial page CREATE/DELETE/restore are correct per CAVEATS.
 - DONE: Regression fence for edge-cache gate × query strings — isEdgeCacheCandidate is query-agnostic (worker.ts feeds URL.pathname, query already stripped; Workers Cache keys by full URL so ?utm= variants cache separately, never cross-serve). No defect; gap was coverage. 2 tests in edge-cache.test.ts.

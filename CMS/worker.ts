@@ -5,6 +5,8 @@
  * `Cache-Control` + `Cache-Tag` on opted-in published pages: RSC pages cannot
  * set response headers and Next marks dynamic pages `no-store`, so the ONLY
  * place edge-cache headers can be set is here, after the handler returns.
+ * It also rewrites `<html lang>` on published-page HTML to the URL's content
+ * locale (the root layout can only stamp the visitor's admin-UI locale).
  *
  * Flow per response: the pure gate (`isEdgeCacheCandidate`) rejects non-GET /
  * non-200 / Set-Cookie / system-path traffic for free; survivors get ONE extra
@@ -28,6 +30,7 @@ import {
   isEdgeCacheCandidate,
   pathnameSegments,
   edgeCacheHeaders,
+  isHtmlContentType,
 } from "./src/lib/render/edge-cache";
 
 export default {
@@ -53,14 +56,26 @@ export default {
       );
       // Stage 2: locale-aware walk — localized-slug URLs stamp the same tags.
       const resolved = await resolvePage(db, resolveSlugPath(rest), locale);
-      const headers = resolved
-        ? edgeCacheHeaders(resolved.page.cacheMaxAge, resolved.page.id)
-        : null;
-      if (!headers) return response;
-      const stamped = new Response(response.body, response);
-      stamped.headers.set("Cache-Control", headers.cacheControl);
-      stamped.headers.set("Cache-Tag", headers.cacheTag);
-      return stamped;
+      if (!resolved) return response;
+      let out = response;
+      const headers = edgeCacheHeaders(resolved.page.cacheMaxAge, resolved.page.id);
+      if (headers) {
+        out = new Response(out.body, out);
+        out.headers.set("Cache-Control", headers.cacheControl);
+        out.headers.set("Cache-Tag", headers.cacheTag);
+      }
+      // The root layout stamps `<html lang>` with the visitor's ADMIN-UI locale
+      // (NEXT_LOCALE cookie / Accept-Language) — an RSC layout can't see the
+      // pathname. On published pages the URL's content locale is the truth, and
+      // the layout value would both mislabel content for SEO and bake the FIRST
+      // visitor's browser language into the cached HTML. Rewrite it here, before
+      // Workers Cache stores the response (HTMLRewriter streams; headers carry over).
+      if (isHtmlContentType(out.headers.get("Content-Type"))) {
+        out = new HTMLRewriter()
+          .on("html", { element: (el) => void el.setAttribute("lang", locale) })
+          .transform(out);
+      }
+      return out;
     } catch {
       // Best-effort (CAVEATS): a cache-stamping failure must never break serving.
       return response;
