@@ -26,3 +26,7 @@ The full record lives in JOURNAL.md; this is the trimmed backlog trace.
 - 2026-07-07 Image hygiene post-pass: lazy/decoding on non-LCP imgs, aspect-ratio CLS box from author dims, author props win.
 - 2026-07-07 Asset pixel dims captured at upload: nullable width/height columns, client createImageBitmap read, trust-boundary clamp parse.
 - 2026-07-07 Asset dims threaded to render imgs via ?w=&h= URL params stamped at pick time; zero render-time D1.
+- 2026-07-07 Editable llms.txt template: renderLlmsTemplate via shared SLOT_RE, LLMS_TEMPLATE_VARS allowlist, verbatim store, auto fallback.
+- 2026-07-07 llms.txt settings editor UI: api/settings/llms GET/PUT with hard unknown-slot reject, click-to-insert variables panel, EN/FI/ET.
+- 2026-07-07 SEO audit admin report: pure auditSeo finds orphans, broken links, missing meta, missing alt; read-only localized page.
+- 2026-07-07 AI bulk-meta tools: audit_meta lists per-locale meta gaps; set_page_meta merge-writes title/desc preserving metaImage, light purge/IndexNow.

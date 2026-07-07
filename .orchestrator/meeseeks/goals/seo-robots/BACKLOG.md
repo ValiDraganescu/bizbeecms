@@ -6,70 +6,36 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Tasks
 
-### USER-QUEUED (2026-07-07): editable llms.txt + caching for llms.txt and .md variants
-- DONE (2026-07-07): Editable llms.txt template with placeholders. Pure `lib/render/llms-template.ts`
-  (7 tests): `LLMS_TEMPLATE_VARS` (single source of truth for slots + UI side-panel docs),
-  `renderLlmsTemplate` (substitution via the SHARED `SLOT_RE` from plan-tree.ts — same `{{slot}}` /
-  `{{ t slot }}` convention as components), `unknownSlots` (names bad tokens for self-correcting
-  save-time validation). Slots: `brandName`, `tagline`, `origin`, `defaultLocale`, `locales`,
-  `pageTree`. Store: `getLlmsTemplate`/`setLlmsTemplate` (key `llms_template`, stored VERBATIM not
-  JSON). Route `/llms.txt` renders the template when set, else auto output; `pageTree` = the exact
-  auto "## Pages" list via new exported `buildLlmsPageList` (llms-txt.ts). NOTE: the settings UI
-  (next task) owns the on-save `unknownSlots` reject — the route substitutes unknowns to "".
-- DONE (2026-07-07): llms.txt settings editor UI. Route `api/settings/llms` (GET `{template}` / PUT
-  with HARD reject of unknown slots → `code:"unknownSlots"` + `slots[]`). Editor
-  `components/settings/llms-editor.tsx` (template textarea LEFT, variables reference panel RIGHT with
-  click-to-insert `{{slot}}` at caret, driven by `LLMS_TEMPLATE_VARS`). Page
-  `(admin)/admin/settings/llms`. Nav item + EN/FI/ET `llms` messages. Live-verified on dev :3602
-  (reject/save/roundtrip + `/llms.txt` renders the stored template). NOTE: opennext deploy-gate build
-  can't run locally (`.env.local` CMS_DEV_SUPERADMIN prod-guard FATAL — pre-existing); compile+tsc passed.
+### USER-QUEUED (2026-07-07): caching for llms.txt and .md variants (tasks 1–2 of 4 shipped — see BACKLOG_ARCHIVE)
 - TODO: Cache /llms.txt: today force-dynamic + no-store + rejected by the edge-cache dot gate
   (deliberate, after the wildcard cache-tag sitemap bug). Add caching WITH explicit purge coverage:
   own cache tag, purged on page publish/unpublish/delete/rename, brand-identity save, AND llms
-  template save. Must NOT reopen the wildcard-page cache-stamping hole — explicit carve-out for
-  exactly /llms.txt, never a general loosening of the dot gate. Any worker.ts change is
-  release-gated (r-*).
+  template save (hook the purge into the api/settings/llms PUT too). Must NOT reopen the
+  wildcard-page cache-stamping hole — explicit carve-out for exactly /llms.txt, never a general
+  loosening of the dot gate. Any worker.ts change is release-gated (r-*).
 - TODO: Cache .md page variants: /api/md/[...slug] currently sets no Cache-Control (recomputed every
   request; the worker rewrite exits BEFORE the edge-cache gate). Add edge caching keyed on the
   PUBLIC /<path>.md URL or the api route with the page's existing cache tag (pageCacheTag) so
   publish/unpublish/rename purges cover it; noindex flips must purge too. Honor the CAVEATS wildcard
   cache-tag caution. Worker.ts changes, if needed, are release-gated (r-*).
 
-### Operator SEO tooling (admin)
-- DONE: SEO audit view in the CMS admin (`/admin/settings/seo-audit`) — orphans, broken internal
-  links, missing per-locale meta title/desc, images missing alt. Pure `auditSeo` (seo-audit.ts,
-  12 tests), read-only localized EN/FI/ET. SCOPE: analyzes RAW page.blocks props, not resolved
-  component trees (see follow-up below).
+### Performance — Core Web Vitals
+- TODO: INVESTIGATION (design note, not code): responsive image variants for `/media/[...key]` R2 assets on per-site Workers — evaluate Cloudflare Images API upload-time variants vs zone Image Resizing (custom-domain sites only; workers.dev sites can't) vs in-Worker resizing (no native codecs on Workers — likely dead end); deliverable = chosen path + cost/constraints written to this goal's JOURNAL + CAVEATS, and implementation tasks filed accordingly. NOTE: dims now ride asset URLs as `?w=&h=` — a responsive path could reuse that query carrier for width hints.
+- BLOCKED (on the investigation above): implement responsive images — srcset/sizes + modern format (WebP/AVIF) for asset images in published pages per the chosen design.
+- TODO: Stamp `?w=&h=` dims on asset URLs the AI inserts (list_assets / generate_image tool responses carry dims-stamped URLs via the existing `withAssetDims`), so AI-authored pages get the CLS aspect-ratio box too — today only the ImagePicker stamps dims (see the asset-dims caveat). Authoring-time only, zero render cost. — queued by scrub: AI page authoring is a first-class path; its images currently get no CLS box.
+
+### Operator SEO tooling (admin) — audit report + AI bulk-meta shipped (see BACKLOG_ARCHIVE)
 - TODO: SEO audit — deep component-tree scan: the current audit only scans raw `page.blocks` prop
   values, so links/images/alt authored INSIDE referenced component trees are not checked. Extend
   by resolving each page's plan (or a lighter component-tree walk over `getComponentByName`) to
   collect `<a href>` + `<img src/alt>` from component markup too. Needs the D1 component resolver
   (not a pure input) — decide: build the plan (heavy, next-intl) vs a dep-light component-tree
   href/img extractor fed the resolved component rows. Then feed those into the same auditSeo shape.
-- DONE (2026-07-07): AI bulk-meta assistant tools — `audit_meta` (returns auditSeo's missingMeta
-  page×locale gaps) + `set_page_meta` (per-locale metaTitle/metaDescription MERGE via upsertPageMeta
-  + light purge/IndexNow hook). Pure `lib/chat/meta-tools.ts` (8 tests). Wired into tool-dispatch,
-  tool-scopes (pages + page-builder), pages context prompt. SCOPE: writes ONLY title/desc — never
-  moves URLs / flips noindex / blanks metaImage, so no rename/noindex pre-capture needed. NOTE: the
-  "images missing alt" WRITE half is NOT included (alt lives in block props / component markup, not a
-  page-meta field — would need a block-prop edit); filed as the follow-up below.
 - TODO (follow-up to the AI bulk-meta tool): AI "fix missing alt" path — audit_meta covers only the
   meta title/description gaps; missing image alt (`auditSeo.missingAlt`) is authored inside block
   props, so fixing it needs `set_block_props` (already exists) driven by an alt audit. Consider an
   `audit_alt` read tool (returns missingAlt) + a guide line so the AI knows to set_block_props the
   alt. Lower value than meta (alt is per-image, harder to auto-generate well).
-
-### Performance — Core Web Vitals
-- TODO: INVESTIGATION (design note, not code): responsive image variants for `/media/[...key]` R2 assets on per-site Workers — evaluate Cloudflare Images API upload-time variants vs zone Image Resizing (custom-domain sites only; workers.dev sites can't) vs in-Worker resizing (no native codecs on Workers — likely dead end); deliverable = chosen path + cost/constraints written to this goal's JOURNAL + CAVEATS, and implementation tasks filed accordingly. NOTE: dims now ride asset URLs as `?w=&h=` — a responsive path could reuse that query carrier for width hints.
-- BLOCKED (on the investigation above): implement responsive images — srcset/sizes + modern format (WebP/AVIF) for asset images in published pages per the chosen design.
-- TODO: Stamp `?w=&h=` dims on asset URLs the AI inserts (list_assets / generate_image tool responses carry dims-stamped URLs via the existing `withAssetDims`), so AI-authored pages get the CLS aspect-ratio box too — today only the ImagePicker stamps dims (see the asset-dims caveat). Authoring-time only, zero render cost. — queued by scrub: AI page authoring is a first-class path; its images currently get no CLS box.
-
-### Page-level SEO controls
-- TODO: Per-URL-locale branded 404 (follow-up to the shipped default-locale branded 404): make the
-  branded 404 render in the VISITOR's URL locale (`/fi/missing` → 404 in fi) instead of the site
-  default. Needs the request path available in `not-found.tsx` — inject it as a header in
-  `worker.ts` (release-gated, r-*) and read it via `next/headers` + `peelActiveLocale` (already
-  exported from load-plan.ts). A 404 is never edge-cached so reading the request header here is safe.
 
 ### JSON-LD components (kind: jsonld) — machinery + authoring shipped; polish items remain
 - TODO: Per-row/ItemList JSON-LD for List blocks (user-queued 2026-07-07): the one binding case the
@@ -81,6 +47,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
 - TODO: AI authoring-guide section for jsonld (tool `kind` param + validation are DONE): schema.org
   patterns per page type — Product/Article/FAQPage/Recipe — the slot-quoting rules (`"n":{{count}}`
   unquoted vs `"n":"{{name}}"` quoted), and WHEN to author a jsonld component vs plain content.
+
+### Page-level SEO controls
+- TODO: Per-URL-locale branded 404 (follow-up to the shipped default-locale branded 404): make the
+  branded 404 render in the VISITOR's URL locale (`/fi/missing` → 404 in fi) instead of the site
+  default. Needs the request path available in `not-found.tsx` — inject it as a header in
+  `worker.ts` (release-gated, r-*) and read it via `next/headers` + `peelActiveLocale` (already
+  exported from load-plan.ts). A 404 is never edge-cached so reading the request header here is safe.
 
 ### OG-image autogen (fallback og:image via Browser Rendering — start with the tracer/decision)
 - TODO: OG-image autogen tracer + decision: Cloudflare Browser Rendering screenshots the published page top (1200×630 viewport) as the og:image fallback. Evaluate the `browser` Worker binding (@cloudflare/puppeteer) vs the Browser Rendering REST API (account token via deployer secret injection, like OpenRouter keys) — paid-plan requirement, session/concurrency limits, cold-start cost; deliverable = decision written to JOURNAL/CAVEATS PLUS a working spike: screenshot one published page to R2 (`og/<pageId>.<locale>.png`). Requires a publicly reachable origin (resolveSiteOrigin) — skip silently in local dev.
