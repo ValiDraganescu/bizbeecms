@@ -1,27 +1,29 @@
 # Note to the next Meeseeks (seo-robots)
 
-**This run shipped: RESPONSIVE IMAGES IMPL 1/2** — `/media/[...key]?w=<n>` delivery-width variants.
-Pure `deliveryWidth` (closed allowlist 320/640/960/1280/1920) + `mediaVariantUrl` in asset.ts; the
-route folds the clamped `w` into `cacheKeyFor` and runs `.transform({width,fit:scale-down})` before
-`.output`. 25/25 asset tests, tsc clean. Live width-transform is DEPLOY-ONLY (HITL). Read the two new
-RESPONSIVE IMAGES caveats — they hand impl 2/2 the exact seam.
+**This run shipped: RESPONSIVE IMAGES IMPL 2/2 (srcset/sizes)** — the responsive-images track is now
+COMPLETE (impl 1/2 delivery-width variants + impl 2/2 srcset/sizes both done). Pure `srcsetFor` in
+image-hygiene.ts, minted via `mediaKeyFromSrc`+`mediaVariantUrl`; wired into `hygieneProps` (author
+srcset/sizes always win; only /media/ images with a known intrinsic width get srcset). Fixed the
+`srcset`→`srcSet` React casing in react-props.ts. Read the new impl-2/2 caveat before touching it.
+27/27 asset tests, image-hygiene +6, react-props +1, tsc clean. Live resize is DEPLOY-ONLY (HITL).
 
-**Take next (no user-queued work left — pick the highest-value GOAL slice):**
+**No user-queued work left — pick the highest-value GOAL slice:**
 
-1. **Responsive images IMPL 2/2** — render srcset/sizes: a PURE post-pass sibling to
-   `applyImageHygiene`. For a `/media/` `<img>` carrying `?w=&h=` dims (readAssetDims), emit
-   `srcset` from `mediaVariantUrl(key, W)` for each DELIVERY_WIDTHS ≤ intrinsic width (skip upscales)
-   + a default `sizes`; author srcset/sizes win. Strip `/media/` + the `?w=&h=` query to get the key.
-   Keep it pure (no getImages/D1). See the two new impl-1/2 + impl-2/2-SEAM caveats.
-2. SEO-audit deep component-tree scan (only raw page.blocks scanned today; component markup missed).
-3. jsonld polish (List/ItemList binding, canvas invisible-element chip, AI authoring guide).
-4. Per-URL-locale branded 404 (release-gated worker header path).
-5. OG-image autogen track (start with the tracer/decision spike — needs Browser Rendering + paid plan).
-6. Naughty-robot rate limiting — the last untouched GOAL track; needs worker.ts (release-gated r-*).
+1. **dims for `generate_image` assets** — AI-generated images store NULL dims (no server-side decode
+   on Workers) so they get NEITHER the CLS box NOR srcset. Add a client-side `createImageBitmap`
+   re-decode after generation (mirror the media-uploader capture) or stamp dims at insert time. Never
+   a render-time D1 read. Small, closes the last CWV image gap.
+2. **SEO-audit deep component-tree scan** — audit only scans raw page.blocks; links/images/alt inside
+   referenced component trees are missed. Needs the D1 component resolver (not a pure input).
+3. **jsonld polish** — List/ItemList per-row binding (the one binding case jsonld can't ride), builder
+   canvas invisible-element chip, AI authoring-guide section.
+4. **Per-URL-locale branded 404** (release-gated worker-header path).
+5. **OG-image autogen track** (start with the tracer/decision spike — Browser Rendering + paid plan).
+6. **Naughty-robot rate limiting** — the last untouched GOAL track; needs worker.ts (release-gated r-*).
 
 **HITL / release-pending (accumulating — needs a real deployed site + a release cut):**
-- responsive image WIDTH variants: live width-transform on a real IMAGES binding + R2 (deploy-only) —
-  hit `/media/<key>?w=640` and confirm resized bytes + cf-cache-status per (key,fmt,width).
-- `.md` variant caching: live cf-cache-status on a real `/<path>.md` + publish/rename purge check.
+- responsive images: live `/media/<key>?w=640` resized bytes AND the rendered `<img srcset>` picking
+  the right variant per DPR/viewport + cf-cache-status per (key,fmt,width).
+- `.md` variant caching: live cf-cache-status + publish/rename purge check.
 - /llms.txt cached (cf-cache-status) + purge on publish/brand/template save.
 - live 404 render; Google Rich Results on a jsonld component; live IndexNow/edge-purge.

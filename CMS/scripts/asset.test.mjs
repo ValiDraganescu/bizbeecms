@@ -23,6 +23,7 @@ import {
   deliveryFormat,
   deliveryWidth,
   mediaVariantUrl,
+  mediaKeyFromSrc,
   DELIVERY_WIDTHS,
   parseAssetDimension,
 } from "../src/lib/render/asset.ts";
@@ -126,6 +127,19 @@ test("isValidAssetKey: rejects traversal / foreign keys", () => {
 // ── assetUrl ──────────────────────────────────────────────────────────────────
 test("assetUrl: prefixes /media/", () => {
   assert.equal(assetUrl("assets/x_1_y.png"), "/media/assets/x_1_y.png");
+});
+
+// ── mediaKeyFromSrc ───────────────────────────────────────────────────────────
+test("mediaKeyFromSrc: strips /media/ prefix + any query, validates the key", () => {
+  assert.equal(mediaKeyFromSrc("/media/assets/x_1_y.png"), "assets/x_1_y.png");
+  assert.equal(mediaKeyFromSrc("/media/assets/x_1_y.png?w=800&h=600"), "assets/x_1_y.png");
+  assert.equal(mediaKeyFromSrc("/media/assets/x_1_y.png?w=640"), "assets/x_1_y.png");
+});
+test("mediaKeyFromSrc: null for non-/media/, external, or invalid keys", () => {
+  assert.equal(mediaKeyFromSrc("/a.png"), null);
+  assert.equal(mediaKeyFromSrc("https://cdn.example.com/x.jpg"), null);
+  assert.equal(mediaKeyFromSrc("/media/../etc/passwd"), null); // fails isValidAssetKey
+  assert.equal(mediaKeyFromSrc(undefined), null);
 });
 
 // ── assetServeHeaders (stored-XSS guard) ──────────────────────────────────────

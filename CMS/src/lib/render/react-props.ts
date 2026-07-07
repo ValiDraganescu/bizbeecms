@@ -41,6 +41,10 @@ function isEventHandlerAttr(name: string): boolean {
 function attrToReactName(name: string): string {
   if (name === "class") return "className";
   if (name === "for") return "htmlFor";
+  // `srcset` has no hyphen so the camelCase pass misses it, but React needs
+  // `srcSet` (lowercase warns + is dropped). Authored HTML uses `srcset`; our
+  // image-hygiene pass emits `srcset` too — one place maps both.
+  if (name === "srcset") return "srcSet";
   // data-* / aria-* are valid React props verbatim — never camelCase them.
   if (name.startsWith("data-") || name.startsWith("aria-")) return name;
   if (name.includes("-")) return hyphenToCamel(name);

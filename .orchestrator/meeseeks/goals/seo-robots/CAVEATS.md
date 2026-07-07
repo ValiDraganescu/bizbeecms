@@ -471,3 +471,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   (e.g. `100vw`); AUTHOR-set srcset/sizes always win. The `key` for mediaVariantUrl = strip the
   `/media/` prefix AND the `?w=&h=` query off the img src (the src is the dims-carrier form; the
   variants are separate URLs). Keep it pure — no getImages/D1.
+
+- (2026-07-07) RESPONSIVE IMAGES impl 2/2 SHIPPED (srcset/sizes): `srcsetFor(src,intrinsicWidth)` in
+  image-hygiene.ts is the pure builder; `applyImageHygiene`→`hygieneProps` wires it. It fires ONLY when
+  (a) the src resolves to a valid /media/ key (`mediaKeyFromSrc` — new in asset.ts, strips /media/ +
+  ANY query then isValidAssetKey; external/hand-typed URLs get NO srcset) AND (b) the intrinsic width
+  is known (author `width` prop OR the `?w=&h=` dims carrier via readAssetDims) AND (c) author
+  `srcset`/`srcSet`/`sizes` are absent (author always wins). Candidates = DELIVERY_WIDTHS ≤ intrinsic
+  (never advertises an upscale). Default `sizes:"100vw"` (over-fetches on narrow layouts, safe). So an
+  image with NO stored dims (AI generate_image, hand-typed URL) gets the lazy/CLS win but NO srcset —
+  same "never invents dims" contract as the CLS box. REACT CASING GOTCHA (bit me): React needs `srcSet`
+  camelCase — plain `srcset` warns AND is dropped by the DOM. Fixed in ONE place: `react-props.ts`
+  attrToReactName maps `srcset`→`srcSet` (it has no hyphen so the camelCase pass missed it). If you emit
+  any other non-hyphen React-cased attr from a plan (rare), add it there too. Live resize is DEPLOY-ONLY
+  (IMAGES binding null in dev) — the srcset URLs render, but the bytes resize only on a deployed site (HITL).

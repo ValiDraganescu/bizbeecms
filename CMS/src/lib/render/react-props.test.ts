@@ -39,6 +39,12 @@ test("class/for → className/htmlFor; data-/aria- pass through verbatim", () =>
   assert.equal(out["aria-selected"], "false");
 });
 
+test("srcset → srcSet (React casing; lowercase would warn + drop)", () => {
+  const out = htmlPropsToReact("img", { src: "/a.png", srcset: "/a.png?w=320 320w" });
+  assert.equal(out.srcSet, "/a.png?w=320 320w");
+  assert.equal(out.srcset, undefined);
+});
+
 test("inline event handlers are dropped (string values React can't bind)", () => {
   const out = htmlPropsToReact("form", {
     onsubmit: "doThing()",

@@ -20,7 +20,34 @@
  */
 
 import type { ElementPlan } from "./plan-types.ts";
-import { readAssetDims } from "./asset.ts";
+import {
+  readAssetDims,
+  mediaKeyFromSrc,
+  mediaVariantUrl,
+  DELIVERY_WIDTHS,
+} from "./asset.ts";
+
+/** Default responsive `sizes` — the image fills the viewport width. Conservative
+ *  (over-fetches on narrow layouts rather than under-fetching), and an author
+ *  `sizes` prop always wins. */
+const DEFAULT_SIZES = "100vw";
+
+/**
+ * Build a `srcset` for a `/media/<key>` image with known intrinsic width, or null
+ * to add none. One candidate per DELIVERY_WIDTHS entry that is <= the intrinsic
+ * width (never advertise an upscale the resize would just scale-down to the
+ * master), each `<variantUrl> <n>w`. Returns null when the src isn't a /media/
+ * key or no allowlist width fits under the intrinsic (tiny image) — the browser
+ * then just uses `src`. Pure: mints URLs via `mediaVariantUrl` so the delivery
+ * `?w=` never collides with the intrinsic-dims `?w=&h=` carrier.
+ */
+export function srcsetFor(src: unknown, intrinsicWidth: number): string | null {
+  const key = mediaKeyFromSrc(src);
+  if (key === null) return null;
+  const widths = DELIVERY_WIDTHS.filter((w) => w <= intrinsicWidth);
+  if (widths.length === 0) return null;
+  return widths.map((w) => `${mediaVariantUrl(key, w)} ${w}w`).join(", ");
+}
 
 /** A finite positive number from a prop that may be a number OR numeric string. */
 function positiveDim(value: unknown): number | null {
@@ -63,6 +90,18 @@ function hygieneProps(
       h = fromUrl.height;
     }
   }
+  // Responsive srcset/sizes: when the /media/ image's intrinsic width is known,
+  // advertise the delivery-width variants the media route can resize to. Author
+  // srcset/sizes always win (only ABSENT props filled). srcsetFor returns null
+  // for non-/media/ srcs or an image smaller than the smallest allowlist width.
+  if (props.srcset === undefined && props.srcSet === undefined && w !== null) {
+    const srcset = srcsetFor(props.src, w);
+    if (srcset !== null) {
+      set("srcset", srcset);
+      if (props.sizes === undefined) set("sizes", DEFAULT_SIZES);
+    }
+  }
+
   if (w !== null && h !== null) {
     const style = props.style;
     const isObjStyle = style != null && typeof style === "object" && !Array.isArray(style);

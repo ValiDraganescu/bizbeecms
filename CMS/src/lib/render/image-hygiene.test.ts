@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyImageHygiene } from "./image-hygiene.ts";
+import { applyImageHygiene, srcsetFor } from "./image-hygiene.ts";
 import type { ElementPlan } from "./plan-types.ts";
 
 function img(props: Record<string, unknown>): ElementPlan {
@@ -105,6 +105,50 @@ test("bad/partial ?w=&h= query → no invented CLS box", () => {
   ]);
   assert.equal((out[0] as { props: Record<string, unknown> }).props.style, undefined);
   assert.equal((out[1] as { props: Record<string, unknown> }).props.style, undefined);
+});
+
+// A valid /media/ asset src carrying intrinsic ?w=&h= dims.
+const MEDIA = "/media/assets/x_1_a.png?w=1000&h=800";
+
+test("srcsetFor: /media/ image emits variants <= intrinsic width", () => {
+  // intrinsic 1000 → 320,640,960 (1280/1920 skipped: upscales)
+  assert.equal(
+    srcsetFor(MEDIA, 1000),
+    "/media/assets/x_1_a.png?w=320 320w, /media/assets/x_1_a.png?w=640 640w, /media/assets/x_1_a.png?w=960 960w",
+  );
+});
+
+test("srcsetFor: null for non-/media/ src and for images below smallest width", () => {
+  assert.equal(srcsetFor("/a.png", 1000), null); // not a /media/ key
+  assert.equal(srcsetFor("https://cdn.example.com/x.jpg", 1000), null); // external
+  assert.equal(srcsetFor(MEDIA, 200), null); // smaller than 320 → no candidate
+});
+
+test("hygiene wires srcset + default sizes from ?w=&h= dims", () => {
+  const out = applyImageHygiene([img({ src: MEDIA })]);
+  const p = (out[0] as { props: Record<string, unknown> }).props;
+  assert.equal(
+    p.srcset,
+    "/media/assets/x_1_a.png?w=320 320w, /media/assets/x_1_a.png?w=640 640w, /media/assets/x_1_a.png?w=960 960w",
+  );
+  assert.equal(p.sizes, "100vw");
+  assert.deepEqual(p.style, { aspectRatio: "1000 / 800" }); // dims still drive CLS
+});
+
+test("author srcset/sizes win — hygiene never overrides them", () => {
+  const out = applyImageHygiene([
+    img({ src: MEDIA, srcset: "/custom.png 500w", sizes: "50vw" }),
+  ]);
+  const p = (out[0] as { props: Record<string, unknown> }).props;
+  assert.equal(p.srcset, "/custom.png 500w");
+  assert.equal(p.sizes, "50vw");
+});
+
+test("no srcset when intrinsic width is unknown (no dims, no /media/ dims)", () => {
+  const out = applyImageHygiene([img({ src: "/media/assets/x_1_a.png" })]);
+  const p = (out[0] as { props: Record<string, unknown> }).props;
+  assert.equal(p.srcset, undefined);
+  assert.equal(p.sizes, undefined);
 });
 
 test("non-img elements untouched; identity no-op when no images", () => {

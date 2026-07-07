@@ -243,6 +243,21 @@ export function mediaVariantUrl(key: string, width: unknown): string {
 }
 
 /**
+ * Extract the R2 asset key from a `/media/<key>` `<img>` src, stripping the
+ * `ASSET_URL_PREFIX` and ANY query (the `?w=&h=` intrinsic-dims carrier or a
+ * `?fmt=`/`?w=` delivery param). Returns null when the src isn't a valid
+ * `/media/<key>` URL (external/hand-typed URLs get no srcset). Pure — the srcset
+ * builder feeds the returned key straight into `mediaVariantUrl`, so variant
+ * URLs are minted from the canonical key, never by string-munging the query.
+ */
+export function mediaKeyFromSrc(src: unknown): string | null {
+  if (typeof src !== "string" || !src.startsWith(ASSET_URL_PREFIX)) return null;
+  const afterPrefix = src.slice(ASSET_URL_PREFIX.length);
+  const key = afterPrefix.split("?")[0];
+  return isValidAssetKey(key) ? key : null;
+}
+
+/**
  * Security headers the serve route adds for a given content type.
  *
  * `nosniff` is always set so the browser can't MIME-sniff an upload into an

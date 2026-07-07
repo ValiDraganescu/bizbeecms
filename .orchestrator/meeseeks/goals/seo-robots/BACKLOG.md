@@ -12,14 +12,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   route folds clamped `w` into `cacheKeyFor` and runs `.transform({width,fit:scale-down})` before
   `.output` (resize-only preserves master format via `resizeOutputFormat`). Transform-failure falls
   back to original. 25/25 asset tests, tsc clean. LIVE transform is deploy-only (HITL).
-- TODO (impl 2/2): render srcset/sizes — `applyImageHygiene` (or a sibling pure pass) emits
-  `srcset` = the allowlist widths as `/media/<key>?w=<n> <n>w` for `/media/` `<img>` srcs that carry
-  `?w=&h=` dims (skip widths above the intrinsic width from `readAssetDims`), plus a sane default
-  `sizes` (e.g. `100vw`, author `sizes` prop wins). Author-set `srcset` always wins. Keep it pure /
-  edge-cache-safe (reads only the built plan) — mirror the existing image-hygiene seam. GOTCHA: the
-  dims query (`?w=&h=`) and the delivery-width query (`?w=`) BOTH use `w` — the srcset URL must carry
-  the DELIVERY width param, distinct from the intrinsic-dims carrier; reconcile in one place (a
-  `mediaVariantUrl(key, width)` helper) so they don't collide.
+- DONE (impl 2/2): render srcset/sizes — `srcsetFor` in image-hygiene.ts (pure) emits DELIVERY_WIDTHS
+  variants ≤ intrinsic width via `mediaVariantUrl(key,w)`; wired into `hygieneProps` (emits `srcset` +
+  default `sizes:"100vw"` only when the intrinsic width is known AND author srcset/sizes absent). Key
+  derived via new `mediaKeyFromSrc` (asset.ts — strips /media/ + query, validates isValidAssetKey).
+  React casing fix: `srcset`→`srcSet` mapped in react-props.ts (lowercase warns + drops). Tests:
+  image-hygiene +6, react-props +1, asset +2 (27/27); tsc clean. Live resize is deploy-only (HITL).
 - TODO: dims for `generate_image` assets — AI-generated images store NULL width/height (no
   server-side decode on Workers) so they never get the CLS box or (future) srcset. Add a client-side
   `createImageBitmap` re-decode after generation (mirror the media-uploader capture path) or stamp

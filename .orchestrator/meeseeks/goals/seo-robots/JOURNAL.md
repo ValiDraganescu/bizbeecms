@@ -894,3 +894,19 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `ImageOutputOptions` in cloudflare-env.d.ts). LIVE width-transform on a real IMAGES binding + R2 is
   DEPLOY-ONLY — unverifiable locally (getImages() returns null in dev → serves original).
 - **Files:** CMS/src/lib/render/asset.ts, CMS/src/app/media/[...key]/route.ts, CMS/scripts/asset.test.mjs
+
+## 2026-07-07 14:57 — Responsive images impl 2/2: render srcset/sizes
+- **Status:** DONE
+- **What I did:** Pure `srcsetFor(src, intrinsicWidth)` in image-hygiene.ts emits one
+  `mediaVariantUrl(key, w) <n>w` candidate per DELIVERY_WIDTHS entry ≤ the intrinsic width (skips
+  upscales), null for non-/media/ srcs or images below the smallest allowlist width. Wired into
+  `hygieneProps`: when the intrinsic width is known (author width or `?w=&h=` dims via readAssetDims)
+  and author `srcset`/`sizes` are absent, sets `srcset` + default `sizes:"100vw"`. Added
+  `mediaKeyFromSrc` (asset.ts) — the ONE place to strip `/media/` + query and validate the key
+  (isValidAssetKey), so variant URLs are minted from the canonical key. Fixed React casing:
+  `srcset`→`srcSet` in react-props.ts attrToReactName (lowercase `srcset` warns + is dropped by React;
+  also benefits authored HTML). Pure/edge-cache-safe — reads only the built plan, no D1/getImages.
+- **Verified:** node --test image-hygiene (+6), react-props (+1), asset (+2) all green (asset 27/27);
+  `npx tsc --noEmit` clean. Could NOT verify live resized bytes/srcset selection in a browser — the
+  IMAGES binding transform is deploy-only (getImages returns null in dev → original served); HITL.
+- **Files:** CMS/src/lib/render/image-hygiene.ts, asset.ts, react-props.ts + their 3 test files.
