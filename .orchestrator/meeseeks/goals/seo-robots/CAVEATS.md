@@ -334,3 +334,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   Home `/` has NO `.md` variant (llms.txt links root to `/`, not `/.md`) and `/api/md/` 308s (Next
   trailing-slash) — fine. Public `/<path>.md` is UNVERIFIED until a release cuts worker.ts; the
   internal route is dev-verified.
+
+- (2026-07-07) SEO audit (`lib/render/seo-audit.ts auditSeo`) is a PURE analyzer over RAW
+  `page.blocks` prop values — it does NOT resolve referenced *component* trees (that needs the D1
+  component resolver + next-intl, not a pure input). So links/images authored INSIDE a component's
+  markup are NOT audited; only author-typed BLOCK props (Hero CTA href, image-block src/alt) are.
+  This is deliberate scope, filed as a follow-up TODO — don't "fix" it by pulling the plan builder
+  into the analyzer (breaks the dep-free `node --test` + it's the wrong layer). Store read is
+  `listPagesForAudit()` (page-store, one query, blocks parsed). The report is READ-ONLY (no API
+  route, no auto-fix) — each finding names page+locale for the operator to fix in page settings.
+  Broken-link detection accepts a link if it matches a published path in ANY locale form
+  (`/about` or `/fi/about`) OR sits under a wildcard `:param` page's static prefix (dynamic detail
+  URLs are un-enumerable — never flag them). Image detection is prop-NAME-based
+  (src/image/imageUrl/imageSrc/backgroundImage + looksLikeImage), so a custom image prop name
+  authored by the AI would be missed — extend IMAGE_SRC_KEYS if a new convention appears.

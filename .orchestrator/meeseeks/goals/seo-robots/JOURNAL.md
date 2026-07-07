@@ -666,3 +666,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/render/asset.ts, CMS/src/lib/render/asset-dims.test.ts,
   CMS/src/lib/render/image-hygiene.ts, CMS/src/lib/render/image-hygiene.test.ts,
   CMS/src/components/page-builder/image-picker.tsx, CMS/src/components/media/media-library.tsx
+
+## 2026-07-07 13:49 — SEO audit admin report (orphans / broken links / missing meta / missing alt)
+- **Status:** DONE
+- **What I did:** New read-only admin SEO health report at `/admin/settings/seo-audit`, driven by a
+  pure analyzer over the published-page rows. Four findings:
+  - **orphans** — published, non-home, non-wildcard pages nothing links to (unreachable except via
+    nav/sitemap);
+  - **brokenLinks** — internal `/path` link props (Hero CTAs etc.) pointing at a path no published
+    page serves; accepts default + every locale-prefixed form, and skips links under a wildcard
+    `:param` subtree (dynamic detail URLs we can't enumerate) so they're never false-flagged;
+  - **missingMeta** — published (non-noindex, non-wildcard) page × content-locale missing meta
+    title or description;
+  - **missingAlt** — image-ish block props (`src`/`image`/`imageUrl`/`imageSrc`/`backgroundImage`,
+    or an `alt`-bearing block) with blank alt.
+  - Pure `lib/render/seo-audit.ts auditSeo(pages, contentLocales)` — no React/D1 imports, reuses
+    `publishedPagePaths` (canonical targets) + `SKIP_SEGMENTS` (system-path skip). Store read
+    `listPagesForAudit()` (one query, blocks parsed + meta maps). Server page computes + renders
+    (localized EN/FI/ET, settings-nav item under "Site"). Read-only — no auto-fix, no API route.
+  - **SCOPE (deliberate):** links + images are collected from RAW `page.blocks` prop trees, NOT from
+    resolved *component* trees (that needs the D1 component resolver + next-intl — not a pure input).
+    Catches the common author mistakes (CTA at a renamed slug, image block with no alt). Deep
+    component-tree scan is filed as a follow-up TODO.
+- **Verified:** `node --test seo-audit.test.ts` 12/12 (orphans/broken/meta/alt + wildcard-skip +
+  locale-form accept + nested-children walk + draft/noindex skips); full `npm test` 1853/1853 (was
+  1841; +12); `npx tsc --noEmit` exit 0; all 3 message JSONs parse. Did NOT run opennext build (pure
+  helper + one store read + a server page + i18n; tsc+tests cover it) nor live-render the admin page
+  (needs live D1 + admin session — HITL). No worker.ts change → ships on next normal CMS build.
+- **Files:** CMS/src/lib/render/seo-audit.ts (+.test.ts), CMS/src/db/page-store.ts (listPagesForAudit),
+  CMS/src/app/(admin)/admin/settings/seo-audit/page.tsx, CMS/src/components/settings/settings-nav.tsx,
+  CMS/messages/{en,fi,et}.json

@@ -262,6 +262,36 @@
       "notPublished": "Sivua ei ole enää julkaistu. Valitse toinen tai lataa uudelleen."
     }
   },
+  "seoAudit": {
+    "title": "SEO-tarkistus",
+    "subtitle": "Vain luku -tilassa oleva kuntoraportti julkaistuista sivuistasi. Se löytää sivut, joihin mikään ei linkitä, rikkinäiset sisäiset linkit, puuttuvat meta-otsikot ja -kuvaukset sekä kuvat ilman alt-tekstiä. Korjaa kukin sivun asetuksissa — mikään ei muutu automaattisesti.",
+    "allClear": "Ongelmia ei löytynyt. Jokaisella julkaistulla sivulla on metatekstit, ei rikkinäisiä sisäisiä linkkejä eikä orpoja, ja jokaisella kuvalla on alt-teksti.",
+    "columnPage": "Sivu",
+    "columnDetail": "Tiedot",
+    "orphans": {
+      "title": "Orpo­sivut",
+      "description": "Julkaistut sivut, joihin mikään muu sivu ei linkitä — saavutettavissa vain navigoinnin tai sivukartan kautta. Lisää sisäinen linkki sopivalta sivulta.",
+      "empty": "Ei orposivuja."
+    },
+    "brokenLinks": {
+      "title": "Rikkinäiset sisäiset linkit",
+      "description": "Sivujen sisällössä olevat linkit osoittavat polkuun, jota mikään julkaistu sivu ei palvele — kävijät ja indeksointirobotit saavat 404-virheen. Korjaa tai poista linkki.",
+      "empty": "Ei rikkinäisiä sisäisiä linkkejä."
+    },
+    "missingMeta": {
+      "title": "Puuttuvat metatekstit",
+      "description": "Julkaistuilta sivuilta puuttuu meta-otsikko tai -kuvaus jollakin sisältökielellä — hakutulokset näyttävät huonon tai puuttuvan katkelman.",
+      "empty": "Jokaisella julkaistulla sivulla on metatekstit kaikilla kielillä.",
+      "missingTitle": "otsikko",
+      "missingDescription": "kuvaus"
+    },
+    "missingAlt": {
+      "title": "Kuvat ilman alt-tekstiä",
+      "description": "Kuvalohkot ilman alt-tekstiä — huono saavutettavuudelle ja kuvahaulle. Lisää alt-teksti lohkon asetuksissa.",
+      "empty": "Jokaisella kuvalla on alt-teksti.",
+      "noSrc": "(ei kuvalähdettä)"
+    }
+  },
   "settingsNav": {
     "label": "Asetusosiot",
     "groups": {
@@ -273,6 +303,7 @@
     "contentLocales": "Sisältökielet",
     "robots": "robots.txt",
     "redirects": "Uudelleenohjaukset",
+    "seoAudit": "SEO-tarkistus",
     "verification": "Vahvistus",
     "notFoundPage": "404-sivu",
     "theme": "Teema",

@@ -7,7 +7,16 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### Operator SEO tooling (admin)
-- TODO: SEO audit view in the CMS admin: one report page listing orphan pages (no inbound internal links), broken internal links (hrefs resolving to deleted/unpublished pages), pages missing per-locale meta title/description, images missing alt text — pure analyzers over page rows + plan trees (dep-free, unit-tested), rendered in a localized EN/FI/ET admin page. Read-only report; no auto-fix.
+- DONE: SEO audit view in the CMS admin (`/admin/settings/seo-audit`) — orphans, broken internal
+  links, missing per-locale meta title/desc, images missing alt. Pure `auditSeo` (seo-audit.ts,
+  12 tests), read-only localized EN/FI/ET. SCOPE: analyzes RAW page.blocks props, not resolved
+  component trees (see follow-up below).
+- TODO: SEO audit — deep component-tree scan: the current audit only scans raw `page.blocks` prop
+  values, so links/images/alt authored INSIDE referenced component trees are not checked. Extend
+  by resolving each page's plan (or a lighter component-tree walk over `getComponentByName`) to
+  collect `<a href>` + `<img src/alt>` from component markup too. Needs the D1 component resolver
+  (not a pure input) — decide: build the plan (heavy, next-intl) vs a dep-light component-tree
+  href/img extractor fed the resolved component rows. Then feed those into the same auditSeo shape.
 - TODO: AI bulk-meta assistant tool: tool(s) letting the AI list pages/locales with missing meta title/description (and images missing alt), then write generated values through the existing upsertPageMeta validation path (per-locale maps, purge semantics intact); self-correcting errors naming exact page+locale; authoring-guide section so the AI knows the workflow.
 
 ### Performance — Core Web Vitals

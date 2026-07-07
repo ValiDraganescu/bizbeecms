@@ -221,6 +221,48 @@ export async function getPathRows(injectedDb?: Db): Promise<
     .from(schema.page);
 }
 
+/**
+ * Every page with the columns the SEO audit analyzer needs (blocks parsed,
+ * per-locale meta maps, publish/noindex/parent). One query, read-only. The
+ * pure `auditSeo` (lib/render/seo-audit.ts) consumes these rows.
+ */
+export async function listPagesForAudit(): Promise<
+  Array<{
+    id: string;
+    slug: string;
+    parentPageId: string | null;
+    publishStatus: string;
+    noindex: number;
+    blocks: Block[];
+    metaTitle: Record<string, string>;
+    metaDescription: Record<string, string>;
+  }>
+> {
+  const db = await getDb();
+  const rows = await db
+    .select({
+      id: schema.page.id,
+      slug: schema.page.slug,
+      parentPageId: schema.page.parentPageId,
+      publishStatus: schema.page.publishStatus,
+      noindex: schema.page.noindex,
+      blocks: schema.page.blocks,
+      metaTitle: schema.page.metaTitle,
+      metaDescription: schema.page.metaDescription,
+    })
+    .from(schema.page);
+  return rows.map((r) => ({
+    id: r.id,
+    slug: r.slug,
+    parentPageId: r.parentPageId,
+    publishStatus: r.publishStatus,
+    noindex: r.noindex,
+    blocks: parseJsonColumn<Block[]>(r.blocks, []),
+    metaTitle: parseMap(r.metaTitle),
+    metaDescription: parseMap(r.metaDescription),
+  }));
+}
+
 /** One page by id, or null. */
 export async function getPageById(id: string): Promise<PageSummary | null> {
   const db = await getDb();

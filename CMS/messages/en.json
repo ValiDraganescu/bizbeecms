@@ -262,6 +262,36 @@
       "notPublished": "That page is no longer published. Pick another or reload."
     }
   },
+  "seoAudit": {
+    "title": "SEO audit",
+    "subtitle": "A read-only health report over your published pages. It finds pages nothing links to, dead internal links, missing meta titles and descriptions, and images without alt text. Fix each in the page's settings — nothing here changes automatically.",
+    "allClear": "No issues found. Every published page has meta text, no broken internal links, no orphans, and every image has alt text.",
+    "columnPage": "Page",
+    "columnDetail": "Detail",
+    "orphans": {
+      "title": "Orphan pages",
+      "description": "Published pages no other page links to — reachable only via navigation or the sitemap. Add an internal link from a relevant page.",
+      "empty": "No orphan pages."
+    },
+    "brokenLinks": {
+      "title": "Broken internal links",
+      "description": "Links in page content pointing at a path no published page serves — visitors and crawlers get a 404. Fix or remove the link.",
+      "empty": "No broken internal links."
+    },
+    "missingMeta": {
+      "title": "Missing meta text",
+      "description": "Published pages missing a meta title or description for a content locale — search results show poor or no snippet.",
+      "empty": "Every published page has meta text in every locale.",
+      "missingTitle": "title",
+      "missingDescription": "description"
+    },
+    "missingAlt": {
+      "title": "Images without alt text",
+      "description": "Image blocks with no alt text — bad for accessibility and image search. Add alt text in the block settings.",
+      "empty": "Every image has alt text.",
+      "noSrc": "(no image source)"
+    }
+  },
   "settingsNav": {
     "label": "Settings sections",
     "groups": {
@@ -273,6 +303,7 @@
     "contentLocales": "Content languages",
     "robots": "robots.txt",
     "redirects": "Redirects",
+    "seoAudit": "SEO audit",
     "verification": "Verification",
     "notFoundPage": "404 page",
     "theme": "Theme",

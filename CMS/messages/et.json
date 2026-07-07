@@ -262,6 +262,36 @@
       "notPublished": "See leht pole enam avaldatud. Vali teine või laadi uuesti."
     }
   },
+  "seoAudit": {
+    "title": "SEO audit",
+    "subtitle": "Kirjutuskaitstud terviseraport sinu avaldatud lehtede kohta. See leiab lehed, millele miski ei viita, katkised siselingid, puuduvad meta-pealkirjad ja -kirjeldused ning alt-tekstita pildid. Paranda igaüks lehe seadetes — miski ei muutu automaatselt.",
+    "allClear": "Probleeme ei leitud. Igal avaldatud lehel on metatekstid, katkiseid siselinke ega orbe pole ja igal pildil on alt-tekst.",
+    "columnPage": "Leht",
+    "columnDetail": "Üksikasjad",
+    "orphans": {
+      "title": "Orvuks jäänud lehed",
+      "description": "Avaldatud lehed, millele ükski teine leht ei viita — ligipääsetavad ainult navigeerimise või saidikaardi kaudu. Lisa sobivalt lehelt siselink.",
+      "empty": "Orvuks jäänud lehti pole."
+    },
+    "brokenLinks": {
+      "title": "Katkised siselingid",
+      "description": "Lehe sisus olevad lingid viitavad teele, mida ükski avaldatud leht ei teeninda — külastajad ja roomajad saavad 404. Paranda või eemalda link.",
+      "empty": "Katkiseid siselinke pole."
+    },
+    "missingMeta": {
+      "title": "Puuduvad metatekstid",
+      "description": "Avaldatud lehtedel puudub mõne sisukeele meta-pealkiri või -kirjeldus — otsingutulemused näitavad kehva või puuduvat kirjeldust.",
+      "empty": "Igal avaldatud lehel on metatekstid kõigis keeltes.",
+      "missingTitle": "pealkiri",
+      "missingDescription": "kirjeldus"
+    },
+    "missingAlt": {
+      "title": "Alt-tekstita pildid",
+      "description": "Pildiplokid ilma alt-tekstita — halb ligipääsetavusele ja pildiotsingule. Lisa alt-tekst ploki seadetes.",
+      "empty": "Igal pildil on alt-tekst.",
+      "noSrc": "(pildiallikat pole)"
+    }
+  },
   "settingsNav": {
     "label": "Seadete jaotised",
     "groups": {
@@ -273,6 +303,7 @@
     "contentLocales": "Sisukeeled",
     "robots": "robots.txt",
     "redirects": "Ümbersuunamised",
+    "seoAudit": "SEO audit",
     "verification": "Kinnitamine",
     "notFoundPage": "404 leht",
     "theme": "Teema",
