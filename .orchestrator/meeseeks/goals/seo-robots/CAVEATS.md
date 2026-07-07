@@ -265,3 +265,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   (CREATE=[] since nothing's cached yet; UPDATE/translate=[pageCacheTag(id)]). If an AI rename or
   AI noindex tool ever lands, it MUST additionally run the REST route's rename/noindex pre-capture
   trio or renames silently 404 inbound links / noindex-ON never re-pings.
+
+- (2026-07-07) `/llms.txt` lists ONE entry per page in the site DEFAULT content
+  locale (a curated index, NOT the sitemap's full locale × page enumeration).
+  Links point at `<path>.md` (root `/` stays `/`, no `/index.md`) — those `.md`
+  URLs 404 until the markdown-page-variants task ships the serializer; that's
+  expected, not a bug. Pure builder `lib/render/llms-txt.ts`: `buildLlmsTxt`
+  oneLine-collapses EVERY value (name/tagline/title/desc) so a newline/tab in
+  operator content can't break a Markdown link line — keep that if you extend it.
+  `publishedPagePaths` now returns `id` (additive) so llms.txt can look up the
+  page row's per-locale metaTitle/metaDescription; sitemap.ts ignores it.
+  GOTCHA: `resolveLocalized({}, locale)` on an EMPTY locale map returns the `{}`
+  OBJECT (empty {} isn't a locale object), so String() it → `[object Object]`.
+  The route guards with a `typeof v === "string"` check — do the same anywhere
+  you String()-ify a resolveLocalized result of a possibly-empty JSON column.

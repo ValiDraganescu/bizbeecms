@@ -29,12 +29,14 @@ export interface SitemapPageRow {
   updatedAt?: Date | null;
 }
 
-/** Every published page's locale-free slug segments + last-modified stamp. */
+/** Every published page's locale-free slug segments + last-modified stamp.
+ *  `id` is the source page row id (additive — llms.txt uses it to look up
+ *  per-locale title/description; sitemap.ts ignores it). */
 export function publishedPagePaths(
   rows: SitemapPageRow[],
-): Array<{ segments: string[]; lastModified?: Date }> {
+): Array<{ id: string; segments: string[]; lastModified?: Date }> {
   const byId = new Map(rows.map((r) => [r.id, r]));
-  const out: Array<{ segments: string[]; lastModified?: Date }> = [];
+  const out: Array<{ id: string; segments: string[]; lastModified?: Date }> = [];
 
   for (const row of rows) {
     if (row.publishStatus !== "published") continue;
@@ -64,6 +66,7 @@ export function publishedPagePaths(
     if (!ok) continue;
 
     out.push({
+      id: row.id,
       segments:
         segments.length === 1 && segments[0] === HOME_SLUG ? [] : segments,
       lastModified: row.updatedAt ?? undefined,

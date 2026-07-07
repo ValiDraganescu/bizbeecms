@@ -533,3 +533,27 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/db/page-store.ts, CMS/src/db/translate-store.ts,
   CMS/src/lib/render/page-write-hooks.ts (new) + .test.ts (new),
   CMS/src/lib/chat/tool-dispatch.ts
+
+## 2026-07-07 13:06 — /llms.txt AI-crawler index
+- **Status:** DONE
+- **What I did:** Serve `/llms.txt` (llmstxt.org format) — brand identity header
+  (`# brandName`, `> tagline`) + a `## Pages` list of every PUBLISHED page in the
+  site DEFAULT content locale, each linking to that page's `.md` variant with the
+  meta description as the note. Pure builder `lib/render/llms-txt.ts` (buildLlmsTxt,
+  oneLine-collapses every value so a newline/tab can't break a link line; drops
+  blank title/url entries) + unit test. Route `app/llms.txt/route.ts` (force-dynamic,
+  no-store) reuses `publishedPagePaths` (added additive `id` to its return so per-page
+  metaTitle/metaDescription lookup works — sitemap.ts ignores id), `createPathTranslator`
+  + `pathForLocale` for the default-locale path, `resolveLocalized`+`parseJsonColumn`
+  for per-locale title/desc. Origin unknown (local dev) → header-only body (mirrors
+  sitemap.ts). ONE entry per page (default locale) — llms.txt is a curated index, not
+  a full URL enumeration. `.md` links point at `<path>.md` (root `/` stays `/`) — the
+  markdown-page-variants task (next) makes them resolve; until then they 404 (harmless,
+  just an unbuilt link target).
+- **Verified:** `tsc --noEmit` clean; new llms-txt.test.ts (5 cases) + sitemap-paths.test.ts
+  + hreflang.test.ts all pass (28 assertions). Did NOT run opennext build (isolated: one
+  new pure module + one route + one additive store-shape field; tsc+tests cover it). No
+  worker.ts/D1 change → no r-* release. `/llms.txt` is dotted-root → already edge-cache
+  excluded by the worker dot gate.
+- **Files:** CMS/src/lib/render/llms-txt.ts (new) + .test.ts (new),
+  CMS/src/app/llms.txt/route.ts (new), CMS/src/lib/render/sitemap-paths.ts (added id)

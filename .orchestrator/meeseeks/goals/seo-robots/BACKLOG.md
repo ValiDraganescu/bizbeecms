@@ -50,7 +50,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
 - TODO: OG-image regenerate button: per-locale "Generate from page" action in the page-settings SEO tab (API route, stable error codes) that (re)screenshots on demand — the explicit path for refreshing after theme/content redesigns; SEO tab shows the currently effective og:image with a manual/auto badge; localized EN/FI/ET.
 
 ### llms.txt + markdown page variants (AI-crawler surface, per llmstxt.org)
-- TODO: Serve `/llms.txt`: site name + description from brand identity, then the published-page tree (per-locale titles/descriptions) with links to each page's `.md` variant; reuse `publishedPagePaths`; force-dynamic like sitemap/robots; skip when origin unknown.
+- DONE (2026-07-07): Serve `/llms.txt` — brand-identity header (`# brandName`, `> tagline`)
+  + `## Pages` list of every published page in the site DEFAULT content locale, each linking
+  to `<path>.md` with meta description as the note. Pure `lib/render/llms-txt.ts` (buildLlmsTxt,
+  unit-tested) + `app/llms.txt/route.ts` (force-dynamic, no-store, header-only when origin
+  unknown). Added additive `id` to `publishedPagePaths` return for per-page metaTitle/desc
+  lookup. `.md` links resolve once the markdown-variants task below lands.
 - TODO: Markdown page variants: serve `<page-path>.md` — a pure ElementPlan→markdown serializer (headings, paragraphs, lists, links, images as alt+URL; skip script/style/nav chrome), unit-tested; the `(site)` catch-all (or a route) resolves the same slug walk then serializes instead of rendering HTML; 404 for unpublished/noindex; linked from llms.txt.
 
 ### Performance — Core Web Vitals (images ship raw R2 bytes today)
