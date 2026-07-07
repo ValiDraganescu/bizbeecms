@@ -180,6 +180,102 @@ export function isEdgeCacheCandidate(input: {
 }
 
 /**
+ * Naughty-robot rate limiting (seo-robots): default cap advertised to crawlers
+ * that blow past the Workers rate-limit binding. The binding's actual
+ * period/limit is configured in wrangler.jsonc (`unsafe.bindings` — 100 req /
+ * 60s per key); this is the human-facing `Retry-After` we return on a 429.
+ * A fixed sane value (60s) — the binding period is the real gate.
+ */
+export const RATE_LIMIT_RETRY_AFTER = 60;
+
+/**
+ * Is this request eligible for per-IP rate limiting? Only PUBLIC PAGE traffic:
+ * a GET whose first path segment is not a system route (media/api/admin/preview/
+ * _next — the SAME SKIP_SEGMENTS gate as edge-cache), and not a dotted-root
+ * file (/sitemap.xml, /robots.txt, /llms.txt, /favicon.ico — crawlers legitimately
+ * hammer those; the edge cache already absorbs them, so don't 429 them).
+ *
+ * NON-GET (form posts, media uploads, admin writes) and system paths are exempt
+ * so a burst of legit authoring/API traffic is never throttled — the target is
+ * a bot crawling published pages, not the operator using the CMS. Mirrors the
+ * `isEdgeCacheCandidate` path shape deliberately (single source of truth for
+ * "what is a public page path").
+ */
+export function isRateLimitCandidate(input: {
+  method: string;
+  pathname: string;
+}): boolean {
+  if (input.method !== "GET") return false;
+  const segments = pathnameSegments(input.pathname);
+  const first = segments[0]?.trim().toLowerCase() ?? "";
+  if (SKIP_SEGMENTS.has(first)) return false;
+  // Dotted root files (sitemap/robots/llms/favicon) — same rule the edge-cache
+  // gate uses; crawlers hit these constantly and they're cheap/cached.
+  if (segments.length === 1 && first.includes(".")) return false;
+  return true;
+}
+
+/**
+ * The client IP to rate-limit on. Cloudflare sets `CF-Connecting-IP` on every
+ * inbound request (it's stripped/overwritten at the edge, so a client can't
+ * forge it). Falls back to a fixed shared key when absent (local/preview) so the
+ * limiter degrades to a single global bucket rather than throwing — never null.
+ */
+export function rateLimitKey(headers: {
+  get: (name: string) => string | null;
+}): string {
+  const ip = headers.get("CF-Connecting-IP") ?? headers.get("cf-connecting-ip");
+  return ip && ip.trim() !== "" ? ip.trim() : "shared";
+}
+
+/**
+ * Verified-crawler exemption (investigation, 2026-07-07): Cloudflare tags known
+ * good bots (Googlebot, Bingbot, …) on the request `cf` object. The RICH signal
+ * (`cf.botManagement.verifiedBot`, `cf.verifiedBotCategory`) is populated by the
+ * Bot Management product — an Enterprise add-on — so on workers.dev / Free/Pro
+ * it is USUALLY absent (undefined), and this helper simply returns false (no
+ * exemption → the IP limiter still applies). It's defensive: if the field IS
+ * present (Enterprise Site, or a future free surfacing of `verifiedBotCategory`),
+ * a verified crawler skips the limit so we never throttle Googlebot's crawl.
+ *
+ * FINDINGS: there is NO reliable FREE verified-bot flag on the `cf` object today
+ * — `cf.verifiedBotCategory`/`cf.botManagement` are Bot-Management-gated. The
+ * robust free alternative is a reverse-DNS check of CF-Connecting-IP against the
+ * crawler's published PTR (googlebot.com, search.msn.com), but that's a DNS
+ * round-trip per request — too heavy for this hot gate. So the shipped default
+ * is: generous cap (100/min) that legit crawlers stay under anyway, PLUS this
+ * cf-object exemption that "lights up for free" on any Site that does carry the
+ * signal. Do NOT reach for the reverse-DNS path here without a cache.
+ */
+export function isVerifiedCrawler(cf: unknown): boolean {
+  if (!cf || typeof cf !== "object") return false;
+  const c = cf as {
+    verifiedBotCategory?: unknown;
+    botManagement?: { verifiedBot?: unknown };
+  };
+  if (typeof c.verifiedBotCategory === "string" && c.verifiedBotCategory.trim() !== "") {
+    return true;
+  }
+  return c.botManagement?.verifiedBot === true;
+}
+
+/**
+ * The 429 response for a rate-limited public page request. `Retry-After` is the
+ * fixed window; `Cache-Control: no-store` so the edge never caches the throttle
+ * (a 429 is not a page, and the same IP must be re-checked next request).
+ */
+export function rateLimitedResponse(): Response {
+  return new Response("Too Many Requests", {
+    status: 429,
+    headers: {
+      "Retry-After": String(RATE_LIMIT_RETRY_AFTER),
+      "Cache-Control": "no-store",
+      "Content-Type": "text/plain; charset=utf-8",
+    },
+  });
+}
+
+/**
  * Markdown page-variant rewrite (seo-robots): a public GET for `/<path>.md`
  * (any depth) is served by the INTERNAL `/api/md/<path>` route — the plan build
  * + serialize can't run in the lean worker, and the `(site)` optional catch-all

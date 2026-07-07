@@ -36,7 +36,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   verified in repo that content-locales/route.ts:74 misses both tags while brand/llms PUTs purge theirs.
 
 ### Naughty-robot rate limiting (needs worker.ts, ships via release)
-- TODO: Worker-level per-IP rate limit on public page paths: Workers rate-limiting binding in CMS/wrangler.jsonc; `CMS/worker.ts` checks it BEFORE the OpenNext handler for public paths only (skip /admin /api /preview /media /_next — reuse/extend the `isEdgeCacheCandidate` path gate), 429 + Retry-After over the cap; fixed sane default (~100 req/min/IP); pure gate logic unit-tested; investigate cheap verified-crawler exemption (cf object fields available on workers.dev) and note findings.
+- DONE (2026-07-07): Worker-level per-IP rate limit on public page paths. `unsafe.bindings`
+  rate-limit binding `PUBLIC_RATE_LIMITER` (100 req/60s per key) in CMS/wrangler.jsonc; worker.ts
+  checks it BEFORE the OpenNext handler for public paths only via pure `isRateLimitCandidate`
+  (reuses the SAME SKIP_SEGMENTS + dotted-root gate as isEdgeCacheCandidate), 429 + `Retry-After:60`
+  + `no-store` over the cap; key = CF-Connecting-IP (→ "shared" fallback). Verified-crawler exemption
+  `isVerifiedCrawler(cf)` — cf.verifiedBotCategory/botManagement.verifiedBot are Bot-Management-gated
+  (usually absent Free/Pro → limiter still applies); no free cf flag today, reverse-DNS too heavy for
+  the hot gate, so generous cap + free cf-exemption is the shipped default. Best-effort (fails OPEN).
+  +13 tests (suite 1932), tsc clean. Release-gated (worker.ts/wrangler.jsonc, r-*) — live HITL pending.
 - TODO: Per-site rate-limit threshold: D1 setting + site-settings UI (Off / presets), read by worker.ts WITHOUT a per-request D1 read on the hot path (in-isolate cache with TTL, or piggyback an existing lookup — the edge-cache task's "extra D1 only on cache miss" precedent); localized EN/FI/ET.
 
 ### Lower-value follow-ups

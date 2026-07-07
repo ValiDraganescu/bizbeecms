@@ -23,6 +23,11 @@ import {
   mdVariantCacheHeaders,
   MD_MAX_AGE,
   REQUEST_PATH_HEADER,
+  isRateLimitCandidate,
+  rateLimitKey,
+  rateLimitedResponse,
+  isVerifiedCrawler,
+  RATE_LIMIT_RETRY_AFTER,
 } from "./edge-cache.ts";
 import { peelLocaleSegment } from "./slug.ts";
 import { SKIP_SEGMENTS } from "./localize-links.ts";
@@ -333,4 +338,63 @@ test("branded 404 falls back to site default for default-locale & absent paths",
   assert.equal(peelPath("/"), "en"); // root
   assert.equal(peelPath(""), "en"); // header absent (pre-release worker)
   assert.equal(peelPath(null), "en");
+});
+
+// ── naughty-robot rate limiting (seo-robots) ─────────────────────────────────
+
+test("public page GETs are rate-limit candidates", () => {
+  assert.equal(isRateLimitCandidate({ method: "GET", pathname: "/about" }), true);
+  assert.equal(isRateLimitCandidate({ method: "GET", pathname: "/" }), true);
+  assert.equal(isRateLimitCandidate({ method: "GET", pathname: "/fi/blog/hello" }), true);
+});
+
+test("non-GET requests are never rate-limited (authoring/API writes exempt)", () => {
+  assert.equal(isRateLimitCandidate({ method: "POST", pathname: "/about" }), false);
+  assert.equal(isRateLimitCandidate({ method: "PUT", pathname: "/about" }), false);
+  assert.equal(isRateLimitCandidate({ method: "HEAD", pathname: "/about" }), false);
+});
+
+test("system paths are exempt from rate limiting (same SKIP_SEGMENTS gate)", () => {
+  for (const seg of SKIP_SEGMENTS) {
+    assert.equal(
+      isRateLimitCandidate({ method: "GET", pathname: `/${seg}/x` }),
+      false,
+      `expected /${seg}/x to be rate-limit-exempt`,
+    );
+  }
+  assert.equal(isRateLimitCandidate({ method: "GET", pathname: "/Admin/pages" }), false);
+});
+
+test("dotted root files (sitemap/robots/llms/favicon) are rate-limit exempt", () => {
+  assert.equal(isRateLimitCandidate({ method: "GET", pathname: "/sitemap.xml" }), false);
+  assert.equal(isRateLimitCandidate({ method: "GET", pathname: "/robots.txt" }), false);
+  assert.equal(isRateLimitCandidate({ method: "GET", pathname: "/llms.txt" }), false);
+  assert.equal(isRateLimitCandidate({ method: "GET", pathname: "/favicon.ico" }), false);
+  // deeper dotted paths (a real wildcard-captured .md page) ARE candidates
+  assert.equal(isRateLimitCandidate({ method: "GET", pathname: "/blog/post.md" }), true);
+});
+
+test("rateLimitKey reads CF-Connecting-IP, falls back to a shared bucket", () => {
+  const hdr = (v: string | null) => ({ get: (n: string) => (n.toLowerCase() === "cf-connecting-ip" ? v : null) });
+  assert.equal(rateLimitKey(hdr("203.0.113.7")), "203.0.113.7");
+  assert.equal(rateLimitKey(hdr("  203.0.113.7  ")), "203.0.113.7"); // trimmed
+  assert.equal(rateLimitKey(hdr(null)), "shared"); // absent → single global bucket
+  assert.equal(rateLimitKey(hdr("")), "shared"); // empty → shared
+});
+
+test("rateLimitedResponse is a 429 with Retry-After and no-store", () => {
+  const res = rateLimitedResponse();
+  assert.equal(res.status, 429);
+  assert.equal(res.headers.get("Retry-After"), String(RATE_LIMIT_RETRY_AFTER));
+  assert.equal(res.headers.get("Cache-Control"), "no-store");
+});
+
+test("isVerifiedCrawler exempts only when the cf signal is present", () => {
+  assert.equal(isVerifiedCrawler(undefined), false); // no Bot Management (Free/Pro/workers.dev)
+  assert.equal(isVerifiedCrawler(null), false);
+  assert.equal(isVerifiedCrawler({}), false);
+  assert.equal(isVerifiedCrawler({ verifiedBotCategory: "" }), false); // blank = unverified
+  assert.equal(isVerifiedCrawler({ verifiedBotCategory: "Search Engine Crawler" }), true);
+  assert.equal(isVerifiedCrawler({ botManagement: { verifiedBot: true } }), true);
+  assert.equal(isVerifiedCrawler({ botManagement: { verifiedBot: false } }), false);
 });
