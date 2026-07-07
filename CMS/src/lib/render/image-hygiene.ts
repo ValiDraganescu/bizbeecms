@@ -20,6 +20,7 @@
  */
 
 import type { ElementPlan } from "./plan-types.ts";
+import { readAssetDims } from "./asset.ts";
 
 /** A finite positive number from a prop that may be a number OR numeric string. */
 function positiveDim(value: unknown): number | null {
@@ -50,9 +51,18 @@ function hygieneProps(
   }
 
   // CLS: reserve the box via aspect-ratio when BOTH dims are known and the author
-  // hasn't already set aspect-ratio in an inline style object.
-  const w = positiveDim(props.width);
-  const h = positiveDim(props.height);
+  // hasn't already set aspect-ratio in an inline style object. Author-set numeric
+  // width/height win; otherwise fall back to the `?w=&h=` dims the picker baked
+  // onto a /media/ src at authoring time (readAssetDims) — zero render-time D1.
+  let w = positiveDim(props.width);
+  let h = positiveDim(props.height);
+  if (w === null || h === null) {
+    const fromUrl = readAssetDims(props.src);
+    if (fromUrl) {
+      w = fromUrl.width;
+      h = fromUrl.height;
+    }
+  }
   if (w !== null && h !== null) {
     const style = props.style;
     const isObjStyle = style != null && typeof style === "object" && !Array.isArray(style);

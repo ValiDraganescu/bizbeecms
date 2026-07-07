@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { GalleryPicker } from "@/components/media/gallery-picker";
+import { withAssetDims } from "@/lib/render/asset";
 
 /**
  * Inline image field — stores a single asset URL, picked from a MODAL gallery
@@ -77,7 +78,10 @@ export function ImagePicker({
           confirmLabel={t("seoMetaImagePick")}
           onConfirm={(assets) => {
             const first = assets[0];
-            if (first) onChange(first.url);
+            // Bake the asset's intrinsic dims onto the URL (?w=&h=) at pick time so
+            // the render path can reserve the CLS box without a per-request D1 read.
+            // withAssetDims returns the plain URL when dims are absent/invalid.
+            if (first) onChange(withAssetDims(first.url, first.width, first.height));
             setOpen(false);
           }}
           onClose={() => setOpen(false)}

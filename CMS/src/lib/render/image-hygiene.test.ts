@@ -84,6 +84,29 @@ test("merges aspect-ratio into an existing style object", () => {
   assert.deepEqual(p.style, { objectFit: "cover", aspectRatio: "800 / 600" });
 });
 
+test("dims baked onto the src (?w=&h=) drive aspect-ratio when props absent", () => {
+  const out = applyImageHygiene([img({ src: "/media/assets/x_1_a.png?w=800&h=600" })]);
+  const p = (out[0] as { props: Record<string, unknown> }).props;
+  assert.deepEqual(p.style, { aspectRatio: "800 / 600" });
+});
+
+test("author width/height props win over ?w=&h= on the src", () => {
+  const out = applyImageHygiene([
+    img({ src: "/media/x.png?w=800&h=600", width: 400, height: 400 }),
+  ]);
+  const p = (out[0] as { props: Record<string, unknown> }).props;
+  assert.deepEqual(p.style, { aspectRatio: "400 / 400" });
+});
+
+test("bad/partial ?w=&h= query → no invented CLS box", () => {
+  const out = applyImageHygiene([
+    img({ src: "/media/x.png?w=800" }),
+    img({ src: "/media/y.png?w=abc&h=600" }),
+  ]);
+  assert.equal((out[0] as { props: Record<string, unknown> }).props.style, undefined);
+  assert.equal((out[1] as { props: Record<string, unknown> }).props.style, undefined);
+});
+
 test("non-img elements untouched; identity no-op when no images", () => {
   const plans = [box(box())];
   assert.equal(applyImageHygiene(plans), plans); // same reference

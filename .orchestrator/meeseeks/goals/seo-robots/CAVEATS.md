@@ -299,6 +299,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   always emits object styles, but string-safe regardless). `style` is a React OBJECT with camelCase
   `aspectRatio` — correct for the createElement adapter (htmlPropsToReact passes style objects
   verbatim). Visitor-independent (reads only the built plan) → edge-cache-safe.
+- (2026-07-07) Asset dims → render `<img>` CLS: dims are carried on the image URL as `?w=&h=`, baked
+  in at PICK time by `withAssetDims(url,w,h)` (pure, `lib/render/asset.ts`) and read back at render by
+  `readAssetDims(src)` — NO render-time D1 read (the caveats' hard constraint on the edge-cached/429
+  path). `applyImageHygiene` uses the URL dims ONLY as a FALLBACK when author width/height props are
+  absent (author props win). `withAssetDims` never stamps over a URL that already has a query (the
+  `/media` route adds its own `?fmt=` variant param) — so if you ever add ANOTHER query to an asset
+  URL, the dims won't be added and CLS silently regresses for that image; keep dims the FIRST query on
+  the URL, or extend both helpers to merge params. Only the ImagePicker (Block-tab image props + SEO
+  OG-image field) stamps dims today; images inserted by the AI or hand-typed `/media/…` URLs carry no
+  `?w=&h=` and get the lazy/decoding win but no CLS box (acceptable — never invents dims). Assets
+  uploaded before migration 0032 have NULL dims → plain URL, graceful.
 - (2026-07-07) Asset pixel dims: `asset.width`/`asset.height` are NULLABLE INTEGER (migration 0032)
   — NULL for non-images, undecodable files, older uploads, AND every non-media-uploader putAsset
   caller (theme fonts / site-import / AI generate / component-asset upload all omit dims). Only the

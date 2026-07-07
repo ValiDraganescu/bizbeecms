@@ -132,6 +132,49 @@ export function assetUrl(key: string): string {
 }
 
 /**
+ * Stamp an asset's intrinsic pixel dims onto its URL as `?w=&h=` query params.
+ * This is the AUTHORING-TIME dims carrier: the picker bakes dims into the stored
+ * URL string so the render path (`applyImageHygiene`) can read them off `src`
+ * with ZERO per-request D1 lookup (the caveats forbid a D1 read on the
+ * edge-cached / 429-sensitive render hot path). The `/media/[...key]` serve route
+ * keys off the PATH only and ignores the query, so the params are inert for
+ * serving. Dims run through `parseAssetDimension` (clamp/reject) before use, so a
+ * bad/absent dim just leaves the URL untouched. Idempotent-ish: a URL that
+ * already carries a query is returned unchanged (never double-stamp).
+ */
+export function withAssetDims(
+  url: string,
+  width: unknown,
+  height: unknown,
+): string {
+  if (!url || url.includes("?")) return url;
+  const w = parseAssetDimension(width);
+  const h = parseAssetDimension(height);
+  if (w === null || h === null) return url;
+  return `${url}?w=${w}&h=${h}`;
+}
+
+/**
+ * Read `?w=&h=` intrinsic dims off an asset `src` (the inverse of
+ * `withAssetDims`). Pure string parse — no `URL` (needs a base) — matches only a
+ * numeric `w`/`h`, so any other query is ignored. Returns null unless BOTH parse
+ * to sane clamped positive integers (`parseAssetDimension`). Used by
+ * `applyImageHygiene` to reserve the CLS box for gallery images whose author set
+ * no explicit width/height.
+ */
+export function readAssetDims(
+  src: unknown,
+): { width: number; height: number } | null {
+  if (typeof src !== "string") return null;
+  const q = src.indexOf("?");
+  if (q === -1) return null;
+  const params = new URLSearchParams(src.slice(q + 1));
+  const w = parseAssetDimension(params.get("w"));
+  const h = parseAssetDimension(params.get("h"));
+  return w !== null && h !== null ? { width: w, height: h } : null;
+}
+
+/**
  * Delivery format negotiation for `/media/<key>` (transform-on-delivery).
  *
  * PNG/JPEG masters (the AI generator emits ~1.5MB PNGs) are transcoded to WebP

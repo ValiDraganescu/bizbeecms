@@ -38,6 +38,9 @@ export interface GalleryAsset {
   size?: number;
   /** Upload time (ISO string over JSON). */
   createdAt?: string | number;
+  /** Intrinsic pixel dimensions when captured at upload; null/absent otherwise. */
+  width?: number | null;
+  height?: number | null;
 }
 
 function isImage(a: GalleryAsset): boolean {

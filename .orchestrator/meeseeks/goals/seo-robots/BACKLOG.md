@@ -30,14 +30,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   FOLLOW-UP (below): thread stored dims into the render `<img>` props so applyImageHygiene sets
   aspect-ratio on gallery images lacking author width/height (has render-hot-path implications — a
   dims lookup keyed by asset URL; the caveats forbid a new per-request D1 read on the render path).
-- TODO: Thread stored asset dims into render `<img>` props (image-hygiene CLS coverage for gallery
-  images). The dims now exist on `asset.width`/`height` (captured at upload). Make `applyImageHygiene`
-  (or the render host that builds img props) fill width/height/aspect-ratio for `<img src="/media/…">`
-  that carry NO author dims, by looking up the asset row by URL/key. CONSTRAINT (caveats): the render
-  path is the 429-sensitive hot path AND is edge-cached — do NOT add a per-request D1 read there.
-  Options to evaluate: (a) resolve dims once when the image is inserted into a block (bake width/height
-  onto the block prop at authoring time — no render-time lookup), or (b) an in-isolate cached
-  key→dims map hydrated off the hot path. Prefer (a): stamp dims when the picker inserts an asset.
+- DONE (2026-07-07): Thread stored asset dims into render `<img>` props (image-hygiene CLS coverage
+  for gallery images). Chose approach (a) — authoring-time, ZERO render-time D1: the picker bakes the
+  asset's intrinsic dims onto the URL as `?w=&h=` (`withAssetDims`, pure), and `applyImageHygiene`
+  reads them off `src` (`readAssetDims`, pure) as a FALLBACK when author width/height props are
+  absent. The `/media/[...key]` serve route ignores the query (keys off the path), so the params are
+  inert for serving. `GalleryAsset` gained `width?`/`height?`. 7 new asserts (asset-dims.test.ts +
+  image-hygiene.test.ts). No worker.ts change → ships on the next normal CMS build (no r-* release).
 - TODO: INVESTIGATION (design note, not code): responsive image variants for `/media/[...key]` R2 assets on per-site Workers — evaluate Cloudflare Images API upload-time variants vs zone Image Resizing (custom-domain sites only; workers.dev sites can't) vs in-Worker resizing (no native codecs on Workers — likely dead end); deliverable = chosen path + cost/constraints written to this goal's JOURNAL + CAVEATS, and implementation tasks filed accordingly.
 - BLOCKED (on the investigation above): implement responsive images — srcset/sizes + modern format (WebP/AVIF) for asset images in published pages per the chosen design.
 

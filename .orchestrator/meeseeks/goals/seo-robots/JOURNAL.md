@@ -639,3 +639,30 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/render/asset.ts, CMS/scripts/asset.test.mjs, CMS/src/db/asset-store.ts,
   CMS/src/lib/chat/image-thumb.ts, CMS/src/components/media/media-library.tsx,
   CMS/src/app/api/assets/route.ts
+
+## 2026-07-07 13:37 — Thread asset dims into render <img> for CLS (authoring-time, zero render D1)
+- **Status:** DONE
+- **What I did:** Closed the CLS gap for gallery images by carrying intrinsic pixel dims on the
+  image URL as `?w=&h=` query params, baked in at PICK time — so `applyImageHygiene` sets an
+  aspect-ratio for gallery images that carry no author width/height, with ZERO per-request D1 read
+  on the edge-cached / 429-sensitive render hot path (the caveats' hard constraint).
+  - **Encode (authoring):** `withAssetDims(url,w,h)` (pure, `lib/render/asset.ts`) appends `?w=&h=`
+    only when BOTH dims pass `parseAssetDimension` (clamp/reject) and the URL has no query yet
+    (never double-stamps over the media route's `?fmt=` variant param). `ImagePicker.onConfirm`
+    now calls it — the Block-tab image props + SEO OG-image field pick a dims-stamped URL. Assets
+    uploaded before migration 0032 (no dims) → plain URL, graceful.
+  - **Decode (render):** `readAssetDims(src)` (pure) parses `?w=&h=` back via URLSearchParams;
+    `applyImageHygiene.hygieneProps` falls back to it ONLY when author width/height props are
+    absent (author props always win). The `/media/[...key]` serve route keys off the PATH and
+    ignores the query, so the params are inert for serving.
+  - `GalleryAsset` gained `width?`/`height?` (the list/POST JSON already spreads the row → dims
+    already flow to the client; just needed the type).
+- **Verified:** `npm test` 1841/1841 (was 1838; +3 image-hygiene URL-dims cases + a new
+  `asset-dims.test.ts` with 4 round-trip/reject cases = 7 new asserts across 2 files);
+  `npx tsc --noEmit` exit 0. asset.ts stays import-free → image-hygiene's new import is dep-free
+  under `node --test`. Did NOT run opennext build (pure helpers + one client-picker line + a type
+  field; tsc+tests cover it) nor live Lighthouse/CWV (HITL — needs a deployed Site). No worker.ts
+  change → no r-* release needed; this ships on the next normal CMS build.
+- **Files:** CMS/src/lib/render/asset.ts, CMS/src/lib/render/asset-dims.test.ts,
+  CMS/src/lib/render/image-hygiene.ts, CMS/src/lib/render/image-hygiene.test.ts,
+  CMS/src/components/page-builder/image-picker.tsx, CMS/src/components/media/media-library.tsx
