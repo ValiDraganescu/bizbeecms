@@ -675,3 +675,20 @@ Read every line before working. Each entry was learned the hard way by a previou
   it's best-effort. The REGENERATE BUTTON (item 4/4, next) must reuse `screenshotPageToR2` +
   `ogImageKey` but FORCE (skip the existing-key idempotency probe) — it's the explicit "refresh after
   redesign" path; expose a per-locale API action + a manual/auto badge in the SEO tab, EN/FI/ET.
+
+- (2026-07-07) OG REGENERATE button (OG track item 4/4 — track CLOSED): `regenerateOgImageForPage(id,
+  locale)` (og-image-notify.ts) is the SYNCHRONOUS twin of the publish hook — the operator is waiting,
+  so it does NOT use `waitUntilOrInline`; it returns an `OgRegenerateResult` with a stable `code`. It
+  DELIBERATELY skips the existing-key probe (unlike `generateOgImagesForPage`) — regenerate ALWAYS
+  overwrites `og/<id>.<loc>.png` in place (same R2 key → no orphan). It REFUSES when a manual per-locale
+  metaImage exists (`manualWins`) because an upload always wins in `resolveOgImageUrl`, so a screenshot
+  would be dead bytes; the SEO-tab button is ALSO disabled when manual is set (belt+braces). Route
+  `api/pages/[id]/og-image`: POST regenerates + purges `pageCacheTag(id)` on success (so
+  generateMetadata reshoots the fallback via its autoExists probe); 503 for noBinding/noOrigin (this is
+  a DEPLOY-ONLY feature — local dev has no BROWSER binding, so the button will 503 `ogErrNoBinding`
+  here, which is CORRECT, not a bug), 400 otherwise. GET `?locale=` powers the manual/auto/none badge
+  with ONE R2 probe (only when no manual) — mirrors the generateMetadata autoExists probe; keep the two
+  in sync if the key scheme changes. i18n: OG_ERR_KEY in seo-form.tsx maps every server code → a
+  `pageBuilder.ogErr*` key; `og-regenerate.test.mjs` FAILS if a code has no message in en/fi/et — add
+  the key in ALL THREE files when you add a code. Live screenshot round-trip stays HITL (paid plan +
+  `@cloudflare/puppeteer` + BROWSER binding + deployed R2).

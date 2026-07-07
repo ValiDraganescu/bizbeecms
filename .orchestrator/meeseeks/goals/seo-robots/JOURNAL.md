@@ -1212,3 +1212,32 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** src/lib/render/og-image.ts (planOgScreenshots + ogImageKeysForLocales),
   src/lib/render/og-image-notify.ts (NEW), src/app/api/pages/[id]/publish/route.ts,
   src/app/api/pages/route.ts, scripts/og-image.test.mjs.
+
+## 2026-07-07 13:xx — OG-image REGENERATE button (OG track item 4/4 — CLOSES the OG track)
+- **Status:** DONE
+- **What I did:** The explicit "refresh after a redesign" path for the fallback og:image.
+  - **Pure/coupled shell:** `regenerateOgImageForPage(pageId, locale)` in `og-image-notify.ts` —
+    reuses `loadOgContext` but FORCE-shoots one page×locale SYNCHRONOUSLY (operator is waiting),
+    SKIPPING the publish hook's existing-key idempotency probe. Refuses when a manual per-locale
+    metaImage exists (`manualWins` — an upload always wins). Returns a structured
+    `OgRegenerateResult` with a STABLE `code` (manualWins|noUrl|noBinding|noOrigin|error).
+  - **Route** `app/api/pages/[id]/og-image/route.ts` (admin-guarded, REST-only):
+    - POST `{locale}` → force regenerate; 503 for noBinding/noOrigin (deploy-only feature), 400 for
+      the rest + badLocale; on success purges `pageCacheTag(id)` so metadata reshoots the fallback.
+    - GET `?locale=` → `{manual,autoExists,url}` via `resolveOgImageUrl` for the SEO-tab badge; one
+      R2 probe only when there's no manual image (mirrors generateMetadata's autoExists probe).
+  - **SEO tab UI:** `OgAutoImage` sub-component in `seo-form.tsx` under the ImagePicker — effective-
+    source badge (manual upload / auto screenshot / none), hint, and a "Generate from page" button
+    DISABLED when a manual image is set. Re-keyed by the fieldset `key={loc}` so state resets on
+    locale switch. Reflects the just-saved manual value optimistically, then confirms auto from GET.
+  - Localized EN/FI/ET — 14 pageBuilder keys (ogAutoTitle/Hint, ogSource{Manual,Auto,None},
+    ogRegenerate/-ing/-ed, ogErr{ManualWins,NoUrl,NoBinding,NoOrigin,Error}).
+  - Did NOT touch worker.ts / wrangler.jsonc (parallel Meeseeks owns them this cycle).
+- **Verified:** +6 tests (`scripts/og-regenerate.test.mjs` — every stable server code + every OG UI
+  key present in all 3 locale files). Full suite 1943 → 1949 pass. `npx tsc --noEmit` clean. Full
+  `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare build` GREEN (compile + TS + static + OpenNext
+  bundle). Live screenshot round-trip is HITL (paid plan + `@cloudflare/puppeteer` + BROWSER binding
+  + deployed R2).
+- **Files:** src/lib/render/og-image-notify.ts (+regenerateOgImageForPage), src/app/api/pages/[id]/
+  og-image/route.ts (NEW), src/components/page-builder/seo-form.tsx (+OgAutoImage), messages/{en,fi,
+  et}.json, scripts/og-regenerate.test.mjs (NEW).

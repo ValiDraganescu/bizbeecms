@@ -141,6 +141,44 @@ export async function generateOgImagesForPage(pageId: string): Promise<void> {
 }
 
 /**
+ * EXPLICIT regenerate (SEO-tab button): force a fresh screenshot for ONE
+ * page×locale, SKIPPING the existing-key idempotency probe — this is the
+ * "refresh after a redesign" path, unlike the publish hook which only fills
+ * gaps. Runs SYNCHRONOUSLY (the operator is waiting for a result) and returns a
+ * structured outcome with a STABLE `code` the SEO tab localizes.
+ *
+ * Refuses when a manual per-locale metaImage exists (`manualWins`) — an upload
+ * always beats autogen, so regenerating would produce a screenshot nothing uses.
+ */
+export type OgRegenerateResult =
+  | { ok: true; key: string }
+  | { ok: false; code: "manualWins" | "noUrl" | "noBinding" | "noOrigin" | "error"; detail?: string };
+
+export async function regenerateOgImageForPage(
+  pageId: string,
+  locale: string,
+): Promise<OgRegenerateResult> {
+  try {
+    const cfg = await loadOgContext(pageId);
+    if (!cfg) return { ok: false, code: "noOrigin" };
+    if ((cfg.manualImageByLocale[locale] ?? "").trim()) {
+      return { ok: false, code: "manualWins" };
+    }
+    const pageUrl = cfg.urlsByLocale[locale];
+    if (!pageUrl) return { ok: false, code: "noUrl" };
+
+    const key = ogImageKey(pageId, locale);
+    const shot = await screenshotPageToR2(pageUrl, key);
+    if (shot.ok) return { ok: true, key };
+    if (shot.reason === "no-binding") return { ok: false, code: "noBinding" };
+    if (shot.reason === "no-origin") return { ok: false, code: "noOrigin" };
+    return { ok: false, code: "error", detail: shot.detail };
+  } catch (e) {
+    return { ok: false, code: "error", detail: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
  * Delete hook: remove every auto OG screenshot a page could have had. Called
  * BEFORE (or alongside) the page delete — the keys are derived from the
  * configured locales, not the page row, so it's safe either way. Best-effort.

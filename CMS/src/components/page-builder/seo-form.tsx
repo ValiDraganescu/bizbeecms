@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { setLocaleValue, buildSeoMetaBody } from "@/lib/pages/page-meta";
 import type { PageSummary } from "@/db/page-store";
@@ -113,6 +113,7 @@ export function SeoForm({
             onChange={(url) => setMetaImage((m) => setLocaleValue(m, loc, url))}
           />
         </div>
+        <OgAutoImage pageId={page.id} locale={loc} hasManual={!!(metaImage[loc] ?? "").trim()} />
       </fieldset>
 
       <label className="flex items-start gap-2 border-t border-border pt-3">
@@ -147,5 +148,118 @@ export function SeoForm({
         {busy ? t("saving") : t("seoSave")}
       </button>
     </form>
+  );
+}
+
+const OG_ERR_KEY: Record<string, string> = {
+  manualWins: "ogErrManualWins",
+  noUrl: "ogErrNoUrl",
+  noBinding: "ogErrNoBinding",
+  noOrigin: "ogErrNoOrigin",
+  error: "ogErrError",
+  badLocale: "ogErrError",
+};
+
+/**
+ * Auto OG-image status + regenerate for the ACTIVE locale. Shows which image is
+ * effective (manual upload / auto screenshot / none) and a "Generate from page"
+ * button that FORCE-reshoots (skips the publish hook's idempotency). Disabled
+ * when a manual image is set (an upload always wins). Best-effort: on a deploy-
+ * only feature (no BROWSER binding locally) POST returns a localized reason.
+ *
+ * ponytail: re-keyed by pageId+locale via `key` in the parent fieldset (loc is
+ * the fieldset key), so state resets on locale switch — no manual reset needed.
+ */
+function OgAutoImage({
+  pageId,
+  locale,
+  hasManual,
+}: {
+  pageId: string;
+  locale: string;
+  hasManual: boolean;
+}) {
+  const t = useTranslations("pageBuilder");
+  const [source, setSource] = useState<"manual" | "auto" | "none">(
+    hasManual ? "manual" : "none",
+  );
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/pages/${pageId}/og-image?locale=${encodeURIComponent(locale)}`,
+      );
+      if (!res.ok) return;
+      const j = (await res.json()) as { manual?: boolean; autoExists?: boolean };
+      setSource(j.manual ? "manual" : j.autoExists ? "auto" : "none");
+    } catch {
+      /* leave last-known source */
+    }
+  }, [pageId, locale]);
+
+  useEffect(() => {
+    // Reflect the just-saved manual value immediately; then confirm auto from R2.
+    setSource(hasManual ? "manual" : "none");
+    if (!hasManual) void refresh();
+  }, [hasManual, refresh]);
+
+  async function regenerate() {
+    setMsg(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/pages/${pageId}/og-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { code?: string };
+      if (!res.ok) {
+        setMsg({ ok: false, text: t(OG_ERR_KEY[j.code ?? "error"] ?? "ogErrError") });
+        return;
+      }
+      setSource("auto");
+      setMsg({ ok: true, text: t("ogRegenerated") });
+    } catch {
+      setMsg({ ok: false, text: t("ogErrError") });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const badge =
+    source === "manual"
+      ? t("ogSourceManual")
+      : source === "auto"
+        ? t("ogSourceAuto")
+        : t("ogSourceNone");
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-border pt-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-foreground-muted">{t("ogAutoTitle")}</span>
+        <span className="rounded-full bg-surface px-2 py-0.5 text-xs text-foreground-muted">
+          {badge}
+        </span>
+      </div>
+      <p className="text-xs text-foreground-muted">{t("ogAutoHint")}</p>
+      <button
+        type="button"
+        onClick={() => void regenerate()}
+        disabled={busy || hasManual}
+        className="self-start rounded-md border border-border px-3 py-1.5 text-sm text-foreground disabled:opacity-60"
+      >
+        {busy ? t("ogRegenerating") : t("ogRegenerate")}
+      </button>
+      {msg && (
+        <p
+          role={msg.ok ? "status" : "alert"}
+          className={`text-xs ${msg.ok ? "text-foreground-muted" : "text-danger"}`}
+        >
+          {msg.text}
+        </p>
+      )}
+    </div>
   );
 }

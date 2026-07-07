@@ -36,7 +36,18 @@ Task states: TODO | DOING | DONE | BLOCKED.
   concurrency), all best-effort under `ctx.waitUntil`. Wired into publish POST + pages DELETE. No-op
   without the BROWSER binding. +6 tests (suite 1943), tsc clean. Live round-trip HITL (paid plan +
   `@cloudflare/puppeteer` + BROWSER binding + deployed R2). Did NOT touch worker.ts/wrangler.jsonc.
-- TODO: OG-image regenerate button: per-locale "Generate from page" action in the page-settings SEO tab (API route, stable error codes) that (re)screenshots on demand — the explicit path for refreshing after theme/content redesigns; SEO tab shows the currently effective og:image with a manual/auto badge; localized EN/FI/ET.
+- DONE (2026-07-07): OG-image regenerate button (OG track item 4/4 — CLOSES the OG track).
+  `regenerateOgImageForPage(pageId, locale)` (og-image-notify.ts) FORCE-screenshots one page×locale
+  SYNCHRONOUSLY, SKIPPING the publish hook's idempotency probe (the explicit "refresh after redesign"
+  path); refuses when a manual metaImage exists (`manualWins`). New route
+  `api/pages/[id]/og-image/route.ts`: POST regenerates (stable codes manualWins|noUrl|noBinding|
+  noOrigin|error|badLocale; 503 for noBinding/noOrigin, 400 else) + purges pageCacheTag(id) on
+  success; GET `?locale=` returns `{manual,autoExists,url}` for the SEO-tab manual/auto/none badge
+  (one R2 probe, only when no manual). SEO tab (`seo-form.tsx` `OgAutoImage` sub-component) shows the
+  effective-source badge + "Generate from page" button (disabled when manual set). Localized EN/FI/ET
+  (14 keys). +6 tests (og-regenerate.test.mjs, i18n-key completeness), suite 1949, tsc clean, full
+  opennext build green. Did NOT touch worker.ts/wrangler.jsonc. Live screenshot round-trip = HITL
+  (paid plan + @cloudflare/puppeteer + BROWSER binding + deployed R2).
 
 ### Edge-cache purge coverage
 - TODO: Purge `SITEMAP_CACHE_TAG` + `LLMS_CACHE_TAG` on content-locales settings save
