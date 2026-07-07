@@ -196,6 +196,27 @@ export async function listPages(): Promise<PageSummary[]> {
   return rows.map((r) => toSummary(r, idToSlug));
 }
 
+/**
+ * The minimal path columns for EVERY page (id, slug, parentPageId,
+ * localizedSlugs) — what the path/URL machinery (`pagePathsByLocale`,
+ * `createPathTranslator`) needs to reconstruct URLs. Used by the rename
+ * auto-capture to snapshot the tree BEFORE and AFTER a meta edit. Best-effort
+ * callers wrap in try/catch.
+ */
+export async function getPathRows(injectedDb?: Db): Promise<
+  { id: string; slug: string; parentPageId: string | null; localizedSlugs: string | null }[]
+> {
+  const db = injectedDb ?? (await getDb());
+  return db
+    .select({
+      id: schema.page.id,
+      slug: schema.page.slug,
+      parentPageId: schema.page.parentPageId,
+      localizedSlugs: schema.page.localizedSlugs,
+    })
+    .from(schema.page);
+}
+
 /** One page by id, or null. */
 export async function getPageById(id: string): Promise<PageSummary | null> {
   const db = await getDb();

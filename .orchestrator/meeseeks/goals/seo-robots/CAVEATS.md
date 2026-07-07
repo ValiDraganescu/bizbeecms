@@ -63,6 +63,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   into a route handler / middleware. The redirect table + serving lives in
   `(site)/[[...slug]]/page.tsx` (loadPlan miss → getRedirect → throw before
   notFound). Pure matcher `lib/render/redirects.ts`, store `db/redirect-store.ts`.
+- (2026-07-07) Rename auto-capture: `api/pages/route.ts` snapshots ALL path rows
+  (`getPathRows`) BEFORE `upsertPageMeta`, then on `res.pathChanged` diffs old→new via
+  `redirectsForRename` (pure, in redirects.ts) and stores via `applyRenameRedirects`
+  (redirect-store). The whole block is best-effort (try/catch) — it MUST never fail the
+  page save. `pathChanged` comes from upsertPageMeta (uses `pagePathInputsChanged`); it's
+  false for pure SEO/publish edits, so no redirect churn on those. Affected set =
+  `descendantIds(oldRows,id)` because a rename shifts the whole subtree's URLs, not just
+  the one page. `applyRenameRedirects` also prevents CHAINS (rewrites existing redirects
+  pointing at an old path) — don't add a second chain-guard elsewhere. If you add a rename
+  path OUTSIDE this route (e.g. an AI rename tool), it must call the same trio or renames
+  there silently 404 inbound links.
 - (2026-07-07) Redirect path NORMALIZATION is case-SENSITIVE and lives in ONE
   place (`normalizeRedirectPath`) used at BOTH insert (store) and lookup so the
   unique index `redirect_from_path_unique` and the matcher agree. When you build

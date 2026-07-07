@@ -136,3 +136,29 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/render/redirects.ts, CMS/src/lib/render/redirects.test.ts,
   CMS/src/app/(site)/[[...slug]]/page.tsx,
   CMS/migrations/0029_brief_malcolm_colcord.sql, CMS/migrations/meta/*
+
+## 2026-07-07 11:16 — 301 redirects task 2: auto-capture on rename
+- **Status:** DONE
+- **What I did:** A slug/parent/localized-slug rename now auto-creates 301 redirects
+  old→new for the renamed page AND its whole subtree, in every content locale, and
+  re-notifies IndexNow with the OLD URLs (crawlers were hitting 404s until now).
+  - **Pure diff** `redirectsForRename(oldRows,newRows,affectedIds,defaultLocale,codes)`
+    in `lib/render/redirects.ts`: builds old vs new `pagePathsByLocale` per affected id
+    (same machinery as sitemap/IndexNow so stored `fromPath` matches `getRedirect`), drops
+    unchanged/self pairs, dedupes `from` (first wins). Wildcard `:param` pages skipped.
+  - **Pure** `descendantIds(rows,pageId)` in `localize-paths.ts`: page + full subtree,
+    cycle-safe (rename shifts the whole subtree's URLs).
+  - **Store** `applyRenameRedirects(pairs)` in `db/redirect-store.ts`: upserts each old→new
+    (store normalizes + drops self-redirects), then NO-CHAINS rewrites existing redirects
+    whose target == an old path to the new target (a→b + b→c ⇒ a→c), deleting any that
+    would become a self-loop. `getPathRows()` added to page-store for the before/after snapshot.
+  - **Wired** into `api/pages/route.ts` persist(): snapshot rows BEFORE upsertPageMeta;
+    on `res.pathChanged`, diff + apply + notifyIndexNowUrls(old URLs). Entirely best-effort
+    (try/catch) — never fails the page save. notifyIndexNowForPage (new URLs) still fires after.
+- **Verified:** 5 new pure tests (default rename captures parent+descendant across en+fi,
+  unchanged→[], localized-slug moves only that locale, from-dedupe, descendantIds subtree/cycle).
+  Full suite 1722→1727 pass; `tsc --noEmit` clean. Could NOT verify live (needs a deployed
+  site with real D1 + reachable origin — HITL).
+- **Files:** `src/lib/render/redirects.ts`, `src/lib/render/localize-paths.ts`,
+  `src/db/redirect-store.ts`, `src/db/page-store.ts`, `src/app/api/pages/route.ts`,
+  `src/lib/render/redirects.test.ts`

@@ -31,6 +31,32 @@ export type PathTranslator = (path: string, locale: string) => string;
 
 const ROOT_KEY = "";
 
+/**
+ * `pageId` plus every descendant id (children, grandchildren, …) in `rows`.
+ * A slug/parent edit on one page shifts the URL of its whole subtree, so the
+ * rename auto-capture needs the full set. Cycle-safe (a `seen` guard). PURE.
+ */
+export function descendantIds(rows: PathPageRow[], pageId: string): string[] {
+  const childrenOf = new Map<string, string[]>();
+  for (const r of rows) {
+    if (r.parentPageId === null) continue;
+    const list = childrenOf.get(r.parentPageId);
+    if (list) list.push(r.id);
+    else childrenOf.set(r.parentPageId, [r.id]);
+  }
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const stack = [pageId];
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    for (const child of childrenOf.get(id) ?? []) stack.push(child);
+  }
+  return out;
+}
+
 /** parentPageId (null → "") → child rows, for the segment-by-segment walk. */
 function childrenIndex(rows: PathPageRow[]): Map<string, PathPageRow[]> {
   const byParent = new Map<string, PathPageRow[]>();

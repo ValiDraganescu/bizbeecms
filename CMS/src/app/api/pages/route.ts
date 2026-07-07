@@ -13,10 +13,15 @@
  * OpenNext/Workers). Pure validation in `lib/pages/page-meta.ts`; D1 in
  * `db/page-store.ts`. Live D1 needs a real binding (HITL).
  */
-import { deletePage, listPages, upsertPageMeta } from "@/db/page-store";
+import { deletePage, getPathRows, listPages, upsertPageMeta } from "@/db/page-store";
+import { applyRenameRedirects } from "@/db/redirect-store";
 import { validatePageMeta } from "@/lib/pages/page-meta";
 import { getContentLocales } from "@/db/settings-store";
 import { localeSlugConflicts } from "@/lib/render/localize";
+import { redirectsForRename } from "@/lib/render/redirects";
+import { descendantIds, type PathPageRow } from "@/lib/render/localize-paths";
+import { pageUrlsAllLocales } from "@/lib/render/indexnow";
+import { resolveSiteOrigin } from "@/lib/render/site-origin";
 import { requireAdmin } from "@/lib/auth/guard";
 import { PAGES_CACHE_TAG, pageCacheTag } from "@/lib/render/edge-cache";
 import { purgeEdgeTags } from "@/lib/render/purge-edge";
@@ -116,6 +121,17 @@ async function persist(body: unknown, id: string | null): Promise<Response> {
         );
       }
     }
+    // Snapshot the page tree BEFORE the write so a rename can diff old→new
+    // URLs and auto-capture 301 redirects. Only needed on an UPDATE (creates
+    // can't move anything). Best-effort — an empty snapshot just skips capture.
+    let oldRows: PathPageRow[] = [];
+    if (id !== null) {
+      try {
+        oldRows = (await getPathRows()) as PathPageRow[];
+      } catch {
+        oldRows = [];
+      }
+    }
     const res = await upsertPageMeta(v.meta, id);
     if (!res.ok) return Response.json({ error: res.errors.join("; ") }, { status: 409 });
     // Meta updates (incl. the publish/UNPUBLISH toggle, slug + SEO changes)
@@ -128,10 +144,38 @@ async function persist(body: unknown, id: string | null): Promise<Response> {
       await purgeEdgeTags(
         ...(res.pathChanged ? [PAGES_CACHE_TAG, pageCacheTag(id)] : [pageCacheTag(id)]),
       );
+      // A PATH change (slug/parent/localized-slug rename) moved this page and its
+      // whole subtree's URLs — auto-capture 301 redirects old→new so inbound
+      // links (and search rankings) survive the rename, and re-notify IndexNow
+      // with the OLD URLs (notifyIndexNowForPage below only submits the new ones,
+      // so crawlers would keep hitting 404s until they recrawled). Best-effort:
+      // any failure here must never fail the page save.
+      if (res.pathChanged && oldRows.length > 0) {
+        try {
+          const [newRows, { default: defaultLocale, locales: codes }, origin] =
+            await Promise.all([
+              getPathRows() as Promise<PathPageRow[]>,
+              getContentLocales(),
+              resolveSiteOrigin(),
+            ]);
+          const affected = descendantIds(oldRows, id);
+          const pairs = redirectsForRename(oldRows, newRows, affected, defaultLocale, codes);
+          if (pairs.length > 0) {
+            await applyRenameRedirects(pairs);
+            // Re-notify IndexNow with the OLD absolute URLs (now redirecting).
+            if (origin) {
+              const oldUrls = affected.flatMap((pid) =>
+                pageUrlsAllLocales(origin, oldRows, pid, defaultLocale, codes),
+              );
+              notifyIndexNowUrls(oldUrls);
+            }
+          }
+        } catch {
+          // Auto-capture is best-effort; the page save already succeeded.
+        }
+      }
       // Content/URL of an existing page changed (publish toggle, slug/SEO edit) —
       // tell IndexNow to recrawl its (possibly new) URLs. Best-effort, non-blocking.
-      // Old URLs on a RENAME are handled later by 301 redirects (backlog); this
-      // submits the new URLs so engines pick up the moved page.
       await notifyIndexNowForPage(id);
     }
     return Response.json(res, { status: id === null ? 201 : 200 });

@@ -77,3 +77,56 @@ export async function deleteRedirect(id: string, injectedDb?: Db): Promise<void>
   const db = injectedDb ?? (await getDb());
   await db.delete(schema.redirect).where(eq(schema.redirect.id, id));
 }
+
+/**
+ * Apply the redirects a page rename produced (seo-robots auto-capture). For each
+ * old→new path move:
+ *   1. upsert a redirect old→new (the store normalizes + drops self-redirects),
+ *   2. NO CHAINS: rewrite any EXISTING redirect whose target is an old path so
+ *      it points straight at the new target (a→b existed, b→c now moves → a→c),
+ *   3. any redirect that would now be a self-loop (from === new target) is
+ *      deleted rather than left as a dead row.
+ * Paths are normalized on both write and compare so the unique index + the
+ * hot-path `getRedirect` match. Best-effort per row is the caller's concern; this
+ * runs the whole batch in one D1 seam. Returns the count of redirects stored.
+ */
+export async function applyRenameRedirects(
+  pairs: { from: string; to: string }[],
+  injectedDb?: Db,
+): Promise<number> {
+  const db = injectedDb ?? (await getDb());
+  if (pairs.length === 0) return 0;
+  // Normalize once; build the old→new map for chain rewriting.
+  const moves = pairs
+    .map((p) => ({ from: normalizeRedirectPath(p.from), to: normalizeRedirectPath(p.to) }))
+    .filter((p) => p.from !== p.to);
+  if (moves.length === 0) return 0;
+  const oldToNew = new Map(moves.map((m) => [m.from, m.to]));
+
+  // 1. Store the new old→new redirects.
+  let stored = 0;
+  for (const m of moves) {
+    const row = await upsertRedirect({ fromPath: m.from, toPath: m.to, status: 301 }, db);
+    if (row) stored++;
+  }
+
+  // 2 + 3. Rewrite existing redirects that pointed AT an old path (no chains),
+  //         then drop any that became a self-loop.
+  const existing = await listRedirects(db);
+  for (const r of existing) {
+    const target = normalizeRedirectPath(r.toPath);
+    const moved = oldToNew.get(target);
+    if (moved === undefined) continue; // target didn't move
+    const from = normalizeRedirectPath(r.fromPath);
+    if (from === moved) {
+      // Rewriting would create a self-loop → drop the row.
+      await deleteRedirect(r.id, db);
+    } else {
+      await db
+        .update(schema.redirect)
+        .set({ toPath: moved })
+        .where(eq(schema.redirect.id, r.id));
+    }
+  }
+  return stored;
+}

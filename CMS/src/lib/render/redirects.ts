@@ -13,6 +13,8 @@
  * module adds NO cache handling.
  */
 
+import { pagePathsByLocale, createPathTranslator, type PathPageRow } from "./localize-paths.ts";
+
 /** A stored redirect row (subset the lookup needs). */
 export interface RedirectRow {
   fromPath: string;
@@ -59,6 +61,59 @@ export function normalizeRedirectPath(raw: string): string {
 /** Clamp a stored status to a supported redirect status (301 default). */
 function normalizeStatus(status: number): 301 | 302 {
   return status === 302 ? 302 : 301;
+}
+
+/** A captured old→new path move produced by a page rename. */
+export interface RedirectPair {
+  from: string;
+  to: string;
+}
+
+/**
+ * Compute the 301 redirects a page rename produces (seo-robots — auto-capture).
+ *
+ * A slug/parent/localized-slug edit on ONE page shifts the URL of that page AND
+ * all its descendants, in every content locale. Given the page-table rows
+ * BEFORE and AFTER the edit plus the affected page ids, this returns the
+ * {from: OLD locale path, to: NEW locale path} pairs to store — using the exact
+ * same path machinery the sitemap/IndexNow use (`pagePathsByLocale`), so the
+ * stored `fromPath` matches what the redirect serving path (getRedirect) will
+ * later look up. Pairs are normalized with `normalizeRedirectPath`, and
+ * unchanged / self pairs are dropped. Duplicate `from` paths are de-duped
+ * (first wins). PURE.
+ *
+ * `affectedIds` are the ids whose path may have moved (the renamed page + its
+ * descendants). Wildcard `:param` pages yield no enumerable path (undefined) and
+ * are skipped, exactly like the sitemap.
+ */
+export function redirectsForRename(
+  oldRows: PathPageRow[],
+  newRows: PathPageRow[],
+  affectedIds: string[],
+  defaultLocale: string,
+  codes: string[],
+): RedirectPair[] {
+  const oldTranslate = createPathTranslator(oldRows, defaultLocale);
+  const newTranslate = createPathTranslator(newRows, defaultLocale);
+  const seen = new Set<string>();
+  const pairs: RedirectPair[] = [];
+  for (const id of affectedIds) {
+    const before = pagePathsByLocale(oldRows, id, {}, defaultLocale, codes, oldTranslate);
+    const after = pagePathsByLocale(newRows, id, {}, defaultLocale, codes, newTranslate);
+    if (!before || !after) continue; // wildcard / unreconstructible → skip
+    for (const code of codes) {
+      const from = before[code];
+      const to = after[code];
+      if (from === undefined || to === undefined) continue;
+      const nFrom = normalizeRedirectPath(from);
+      const nTo = normalizeRedirectPath(to);
+      if (nFrom === nTo) continue; // path didn't move for this locale
+      if (seen.has(nFrom)) continue; // one redirect per source path
+      seen.add(nFrom);
+      pairs.push({ from: nFrom, to: nTo });
+    }
+  }
+  return pairs;
 }
 
 /**
