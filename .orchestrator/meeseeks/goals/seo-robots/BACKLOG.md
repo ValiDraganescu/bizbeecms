@@ -40,7 +40,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
   exported from load-plan.ts). A 404 is never edge-cached so reading the request header here is safe.
 
 ### OG-image autogen (fallback og:image via Browser Rendering — start with the tracer/decision)
-- TODO: OG-image autogen tracer + decision: Cloudflare Browser Rendering screenshots the published page top (1200×630 viewport) as the og:image fallback. Evaluate the `browser` Worker binding (@cloudflare/puppeteer) vs the Browser Rendering REST API (account token via deployer secret injection, like OpenRouter keys) — paid-plan requirement, session/concurrency limits, cold-start cost; deliverable = decision written to JOURNAL/CAVEATS PLUS a working spike: screenshot one published page to R2 (`og/<pageId>.<locale>.png`). Requires a publicly reachable origin (resolveSiteOrigin) — skip silently in local dev.
+- DONE (2026-07-07): OG-image autogen tracer + decision. DECISION = the `browser` Worker binding
+  (@cloudflare/puppeteer), NOT the REST API — CF-native like AI/IMAGES bindings, no per-Site secret
+  plumbing (the REST path would need an account token injected as a Worker secret via the deployer,
+  like OPENROUTER_API_KEY). Both need a PAID Workers plan + share session/concurrency limits → autogen
+  must be off the hot path, best-effort, waitUntil (publish-wiring task). SPIKE shipped:
+  `lib/render/og-image.ts` — PURE key scheme `ogImageKey`/`isOgImageKey` (`og/<id>.<locale>.png`,
+  sanitized, distinct `og/` namespace from `assets/` uploads), OG dims (1200×630/png), + best-effort
+  `screenshotPageToR2(pageUrl,key)` that resolves BROWSER binding + puppeteer via NON-LITERAL dynamic
+  import (optional dep, not installed → returns `{ok:false,reason:"no-binding"}`, skips silently in
+  local dev, never throws). +6 tests (og-image.test.mjs), tsc clean. Live screenshot = HITL (paid
+  plan + BROWSER binding + install @cloudflare/puppeteer).
 - TODO: OG-image autogen publish wiring: on page publish, for each configured locale, IF no manual per-locale metaImage AND no auto screenshot exists yet → best-effort background screenshot via `ctx.waitUntil` (never fails/delays the publish — purge-edge pattern); page delete removes its screenshots; auto image is stored SEPARATELY from user uploads and can never overwrite one.
 - TODO: OG-image fallback serving + metadata precedence: `generateMetadata` og:image = manual per-locale metaImage ?? auto screenshot ?? none (absolute URL via site origin); serving route for the R2 og/ objects; twitter:card already picks summary_large_image when a meta image exists (social-cards.ts) — extend its input to count the auto screenshot. Pure precedence helper unit-tested.
 - TODO: OG-image regenerate button: per-locale "Generate from page" action in the page-settings SEO tab (API route, stable error codes) that (re)screenshots on demand — the explicit path for refreshing after theme/content redesigns; SEO tab shows the currently effective og:image with a manual/auto badge; localized EN/FI/ET.

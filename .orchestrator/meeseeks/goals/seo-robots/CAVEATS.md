@@ -574,3 +574,29 @@ Read every line before working. Each entry was learned the hard way by a previou
   unless it's in IMAGE_SRC_KEYS — same extend-point as the block-prop scan. The AI `audit_meta` tool
   (tool-dispatch handleAuditMeta) DELIBERATELY does NOT pass the index — it only surfaces
   `missingMeta`, which the deep scan never touches; don't wire the index there.
+
+- (2026-07-07) OG-image autogen DECISION: use the `browser` Worker binding + `@cloudflare/puppeteer`
+  (NOT the Browser Rendering REST API). The binding is account-level like AI/IMAGES — no secret, no
+  per-Site provision (deployer needs no override). REST would need an account API token as a per-Site
+  Worker SECRET (OPENROUTER_API_KEY plumbing). BOTH need a PAID Workers plan (Free has no Browser
+  Rendering) and share scarce session/concurrency limits + cold-start, so the publish-wiring MUST be
+  best-effort + ctx.waitUntil (purge-edge/IndexNow pattern): at most one screenshot per publish per
+  locale, ONLY when none exists (idempotent), never queue/retry on the request path. `@cloudflare/
+  puppeteer` is NOT installed — arm it with `npm i @cloudflare/puppeteer` + add
+  `"browser": { "binding": "BROWSER" }` to CMS/wrangler.jsonc (typegen after). Until then
+  `screenshotPageToR2` returns `{ok:false,reason:"no-binding"}` and skips silently (incl. local dev).
+- (2026-07-07) OG-image key scheme (`lib/render/og-image.ts`): auto screenshots live under the `og/`
+  R2 prefix (`ogImageKey`→`og/<id>.<locale>.png`), a DISTINCT namespace from user uploads (`assets/…`)
+  — that's the mechanism for "autogen stored separately, a manual upload always wins": the serving/
+  precedence task (og-image fallback serving) reads a MANUAL per-locale metaImage first and only falls
+  back to `og/<id>.<locale>.png`; the two keyspaces can never collide. `isOgImageKey` guards a future
+  serve route against traversal (must be under /api or a fixed path — the catch-all shadows arbitrary
+  page paths, see the routing caveat; do NOT add a dynamic top-level route for it). Both id+locale are
+  sanitized ([a-z0-9_-], never empty). Dims 1200×630/png (OG large-card standard).
+- (2026-07-07) The og-image SPIKE launches puppeteer via a NON-LITERAL dynamic import
+  (`const spec="@cloudflare/puppeteer"; await import(spec)`) SPECIFICALLY so tsc + the OpenNext
+  bundler don't statically require the optional, not-yet-installed dep — a literal
+  `import("@cloudflare/puppeteer")` fails `tsc --noEmit` (TS2307) until it's installed. Keep it
+  non-literal (or install the dep) if you edit that call. The spike screenshots the PUBLIC page URL
+  over the network — needs a reachable origin (resolveSiteOrigin); the publish-wiring task passes the
+  built absolute page URL. It's URL-driven (no coupling to the render pipeline).

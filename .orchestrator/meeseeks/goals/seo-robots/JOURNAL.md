@@ -1068,3 +1068,28 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/render/edge-cache.ts, CMS/worker.ts, CMS/src/app/api/pages/route.ts,
   CMS/src/app/api/pages/[id]/publish/route.ts, CMS/src/lib/render/page-write-hooks.ts,
   CMS/src/lib/render/edge-cache.test.ts, CMS/src/lib/render/page-write-hooks.test.ts
+
+## 2026-07-07 15:45 — OG-image autogen tracer + decision (+ spike)
+- **Status:** DONE
+- **What I did:** Evaluated Cloudflare Browser Rendering for the fallback og:image and picked the
+  `browser` Worker binding + `@cloudflare/puppeteer` over the Browser Rendering REST API. Rationale:
+  the binding is an ACCOUNT-level product wired exactly like the existing `AI`/`IMAGES` bindings — no
+  secret, no per-Site provision (deployer needs zero override). The REST path would need a Cloudflare
+  account API token injected per-Site as a Worker SECRET through the deployer (the OPENROUTER_API_KEY
+  plumbing) — more moving parts. Both need a PAID Workers plan (Browser Rendering isn't on Free) and
+  share session/concurrency limits + cold-start, so autogen must be off the hot path, best-effort,
+  waitUntil (that's the publish-wiring task). Shipped the SPIKE in `lib/render/og-image.ts`: the PURE
+  R2 key scheme `ogImageKey(pageId,locale)`→`og/<id>.<locale>.png` (sanitized, its OWN `og/` namespace
+  distinct from `assets/` uploads so autogen can never overwrite a media upload) + `isOgImageKey`
+  guard + OG dims (1200×630, image/png), and best-effort `screenshotPageToR2(pageUrl,key)` — resolves
+  the `BROWSER` binding via getCloudflareContext, launches puppeteer via a NON-LITERAL dynamic import
+  (so tsc/the bundler don't require the optional, not-yet-installed dep), setViewport 1200×630,
+  goto(networkidle0), png screenshot, put to R2 via the Storage port. Returns a structured
+  `{ok:false,reason}` instead of throwing (so a waitUntil caller can ignore failures); skips silently
+  when no binding/origin (local dev).
+- **Verified:** +6 pure tests (scripts/og-image.test.mjs — key scheme, sanitization/traversal guard,
+  namespace separation, dims, and that the spike returns ok:false without throwing in a bindingless
+  env). `npx tsc --noEmit` fully clean. Could NOT verify a live screenshot — needs a PAID plan + the
+  `BROWSER` binding in wrangler.jsonc + `npm i @cloudflare/puppeteer` on a DEPLOYED site (HITL). Did
+  NOT touch worker.ts / edge-cache.ts (a parallel Meeseeks owned those this cycle).
+- **Files:** CMS/src/lib/render/og-image.ts (new), CMS/scripts/og-image.test.mjs (new).
