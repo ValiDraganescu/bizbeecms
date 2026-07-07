@@ -450,3 +450,24 @@ Read every line before working. Each entry was learned the hard way by a previou
   ONE `mediaVariantUrl(key,width)` helper so srcset builders never emit a URL that a future
   readAssetDims change could misread. R2 master untouched (export/import ships masters); billing =
   one Images op per uncached variant per PoP (same class as the WebP transcode already shipping).
+
+- (2026-07-07) RESPONSIVE IMAGES impl 1/2 SHIPPED: `/media/[...key]?w=<n>` resizes via the IMAGES
+  binding. `DELIVERY_WIDTHS=[320,640,960,1280,1920]` (asset.ts) is the CLOSED allowlist — `deliveryWidth`
+  rounds a request UP to the smallest ≥ it, caps at 1920, null for absent/garbage (bounded variants so a
+  scraper can't mint unbounded cache/Images-ops). `mediaVariantUrl(key,width)` is THE mint point for
+  variant URLs — impl 2/2's srcset builder MUST use it, never hand-build `?w=` (it clamps + keeps the
+  delivery `?w=` from colliding with the intrinsic-dims `?w=&h=` carrier: a variant URL has NO `h`, so
+  `readAssetDims` returns null for it — by design). `cacheKeyFor(url,fmt,width)` folds the CLAMPED width
+  (not raw px) so `?w=500` and `?w=600` share the `640` cache entry. Resize runs `.transform({width,
+  fit:"scale-down"})` (never upscales past the master) BEFORE `.output`; resize-only (no WebP transcode)
+  preserves the master format via `resizeOutputFormat(key)` (ImageOutputOptions.format is a CLOSED
+  literal union — you can't pass a raw content-type string; map from the key ext, jpeg default). SVG/GIF
+  `?w=` requests attempt-then-fall-back-to-original (harmless). Live transform is DEPLOY-ONLY (getImages
+  returns null in dev → serves original) — HITL to verify.
+- (2026-07-07) impl 2/2 (srcset/sizes) SEAM: mirror `applyImageHygiene` (image-hygiene.ts) — a PURE
+  post-pass over the built plan, edge-cache-safe (reads only the plan, no request/D1). For an `/media/`
+  `<img>` that carries `?w=&h=` intrinsic dims (readAssetDims), emit `srcset` from `mediaVariantUrl(key,
+  W)` for each DELIVERY_WIDTHS entry ≤ the intrinsic width (skip upscales), plus a default `sizes`
+  (e.g. `100vw`); AUTHOR-set srcset/sizes always win. The `key` for mediaVariantUrl = strip the
+  `/media/` prefix AND the `?w=&h=` query off the img src (the src is the dims-carrier form; the
+  variants are separate URLs). Keep it pure — no getImages/D1.

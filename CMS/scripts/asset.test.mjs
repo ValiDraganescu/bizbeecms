@@ -21,6 +21,9 @@ import {
   assetServeHeaders,
   filenameFromText,
   deliveryFormat,
+  deliveryWidth,
+  mediaVariantUrl,
+  DELIVERY_WIDTHS,
   parseAssetDimension,
 } from "../src/lib/render/asset.ts";
 
@@ -173,6 +176,47 @@ test("deliveryFormat: no webp in Accept (or no Accept) → original", () => {
   assert.equal(deliveryFormat("assets/photo_1_x.png", null), null);
   assert.equal(deliveryFormat("assets/photo_1_x.png", undefined), null);
   assert.equal(deliveryFormat("assets/photo_1_x.png", ""), null);
+});
+
+// ── deliveryWidth (delivery-size negotiation, closed allowlist) ───────────────
+test("deliveryWidth: rounds UP to the smallest allowlist width >= request", () => {
+  assert.equal(deliveryWidth(1), 320);
+  assert.equal(deliveryWidth(320), 320);
+  assert.equal(deliveryWidth(321), 640);
+  assert.equal(deliveryWidth(500), 640);
+  assert.equal(deliveryWidth("960"), 960); // numeric string (query param)
+  assert.equal(deliveryWidth(1000), 1280);
+});
+
+test("deliveryWidth: caps at the largest allowlist width (never mints unbounded variants)", () => {
+  const max = DELIVERY_WIDTHS[DELIVERY_WIDTHS.length - 1];
+  assert.equal(deliveryWidth(max), max);
+  assert.equal(deliveryWidth(max + 1), max);
+  assert.equal(deliveryWidth(99999), max);
+});
+
+test("deliveryWidth: absent/garbage/<1 → null (serve original size)", () => {
+  for (const bad of [null, undefined, "", "abc", 0, -5, NaN, Infinity]) {
+    assert.equal(deliveryWidth(bad), null, String(bad));
+  }
+});
+
+// ── mediaVariantUrl (the ONE place variant URLs are minted) ───────────────────
+test("mediaVariantUrl: stamps the CLAMPED width as ?w=", () => {
+  assert.equal(mediaVariantUrl("assets/p_1_x.png", 500), "/media/assets/p_1_x.png?w=640");
+  assert.equal(mediaVariantUrl("assets/p_1_x.png", 320), "/media/assets/p_1_x.png?w=320");
+  assert.equal(mediaVariantUrl("assets/p_1_x.png", "1920"), "/media/assets/p_1_x.png?w=1920");
+});
+
+test("mediaVariantUrl: null-clamping width → plain /media URL (original size)", () => {
+  assert.equal(mediaVariantUrl("assets/p_1_x.png", undefined), "/media/assets/p_1_x.png");
+  assert.equal(mediaVariantUrl("assets/p_1_x.png", 0), "/media/assets/p_1_x.png");
+  assert.equal(mediaVariantUrl("assets/p_1_x.png", "junk"), "/media/assets/p_1_x.png");
+});
+
+test("mediaVariantUrl: variant URL carries no ?h= so readAssetDims can't misread it as dims", () => {
+  const url = mediaVariantUrl("assets/p_1_x.png", 640);
+  assert.ok(!url.includes("h="), url);
 });
 
 // ── i18n parity ───────────────────────────────────────────────────────────────

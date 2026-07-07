@@ -7,12 +7,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### Performance — Core Web Vitals (investigation DONE — see BACKLOG_ARCHIVE; impl tasks below)
-- TODO (impl 1/2, unblocked by investigation): `/media/[...key]` `?w=` width variants — add a
-  `deliveryWidth(param, allowlist)` PURE helper (asset.ts) that floors/clamps the requested width to
-  a fixed ALLOWLIST (e.g. 320/640/960/1280/1920), null = original. Route calls
-  `.transform({ width })` when non-null; fold `w` into `cacheKeyFor` (alongside `fmt`) so each width
-  edge-caches distinctly. Original R2 bytes untouched; transform failure falls back to original (same
-  as WebP path). Pure helper unit-tested; no D1 read, no hot-path cost.
+- DONE (impl 1/2): `/media/[...key]?w=` width variants — pure `deliveryWidth` (closed allowlist
+  320/640/960/1280/1920, rounds up, caps, null=original) + `mediaVariantUrl` helpers in asset.ts;
+  route folds clamped `w` into `cacheKeyFor` and runs `.transform({width,fit:scale-down})` before
+  `.output` (resize-only preserves master format via `resizeOutputFormat`). Transform-failure falls
+  back to original. 25/25 asset tests, tsc clean. LIVE transform is deploy-only (HITL).
 - TODO (impl 2/2): render srcset/sizes — `applyImageHygiene` (or a sibling pure pass) emits
   `srcset` = the allowlist widths as `/media/<key>?w=<n> <n>w` for `/media/` `<img>` srcs that carry
   `?w=&h=` dims (skip widths above the intrinsic width from `readAssetDims`), plus a sane default

@@ -22,6 +22,7 @@ import { getImages } from "@/lib/ports/images";
 import {
   assetServeHeaders,
   deliveryFormat,
+  deliveryWidth,
   DELIVERY_WEBP_QUALITY,
   isValidAssetKey,
 } from "@/lib/render/asset";
@@ -42,15 +43,38 @@ const edgeCache = (): Cache | undefined =>
 
 /**
  * Per-variant cache key: the request URL plus a synthetic `fmt` param for
- * transcoded responses. The Cache API doesn't honor `Vary`, so WebP and
- * original variants MUST live under distinct keys or a WebP response cached
- * first would be served to a client that can't decode it.
+ * transcoded responses and a normalized `w` for resized ones. The Cache API
+ * doesn't honor `Vary`, so WebP/original AND each width MUST live under distinct
+ * keys or a variant cached first would be served to a client that asked for a
+ * different one. `w` is the CLAMPED allowlist width (not the raw request px), so
+ * `?w=500` and `?w=600` both key to the same `640` entry — the whole point of
+ * the closed allowlist (bounded cache/Images-ops per asset).
  */
-function cacheKeyFor(url: string, fmt: string | null): string {
-  if (!fmt) return url;
+function cacheKeyFor(url: string, fmt: string | null, width: number | null): string {
+  if (!fmt && width === null) return url;
   const u = new URL(url);
-  u.searchParams.set("fmt", fmt.replace("image/", ""));
+  if (fmt) u.searchParams.set("fmt", fmt.replace("image/", ""));
+  // Overwrite the raw request `w` with the clamped one so the key is canonical.
+  if (width === null) u.searchParams.delete("w");
+  else u.searchParams.set("w", String(width));
   return u.toString();
+}
+
+/**
+ * Output format for a RESIZE-ONLY transform (no WebP transcode): preserve the
+ * master's format so a resized PNG stays PNG etc. `ImageOutputOptions.format` is
+ * a closed literal union, so map the key extension to it; unknown/animated types
+ * never reach here (deliveryWidth is applied to any key, but resize-only fires
+ * only when the client didn't get a WebP transcode — the transform still runs
+ * and jpeg is a safe default the binding can always emit).
+ * ponytail: gif is left as jpeg on the resize-only path — a resized animated gif
+ * would drop frames anyway; switch to "image/gif" here if animated resize matters.
+ */
+function resizeOutputFormat(key: string): "image/jpeg" | "image/png" | "image/webp" {
+  const ext = key.toLowerCase().split(".").pop() ?? "";
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  return "image/jpeg";
 }
 
 export async function GET(
@@ -63,11 +87,13 @@ export async function GET(
     return new Response("not found", { status: 404 });
   }
 
-  // Negotiate the delivery format from the KEY + Accept header alone (pure,
-  // no R2 read) so an edge-cache hit costs zero R2 operations.
+  // Negotiate the delivery format (from KEY + Accept) and the delivery WIDTH
+  // (from the `?w=` query, clamped to the allowlist) — both pure, no R2 read,
+  // so an edge-cache hit costs zero R2 operations.
   const fmt = deliveryFormat(key, request.headers.get("accept"));
+  const width = deliveryWidth(new URL(request.url).searchParams.get("w"));
   const cache = edgeCache();
-  const cacheKey = cacheKeyFor(request.url, fmt);
+  const cacheKey = cacheKeyFor(request.url, fmt, width);
   if (cache) {
     const hit = await cache.match(cacheKey).catch(() => undefined);
     if (hit) return hit;
@@ -90,13 +116,21 @@ export async function GET(
   // is both the local-dev fix and a simplification — identical behavior in prod.
   let contentType = object.httpMetadata?.contentType ?? "";
   let body: BodyInit = object.body;
-  if (fmt) {
+  // Resize and/or transcode when either is requested. `.transform({ width })`
+  // runs on the same Workers Images binding as the WebP `.output` — one pipeline
+  // (resize then encode). `fit: "scale-down"` never UPSCALES past the master, so
+  // asking for a width larger than the intrinsic size is a no-op, not a blur.
+  if (fmt || width !== null) {
     const images = await getImages();
     if (images) {
       try {
-        const out = await images
-          .input(object.body)
-          .output({ format: fmt, quality: DELIVERY_WEBP_QUALITY });
+        let pipeline = images.input(object.body);
+        if (width !== null) pipeline = pipeline.transform({ width, fit: "scale-down" });
+        const out = await pipeline.output(
+          fmt
+            ? { format: fmt, quality: DELIVERY_WEBP_QUALITY }
+            : { format: resizeOutputFormat(key) },
+        );
         body = out.image();
         contentType = out.contentType();
       } catch {
@@ -112,8 +146,9 @@ export async function GET(
 
   const headers = new Headers();
   if (contentType) headers.set("content-type", contentType);
-  // ETag identifies the VARIANT (browser revalidation is per-URL, and one
-  // browser always sends the same Accept — but keep variants distinguishable).
+  // ETag identifies the VARIANT (browser revalidation is per-URL; the URL
+  // already carries `?w=`, so width is covered — only the Accept-driven fmt
+  // needs an explicit suffix since it isn't in the URL).
   headers.set("etag", fmt ? object.httpEtag.replace(/"$/, `-${fmt.replace("image/", "")}"`) : object.httpEtag);
   // Assets are content-addressed (key has a timestamp+rand), so cache hard.
   headers.set("cache-control", "public, max-age=31536000, immutable");

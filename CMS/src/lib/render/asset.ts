@@ -203,6 +203,46 @@ export function deliveryFormat(
 export const DELIVERY_WEBP_QUALITY = 82;
 
 /**
+ * Fixed set of delivery widths `/media/<key>?w=<n>` will resize to. A CLOSED
+ * allowlist (not an arbitrary requested px) so the edge only ever caches a
+ * bounded number of variants per asset — an open `?w=` would let a scraper mint
+ * unbounded cache entries + Images ops. Chosen to span phone→retina-desktop.
+ */
+export const DELIVERY_WIDTHS = [320, 640, 960, 1280, 1920] as const;
+
+/**
+ * Clamp a requested delivery width (`?w=` query, so a string) to the
+ * `DELIVERY_WIDTHS` allowlist, or null for "serve the original size".
+ *
+ * A request for width N is served the SMALLEST allowlist width >= N (so the
+ * image is never upscaled below what the layout asked for), capped at the
+ * largest allowlist entry. null (absent / garbage / <1) means no resize. Pure —
+ * the route calls `.transform({ width })` only when this returns non-null, and
+ * folds the clamped value into the cache key so each width edge-caches distinctly.
+ */
+export function deliveryWidth(value: unknown): number | null {
+  const n = parseAssetDimension(value);
+  if (n === null) return null;
+  for (const w of DELIVERY_WIDTHS) if (n <= w) return w;
+  return DELIVERY_WIDTHS[DELIVERY_WIDTHS.length - 1];
+}
+
+/**
+ * Build a `/media/<key>` delivery URL for a given target width — the ONE place
+ * srcset builders (impl 2/2) mint variant URLs, so the delivery-width `?w=`
+ * param never collides in spelling with the INTRINSIC-dims `?w=&h=` carrier
+ * (`withAssetDims`/`readAssetDims`). A variant URL carries `?w=<n>` with NO `h`,
+ * so `readAssetDims` returns null for it (it needs both) — intentional: a
+ * variant URL is not a dims carrier. `width` is clamped to the allowlist; when
+ * it clamps to null the plain `/media/<key>` URL is returned (original size).
+ */
+export function mediaVariantUrl(key: string, width: unknown): string {
+  const base = assetUrl(key);
+  const w = deliveryWidth(width);
+  return w === null ? base : `${base}?w=${w}`;
+}
+
+/**
  * Security headers the serve route adds for a given content type.
  *
  * `nosniff` is always set so the browser can't MIME-sniff an upload into an

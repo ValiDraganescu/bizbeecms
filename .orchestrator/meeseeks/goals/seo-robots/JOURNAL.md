@@ -871,3 +871,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   build/test run needed. Live transform of a width variant is DEPLOY-ONLY (needs a real IMAGES
   binding + R2) — unverifiable locally.
 - **Files:** (design note only) .orchestrator/meeseeks/goals/seo-robots/{JOURNAL,CAVEATS,BACKLOG,NEXT}.md
+
+## 2026-07-07 14:42 — Responsive images IMPL 1/2: /media?w= width variants
+- **Status:** DONE
+- **What I did:** Delivered the `/media/[...key]?w=<n>` delivery-width variant path per the
+  investigation design. Added two PURE helpers to `lib/render/asset.ts`: `deliveryWidth(value)` clamps
+  a requested width to a CLOSED allowlist `DELIVERY_WIDTHS=[320,640,960,1280,1920]` (rounds UP to the
+  smallest ≥ request, caps at 1920, null for absent/garbage — bounded variants so a scraper can't mint
+  unbounded cache entries/Images ops), and `mediaVariantUrl(key,width)` — the ONE place srcset builders
+  (impl 2/2) mint variant URLs, so the delivery `?w=` never collides with the intrinsic-dims `?w=&h=`
+  carrier (variant URL has NO `h`, so `readAssetDims` returns null for it — intentional). Route
+  (`media/[...key]/route.ts`): negotiates `width` from `?w=` (pure, no R2 read), folds the CLAMPED width
+  into `cacheKeyFor(url,fmt,width)` so each (key,fmt,width) edge-caches distinctly, and runs
+  `.transform({width, fit:"scale-down"})` before `.output` on the same Images binding — one pipeline
+  (resize then encode). fit:scale-down never upscales past the master. Resize-only (no WebP transcode)
+  preserves the master format via `resizeOutputFormat(key)` (ImageOutputOptions.format is a closed
+  literal union, so mapped from the key ext; jpeg default). Transform failure falls back to the original
+  bytes (same as the WebP path). R2 master untouched.
+- **Verified:** `node --test scripts/asset.test.mjs` → 25/25 pass (added 5 tests: deliveryWidth
+  round-up/cap/reject, mediaVariantUrl clamp/null/no-h). `npx tsc --noEmit` clean (confirmed the
+  Images `.transform`/`.output` calls typecheck against the generated `ImageTransform`/
+  `ImageOutputOptions` in cloudflare-env.d.ts). LIVE width-transform on a real IMAGES binding + R2 is
+  DEPLOY-ONLY — unverifiable locally (getImages() returns null in dev → serves original).
+- **Files:** CMS/src/lib/render/asset.ts, CMS/src/app/media/[...key]/route.ts, CMS/scripts/asset.test.mjs
