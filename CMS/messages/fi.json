@@ -248,6 +248,29 @@
     "saving": "Tallennetaan...",
     "saved": "Tallennettu."
   },
+  "rateLimit": {
+    "title": "Bottien nopeusrajoitus",
+    "subtitle": "Säädä, kuinka voimakkaasti sivusto rajoittaa botteja ja kaapijoita, jotka kuormittavat julkisia sivujasi. Todelliset kävijät ja vahvistetut hakukoneiden robotit eivät kärsi; rajan ylittyessä palautetaan HTTP 429 ja uudelleenyritysvihje. Ylläpito- ja API-liikennettä ei koskaan rajoiteta.",
+    "legend": "Rajoitustaso",
+    "preset": {
+      "off": {
+        "label": "Pois",
+        "help": "Ei nopeusrajoitusta. Jokainen pyyntö palvellaan — käytä vain, jos edessä oleva välityspalvelin hoitaa jo väärinkäytökset."
+      },
+      "normal": {
+        "label": "Normaali",
+        "help": "Oletus. Rajoittaa jokaisen IP:n 100 sivupyyntöön minuutissa — riittävä kenelle tahansa ihmiselle tai lailliselle robotille."
+      },
+      "strict": {
+        "label": "Tiukka",
+        "help": "Katkaisee väärinkäyttävät IP:t aiemmin (noin 40 sivupyyntöä minuutissa). Valitse tämä, jos kaapija pääsee normaalin rajan läpi."
+      }
+    },
+    "save": "Tallenna",
+    "saving": "Tallennetaan...",
+    "saved": "Tallennettu.",
+    "note": "Tulee voimaan julkaistulla sivustolla seuraavan julkaisun jälkeen, ja voi kestää jopa 30 sekuntia levitä reunaverkkoon."
+  },
   "notFoundPage": {
     "title": "404-sivu",
     "subtitle": "Valitse julkaistu sivu, joka näytetään tämän sivuston brändätynä 404-sivuna (ei löydy). Puuttuvaan tai uudelleennimettyyn osoitteeseen osuvat kävijät näkevät sen HTTP 404 -tilalla, eivätkä hakukoneet indeksoi sitä. Jätä oletukseksi tavallinen 404.",
@@ -302,6 +325,7 @@
     },
     "contentLocales": "Sisältökielet",
     "robots": "robots.txt",
+    "rateLimit": "Bottien nopeusrajoitus",
     "redirects": "Uudelleenohjaukset",
     "seoAudit": "SEO-tarkistus",
     "verification": "Vahvistus",

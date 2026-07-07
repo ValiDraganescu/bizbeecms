@@ -67,7 +67,17 @@ Task states: TODO | DOING | DONE | BLOCKED.
   (usually absent Free/Pro → limiter still applies); no free cf flag today, reverse-DNS too heavy for
   the hot gate, so generous cap + free cf-exemption is the shipped default. Best-effort (fails OPEN).
   +13 tests (suite 1932), tsc clean. Release-gated (worker.ts/wrangler.jsonc, r-*) — live HITL pending.
-- TODO: Per-site rate-limit threshold: D1 setting + site-settings UI (Off / presets), read by worker.ts WITHOUT a per-request D1 read on the hot path (in-isolate cache with TTL, or piggyback an existing lookup — the edge-cache task's "extra D1 only on cache miss" precedent); localized EN/FI/ET.
+- DONE (2026-07-07): Per-site rate-limit threshold. D1 setting `rate_limit_preset`
+  (`off`|`normal`|`strict`, default `normal`) + site-settings UI (radio group at
+  `/admin/settings/rate-limit`, EN/FI/ET). worker.ts reads it via
+  `getRateLimitPresetCached` — a 30s in-isolate TTL cache (never a per-request D1 read
+  on the hot gate; edge-cache "extra D1 only on cache miss" precedent). `off` skips
+  `limiter.limit()` entirely; `strict` layers an in-isolate sliding counter
+  (STRICT_LIMIT=40/60s per key) ON TOP of the fixed 100/60s binding (a truly-lower cap
+  can't be enforced by the fixed binding alone). Pure `lib/render/rate-limit-config.ts`
+  (normalize + usesBindingLimiter + strictCounterOverLimit) +6 tests (suite 1943), tsc
+  clean (pre-existing env.DB typegen errors only). Release-gated (worker.ts, r-*) — the
+  cap-skip/strict behaviour is live-HITL on a deployed Site + paid plan.
 
 ### Lower-value follow-ups
 - TODO (follow-up to the AI bulk-meta tool): AI "fix missing alt" path — audit_meta covers only the

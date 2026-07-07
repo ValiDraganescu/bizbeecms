@@ -23,7 +23,11 @@
 // resolvable after a build, absent on a clean checkout (so not expect-error).
 import { default as handler } from "./.open-next/worker.js";
 import { cfDb } from "./src/lib/ports/db";
-import { getContentLocales } from "./src/db/settings-store";
+import { getContentLocales, getRateLimitPresetCached } from "./src/db/settings-store";
+import {
+  usesBindingLimiter,
+  strictCounterOverLimit,
+} from "./src/lib/render/rate-limit-config";
 import { peelLocaleSegment, resolveSlugPath } from "./src/lib/render/slug";
 import { resolvePage } from "./src/lib/render/resolve-page";
 import {
@@ -40,6 +44,12 @@ import {
   rateLimitedResponse,
   isVerifiedCrawler,
 } from "./src/lib/render/edge-cache";
+
+// Per-isolate sliding-window hit log for the `strict` rate-limit preset (a
+// best-effort TIGHTENING on top of the cross-isolate binding; resets on isolate
+// recycle — see rate-limit-config.ts). Module scope so it persists across
+// requests within one isolate.
+const strictHits = new Map<string, number[]>();
 
 export default {
   async fetch(request, env, ctx) {
@@ -69,8 +79,19 @@ export default {
       !isVerifiedCrawler((request as { cf?: unknown }).cf)
     ) {
       try {
-        const { success } = await limiter.limit({ key: rateLimitKey(request.headers) });
-        if (!success) return rateLimitedResponse();
+        // Per-site threshold (seo-robots 2/2): read the D1 preset OFF the hot path
+        // via a short-TTL in-isolate cache (never a per-request D1 read — CAVEAT).
+        // `off` skips the limiter entirely; `strict` layers an in-isolate lower
+        // cap ON TOP of the binding. Fails safe to `normal` on any D1 error.
+        const preset = await getRateLimitPresetCached(cfDb(env.DB));
+        if (usesBindingLimiter(preset)) {
+          const key = rateLimitKey(request.headers);
+          const { success } = await limiter.limit({ key });
+          if (!success) return rateLimitedResponse();
+          if (preset === "strict" && strictCounterOverLimit(strictHits, key, Date.now())) {
+            return rateLimitedResponse();
+          }
+        }
       } catch {
         /* limiter unavailable — fail open, never block serving */
       }
