@@ -10,3 +10,7 @@ The full record lives in JOURNAL.md; this is the trimmed backlog trace.
 - 2026-07-07 Rename auto-capture: subtree-wide per-locale 301s, chain rewrite, IndexNow old-URL re-notify; best-effort in pages route.
 - 2026-07-07 Manual redirects admin UI: list/add/delete, hard-reject validation with 8 stable error codes, EN/FI/ET.
 - 2026-07-07 Per-page noindex: SEO-tab toggle, robots meta, sitemap + IndexNow leaf-only skip, preserve-when-absent contract.
+- 2026-07-07 Full OG/Twitter cards in generateMetadata: pure social-cards builders, brand site_name, locale, summary_large_image when meta image exists.
+- 2026-07-07 IndexNow notify on noindex OFF→ON: pre-captured URLs before meta write, pure transition helper, best-effort.
+- 2026-07-07 Auto BreadcrumbList JSON-LD at plan time for depth≥1 pages; cycle-safe ancestor chain, breakout-safe escaping, RenderPlan.jsonLd.
+- 2026-07-07 Per-site Google/Bing/Yandex verification tokens: settings + REST + editor, emitted via Metadata.verification, injection-stripping normalizer.
