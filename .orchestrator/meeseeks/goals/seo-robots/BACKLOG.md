@@ -6,23 +6,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Tasks
 
-### Performance — Core Web Vitals (investigation DONE — see BACKLOG_ARCHIVE; impl tasks below)
-- DONE (impl 1/2): `/media/[...key]?w=` width variants — pure `deliveryWidth` (closed allowlist
-  320/640/960/1280/1920, rounds up, caps, null=original) + `mediaVariantUrl` helpers in asset.ts;
-  route folds clamped `w` into `cacheKeyFor` and runs `.transform({width,fit:scale-down})` before
-  `.output` (resize-only preserves master format via `resizeOutputFormat`). Transform-failure falls
-  back to original. 25/25 asset tests, tsc clean. LIVE transform is deploy-only (HITL).
-- DONE (impl 2/2): render srcset/sizes — `srcsetFor` in image-hygiene.ts (pure) emits DELIVERY_WIDTHS
-  variants ≤ intrinsic width via `mediaVariantUrl(key,w)`; wired into `hygieneProps` (emits `srcset` +
-  default `sizes:"100vw"` only when the intrinsic width is known AND author srcset/sizes absent). Key
-  derived via new `mediaKeyFromSrc` (asset.ts — strips /media/ + query, validates isValidAssetKey).
-  React casing fix: `srcset`→`srcSet` mapped in react-props.ts (lowercase warns + drops). Tests:
-  image-hygiene +6, react-props +1, asset +2 (27/27); tsc clean. Live resize is deploy-only (HITL).
-- DONE: dims for `generate_image` assets — new pure `imageDimensionsFromBytes`
-  (lib/media/image-dimensions.ts) reads intrinsic dims from the FILE HEADER (PNG/JPEG/GIF/WebP, no
-  decode → Workers-safe) since the tool runs server-side with no browser; stamped into the existing
-  `putAsset` call in `handleGenerateImage`. null→null (never breaks an asset). AI images now get the
-  CLS box + srcset. 7 header-parse tests; suite 1895; tsc clean. Live gen round-trip is HITL.
+### JSON-LD components (kind: jsonld) — machinery + authoring shipped; polish items remain
+- TODO: Per-row/ItemList JSON-LD for List blocks (user-queued 2026-07-07): the one binding case the
+  jsonld component kind can't ride today — a List block's rows should be able to emit a schema.org
+  ItemList (or per-row items, e.g. Product/Article per row) into plan.jsonLd. planPage's jsonld
+  branch handles a SINGLE component instance, not the per-row List repeat — needs new work in
+  planList, not hydrateProps. See CAVEATS note from the jsonld-bindings run for the seam analysis.
+- TODO: AI authoring-guide section for jsonld (tool `kind` param + validation are DONE): schema.org
+  patterns per page type — Product/Article/FAQPage/Recipe — the slot-quoting rules (`"n":{{count}}`
+  unquoted vs `"n":"{{name}}"` quoted), and WHEN to author a jsonld component vs plain content.
 
 ### Operator SEO tooling (admin) — audit report + AI bulk-meta shipped (see BACKLOG_ARCHIVE)
 - TODO: SEO audit — deep component-tree scan: the current audit only scans raw `page.blocks` prop
@@ -31,25 +23,6 @@ Task states: TODO | DOING | DONE | BLOCKED.
   collect `<a href>` + `<img src/alt>` from component markup too. Needs the D1 component resolver
   (not a pure input) — decide: build the plan (heavy, next-intl) vs a dep-light component-tree
   href/img extractor fed the resolved component rows. Then feed those into the same auditSeo shape.
-- TODO (follow-up to the AI bulk-meta tool): AI "fix missing alt" path — audit_meta covers only the
-  meta title/description gaps; missing image alt (`auditSeo.missingAlt`) is authored inside block
-  props, so fixing it needs `set_block_props` (already exists) driven by an alt audit. Consider an
-  `audit_alt` read tool (returns missingAlt) + a guide line so the AI knows to set_block_props the
-  alt. Lower value than meta (alt is per-image, harder to auto-generate well).
-
-### JSON-LD components (kind: jsonld) — machinery + authoring shipped; polish items remain
-- TODO: Per-row/ItemList JSON-LD for List blocks (user-queued 2026-07-07): the one binding case the
-  jsonld component kind can't ride today — a List block's rows should be able to emit a schema.org
-  ItemList (or per-row items, e.g. Product/Article per row) into plan.jsonLd. See CAVEATS note from
-  the jsonld-bindings run for the seam analysis.
-- DONE: Builder canvas invisible-element CHIP for a jsonld block — PREVIEW-ONLY overlay
-  (`preview-overlay.ts`) injects a visible dashed `◇ <name>` chip (`data-bb-invisible-chip`) into any
-  zero-area `data-block-wrap` at wire time, so the existing hover/select/delete machinery works on
-  otherwise-invisible blocks. Render plan untouched (public=preview stays byte-identical). Pure
-  `isVisuallyEmptyRect` gate, 3 tests; suite 1898; tsc clean. Live visual check is HITL.
-- TODO: AI authoring-guide section for jsonld (tool `kind` param + validation are DONE): schema.org
-  patterns per page type — Product/Article/FAQPage/Recipe — the slot-quoting rules (`"n":{{count}}`
-  unquoted vs `"n":"{{name}}"` quoted), and WHEN to author a jsonld component vs plain content.
 
 ### Page-level SEO controls
 - TODO: Per-URL-locale branded 404 (follow-up to the shipped default-locale branded 404): make the
@@ -67,3 +40,16 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ### Naughty-robot rate limiting (needs worker.ts, ships via release)
 - TODO: Worker-level per-IP rate limit on public page paths: Workers rate-limiting binding in CMS/wrangler.jsonc; `CMS/worker.ts` checks it BEFORE the OpenNext handler for public paths only (skip /admin /api /preview /media /_next — reuse/extend the `isEdgeCacheCandidate` path gate), 429 + Retry-After over the cap; fixed sane default (~100 req/min/IP); pure gate logic unit-tested; investigate cheap verified-crawler exemption (cf object fields available on workers.dev) and note findings.
 - TODO: Per-site rate-limit threshold: D1 setting + site-settings UI (Off / presets), read by worker.ts WITHOUT a per-request D1 read on the hot path (in-isolate cache with TTL, or piggyback an existing lookup — the edge-cache task's "extra D1 only on cache miss" precedent); localized EN/FI/ET.
+
+### Lower-value follow-ups
+- TODO: Edge-cache /sitemap.xml with its own tag (mirror the /llms.txt carve-out): fixed-path
+  `pathname === "/sitemap.xml"` worker carve-out (release-gated r-*) + own `sitemap` Cache-Tag,
+  purged everywhere LLMS_CACHE_TAG is purged (page/brand writes change both files). Sitemap is
+  crawler-hammered and does a per-request D1 read today; llms caveat explicitly says give each
+  dotted-root cacheable file its OWN carve-out fn + tag, never widen the dot gate.
+  — queued by scrub: same per-request-D1 cost llms.txt had; the shipped llms pattern makes this cheap.
+- TODO (follow-up to the AI bulk-meta tool): AI "fix missing alt" path — audit_meta covers only the
+  meta title/description gaps; missing image alt (`auditSeo.missingAlt`) is authored inside block
+  props, so fixing it needs `set_block_props` (already exists) driven by an alt audit. Consider an
+  `audit_alt` read tool (returns missingAlt) + a guide line so the AI knows to set_block_props the
+  alt. Lower value than meta (alt is per-image, harder to auto-generate well).

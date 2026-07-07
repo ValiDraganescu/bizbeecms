@@ -34,3 +34,7 @@ The full record lives in JOURNAL.md; this is the trimmed backlog trace.
 - 2026-07-07 .md variants edge-cached in-route under the page's own tag; existing per-page purges cover it, no worker change.
 - 2026-07-07 Responsive-images investigation: IMAGES binding resizes on workers.dev; chose ?w= allowlist on-delivery transform, filed 2 impl tasks.
 - 2026-07-07 AI list_assets URLs now stamp ?w=&h= intrinsic dims so AI-inserted gallery images get the CLS box.
+- 2026-07-07 /media?w= delivery-width variants: closed allowlist clamp, width folded into cache key, IMAGES transform with original-bytes fallback.
+- 2026-07-07 Render srcset/sizes: pure srcsetFor emits allowlist variants ≤ intrinsic width; srcset→srcSet React casing fix.
+- 2026-07-07 generate_image assets get intrinsic dims via pure header-parse imageDimensionsFromBytes (PNG/JPEG/GIF/WebP), Workers-safe.
+- 2026-07-07 Builder canvas chip: preview-only overlay injects ◇ name chip into zero-area jsonld block wraps, making them selectable.
