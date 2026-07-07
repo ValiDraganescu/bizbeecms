@@ -408,3 +408,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   1682/1682 (+3); `npx tsc --noEmit` clean. Test-only change (no source, no
   docs) → no deploy-gate build needed.
 - **Files:** CMS/src/lib/render/localize-paths.test.ts
+
+## 2026-07-07 09:12 — Regression fence: edge-cache gate × query strings
+- **Status:** DONE
+- **What I did:** Locked in NEXT.md's flagged invented slice — cache × query-param
+  page interplay. Confirmed (no defect) the gate is query-agnostic by design:
+  worker.ts feeds `isEdgeCacheCandidate` `new URL(request.url).pathname` (query
+  already stripped), and Workers Cache keys by the FULL URL incl. query (CAVEATS),
+  so a `?utm=` variant caches SEPARATELY and can never cross-serve another page's
+  HTML while stamping identical Cache-Control/Cache-Tag. The gap was coverage:
+  no test proved the query never leaks into pathname/segments nor flips the skip
+  decision. Added 2 tests in edge-cache.test.ts — one asserts URL.pathname strips
+  the query + pathnameSegments never spawns a fake segment from a raw `?`, one
+  asserts the candidate verdict is identical with/without a query (page path AND
+  system path). Ponytail: no code touched — the seam is already correct; value
+  is the fence. Real hit/miss caching remains HITL on a deployed site.
+- **Verified:** `node --test edge-cache.test.ts` 12/12 (+2); full render suite
+  `node --test src/lib/render/*.test.ts` 189/189; `npx tsc --noEmit` clean.
+  Test-only change (no source) → no deploy-gate build needed.
+- **Files:** CMS/src/lib/render/edge-cache.test.ts

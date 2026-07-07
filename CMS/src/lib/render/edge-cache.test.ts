@@ -65,6 +65,35 @@ test("a page slug merely CONTAINING a system word is still a candidate", () => {
   assert.equal(isEdgeCacheCandidate({ ...OK, pathname: "/blog/api" }), true);
 });
 
+// ── query strings ────────────────────────────────────────────────────────────
+// Workers Cache keys by the FULL URL incl. the query string (CAVEATS), so a
+// `?utm=` variant caches SEPARATELY and never cross-serves another page's HTML.
+// The gate must decide identically regardless of the query — worker.ts feeds it
+// `new URL(url).pathname` (query already stripped), so a query can never leak
+// into `pathname`/segments nor flip the skip decision. Fence both facts.
+
+test("pathnameSegments never contains the query string (worker.ts strips it via URL.pathname)", () => {
+  // worker.ts always passes new URL(url).pathname — the query is already gone.
+  const pathname = new URL("https://x.tld/about?utm=nl&ref=twitter").pathname;
+  assert.equal(pathname, "/about");
+  assert.deepEqual(pathnameSegments(pathname), ["about"]);
+  // Defense in depth: even a raw `?` in a segment doesn't spawn a fake segment.
+  assert.deepEqual(pathnameSegments("/about?utm=nl"), ["about?utm=nl"]);
+});
+
+test("the cache decision is identical with or without a query string", () => {
+  // Same pathname → same verdict; the query is not part of the candidate input.
+  assert.equal(
+    isEdgeCacheCandidate({ ...OK, pathname: new URL("https://x.tld/about?utm=nl").pathname }),
+    isEdgeCacheCandidate({ ...OK, pathname: "/about" }),
+  );
+  // A system path stays excluded regardless of its query.
+  assert.equal(
+    isEdgeCacheCandidate({ ...OK, pathname: new URL("https://x.tld/api/x?y=1").pathname }),
+    false,
+  );
+});
+
 // ── edgeCacheHeaders ─────────────────────────────────────────────────────────
 
 test("opted-in page gets public max-age + SWR and the pages,page:<id> tags", () => {
