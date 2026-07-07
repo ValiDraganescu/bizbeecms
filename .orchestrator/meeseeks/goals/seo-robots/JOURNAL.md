@@ -475,6 +475,43 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/(admin)/admin/components/develop/page.tsx (kind in initialComponents),
   CMS/src/lib/components/base64-header.ts (new) + .test.ts (new), CMS/messages/{en,fi,et}.json (jsonld keys)
 
+## 2026-07-07 13:01 — Designated branded 404 page (Page-level SEO controls)
+- **Status:** DONE
+- **What I did:** A site can now designate a PUBLISHED page as its branded 404. On a
+  catch-all miss (after the redirect check) `notFound()` fires and `(site)/not-found.tsx`
+  renders that page's real plan with HTTP 404 + robots noindex; falls back to a plain
+  built-in 404 when unset/unpublished.
+  - **Setting** `site_settings` key `not_found_page` (getNotFoundPageId/setNotFoundPageId,
+    settings-store) — plain page-id string, "" = plain 404. No migration (reuses the
+    existing settings table).
+  - **Plan loader** `loadPlanById(pageId, activeLocale)` + `peelActiveLocale` in load-plan.ts;
+    refactored the shared tail into `planForPage(pageRow, locale, routeContext)` (loadPlan +
+    loadPlanById both call it). loadPlanById re-checks `publishStatus==="published"` so a
+    deleted/unpublished target degrades to the plain 404.
+  - **not-found.tsx** renders in the site DEFAULT content locale (Next gives not-found no
+    params/pathname, and the (site) group reads no request/visitor data — cache-poison guard).
+    Per-URL-locale 404 would need worker.ts to inject the path (release-gated) → filed as
+    follow-up. A 404 is never edge-cached anyway (worker gate is GET-200-only —
+    isEdgeCacheCandidate rejects status 404/308, already asserted in edge-cache.test.ts).
+  - **Admin:** pure `lib/render/not-found-page.ts notFoundPageOptions` (published-only,
+    label = default-locale metaTitle → any title → path; dep-free, node-tested). REST
+    `api/settings/not-found-page` (force-dynamic, requireAdmin; GET → {pageId, options};
+    PUT hard-rejects a non-published id with stable code `notPublished`, "" clears). Editor
+    `not-found-page-editor.tsx` (select + save, fetches its own data). Page
+    `(admin)/admin/settings/not-found-page/page.tsx` (explicit route beats catch-all). Nav
+    link in "Site" group after verification. i18n EN/FI/ET (`notFoundPage` + `settingsNav.notFoundPage`).
+- **Verified:** `npx tsc --noEmit` exit 0; new pure suite not-found-page.test.ts 4/4; full
+  `npm test` 1794/1794 (was 1785; +4 new + counts). All 3 message JSONs parse. Did NOT run
+  opennext build (heavy gate; routes mirror proven force-dynamic patterns) nor live-verify a
+  real 404 (needs a deployed Site + published page designated — HITL). No worker.ts/D1 change
+  → no r-* release needed.
+- **Files:** CMS/src/db/settings-store.ts, CMS/src/lib/render/load-plan.ts,
+  CMS/src/lib/render/not-found-page.ts (+ .test.ts), CMS/src/app/(site)/not-found.tsx,
+  CMS/src/app/api/settings/not-found-page/route.ts,
+  CMS/src/components/settings/not-found-page-editor.tsx,
+  CMS/src/app/(admin)/admin/settings/not-found-page/page.tsx,
+  CMS/src/components/settings/settings-nav.tsx, CMS/messages/{en,fi,et}.json
+
 ## 2026-07-07 12:52 — AI write-path IndexNow + edge-purge coherence
 - **Status:** DONE
 - **What I did:** The AI live-write tools now mirror the REST /api/pages post-write

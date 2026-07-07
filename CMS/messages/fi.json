@@ -248,6 +248,20 @@
     "saving": "Tallennetaan...",
     "saved": "Tallennettu."
   },
+  "notFoundPage": {
+    "title": "404-sivu",
+    "subtitle": "Valitse julkaistu sivu, joka näytetään tämän sivuston brändätynä 404-sivuna (ei löydy). Puuttuvaan tai uudelleennimettyyn osoitteeseen osuvat kävijät näkevät sen HTTP 404 -tilalla, eivätkä hakukoneet indeksoi sitä. Jätä oletukseksi tavallinen 404.",
+    "selectLabel": "404-sivu",
+    "selectHint": "Vain julkaistut sivut voi valita.",
+    "none": "Oletus (tavallinen 404)",
+    "loading": "Ladataan...",
+    "save": "Tallenna",
+    "saving": "Tallennetaan...",
+    "saved": "Tallennettu.",
+    "errors": {
+      "notPublished": "Sivua ei ole enää julkaistu. Valitse toinen tai lataa uudelleen."
+    }
+  },
   "settingsNav": {
     "label": "Asetusosiot",
     "groups": {
@@ -260,6 +274,7 @@
     "robots": "robots.txt",
     "redirects": "Uudelleenohjaukset",
     "verification": "Vahvistus",
+    "notFoundPage": "404-sivu",
     "theme": "Teema",
     "brand": "Brändi ja tekoäly",
     "apiKeys": "MCP",

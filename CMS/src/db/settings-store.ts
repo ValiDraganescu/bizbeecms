@@ -58,6 +58,7 @@ const IMAGE_MODEL_KEY = "image_model";
 const TRANSLATE_MODEL_KEY = "translate_model";
 const IMAGE_GEN_MODEL_KEY = "image_gen_model";
 const ICON_SET_KEY = "icon_set";
+const NOT_FOUND_PAGE_KEY = "not_found_page";
 const API_CACHE_VERSIONS_KEY = "api_cache_versions";
 const INDEXNOW_KEY_KEY = "indexnow_key";
 const ROBOTS_CONFIG_KEY = "robots_config";
@@ -327,6 +328,27 @@ export async function getIconSet(injectedDb?: Db): Promise<string> {
 /** Store the selected icon set id (validated by the route before it gets here). */
 export async function setIconSet(set: string, injectedDb?: Db): Promise<void> {
   await upsertSetting(ICON_SET_KEY, set, injectedDb);
+}
+
+/**
+ * Read the operator-designated 404 page id (seo-robots — branded 404). "" when
+ * unset → the catch-all falls back to the plain Next 404. Plain string (a page
+ * id); the setting stores an id but the render path re-checks the page is still
+ * published before using it, so a deleted/unpublished target degrades gracefully.
+ */
+export async function getNotFoundPageId(injectedDb?: Db): Promise<string> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, NOT_FOUND_PAGE_KEY))
+    .limit(1);
+  return rows[0]?.value ?? "";
+}
+
+/** Store the designated 404 page id ("" clears it → plain 404). */
+export async function setNotFoundPageId(id: string, injectedDb?: Db): Promise<void> {
+  await upsertSetting(NOT_FOUND_PAGE_KEY, id, injectedDb);
 }
 
 /**

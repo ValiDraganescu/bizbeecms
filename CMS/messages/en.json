@@ -248,6 +248,20 @@
     "saving": "Saving...",
     "saved": "Saved."
   },
+  "notFoundPage": {
+    "title": "404 page",
+    "subtitle": "Choose a published page to serve as this site's branded 404 (not-found) page. Visitors who hit a missing or renamed URL see it, with an HTTP 404 status and search engines told not to index it. Leave as the default for a plain 404.",
+    "selectLabel": "404 page",
+    "selectHint": "Only published pages can be selected.",
+    "none": "Default (plain 404)",
+    "loading": "Loading...",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Saved.",
+    "errors": {
+      "notPublished": "That page is no longer published. Pick another or reload."
+    }
+  },
   "settingsNav": {
     "label": "Settings sections",
     "groups": {
@@ -260,6 +274,7 @@
     "robots": "robots.txt",
     "redirects": "Redirects",
     "verification": "Verification",
+    "notFoundPage": "404 page",
     "theme": "Theme",
     "brand": "Brand & AI",
     "apiKeys": "MCP",

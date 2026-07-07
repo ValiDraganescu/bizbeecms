@@ -30,7 +30,20 @@ Task states: TODO | DOING | DONE | BLOCKED.
   tool ever lands, it must run the same redirectsForRename/applyRenameRedirects trio the REST route does.
 
 ### Page-level SEO controls
-- TODO: Designated branded 404 page: site setting selecting a published page as the 404 page; the `(site)` catch-all's miss path renders that page's plan in the ACTIVE peeled locale (`/fi/missing` → 404 in fi) with HTTP status 404 + robots noindex; settings UI select (only published pages); fallback to the current plain 404 when unset. Non-200 → never edge-cached (worker gate is GET-200-only; assert).
+- DONE (2026-07-07): Designated branded 404 page. Site setting `not_found_page` selects a
+  published page; `(site)/not-found.tsx` (reached via the catch-all's `notFound()`) renders that
+  page's plan with HTTP 404 + robots noindex, falling back to a plain 404 when unset/unpublished.
+  Loader `loadPlanById` in load-plan.ts; pure `notFoundPageOptions` in not-found-page.ts; REST
+  `api/settings/not-found-page` (hard-rejects non-published id); editor + settings page + nav +
+  EN/FI/ET. Non-200 is never edge-cached (isEdgeCacheCandidate rejects 404/308, already tested).
+  DEVIATION: renders in the site DEFAULT locale, not the ACTIVE peeled URL locale — Next's
+  not-found.tsx gets no params/pathname and the (site) group reads no request data (cache-poison
+  guard). Per-URL-locale 404 needs worker.ts to inject the path (release-gated) — FOLLOW-UP TODO below.
+- TODO: Per-URL-locale branded 404 (follow-up to the above): make the branded 404 render in the
+  VISITOR's URL locale (`/fi/missing` → 404 in fi) instead of the site default. Needs the request
+  path available in `not-found.tsx` — inject it as a header in `worker.ts` (release-gated, r-*) and
+  read it via `next/headers` + `peelActiveLocale` (already exported from load-plan.ts). A 404 is
+  never edge-cached so reading the request header here is safe.
 - TODO: OG-image autogen tracer + decision: Cloudflare Browser Rendering screenshots the published page top (1200×630 viewport) as the og:image fallback. Evaluate the `browser` Worker binding (@cloudflare/puppeteer) vs the Browser Rendering REST API (account token via deployer secret injection, like OpenRouter keys) — paid-plan requirement, session/concurrency limits, cold-start cost; deliverable = decision written to JOURNAL/CAVEATS PLUS a working spike: screenshot one published page to R2 (`og/<pageId>.<locale>.png`). Requires a publicly reachable origin (resolveSiteOrigin) — skip silently in local dev.
 - TODO: OG-image autogen publish wiring: on page publish, for each configured locale, IF no manual per-locale metaImage AND no auto screenshot exists yet → best-effort background screenshot via `ctx.waitUntil` (never fails/delays the publish — purge-edge pattern); page delete removes its screenshots; auto image is stored SEPARATELY from user uploads and can never overwrite one.
 - TODO: OG-image fallback serving + metadata precedence: `generateMetadata` og:image = manual per-locale metaImage ?? auto screenshot ?? none (absolute URL via site origin); serving route for the R2 og/ objects; twitter:card already picks summary_large_image when a meta image exists (social-cards.ts) — extend its input to count the auto screenshot. Pure precedence helper unit-tested.

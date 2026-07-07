@@ -248,6 +248,20 @@
     "saving": "Salvestan...",
     "saved": "Salvestatud."
   },
+  "notFoundPage": {
+    "title": "404 leht",
+    "subtitle": "Vali avaldatud leht, mida serveerida selle saidi brändi 404 (ei leitud) lehena. Külastajad, kes satuvad puuduvale või ümbernimetatud aadressile, näevad seda HTTP 404 staatusega ja otsingumootoritel palutakse seda mitte indekseerida. Jäta vaikeväärtuseks tavaline 404.",
+    "selectLabel": "404 leht",
+    "selectHint": "Valida saab ainult avaldatud lehti.",
+    "none": "Vaikimisi (tavaline 404)",
+    "loading": "Laadin...",
+    "save": "Salvesta",
+    "saving": "Salvestan...",
+    "saved": "Salvestatud.",
+    "errors": {
+      "notPublished": "See leht pole enam avaldatud. Vali teine või laadi uuesti."
+    }
+  },
   "settingsNav": {
     "label": "Seadete jaotised",
     "groups": {
@@ -260,6 +274,7 @@
     "robots": "robots.txt",
     "redirects": "Ümbersuunamised",
     "verification": "Kinnitamine",
+    "notFoundPage": "404 leht",
     "theme": "Teema",
     "brand": "Bränd ja AI",
     "apiKeys": "MCP",

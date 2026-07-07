@@ -239,6 +239,21 @@ Read every line before working. Each entry was learned the hard way by a previou
   row" (ItemList) use case would need new work in planList, not hydrateProps. Single-item
   binding + wildcard `:param` detail pages (the stated goal) are fully covered.
 
+- (2026-07-07) Branded 404: the site's 404 page renders via `(site)/not-found.tsx`, reached when
+  the catch-all `[[...slug]]/page.tsx` calls `notFound()` (a Server Component CANNOT set an
+  arbitrary HTTP status — `notFound()` → not-found.tsx is the ONLY way to get a 404 status). It
+  reads setting `not_found_page` (getNotFoundPageId/setNotFoundPageId) and renders via
+  `loadPlanById(pageId, DEFAULT_locale)` (load-plan.ts — re-checks published, so a deleted target
+  degrades to the plain 404). It renders in the site DEFAULT content locale, NOT the visitor's URL
+  locale, because Next gives not-found.tsx NO params/pathname AND the (site) group must read no
+  request/visitor-varying data (cache-poison guard). Do NOT "fix" it to read Accept-Language/cookie
+  — use the release-gated worker-header path (BACKLOG follow-up) if per-URL-locale 404 is needed. A
+  404 is never edge-cached (isEdgeCacheCandidate rejects status!=200), so reading a request header
+  in not-found.tsx would be edge-safe IF you go the worker-injected-path route. The PUT route
+  (`api/settings/not-found-page`) HARD-rejects a non-published id (code `notPublished`) — options
+  list is published-only, so this only fires on a stale list. load-plan.ts refactor: `loadPlan`
+  and `loadPlanById` share `planForPage(pageRow, locale, routeContext)`; `peelActiveLocale` is
+  exported for the future per-locale follow-up.
 - (2026-07-07) AI write-path IndexNow/purge: `upsertPage` (page-store) and `applyTranslation`
   (translate-store) success shapes now return `pageId` (additive — needed because the AI tools
   address pages by SLUG but the hooks need the id). The AI hooks live in tool-dispatch

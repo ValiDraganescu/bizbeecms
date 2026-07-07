@@ -19,6 +19,7 @@ const GROUPS = [
       { key: "robots", href: "/admin/settings/robots" },
       { key: "redirects", href: "/admin/settings/redirects" },
       { key: "verification", href: "/admin/settings/verification" },
+      { key: "notFoundPage", href: "/admin/settings/not-found-page" },
       { key: "exportImport", href: "/admin/settings/export-import" },
     ],
   },
