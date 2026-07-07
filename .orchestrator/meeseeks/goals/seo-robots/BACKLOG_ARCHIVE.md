@@ -30,3 +30,7 @@ The full record lives in JOURNAL.md; this is the trimmed backlog trace.
 - 2026-07-07 llms.txt settings editor UI: api/settings/llms GET/PUT with hard unknown-slot reject, click-to-insert variables panel, EN/FI/ET.
 - 2026-07-07 SEO audit admin report: pure auditSeo finds orphans, broken links, missing meta, missing alt; read-only localized page.
 - 2026-07-07 AI bulk-meta tools: audit_meta lists per-locale meta gaps; set_page_meta merge-writes title/desc preserving metaImage, light purge/IndexNow.
+- 2026-07-07 /llms.txt edge-cached: own llms tag, fixed-path worker carve-out (release-gated), purges on page/brand/template writes.
+- 2026-07-07 .md variants edge-cached in-route under the page's own tag; existing per-page purges cover it, no worker change.
+- 2026-07-07 Responsive-images investigation: IMAGES binding resizes on workers.dev; chose ?w= allowlist on-delivery transform, filed 2 impl tasks.
+- 2026-07-07 AI list_assets URLs now stamp ?w=&h= intrinsic dims so AI-inserted gallery images get the CLS box.

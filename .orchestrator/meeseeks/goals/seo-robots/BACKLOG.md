@@ -6,28 +6,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 
 ## Tasks
 
-### USER-QUEUED (2026-07-07): caching for llms.txt and .md variants (tasks 1–2 of 4 shipped — see BACKLOG_ARCHIVE)
-- DONE (2026-07-07): Cache /llms.txt — own tag `LLMS_CACHE_TAG="llms"` + pure
-  `llmsTxtCacheHeaders` (EXACTLY /llms.txt, never a dot-gate loosening); worker.ts carve-out
-  before the general gate; purge added to page publish/create/update/unpublish/rename/delete
-  (REST + AI page-write-hooks), brand save, and llms-template save. Release-gated worker change.
-- DONE (2026-07-07): Cache .md page variants — pure `mdVariantCacheHeaders(pageId)` + `MD_MAX_AGE`
-  in edge-cache.ts; /api/md route stamps `Cache-Control` + `Cache-Tag: page:<id>` on its 200 body
-  (via loaded.page.id). NO worker.ts change / NO release gate (worker rewrites `/<path>.md`→/api/md
-  and returns it untouched). Tagged with the page's OWN tag so existing publish/unpublish/rename/
-  delete/noindex purges (all purge pageCacheTag(id)) cover it with zero new purge sites; /api =
-  SKIP_SEGMENTS so no wildcard tag can land. 404s stay uncached. USER-QUEUED caching block (4/4) DONE.
-
-### Performance — Core Web Vitals
-- DONE (2026-07-07): INVESTIGATION — responsive image variants. CHOSEN PATH: the `IMAGES` binding
-  (`env.IMAGES.input().transform({width}).output({format,quality})`) already wired for WebP
-  transform-on-delivery ALSO does width resize — works on workers.dev (it's the Workers Images
-  binding, NOT zone Image Resizing). So the original "workers.dev can't" premise is stale. Plan:
-  add a `?w=` param to `/media/[...key]`, clamped to a fixed width ALLOWLIST, transform runs once
-  per (key,fmt,width) and edge-caches under a distinct key (request.url already the cache key).
-  Rejected: upload-time Cloudflare Images variants (2nd product, per-image billing, export/import
-  churn); zone Image Resizing (custom-domain only); in-Worker JS resize (no native codecs). Full
-  reasoning + cost/limits in JOURNAL + CAVEATS. Impl tasks filed below.
+### Performance — Core Web Vitals (investigation DONE — see BACKLOG_ARCHIVE; impl tasks below)
 - TODO (impl 1/2, unblocked by investigation): `/media/[...key]` `?w=` width variants — add a
   `deliveryWidth(param, allowlist)` PURE helper (asset.ts) that floors/clamps the requested width to
   a fixed ALLOWLIST (e.g. 320/640/960/1280/1920), null = original. Route calls
@@ -42,7 +21,11 @@ Task states: TODO | DOING | DONE | BLOCKED.
   dims query (`?w=&h=`) and the delivery-width query (`?w=`) BOTH use `w` — the srcset URL must carry
   the DELIVERY width param, distinct from the intrinsic-dims carrier; reconcile in one place (a
   `mediaVariantUrl(key, width)` helper) so they don't collide.
-- DONE (2026-07-07): Stamp `?w=&h=` dims on asset URLs the AI inserts — `formatAssetList` (list_assets) now stamps via `withAssetDims(assetUrl(key),width,height)`; dispatch already hands full `Asset[]` rows so no route change. `generate_image` left as-is: its `putAsset` stores NULL dims (asset-dims caveat), nothing to stamp. 2 new regression tests in list-assets-tool.test.mjs. Authoring-time only, zero render cost.
+- TODO: dims for `generate_image` assets — AI-generated images store NULL width/height (no
+  server-side decode on Workers) so they never get the CLS box or (future) srcset. Add a client-side
+  `createImageBitmap` re-decode after generation (mirror the media-uploader capture path) or stamp
+  dims at insert time; never a render-time D1 read. — queued by scrub: journal 14:27 said
+  "filed as its own concern" but no task was ever filed.
 
 ### Operator SEO tooling (admin) — audit report + AI bulk-meta shipped (see BACKLOG_ARCHIVE)
 - TODO: SEO audit — deep component-tree scan: the current audit only scans raw `page.blocks` prop
