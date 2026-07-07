@@ -68,7 +68,7 @@ the script, and include the text in your reply as well.
 
 ## Voice / model overrides
 
-Defaults match `docs/narrator-mlx-audio-setup.md`
+Defaults match the Orchestrator repo's `docs/narrator-mlx-audio-setup.md`
 (model `mlx-community/Kokoro-82M-bf16`, voice `af_heart`). Override per-call via
 environment variables — no config files:
 
@@ -88,7 +88,7 @@ female, `bm_*` British male (full 54-voice list is in the mlx-audio README).
 
 This skill needs a local mlx-audio install. If `say.sh` exits with a
 "python not found" message, the backend isn't installed on this machine —
-follow `docs/narrator-mlx-audio-setup.md` (clone mlx-audio, make the venv,
+follow the Orchestrator repo's `docs/narrator-mlx-audio-setup.md` (clone mlx-audio, make the venv,
 `pip install -e ".[tts]"`), then retry. First synthesis downloads ~325 MB of
 Kokoro weights from HuggingFace; subsequent calls are ~2–3 s.
 

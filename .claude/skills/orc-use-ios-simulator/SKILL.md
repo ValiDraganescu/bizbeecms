@@ -156,51 +156,10 @@ Screenshots cost 1,600–6,300 tokens depending on size. The accessibility tree 
     - Options: `--ls`, `--cat`, `--userdefaults`, `--core-data-path`, `--export`, `--udid`, `--json`, `--verbose`
 
 17. **hang_watcher.py** (HangBuster) - Record + summarise os_log hang events with progressive disclosure
-    - **Session mode (HangBuster, agent-native):** start a detached recorder, interact with the simulator, stop for a token-tight summary
-      - `--start` → returns a session ID; detached worker normalises + thresholds events on the fly
-      - `--stop SESSION_ID` → emits ~80–120 token L1 summary (header + top-N clusters + drill hint)
-      - `--get-details SESSION_ID [--cluster N | --raw]` → L2 full clusters or L3 per-event detail
-      - `--list-sessions` / `--clear-sessions [--older-than 24h]` / `--diff A B` (cross-session regression report)
-      - Filter pipeline: parse → normalise → threshold → bucket → cluster → aggregate → rank → format (in `common/hang_pipeline.py`)
-      - `--budget-tokens N` picks the densest level (L0/L1/L2) that fits; `--terse` forces L0
-      - `--auto-sample` captures a main-thread stack on first event per cluster (soft dependency: `main_thread_sampler.py` #62; graceful no-op if absent)
-    - **Raw capture mode (full fidelity for `jq` exploration):** skip the clustering pipeline, dump every matching log line verbatim to `raw.ndjson`
-      - `--start --raw-capture [--max-size-mb 10] [--no-gzip]` — spawns `log stream --style ndjson`
-      - Per-session size cap (`--max-size-mb`, default 10) — worker stops cleanly on cap; `extras.truncated=true`
-      - `--stop` gzips `raw.ndjson` → `raw.ndjson.gz` (~15–19× compression; `--no-gzip` opts out)
-      - `--get-details SESSION_ID` on a raw session prints the path with a `zcat | jq ...` hint
-    - **Resilience (auto-restart on stream death):** EOF or subprocess death triggers a `stream_died` event then a bounded restart with 2s backoff. After `IOS_SIM_HANG_MAX_RESTARTS` (default 3) the session is marked `crashed`, never left in stale `running` state. `--list-sessions` shows `capture=Xs` and `restarts=N`.
-    - **Cleanup is automatic:** TTL prune (`IOS_SIM_HANG_SESSION_TTL_HOURS`, default 24h) + aggregate cap (`IOS_SIM_HANG_TOTAL_CAP_MB`, default 100 MB, oldest-first eviction) both run on every `--start`.
-    - **Legacy modes (unchanged for backward compat):** `--watch [--duration N]` (live stream) and `--since 5m` (historical)
-    - Filters: `--bundle-id` (post-parse — hang capture stays simulator-global so RunningBoard/SpringBoard events are kept), `--predicate` (also via `IOS_SIM_HANG_PREDICATE`)
-    - All output supports `--json`; session storage at `~/.ios-simulator-skill/sessions/<id>/{meta.json,events.jsonl,summary.json,raw.ndjson.gz}`
-
-    **Quick start (summarised mode):**
-    ```bash
-    SID=$(python scripts/hang_watcher.py --start --min-hang-ms 200)
-    # ... interact with the simulator (open sheets, scroll, navigate) ...
-    python scripts/hang_watcher.py --stop $SID                  # token-tight L1 summary
-    python scripts/hang_watcher.py --get-details $SID --cluster 1  # drill into cluster 1
-    python scripts/hang_watcher.py --diff $SID_BASELINE $SID    # cross-session regression
-    ```
-
-    **Quick start (raw capture + `jq` exploration):**
-    ```bash
-    SID=$(python scripts/hang_watcher.py --start --raw-capture --max-size-mb 5)
-    # ... interact with the simulator ...
-    python scripts/hang_watcher.py --stop $SID
-    # → "Session ...: raw mode, 737 lines, 0.96 MB → 0.05 MB gzipped"
-
-    # Top processes by event count:
-    zcat ~/.ios-simulator-skill/sessions/$SID/raw.ndjson.gz \
-      | jq -s 'group_by(.processImagePath) | map({proc: (.[0].processImagePath | split("/") | last), n: length}) | sort_by(-.n) | .[:5]'
-
-    # All RunningBoard assertion invalidations:
-    zcat .../raw.ndjson.gz | jq -c 'select(.subsystem == "com.apple.runningboard" and (.eventMessage | startswith("Invalidating")))'
-
-    # Hangs per minute:
-    zcat .../raw.ndjson.gz | jq -r '.timestamp[:16]' | sort | uniq -c
-    ```
+    - Session mode: `--start` → session ID; interact with the simulator; `--stop SID` → token-tight summary; `--get-details SID [--cluster N | --raw]` to drill
+    - Raw capture mode (`--start --raw-capture`) dumps every matching log line to a gzipped ndjson for `jq` exploration
+    - Sessions auto-restart a dead log stream, TTL-prune, and cap total disk; `--diff A B` gives a cross-session regression report
+    - Full modes, filters, env-var tuning, storage layout, and jq recipes: [`HANGBUSTER.md`](./HANGBUSTER.md)
 
 18. **localization_audit.py** - Detect string catalog gaps, missing keys, and placeholder mismatches
     - Report missing and `needs_review`/`new` keys per locale in `.xcstrings` catalogs
@@ -311,45 +270,7 @@ Screenshots cost 1,600–6,300 tokens depending on size. The accessibility tree 
 
 ## Configuration
 
-Most operational limits can be tuned via environment variables. Defaults work for typical local development; raise them for slow CI runners, large monorepo builds, or accessibility audits on complex screens.
-
-| Variable | Default | Controls |
-|---|---|---|
-| `IOS_SIM_A11Y_LABEL_MAX` | `80` | Max chars of `AXLabel` retained in accessibility audit output |
-| `IOS_SIM_A11Y_TOP_ISSUES` | `10` | Top accessibility issues surfaced per audit |
-| `IOS_SIM_APPS_PREVIEW` | `30` | App entries listed by `app_launcher.py` before truncation |
-| `IOS_SIM_BOOT_SUBPROCESS_TIMEOUT` | `60` | Timeout for the `simctl boot` subprocess itself (seconds) |
-| `IOS_SIM_BOOT_TIMEOUT` | `300` | Wait-for-ready timeout after boot (seconds) |
-| `IOS_SIM_BUILD_JSON_CAP` | `50` | Max build errors / failed tests in JSON output |
-| `IOS_SIM_BUILD_LOG_PREVIEW` | `4000` | Chars of build log preview in default output |
-| `IOS_SIM_BUILD_TIMEOUT` | `1800` | Max seconds for an `xcodebuild build` invocation before kill |
-| `IOS_SIM_INTROSPECT_TIMEOUT` | `60` | Timeout for `xcodebuild -list` and `simctl list` lookups (seconds) |
-| `IOS_SIM_TEST_TIMEOUT` | `2700` | Max seconds for an `xcodebuild test` invocation before kill |
-| `IOS_SIM_BUILD_SUMMARY_CAP` | `15` | Errors/failures in default build summary |
-| `IOS_SIM_BUILD_VERBOSE_CAP` | `100` | Errors/warnings in verbose build output |
-| `IOS_SIM_CACHE_MAX_ENTRIES` | `500` | Max entries in progressive disclosure cache (LRU eviction) |
-| `IOS_SIM_CACHE_TTL_HOURS` | `1` | Cache entry expiration |
-| `IOS_SIM_ERASE_TIMEOUT` | `90` | Wait-for-erase timeout (seconds) |
-| `IOS_SIM_HANG_PREDICATE` | _(default)_ | Override the `os_log` predicate used by `hang_watcher.py` (default catches RunningBoard kills + "Hang detected" + main-thread hangs). Hang events originate from system daemons (RunningBoard, SpringBoard) so the predicate stays simulator-global — `--bundle-id` is applied post-parse, not ANDed in. |
-| `IOS_SIM_HANG_MIN_MS` | `250` | HangBuster threshold — events below this duration never reach disk (smaller = more sensitive, larger summaries) |
-| `IOS_SIM_HANG_SESSION_TTL_HOURS` | `24` | HangBuster session prune age; pruning runs on every `--start` |
-| `IOS_SIM_HANG_DEFAULT_TOP_N` | `3` | Default top-N clusters in `--stop` L1 output |
-| `IOS_SIM_HANG_BUDGET_TOKENS` | _(unset)_ | Default token budget for `--stop` (picks L0/L1/L2 to fit) |
-| `IOS_SIM_HANG_MAX_RESTARTS` | `3` | HangBuster worker: max `log stream` respawn attempts on EOF/subprocess death before the session is marked `crashed` |
-| `IOS_SIM_HANG_TOTAL_CAP_MB` | `100` | HangBuster aggregate disk cap. When total session-state exceeds this on `--start`, oldest sessions are dropped first. Set to `0` to disable. |
-| `IOS_SIM_LOG_JSON_CAP` | `100` | Max errors/warnings in `log_monitor.py` JSON output |
-| `IOS_SIM_LOG_LINE_MAX` | `300` | Per-line truncation in log summaries |
-| `IOS_SIM_LOG_TAIL` | `200` | Lines of log tail in verbose / sample output |
-| `IOS_SIM_LOG_TEXT_SUMMARY` | `15` | Errors/warnings shown in text-mode log summary |
-| `IOS_SIM_MAX_ELEMENTS` | `25` | Tappable elements listed by `navigator.py` |
-| `IOS_SIM_POLL_INTERVAL` | `0.5` | Boot/erase state polling interval (seconds) |
-| `IOS_SIM_RELAUNCH_DELAY_MS` | `1000` | Delay between terminate and re-launch in `app_launcher.py` |
-| `IOS_SIM_SCREEN_BUTTONS_PREVIEW` | `15` | Button names listed by `screen_mapper.py` |
-| `IOS_SIM_SCREEN_SECTION_ITEMS` | `10` | Items per section shown by `screen_mapper.py` |
-| `IOS_SIM_STATE_SUBPROCESS_TIMEOUT` | `15` | Subprocess timeout in `app_state_capture.py` (seconds) |
-| `IOS_SIM_TAP_SETTLE_MS` | `500` | Post-tap settle delay in `navigator.py` |
-
-Example:
+Most operational limits tune via `IOS_SIM_*` environment variables — defaults suit typical local development; raise them for slow CI runners, large monorepo builds, or complex screens. The full variable table lives in [`CONFIG.md`](./CONFIG.md). Example:
 
 ```bash
 # Slow GitHub Actions runner: give boot 10 minutes
@@ -365,11 +286,10 @@ IOS_SIM_BOOT_TIMEOUT=600 python scripts/simctl_boot.py --wait-ready
 
 ## Documentation
 
-- **SKILL.md** (this file) - Script reference and quick start
-- **README.md** - Installation and examples
-- **CLAUDE.md** - Architecture and implementation details
-- **references/** - Deep documentation on specific topics
-- **examples/** - Complete automation workflows
+- **SKILL.md** (this file) - script reference and quick start
+- **HANGBUSTER.md** - deep reference for the hang recorder
+- **CONFIG.md** - environment-variable tuning table
+- **scripts/** - the 29 scripts themselves; every one answers `--help` with detailed options and examples
 
 ## Key Design Principles
 

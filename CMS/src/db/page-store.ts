@@ -486,7 +486,7 @@ export async function setPageBlocks(
  * schema entry forgot the flag (see applyTranslatableFromSlots).
  */
 export async function listComponentPalette(): Promise<
-  { name: string; propsSchema: string | null }[]
+  { name: string; propsSchema: string | null; hasDraft: boolean; version: number }[]
 > {
   const db = await getDb();
   const rows = await db
@@ -494,12 +494,21 @@ export async function listComponentPalette(): Promise<
       name: schema.component.name,
       propsSchema: schema.component.propsSchema,
       html: schema.component.html,
+      hasDraft: schema.component.hasDraft,
+      updatedAt: schema.component.updatedAt,
     })
     .from(schema.component);
   return rows
     .map((r) => ({
       name: r.name,
       propsSchema: applyTranslatableFromSlots(r.propsSchema, translatableSlotNames(r.html)),
+      // Unpublished component edit pending → the builder badges blocks using it
+      // and offers to publish it alongside the page.
+      hasDraft: r.hasDraft,
+      // Change token (every component mutation bumps updatedAt) — the builder
+      // compares palettes on window focus to catch EXTERNAL (MCP) edits that
+      // can't fire the in-app page-mutation event.
+      version: r.updatedAt?.getTime() ?? 0,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

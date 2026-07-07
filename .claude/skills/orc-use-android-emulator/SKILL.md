@@ -37,9 +37,7 @@ python scripts/accessibility_audit.py
 
 All scripts support `--help` for detailed options and `--json` for machine-readable output.
 
-## Status: Feature Complete (v0.1.0)
-
-### Completed Components ✓ (20 scripts)
+## The scripts (20, plus 3 shared modules)
 
 #### Core Utilities (3 modules)
 1. **common/device_utils.py** - ADB command building and device detection
@@ -56,7 +54,7 @@ All scripts support `--help` for detailed options and `--json` for machine-reada
    - Check app state
    - Options: `--launch`, `--terminate`, `--install`, `--uninstall`, `--open-url`, `--list`, `--state`, `--json`
 
-#### Device Lifecycle (5 scripts) ✓ COMPLETE
+#### Device Lifecycle (5 scripts)
 5. **emulator_boot.py** - Boot emulators with optional readiness verification
    - Boot by AVD name
    - Wait for device ready with timeout
@@ -70,31 +68,31 @@ All scripts support `--help` for detailed options and `--json` for machine-reada
    - Batch shutdown operations
    - Options: `--serial`, `--verify`, `--timeout`, `--all`, `--json`
 
-7. **emulator_create.py** ⭐ NEW - Create AVDs dynamically
+7. **emulator_create.py** - Create AVDs dynamically
    - Create by device type and API level
    - List available device definitions
    - List available system images
    - Options: `--device`, `--api`, `--name`, `--abi`, `--variant`, `--list-devices`, `--list-images`, `--json`
 
-8. **emulator_delete.py** ⭐ NEW - Delete AVDs permanently
+8. **emulator_delete.py** - Delete AVDs permanently
    - Delete by AVD name
    - List available AVDs
    - Options: `--name`, `--list`, `--json`
 
-9. **emulator_erase.py** ⭐ NEW - Factory reset AVDs
+9. **emulator_erase.py** - Factory reset AVDs
    - Wipe user data without deleting AVD
    - Preserve AVD configuration
    - Options: `--name`, `--force`, `--list`, `--json`
 
-#### Build & Development (2 scripts) ✓ COMPLETE
-10. **build_and_test.py** ⭐ NEW - Gradle build automation
+#### Build & Development (2 scripts)
+10. **build_and_test.py** - Gradle build automation
     - Build with minimal token output
     - Clean builds
     - Run tests
     - Parse errors and warnings
     - Options: `--project`, `--variant`, `--clean`, `--test`, `--verbose`, `--json`
 
-11. **log_monitor.py** ⭐ NEW - Real-time logcat monitoring
+11. **log_monitor.py** - Real-time logcat monitoring
     - Filter by app package
     - Filter by severity (error/warning/info/debug)
     - Smart deduplication
@@ -127,8 +125,8 @@ All scripts support `--help` for detailed options and `--json` for machine-reada
     - Clear text
     - Options: `--text`, `--key`, `--button`, `--clear`, `--serial`, `--json`
 
-#### Testing & Analysis (5 scripts) ✓ COMPLETE
-16. **accessibility_audit.py** ⭐ NEW - WCAG compliance checking
+#### Testing & Analysis (5 scripts)
+16. **accessibility_audit.py** - WCAG compliance checking
     - Missing content descriptions
     - Touch target size verification
     - EditText hint checking
@@ -143,56 +141,44 @@ All scripts support `--help` for detailed options and `--json` for machine-reada
     - Generate diff images
     - Options: `--image1`, `--image2`, `--output`, `--threshold`, `--json`
 
-18. **test_recorder.py** ⭐ NEW - Automatically document test execution
+18. **test_recorder.py** - Automatically document test execution
     - Record test steps with screenshots
     - Capture UI hierarchy per step
     - Generate test reports (JSON + Markdown)
     - Inline mode for vision-based testing
     - Options: `--test-name`, `--output`, `--serial`, `--inline`, `--size`, `--app-name`
 
-19. **app_state_capture.py** ⭐ NEW - Complete debugging snapshots
+19. **app_state_capture.py** - Complete debugging snapshots
     - Capture screenshot + UI hierarchy + logs + app info
     - Create timestamped snapshots
     - All-in-one debugging artifact
     - Options: `--package`, `--output`, `--serial`, `--logs`, `--no-logs`, `--screenshot-size`, `--json`
 
-#### Advanced Testing & Permissions (4 scripts) ✓ COMPLETE
-20. **privacy_manager.py** ⭐ NEW - App permission management
+#### Advanced Testing & Permissions (4 scripts)
+20. **privacy_manager.py** - App permission management
     - Grant/revoke permissions
     - List app permissions
     - Support for 20+ permission types
     - Batch operations
     - Options: `--grant`, `--revoke`, `--list`, `--package`, `--serial`, `--list-permissions`, `--json`
 
-21. **clipboard.py** ⭐ NEW - Clipboard management
+21. **clipboard.py** - Clipboard management
     - Copy text to device clipboard
     - Test paste functionality
     - Options: `--copy`, `--paste`, `--serial`, `--json`
 
-22. **status_bar.py** ⭐ NEW - Status bar control
+22. **status_bar.py** - Status bar control
     - Set battery level and charging state
     - Set WiFi/mobile signal strength
     - Set time display (for consistent screenshots)
     - Demo mode support
     - Options: `--battery`, `--charging`, `--wifi`, `--mobile`, `--time`, `--reset`, `--serial`, `--json`
 
-23. **push_notification.py** ⭐ NEW - Push notification simulation
+23. **push_notification.py** - Push notification simulation
     - Send test notifications
     - List notification channels
     - Multiple delivery methods
     - Options: `--package`, `--title`, `--message`, `--id`, `--data`, `--list-channels`, `--method`, `--serial`, `--json`
-
-## Android vs iOS Mapping
-
-| iOS Tool | Android Equivalent | Status |
-|----------|-------------------|--------|
-| xcrun simctl | adb / avdmanager / emulator | ✓ Complete |
-| IDB | adb shell uiautomator / input | ✓ Complete |
-| iOS Simulator | Android Emulator | ✓ Complete |
-| xcodebuild | Gradle wrapper | ✓ Complete |
-| Accessibility tree | UI hierarchy dump | ✓ Complete |
-| simctl privacy | pm grant/revoke | ✓ Complete |
-| xcresult | Gradle test reports | ✓ Complete |
 
 ## Script Categories
 
@@ -310,25 +296,12 @@ adb version
 emulator -version
 ```
 
-### As Claude Code Skill
-
-```bash
-# Personal installation
-git clone <repository-url> ~/.claude/skills/android-emulator-skill
-
-# Project installation
-git clone <repository-url> .claude/skills/android-emulator-skill
-```
-
 ## Documentation
 
-- **SKILL.md** (this file) - Script reference and quick start
-- **README.md** - Installation and examples
-- **CLAUDE.md** - Architecture and implementation details
-- **STATUS.md** - Project status and roadmap
-- **TESTING.md** - Testing guide
-- **references/** - Deep documentation on specific topics
-- **examples/** - Complete automation workflows
+- **SKILL.md** (this file) - script reference and quick start
+- **README.md** - installation and examples
+- **examples/** - complete automation workflows
+- **scripts/** - the scripts themselves; every one answers `--help` with detailed options and examples
 
 ## Key Design Principles
 
@@ -362,41 +335,6 @@ git clone <repository-url> .claude/skills/android-emulator-skill
 
 **Notification Testing**: Simulate push notifications for testing handling logic.
 
-## Feature Parity with iOS Skill
-
-**100% Feature Parity Achieved!** ✓
-
-This Android skill now provides equivalent functionality to the iOS Simulator Skill:
-
-| Feature Category | iOS | Android | Status |
-|-----------------|-----|---------|--------|
-| App Management | ✓ | ✓ | Complete |
-| Device Lifecycle | ✓ | ✓ | Complete |
-| Navigation | ✓ | ✓ | Complete |
-| Gestures | ✓ | ✓ | Complete |
-| Keyboard Input | ✓ | ✓ | Complete |
-| Build Automation | ✓ | ✓ | Complete |
-| Log Monitoring | ✓ | ✓ | Complete |
-| Accessibility Audit | ✓ | ✓ | Complete |
-| Visual Testing | ✓ | ✓ | Complete |
-| Test Recording | ✓ | ✓ | Complete |
-| State Capture | ✓ | ✓ | Complete |
-| Permissions | ✓ | ✓ | Complete |
-| Clipboard | ✓ | ✓ | Complete |
-| Status Bar | ✓ | ✓ | Complete |
-| Push Notifications | ✓ | ✓ | Complete |
-
-## Contributing
-
-New scripts should:
-- Use class-based design for > 50 lines of logic
-- Support --serial and auto-detection
-- Support --json output
-- Provide --help documentation
-- Follow Black and Ruff standards
-- Update this SKILL.md
-- Test with real emulators before submission
-
 ## Differences from iOS
 
 ### Architecture
@@ -416,7 +354,5 @@ New scripts should:
 - **Android**: Gradle build files (build.gradle)
 
 ---
-
-**Status**: Feature complete! All 20 scripts implemented with full feature parity to iOS Simulator Skill.
 
 Use these scripts directly or let Claude Code invoke them automatically when your request matches the skill description.

@@ -103,6 +103,7 @@ function DeleteNodeControl({
  */
 export function LayersTree({
   blocks,
+  draftComponents,
   selectedId,
   onSelect,
   onDropComponent,
@@ -117,6 +118,8 @@ export function LayersTree({
   onSetRowColumns,
 }: {
   blocks: Block[];
+  /** Component names with an unpublished draft — their blocks get a badge. */
+  draftComponents?: Set<string>;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onDropComponent: (sectionId: string, colIndex: number, name: string, rowId: string) => void;
@@ -165,6 +168,17 @@ export function LayersTree({
   const [confirmDeleteCol, setConfirmDeleteCol] = useState<string | null>(null);
   // Which node (Section or component leaf) is awaiting in-app delete confirm.
   const [confirmDeleteNode, setConfirmDeleteNode] = useState<string | null>(null);
+
+  // "draft" chip on a component leaf whose component has an unpublished draft
+  // (the preview shows the draft; the public site won't until it's published).
+  function draftBadge(component: string | undefined): React.ReactNode {
+    if (!component || !draftComponents?.has(component)) return null;
+    return (
+      <span className="ml-1.5 rounded border border-warning bg-warning-subtle px-1 py-px align-middle text-[10px] font-medium uppercase tracking-wide text-foreground">
+        {t("draftBadge")}
+      </span>
+    );
+  }
 
   function nodeClass(id: string): string {
     return (
@@ -384,6 +398,7 @@ export function LayersTree({
                 {...reorderProps(b.id)}
               >
                 {isSection(b) ? sectionName(b, i) : b.component}
+                {!isSection(b) && draftBadge(b.component)}
               </button>
             )}
             {isSection(b) && renamingId !== b.id && (
@@ -599,6 +614,7 @@ export function LayersTree({
                                         {...reorderProps(c.id)}
                                       >
                                         {c.component}
+                                        {draftBadge(c.component)}
                                       </button>
                                       <DeleteNodeControl
                                         id={c.id}

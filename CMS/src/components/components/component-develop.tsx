@@ -157,11 +157,40 @@ export function ComponentDevelop({
   const [hasDraft, setHasDraft] = useState(false);
   const [usage, setUsage] = useState<Array<{ slug: string; direct: boolean }>>([]);
   const [publishBusy, setPublishBusy] = useState(false);
+  // ── Prod-latency race guards ─────────────────────────────────────────────
+  // On localhost every round trip is ~5ms and these races are unhittable; on a
+  // deployed Site they're routine ("my edit reverted", "published but still
+  // shows unpublished changes"). Async callbacks close over stale state, so the
+  // guards read the LATEST edit-state through refs.
+  const saveStateRef = useRef<SaveState>("idle");
+  saveStateRef.current = saveState;
+  const propsDirtyRef = useRef(false);
+  // Which component the editor was last seeded for (reseed guard below).
+  const seededForRef = useRef<string | null>(null);
+  // The in-flight write; writes serialize behind it and publish/discard flush it.
+  const saveInFlightRef = useRef<Promise<void> | null>(null);
+  // Bumped to invalidate in-flight loadUsage responses (a usage GET started
+  // before a publish must not land after it and resurrect the publish bar).
+  const usageEpochRef = useRef(0);
+
+  // Run ONE write at a time: two overlapping PUTs can land out of order
+  // server-side, letting an OLDER draft win.
+  async function runExclusive(job: () => Promise<void>): Promise<void> {
+    while (saveInFlightRef.current) await saveInFlightRef.current;
+    const p = job();
+    saveInFlightRef.current = p;
+    try {
+      await p;
+    } finally {
+      if (saveInFlightRef.current === p) saveInFlightRef.current = null;
+    }
+  }
   // The selected component's declared props + the edited PLACEHOLDER values (its
   // propsSchema `default`s). Null = not loaded / no declared props.
   const [propsSchemaStr, setPropsSchemaStr] = useState<string | null>(null);
   const [propValues, setPropValues] = useState<Record<string, unknown>>({});
   const [propsDirty, setPropsDirty] = useState(false);
+  propsDirtyRef.current = propsDirty;
 
   // Props panel sizing — same presets + collapse as the Page Builder inspector.
   // Persisted under Develop-specific keys so it's independent of the builder's.
@@ -251,6 +280,21 @@ export function ComponentDevelop({
         };
         if (!cancelled && bundle.component) {
           setActiveComponentContext(bundle.component);
+          // RESEED GUARD: a post-autosave reload (reloadKey bump) refetches and
+          // reseeds the editor — but edits typed DURING that round trip must
+          // not be clobbered ("my change saved then instantly reverted", hit
+          // routinely under deployed-Site latency). Checked at RESPONSE time
+          // via refs, because the round trip IS the race window. A component
+          // switch (different `selected`) always reseeds.
+          if (
+            seededForRef.current === selected &&
+            (saveStateRef.current === "dirty" ||
+              saveStateRef.current === "saving" ||
+              propsDirtyRef.current)
+          ) {
+            return;
+          }
+          seededForRef.current = selected;
           // Seed the editor drafts from the same fetch. The bundle carries the
           // parsed tree; pretty-print it to Handlebars-HTML for the editor.
           const c = bundle.component;
@@ -305,6 +349,10 @@ export function ComponentDevelop({
   }, [draft, saveState, selected]);
 
   async function saveDraft(name: string, d: Draft) {
+    await runExclusive(() => doSaveDraft(name, d));
+  }
+
+  async function doSaveDraft(name: string, d: Draft) {
     setSaveState("saving");
     setSaveError(null);
     try {
@@ -340,13 +388,18 @@ export function ComponentDevelop({
 
   /** Load the draft state + live pages that reference `name` (blast radius). */
   async function loadUsage(name: string) {
+    // Epoch check: a usage GET fired by an autosave can resolve AFTER a
+    // publish/discard (deployed-Site latency) — its stale hasDraft:true would
+    // resurrect the publish bar. Superseded responses are dropped.
+    const epoch = ++usageEpochRef.current;
     try {
       const res = await fetch(`/api/components/${encodeURIComponent(name)}/usage`);
-      if (!res.ok) return;
+      if (!res.ok || epoch !== usageEpochRef.current) return;
       const body = (await res.json()) as {
         usage?: Array<{ slug: string; direct: boolean }>;
         hasDraft?: boolean;
       };
+      if (epoch !== usageEpochRef.current) return;
       setUsage(body.usage ?? []);
       setHasDraft(body.hasDraft ?? false);
     } catch {
@@ -358,6 +411,19 @@ export function ComponentDevelop({
   async function publishOrDiscard(name: string, action: "publish" | "discard") {
     setPublishBusy(true);
     try {
+      // Flush the write pipeline FIRST: under deployed-Site latency a debounced
+      // or in-flight autosave can land AFTER this POST and silently re-create
+      // the draft ("published but still shows unpublished changes"). Discard
+      // disarms the pending debounces (those edits are being thrown away);
+      // publish saves a dirty edit first (publish-what-you-see).
+      if (action === "discard") {
+        setSaveState("idle");
+        setPropsDirty(false);
+      }
+      if (saveInFlightRef.current) await saveInFlightRef.current;
+      if (action === "publish" && saveStateRef.current === "dirty" && draft) {
+        await saveDraft(name, draft);
+      }
       const res = await fetch(`/api/components/${encodeURIComponent(name)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -368,7 +434,9 @@ export function ComponentDevelop({
         setSaveError(body?.error || `HTTP ${res.status}`);
         return;
       }
-      // Draft consumed either way — clear the bar and refresh the preview.
+      // Draft consumed either way — drop any in-flight usage response (it would
+      // report the PRE-publish hasDraft), clear the bar, refresh the preview.
+      usageEpochRef.current++;
       setHasDraft(false);
       setUsage([]);
       setReloadKey((k) => k + 1);
@@ -410,7 +478,7 @@ export function ComponentDevelop({
     if (!selected || !draft || !propsDirty) return;
     const tid = setTimeout(() => {
       const nextSchema = applyDefaults(propsSchemaStr, propValues);
-      void (async () => {
+      void runExclusive(async () => {
         setSaveState("saving");
         setSaveError(null);
         try {
@@ -441,7 +509,7 @@ export function ComponentDevelop({
           setSaveState("error");
           setSaveError((err as Error).message);
         }
-      })();
+      });
     }, 800);
     return () => clearTimeout(tid);
     // eslint-disable-next-line react-hooks/exhaustive-deps

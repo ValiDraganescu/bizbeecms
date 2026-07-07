@@ -608,6 +608,18 @@
     "save": "Tallenna",
     "publish": "Julkaise",
     "pendingChanges": "Julkaisemattomia muutoksia",
+    "draftBadge": "luonnos",
+    "draftBadgeHint": "Tällä komponentilla on julkaisemattomia muokkauksia — esikatselu näyttää ne, julkinen sivusto ei vielä.",
+    "publishDialog": {
+      "title": "Julkaistaanko myös komponenttimuutokset?",
+      "intro": "Tämä sivu käyttää komponentteja, joissa on julkaisemattomia muokkauksia. Esikatselu näyttää ne, mutta julkaistu sivu ei ennen kuin komponentit julkaistaan — ja komponentin julkaisu päivittää sen jokaisella sitä käyttävällä sivulla.",
+      "usageLoading": "Tarkistetaan käyttökohteita…",
+      "usageNone": "Ei käytössä millään muulla julkaistulla sivulla.",
+      "usageOn": "Käytössä myös {count, plural, one {# muulla julkaistulla sivulla:} other {# muulla julkaistulla sivulla:}}",
+      "cancel": "Peruuta",
+      "pageOnly": "Vain sivu",
+      "publishBoth": "Julkaise sivu + {count, plural, one {# komponentti} other {# komponenttia}}"
+    },
     "draftStatus": {
       "saving": "Tallennetaan…",
       "saved": "Tallennettu",

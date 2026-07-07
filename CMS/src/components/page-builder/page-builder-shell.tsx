@@ -20,7 +20,7 @@
  * later slice actually has shared editor state to manage.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   type InspectorPreset,
@@ -67,7 +67,7 @@ import {
   renameSection,
   parsePropsSchema,
 } from "@/lib/pages/page-blocks";
-import type { Block, FormTarget } from "@/lib/render/tree";
+import { collectComponentNames, type Block, type FormTarget } from "@/lib/render/tree";
 import { declaredPropNames } from "@/lib/content/binding";
 import type {
   Viewport,
@@ -83,6 +83,7 @@ import { ViewportIcon, PreviewThemeIcon, CollapseToggle, ICON } from "./shared";
 import { ComponentsRail } from "./components-rail";
 import { PagePicker } from "./page-picker";
 import { LayersTree } from "./layers-tree";
+import { PublishDialog } from "./publish-dialog";
 import { SeoForm } from "./seo-form";
 import { ColumnSettings } from "./column-settings";
 import { SectionSettings } from "./section-settings";
@@ -191,6 +192,34 @@ export function PageBuilderShell({
   const [search, setSearch] = useState("");
   // name → raw propsSchema JSON (Block tab renders a settings form per declared prop).
   const [propsSchemas, setPropsSchemas] = useState<Record<string, string | null>>({});
+  // Components with an unpublished DRAFT (component edits land as drafts; the
+  // preview renders them but the public site won't until published). Drives the
+  // Layers/inspector "draft" badges + the publish-together dialog.
+  const [draftComponents, setDraftComponents] = useState<Set<string>>(new Set());
+  // name → updatedAt token from the last palette load. Compared on window focus
+  // to detect EXTERNAL component edits (MCP tools can't fire the in-app
+  // page-mutation event) and refresh the stale preview.
+  const paletteVersions = useRef<Record<string, number>>({});
+  // Publish-together dialog: draft components used by the page awaiting the
+  // operator's publish decision (null = closed).
+  const [publishDialog, setPublishDialog] = useState<string[] | null>(null);
+
+  // (Re)load the component palette: props schemas + draft flags. Returns true
+  // when any component changed since the previous load (new/removed/edited).
+  const loadPalette = useCallback(async (): Promise<boolean> => {
+    const res = await fetch("/api/components/palette");
+    if (!res.ok) return false;
+    const body = (await res.json()) as {
+      palette?: { name: string; propsSchema: string | null; hasDraft?: boolean; version?: number }[];
+    };
+    const list = body.palette ?? [];
+    setPropsSchemas(Object.fromEntries(list.map((p) => [p.name, p.propsSchema])));
+    setDraftComponents(new Set(list.filter((p) => p.hasDraft).map((p) => p.name)));
+    const versions = Object.fromEntries(list.map((p) => [p.name, p.version ?? 0]));
+    const changed = JSON.stringify(versions) !== JSON.stringify(paletteVersions.current);
+    paletteVersions.current = versions;
+    return changed;
+  }, []);
   // Phase-2 binding (Slice C): the Site's collections (registry views) for the
   // "Bind to collection" + List query panels. tableName is the stable handle.
   const [collections, setCollections] = useState<CollectionMeta[]>([]);
@@ -300,10 +329,27 @@ export function PageBuilderShell({
     function onMutated() {
       setPreviewNonce((n) => n + 1);
       if (!dirty) setDraftReloadNonce((n) => n + 1);
+      // Component edits change draft flags/schemas — keep badges + forms fresh.
+      void loadPalette();
     }
     window.addEventListener(PAGE_MUTATION_EVENT, onMutated);
     return () => window.removeEventListener(PAGE_MUTATION_EVENT, onMutated);
-  }, [dirty]);
+  }, [dirty, loadPalette]);
+
+  // EXTERNAL component edits (MCP tools from an outside AI session) can't fire
+  // the in-app mutation event, so the preview would sit stale. On window focus
+  // (the operator returns from that session) re-check the palette; any component
+  // change token moved → reload the preview. ponytail: focus-triggered diff, no
+  // polling — a cheap local JSON fetch per focus.
+  useEffect(() => {
+    function onFocus() {
+      void loadPalette().then((changed) => {
+        if (changed) setPreviewNonce((n) => n + 1);
+      });
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadPalette]);
 
   // Names for the Preview hover label: section id → its display name, component
   // leaf id → its component name. Only the blocks the overlay OUTLINES need an
@@ -562,7 +608,26 @@ export function PageBuilderShell({
 
   // Publish — snapshot the draft into a new published version + auto-create a
   // fresh draft (publishDraft). Saves the draft first so the latest edits ship.
+  // When the page uses components with unpublished DRAFTS (e.g. an AI edit), the
+  // public page would still render their LIVE artifact — so first open the
+  // publish-together dialog: it shows each draft component's blast radius and
+  // lets the operator publish them alongside the page (or page-only).
   async function onPublish() {
+    if (!selected) return;
+    // Direct block references only — a draft component nested INSIDE another
+    // component's markup isn't detected here. ponytail: direct refs cover the
+    // builder's own compositions; add collectTreeComponentTags if nesting bites.
+    const draftsOnPage = [...collectComponentNames(blocks)].filter((n) =>
+      draftComponents.has(n),
+    );
+    if (draftsOnPage.length > 0) {
+      setPublishDialog(draftsOnPage.sort());
+      return;
+    }
+    await publishPage();
+  }
+
+  async function publishPage() {
     if (!selected) return;
     setPublishing(true);
     try {
@@ -580,6 +645,34 @@ export function PageBuilderShell({
     } finally {
       setPublishing(false);
     }
+  }
+
+  // Dialog confirm: publish the SELECTED draft components first (each publish
+  // makes its draft live everywhere it's used), then the page. A failed
+  // component publish aborts before the page ships half-updated.
+  async function onConfirmPublish(componentNames: string[]) {
+    setPublishDialog(null);
+    setPublishing(true);
+    try {
+      for (const name of componentNames) {
+        const res = await fetch(`/api/components/${encodeURIComponent(name)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "publish" }),
+        });
+        if (!res.ok) {
+          setDraftStatus((s) => nextDraftStatus(s, "error"));
+          return;
+        }
+      }
+    } catch {
+      setDraftStatus((s) => nextDraftStatus(s, "error"));
+      return;
+    } finally {
+      setPublishing(false);
+    }
+    await publishPage();
+    void loadPalette(); // draft flags changed → refresh badges
   }
 
   // Reflect a pending edit in the status badge ("Unsaved changes") the moment a
@@ -621,17 +714,7 @@ export function PageBuilderShell({
         setTagGroups(body.tagGroups ?? []);
       }
     })();
-    void (async () => {
-      const res = await fetch("/api/components/palette");
-      if (live && res.ok) {
-        const body = (await res.json()) as {
-          palette?: { name: string; propsSchema: string | null }[];
-        };
-        setPropsSchemas(
-          Object.fromEntries((body.palette ?? []).map((p) => [p.name, p.propsSchema])),
-        );
-      }
-    })();
+    void loadPalette();
     void (async () => {
       // Slice C: collections for the binding panels. 403 (non-admin) / offline →
       // empty list → panels show "no collections" (graceful, never throws).
@@ -908,6 +991,7 @@ export function PageBuilderShell({
               ) : (
                 <LayersTree
                   blocks={blocks}
+                  draftComponents={draftComponents}
                   selectedId={selectedBlockId}
                   onSelect={setSelectedBlockId}
                   onDropComponent={onDropComponentToColumn}
@@ -1147,6 +1231,7 @@ export function PageBuilderShell({
                       <ComponentSettings
                         key={sel.id}
                         block={sel}
+                        hasDraft={draftComponents.has(sel.component)}
                         schema={parsePropsSchema(propsSchemas[sel.component])}
                         locales={contentLocales}
                         onChange={(props) => onUpdateComponentProps(sel.id, props)}
@@ -1217,6 +1302,14 @@ export function PageBuilderShell({
         </aside>
         )}
       </div>
+      {publishDialog && selected && (
+        <PublishDialog
+          componentNames={publishDialog}
+          currentPageId={selected.id}
+          onConfirm={(names) => void onConfirmPublish(names)}
+          onCancel={() => setPublishDialog(null)}
+        />
+      )}
     </div>
   );
 }

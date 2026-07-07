@@ -1,104 +1,69 @@
 ---
-description: Bump version (SemVer), commit, and push the current branch. Inspects the diff, picks major/minor/patch, writes the version file, and pushes.
+description: Ship the current working-tree changes — inspect the diff, bump the project version per SemVer, commit with a tight message, and push the current branch. Use when the user wants to commit, ship, release, or push what's in the working tree.
 allowed-tools: Read, Edit, Bash, Grep, Glob
 ---
 
-Your task: ship the current working-tree changes. Inspect what changed, bump the project's version using SemVer (if the project has a version file), update it, commit with a tight message, and push to the current branch's upstream.
-
-You do this end-to-end without asking the user to confirm each step. Only stop to ask if something is genuinely ambiguous (e.g. the diff mixes a breaking change with unrelated patch-level work and you can't tell what the user intends to release, or you cannot determine which file holds the project's version).
+Ship the current working-tree changes end-to-end, with no per-step confirmations. The one reason to stop and ask is genuine ambiguity: a diff that mixes a breaking change with unrelated work so the release intent is unclear, or no way to tell which file holds the project's version.
 
 # Step 1 — Inspect the change
 
 Run these in parallel:
-- `git status` (see untracked + modified files)
+- `git status` (untracked + modified files)
 - `git diff HEAD` (full working-tree diff vs HEAD)
 - `git log --oneline -20` (recent commit style)
 - `git rev-parse --abbrev-ref HEAD` (current branch — you'll push to this)
 
-Read the diff carefully. You need to know **what changed and why** before you can pick a bump level or write a commit message. If the diff is large, read it in full anyway — don't skim.
-
-If there are no changes to commit (working tree clean and nothing staged), stop and tell the user.
+Read the diff **in full — a large diff too**: the bump level and the commit message both come from knowing what changed and why. If the working tree is clean and nothing is staged, stop and tell the user.
 
 # Step 2 — Locate the version file
 
-Find the canonical version source for this project. Check, in order, and stop at the first match:
+Find the project's canonical version source — the per-ecosystem lookup table (where each ecosystem keeps its version, and how to edit that file) is in [`VERSIONS.md`](./VERSIONS.md); check its entries in order and stop at the first match.
 
-1. **Node / JS / TS** — `package.json` → `"version": "X.Y.Z"`. If a workspace root with no `version` field, look for the primary package's `package.json` instead.
-2. **Python** — `pyproject.toml` (`[project] version = "X.Y.Z"` or `[tool.poetry] version`), then `setup.py` / `setup.cfg`, then `__version__` in `<pkg>/__init__.py`.
-3. **Rust** — `Cargo.toml` → `[package] version = "X.Y.Z"` (workspace: the root or member that owns the public crate).
-4. **Go** — usually no in-tree version file; releases happen via git tags. If `version.go` / a `Version` constant exists, use it; otherwise treat the git tag as the version (see Step 3 fallback).
-5. **Java / Kotlin / JVM** — `build.gradle(.kts)` (`version = "X.Y.Z"`), `pom.xml` (`<version>X.Y.Z</version>` of the project, not a parent/dependency), `gradle.properties` (`version=…`).
-6. **.NET / C#** — `Directory.Build.props` or the relevant `*.csproj` (`<Version>` / `<VersionPrefix>`).
-7. **PHP** — `composer.json` (`"version"`), if present.
-8. **Ruby** — `*.gemspec` (`spec.version`) or `lib/<gem>/version.rb` (`VERSION = "X.Y.Z"`).
-9. **Elixir** — `mix.exs` (`@version` or the `version:` key in `project/0`).
-10. **Dart / Flutter** — `pubspec.yaml` (`version: X.Y.Z+B`).
-11. **Swift / Apple platforms** — `*.podspec` (`spec.version`), or an `Info.plist` with `CFBundleShortVersionString` (also has `CFBundleVersion` as a build counter — see Step 3).
-12. **Generic** — a top-level `VERSION` or `version.txt` file containing just `X.Y.Z`.
-
-If multiple candidates exist (e.g. both `package.json` and `pyproject.toml`), prefer the one that matches the dominant language of the diff. If still ambiguous, ask the user.
-
-If **no version file exists** (e.g. a Go module released by tag, a script repo, a docs-only repo), skip Step 3 entirely. Note in your final report that no version file was bumped, and proceed with the commit + push.
+If multiple candidates exist (e.g. both `package.json` and `pyproject.toml`), prefer the one matching the dominant language of the diff; still ambiguous → ask the user. If **no version file exists** (a Go module released by tag, a script repo, a docs-only repo), skip Steps 3–4, note it in the report, and proceed with the commit + push.
 
 # Step 3 — Pick the SemVer bump
 
-Use the version found in Step 2 as the current version (`X.Y.Z`). Pick the bump by the largest impact present in the diff:
+From the current version `X.Y.Z`, pick by the **largest impact present** in the diff:
 
 - **major** (`X+1.0.0`) — breaking change to the project's public surface: removed/renamed exported function or class, removed/renamed CLI subcommand or flag, breaking change to a network/wire protocol or persisted file format, removed/renamed public API endpoint, dropped support for a runtime/SDK version. Anything that forces a downstream consumer to change their code or data.
 - **minor** (`X.Y+1.0`) — additive new functionality: new exported API, new CLI subcommand or flag, new endpoint, new user-visible feature, new optional config key. Backwards-compatible.
 - **patch** (`X.Y.Z+1`) — bug fix, performance fix, internal refactor with no public-surface change, dependency bump, doc/comment-only change, test-only change, build/CI tweak, log/telemetry adjustment, config tweak that ships safe defaults.
 
-When the diff mixes levels, pick the **highest** level present. A patch fix alongside a new feature is still a minor bump.
+A patch fix alongside a new feature is still a minor bump — the highest level present wins.
 
-"Public surface" is project-relative — for a library it's the exported API; for a CLI it's the subcommand and flag set; for a service it's its HTTP/RPC contract; for an app it's the persisted state schema and any documented integrations. If the project's CLAUDE.md or README defines its public surface, defer to that.
+"Public surface" is project-relative — for a library the exported API; for a CLI the subcommand and flag set; for a service its HTTP/RPC contract; for an app the persisted state schema and any documented integrations. If the project's CLAUDE.md or README defines its public surface, defer to that.
 
-Edge cases:
-- Pure test additions with no source change → patch.
-- Rename of an internal symbol with no public-surface impact → patch.
-- Doc-only or housekeeping changes (moving files inside a `done/` archive, formatting, etc.) → patch.
-- If you genuinely cannot tell whether a change is breaking, ask the user one sharp question before bumping.
+Edge cases: pure test additions → patch. Internal-symbol rename with no public-surface impact → patch. Doc-only or housekeeping changes → patch. Genuinely can't tell whether a change is breaking → ask the user one sharp question before bumping.
 
 # Step 4 — Write the version
 
-Update **only** the version field(s) in the file you identified. Do not touch unrelated keys.
-
-Per-format notes:
-- `package.json` — preserve JSON formatting; bump only `"version"`.
-- `Cargo.toml` / `pyproject.toml` / `mix.exs` — bump only the `version` line; preserve TOML/Elixir formatting and surrounding keys.
-- `pom.xml` — bump only the project's `<version>` element (the one directly under `<project>`, not a `<parent>` or `<dependency>`).
-- `Info.plist` — set `CFBundleShortVersionString` to the new SemVer string. If `CFBundleVersion` is present (the build counter), increment it by 1 as an integer — independent of the SemVer bump. Do not touch any other key.
-- `pubspec.yaml` — Dart/Flutter format is `X.Y.Z+B`; bump SemVer and, if a `+B` build counter is present, increment it by 1.
-- Plain `VERSION` / `version.txt` — overwrite the contents with the new SemVer string and a trailing newline.
-
-For any format-specific build counter (e.g. `CFBundleVersion`, pubspec `+B`), increment it on every commit even when the SemVer part stays the same.
+Update **only** the version field(s), following the format notes in [`VERSIONS.md`](./VERSIONS.md) — surrounding keys and formatting stay untouched. Format-specific build counters (`CFBundleVersion`, pubspec's `+B`) increment by 1 on **every** commit, independent of the SemVer bump.
 
 # Step 5 — Commit message
 
-Use Conventional Commit prefixes matching the repo's style (see `git log` output from Step 1): `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`, `perf:`, `build:`, `ci:`, `style:`. Pick the prefix that matches the **dominant** change, not the bump level. If the repo's existing log uses a different convention (e.g. plain imperative subjects, ticket prefixes, gitmoji), match that style instead.
+Use Conventional Commit prefixes matching the repo's style (the `git log` from Step 1): `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`, `perf:`, `build:`, `ci:`, `style:`. Pick the prefix matching the **dominant** change, not the bump level. A repo whose log uses a different convention (plain imperative subjects, ticket prefixes, gitmoji) gets that style instead.
 
-Rules:
 - Subject line: one sentence, imperative mood, under 72 chars, no trailing period.
-- Focus on the **why** or the user-visible effect, not a file list.
-- If multiple unrelated things changed, still keep the subject to one line — summarize the theme. Do not add a body unless the user asked for one.
-- Do NOT mention the version bump in the subject (the tag/version itself communicates that).
-- Include the Claude co-author trailer via HEREDOC, exactly as the global commit protocol requires.
+- Say the **why** or the user-visible effect, not a file list.
+- Multiple unrelated changes still get one subject line — summarize the theme. Add a body only if the user asked for one.
+- The version bump stays out of the subject — the version itself communicates it.
+- Append whatever trailer the global commit protocol in your context requires, via the HEREDOC form below.
 
 # Step 6 — Stage, commit, push
 
-- Stage the version file (if any was bumped) plus any other modified/untracked files that are part of the logical change. **Never** use `git add -A` or `git add .` — add files by name. Skip files that look like secrets (`.env*`, `credentials*`, `*.p12`, `*.keychain*`, `*.pem`, `id_rsa*`, `*.key`, etc.) and warn the user if any exist.
-- Respect `.gitignore`: if a candidate file is ignored, skip it silently.
+- Stage the version file (if bumped) plus the other modified/untracked files that belong to the logical change, **by name** — the explicit list is a hard guardrail; `git add -A` / `git add .` would sweep in unrelated files. Files that look like secrets (`.env*`, `credentials*`, `*.p12`, `*.keychain*`, `*.pem`, `id_rsa*`, `*.key`, …) stay unstaged — warn the user if any exist. A candidate that's gitignored is skipped silently.
 - Commit with the HEREDOC form:
   ```
   git commit -m "$(cat <<'EOF'
   <subject line>
 
-  Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+  <required trailer(s)>
   EOF
   )"
   ```
-- Push to the current branch's upstream: `git push origin <current-branch>`. If the branch has no upstream yet, push with `-u` to set it. Do not force-push. Do not push to `master`/`main` unless the current branch already is one — and if it is, confirm with the user first.
+- Push to the current branch's upstream: `git push origin <current-branch>` (`-u` if no upstream yet). Plain push only — a force-push rewrites shared history. If the current branch IS `master`/`main`, confirm with the user before pushing.
 
-If the pre-commit hook fails, fix the underlying issue, re-stage, and create a **new** commit (never `--amend` after a hook failure — the prior commit didn't happen, amending would rewrite the previous one).
+If the pre-commit hook fails, fix the underlying issue, re-stage, and create a **new** commit — the hook-failed commit never happened, so `--amend` would rewrite the *previous* one.
 
 # Step 7 — Report
 

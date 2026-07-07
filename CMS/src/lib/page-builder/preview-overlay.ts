@@ -175,6 +175,14 @@ export function wirePreviewOverlay(
     doc.querySelectorAll("[data-block-wrap]").forEach((wrap) => {
       if (wrap.querySelector(`:scope > [${CHIP_ATTR}]`)) return;
       if (!isVisuallyEmptyRect(wrap.getBoundingClientRect())) return;
+      // A zero-area wrap can still hold a VISIBLE block: an `absolute`
+      // child (e.g. SiteHeader overlaying the hero) escapes flow, so the
+      // wrap collapses while the block paints fine. Only chip a block whose
+      // descendants ALL measure zero too (display:none placeholders do).
+      const els = wrap.querySelectorAll("*");
+      for (const el of els) {
+        if (!isVisuallyEmptyRect(el.getBoundingClientRect())) return;
+      }
       const id = wrap.getAttribute("data-block-wrap");
       const chip = doc.createElement("span");
       chip.setAttribute(CHIP_ATTR, "");
@@ -182,9 +190,28 @@ export function wirePreviewOverlay(
       wrap.appendChild(chip);
     });
   };
-  injectInvisibleChips();
+  // DEFERRED past React hydration: the iframe's `load` (which triggers this
+  // wiring) can fire before React 19's concurrent hydration finishes, and
+  // mutating the DOM mid-hydration trips a hydration-mismatch → React
+  // regenerates the tree (and deletes the chip). requestIdleCallback fires
+  // once the main thread goes idle — i.e. hydration is done — and also lets
+  // layout settle before we measure rects. The `timeout` is REQUIRED: without
+  // it Chrome starves rIC in unfocused/background frames and the chip never
+  // appears (verified in the builder iframe). Safari has no rIC → timeout.
+  const win = doc.defaultView;
+  let cancelInject = () => {};
+  if (win) {
+    if (typeof win.requestIdleCallback === "function") {
+      const id = win.requestIdleCallback(injectInvisibleChips, { timeout: 1000 });
+      cancelInject = () => win.cancelIdleCallback(id);
+    } else {
+      const id = win.setTimeout(injectInvisibleChips, 250);
+      cancelInject = () => win.clearTimeout(id);
+    }
+  }
 
   return () => {
+    cancelInject();
     doc.removeEventListener("click", onClick, true);
     doc.removeEventListener("mousemove", onMove, true);
     doc.removeEventListener("mouseleave", onLeave, true);

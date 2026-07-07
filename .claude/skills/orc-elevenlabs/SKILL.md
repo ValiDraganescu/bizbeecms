@@ -1,18 +1,18 @@
 ---
-description: Meeseeks capability — generate real, high-quality AUDIO assets using the ElevenLabs API (build-time). Three modes — Text to Speech (narration / voice lines), Sound Effects (gunfire/wind/footsteps/ambient beds, one-shot or looping), and Music Generation (studio-grade soundtrack beds). Load this when a Meeseeks task involves producing voice, sound-effect, or music audio files, picking voices, or replacing placeholder/silent audio. Reads the API key from .env (never committed); renders into bundled assets the app plays back locally.
+description: Generate real audio assets via the ElevenLabs API at build time. Text to Speech (narration / voice lines), Sound Effects (one-shot or looping ambient beds), and Music (soundtrack beds). Load when a task involves producing voice, sound-effect, or music audio files, picking voices, or replacing placeholder/silent audio.
 argument-hint: "(optional) which voices / cues / sfx / music to generate"
 allowed-tools: Read, Edit, Write, Bash, Grep, Glob
 ---
 
 # ElevenLabs audio generation (build-time)
 
-You're a Meeseeks whose task touches **audio**. This skill gives the app a real soundtrack via the [ElevenLabs](https://elevenlabs.io/docs/overview/intro) API — three capabilities, all build-time, all producing bundled audio assets the app plays back:
+Your task touches **audio**. This skill gives the app a real soundtrack via the [ElevenLabs](https://elevenlabs.io/docs/overview/intro) API — three capabilities, all build-time, all producing bundled audio assets the app plays back:
 
 - **Text to Speech** — narration / spoken lines from authored text. [[docs](https://elevenlabs.io/docs/api-reference/text-to-speech/convert)]
 - **Sound Effects** — one-shot or seamless-looping SFX: distant gunfire, wind, footsteps, a trailer braam, ambient beds. [[docs](https://elevenlabs.io/docs/api-reference/text-to-sound-effects/convert)]
 - **Music Generation** — studio-grade soundtrack beds from a prompt (tense strings, driving chase synth, ambient pads). [[docs](https://elevenlabs.io/docs/api-reference/music/compose)]
 
-> Your API key must have the matching endpoints enabled (Text to Speech / Sound Effects / Music Generation). If a call returns 401/permission errors on one capability but others work, the key is missing that endpoint's access — record it as a caveat and tell the user.
+> Your API key must have the matching endpoints enabled (Text to Speech / Sound Effects / Music Generation). If a call returns 401/permission errors on one capability but others work, the key is missing that endpoint's access — record it and tell the user.
 
 The rest of this skill covers all three. They share the same architecture, key handling, and tool.
 
@@ -23,22 +23,22 @@ Audio is generated at **build time**, not runtime:
 - A repo script pre-renders each cue into an audio file; those files ship in the app bundle.
 - At runtime the app just **plays the local file** — it never calls ElevenLabs, so the API key never leaves your machine.
 
-So your job in an audio task is: pick voices → render the cues → wire the generated filenames into wherever the app references its audio assets → make the player prefer the generated asset. Do as much as fits one Meeseeks run; leave the rest in `BACKLOG.md`/`NEXT.md`.
+So your job in an audio task is: pick voices → render the cues → wire the generated filenames into wherever the app references its audio assets → make the player prefer the generated asset. Slice the work sensibly and note whatever you leave unfinished.
 
-> **Orient first.** This is a generic capability — before generating, read `GOAL.md` and the project's own source to learn where audio assets live, what model type the code expects (which audio container/path it loads), and how the player picks an asset. Don't invent a structure the project doesn't have; fit the project's existing seam.
+> **Orient first.** This is a generic capability — before generating, read the project's own source (and its goal/design docs, if any) to learn where audio assets live, what model type the code expects (which audio container/path it loads), and how the player picks an asset. Fit the project's existing seam rather than inventing a structure.
 
 ## The key — from `.env`, never committed
 
 The API key is read from **`.env` in the project root** (`ELEVENLABS_API_KEY=...`). This file is gitignored. Rules:
-- **Never** print, echo, log, or commit the key. Don't `cat .env`. Don't paste it into code, tests, manifests, or a journal entry.
-- If `.env` is missing or the key is the `your-key-here` placeholder, you're **blocked** — record it as a blocker (`CAVEATS.md` + `NEXT.md`), tell the user to add their key to `.env` (a committed `.env.example` template is the convention), and end the run. Do not invent a key.
+- **Never** print, echo, log, or commit the key. Don't `cat .env`. Don't paste it into code, tests, manifests, or notes.
+- If `.env` is missing or the key is the `your-key-here` placeholder, you're **blocked** — record the blocker, tell the user to add their key to `.env` (a committed `.env.example` template is the convention), and stop. Do not invent a key.
 - Generated audio files are fine to commit (they're just audio, no secret).
 
 ## The tool — `Tools/AudioGen/elevenlabs.sh`
 
 A thin wrapper over all three capabilities. It loads the key from `.env` itself; you never pass it. Run with no args to see usage.
 
-> **First run:** if `Tools/AudioGen/elevenlabs.sh` doesn't exist yet, creating it (per the endpoint spec in the caveats below) is itself a good single Meeseeks task — a thin `curl` wrapper that loads `.env`, masks the key on error, and guards HTTP≠200. Leave the actual asset generation to the next run.
+> **First run:** if `Tools/AudioGen/elevenlabs.sh` doesn't exist yet, creating it (per the endpoint spec in the caveats below) is itself a good first slice — a thin `curl` wrapper that loads `.env`, masks the key on error, and guards HTTP≠200. Generate the actual assets after it works.
 
 ### 1. Text to Speech (narration)
 ```bash
@@ -84,7 +84,7 @@ Run `voices`, then choose a fitting `voice_id` per role the project's narration 
 
 Map these to whatever narrator roles the project's own domain model actually has — read its source first.
 
-**Record your choices** so the next Meeseeks doesn't re-pick: write the chosen `voice_id`s into a small committed config (e.g. `Tools/AudioGen/voices.json` mapping role → voice_id + a human note on why) AND add a one-line caveat to your goal's `CAVEATS.md` (the `<GOAL_DIR>/CAVEATS.md` your core `orc-meeseeks` run resolved). Voice IDs are not secret — safe to commit.
+**Record your choices** so a future session doesn't re-pick: write the chosen `voice_id`s into a small committed config (e.g. `Tools/AudioGen/voices.json` mapping role → voice_id + a human note on why). Voice IDs are not secret — safe to commit.
 
 ## Where SFX & music fit in the app (domain note)
 
@@ -93,21 +93,23 @@ Narration usually has a home already — a per-cue audio-asset field and a playe
 - **Music** as a per-screen / per-scene bed (an optional asset name for the soundtrack that loops underneath), played on a separate audio channel from narration so voice ducks over the music. The player/controller layer owns the mixing (AVAudioSession + multiple players on Apple platforms).
 - **Looping ambient SFX** (wind, distant battle) behaves like music — a bed that loops for a phase.
 
-Keep new domain fields in the project's core/domain module and add tests. Pick ONE slice per run: generating the assets is one task; wiring a new domain field + player channel is another. Leave the rest in `BACKLOG.md`/`NEXT.md`.
+Keep new domain fields in the project's core/domain module and add tests. Pick ONE slice at a time: generating the assets is one task; wiring a new domain field + player channel is another.
 
-## A sensible one-run slice
+## A sensible first slice
 
-If this is the first audio Meeseeks, a good single task is: ensure the tool exists, pick the voices, write `voices.json`, build a manifest for one batch of the project's narration cues (pull the exact text from the project's source), generate them into the project's audio asset dir, and play **one** generated file (`afplay <something>.mp3`) to sanity-check it's real audio. Wiring the assets into the narration model + player can be the next Meeseeks if you run out of room — leave it in `NEXT.md`.
+If this is the project's first audio work, a good single slice is: ensure the tool exists, pick the voices, write `voices.json`, build a manifest for one batch of the project's narration cues (pull the exact text from the project's source), generate them into the project's audio asset dir, and play **one** generated file (`afplay <something>.mp3`) to sanity-check it's real audio. Wiring the assets into the narration model + player can be the next slice.
 
-Good follow-on single slices once narration exists: generate a **music bed** (`music`); generate a small **SFX set** (`sfx` → gunfire, whistle, a looping wind bed); then separately wire each into the domain + player.
+Good follow-on slices once narration exists: generate a **music bed** (`music`); generate a small **SFX set** (`sfx` → gunfire, whistle, a looping wind bed); then separately wire each into the domain + player.
 
 ## Verify before you commit
 
 - Each generated audio file is non-trivial in size (a 422 error writes a tiny JSON-ish blob; the script already guards HTTP!=200, but eyeball `wc -c`).
-- `afplay <file>` plays something audible (you can't *hear* it, but a clean exit + plausible size + correct duration via `afinfo <file>` is good signal). Record exactly what you could and couldn't verify in the JOURNAL.
-- Generated audio + `voices.json` + any manifest get committed in your normal Meeseeks commit step.
+- `afplay <file>` plays something audible (you can't *hear* it, but a clean exit + plausible size + correct duration via `afinfo <file>` is good signal). Record exactly what you could and couldn't verify.
+- Generated audio + `voices.json` + any manifest get committed with the rest of the work.
 
-## Caveats to carry forward (seed these into your goal's `CAVEATS.md` — `<GOAL_DIR>/CAVEATS.md` — if absent; a goal-agnostic one also belongs in `goals/main/CAVEATS.md`)
+## Caveats worth carrying forward
+
+Durable facts future sessions need. Record them wherever the project keeps such notes — a Meeseeks worker seeds them into its goal's `CAVEATS.md` (goal-agnostic ones also into `goals/main/CAVEATS.md`):
 
 - Audio is BUILD-TIME via `Tools/AudioGen/elevenlabs.sh` (3 modes: `say`/`manifest` TTS, `sfx`, `music`); the app never calls ElevenLabs at runtime. Key is in `.env` (gitignored) — never print/commit it.
 - `eleven_v3` = most expressive TTS model. SFX model = `eleven_text_to_sound_v2` (only model with seamless `loop`). Music model = `music_v1` (a newer `music_v2` may exist — check `models`/web).

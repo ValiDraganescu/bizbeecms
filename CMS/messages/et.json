@@ -608,6 +608,18 @@
     "save": "Salvesta",
     "publish": "Avalda",
     "pendingChanges": "Avaldamata muudatused",
+    "draftBadge": "mustand",
+    "draftBadgeHint": "Sellel komponendil on avaldamata muudatusi — eelvaade näitab neid, avalik sait veel mitte.",
+    "publishDialog": {
+      "title": "Kas avaldada ka komponendi muudatused?",
+      "intro": "See leht kasutab komponente, millel on avaldamata muudatusi. Eelvaade näitab neid, kuid avaldatud leht mitte enne, kui komponendid on avaldatud — ja komponendi avaldamine uuendab seda igal lehel, mis seda kasutab.",
+      "usageLoading": "Kontrollitakse kasutuskohti…",
+      "usageNone": "Ei ole kasutusel ühelgi teisel avaldatud lehel.",
+      "usageOn": "Kasutusel ka {count, plural, one {# teisel avaldatud lehel:} other {# teisel avaldatud lehel:}}",
+      "cancel": "Tühista",
+      "pageOnly": "Ainult leht",
+      "publishBoth": "Avalda leht + {count, plural, one {# komponent} other {# komponenti}}"
+    },
     "draftStatus": {
       "saving": "Salvestan…",
       "saved": "Salvestatud",

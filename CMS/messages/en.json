@@ -608,6 +608,18 @@
     "save": "Save",
     "publish": "Publish",
     "pendingChanges": "Unpublished changes",
+    "draftBadge": "draft",
+    "draftBadgeHint": "This component has unpublished edits — the preview shows them, the live site doesn't yet.",
+    "publishDialog": {
+      "title": "Publish component changes too?",
+      "intro": "This page uses components with unpublished edits. The preview shows them, but the published page won't until the components are published — and publishing a component updates it on every page that uses it.",
+      "usageLoading": "Checking where it's used…",
+      "usageNone": "Not used on any other published page.",
+      "usageOn": "Also used on {count, plural, one {# other published page:} other {# other published pages:}}",
+      "cancel": "Cancel",
+      "pageOnly": "Page only",
+      "publishBoth": "Publish page + {count, plural, one {# component} other {# components}}"
+    },
     "draftStatus": {
       "saving": "Saving…",
       "saved": "Saved",

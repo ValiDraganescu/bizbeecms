@@ -1,7 +1,7 @@
 ---
 description: Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions crystallise. Use when you want to stress-test a plan against the project's language and documented decisions.
 argument-hint: "[what you want to grill — feature, plan, refactor, or just 'this conversation']"
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob, mcp__orchestrator__list_agents, mcp__orchestrator__send_message, mcp__orchestrator__get_messages, mcp__orchestrator__list_prds, mcp__orchestrator__read_prd
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, mcp__orchestrator__list_agents, mcp__orchestrator__send_message, mcp__orchestrator__get_messages
 ---
 
 Your job is to **interview the user relentlessly** about every aspect of their plan until you reach a shared understanding, walking down each branch of the design tree and resolving dependencies between decisions one-by-one. As decisions crystallise, you update the project's domain documentation **inline** — `CONTEXT.md` for terminology, `docs/adr/` for hard-to-reverse decisions.
@@ -30,35 +30,11 @@ Before asking the first question, find what's already documented so you don't wa
 
 ## File-structure conventions
 
-Most repos have a single context. The skill assumes this layout:
+Most repos have a single context: `CONTEXT.md` at the project root, ADRs in `docs/adr/` (numbered `0001-<slug>.md`), source folders beside them.
 
-```
-<projectRoot>/
-├── CONTEXT.md
-├── docs/
-│   └── adr/
-│       ├── 0001-event-sourced-orders.md
-│       └── 0002-postgres-for-write-model.md
-└── <source folders>/
-```
+If a `CONTEXT-MAP.md` exists at the project root, the repo has **multiple bounded contexts**: the map points at each context's home (e.g. `src/ordering/`), each context folder carries its own `CONTEXT.md` + `docs/adr/`, and system-wide decisions stay in the root `docs/adr/`.
 
-If a `CONTEXT-MAP.md` exists at the project root, the repo has **multiple bounded contexts** and the map points at where each one lives:
-
-```
-<projectRoot>/
-├── CONTEXT-MAP.md
-├── docs/
-│   └── adr/                          ← system-wide decisions
-└── src/
-    ├── ordering/
-    │   ├── CONTEXT.md
-    │   └── docs/adr/                 ← context-specific decisions
-    └── billing/
-        ├── CONTEXT.md
-        └── docs/adr/
-```
-
-`CONTEXT.md` lives **with the code its language describes** — at the project root for a single-context repo, or inside each context's source folder for a multi-context repo. Do NOT create a separate top-level `context/` or `docs/context/` directory.
+`CONTEXT.md` lives **with the code its language describes** — the project root for a single-context repo, inside each context's source folder for a multi-context one. That location rule is the whole convention; a separate top-level `context/` or `docs/context/` directory is the wrong home.
 
 ## Discovery probe (run before your first question)
 
@@ -68,38 +44,9 @@ Check, in order:
 2. **`CONTEXT-MAP.md` at the project root** — if it exists, this is a multi-context repo. Read the map and follow it to the contexts that the current subject touches.
 3. **Single-context fallback** — `<projectRoot>/CONTEXT.md`. If it exists, load it.
 4. **ADRs** — `<projectRoot>/docs/adr/*.md` for system-wide decisions, and `<context-folder>/docs/adr/*.md` for any context the subject touches. Skim them so you can cite the relevant ones during the interview and so you can refuse to relitigate ones already settled.
-5. **Triage / open PRDs** — call `list_prds({stage: "triage"})` and `list_prds({stage: "todo"})`. If the subject already has a PRD, the grill should sharpen it (`read_prd({key})` to load its body), not duplicate it. PRDs are kanban-store rows (PRD_34 / ADR_0008), not files.
+5. **Open work** — if the project uses the Meeseeks goal tree (`.orchestrator/meeseeks/goals/`), skim the relevant goal's `GOAL.md` and `BACKLOG.md`. If the subject is already queued there, the grill should sharpen it, not duplicate it.
 
 If neither `CONTEXT.md` nor `docs/adr/` exists, that's fine — **create them lazily**. Don't scaffold empty files; wait until the first term is resolved (then `CONTEXT.md`) or the first qualifying decision is settled (then `docs/adr/0001-<slug>.md`).
-
-# Architect consult (architect-gated projects only)
-
-If the project uses the architect (`<projectRoot>/.claude/agents/orc-architect.md` exists AND `<projectRoot>/docs/architecture/MAP.md` exists), there may be an architect agent alive for a PRD that overlaps with what you are grilling. The architect holds the module map and the rationale behind existing module boundaries — exactly the kind of context that prevents the grill from proposing a design that contradicts the architecture.
-
-## When to consult
-
-Consult the architect when the grill touches **architectural shape** — what module a piece of functionality belongs in, whether a capability already exists, whether a proposed boundary crosses an existing one, whether a new module is justified. Do not consult on terminology or domain language; that is your job.
-
-Skip the consult entirely if the grill is purely about domain language (terms in `CONTEXT.md`) and has no structural implications.
-
-## How to consult
-
-1. Read `docs/architecture/MAP.md` first to ground yourself. It is generated; treat it as authoritative for the module roster. For module-specific detail, follow the link to the relevant `MODULE.md`.
-2. Check whether an architect is currently alive on the channel: call `list_agents` and look for an agent named `architect-<PRD-key>` or with role `orc-architect` in the subscribers list. If none is alive, you cannot consult — proceed with the grill using the on-disk docs (`MAP.md` and `MODULE.md` files) as your sole source of truth, and tell the user any architectural conclusions you reach will need to be confirmed by the architect when one is spawned.
-3. If an architect IS alive, send a `question` message via `send_message`:
-   ```
-   send_message({
-     to: "<architect-name:first-8-hex>",
-     type: "question",
-     content: "Grill-consult for <subject>: <specific architectural question>. Reading suggests <your current hypothesis from MAP.md / MODULE.md>. Confirm or correct?"
-   })
-   ```
-4. Wait for the architect's reply. You will see it as a `notifications/claude/channel` event in your normal input stream — do NOT poll `get_messages`. The architect replies with a module reference, a "use the existing X instead of building Y" callout, or a contradiction against an existing ADR / `MODULE.md`.
-5. Fold the architect's reply into the grill. If they contradicted the user's plan, that becomes the next question to the user.
-
-## Architect peer, not architect proxy
-
-You are not relaying every grill question to the architect. The architect is a peer you consult on structural questions when reading the docs is not enough. The conversation with the user remains yours; the architect is a fact-check you reach for when needed.
 
 # During the session
 
@@ -123,7 +70,7 @@ When the user states how something works, check whether the code agrees. If you 
 
 When a term is resolved, write it into `CONTEXT.md` **right there**. Don't batch resolutions — capture them as they happen, then continue the interview.
 
-`CONTEXT.md` is a **glossary, not a spec, not a scratchpad, not an implementation-decisions log**. If you find yourself adding implementation details, stop — those belong in the PRD or an ADR.
+`CONTEXT.md` is a **glossary, not a spec, not a scratchpad, not an implementation-decisions log**. If you find yourself adding implementation details, stop — those belong in an ADR or the plan/backlog.
 
 The exact format, rules, and multi-context map structure live in [`CONTEXT-FORMAT.md`](./CONTEXT-FORMAT.md) — read it once at session start, then keep it in mind as you write entries.
 
@@ -147,7 +94,7 @@ Before you end the session:
 
 - **The user can describe the plan in the project's own vocabulary.** If they still drift between two words for the same concept, the grill isn't done.
 - **No fuzzy terms left.** Every term used in the plan resolves to a `CONTEXT.md` entry or has been deliberately scoped out as a non-domain concept.
-- **All settled decisions are recorded where they belong** — terminology in `CONTEXT.md`, hard-to-reverse decisions in `docs/adr/`, scope and acceptance criteria in the PRD (use `/orc-to-prd` if one doesn't exist yet and the plan is concrete enough to write).
+- **All settled decisions are recorded where they belong** — terminology in `CONTEXT.md`, hard-to-reverse decisions in `docs/adr/`, scope and next steps in the plan or the goal's backlog (`/orc-meeseeks-curator` can queue them).
 - **No new ADRs for reversible decisions.** If you created an ADR that fails the three-question test, delete it.
 - **No CONTEXT.md entries for generic programming concepts.** If you wrote one, delete it.
 
@@ -159,6 +106,6 @@ When the grilling session ends, send one short summary message:
 - New / updated terms in `CONTEXT.md` (filename + bold term names; do not paste the bodies).
 - New ADRs (filename + one-line title each).
 - Open questions you and the user agreed to defer (with the reason).
-- Suggested next step (often `/orc-to-prd` if the plan is now concrete, or `/orc-to-tasks` if a PRD already exists and the grill sharpened its decomposition).
+- Suggested next step (often `/orc-meeseeks-curator` to queue the sharpened plan into a goal’s backlog, or starting the work directly if it’s small).
 
 Nothing else — the documentation files are the artifact.

@@ -29,14 +29,31 @@ export function ComponentSettings({
   schema,
   locales,
   onChange,
+  hasDraft = false,
 }: {
   block: Block;
   schema: PropField[];
   locales: string[];
   onChange: (props: Record<string, unknown>) => void;
+  /** The block's component has an unpublished draft (preview ≠ public render). */
+  hasDraft?: boolean;
 }) {
   const t = useTranslations("pageBuilder");
   const props = (block.props ?? {}) as Record<string, unknown>;
+
+  const heading = (
+    <p className="font-mono text-sm text-foreground">
+      {block.component}
+      {hasDraft && (
+        <span
+          className="ml-1.5 rounded border border-warning bg-warning-subtle px-1 py-px align-middle font-sans text-[10px] font-medium uppercase tracking-wide text-foreground"
+          title={t("draftBadgeHint")}
+        >
+          {t("draftBadge")}
+        </span>
+      )}
+    </p>
+  );
 
   const segLabel = "text-xs font-medium uppercase tracking-wide text-foreground-muted";
   const seg = "flex-1 rounded-md border px-2 py-1 text-sm transition-colors";
@@ -85,7 +102,7 @@ export function ComponentSettings({
   if (schema.length === 0) {
     return (
       <div className="flex flex-col gap-4">
-        <p className="font-mono text-sm text-foreground">{block.component}</p>
+        {heading}
         {layoutControls}
         <p className="text-sm text-foreground-muted">{t("componentNoProps")}</p>
       </div>
@@ -94,7 +111,7 @@ export function ComponentSettings({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="font-mono text-sm text-foreground">{block.component}</p>
+      {heading}
       {layoutControls}
       {schema.map((f) => {
         // Translatable text → its own per-locale field (lang tabs + AI translate).
