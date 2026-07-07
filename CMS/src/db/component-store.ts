@@ -59,6 +59,7 @@ export async function listComponents(): Promise<ComponentRow[]> {
       propsSchema: schema.component.propsSchema,
       tags: schema.component.tags,
       label: schema.component.label,
+      kind: schema.component.kind,
       updatedAt: schema.component.updatedAt,
     })
     .from(schema.component);
@@ -71,6 +72,7 @@ export async function listComponents(): Promise<ComponentRow[]> {
       propsSchema: r.propsSchema,
       tags: r.tags,
       label: r.label,
+      kind: r.kind,
       updatedAt: r.updatedAt,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -174,6 +176,12 @@ export async function getComponentByName(
     // effective kind falls back to live (mirrors publishComponentDraft's
     // `draftKind ?? kind`). Live read always returns the committed kind.
     kind: useDraft ? r.draftKind ?? r.kind : r.kind,
+    // The RAW `html` column verbatim. For a jsonld component this is the JSON-LD
+    // TEMPLATE (which `tree` above mangles, since parseHtml treats it as markup).
+    // The Develop workbench needs the un-mangled template to edit; it's carried
+    // here so the GET route can ship it out-of-band (like `kind`) without
+    // polluting the portable bundle (`serializeComponent` ignores this field).
+    jsonTemplate: useDraft ? r.draftHtml ?? "" : r.html,
   };
 }
 

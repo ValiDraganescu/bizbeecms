@@ -208,6 +208,27 @@ Read every line before working. Each entry was learned the hard way by a previou
   save PUT kind:jsonld) is still TODO; it reads kind from that header. `listComponents` (the gallery
   list) still doesn't select kind — add it there if the rail ever needs to badge jsonld components.
 
+- (2026-07-07) JSON-LD Develop editor: the portable-bundle `tree` for a jsonld component is a
+  parseHtml-MANGLED version of the JSON template (getComponentByName does `parseHtml(r.html)` and
+  r.html IS the JSON template) — you CANNOT reconstruct the template from the bundle. The raw
+  template rides out-of-band on GET `/api/components?name=` as a base64 header
+  `X-Component-Json-Template` (base64 so newlines/non-ASCII survive; codec = shared pure
+  `lib/components/base64-header.ts`, round-trip tested). The workbench decodes it as the editor
+  content. Kept OUT of the portable bundle for the same reason as `kind`/`label` (UI-only). Added
+  `ComponentRow.jsonTemplate` (the raw html column verbatim) so the route can read it — it's NOT
+  serialized into the bundle (portable.test.ts still pins the bundle shape).
+- (2026-07-07) The Develop editor is now AUTHORITATIVE on kind: it reads the loaded kind on GET and
+  the save PUT ALWAYS sends `kind` (not just when jsonld). This is fine — an explicit `kind:"html"`
+  on an html component is a no-op, and it's REQUIRED so the HTML|JSON-LD toggle can persist a
+  jsonld→html switch (preserve-when-absent would otherwise strand the old kind). Do NOT copy this
+  "always send kind" onto the AI `update_component` tool — the AI legitimately omits kind to leave
+  it alone; only the workbench (which loaded the kind) may assert it.
+- (2026-07-07) Switching an html component to jsonld via the toggle leaves the current html markup
+  as the template draft — it usually won't be valid JSON, so the SAVE gets a 400 from
+  validateJsonLdArtifact (shown inline) and the preview says "invalid JSON" until the operator writes
+  a real schema.org template. This is intended/self-correcting, NOT a bug — don't "fix" it by
+  blanking the editor on switch (that would nuke an operator's in-progress work if they mis-toggled).
+
 - (2026-07-07) JSON-LD × bindings needs NO special seam — `hydrateBlockBindings`
   (render-page.tsx) resolves `block.bindings` + route `{param}`/`{query}` refs INTO
   `block.props` BEFORE planPage, and the jsonld branch in tree.ts (~line 285) reads that

@@ -30,6 +30,7 @@ import {
   serializeComponent,
 } from "@/lib/components/portable";
 import { normalizeTags, parseTags } from "@/lib/components/tags";
+import { encodeBase64Utf8 } from "@/lib/components/base64-header";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -47,18 +48,24 @@ export async function GET(request: Request): Promise<Response> {
       const row = await getComponentByName(name, preferDraft);
       if (!row) return Response.json({ error: "component not found" }, { status: 404 });
       const bundle = serializeComponent(row, { exportedAt: new Date().toISOString() });
-      return new Response(JSON.stringify(bundle, null, 2), {
-        headers: {
-          "Content-Type": "application/json",
-          // Offer a sensible download filename when fetched directly.
-          "Content-Disposition": `attachment; filename="${row.name}.component.json"`,
-          // Kind is UI-only and deliberately NOT in the portable bundle (like
-          // `label`), but the Develop editor needs to know a loaded component's
-          // kind to pick the HTML vs JSON-LD workbench. Ship it out-of-band in a
-          // header so the JSON download stays a clean portable bundle.
-          "X-Component-Kind": row.kind ?? "html",
-        },
-      });
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        // Offer a sensible download filename when fetched directly.
+        "Content-Disposition": `attachment; filename="${row.name}.component.json"`,
+        // Kind is UI-only and deliberately NOT in the portable bundle (like
+        // `label`), but the Develop editor needs to know a loaded component's
+        // kind to pick the HTML vs JSON-LD workbench. Ship it out-of-band in a
+        // header so the JSON download stays a clean portable bundle.
+        "X-Component-Kind": row.kind ?? "html",
+      };
+      // For a jsonld component, the bundle's `tree` is a parseHtml-mangled version
+      // of the JSON template — useless to edit. Ship the RAW template out-of-band,
+      // base64-encoded so newlines/non-ASCII survive the header. The workbench
+      // decodes it as the JSON-LD editor content.
+      if ((row.kind ?? "html") === "jsonld") {
+        headers["X-Component-Json-Template"] = encodeBase64Utf8(row.jsonTemplate ?? "");
+      }
+      return new Response(JSON.stringify(bundle, null, 2), { headers });
     }
     const rows = await listComponents();
     return Response.json(
@@ -72,6 +79,8 @@ export async function GET(request: Request): Promise<Response> {
         // (which only accepts arrays and turns a string into []).
         tags: parseTags(r.tags),
         label: r.label ?? null,
+        // Effective kind so the Develop list can badge jsonld components.
+        kind: r.kind ?? "html",
         // Cache-bust token for the gallery's preview iframes: every component
         // mutation bumps updatedAt, so `?v=` changes and the browser refetches.
         version: r.updatedAt?.getTime() ?? 0,

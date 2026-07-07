@@ -29,6 +29,9 @@ import {
   resolvePreset,
 } from "@/lib/page-builder/inspector-width";
 import { formatHtml } from "@/lib/render/parse-html";
+import { bindJsonLdSlots } from "@/lib/render/jsonld-component";
+import { declaredProps } from "@/lib/render/plan-tree";
+import { decodeBase64Utf8 } from "@/lib/components/base64-header";
 import { linkNewTabProp, parsePropsSchema } from "@/lib/pages/page-blocks";
 import { applyDefaults } from "@/lib/chat/props-defaults";
 import { PAGE_MUTATION_EVENT } from "@/lib/chat/page-mutation-signal";
@@ -100,6 +103,7 @@ type ComponentSummary = {
   hasPreviewData: boolean;
   tags: string[];
   label?: string | null;
+  kind?: string | null;
 };
 
 export function ComponentDevelop({
@@ -139,6 +143,11 @@ export function ComponentDevelop({
   // The editor drafts for the selected component (seeded from the fetched artifact;
   // edited locally; autosaved). null = not loaded yet for the current selection.
   const [draft, setDraft] = useState<Draft | null>(null);
+  // The loaded component's KIND ('html' default | 'jsonld'), read from the
+  // X-Component-Kind response header on the GET. Drives the JSON-LD workbench:
+  // a jsonld component edits a JSON template (not html/script/css) and previews
+  // the emitted structured data instead of rendering visible HTML.
+  const [kind, setKind] = useState<"html" | "jsonld">("html");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   // COMPONENT DRAFT/PUBLISH: editing writes an unpublished draft (live pages keep
@@ -197,6 +206,12 @@ export function ComponentDevelop({
 
   const current = components.find((c) => c.name === selected) ?? null;
   const propFields = parsePropsSchema(propsSchemaStr);
+  const isJsonLd = kind === "jsonld";
+  // For a jsonld component, the "preview" is the emitted structured data (the
+  // iframe would be blank — it renders a hidden <script>). Build it from the
+  // draft template + placeholder props so edits reflect live.
+  const jsonLdPreview =
+    isJsonLd && draft ? previewJsonLd(draft.html, propsSchemaStr, propValues) : null;
 
   // Publish the selected component's FULL artifact as inline chat context so the
   // assistant's next message knows which component is open AND has its whole code
@@ -215,6 +230,16 @@ export function ComponentDevelop({
         // from live after each autosave would clobber unpublished edits).
         const res = await fetch(`/api/components?name=${encodeURIComponent(selected)}&draft=1`);
         if (!res.ok) return;
+        // Kind rides out-of-band in a header (it's UI-only, kept out of the
+        // portable bundle). `?draft=1` returns the DRAFT kind, matching the draft
+        // artifact the editor loads below.
+        const loadedKind = res.headers.get("X-Component-Kind") === "jsonld" ? "jsonld" : "html";
+        // For a jsonld component the RAW JSON-LD template rides in a base64 header
+        // (the bundle's `tree` is a parseHtml-mangled version, useless to edit).
+        const jsonTemplate =
+          loadedKind === "jsonld"
+            ? decodeBase64Utf8(res.headers.get("X-Component-Json-Template"))
+            : null;
         const bundle = (await res.json()) as {
           component?: {
             name: string;
@@ -229,11 +254,16 @@ export function ComponentDevelop({
           // Seed the editor drafts from the same fetch. The bundle carries the
           // parsed tree; pretty-print it to Handlebars-HTML for the editor.
           const c = bundle.component;
+          setKind(loadedKind);
           setDraft({
+            // jsonld: the editor edits the raw JSON-LD template (from the header),
+            // not the mangled tree; script/css are unused for a jsonld component.
             html:
-              typeof c.tree === "string"
-                ? c.tree
-                : formatHtml(c.tree as Parameters<typeof formatHtml>[0]),
+              loadedKind === "jsonld"
+                ? (jsonTemplate ?? "")
+                : typeof c.tree === "string"
+                  ? c.tree
+                  : formatHtml(c.tree as Parameters<typeof formatHtml>[0]),
             script: c.script ?? "",
             css: c.css ?? "",
           });
@@ -281,7 +311,11 @@ export function ComponentDevelop({
       const res = await fetch(`/api/components/${encodeURIComponent(name)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ html: d.html, script: d.script, css: d.css }),
+        // Always send the loaded/selected `kind` — the editor is authoritative
+        // (it read the kind on load). For jsonld, `html` carries the JSON-LD
+        // template and the write path routes it to jsonTemplate. Sending it on
+        // every save also lets the kind toggle persist an html⇄jsonld switch.
+        body: JSON.stringify({ html: d.html, script: d.script, css: d.css, kind }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as
@@ -351,6 +385,18 @@ export function ComponentDevelop({
     setSaveState("dirty");
   }
 
+  // Switch the selected component's kind (HTML ⇄ JSON-LD). Marks the draft dirty
+  // so the next autosave PUT persists the new kind (staged as a draft_kind until
+  // published). The editor content stays as-is: switching to JSON-LD, the current
+  // html becomes the template draft (usually not valid JSON yet — the preview says
+  // so until the operator writes a schema.org template), which is the intended
+  // author flow. No-op when already that kind.
+  function switchKind(next: "html" | "jsonld") {
+    if (next === kind) return;
+    setKind(next);
+    setSaveState("dirty");
+  }
+
   // Edit one prop's placeholder value → mark the props sidebar dirty.
   function editProp(name: string, value: unknown) {
     setPropValues((v) => ({ ...v, [name]: value }));
@@ -376,6 +422,7 @@ export function ComponentDevelop({
               script: draft.script,
               css: draft.css,
               propsSchema: nextSchema,
+              kind,
             }),
           });
           if (!res.ok) {
@@ -536,14 +583,21 @@ export function ComponentDevelop({
                       className="flex min-w-0 flex-1 flex-col items-start text-left"
                       onClick={() => setSelected(c.name)}
                     >
-                      <span
-                        className={
-                          "truncate " +
-                          (c.label ? "font-medium " : "font-mono ") +
-                          (active ? "text-primary" : "text-foreground")
-                        }
-                      >
-                        {c.label || c.name}
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span
+                          className={
+                            "truncate " +
+                            (c.label ? "font-medium " : "font-mono ") +
+                            (active ? "text-primary" : "text-foreground")
+                          }
+                        >
+                          {c.label || c.name}
+                        </span>
+                        {c.kind === "jsonld" && (
+                          <span className="shrink-0 rounded bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-foreground-muted">
+                            {t("jsonld.badge")}
+                          </span>
+                        )}
                       </span>
                       <span className="truncate text-xs text-foreground-muted">
                         {[
@@ -580,8 +634,9 @@ export function ComponentDevelop({
           </h2>
           <div className="flex items-center gap-2">
             {/* Viewport selector — desktop/tablet/mobile preview widths, mirrors
-                the Page Builder. Only meaningful in Preview; hidden in Code view. */}
-            {current && view === "preview" && (
+                the Page Builder. Only meaningful in Preview; hidden in Code view.
+                Also hidden for jsonld (no visual layout to size). */}
+            {current && view === "preview" && !isJsonLd && (
               <div className="flex overflow-hidden rounded-md border border-border">
                 {(["desktop", "tablet", "mobile"] as Viewport[]).map((v) => (
                   <button
@@ -606,7 +661,7 @@ export function ComponentDevelop({
             {/* Device-size picker — only in Mobile view. Sizes the frame to a
                 real phone viewport (width AND height) so a tall hero is judged
                 against an actual screen, not an unbounded pane. */}
-            {current && view === "preview" && viewport === "mobile" && (
+            {current && view === "preview" && !isJsonLd && viewport === "mobile" && (
               <select
                 value={deviceIdx}
                 onChange={(e) => setDeviceIdx(Number(e.target.value))}
@@ -621,8 +676,9 @@ export function ComponentDevelop({
               </select>
             )}
             {/* Send the rendered component at all 3 sizes to the AI (vision) so it
-                can nail the look across screen sizes. Preview view only. */}
-            {current && view === "preview" && (
+                can nail the look across screen sizes. Preview view only; a jsonld
+                component has no visual to screenshot. */}
+            {current && view === "preview" && !isJsonLd && (
               <button
                 type="button"
                 onClick={() => void sendPreviewToAI()}
@@ -656,6 +712,30 @@ export function ComponentDevelop({
               >
                 {t("reload")}
               </button>
+            )}
+            {/* Kind toggle — HTML (visible component) vs JSON-LD (invisible
+                structured-data component). Switching stages a draft kind change,
+                published with the next Publish. */}
+            {current && draft && (
+              <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                {(["html", "jsonld"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => switchKind(k)}
+                    aria-pressed={kind === k}
+                    title={k === "jsonld" ? t("jsonld.template") : t("codeTab.html")}
+                    className={
+                      "rounded px-3 py-1 text-sm transition-colors " +
+                      (kind === k
+                        ? "bg-surface-muted font-medium text-foreground"
+                        : "text-foreground-muted hover:text-foreground")
+                    }
+                  >
+                    {k === "jsonld" ? t("jsonld.badge") : t("codeTab.html")}
+                  </button>
+                ))}
+              </div>
             )}
             {/* Preview / Code toggle — mirrors the Page Builder's center tabs. */}
             {current && (
@@ -693,7 +773,7 @@ export function ComponentDevelop({
           </p>
         )}
 
-        {current && view === "preview" && !current.hasPreviewData && (
+        {current && view === "preview" && !isJsonLd && !current.hasPreviewData && (
           <p
             role="status"
             className="rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-foreground-muted"
@@ -706,22 +786,30 @@ export function ComponentDevelop({
         {current && view === "code" && (
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
-              {(["html", "script", "css"] as CodeTab[]).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setCodeTab(tab)}
-                  aria-pressed={codeTab === tab}
-                  className={
-                    "rounded-md px-3 py-1 text-sm transition-colors " +
-                    (codeTab === tab
-                      ? "bg-surface-muted font-medium text-foreground"
-                      : "text-foreground-muted hover:text-foreground")
-                  }
-                >
-                  {t(`codeTab.${tab}`)}
-                </button>
-              ))}
+              {isJsonLd ? (
+                // A jsonld component has ONE editable surface: its JSON-LD template
+                // (the html/script/css split is meaningless — it emits no markup/JS).
+                <span className="rounded-md bg-surface-muted px-3 py-1 text-sm font-medium text-foreground">
+                  {t("jsonld.template")}
+                </span>
+              ) : (
+                (["html", "script", "css"] as CodeTab[]).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setCodeTab(tab)}
+                    aria-pressed={codeTab === tab}
+                    className={
+                      "rounded-md px-3 py-1 text-sm transition-colors " +
+                      (codeTab === tab
+                        ? "bg-surface-muted font-medium text-foreground"
+                        : "text-foreground-muted hover:text-foreground")
+                    }
+                  >
+                    {t(`codeTab.${tab}`)}
+                  </button>
+                ))
+              )}
             </div>
             <span
               className={
@@ -790,6 +878,40 @@ export function ComponentDevelop({
             <div className="flex h-full min-h-[60vh] items-center justify-center text-foreground-muted">
               {t("selectPrompt")}
             </div>
+          ) : view === "preview" && isJsonLd ? (
+            // JSON-LD preview: the iframe would be blank (a jsonld component
+            // renders a HIDDEN <script>), so show the EMITTED structured data
+            // instead, with a Google Rich Results deep-link to validate it.
+            <div className="flex h-full min-h-[60vh] flex-col gap-3 overflow-auto bg-surface-muted p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {t("jsonld.previewTitle")}
+                  </h3>
+                  <p className="text-xs text-foreground-muted">{t("jsonld.previewHint")}</p>
+                </div>
+                <a
+                  href="https://search.google.com/test/rich-results"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs text-foreground-muted hover:text-foreground"
+                >
+                  {t("jsonld.richResults")}
+                </a>
+              </div>
+              {jsonLdPreview ? (
+                <pre className="min-h-0 flex-1 overflow-auto rounded-md border border-border bg-surface p-3 text-xs text-foreground">
+                  <code>{jsonLdPreview}</code>
+                </pre>
+              ) : (
+                <p
+                  role="status"
+                  className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground-muted"
+                >
+                  {(draft?.html ?? "").trim() === "" ? t("jsonld.empty") : t("jsonld.invalid")}
+                </p>
+              )}
+            </div>
           ) : view === "preview" ? (
             // Centered, width-constrained frame so tablet/mobile widths show the
             // component's responsive layout (desktop = full width).
@@ -819,12 +941,23 @@ export function ComponentDevelop({
             </div>
           ) : draft ? (
             <div className="h-full min-h-[60vh]">
-              <CodeEditor
-                key={`${current.name}-${codeTab}`}
-                value={draft[codeTab]}
-                language={CODE_TAB_LANG[codeTab]}
-                onChange={(next) => editField(codeTab, next)}
-              />
+              {isJsonLd ? (
+                // Edit the JSON-LD template (stored in the `html` field for a
+                // jsonld component). No script/css panes — it emits neither.
+                <CodeEditor
+                  key={`${current.name}-jsonld`}
+                  value={draft.html}
+                  language="json"
+                  onChange={(next) => editField("html", next)}
+                />
+              ) : (
+                <CodeEditor
+                  key={`${current.name}-${codeTab}`}
+                  value={draft[codeTab]}
+                  language={CODE_TAB_LANG[codeTab]}
+                  onChange={(next) => editField(codeTab, next)}
+                />
+              )}
             </div>
           ) : (
             <div className="flex h-full min-h-[60vh] items-center justify-center text-foreground-muted">
@@ -939,6 +1072,30 @@ function ViewportIcon({ kind }: { kind: Viewport }) {
           <line x1="11" y1="18" x2="13" y2="18" />
         </svg>
       );
+  }
+}
+
+/**
+ * Bind the JSON-LD template's `{{prop}}` slots with the current placeholder
+ * values and pretty-print the parsed object — the exact structured data the
+ * component emits, made readable. Returns null when the bound result isn't valid
+ * JSON (same gate as the renderer's buildJsonLdComponent — never preview a lie).
+ * Reuses the SHARED pure binder so the preview matches production output.
+ */
+function previewJsonLd(
+  template: string,
+  propsSchemaStr: string | null,
+  values: Record<string, unknown>,
+): string | null {
+  const raw = (template ?? "").trim();
+  if (raw === "") return null;
+  try {
+    const bound = bindJsonLdSlots(raw, values, declaredProps(propsSchemaStr));
+    const parsed = JSON.parse(bound);
+    if (parsed == null || typeof parsed !== "object") return null;
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    return null;
   }
 }
 

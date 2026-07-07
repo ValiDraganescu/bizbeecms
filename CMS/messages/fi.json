@@ -1251,6 +1251,15 @@
       "script": "Skripti",
       "css": "CSS"
     },
+    "jsonld": {
+      "template": "JSON-LD-malli",
+      "previewTitle": "Muodostettu rakenteinen data",
+      "previewHint": "Tämä <script type=\"application/ld+json\">, jonka komponentti muodostaa sivulle, esimerkkiarvoilla täytettynä.",
+      "invalid": "Malli (esimerkkiarvoilla) ei ole vielä kelvollista JSONia, joten rakenteista dataa ei muodosteta. Korjaa JSON nähdäksesi esikatselun.",
+      "empty": "Lisää JSON-LD-malli nähdäksesi muodostetun rakenteisen datan.",
+      "richResults": "Testaa Google Rich Results -työkalulla",
+      "badge": "JSON-LD"
+    },
     "capture": {
       "send": "Lähetä esikatselu tekoälylle",
       "capturing": "Kaapataan…",

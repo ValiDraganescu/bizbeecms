@@ -1251,6 +1251,15 @@
       "script": "Skript",
       "css": "CSS"
     },
+    "jsonld": {
+      "template": "JSON-LD mall",
+      "previewTitle": "Genereeritud struktureeritud andmed",
+      "previewHint": "See <script type=\"application/ld+json\">, mille komponent lehele genereerib, näidisandmetega täidetuna.",
+      "invalid": "Mall (näidisandmetega) pole veel korrektne JSON, seega struktureeritud andmeid ei genereerita. Paranda JSON eelvaate nägemiseks.",
+      "empty": "Lisa JSON-LD mall, et näha genereeritud struktureeritud andmeid.",
+      "richResults": "Testi Google Rich Results tööriistaga",
+      "badge": "JSON-LD"
+    },
     "capture": {
       "send": "Saada eelvaade AI-le",
       "capturing": "Jäädvustan…",

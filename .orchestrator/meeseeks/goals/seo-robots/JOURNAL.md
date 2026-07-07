@@ -446,3 +446,31 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `npx tsc --noEmit` exit 0. Did NOT run opennext build (test-only change, no runtime code touched)
   nor live rich-results validation (needs an authored+published jsonld component + D1 — HITL).
 - **Files:** CMS/src/lib/render/jsonld-bindings.test.ts (new)
+
+## 2026-07-07 12:46 — JSON-LD Develop editor UI (authoring surface)
+- **Status:** DONE
+- **What I did:** Wired the operator-facing JSON-LD authoring surface into the component
+  workbench — the LAST jsonld gap (render/write/read/bindings were all done). Changes:
+  (1) Develop reads the loaded kind from the `X-Component-Kind` header on the `?draft=1` GET and
+  stores it; (2) the raw JSON-LD TEMPLATE now rides out-of-band on GET as a base64 header
+  `X-Component-Json-Template` (the portable bundle's `tree` is a parseHtml-mangled version of the
+  template — useless to edit); (3) a HTML | JSON-LD kind toggle in the workbench (`switchKind`
+  stages a draft kind change, persisted on next autosave/publish); (4) for jsonld the Code view
+  shows ONE "JSON-LD template" editor (json language) editing `draft.html`, no script/css tabs;
+  (5) the Preview shows the EMITTED structured data (pretty-printed via the SHARED `bindJsonLdSlots`
+  + `declaredProps` — matches production `buildJsonLdComponent`) with a "Test in Google Rich
+  Results" deep-link, and hides the viewport/device/send-to-AI/no-placeholder controls (no visual);
+  (6) save PUT always sends the editor's authoritative `kind` (so html⇄jsonld switches persist);
+  (7) `listComponents` now selects `kind` → the list badges jsonld components; (8) extracted the
+  base64 UTF-8 header codec to a shared pure module `lib/components/base64-header.ts` (used by the
+  route + the client) with a round-trip regression test.
+- **Verified:** `npx tsc --noEmit` exit 0; `node --test` on base64-header (2/2), jsonld-component
+  (13), all component/chat/render/jsonld pure suites (274/274). Did NOT run opennext build (heavy;
+  isolated UI + one pure module, tsc+tests cover it) nor live Google Rich Results validation — that
+  needs an authored+published jsonld component on a deployed Site with real D1 (HITL). No worker.ts
+  / D1 schema change → no r-* release needed.
+- **Files:** CMS/src/components/components/component-develop.tsx, CMS/src/app/api/components/route.ts,
+  CMS/src/db/component-store.ts (jsonTemplate on getComponentByName row + kind in listComponents),
+  CMS/src/lib/components/portable.ts (ComponentRow.jsonTemplate field),
+  CMS/src/app/(admin)/admin/components/develop/page.tsx (kind in initialComponents),
+  CMS/src/lib/components/base64-header.ts (new) + .test.ts (new), CMS/messages/{en,fi,et}.json (jsonld keys)

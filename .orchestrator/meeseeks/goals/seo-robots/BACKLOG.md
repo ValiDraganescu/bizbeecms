@@ -7,15 +7,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### JSON-LD components (kind: jsonld) — machinery proven end-to-end; only the authoring SURFACE remains
-- TODO: JSON-LD authoring — Develop editor UI PROPER (render/write/read paths + bindings all DONE,
-  see JOURNAL 2026-07-07): a kind toggle (HTML | JSON-LD) in the component workbench; when JSON-LD,
-  the code editor edits the JSON template (label it, drop the script/css panes), the standalone
-  preview shows the emitted `<script type=application/ld+json>` inner JSON (or a Google Rich Results
-  deep-link), and the save PUT sends `kind:"jsonld"`. The editor reads the loaded kind from the
-  `X-Component-Kind` header on the GET (`?draft=1` refetch returns draft kind). Optional nit while
-  there: `listComponents` doesn't select `kind` — add it if the gallery rail should badge jsonld
-  components. One proof jsonld component authored via the UI → published → validated in Google
-  Rich Results (HITL).
+- DONE (2026-07-07): JSON-LD authoring — Develop editor UI PROPER. Kind toggle (HTML|JSON-LD),
+  single JSON-template editor for jsonld (no script/css panes), preview shows the emitted structured
+  data + Google Rich Results deep-link, save PUT sends the authoritative `kind`. Editor reads the
+  loaded kind from `X-Component-Kind` and the raw template from a new base64 `X-Component-Json-Template`
+  header (portable bundle `tree` is a parseHtml-mangled template — useless to edit). `listComponents`
+  now selects kind → list badges jsonld components. HITL REMAINS: author a proof jsonld component via
+  the UI → publish → validate in Google Rich Results (needs a deployed Site + real D1).
 - TODO: Builder canvas invisible-element CHIP for a jsonld block (renders no visible HTML — the
   `data-block-wrap` placeholder is empty; show a selectable/deletable chip so operators can manage it).
 - TODO: AI authoring-guide section for jsonld (tool `kind` param + validation are DONE): schema.org

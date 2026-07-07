@@ -223,6 +223,12 @@ export interface ComponentRow {
    * NOT part of the portable bundle; `serializeComponent` deliberately ignores it.
    */
   kind?: string | null;
+  /**
+   * The RAW `html` column verbatim (JSON-LD template for a jsonld component,
+   * where `tree` is a parseHtml-mangled version). UI-only; NOT in the bundle —
+   * carried so the Develop workbench can edit a jsonld template un-mangled.
+   */
+  jsonTemplate?: string | null;
   /** Last-mutation timestamp (UI cache-busting only; not part of the bundle). */
   updatedAt?: Date | null;
 }

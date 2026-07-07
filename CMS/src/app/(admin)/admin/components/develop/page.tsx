@@ -34,6 +34,7 @@ export default async function ComponentDevelopPage({
     hasPreviewData: boolean;
     tags: string[];
     label?: string | null;
+    kind?: string | null;
   }[] = [];
   try {
     const rows = await listComponents();
@@ -44,6 +45,7 @@ export default async function ComponentDevelopPage({
       hasPreviewData: (r.propsSchema ?? "") !== "",
       tags: parseTags(r.tags),
       label: r.label ?? null,
+      kind: r.kind ?? "html",
     }));
   } catch {
     /* unbound D1 in this env — render empty */

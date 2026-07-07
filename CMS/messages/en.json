@@ -1251,6 +1251,15 @@
       "script": "Script",
       "css": "CSS"
     },
+    "jsonld": {
+      "template": "JSON-LD template",
+      "previewTitle": "Emitted structured data",
+      "previewHint": "The <script type=\"application/ld+json\"> this component renders on the page, with placeholder props bound in.",
+      "invalid": "The template (with placeholder props) isn't valid JSON yet, so no structured data is emitted. Fix the JSON to preview it.",
+      "empty": "Add a JSON-LD template to preview the emitted structured data.",
+      "richResults": "Test in Google Rich Results",
+      "badge": "JSON-LD"
+    },
     "capture": {
       "send": "Send preview to AI",
       "capturing": "Capturing…",
