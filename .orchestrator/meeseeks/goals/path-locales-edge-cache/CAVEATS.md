@@ -148,6 +148,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   OTHER cached pages go 404 otherwise). CREATE/DELETE/publish deliberately do NOT
   blast: the path translator ignores publish status, and before-create/after-delete
   the inbound href 404s either way — no correctness delta, don't "complete" it.
+- Global-blast purge audit is COMPLETE (2026-07-07): every admin write that
+  affects published-page HTML now purges the shared `pages` tag —
+  theme colors/fonts, brand, component publish, content-locales, AND icon-set
+  (the last was the one gap: the site Iconify prefix resolves `{{icon}}` slots
+  in render-page.tsx, so it's a global-blast write). The OTHER settings routes
+  (google/openrouter-key/image-model/image-gen-model/translate-model) are
+  AI/integration config — they do NOT change published HTML, so they correctly
+  do NOT purge. Don't add purges there. Don't re-hunt this audit.
 - Deeply-nested localized-slug translation is VERIFIED CORRECT + regression-fenced
   (localize-paths.test.ts "sitemap: 3-level chain…"): every-segment, mid-chain-gap,
   and wildcard-ancestor-with-deeper-override all resolve. Don't re-hunt this angle —

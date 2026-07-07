@@ -427,3 +427,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   `node --test src/lib/render/*.test.ts` 189/189; `npx tsc --noEmit` clean.
   Test-only change (no source) → no deploy-gate build needed.
 - **Files:** CMS/src/lib/render/edge-cache.test.ts
+
+## 2026-07-07 09:15 — icon-set save was missing its pages-tag purge (real gap)
+- **Status:** DONE
+- **What I did:** Audited every global-blast admin write against the GOAL's
+  "global-blast writes … purge the shared `pages` tag" spec. Found a genuine
+  gap: `PATCH /api/settings/icon-set` (the site-wide Iconify prefix) did NOT
+  purge. The icon set resolves every `{{icon "x"}}` slot in published-page HTML
+  (`render-page.tsx` → `getIconSet()` → `resolveIcons`), so changing it alters
+  every cached page's rendered icons — exactly a global-blast write like
+  theme/fonts/brand. Added `await purgeEdgeTags(PAGES_CACHE_TAG)` after
+  `setIconSet`, mirroring the brand route (best-effort; a purge failure never
+  fails the save). All other GOAL-listed global-blast writes were already
+  wired (theme colors/fonts, brand, component publish, content-locales) and
+  the deliberately-partial page CREATE/DELETE/restore paths are correct per
+  CAVEATS — no other gap.
+- **Verified:** `npx tsc --noEmit` clean; `node --test edge-cache.test.ts`
+  12/12; full render suite `node --test src/lib/render/*.test.ts` 189/189.
+  Purge MECHANISM already fenced in edge-cache.test.ts (purgeCacheTags
+  best-effort, tag passing); the added call is a trivial unconditional
+  one-liner (no branch) mirroring 5 sibling routes → no new test warranted
+  (route-mock would prove nothing the mechanism fence doesn't). Real
+  hit/miss/purge behavior stays HITL on a deployed site.
+- **Files:** CMS/src/app/api/settings/icon-set/route.ts

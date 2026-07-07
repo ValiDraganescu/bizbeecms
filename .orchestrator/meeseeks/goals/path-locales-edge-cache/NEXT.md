@@ -1,31 +1,34 @@
 # Note to the next Meeseeks (path-locales-edge-cache)
 
-Run 18 done: fenced NEXT.md's last flagged invented slice — edge-cache gate ×
-query strings. NO defect: `isEdgeCacheCandidate` is query-agnostic (worker.ts
-feeds `new URL(url).pathname`, query already stripped) and Workers Cache keys by
-the FULL URL incl. query, so `?utm=` variants cache separately and never
-cross-serve. Locked with 2 tests in edge-cache.test.ts (12/12, +2). Test-only;
-189/189 render suite, tsc clean.
+Run 19 done: closed the one REAL gap the prior NEXT.md flagged as a possible
+audit finding. `PATCH /api/settings/icon-set` was NOT purging the shared
+`pages` tag even though the site-wide Iconify prefix resolves every
+`{{icon "x"}}` slot in published-page HTML (render-page.tsx `getIconSet` →
+`resolveIcons`). Changing the icon set silently left every cached page rendering
+old icons until expiry. Fixed: `await purgeEdgeTags(PAGES_CACHE_TAG)` after
+`setIconSet`, mirroring the brand route (best-effort). tsc clean; render suite
+189/189; edge-cache 12/12. One-line source change → no new test (purge mechanism
+already fenced in edge-cache.test.ts; the call is a branch-free one-liner).
 
-**Goal state:** ALL coded work DONE. Every defect-hunt / invented-slice angle
-from prior NEXT notes is now closed (inbound-link staleness, deep-nested slugs,
-query-param interplay — all verified + fenced). The only genuinely remaining
-non-invented work is HITL:
-- Real `cf-cache-status` hit/miss/purge verification on a DEPLOYED site (needs a
-  new r-* release — worker.ts ships only via a release tag; DON'T cut releases).
-- Live end-to-end AI create_page smoke (needs an AI chat session).
+**Global-blast purge audit is now COMPLETE** — see the new CAVEAT. Every write
+that changes published HTML purges `pages`; the AI/integration settings routes
+(google/openrouter-key/image-model/image-gen-model/translate-model) correctly
+do NOT (they don't touch published render). Don't re-hunt this.
 
-**If you must invent the next slice** (goals never end), the honest tank is
-running low — most correctness seams are now fenced. Thin remaining options:
-- A small admin-UI in-app help affordance linking the operator-guide concepts
-  (only if the user asks — don't build unrequested UI).
-- Audit whether any global-blast admin write (theme/font/component/brand/locale)
-  is MISSING a `pages`-tag purge call vs. the goal spec; if a gap exists, that's
-  a real fix + regression test. Cross-check purge-edge.ts call sites against the
-  GOAL.md "global-blast writes" list before assuming a gap — several are
-  deliberately partial per CAVEATS.
+**Goal state:** ALL coded correctness work is DONE and fenced. Genuinely
+remaining = HITL only:
+- Real `cf-cache-status` hit/miss/PURGE verification on a DEPLOYED site (worker.ts
+  ships only via a new r-* release — DON'T cut releases).
+- Live AI create_page smoke.
+
+**If you must invent the next slice** (goals never end) — the tank is genuinely
+low; almost every seam is fenced. Honest remaining thin options:
+- Verify the icon-set purge end-to-end once deployed (HITL — needs cf-cache-status).
+- Small operator-guide addition documenting that the icon set is a cache-busting
+  global setting (doc-only, low value; only if nothing better).
+- Re-read GOAL.md for any UX/SEO polish slice not yet built — but check the
+  JOURNAL/BACKLOG first; nearly everything is DONE.
 
 Gotchas unchanged: deploy gate = `CMS_DEV_SUPERADMIN=0 npx opennextjs-cloudflare
 build`, never while dev runs. Read CAVEATS — several "deliberately partial"
-designs look like bugs but aren't. Don't re-hunt query-params, deep-nested
-slugs, or inbound-link staleness — all proven correct + fenced.
+purge designs (page CREATE/DELETE/restore) look like bugs but are correct.

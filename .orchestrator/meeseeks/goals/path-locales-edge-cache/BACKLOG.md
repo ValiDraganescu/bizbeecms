@@ -7,6 +7,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### Docs
+- DONE: Purge gap fix — `PATCH /api/settings/icon-set` now blasts the shared `pages` tag. The site-wide Iconify prefix resolves every `{{icon "x"}}` slot in published-page HTML (render-page.tsx getIconSet), so it's a global-blast write per the GOAL spec but was the ONE such write missing its purge. Mirrors the brand route (best-effort). All other GOAL-listed global-blast writes already wired; partial page CREATE/DELETE/restore are correct per CAVEATS.
 - DONE: Regression fence for edge-cache gate × query strings — isEdgeCacheCandidate is query-agnostic (worker.ts feeds URL.pathname, query already stripped; Workers Cache keys by full URL so ?utm= variants cache separately, never cross-serve). No defect; gap was coverage. 2 tests in edge-cache.test.ts.
 - DONE: Regression lock for DEEPLY NESTED localized-slug sitemap seam (publishedPagePaths → createPathTranslator → pathForLocale, 3-level chains + mixed overrides). Defect hunt found no bug; the gap was coverage. 3 tests in localize-paths.test.ts.
 - DONE: Operator guide "URL locales + edge cache" (`CMS/docs/url-locales-and-edge-cache.md`, linked from CMS/README.md) — prefixes, localized slugs, cache opt-in, purge behavior. First user-facing doc for Stage 1/2. Facts cross-checked against code.

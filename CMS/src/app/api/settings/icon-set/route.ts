@@ -12,6 +12,8 @@
  */
 import { requireUserManager } from "@/lib/auth/guard";
 import { DEFAULT_ICON_SET, ICON_SET_OPTIONS, isValidIconSet } from "@/lib/render/icons";
+import { PAGES_CACHE_TAG } from "@/lib/render/edge-cache";
+import { purgeEdgeTags } from "@/lib/render/purge-edge";
 import { getIconSet, setIconSet } from "@/db/settings-store";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +50,10 @@ export async function PATCH(request: Request): Promise<Response> {
     const raw = typeof body.set === "string" ? body.set.trim() : "";
     const resolved = isValidIconSet(raw) ? raw : DEFAULT_ICON_SET;
     await setIconSet(resolved);
+    // The icon set resolves every `{{icon "x"}}` slot in published-page HTML
+    // (render-page.tsx getIconSet) — a global-blast write. Purge the shared
+    // pages tag so cached pages re-render with the new set. Best-effort.
+    await purgeEdgeTags(PAGES_CACHE_TAG);
     return Response.json({ set: resolved });
   } catch (err) {
     return Response.json(
