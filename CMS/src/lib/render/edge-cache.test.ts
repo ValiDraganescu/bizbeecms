@@ -14,6 +14,9 @@ import {
   isHtmlContentType,
   STALE_WHILE_REVALIDATE,
   markdownVariantRewrite,
+  llmsTxtCacheHeaders,
+  LLMS_CACHE_TAG,
+  LLMS_MAX_AGE,
 } from "./edge-cache.ts";
 import { SKIP_SEGMENTS } from "./localize-links.ts";
 
@@ -222,4 +225,31 @@ test("case-insensitive suffix; query preserved", () => {
 
 test("garbage input returns null (best-effort)", () => {
   assert.equal(markdownVariantRewrite("not a url"), null);
+});
+
+test("/llms.txt gets an explicit cache carve-out with its OWN tag", () => {
+  const h = llmsTxtCacheHeaders("/llms.txt");
+  assert.ok(h);
+  assert.equal(h.cacheTag, LLMS_CACHE_TAG);
+  assert.equal(
+    h.cacheControl,
+    `public, max-age=${LLMS_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+  );
+});
+
+test("the /llms.txt carve-out is a FIXED single path — nothing else opts in", () => {
+  // Crucially NOT a dot-gate loosening: a top-level wildcard-like path that a
+  // page could occupy must never match, or it'd get the llms tag stamped on it.
+  for (const p of [
+    "/robots.txt",
+    "/sitemap.xml",
+    "/llms.txt/",
+    "/fi/llms.txt",
+    "/anything.txt",
+    "/llms.txt.md",
+    "/",
+    "/about",
+  ]) {
+    assert.equal(llmsTxtCacheHeaders(p), null, p);
+  }
 });

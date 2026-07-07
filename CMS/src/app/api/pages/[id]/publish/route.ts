@@ -11,7 +11,7 @@
  */
 import { publishDraft } from "@/db/page-version-store";
 import { requireAdmin } from "@/lib/auth/guard";
-import { pageCacheTag } from "@/lib/render/edge-cache";
+import { pageCacheTag, LLMS_CACHE_TAG } from "@/lib/render/edge-cache";
 import { purgeEdgeTags } from "@/lib/render/purge-edge";
 import { notifyIndexNowForPage } from "@/lib/render/indexnow-notify";
 
@@ -27,9 +27,9 @@ export async function POST(
   try {
     const res = await publishDraft(id);
     if (!res) return Response.json({ error: "page not found" }, { status: 404 });
-    // Publish must be visible immediately: bust this page's edge-cache entries.
-    // Best-effort — a purge failure never fails the publish.
-    await purgeEdgeTags(pageCacheTag(id));
+    // Publish must be visible immediately: bust this page's edge-cache entries
+    // AND /llms.txt (it lists every published page). Best-effort.
+    await purgeEdgeTags(pageCacheTag(id), LLMS_CACHE_TAG);
     // Tell IndexNow engines this page's URLs changed (best-effort, non-blocking).
     await notifyIndexNowForPage(id);
     return Response.json({ ok: true, versionNo: res.published.versionNo });

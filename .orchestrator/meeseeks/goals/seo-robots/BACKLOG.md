@@ -7,12 +7,10 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### USER-QUEUED (2026-07-07): caching for llms.txt and .md variants (tasks 1–2 of 4 shipped — see BACKLOG_ARCHIVE)
-- TODO: Cache /llms.txt: today force-dynamic + no-store + rejected by the edge-cache dot gate
-  (deliberate, after the wildcard cache-tag sitemap bug). Add caching WITH explicit purge coverage:
-  own cache tag, purged on page publish/unpublish/delete/rename, brand-identity save, AND llms
-  template save (hook the purge into the api/settings/llms PUT too). Must NOT reopen the
-  wildcard-page cache-stamping hole — explicit carve-out for exactly /llms.txt, never a general
-  loosening of the dot gate. Any worker.ts change is release-gated (r-*).
+- DONE (2026-07-07): Cache /llms.txt — own tag `LLMS_CACHE_TAG="llms"` + pure
+  `llmsTxtCacheHeaders` (EXACTLY /llms.txt, never a dot-gate loosening); worker.ts carve-out
+  before the general gate; purge added to page publish/create/update/unpublish/rename/delete
+  (REST + AI page-write-hooks), brand save, and llms-template save. Release-gated worker change.
 - TODO: Cache .md page variants: /api/md/[...slug] currently sets no Cache-Control (recomputed every
   request; the worker rewrite exits BEFORE the edge-cache gate). Add edge caching keyed on the
   PUBLIC /<path>.md URL or the api route with the page's existing cache tag (pageCacheTag) so

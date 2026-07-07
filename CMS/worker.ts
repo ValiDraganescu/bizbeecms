@@ -32,6 +32,7 @@ import {
   edgeCacheHeaders,
   isHtmlContentType,
   markdownVariantRewrite,
+  llmsTxtCacheHeaders,
 } from "./src/lib/render/edge-cache";
 
 export default {
@@ -49,6 +50,20 @@ export default {
     }
     const response: Response = await handler.fetch(request, env, ctx);
     try {
+      // /llms.txt explicit carve-out (seo-robots): the dot gate excludes it
+      // (isEdgeCacheCandidate rejects dotted root paths), so opt it back in with
+      // its OWN tag here — a FIXED /llms.txt match, never a loosening of the dot
+      // gate. Purge coverage (page write/publish/delete/rename, brand save, llms
+      // template save) clears LLMS_CACHE_TAG. GET 200 only; no per-request D1.
+      if (request.method === "GET" && response.status === 200) {
+        const llms = llmsTxtCacheHeaders(new URL(request.url).pathname);
+        if (llms) {
+          const out = new Response(response.body, response);
+          out.headers.set("Cache-Control", llms.cacheControl);
+          out.headers.set("Cache-Tag", llms.cacheTag);
+          return out;
+        }
+      }
       if (
         !isEdgeCacheCandidate({
           method: request.method,

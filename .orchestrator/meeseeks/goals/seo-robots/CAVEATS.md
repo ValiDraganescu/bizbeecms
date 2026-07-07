@@ -398,3 +398,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   loads `.env.local` even when you `env -u` the var. The COMPILE + TypeScript stages run BEFORE the
   guard, so a green "✓ Compiled successfully / Finished TypeScript" + a clean `npx tsc --noEmit` +
   live dev verification is the achievable pre-commit bar here. Don't burn a run chasing the build gate.
+
+- (2026-07-07) /llms.txt edge caching: `LLMS_CACHE_TAG="llms"` is the file's OWN tag (NOT
+  `pages` — a per-page purge can't clear a global file, and blasting `pages` on every
+  llms-only change would needlessly re-render every cached page). worker.ts opts /llms.txt
+  back in via `llmsTxtCacheHeaders(pathname)` — a FIXED `pathname === "/llms.txt"` match placed
+  BEFORE the general edge-cache gate. It is DELIBERATELY not a loosening of the dot gate: a
+  top-level wildcard page can never match `/llms.txt`, so it can never get the llms tag stamped
+  on it (the sitemap wildcard-cache-tag hole is sidestructurally). If you add MORE dotted-root
+  cacheable files (e.g. a cached sitemap), give each its OWN carve-out fn + tag, never widen the
+  dot gate. PURGE COVERAGE for LLMS_CACHE_TAG lives in 6 places — keep in sync when a NEW page-
+  or brand-mutating path lands: (1) publish route, (2) api/pages persist (update/unpublish/
+  rename), (3) api/pages DELETE, (4) settings/brand PUT (alongside PAGES_CACHE_TAG), (5)
+  settings/llms PUT, (6) `purgeTagsForPageWrite` (the AI path — CREATE now returns
+  [LLMS_CACHE_TAG] because a create ADDS a page to the index; it's no longer []). The route still
+  emits `Cache-Control: no-store` as the PRE-RELEASE fallback (worker overwrites it once shipped)
+  — leaving it means /llms.txt stays uncached until the worker.ts release, never stale-cached.

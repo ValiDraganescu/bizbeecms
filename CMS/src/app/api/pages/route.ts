@@ -23,7 +23,7 @@ import { descendantIds, type PathPageRow } from "@/lib/render/localize-paths";
 import { noindexTurnedOn, pageUrlsAllLocales } from "@/lib/render/indexnow";
 import { resolveSiteOrigin } from "@/lib/render/site-origin";
 import { requireAdmin } from "@/lib/auth/guard";
-import { PAGES_CACHE_TAG, pageCacheTag } from "@/lib/render/edge-cache";
+import { PAGES_CACHE_TAG, pageCacheTag, LLMS_CACHE_TAG } from "@/lib/render/edge-cache";
 import { purgeEdgeTags } from "@/lib/render/purge-edge";
 import {
   collectPageUrls,
@@ -77,8 +77,9 @@ export async function DELETE(request: Request): Promise<Response> {
     const urls = await collectPageUrls(id);
     const res = await deletePage(id);
     if (!res.ok) return Response.json({ error: res.errors.join("; ") }, { status: 409 });
-    // A deleted page must stop serving from the edge cache. Best-effort.
-    await purgeEdgeTags(pageCacheTag(id));
+    // A deleted page must stop serving from the edge cache, and drop off
+    // /llms.txt's index. Best-effort.
+    await purgeEdgeTags(pageCacheTag(id), LLMS_CACHE_TAG);
     // Tell IndexNow the URLs are gone (best-effort, non-blocking).
     notifyIndexNowUrls(urls);
     return Response.json({ ok: true });
@@ -153,8 +154,12 @@ async function persist(body: unknown, id: string | null): Promise<Response> {
     // links to this page and would serve now-404 hrefs until expiry.
     // Creates (id === null) can't be cached yet. Best-effort.
     if (id !== null) {
+      // Also purge /llms.txt: a publish/UNPUBLISH toggle or a title/desc/slug
+      // edit changes what it lists for this page.
       await purgeEdgeTags(
-        ...(res.pathChanged ? [PAGES_CACHE_TAG, pageCacheTag(id)] : [pageCacheTag(id)]),
+        ...(res.pathChanged
+          ? [PAGES_CACHE_TAG, pageCacheTag(id), LLMS_CACHE_TAG]
+          : [pageCacheTag(id), LLMS_CACHE_TAG]),
       );
       // A PATH change (slug/parent/localized-slug rename) moved this page and its
       // whole subtree's URLs — auto-capture 301 redirects old→new so inbound

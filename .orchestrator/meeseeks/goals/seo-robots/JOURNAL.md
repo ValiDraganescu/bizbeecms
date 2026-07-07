@@ -775,3 +775,26 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/app/api/settings/llms/route.ts, CMS/src/components/settings/llms-editor.tsx,
   CMS/src/app/(admin)/admin/settings/llms/page.tsx, CMS/src/components/settings/settings-nav.tsx,
   CMS/messages/{en,fi,et}.json
+
+## 2026-07-07 14:19 — Cache /llms.txt (USER-QUEUED task 3/4)
+- **Status:** DONE
+- **What I did:** Gave `/llms.txt` its own edge-cache tag `LLMS_CACHE_TAG = "llms"`
+  (edge-cache.ts) + a pure `llmsTxtCacheHeaders(pathname)` that opts EXACTLY `/llms.txt`
+  back in (public, max-age=LLMS_MAX_AGE=3600, SWR). worker.ts: explicit carve-out BEFORE
+  the general edge-cache gate — GET 200 + `llmsTxtCacheHeaders` match → stamp Cache-Control +
+  `Cache-Tag: llms`. This is a FIXED single-path match, NOT a dot-gate loosening, so a
+  top-level wildcard page can never get the llms tag stamped (the sitemap-staleness precedent).
+  Purge coverage for `LLMS_CACHE_TAG` added to every site that changes the file: page publish
+  (publish route), page create/update/unpublish/rename + delete (api/pages route), brand save
+  (settings/brand), llms-template save (settings/llms PUT — new purge), and the AI write path
+  (page-write-hooks: CREATE now returns [LLMS_CACHE_TAG] not []; update/translate append it).
+- **Verified:** `node --test edge-cache.test.ts + page-write-hooks.test.ts` = 27/27 (2 new
+  carve-out tests: exact-match + rejects-everything-else incl. /fi/llms.txt, /robots.txt, a page
+  path; 3 page-write-hooks tests updated for the always-purge-llms rule). `npx tsc --noEmit` clean.
+  worker.ts carve-out is RELEASE-GATED (r-*) → unverifiable locally (dev :3602 not running; same
+  bar as every worker.ts change). Route still emits no-store as the pre-release fallback; the
+  worker overwrites it.
+- **Files:** CMS/src/lib/render/edge-cache.ts (+ .test.ts), CMS/worker.ts,
+  CMS/src/lib/render/page-write-hooks.ts (+ .test.ts), CMS/src/app/api/settings/llms/route.ts,
+  CMS/src/app/api/settings/brand/route.ts, CMS/src/app/api/pages/route.ts,
+  CMS/src/app/api/pages/[id]/publish/route.ts

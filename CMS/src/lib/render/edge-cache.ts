@@ -20,6 +20,43 @@ export const STALE_WHILE_REVALIDATE = 86400;
 /** Cache-Tag shared by ALL published pages — global-blast writes purge this. */
 export const PAGES_CACHE_TAG = "pages";
 
+/**
+ * Cache-Tag for the single `/llms.txt` file. It's a curated index of EVERY
+ * published page (+ brand identity + the operator template), so its content
+ * changes on any page publish/unpublish/delete/rename, a brand-identity save,
+ * and an llms-template save — every one of those purge sites also purges THIS
+ * tag. Its own tag (not `pages`) because a per-page purge (`page:<id>`) can't
+ * clear a global file, and blasting `pages` on every llms-only change would
+ * needlessly re-render every cached page.
+ *
+ * `/llms.txt` is dot-gated out of `isEdgeCacheCandidate` (like sitemap/robots);
+ * worker.ts opts it back in with an EXPLICIT carve-out that stamps exactly this
+ * tag — never a general loosening of the dot gate (which would reopen the
+ * wildcard-page cache-stamping hole).
+ */
+export const LLMS_CACHE_TAG = "llms";
+
+/**
+ * The `/llms.txt` edge-cache carve-out: exactly the dotted-root path `/llms.txt`
+ * (and its locale-prefixed forms are N/A — llms.txt is a single default-locale
+ * file at the root). Returns the headers to stamp, or null for anything else.
+ * Deliberately a FIXED single-path match, NOT a loosening of the dot gate — a
+ * top-level wildcard page can never match `/llms.txt` here, so it can't get a
+ * page's Cache-Tag stamped on the file (the sitemap-staleness precedent).
+ */
+export function llmsTxtCacheHeaders(
+  pathname: string,
+): { cacheControl: string; cacheTag: string } | null {
+  if (pathname !== "/llms.txt") return null;
+  return {
+    cacheControl: `public, max-age=${LLMS_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+    cacheTag: LLMS_CACHE_TAG,
+  };
+}
+
+/** llms.txt fresh window (seconds). Purge covers correctness; this bounds drift. */
+export const LLMS_MAX_AGE = 3600;
+
 /** The per-page Cache-Tag (`page:<id>`) — publish/unpublish/delete purge it. */
 export function pageCacheTag(pageId: string): string {
   return `page:${pageId}`;

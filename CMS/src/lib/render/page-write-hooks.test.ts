@@ -6,16 +6,22 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { purgeTagsForPageWrite } from "./page-write-hooks.ts";
-import { pageCacheTag } from "./edge-cache.ts";
+import { pageCacheTag, LLMS_CACHE_TAG } from "./edge-cache.ts";
 
-test("a CREATE has nothing cached yet → no purge", () => {
-  assert.deepEqual(purgeTagsForPageWrite("created", "p1"), []);
+test("a CREATE has no page-cache yet but still purges /llms.txt (it adds a page)", () => {
+  assert.deepEqual(purgeTagsForPageWrite("created", "p1"), [LLMS_CACHE_TAG]);
 });
 
-test("an UPDATE purges the page's per-page tag", () => {
-  assert.deepEqual(purgeTagsForPageWrite("updated", "p2"), [pageCacheTag("p2")]);
+test("an UPDATE purges the page's per-page tag AND /llms.txt", () => {
+  assert.deepEqual(purgeTagsForPageWrite("updated", "p2"), [
+    pageCacheTag("p2"),
+    LLMS_CACHE_TAG,
+  ]);
 });
 
-test("a translate (always an existing page) purges the per-page tag", () => {
-  assert.deepEqual(purgeTagsForPageWrite("translated", "p3"), [pageCacheTag("p3")]);
+test("a translate (always an existing page) purges the per-page tag AND /llms.txt", () => {
+  assert.deepEqual(purgeTagsForPageWrite("translated", "p3"), [
+    pageCacheTag("p3"),
+    LLMS_CACHE_TAG,
+  ]);
 });
