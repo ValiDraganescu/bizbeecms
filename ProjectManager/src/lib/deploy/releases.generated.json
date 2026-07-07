@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.25.0",
+      "tag": "r-1.25.0",
+      "markdown": "# CMS v1.25.0\n\n_2026-07-07 · changes since r-1.24.0_\n\n## Features\n- Publish-together: when you publish a page that uses components with unpublished draft edits (for example an AI change that hasn't gone live), the CMS now prompts you to publish those draft components alongside the page — so the published page doesn't silently render stale component versions. Draft components are flagged with a badge in the Layers tree and inspector.\n"
+    },
+    {
       "version": "1.24.0",
       "tag": "r-1.24.0",
       "markdown": "# CMS v1.24.0\n\n_2026-07-07 · changes since r-1.23.0_\n\n## Features\n- Per-Site `robots.txt`: a settings editor with a safe default (crawlers allowed, `/admin` `/api` `/preview` disallowed) plus a free-text override and an auto `Sitemap:` pointer.\n- IndexNow: publishing, unpublishing, deleting or renaming a page automatically notifies search engines of the changed URLs (per-Site key served at a fixed path).\n- 301 redirects: auto-captured when a page is renamed, plus a manual redirects admin UI.\n- Per-page SEO controls: a `noindex` toggle (also excludes the page from the sitemap and IndexNow), full Open Graph / Twitter cards, per-Site search-engine verification tokens (Google / Bing / Yandex), and automatic BreadcrumbList JSON-LD for nested pages.\n- JSON-LD authoring: a JSON-LD component kind with a Develop editor (kind toggle, template editor, live JSON preview), List → schema.org `ItemList` aggregation, and an on-demand JSON-LD authoring guide for the AI.\n- `/llms.txt` AI-crawler index and per-page `.md` variants for AI crawlers, with an editable `llms.txt` template (variable slots) and settings editor.\n- SEO audit report: an admin page flagging orphan pages, broken internal links, missing meta, and missing image alt text — now scanning inside referenced component trees too. Plus AI tools to audit and bulk-fix missing meta and missing alt text.\n- Responsive images: width variants served from `/media?w=`, `srcset`/`sizes` on rendered images, image dimensions captured at upload and stamped through for CLS stability (including AI-generated images).\n- Open Graph images: auto-generated OG images with fallback serving and a regenerate button.\n- A designated branded 404 page that renders in the visitor's URL locale, and a per-Site rate-limit threshold (Off / Normal / Strict) enforced at the edge on public page paths.\n\n## Fixes\n- Content-locales save now purges the sitemap and `/llms.txt` caches.\n"
@@ -19,11 +24,6 @@
       "version": "1.21.0",
       "tag": "r-1.21.0",
       "markdown": "# CMS v1.21.0\n\n_2026-07-03 · changes since r-1.20.0_\n\n## Features\n- Page builder: every sizing control now has a rem/px unit picker, and every block's settings panel starts with standard spacing controls (per-side padding & margin). Existing pages keep their current look — legacy defaults are preserved.\n- A more reliable number input across the page builder: fields can be fully cleared while typing (no more values snapping back mid-edit).\n- Chat assistant context engineering: the assistant's system prompt now scopes to the tools available on the current page, and long lists (components, collections) are capped — cutting token cost substantially (e.g. data-sources admin ~17.7k → ~1.9k tokens) with no loss of capability. Old, cold chat threads are compacted on load so they no longer blow up context.\n- Component authoring now lints generated HTML and scripts and reconciles CSS classes, catching malformed output before it ships.\n\n## Fixes\n- SSO: closed a `redirect_uri_mismatch` on login (the shared app-origin fix), verified live.\n"
-    },
-    {
-      "version": "1.20.0",
-      "tag": "r-1.20.0",
-      "markdown": "# CMS v1.20.0\n\n_2026-07-03 · changes since r-1.19.0_\n\n## Features\n- Site export / import: from Settings → Export / Import, download a whole Site as a single `.zip` (pages, components, collections and their items, settings, and asset bytes) and import it into another CMS instance. Import runs a validate + dry-run first, then a destructive replace, uploading the bundled asset bytes automatically.\n\n## Fixes\n- Export no longer silently truncates at 1000 rows — large collections export in full.\n"
     },
     {
       "version": "0.11.0",
