@@ -62,6 +62,28 @@ export function pageCacheTag(pageId: string): string {
   return `page:${pageId}`;
 }
 
+/** Markdown page-variant (`/api/md/…`) fresh window (seconds). */
+export const MD_MAX_AGE = 3600;
+
+/**
+ * Edge-cache headers for a `/<path>.md` page variant, stamped by the `/api/md`
+ * route ITSELF (not worker.ts): the worker rewrites `/<path>.md` → `/api/md/…`
+ * and returns that response untouched, so the route is the only place to opt in.
+ * Tagged with the page's OWN `page:<id>` tag (NOT `pages`) so every existing
+ * page-write purge (publish/unpublish/rename/delete/noindex — all purge
+ * `pageCacheTag(id)`) already clears the cached `.md` too. Because the route
+ * lives under `/api` (SKIP_SEGMENTS), no wildcard page's tag can ever be stamped
+ * on it — the sitemap-staleness precedent is sidestepped structurally.
+ */
+export function mdVariantCacheHeaders(
+  pageId: string,
+): { cacheControl: string; cacheTag: string } {
+  return {
+    cacheControl: `public, max-age=${MD_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+    cacheTag: pageCacheTag(pageId),
+  };
+}
+
 /**
  * URL pathname → decoded slug segments, the same shape Next hands the
  * `[[...slug]]` route as `params.slug` (undecodable segments pass through raw).

@@ -17,6 +17,8 @@ import {
   llmsTxtCacheHeaders,
   LLMS_CACHE_TAG,
   LLMS_MAX_AGE,
+  mdVariantCacheHeaders,
+  MD_MAX_AGE,
 } from "./edge-cache.ts";
 import { SKIP_SEGMENTS } from "./localize-links.ts";
 
@@ -252,4 +254,23 @@ test("the /llms.txt carve-out is a FIXED single path — nothing else opts in", 
   ]) {
     assert.equal(llmsTxtCacheHeaders(p), null, p);
   }
+});
+
+// ── mdVariantCacheHeaders (.md page variants) ────────────────────────────────
+
+test(".md variant gets public max-age + SWR tagged with the page's OWN tag", () => {
+  const h = mdVariantCacheHeaders("p-42");
+  // OWN page tag (not `pages`) so existing per-page purges cover it, and no
+  // wildcard-page tag can ever land here (route is under /api → SKIP_SEGMENTS).
+  assert.equal(h.cacheTag, pageCacheTag("p-42"));
+  assert.equal(
+    h.cacheControl,
+    `public, max-age=${MD_MAX_AGE}, stale-while-revalidate=${STALE_WHILE_REVALIDATE}`,
+  );
+});
+
+test(".md variant tag matches the tag the page-write purges already clear", () => {
+  // Regression: publish/unpublish/rename/delete/noindex all purge pageCacheTag(id);
+  // the cached .md must carry EXACTLY that tag or those purges miss it.
+  assert.equal(mdVariantCacheHeaders("abc").cacheTag, pageCacheTag("abc"));
 });

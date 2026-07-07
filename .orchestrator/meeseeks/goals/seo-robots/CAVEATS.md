@@ -414,3 +414,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   [LLMS_CACHE_TAG] because a create ADDS a page to the index; it's no longer []). The route still
   emits `Cache-Control: no-store` as the PRE-RELEASE fallback (worker overwrites it once shipped)
   — leaving it means /llms.txt stays uncached until the worker.ts release, never stale-cached.
+
+- (2026-07-07) `.md` variant caching is stamped IN the ROUTE (`api/md/[...slug]/route.ts` via pure
+  `mdVariantCacheHeaders`), NOT worker.ts — because the worker REWRITES `/<path>.md`→/api/md and
+  returns THAT response untouched (worker.ts line ~48, `return handler.fetch(...)` — it never
+  reaches the header-stamping block below). So it's NOT release-gated (ships with the CMS deploy),
+  UNLIKE /llms.txt's worker carve-out. Tag = the page's OWN `pageCacheTag(id)` (NOT `pages`, NOT a
+  new tag): the existing publish/unpublish/rename/delete/noindex purges all already purge
+  pageCacheTag(id), so the `.md` is covered with ZERO new purge sites — do NOT add a separate `.md`
+  purge. Safe from the wildcard-tag hole because /api is in SKIP_SEGMENTS (isEdgeCacheCandidate
+  rejects it), so worker.ts can never stamp a wildcard page's tag on an /api/md response. Only the
+  200 body carries Cache-Control; 404s (unpublished/miss/noindex) stay uncached. If you ever move
+  `.md` serving OFF /api, you reopen the wildcard-tag hole — keep it under /api.

@@ -19,6 +19,7 @@
  * be exercised directly (`/api/md/about.md`) without the worker rewrite.
  */
 import { loadPlan } from "@/lib/render/load-plan";
+import { mdVariantCacheHeaders } from "@/lib/render/edge-cache";
 import {
   planToMarkdown,
   peelMarkdownSuffix,
@@ -54,8 +55,18 @@ export async function GET(
   const title = localized(loaded.page.metaTitle, loaded.locale);
   const description = localized(loaded.page.metaDescription, loaded.locale);
   const body = planToMarkdown(loaded.plan.root, { title, description });
+  // Edge-cache the variant with the page's OWN cache tag, so the existing
+  // publish/unpublish/rename/delete/noindex purges (all purge pageCacheTag(id))
+  // already cover it — no worker.ts change, no release gate. The worker rewrites
+  // `/<path>.md` → here and returns this response untouched, so stamping the
+  // headers on the route is what opts the `.md` variant into Workers Cache.
+  const cache = mdVariantCacheHeaders(loaded.page.id);
   return new Response(body, {
     status: 200,
-    headers: { "content-type": "text/markdown; charset=utf-8" },
+    headers: {
+      "content-type": "text/markdown; charset=utf-8",
+      "Cache-Control": cache.cacheControl,
+      "Cache-Tag": cache.cacheTag,
+    },
   });
 }

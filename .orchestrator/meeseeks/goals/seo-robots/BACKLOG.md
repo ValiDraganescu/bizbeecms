@@ -11,11 +11,12 @@ Task states: TODO | DOING | DONE | BLOCKED.
   `llmsTxtCacheHeaders` (EXACTLY /llms.txt, never a dot-gate loosening); worker.ts carve-out
   before the general gate; purge added to page publish/create/update/unpublish/rename/delete
   (REST + AI page-write-hooks), brand save, and llms-template save. Release-gated worker change.
-- TODO: Cache .md page variants: /api/md/[...slug] currently sets no Cache-Control (recomputed every
-  request; the worker rewrite exits BEFORE the edge-cache gate). Add edge caching keyed on the
-  PUBLIC /<path>.md URL or the api route with the page's existing cache tag (pageCacheTag) so
-  publish/unpublish/rename purges cover it; noindex flips must purge too. Honor the CAVEATS wildcard
-  cache-tag caution. Worker.ts changes, if needed, are release-gated (r-*).
+- DONE (2026-07-07): Cache .md page variants — pure `mdVariantCacheHeaders(pageId)` + `MD_MAX_AGE`
+  in edge-cache.ts; /api/md route stamps `Cache-Control` + `Cache-Tag: page:<id>` on its 200 body
+  (via loaded.page.id). NO worker.ts change / NO release gate (worker rewrites `/<path>.md`→/api/md
+  and returns it untouched). Tagged with the page's OWN tag so existing publish/unpublish/rename/
+  delete/noindex purges (all purge pageCacheTag(id)) cover it with zero new purge sites; /api =
+  SKIP_SEGMENTS so no wildcard tag can land. 404s stay uncached. USER-QUEUED caching block (4/4) DONE.
 
 ### Performance — Core Web Vitals
 - TODO: INVESTIGATION (design note, not code): responsive image variants for `/media/[...key]` R2 assets on per-site Workers — evaluate Cloudflare Images API upload-time variants vs zone Image Resizing (custom-domain sites only; workers.dev sites can't) vs in-Worker resizing (no native codecs on Workers — likely dead end); deliverable = chosen path + cost/constraints written to this goal's JOURNAL + CAVEATS, and implementation tasks filed accordingly. NOTE: dims now ride asset URLs as `?w=&h=` — a responsive path could reuse that query carrier for width hints.

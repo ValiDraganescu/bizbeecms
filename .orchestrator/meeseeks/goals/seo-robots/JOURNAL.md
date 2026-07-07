@@ -798,3 +798,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/render/page-write-hooks.ts (+ .test.ts), CMS/src/app/api/settings/llms/route.ts,
   CMS/src/app/api/settings/brand/route.ts, CMS/src/app/api/pages/route.ts,
   CMS/src/app/api/pages/[id]/publish/route.ts
+
+## 2026-07-07 14:23 — Cache .md page variants (USER-QUEUED task 4/4)
+- **Status:** DONE
+- **What I did:** Edge-cache the `/api/md/[...slug]` markdown page variants. Added pure
+  `mdVariantCacheHeaders(pageId)` + `MD_MAX_AGE=3600` to edge-cache.ts (public, max-age, SWR;
+  Cache-Tag = the page's OWN `pageCacheTag(id)`). The /api/md route now stamps `Cache-Control` +
+  `Cache-Tag` on its 200 body using `loaded.page.id`. NO worker.ts change / NO release gate: the
+  worker rewrites `/<path>.md`→/api/md and returns that response untouched, so stamping in the
+  route is what opts it into Workers Cache. Tagged `page:<id>` (not `pages`) so the EXISTING
+  publish/unpublish/rename/delete/noindex purges — all of which already purge `pageCacheTag(id)` —
+  cover the cached `.md` with zero new purge sites. Route is under /api (SKIP_SEGMENTS), so no
+  wildcard page tag can ever be stamped there (sitemap-staleness precedent sidestepped
+  structurally). 404 responses (unpublished/miss/noindex) stay uncached (no Cache-Control).
+- **Verified:** `node --test edge-cache.test.ts` 26/26 (2 new regression tests: own-tag +
+  tag-matches-purge). `npx tsc --noEmit` clean. Live edge behavior (cf-cache-status on a real
+  `.md` URL) is DEPLOY-ONLY + the public `/<path>.md` rewrite is release-gated (r-*) — unverifiable
+  locally; the internal /api/md route is dev-verifiable.
+- **Files:** CMS/src/lib/render/edge-cache.ts (+ .test.ts),
+  CMS/src/app/api/md/[...slug]/route.ts
