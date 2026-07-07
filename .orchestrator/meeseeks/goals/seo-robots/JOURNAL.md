@@ -817,3 +817,17 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   locally; the internal /api/md route is dev-verifiable.
 - **Files:** CMS/src/lib/render/edge-cache.ts (+ .test.ts),
   CMS/src/app/api/md/[...slug]/route.ts
+
+## 2026-07-07 14:27 — Stamp ?w=&h= dims on AI-inserted asset URLs (list_assets)
+- **Status:** DONE
+- **What I did:** `formatAssetList` (list-assets-tool.ts) now URL-stamps intrinsic pixel
+  dims via `withAssetDims(assetUrl(key), width, height)` — so an image the AI drops into a
+  page from `list_assets` carries the `?w=&h=` CLS carrier the render path (`applyImageHygiene`)
+  reads for the aspect-ratio box, ZERO per-request D1 read (authoring-time only). Added
+  optional `width?/height?` to `AssetRowLike`; the dispatch handler already hands full `Asset[]`
+  rows (listAssets returns them), so no route wiring change. `generate_image` was checked and
+  left ALONE: its `putAsset` omits dims (per the asset-dims caveat — AI generate stores NULL
+  dims), so there's nothing to stamp there; `withAssetDims` never invents dims → plain URL.
+- **Verified:** `node --test scripts/list-assets-tool.test.mjs` 4/4 (2 new regression tests:
+  dims-stamped when both present; plain URL when a dim is null/absent). `npx tsc --noEmit` clean.
+- **Files:** CMS/src/lib/chat/list-assets-tool.ts, CMS/scripts/list-assets-tool.test.mjs

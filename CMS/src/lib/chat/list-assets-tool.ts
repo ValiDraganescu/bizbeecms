@@ -24,7 +24,7 @@
  */
 
 // Relative (not @/) imports so this stays node-testable (see CAVEATS).
-import { assetUrl } from "../render/asset.ts";
+import { assetUrl, withAssetDims } from "../render/asset.ts";
 
 /** Default + max number of assets returned to the model in one call. */
 export const DEFAULT_ASSET_LIMIT = 50;
@@ -36,6 +36,9 @@ export interface AssetRowLike {
   filename: string;
   contentType: string;
   size: number;
+  /** Intrinsic pixel dims (media-gallery uploads capture them; NULL otherwise). */
+  width?: number | null;
+  height?: number | null;
 }
 
 /** One asset as the model sees it: a ready-to-use `/media/<key>` URL + metadata. */
@@ -82,10 +85,17 @@ export const LIST_ASSETS_TOOL = {
  * Turn D1 asset rows into the tool items the model sees: each row becomes a
  * `{ url, filename, contentType, size }` with the public `/media/<key>` URL.
  * Paging (limit/offset/total) is applied by the caller via `paging.ts`. PURE.
+ *
+ * The URL is dims-stamped (`?w=&h=`) via `withAssetDims` when the row carries
+ * intrinsic pixel dims — the same authoring-time CLS carrier the ImagePicker
+ * bakes in. So an image the AI drops into a page from `list_assets` gets the
+ * render-time CLS aspect-ratio box, no per-request D1 read (see asset-dims
+ * caveat). Rows without dims (non-images, pre-0032 uploads) get a plain URL —
+ * `withAssetDims` never invents dimensions.
  */
 export function formatAssetList(rows: AssetRowLike[]): AssetListItem[] {
   return rows.map((r) => ({
-    url: assetUrl(r.key),
+    url: withAssetDims(assetUrl(r.key), r.width, r.height),
     filename: r.filename,
     contentType: r.contentType,
     size: r.size,

@@ -39,3 +39,21 @@ test("formatAssetList: maps rows to /media/<key> URLs + metadata", () => {
   assert.equal(out.length, 2); // shapes ALL rows; paging is the caller's job
   assert.equal(formatAssetList([]).length, 0);
 });
+
+test("formatAssetList: stamps ?w=&h= when the row carries intrinsic dims (CLS box)", () => {
+  const out = formatAssetList([
+    { key: "assets/logo_1_ab.png", filename: "logo.png", contentType: "image/png", size: 1, width: 800, height: 600 },
+  ]);
+  // dims-stamped so the AI-inserted <img> gets a render-time aspect-ratio box
+  assert.equal(out[0].url, "/media/assets/logo_1_ab.png?w=800&h=600");
+});
+
+test("formatAssetList: no dims → plain URL (never invents dimensions)", () => {
+  // width without height, and both null — either way, no ?w=&h=
+  const out = formatAssetList([
+    { key: "assets/a_1_x.png", filename: "a.png", contentType: "image/png", size: 1, width: 800, height: null },
+    { key: "assets/b_2_y.svg", filename: "b.svg", contentType: "image/svg+xml", size: 1 },
+  ]);
+  assert.equal(out[0].url, "/media/assets/a_1_x.png");
+  assert.equal(out[1].url, "/media/assets/b_2_y.svg");
+});

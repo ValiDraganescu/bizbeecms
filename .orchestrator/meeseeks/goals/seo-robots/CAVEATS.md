@@ -426,3 +426,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   rejects it), so worker.ts can never stamp a wildcard page's tag on an /api/md response. Only the
   200 body carries Cache-Control; 404s (unpublished/miss/noindex) stay uncached. If you ever move
   `.md` serving OFF /api, you reopen the wildcard-tag hole — keep it under /api.
+- (2026-07-07) AI-inserted image dims: `list_assets` (formatAssetList) NOW stamps `?w=&h=` via
+  withAssetDims when the D1 row carries width/height — so AI-authored pages get the CLS box for
+  GALLERY-uploaded images (only those capture dims; migration 0032). `generate_image` still can't
+  be stamped: its `handleGenerateImage`→`putAsset` omits width/height (no server-side decode — no
+  native codecs on Workers), so generated images have NULL dims → plain URL, no CLS box. To fix that
+  you'd need dims at generate time (the model/upstream doesn't return them reliably) or a client
+  re-decode step — filed as its own concern, don't retro-fit a render-time D1 read (forbidden on the
+  edge-cached/429 hot path). Keep dims the FIRST query on the URL (withAssetDims won't stamp a URL
+  that already has one — the /media route adds `?fmt=`).
