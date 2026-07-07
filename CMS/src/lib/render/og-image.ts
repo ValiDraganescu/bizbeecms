@@ -64,6 +64,53 @@ function sanitizeSegment(value: string): string {
   return s || "x";
 }
 
+/**
+ * Public serve path for an auto OG screenshot. Lives under `/api` (NOT a
+ * top-level `/og/...` route) because the `(site)` optional catch-all shadows
+ * every arbitrary top-level path — see the routing CAVEAT. `og/<id>.<loc>.png`
+ * (the R2 key) is served at `/api/og/<id>.<loc>.png`; the route strips the
+ * `/api/` prefix back to the key and guards it with `isOgImageKey`.
+ */
+export const OG_IMAGE_ROUTE_PREFIX = "/api/";
+
+/** Public URL for an auto OG screenshot's R2 key (`og/<id>.<loc>.png`). */
+export function ogImageUrl(key: string): string {
+  return OG_IMAGE_ROUTE_PREFIX + key;
+}
+
+/**
+ * PURE og:image precedence for a page×locale:
+ *   1. a MANUAL per-locale metaImage (a media upload) ALWAYS wins,
+ *   2. else the auto screenshot `og/<id>.<locale>.png` IF it exists in R2,
+ *   3. else none (undefined → the card carries no image).
+ * Returns an ABSOLUTE URL when `origin` is known (social scrapers need absolute
+ * og:image), else the root-relative form (Next's metadataBase absolutizes it in
+ * prod; fine for local dev). The auto-existence check is the caller's job (an R2
+ * lookup off the metadata path, only when there's no manual image) — this stays
+ * pure/testable and never touches R2.
+ */
+export function resolveOgImageUrl(input: {
+  manualImage?: string;
+  autoExists?: boolean;
+  pageId: string;
+  locale: string;
+  origin?: string | null;
+}): string | undefined {
+  const manual = typeof input.manualImage === "string" ? input.manualImage.trim() : "";
+  if (manual) return absolutize(manual, input.origin);
+  if (input.autoExists) {
+    return absolutize(ogImageUrl(ogImageKey(input.pageId, input.locale)), input.origin);
+  }
+  return undefined;
+}
+
+/** Make a root-relative URL absolute against `origin`; leave already-absolute untouched. */
+function absolutize(url: string, origin?: string | null): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  if (!origin) return url;
+  return origin.replace(/\/+$/, "") + (url.startsWith("/") ? url : "/" + url);
+}
+
 export type OgSpikeResult =
   | { ok: true; key: string; bytes: number }
   | { ok: false; reason: "no-binding" | "no-origin" | "error"; detail?: string };

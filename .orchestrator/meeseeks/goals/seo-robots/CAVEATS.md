@@ -600,7 +600,23 @@ Read every line before working. Each entry was learned the hard way by a previou
   non-literal (or install the dep) if you edit that call. The spike screenshots the PUBLIC page URL
   over the network — needs a reachable origin (resolveSiteOrigin); the publish-wiring task passes the
   built absolute page URL. It's URL-driven (no coupling to the render pipeline).
-- (2026-07-07) Per-URL-locale branded 404: `not-found.tsx` now renders in the VISITOR's URL locale.
+- (2026-07-07) OG-image PRECEDENCE + serving: pure `resolveOgImageUrl` (og-image.ts) is the ONE
+  place og:image precedence lives — manual per-locale metaImage ALWAYS wins → else auto
+  `og/<id>.<locale>.png` if it exists → else undefined (no image). It's PURE: the caller decides
+  `autoExists`. `generateMetadata` ((site)/[[...slug]]) probes R2 (`getStorage().get(ogImageKey(id,
+  loc))`) for the auto image ONLY when there's no manual image — a manual-image page pays ZERO extra
+  reads; a no-image page pays ONE R2 read. This read is on the METADATA path, NOT the 429 render hot
+  path (same rationale as the brand/verification reads) — do NOT move it into the render/worker hot
+  path. The auto image is served by `app/api/og/[...key]/route.ts` at `/api/og/<id>.<loc>.png`
+  (minted by `ogImageUrl`/`OG_IMAGE_ROUTE_PREFIX`="/api/"): under /api because (a) the (site)
+  catch-all shadows arbitrary top-level paths and (b) /api is a SKIP_SEGMENT so worker.ts can't stamp
+  a wildcard page's cache-tag on it. The route is `isOgImageKey`-guarded (only `og/…` keys, never an
+  arbitrary R2 object) and serves `max-age=3600` (NOT immutable — the key is fixed per page×locale so
+  a regenerate overwrites in place; short TTL lets a refresh propagate). twitter:card auto-upgrades
+  to summary_large_image because buildTwitterCard keys off the RESOLVED `image` (manual OR auto) — no
+  social-cards.ts change was needed. NOTHING WRITES `og/` objects yet (the screenshotPageToR2 spike
+  is unwired) — until the publish-wiring task lands, `autoExists` is always false on real sites, so
+  precedence degrades to "manual metaImage or none" (correct, no-op). Live R2 = HITL.
   It CANNOT read params (Next gives none), so worker.ts injects the incoming pathname as request
   header `REQUEST_PATH_HEADER` (`x-bizbee-path`, edge-cache.ts) BEFORE the OpenNext handler, GET-only,
   via `headers.set` (OVERWRITE not append — a client header can't spoof the locale). not-found.tsx

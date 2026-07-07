@@ -18,12 +18,15 @@ Task states: TODO | DOING | DONE | BLOCKED.
   composition), suite 1919, tsc clean. Release-gated (worker.ts, r-*) — live HITL pending.
 
 ### OG-image autogen (fallback og:image via Browser Rendering — tracer/decision DONE, 3 impl items in order)
-- TODO: OG-image fallback serving + metadata precedence (do FIRST — lowest-risk, needs no paid
-  plan/binding, per NEXT): pure precedence helper `og:image = manual per-locale metaImage ?? auto
-  `og/<id>.<locale>.png` ?? none` (absolute URL via resolveSiteOrigin); serving route for the R2
-  `og/` objects (MUST live under /api or a fixed path — the catch-all shadows arbitrary paths; guard
-  traversal with `isOgImageKey`); extend social-cards.ts twitter:card input to count the auto
-  screenshot. Precedence helper unit-tested.
+- DONE (2026-07-07): OG-image fallback serving + metadata precedence. Pure `resolveOgImageUrl`
+  (og-image.ts): manual per-locale metaImage ALWAYS wins → else auto `og/<id>.<locale>.png` IF it
+  exists → else none; absolutized against resolveSiteOrigin (already-absolute + no-origin handled).
+  Serve route `app/api/og/[...key]/route.ts` streams the R2 `og/` object, `isOgImageKey`-guarded
+  (traversal-safe, /api = catch-all-safe + SKIP_SEGMENT). `ogImageUrl`/`OG_IMAGE_ROUTE_PREFIX`
+  (`/api/`) mint the public URL. Wired into `generateMetadata`: probes R2 for the auto image ONLY
+  when there's no manual image (single R2 read, metadata path — NOT the 429 render hot path).
+  twitter:card auto-counts the auto image (buildTwitterCard keys off the resolved `image`, no
+  social-cards change needed). +8 tests (og-image.test.mjs), suite 1930, tsc clean. Live R2 = HITL.
 - TODO: OG-image autogen publish wiring: on page publish, for each configured locale, IF no manual per-locale metaImage AND no auto screenshot exists yet → best-effort background screenshot via `ctx.waitUntil` (never fails/delays the publish — purge-edge pattern); page delete removes its screenshots; auto image is stored SEPARATELY from user uploads and can never overwrite one.
 - TODO: OG-image regenerate button: per-locale "Generate from page" action in the page-settings SEO tab (API route, stable error codes) that (re)screenshots on demand — the explicit path for refreshing after theme/content redesigns; SEO tab shows the currently effective og:image with a manual/auto badge; localized EN/FI/ET.
 

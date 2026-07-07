@@ -1123,3 +1123,32 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/worker.ts, CMS/src/lib/render/edge-cache.ts (REQUEST_PATH_HEADER const),
   CMS/src/lib/render/load-plan.ts (peelActiveLocaleFromPath), CMS/src/app/(site)/not-found.tsx,
   CMS/src/lib/render/edge-cache.test.ts
+
+## 2026-07-07 12:53 — OG-image serving + metadata precedence (OG track item 2/4)
+- **Status:** DONE
+- **What I did:** Shipped the fallback-og:image serving + precedence layer (the lowest-risk OG item;
+  no paid plan / BROWSER binding needed).
+  - **Pure precedence** `resolveOgImageUrl` (og-image.ts): manual per-locale metaImage ALWAYS wins →
+    else auto `og/<id>.<locale>.png` IF it exists → else undefined. Absolutizes against
+    resolveSiteOrigin (leaves already-absolute URLs; collapses trailing origin slash; root-relative
+    when no origin — Next metadataBase absolutizes in prod). Added `ogImageUrl` +
+    `OG_IMAGE_ROUTE_PREFIX` (`/api/`) to mint the public URL for an `og/` R2 key.
+  - **Serve route** `app/api/og/[...key]/route.ts`: streams the R2 `og/` object via the storage port,
+    `isOgImageKey`-guarded (traversal-safe). Under /api because the (site) catch-all shadows arbitrary
+    top-level paths AND /api is a SKIP_SEGMENT (worker can't stamp a wildcard cache-tag on it).
+    `max-age=3600` (NOT immutable — fixed key per page×locale, a regenerate overwrites in place).
+  - **Wiring** `generateMetadata` ((site)/[[...slug]]): renamed `image`→`manualImage`, and now probes
+    R2 for the auto image ONLY when there's no manual image (one `getStorage().get(ogImageKey(...))`
+    on the METADATA path — NOT the 429 render hot path; a manual-image page pays ZERO extra reads).
+    The resolved `image` flows into buildOpenGraph + buildTwitterCard unchanged, so twitter:card
+    auto-upgrades to summary_large_image on the auto image with NO social-cards.ts change.
+- **Verify:** +8 tests in og-image.test.mjs (precedence: manual-wins / auto-fallback / none /
+  blank-manual / absolute-untouched / no-origin / trailing-slash; ogImageUrl round-trips through
+  isOgImageKey). `npm test` = 1930 pass / 0 fail; `tsc --noEmit` clean.
+- **Caveat left:** "OG-image PRECEDENCE + serving" — the one place precedence lives; R2 probe stays
+  off the render hot path; nothing writes `og/` objects yet (autoExists always false until the
+  publish-wiring task) so precedence currently degrades to manual-or-none (correct no-op). Live R2 = HITL.
+- **NEXT:** OG-image publish wiring (track item 3/4) — on publish, per configured locale, if no
+  manual metaImage AND no `og/<id>.<locale>.png` yet → best-effort `ctx.waitUntil(screenshotPageToR2(...))`;
+  page delete removes its `og/` objects. Never blocks the publish (purge-edge/IndexNow pattern).
+  Do NOT touch CMS/worker.ts or CMS/wrangler.jsonc this cycle (parallel rate-limit Meeseeks owns them).

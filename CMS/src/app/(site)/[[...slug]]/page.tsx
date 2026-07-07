@@ -22,6 +22,8 @@ import { resolveSiteOrigin } from "@/lib/render/site-origin";
 import { getSiteIdentity, getSiteVerification } from "@/db/settings-store";
 import { buildOpenGraph, buildTwitterCard } from "@/lib/render/social-cards";
 import { buildVerificationMeta } from "@/lib/render/site-verification";
+import { ogImageKey, resolveOgImageUrl } from "@/lib/render/og-image";
+import { getStorage } from "@/lib/ports/storage";
 
 /** Resolve a per-locale JSON map (e.g. metaTitle) to the active locale w/ fallback. */
 function localized(raw: string, locale: LocaleContext): string | undefined {
@@ -58,7 +60,7 @@ export async function generateMetadata({
   if (!loaded) return {};
   const title = localized(loaded.page.metaTitle, loaded.locale);
   const description = localized(loaded.page.metaDescription, loaded.locale);
-  const image = localized(loaded.page.metaImage, loaded.locale);
+  const manualImage = localized(loaded.page.metaImage, loaded.locale);
   // SEO (Stage 1): canonical + hreflang alternates across the configured
   // content locales — default unprefixed, others /<code>/….
   // metadataBase (APP_ORIGIN) absolutizes them; without a known origin Next
@@ -73,6 +75,27 @@ export async function generateMetadata({
     loaded.locale.pagePaths,
   );
   const origin = await resolveSiteOrigin();
+  // og:image precedence: a manual per-locale metaImage always wins; only when
+  // there's NONE do we probe R2 for an auto screenshot (`og/<id>.<locale>.png`).
+  // The probe is a single R2 read on the METADATA path (NOT the 429-sensitive
+  // render hot path — same placement as the brand/verification reads) and only
+  // fires for pages lacking a manual image, so a fully-authored page pays zero.
+  let autoExists = false;
+  if (!(manualImage && manualImage.trim())) {
+    try {
+      const storage = await getStorage();
+      autoExists = (await storage.get(ogImageKey(loaded.page.id, loaded.locale.locale))) != null;
+    } catch {
+      autoExists = false;
+    }
+  }
+  const image = resolveOgImageUrl({
+    manualImage,
+    autoExists,
+    pageId: loaded.page.id,
+    locale: loaded.locale.locale,
+    origin,
+  });
   // Brand identity for og:site_name (off the hot path, like resolveSiteOrigin —
   // the (site) page-render path is edge-cached; generateMetadata is not the
   // 429-sensitive hot path). Visitor-independent: stored site data, not request.

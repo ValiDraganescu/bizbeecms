@@ -1,29 +1,16 @@
 # Note to the next Meeseeks (seo-robots)
 
-**TWO parallel runs landed on 2026-07-07 (driver merged the lane-B worktree):**
-
-1. **OG-image autogen tracer + decision (DONE, track item 1/4).** DECISION = the `browser` Worker
-   binding + `@cloudflare/puppeteer` (CF-native like AI/IMAGES, no per-Site secret) over the REST
-   API. Shipped `lib/render/og-image.ts`: PURE key scheme `ogImageKey`/`isOgImageKey`
-   (`og/<id>.<locale>.png`, own namespace ≠ `assets/`), OG dims (1200×630/png), + best-effort
-   `screenshotPageToR2(pageUrl,key)` (non-literal dynamic puppeteer import → skips silently when the
-   optional dep/binding is absent, never throws). See the three new "OG-image" CAVEATs. Live
-   screenshot is HITL (paid plan + `npm i @cloudflare/puppeteer` + BROWSER binding in wrangler.jsonc).
-2. **Per-URL-locale branded 404 (DONE — Page-level SEO controls track CLOSED).** worker.ts injects
-   the request pathname as `REQUEST_PATH_HEADER` (`x-bizbee-path`, GET-only, overwrite-not-append);
-   `not-found.tsx` reads it via `next/headers` + new `peelActiveLocaleFromPath` (load-plan.ts).
-   Absent header (pre-release worker) → site default = old behavior. Safe: a 404 is never
-   edge-cached. Release-gated (worker.ts, r-*). See the "Per-URL-locale branded 404" CAVEAT.
+**THIS RUN (2026-07-07): OG-image serving + metadata precedence (DONE, track item 2/4).**
+Pure `resolveOgImageUrl` (og-image.ts) = manual metaImage ?? auto `og/<id>.<locale>.png` (if exists)
+?? none, absolutized via resolveSiteOrigin. Serve route `app/api/og/[...key]/route.ts` (isOgImageKey-
+guarded, /api = catch-all-safe + SKIP_SEGMENT, max-age=3600 non-immutable). Wired into
+`generateMetadata`: probes R2 for the auto image ONLY when no manual image (one R2 read on the
+METADATA path, not the render hot path). twitter:card auto-counts it (no social-cards change).
++8 tests, suite 1930, tsc clean. See the new "OG-image PRECEDENCE + serving" CAVEAT. Live R2 = HITL.
 
 **Pick the highest-value GOAL slice (ranked):**
-1. **OG-image autogen — CONTINUE the track (3 items left):**
-   a. **Serving + metadata precedence** (LOWEST-risk, no paid plan needed — do this next): pure
-      precedence helper `og:image = manual per-locale metaImage ?? auto og/<id>.<locale>.png ?? none`
-      (absolute via resolveSiteOrigin), a serve route for the `og/` R2 objects (MUST be under /api or
-      a fixed path — the catch-all shadows arbitrary page paths; use `isOgImageKey` to guard
-      traversal), and extend social-cards.ts twitter:card input to count the auto screenshot.
-      Unit-test the precedence helper. Authorable/testable WITHOUT the paid-plan screenshot.
-   b. **Publish wiring**: on publish, per configured locale, IF no manual metaImage AND no
+1. **OG-image autogen — CONTINUE the track (2 items left, do 1b NEXT):**
+   b. **Publish wiring** (do this next): on publish, per configured locale, IF no manual metaImage AND no
       `og/<id>.<locale>.png` exists → `ctx.waitUntil(screenshotPageToR2(absPageUrl, ogImageKey(id,loc)))`;
       page delete removes its `og/` objects. Best-effort, never blocks the publish.
    c. **Regenerate button** — per-locale "Generate from page" SEO-tab action (API route, stable

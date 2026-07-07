@@ -16,6 +16,9 @@ import {
   OG_IMAGE_CONTENT_TYPE,
   ogImageKey,
   isOgImageKey,
+  ogImageUrl,
+  resolveOgImageUrl,
+  OG_IMAGE_ROUTE_PREFIX,
   screenshotPageToR2,
 } from "../src/lib/render/og-image.ts";
 
@@ -47,6 +50,62 @@ test("isOgImageKey accepts minted keys, rejects everything else", () => {
   assert.ok(!isOgImageKey("og/../secret.png")); // traversal
   assert.ok(!isOgImageKey("og/abc.en.jpg")); // wrong ext
   assert.ok(!isOgImageKey("og/abc.png")); // missing locale segment
+});
+
+test("ogImageUrl serves the R2 key under /api/ (catch-all-safe path)", () => {
+  assert.equal(OG_IMAGE_ROUTE_PREFIX, "/api/");
+  assert.equal(ogImageUrl(ogImageKey("abc", "en")), "/api/og/abc.en.png");
+  // the served path minus /api/ is exactly the guarded R2 key
+  assert.ok(isOgImageKey(ogImageUrl(ogImageKey("abc", "en")).slice("/api/".length)));
+});
+
+test("resolveOgImageUrl: manual metaImage ALWAYS wins (auto ignored)", () => {
+  const r = resolveOgImageUrl({
+    manualImage: "/media/assets/hero.png",
+    autoExists: true,
+    pageId: "p1",
+    locale: "en",
+    origin: "https://site.example",
+  });
+  assert.equal(r, "https://site.example/media/assets/hero.png");
+});
+
+test("resolveOgImageUrl: falls back to auto screenshot when it exists", () => {
+  const r = resolveOgImageUrl({
+    autoExists: true,
+    pageId: "p1",
+    locale: "fi",
+    origin: "https://site.example",
+  });
+  assert.equal(r, "https://site.example/api/og/p1.fi.png");
+});
+
+test("resolveOgImageUrl: none when no manual image and no auto screenshot", () => {
+  assert.equal(
+    resolveOgImageUrl({ autoExists: false, pageId: "p1", locale: "en" }),
+    undefined,
+  );
+  // blank/whitespace manual image is treated as absent
+  assert.equal(
+    resolveOgImageUrl({ manualImage: "   ", autoExists: false, pageId: "p1", locale: "en" }),
+    undefined,
+  );
+});
+
+test("resolveOgImageUrl: absolute manual URL is left untouched; no origin → root-relative", () => {
+  assert.equal(
+    resolveOgImageUrl({ manualImage: "https://cdn.x/y.png", pageId: "p1", locale: "en" }),
+    "https://cdn.x/y.png",
+  );
+  assert.equal(
+    resolveOgImageUrl({ autoExists: true, pageId: "p1", locale: "en" }),
+    "/api/og/p1.en.png",
+  );
+  // trailing slash on origin is collapsed (no double slash)
+  assert.equal(
+    resolveOgImageUrl({ autoExists: true, pageId: "p1", locale: "en", origin: "https://x/" }),
+    "https://x/api/og/p1.en.png",
+  );
 });
 
 test("screenshotPageToR2 skips silently on empty url (no throw)", async () => {
