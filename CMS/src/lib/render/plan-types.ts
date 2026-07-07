@@ -368,6 +368,11 @@ export type RenderPlan = {
   scripts: string[];
   // Component-scoped CSS, in first-seen order, one per distinct component used.
   styles: string[];
+  // Structured-data payloads (seo-robots): the ESCAPED inner text of
+  // `application/ld+json` scripts (e.g. auto BreadcrumbList), built at plan time
+  // from visitor-independent stored page data and already `<`/`>`/`&`-escaped
+  // (see breadcrumb.ts). RenderedPage wraps each in a <script>. Absent/empty = none.
+  jsonLd?: string[];
 };
 
 /**

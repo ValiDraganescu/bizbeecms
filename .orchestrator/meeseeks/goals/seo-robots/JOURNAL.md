@@ -278,3 +278,32 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   +1); `npx tsc --noEmit` clean. Did NOT run opennext build (heavy gate; route already
   force-dynamic) nor live-submit (needs deployed origin+key — HITL).
 - **Files:** CMS/src/lib/render/indexnow.ts (+ .test.ts), CMS/src/app/api/pages/route.ts
+
+## 2026-07-07 11:51 — Auto BreadcrumbList JSON-LD (JSON-LD track)
+- **Status:** DONE
+- **What I did:** Emit a schema.org `BreadcrumbList` `<script type="application/ld+json">`
+  for every published page at depth ≥ 1, built at plan time from the ancestor chain.
+  - Pure builder `lib/render/breadcrumb.ts`: `ancestorChain(rows,id)` (root→leaf, cycle- &
+    dangling-parent-safe → null on any gap), `buildBreadcrumbData(items)` → escaped inner
+    JSON (or null for <2 items / any missing name|url — no lying trail), and
+    `buildBreadcrumbJsonLd` (full `<script>` string for future HTML-emitting callers, e.g.
+    the jsonld component kind). Escaping: JSON.stringify + `<`/`>`/`&` → `\uXXXX` so no
+    `</script>` breakout.
+  - Wiring in `render-page.tsx` `buildPlanFromPage`: reused the existing per-render page-rows
+    read (added `metaTitle` to its select — no new query), built the chain, resolved each
+    ancestor's per-locale meta title + its localized path via `pagePathsByLocale` (active
+    locale), absolutized against `resolveSiteOrigin()` (root-relative fallback in local dev).
+    Attached to `RenderPlan.jsonLd` (new optional field). Best-effort behind the same
+    try-guarded block — any gap drops the whole trail (no partial breadcrumb).
+  - `RenderedPage` renders each `plan.jsonLd` entry as an inert `<script type="application/
+    ld+json">` (JSON-LD is data, not executed — a React inline script is correct here, unlike
+    author client scripts). Payload is pre-escaped in the pure builder → dangerouslySetInnerHTML safe.
+  - Visitor-independent: every input is stored page/site data (titles, slugs, origin), never
+    the request → safe on the edge-cached (site) render path (see CAVEATS).
+- **Verified:** `node --test breadcrumb.test.ts` 10/10 (order, depth-0 skip, cycle/dangling
+  → null, escaping/`</script>` breakout, JSON round-trip, wrapper). Full `npm test` 1750/1750
+  (was 1740; +10). `npx tsc --noEmit` clean, exit 0. No dev server running. Did NOT run the
+  opennext deploy gate (heavy; pure additive Next render-path change, tsc covers type breakage)
+  nor validate live rich-results (needs deployed origin — HITL).
+- **Files:** CMS/src/lib/render/breadcrumb.ts (+ .test.ts), CMS/src/lib/render/render-page.tsx,
+  CMS/src/lib/render/plan-types.ts

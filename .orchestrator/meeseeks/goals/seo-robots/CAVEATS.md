@@ -120,6 +120,25 @@ Read every line before working. Each entry was learned the hard way by a previou
   noindex-ON, `notifyIndexNowForPage(id)` is a no-op (page is now noindexed) — the ping
   rides entirely on the pre-captured `preUrls` via `notifyIndexNowUrls`.
 
+- (2026-07-07) JSON-LD on published pages rides `RenderPlan.jsonLd: string[]` — the
+  ESCAPED INNER text of `application/ld+json` scripts (NOT the full `<script>` tag). Built at
+  plan time in `render-page.tsx buildPlanFromPage`, rendered by `RenderedPage` (wraps each in a
+  React `<script type="application/ld+json" dangerouslySetInnerHTML>` — JSON-LD is INERT data,
+  a React inline script is correct here, UNLIKE author client scripts which need ClientScripts).
+  The pure builder does ALL escaping (`<`/`>`/`&`→`\uXXXX`, breakout-safe) so the plan string is
+  safe to inject raw — DON'T re-escape or wrap. `breadcrumb.ts` exports BOTH `buildBreadcrumbData`
+  (inner JSON, for React callers) and `buildBreadcrumbJsonLd` (full `<script>` string, for the
+  future jsonld-component-kind HTML path). When the jsonld component kind lands, reuse the SAME
+  escaping (JSON-string escape, NOT the HTML escape path) and consider funneling its output onto
+  `plan.jsonLd` too, or into the tree — either way keep the escaping in ONE pure place.
+- (2026-07-07) Breadcrumb build REUSES the per-render page-rows read in `buildPlanFromPage`
+  (the one feeding `createPathTranslator`/`pagePathsByLocale`) — added `metaTitle` to its select,
+  NO new query. Ancestor titles = `resolveLocalized(parseJsonColumn(row.metaTitle))` (per-locale
+  map, active locale); ancestor URLs = `pagePathsByLocale(rows, ancestorId, params, ...)` for the
+  active locale, absolutized via `resolveSiteOrigin()` (root-relative fallback in local dev). It's
+  best-effort: `ancestorChain` returns null on a cycle/dangling parent, `buildBreadcrumbData`
+  returns null if ANY hop lacks a name or url — no partial/lying trail is ever emitted. If you add
+  a 2nd page column to that select, keep the type in `BreadcrumbRow` in sync.
 - (2026-07-07) OG/Twitter cards: pure builders in `lib/render/social-cards.ts`
   (`buildOpenGraph`/`buildTwitterCard`) fed by `generateMetadata`. brandName comes
   from `getSiteIdentity()` (settings-store) — this is an EXTRA D1 read, deliberately

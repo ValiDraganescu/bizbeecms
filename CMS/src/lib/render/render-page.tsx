@@ -22,6 +22,12 @@ import {
   createPathTranslator,
   pagePathsByLocale,
 } from "@/lib/render/localize-paths";
+import {
+  ancestorChain,
+  buildBreadcrumbData,
+  type BreadcrumbItem,
+} from "@/lib/render/breadcrumb";
+import { resolveSiteOrigin } from "@/lib/render/site-origin";
 import { getLocale } from "next-intl/server";
 import { cookies } from "next/headers";
 import { CONTENT_LOCALE_COOKIE } from "@/lib/render/plan-language-switcher";
@@ -264,6 +270,15 @@ export async function buildPlanFromPage(
   // override 404s the prefix-only rewrite) plus the rendered page's own path
   // in every locale for the LanguageSwitcher. One small full-table read per
   // render; best-effort — any failure keeps the prefix-only behavior.
+  let breadcrumbRows:
+    | Array<{
+        id: string;
+        slug: string;
+        parentPageId: string | null;
+        localizedSlugs: string | null;
+        metaTitle: string;
+      }>
+    | null = null;
   try {
     const pageRows = await db
       .select({
@@ -271,8 +286,10 @@ export async function buildPlanFromPage(
         slug: pageTable.slug,
         parentPageId: pageTable.parentPageId,
         localizedSlugs: pageTable.localizedSlugs,
+        metaTitle: pageTable.metaTitle,
       })
       .from(pageTable);
+    breadcrumbRows = pageRows;
     locale.translatePath = createPathTranslator(pageRows, locale.fallback);
     locale.pagePaths = pagePathsByLocale(
       pageRows,
@@ -312,7 +329,88 @@ export async function buildPlanFromPage(
 
   const plan = planPage(hydratedBlocks, components, locale, icons);
 
+  // Auto BreadcrumbList JSON-LD (seo-robots): built from the ancestor chain of
+  // the rendered page — per-locale meta titles + the reverse-resolved localized
+  // path of each ancestor (both visitor-independent stored data, so it's safe on
+  // the edge-cached (site) render path). Emitted only for pages at depth ≥ 1;
+  // best-effort — any gap (missing title/path, unbound D1) drops the whole trail.
+  if (breadcrumbRows) {
+    const jsonLd = await buildPageBreadcrumb(
+      breadcrumbRows,
+      pageRow.id,
+      routeContext.params,
+      locale,
+    );
+    if (jsonLd) plan.jsonLd = [jsonLd];
+  }
+
   return { plan, locale, routeNotFound: routeMiss.hit };
+}
+
+/** A page row carrying the columns the breadcrumb build needs. */
+type BreadcrumbRow = {
+  id: string;
+  slug: string;
+  parentPageId: string | null;
+  localizedSlugs: string | null;
+  metaTitle: string;
+};
+
+/**
+ * Build the auto BreadcrumbList JSON-LD `<script>` for the rendered page, or
+ * null when there's nothing to emit (root/top-level page, or an incomplete
+ * chain). Resolves each ancestor's per-locale meta title + its localized path
+ * (via pagePathsByLocale, active-locale entry) and absolutizes the paths against
+ * the site origin (Google prefers absolute `item` URLs; falls back to the
+ * root-relative path when the origin is unknown, e.g. local dev). Pure assembly
+ * lives in breadcrumb.ts; this shell only reads stored data + the origin.
+ */
+async function buildPageBreadcrumb(
+  rows: BreadcrumbRow[],
+  pageId: string,
+  params: Record<string, string>,
+  locale: LocaleContext,
+): Promise<string | null> {
+  const chain = ancestorChain(rows, pageId);
+  if (!chain || chain.length < 2) return null; // depth 0 → no breadcrumb
+
+  const translate =
+    locale.translatePath ?? createPathTranslator(rows, locale.fallback);
+  const codes = [locale.locale];
+  let origin = "";
+  try {
+    origin = (await resolveSiteOrigin()) ?? "";
+  } catch {
+    /* unknown origin → root-relative item URLs (local dev) */
+  }
+  const abs = (path: string) =>
+    origin ? origin.replace(/\/$/, "") + path : path;
+
+  const items: BreadcrumbItem[] = [];
+  for (const node of chain) {
+    const title = resolveLocalized(
+      parseJsonColumn<unknown>(
+        rows.find((r) => r.id === node.id)?.metaTitle ?? "",
+        {},
+      ),
+      locale.locale,
+      locale.fallback,
+    );
+    const paths = pagePathsByLocale(
+      rows,
+      node.id,
+      params,
+      locale.fallback,
+      codes,
+      translate,
+    );
+    const path = paths?.[locale.locale];
+    items.push({
+      name: typeof title === "string" ? title : "",
+      url: path ? abs(path) : "",
+    });
+  }
+  return buildBreadcrumbData(items);
 }
 
 /**
@@ -627,6 +725,17 @@ export async function RenderedPage({ plan }: { plan: RenderPlan }) {
         <style key={`c${i}`} dangerouslySetInnerHTML={{ __html: css }} />
       ))}
       {renderPlans(plan.root)}
+      {/* Structured-data scripts (seo-robots auto BreadcrumbList). Unlike author
+          client scripts, these are inert JSON-LD (`type="application/ld+json"`,
+          never executed) so a React-rendered inline <script> is exactly right —
+          crawlers read the DOM text. Built from visitor-independent stored data. */}
+      {(plan.jsonLd ?? []).map((json, i) => (
+        <script
+          key={`ld${i}`}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: json }}
+        />
+      ))}
       {/* Author scripts must run via a client effect — a React-rendered inline
           <script> is inert (never executes). See client-scripts.tsx. */}
       <ClientScripts scripts={plan.scripts} />
