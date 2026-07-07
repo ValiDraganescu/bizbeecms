@@ -19,7 +19,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ConfirmModal } from "@/components/content/confirm-modal";
-import { makeDescribeThumb } from "@/lib/chat/image-thumb";
+import { makeDescribeThumb, readImageDimensions } from "@/lib/chat/image-thumb";
 import { normalizeTags } from "@/lib/components/tags";
 import { TagChip } from "@/components/ui/tag-chip";
 import { cycleIndex, formatBytes, pageWindow } from "@/lib/media/format";
@@ -175,6 +175,12 @@ export function MediaLibrary({
         // Small ≤512px JPEG for the AI describe call (full file still uploads).
         const thumb = await makeDescribeThumb(file);
         if (thumb) form.append("describeThumb", thumb);
+        // Intrinsic pixel dims → stored for the render aspect-ratio (CLS) hint.
+        const dims = await readImageDimensions(file);
+        if (dims) {
+          form.append("width", String(dims.width));
+          form.append("height", String(dims.height));
+        }
         const res = await fetch("/api/assets", { method: "POST", body: form });
         if (!res.ok) {
           setActionError(t("gallery.uploadFailed", { message: await errorOf(res) }));

@@ -13,7 +13,13 @@
  */
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { deleteAsset, listAssets, putAsset, setAssetTags } from "@/db/asset-store";
-import { assetUrl, buildAssetKey, isValidAssetKey, validateAsset } from "@/lib/render/asset";
+import {
+  assetUrl,
+  buildAssetKey,
+  isValidAssetKey,
+  parseAssetDimension,
+  validateAsset,
+} from "@/lib/render/asset";
 import { normalizeTags } from "@/lib/components/tags";
 import { requireAdmin } from "@/lib/auth/guard";
 import { describeImage } from "@/lib/chat/describe-image";
@@ -120,6 +126,10 @@ export async function POST(request: Request): Promise<Response> {
   // Optional client-made ≤512px JPEG data-URL, used ONLY for the describe call.
   const thumb = form.get("describeThumb");
   const thumbDataUrl = typeof thumb === "string" ? thumb : undefined;
+  // Optional client-reported intrinsic pixel dims (captured via createImageBitmap).
+  // Untrusted → parseAssetDimension clamps/rejects; a bad/absent value stores null.
+  const width = parseAssetDimension(form.get("width"));
+  const height = parseAssetDimension(form.get("height"));
 
   const check = validateAsset(file.type, file.size);
   if (!check.valid) {
@@ -138,6 +148,8 @@ export async function POST(request: Request): Promise<Response> {
       contentType: file.type,
       bytes,
       description,
+      width,
+      height,
     });
     return Response.json(
       { ...row, url: assetUrl(row.key), tags: normalizeTags(safeJson(row.tags)) },

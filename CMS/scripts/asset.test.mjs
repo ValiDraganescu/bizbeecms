@@ -13,6 +13,7 @@ import { dirname, join } from "node:path";
 import {
   ALLOWED_ASSET_TYPES,
   MAX_ASSET_SIZE,
+  MAX_ASSET_DIMENSION,
   validateAsset,
   buildAssetKey,
   isValidAssetKey,
@@ -20,7 +21,34 @@ import {
   assetServeHeaders,
   filenameFromText,
   deliveryFormat,
+  parseAssetDimension,
 } from "../src/lib/render/asset.ts";
+
+// ── parseAssetDimension ───────────────────────────────────────────────────────
+test("parseAssetDimension: accepts sane positive dims (number or numeric string)", () => {
+  assert.equal(parseAssetDimension(1200), 1200);
+  assert.equal(parseAssetDimension("630"), 630);
+  assert.equal(parseAssetDimension(1), 1);
+  assert.equal(parseAssetDimension(MAX_ASSET_DIMENSION), MAX_ASSET_DIMENSION);
+});
+
+test("parseAssetDimension: floors fractional values", () => {
+  assert.equal(parseAssetDimension(1200.9), 1200);
+  assert.equal(parseAssetDimension("630.5"), 630);
+});
+
+test("parseAssetDimension: rejects bad/out-of-range/absent → null", () => {
+  assert.equal(parseAssetDimension(0), null);
+  assert.equal(parseAssetDimension(-5), null);
+  assert.equal(parseAssetDimension(0.4), null); // floors to 0
+  assert.equal(parseAssetDimension(MAX_ASSET_DIMENSION + 1), null);
+  assert.equal(parseAssetDimension(NaN), null);
+  assert.equal(parseAssetDimension(Infinity), null);
+  assert.equal(parseAssetDimension("nope"), null);
+  assert.equal(parseAssetDimension(""), null);
+  assert.equal(parseAssetDimension(null), null);
+  assert.equal(parseAssetDimension(undefined), null);
+});
 
 // ── filenameFromText ──────────────────────────────────────────────────────────
 test("filenameFromText: 2-5 meaningful words, filler dropped, kebab-case", () => {

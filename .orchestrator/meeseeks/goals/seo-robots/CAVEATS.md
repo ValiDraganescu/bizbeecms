@@ -299,7 +299,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   always emits object styles, but string-safe regardless). `style` is a React OBJECT with camelCase
   `aspectRatio` — correct for the createElement adapter (htmlPropsToReact passes style objects
   verbatim). Visitor-independent (reads only the built plan) → edge-cache-safe.
-- (2026-07-07) Markdown variants: served by INTERNAL route `app/api/md/[...slug]/route.ts` (builds
+- (2026-07-07) Asset pixel dims: `asset.width`/`asset.height` are NULLABLE INTEGER (migration 0032)
+  — NULL for non-images, undecodable files, older uploads, AND every non-media-uploader putAsset
+  caller (theme fonts / site-import / AI generate / component-asset upload all omit dims). Only the
+  MEDIA GALLERY upload captures them: `readImageDimensions` (image-thumb.ts, createImageBitmap) client-
+  side → `width`/`height` form fields → pure `parseAssetDimension` (asset.ts, the TRUST BOUNDARY:
+  floors, clamps 1..MAX_ASSET_DIMENSION=100k, rejects garbage → null) → `putAsset`. Client dims are
+  UNTRUSTED (never decode server-side — no native image codecs on Workers). The dims are NOT yet used
+  at render: threading them into `<img>` props for applyImageHygiene's CLS aspect-ratio is a FILED
+  TODO, and it must NOT add a per-request D1 read on the edge-cached/429-sensitive render hot path —
+  the recommended path is to bake dims onto the block prop when the image PICKER inserts the asset
+  (authoring-time), not a render-time lookup. (builds
   the plan via `loadPlan` — pulls next-intl/React, so it CAN'T live in the lean worker.ts) + a
   release-gated `worker.ts` rewrite of public `/<path>.md`→`/api/md/<path>.md` (pure
   `markdownVariantRewrite` in edge-cache.ts). Placed under `/api` on purpose: `api` is in

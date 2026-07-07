@@ -54,6 +54,24 @@ export function validateAsset(contentType: string, size: number): ValidationResu
   return { valid: true };
 }
 
+/** Largest pixel dimension we'll store — client-reported dims are untrusted, so
+ *  clamp out absurd values (a forged 10^9 would poison the aspect-ratio math). */
+export const MAX_ASSET_DIMENSION = 100_000;
+
+/**
+ * Coerce a client-reported image dimension (form field, so a string) to a stored
+ * pixel integer, or null when it isn't a sane positive dimension. Rejects
+ * non-numeric, non-finite, non-positive, and out-of-range values, and floors
+ * fractional input. Client-side capture is a convenience, NOT trusted — this is
+ * the trust boundary, so a bad/absent value simply stores null (no dims).
+ */
+export function parseAssetDimension(value: unknown): number | null {
+  const n = typeof value === "string" ? Number(value) : value;
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 1) return null;
+  const px = Math.floor(n);
+  return px >= 1 && px <= MAX_ASSET_DIMENSION ? px : null;
+}
+
 /**
  * Collision-resistant R2 object key from the original filename + content type.
  * `assets/<slug-of-base>_<ts>_<rand>.<ext>` — lowercase, safe chars only, so it

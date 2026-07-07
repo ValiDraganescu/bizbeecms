@@ -22,10 +22,22 @@ Task states: TODO | DOING | DONE | BLOCKED.
   kill CLS. Never invents dimensions, never clobbers an author `loading`/`decoding`/existing
   aspect-ratio/string style. FOLLOW-UP (below): capture asset pixel dims at upload so CLS applies to
   images that don't carry explicit width/height.
-- TODO: Capture asset pixel dimensions at upload (assets API + new `width`/`height` columns) and
-  surface them so `applyImageHygiene` can set aspect-ratio on images WITHOUT author-set width/height
-  (today CLS only fires when the author already set both dims). Backfill lazily. Then the image
-  hygiene pass covers gallery-inserted images too, not just explicitly-sized ones.
+- DONE (2026-07-07): Capture asset pixel dimensions at upload — nullable `asset.width`/`height`
+  INTEGER columns (migration 0032), captured client-side via `readImageDimensions` (image-thumb.ts,
+  reuses createImageBitmap), sent as form fields, hardened through pure `parseAssetDimension`
+  (asset.ts — clamps to 1..MAX_ASSET_DIMENSION, floors, rejects garbage → null) and written by
+  `putAsset`. GET/POST responses already spread the row so `width`/`height` surface to clients.
+  FOLLOW-UP (below): thread stored dims into the render `<img>` props so applyImageHygiene sets
+  aspect-ratio on gallery images lacking author width/height (has render-hot-path implications — a
+  dims lookup keyed by asset URL; the caveats forbid a new per-request D1 read on the render path).
+- TODO: Thread stored asset dims into render `<img>` props (image-hygiene CLS coverage for gallery
+  images). The dims now exist on `asset.width`/`height` (captured at upload). Make `applyImageHygiene`
+  (or the render host that builds img props) fill width/height/aspect-ratio for `<img src="/media/…">`
+  that carry NO author dims, by looking up the asset row by URL/key. CONSTRAINT (caveats): the render
+  path is the 429-sensitive hot path AND is edge-cached — do NOT add a per-request D1 read there.
+  Options to evaluate: (a) resolve dims once when the image is inserted into a block (bake width/height
+  onto the block prop at authoring time — no render-time lookup), or (b) an in-isolate cached
+  key→dims map hydrated off the hot path. Prefer (a): stamp dims when the picker inserts an asset.
 - TODO: INVESTIGATION (design note, not code): responsive image variants for `/media/[...key]` R2 assets on per-site Workers — evaluate Cloudflare Images API upload-time variants vs zone Image Resizing (custom-domain sites only; workers.dev sites can't) vs in-Worker resizing (no native codecs on Workers — likely dead end); deliverable = chosen path + cost/constraints written to this goal's JOURNAL + CAVEATS, and implementation tasks filed accordingly.
 - BLOCKED (on the investigation above): implement responsive images — srcset/sizes + modern format (WebP/AVIF) for asset images in published pages per the chosen design.
 

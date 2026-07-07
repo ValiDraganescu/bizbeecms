@@ -58,6 +58,9 @@ export async function putAsset(
     bytes: ArrayBuffer;
     /** AI description for search (optional; "" for non-images / not-yet-described). */
     description?: string;
+    /** Intrinsic pixel dims (optional; null for non-images / undecodable / older clients). */
+    width?: number | null;
+    height?: number | null;
   },
   injectedStorage?: Storage,
   injectedDb?: Db,
@@ -72,6 +75,8 @@ export async function putAsset(
     filename: input.filename,
     contentType: input.contentType,
     size: input.bytes.byteLength,
+    width: input.width ?? null,
+    height: input.height ?? null,
     description: input.description ?? "",
     tags: "[]",
     createdAt: new Date(),

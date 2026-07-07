@@ -15,6 +15,25 @@
 const MAX_EDGE = 512;
 const QUALITY = 0.7;
 
+/**
+ * Read an image File's intrinsic pixel dimensions client-side (createImageBitmap).
+ * Returns null for non-images or an undecodable file — the caller then just omits
+ * the dims and the asset row stores null (no aspect-ratio hint). Browser-only.
+ */
+export async function readImageDimensions(
+  file: File,
+): Promise<{ width: number; height: number } | null> {
+  if (!file.type.startsWith("image/")) return null;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const dims = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return dims.width > 0 && dims.height > 0 ? dims : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function makeDescribeThumb(file: File): Promise<string | null> {
   if (!file.type.startsWith("image/")) return null;
   try {

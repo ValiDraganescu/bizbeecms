@@ -234,6 +234,12 @@ export const asset = sqliteTable(
     filename: text("filename").notNull(),
     contentType: text("content_type").notNull(),
     size: integer("size").notNull().default(0),
+    // Intrinsic pixel dimensions of the image (captured client-side at upload via
+    // createImageBitmap). NULL for non-images, older uploads, or when the client
+    // couldn't decode it. Threaded into the render `<img>` props so applyImageHygiene
+    // can set aspect-ratio (CLS) even when the author set no explicit width/height.
+    width: integer("width"),
+    height: integer("height"),
     // AI-generated description of the image (epic: searchable media). Empty for
     // non-images or when the describe call failed. Matched by media search.
     description: text("description").notNull().default(""),

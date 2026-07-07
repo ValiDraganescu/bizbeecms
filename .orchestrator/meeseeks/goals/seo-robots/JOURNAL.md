@@ -608,3 +608,34 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/render/element-to-markdown.ts (+.test.ts),
   CMS/src/app/api/md/[...slug]/route.ts, CMS/src/lib/render/edge-cache.ts (+.test.ts append),
   CMS/worker.ts.
+
+## 2026-07-07 13:31 — Capture asset pixel dimensions at upload (image-hygiene follow-up)
+- **Status:** DONE
+- **What I did:** Assets now store their intrinsic pixel dims so a later run can give
+  applyImageHygiene an aspect-ratio (CLS) hint on gallery images the author never sized.
+  - **Schema:** nullable `asset.width`/`asset.height` INTEGER (Drizzle → migration
+    `0032_last_baron_zemo.sql` → applied --local). NULL for non-images / undecodable /
+    older uploads — fully backward-compatible; the other putAsset callers (theme fonts,
+    site-import, AI generate, component asset upload) omit dims and store null.
+  - **Client capture:** new pure-ish `readImageDimensions(file)` in `lib/chat/image-thumb.ts`
+    (reuses `createImageBitmap`, closes the bitmap, null on non-image/undecodable). The media
+    uploader (`media-library.tsx onUpload`) reads dims alongside the existing describe-thumb and
+    appends `width`/`height` form fields.
+  - **Trust boundary:** pure `parseAssetDimension(value)` in `lib/render/asset.ts` — client dims
+    are UNTRUSTED, so it coerces number|string, floors, rejects non-finite/non-positive and clamps
+    to `1..MAX_ASSET_DIMENSION` (100k), null otherwise. The POST route parses `width`/`height`
+    through it and passes to `putAsset`; a forged huge/garbage value simply stores null.
+  - **Store:** `putAsset` gained optional `width?`/`height?` (default null) written into the row.
+    GET list + POST response already spread the row → dims surface to clients with no extra work.
+  - Did NOT thread dims into the render `<img>` props yet — that touches the 429-sensitive,
+    edge-cached RENDER hot path (caveats forbid a new per-request D1 read there). Filed as its own
+    BACKLOG TODO with the recommended approach (bake dims onto the block prop at picker-insert time,
+    NOT a render-time lookup).
+- **Verified:** `node --test scripts/asset.test.mjs` 19/19 (+3 new parseAssetDimension cases);
+  full `npm test` 1834/1834 (was 1831; +3); `npx tsc --noEmit` exit 0; migration applied local.
+  Did NOT run opennext build (heavy gate; additive column + pure helper + one form field, tsc+tests
+  cover it) nor live-upload verify (needs live R2/D1 binding — HITL). No worker.ts change → no r-* release.
+- **Files:** CMS/src/db/schema.ts, CMS/migrations/0032_last_baron_zemo.sql, CMS/migrations/meta/*,
+  CMS/src/lib/render/asset.ts, CMS/scripts/asset.test.mjs, CMS/src/db/asset-store.ts,
+  CMS/src/lib/chat/image-thumb.ts, CMS/src/components/media/media-library.tsx,
+  CMS/src/app/api/assets/route.ts
