@@ -21,7 +21,13 @@ Task states: TODO | DOING | DONE | BLOCKED.
   unquoted vs `"n":"{{name}}"` quoted), and WHEN to author a jsonld component vs plain content.
 
 ### AI write-path coherence (IndexNow + edge purge)
-- TODO: Notify IndexNow (and purge edge cache) on the AI live-write paths: `handleCreatePage` → `upsertPage` can publish/unpublish or rewrite a PUBLISHED page's live blocks, and `handleTranslate` → translate-store rewrites a published page's live metaTitle/metaDescription — neither calls notifyIndexNowForPage nor purge-edge (the REST pages/publish routes do both). Add the same best-effort post-write block (ctx.waitUntil, never fails the tool result) after successful upsertPage/applyTranslation in tool-dispatch. — queued by scrub: AI authoring is a first-class write path; today an AI publish never pings IndexNow and an AI edit of a cached published page (cache_max_age>0) leaves the edge stale until TTL.
+- DONE (2026-07-07): AI create_page/translate now ping IndexNow + purge the edge cache after
+  a successful write (upsertPage/applyTranslation now return `pageId`; pure
+  `page-write-hooks.purgeTagsForPageWrite` decides purge tags — CREATE=none, UPDATE/translate=per-page
+  tag; both handlers fire `purgeEdgeTags` + `notifyIndexNowForPage`, best-effort/self-wrapping).
+  NOTE: rename/slug-change 301 auto-capture is NOT wired on the AI path — the AI has no page-rename
+  tool today, so create_page can't move an existing page's URLs (it upserts by slug). If an AI rename
+  tool ever lands, it must run the same redirectsForRename/applyRenameRedirects trio the REST route does.
 
 ### Page-level SEO controls
 - TODO: Designated branded 404 page: site setting selecting a published page as the 404 page; the `(site)` catch-all's miss path renders that page's plan in the ACTIVE peeled locale (`/fi/missing` → 404 in fi) with HTTP status 404 + robots noindex; settings UI select (only published pages); fallback to the current plain 404 when unset. Non-200 → never edge-cached (worker gate is GET-200-only; assert).

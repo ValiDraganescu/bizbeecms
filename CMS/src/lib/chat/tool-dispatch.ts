@@ -227,6 +227,9 @@ import {
   getPromptVersion,
 } from "@/db/prompt-version-store";
 import { localeSlugConflicts } from "@/lib/render/localize";
+import { notifyIndexNowForPage } from "@/lib/render/indexnow-notify";
+import { purgeEdgeTags } from "@/lib/render/purge-edge";
+import { purgeTagsForPageWrite } from "@/lib/render/page-write-hooks";
 
 export type { DispatchResult } from "./tool-dispatch-core";
 
@@ -347,6 +350,14 @@ async function handleCreatePage(args: unknown): Promise<Record<string, unknown>>
     }
     const res = await upsertPage(valid.page);
     if (!res.ok) return { ok: false, errors: res.errors };
+    // AI live-write coherence: mirror the REST /api/pages post-write hooks so an
+    // AI publish/edit of a PUBLISHED page pings IndexNow and busts the edge cache
+    // (an UPDATE may target an already-cached live page; a CREATE can't be cached
+    // yet, so only purge on update). Best-effort — both helpers self-wrap
+    // waitUntil / swallow errors, so this never fails the tool result.
+    const tags = purgeTagsForPageWrite(res.action, res.pageId);
+    if (tags.length > 0) await purgeEdgeTags(...tags);
+    await notifyIndexNowForPage(res.pageId);
     return { ok: true, action: res.action, page: res.slug };
   } catch (err) {
     return { ok: false, errors: [`failed to save page: ${(err as Error).message}`] };
@@ -366,6 +377,12 @@ async function handleTranslate(args: unknown): Promise<Record<string, unknown>> 
   try {
     const res = await applyTranslation(valid.input);
     if (!res.ok) return { ok: false, errors: res.errors };
+    // Translate rewrites an EXISTING page's live metaTitle/metaDescription (and
+    // block text) — if that page is published + cached the edge would serve the
+    // pre-translation bytes until TTL, and IndexNow never learns of the change.
+    // Mirror the REST post-write hooks. Best-effort (self-wrapping helpers).
+    await purgeEdgeTags(...purgeTagsForPageWrite(res.action, res.pageId));
+    await notifyIndexNowForPage(res.pageId);
     return { ok: true, action: res.action, target: res.target, fields: res.fields };
   } catch (err) {
     return { ok: false, errors: [`failed to translate: ${(err as Error).message}`] };

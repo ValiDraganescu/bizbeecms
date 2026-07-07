@@ -1,34 +1,31 @@
 # Note to the next Meeseeks (seo-robots)
 
-**JSON-LD is now COMPLETE code-wise** — render + write + read + bindings + the Develop
-editor UI all shipped. This run added the operator authoring surface: a HTML|JSON-LD kind
-toggle in the component workbench, a single JSON-template editor for jsonld (no script/css
-panes), a preview of the EMITTED structured data with a Google Rich Results deep-link, the
-raw template shipped out-of-band on GET as base64 header `X-Component-Json-Template`, and a
-jsonld badge in the component list. See CAVEATS for the template-header + "editor is
-authoritative on kind" gotchas.
-
-**Only remaining jsonld items:**
-- HITL (not codeable): author a proof jsonld component via the UI → publish → validate in
-  Google Rich Results. Needs a deployed Site + real D1.
-- Builder canvas invisible-element CHIP for a jsonld block (backlog) — a jsonld block renders
-  no visible HTML, so the `data-block-wrap` placeholder is empty; add a selectable/deletable
-  chip so operators can manage it in the page builder canvas.
-- AI authoring-guide section for jsonld (backlog) — schema.org patterns per page type +
-  slot-quoting rules (`"n":{{count}}` unquoted vs `"n":"{{name}}"` quoted).
+**This run closed the AI write-path IndexNow/purge gap** — AI `create_page` (update) and
+`translate` now ping IndexNow + purge the edge cache like the REST routes. `upsertPage` /
+`applyTranslation` now return `pageId`; purge-tag decision is pure `lib/render/page-write-hooks.ts`.
+The AI hooks are DELIBERATELY lighter than REST (no rename 301 auto-capture / no noindex
+pre-capture — there's no AI rename/noindex tool). See the newest CAVEAT.
 
 **Take next — pick one, in rough priority order:**
 
-1. **AI write-path IndexNow/purge gap** (backlog, self-contained + testable): `handleCreatePage`
-   → `upsertPage` and `handleTranslate` → applyTranslation don't call notifyIndexNowForPage / purge
-   like the REST routes do. Add the same best-effort `ctx.waitUntil` block after successful
-   upsertPage/applyTranslation in tool-dispatch. Clean slice.
+1. **Designated branded 404 page** (backlog, Page-level SEO controls) — self-contained: site
+   setting selecting a published page as the 404; catch-all miss path renders that page's plan in
+   the active peeled locale with HTTP 404 + noindex; settings UI select (published pages only);
+   fallback to plain 404 when unset. Non-200 → never edge-cached (worker gate is GET-200-only; assert).
 
-2. **Builder canvas invisible-element CHIP** for jsonld blocks (see above — finishes the jsonld
-   operator loop in the page builder).
+2. **Robots settings UI** (Naughty-robot section / robots task 2) — the structured-rules +
+   free-text override editor. All server plumbing exists (getRobotsConfig/setRobotsConfig,
+   `api/settings/robots` PUT normalizes silently). Read the robots CAVEATS: editor must ADOPT the
+   server-returned normalized config, a non-blank free-text override DIMS the structured section,
+   and the UI must NOT add its own `Sitemap:` pointer (buildRobotsTxt appends it).
 
-3. Or another track: robots settings UI (backlog task 2), the 404 page, OG-image, llms.txt,
-   the image-hygiene post-pass, or the SEO-audit admin report.
+3. **llms.txt + markdown page variants** — self-contained pure serializer + a route; skip when
+   origin unknown. Or the **image-hygiene post-pass** (lazy/decoding/CLS over the finished
+   ElementPlan, same pattern as localize-links), or the **SEO-audit admin report**.
 
-**HITL pending:** no D1/worker.ts change this run → no r-* release needed. Live rich-results
-validation of an authored+published jsonld component is still the only jsonld verification gap.
+**Still open jsonld items (lower priority):** builder-canvas invisible-element CHIP for a jsonld
+block, and the AI authoring-guide section for jsonld.
+
+**HITL pending:** no worker.ts / D1 change this run → no r-* release needed. Still-open verification
+gaps: live Google Rich Results validation of an authored+published jsonld component, and a live
+IndexNow/edge-purge spot-check (needs a deployed Site with real D1 + reachable origin).

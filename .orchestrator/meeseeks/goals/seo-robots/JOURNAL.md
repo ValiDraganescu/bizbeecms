@@ -474,3 +474,25 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/components/portable.ts (ComponentRow.jsonTemplate field),
   CMS/src/app/(admin)/admin/components/develop/page.tsx (kind in initialComponents),
   CMS/src/lib/components/base64-header.ts (new) + .test.ts (new), CMS/messages/{en,fi,et}.json (jsonld keys)
+
+## 2026-07-07 12:52 — AI write-path IndexNow + edge-purge coherence
+- **Status:** DONE
+- **What I did:** The AI live-write tools now mirror the REST /api/pages post-write
+  hooks — an AI `create_page` (update path) or `translate` of a PUBLISHED page now
+  pings IndexNow and busts the edge cache (previously an AI publish never notified
+  IndexNow and an AI edit of a cached published page left the edge stale until TTL).
+  (1) `upsertPage` (page-store) + `applyTranslation` (translate-store) success shapes
+  now return `pageId` (additive — no caller broke). (2) New pure module
+  `lib/render/page-write-hooks.ts` `purgeTagsForPageWrite(action,pageId)`: CREATE→[]
+  (nothing cached yet), UPDATE/translate→[pageCacheTag(id)]. (3) `handleCreatePage` +
+  `handleTranslate` (tool-dispatch) call it then `purgeEdgeTags(...tags)` +
+  `notifyIndexNowForPage(pageId)` — both helpers self-wrap ctx.waitUntil / swallow
+  errors, so this is best-effort and never fails the tool result.
+- **Verified:** `npx tsc --noEmit -p tsconfig.json` exit 0; `node --test` on the new
+  page-write-hooks suite (3/3) + all render suites (280/280). No live IndexNow/purge
+  test — those hit the CF/network boundary (HITL); the PURE purge decision is fenced.
+  Did NOT run opennext build (isolated: two store return fields + one pure module +
+  two handler edits, tsc+tests cover it). No worker.ts/D1 change → no r-* release.
+- **Files:** CMS/src/db/page-store.ts, CMS/src/db/translate-store.ts,
+  CMS/src/lib/render/page-write-hooks.ts (new) + .test.ts (new),
+  CMS/src/lib/chat/tool-dispatch.ts

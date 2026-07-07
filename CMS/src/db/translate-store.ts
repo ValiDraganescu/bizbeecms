@@ -28,7 +28,7 @@ import { getDb, schema } from "./index";
 import { mergePageFields, type TranslationInput } from "@/lib/chat/translate-tool";
 
 export type MergeResult =
-  | { ok: true; action: "translated"; target: string; fields: number }
+  | { ok: true; action: "translated"; target: string; fields: number; pageId: string }
   | { ok: false; errors: string[] };
 
 /** Persist a validated translation by merging it into the target artifact. */
@@ -88,7 +88,13 @@ export async function applyTranslation(input: TranslationInput): Promise<MergeRe
     })
     .where(eq(schema.page.id, row.id));
 
-  return { ok: true, action: "translated", target: input.target, fields: merged.applied };
+  return {
+    ok: true,
+    action: "translated",
+    target: input.target,
+    fields: merged.applied,
+    pageId: row.id,
+  };
 }
 
 function parseJson<T>(raw: string | null, fallback: T): T {

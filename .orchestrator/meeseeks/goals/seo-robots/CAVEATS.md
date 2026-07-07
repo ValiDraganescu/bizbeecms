@@ -238,3 +238,15 @@ Read every line before working. Each entry was learned the hard way by a previou
   component instance, not the per-row List repeat — a "one JSON-LD script per collection
   row" (ItemList) use case would need new work in planList, not hydrateProps. Single-item
   binding + wildcard `:param` detail pages (the stated goal) are fully covered.
+
+- (2026-07-07) AI write-path IndexNow/purge: `upsertPage` (page-store) and `applyTranslation`
+  (translate-store) success shapes now return `pageId` (additive — needed because the AI tools
+  address pages by SLUG but the hooks need the id). The AI hooks live in tool-dispatch
+  `handleCreatePage`/`handleTranslate`, NOT the REST route, and are DELIBERATELY LIGHTER than the
+  REST /api/pages hooks: they do purge(per-page tag) + notifyIndexNowForPage only. They do NOT run
+  the rename 301 auto-capture (redirectsForRename/applyRenameRedirects) or the noindex-transition
+  pre-capture — create_page upserts by slug and can't MOVE an existing page's URLs, and there's no
+  AI noindex/rename tool. Purge-tag decision is the pure `lib/render/page-write-hooks.ts`
+  (CREATE=[] since nothing's cached yet; UPDATE/translate=[pageCacheTag(id)]). If an AI rename or
+  AI noindex tool ever lands, it MUST additionally run the REST route's rename/noindex pre-capture
+  trio or renames silently 404 inbound links / noindex-ON never re-pings.

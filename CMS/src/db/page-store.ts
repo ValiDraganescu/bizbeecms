@@ -48,7 +48,7 @@ export async function upsertPage(
   page: PageInput,
   injectedDb?: Db,
 ): Promise<
-  | { ok: true; action: "created" | "updated"; slug: string }
+  | { ok: true; action: "created" | "updated"; slug: string; pageId: string }
   | { ok: false; errors: string[] }
 > {
   const db = injectedDb ?? (await getDb());
@@ -96,7 +96,7 @@ export async function upsertPage(
         updatedAt: now,
       })
       .where(eq(schema.page.id, existing[0].id));
-    return { ok: true, action: "updated", slug: page.slug };
+    return { ok: true, action: "updated", slug: page.slug, pageId: existing[0].id };
   }
 
   // Stage-2 localized slugs: UNIQUE(parent_page_id, slug) only guards the
@@ -122,8 +122,9 @@ export async function upsertPage(
     };
   }
 
+  const newId = crypto.randomUUID();
   await db.insert(schema.page).values({
-    id: crypto.randomUUID(),
+    id: newId,
     slug: page.slug,
     parentPageId,
     publishStatus: page.publishStatus,
@@ -133,7 +134,7 @@ export async function upsertPage(
     createdAt: now,
     updatedAt: now,
   });
-  return { ok: true, action: "created", slug: page.slug };
+  return { ok: true, action: "created", slug: page.slug, pageId: newId };
 }
 
 // ── C2 page-management UI (non-AI authoring of page metadata) ────────────────
