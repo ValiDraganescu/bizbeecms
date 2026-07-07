@@ -424,11 +424,12 @@ Read every line before working. Each entry was learned the hard way by a previou
   top-level wildcard page can never match `/llms.txt`, so it can never get the llms tag stamped
   on it (the sitemap wildcard-cache-tag hole is sidestructurally). If you add MORE dotted-root
   cacheable files (e.g. a cached sitemap), give each its OWN carve-out fn + tag, never widen the
-  dot gate. PURGE COVERAGE for LLMS_CACHE_TAG lives in 6 places — keep in sync when a NEW page-
+  dot gate. PURGE COVERAGE for LLMS_CACHE_TAG lives in 7 places — keep in sync when a NEW page-
   or brand-mutating path lands: (1) publish route, (2) api/pages persist (update/unpublish/
   rename), (3) api/pages DELETE, (4) settings/brand PUT (alongside PAGES_CACHE_TAG), (5)
   settings/llms PUT, (6) `purgeTagsForPageWrite` (the AI path — CREATE now returns
-  [LLMS_CACHE_TAG] because a create ADDS a page to the index; it's no longer []). The route still
+  [LLMS_CACHE_TAG] because a create ADDS a page to the index; it's no longer []), (7)
+  settings/content-locales PUT (a locale add/remove changes the `{{locales}}` slot). The route still
   emits `Cache-Control: no-store` as the PRE-RELEASE fallback (worker overwrites it once shipped)
   — leaving it means /llms.txt stays uncached until the worker.ts release, never stale-cached.
 
@@ -536,12 +537,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   dotted-root file keeps its OWN carve-out fn + tag — the `??` chain does NOT widen the dot gate, so
   a top-level wildcard page can never match `/sitemap.xml` and get its tag stamped (the whole point
   of this task — /sitemap.xml did a per-request D1 read + risked the wildcard-cache-tag stale hole).
-  PURGE COVERAGE for SITEMAP_CACHE_TAG is a SUBSET of the llms sites — ONLY the page-content ones:
-  (1) publish route, (2) api/pages persist (update/unpublish/rename — both pathChanged branches),
-  (3) api/pages DELETE, (4) `purgeTagsForPageWrite` (AI path — created+updated+translated). It is
-  DELIBERATELY NOT purged by (a) settings/brand PUT or (b) settings/llms PUT — brand identity and the
-  llms template are NOT sitemap content (the sitemap is just URL + lastmod). If you add a NEW
-  page-mutating path, purge sitemap alongside llms; if it's brand/content-index only, do NOT. Pre-
+  PURGE COVERAGE for SITEMAP_CACHE_TAG is a SUBSET of the llms sites — ONLY the page-content ones
+  PLUS the content-locales PUT: (1) publish route, (2) api/pages persist (update/unpublish/rename —
+  both pathChanged branches), (3) api/pages DELETE, (4) `purgeTagsForPageWrite` (AI path —
+  created+updated+translated), (5) settings/content-locales PUT (a locale add/remove changes the
+  sitemap's per-locale URLs + hreflang alternates). It is DELIBERATELY NOT purged by (a) settings/
+  brand PUT or (b) settings/llms PUT — brand identity and the llms template are NOT sitemap content
+  (the sitemap is just URL + lastmod). If you add a NEW page-mutating path, purge sitemap alongside
+  llms; if it's brand/content-index only, do NOT. Pre-
   release the route stays uncached: sitemap.ts is `dynamic="force-dynamic"` (Next → no-store), and the
   worker header only lands once a release cuts worker.ts — never stale-cached before that (HITL).
   NOTE: page.noindex flip already purges via pageCacheTag(id)+SITEMAP path in api/pages PUT, so the

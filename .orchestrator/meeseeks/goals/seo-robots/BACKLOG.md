@@ -7,13 +7,9 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### Edge-cache purge coverage
-- TODO: Purge `SITEMAP_CACHE_TAG` + `LLMS_CACHE_TAG` on content-locales settings save
-  (`api/settings/content-locales` PUT currently purges only `PAGES_CACHE_TAG`): a locale add/remove
-  changes /sitemap.xml (per-locale URLs + hreflang alternates) and /llms.txt (`{{locales}}` slot),
-  both now edge-cached with their own tags → stale up to max-age after the write. One-line purge
-  extension + update the purge-coverage lists in the two edge-cache CAVEATs. — queued by scrub:
-  verified in repo that content-locales/route.ts:74 misses both tags while brand/llms PUTs purge theirs.
-  (Re-verified by scrub 2026-07-07 second pass: still purges only PAGES_CACHE_TAG.)
+- DONE (2026-07-07): Purge `SITEMAP_CACHE_TAG` + `LLMS_CACHE_TAG` on content-locales settings save.
+  `api/settings/content-locales` PUT now purges all three tags (was PAGES only). Both edge-cache
+  CAVEATs' purge-coverage lists updated (SITEMAP → 5 sites, LLMS → 7 sites).
 
 ### Lower-value follow-ups
 - TODO (follow-up to the AI bulk-meta tool): AI "fix missing alt" path — audit_meta covers only the

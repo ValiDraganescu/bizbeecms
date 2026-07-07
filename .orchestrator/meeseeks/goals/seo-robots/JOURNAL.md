@@ -1275,3 +1275,15 @@ hot path (no per-request D1 read on the render gate), localized EN/FI/ET.
   the stashed base; worktree lacks the OpenNext-generated env types; `wrangler types` didn't add DB).
 - **Release-gated:** worker.ts ships via r-* only; the off-skip/strict behaviour + 30s cache
   propagation is HITL on a deployed Site + paid plan for the binding.
+
+## 2026-07-07 16:23 — Purge SITEMAP+LLMS cache tags on content-locales save
+- **Status:** DONE
+- **What I did:** `api/settings/content-locales` PUT purged only `PAGES_CACHE_TAG`; a locale
+  add/remove changes /sitemap.xml (per-locale URLs + hreflang) and /llms.txt (`{{locales}}` slot),
+  both edge-cached with their own tags → stale up to max-age. Extended the one purge call to
+  `purgeEdgeTags(PAGES_CACHE_TAG, SITEMAP_CACHE_TAG, LLMS_CACHE_TAG)` (variadic), imported the two
+  tags, updated the comment. Synced both edge-cache CAVEATs' purge-coverage lists (SITEMAP: 4→5
+  sites, LLMS: 6→7 sites) with the content-locales PUT.
+- **Verified:** `npx tsc --noEmit` clean. Purge is best-effort (`purge-edge.ts` swallows). Live
+  cache-bust = HITL (release-gated worker carve-outs serve /sitemap.xml + /llms.txt).
+- **Files:** CMS/src/app/api/settings/content-locales/route.ts, goals/seo-robots/CAVEATS.md

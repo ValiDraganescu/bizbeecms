@@ -16,7 +16,7 @@ import { getContentLocales, setContentLocales } from "@/db/settings-store";
 import { listPages } from "@/db/page-store";
 import { localeSlugConflicts, normalizeContentLocales } from "@/lib/render/localize";
 import { requireAdmin } from "@/lib/auth/guard";
-import { PAGES_CACHE_TAG } from "@/lib/render/edge-cache";
+import { PAGES_CACHE_TAG, SITEMAP_CACHE_TAG, LLMS_CACHE_TAG } from "@/lib/render/edge-cache";
 import { purgeEdgeTags } from "@/lib/render/purge-edge";
 
 export const dynamic = "force-dynamic";
@@ -69,9 +69,11 @@ export async function PUT(request: Request): Promise<Response> {
       );
     }
     const saved = await setContentLocales(normalized);
-    // Locale set changes every page's hreflang alternates + LanguageSwitcher —
-    // blast the shared pages tag. Best-effort.
-    await purgeEdgeTags(PAGES_CACHE_TAG);
+    // Locale set changes every page's hreflang alternates + LanguageSwitcher
+    // (PAGES), the /sitemap.xml per-locale URLs + hreflang alternates (SITEMAP),
+    // and /llms.txt's {{locales}} slot (LLMS) — all edge-cached with their own
+    // tags, so purge all three or they stay stale up to max-age. Best-effort.
+    await purgeEdgeTags(PAGES_CACHE_TAG, SITEMAP_CACHE_TAG, LLMS_CACHE_TAG);
     return Response.json(saved);
   } catch (err) {
     return Response.json(
