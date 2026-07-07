@@ -12,17 +12,19 @@
  *  3. missingMeta  — published page × locale missing a meta title or description.
  *  4. missingAlt   — an image prop with no alt text (accessibility + image SEO).
  *
- * SCOPE (deliberate, ponytail): links + images are collected from the raw
- * `page.blocks` prop trees (author-typed link/image props — Hero CTAs, image
- * blocks, etc.). It does NOT resolve referenced *component* trees (that needs the
- * D1-backed component resolver + next-intl and isn't a pure input) — a
- * component-tree deep scan is a filed follow-up. This already catches the common
- * author mistakes: a CTA pointing at a renamed slug, an image block with no alt.
+ * SCOPE: links + images are collected from the raw `page.blocks` prop trees
+ * (author-typed link/image props — Hero CTAs, image blocks, etc.) AND, when the
+ * caller supplies a `componentSeo` index, from the MARKUP inside referenced
+ * component trees (a component's own `<a href>` / `<img src alt>`, transitively
+ * through nested component refs). The index is built by `buildComponentSeoIndex`
+ * from resolved component rows (see the admin route) — `auditSeo` itself stays a
+ * PURE input transform, no D1/React. Without the index the audit degrades to the
+ * old block-props-only scan (backwards compatible).
  *
  * PURE — no React/D1/CF imports; unit-tested with dep-free `node --test`.
  */
 
-import type { Block } from "./plan-types.ts";
+import type { Block, TreeNode } from "./plan-types.ts";
 import { publishedPagePaths, type SitemapPageRow } from "./sitemap-paths.ts";
 import { SKIP_SEGMENTS } from "./localize-links.ts";
 import type { ContentLocales } from "./localize.ts";
@@ -163,14 +165,114 @@ function linkPathsInProps(props: Record<string, unknown> | undefined): string[] 
   return out;
 }
 
+// ── Component-tree SEO extraction (deep scan) ────────────────────────────────
+
+/** A single component's own links + images, plus the component names it refs. */
+export interface ComponentSeo {
+  /** Internal page-link hrefs found in this component's markup (normalized). */
+  hrefs: string[];
+  /** Images found in this component's markup (src may be "", alt trimmed). */
+  images: Array<{ src: string; alt: string }>;
+  /** Component names this tree references (PascalCase tag = nested component). */
+  deps: string[];
+}
+
+/** The name→SEO index the deep scan consumes (built from resolved components). */
+export type ComponentSeoIndex = Map<string, ComponentSeo>;
+
+/** True if a tag is a component reference (PascalCase identifier), not an HTML tag. */
+function isComponentTag(tag: string): boolean {
+  return /^[A-Z][A-Za-z0-9]*$/.test(tag);
+}
+
+/**
+ * Extract the SEO-relevant surface (internal link hrefs + images + nested
+ * component deps) from ONE component's parsed tree. PURE. Mirrors the block-prop
+ * heuristics so the same broken-link / missing-alt logic applies: hrefs are only
+ * kept when internal-page-routable; an `<img>` (or any node carrying an image-ish
+ * prop) contributes an image finding, alt read from `alt`/`altText`/`imageAlt`.
+ */
+export function extractComponentSeo(tree: TreeNode): ComponentSeo {
+  const hrefs: string[] = [];
+  const images: Array<{ src: string; alt: string }> = [];
+  const deps = new Set<string>();
+
+  const walk = (node: TreeNode): void => {
+    if (typeof node === "string") return;
+    if (isComponentTag(node.tag)) deps.add(node.tag);
+
+    const props = node.props as Record<string, unknown> | undefined;
+    if (props) {
+      for (const href of linkPathsInProps(props)) hrefs.push(href);
+      const src = imageSrc(props);
+      const isImgTag = node.tag.toLowerCase() === "img";
+      if (src !== null || isImgTag || hasImageBlock(props)) {
+        images.push({ src: src ?? "", alt: imageAlt(props) });
+      }
+    }
+    for (const child of node.children ?? []) walk(child);
+  };
+  walk(tree);
+  return { hrefs, images, deps: [...deps] };
+}
+
+/**
+ * Build the deep-scan index from resolved component rows: each `tree` is the
+ * JSON string stored in D1 (`ComponentRow.tree`). `kind === "jsonld"` components
+ * emit no HTML (their `tree` is empty / a mangled JSON template — no visitor
+ * links or images), so they're skipped. A tree that fails to parse is skipped.
+ */
+export function buildComponentSeoIndex(
+  components: Array<{ name: string; tree: string; kind?: string | null }>,
+): ComponentSeoIndex {
+  const index: ComponentSeoIndex = new Map();
+  for (const c of components) {
+    if (c.kind === "jsonld") continue;
+    let parsed: TreeNode;
+    try {
+      parsed = JSON.parse(c.tree) as TreeNode;
+    } catch {
+      continue;
+    }
+    index.set(c.name, extractComponentSeo(parsed));
+  }
+  return index;
+}
+
+/**
+ * Collect a component's TRANSITIVE hrefs + images: its own markup plus every
+ * component it references (cycle-safe via `seen`). Unknown deps (a built-in like
+ * Section, or a missing component) contribute nothing.
+ */
+function resolveComponentSeo(
+  name: string,
+  index: ComponentSeoIndex,
+  seen: Set<string>,
+  out: { hrefs: string[]; images: Array<{ src: string; alt: string }> },
+): void {
+  if (seen.has(name)) return;
+  seen.add(name);
+  const seo = index.get(name);
+  if (!seo) return;
+  for (const h of seo.hrefs) out.hrefs.push(h);
+  for (const img of seo.images) out.images.push(img);
+  for (const dep of seo.deps) resolveComponentSeo(dep, index, seen, out);
+}
+
 /**
  * Run all four analyzers. `contentLocales.locales` drives the per-locale meta
  * checks and the accepted set of link targets (a `/fi/about` link is valid if
  * `/about` is a published page and `fi` is a content locale).
+ *
+ * `componentSeo` (optional): the deep-scan index from `buildComponentSeoIndex`.
+ * When supplied, a block referencing a component ALSO contributes that
+ * component's (transitive) markup links + images to the broken-link / missing-alt
+ * checks. Omit it for the pure block-props-only scan.
  */
 export function auditSeo(
   pages: AuditPage[],
   contentLocales: ContentLocales,
+  componentSeo?: ComponentSeoIndex,
 ): SeoAuditReport {
   const localeCodes = contentLocales.locales;
 
@@ -207,28 +309,42 @@ export function auditSeo(
   for (const page of pages) {
     const isPublished = page.publishStatus === "published";
 
-    // Collect this page's links + images from its block props.
+    // Handle one internal-link href against the published-path/wildcard sets.
+    const checkHref = (href: string): void => {
+      const targetId = pathToId.get(href);
+      if (targetId) {
+        linkedTo.add(targetId);
+      } else if (
+        isPublished &&
+        !validTargets.has(href) &&
+        !underWildcardPrefix(href, wildcardPrefixes, localeCodes)
+      ) {
+        brokenLinks.push({ pageId: page.id, slug: page.slug, href });
+      }
+    };
+    // Flag an image with no alt (published pages only).
+    const checkImage = (src: string, alt: string): void => {
+      if (isPublished && alt.length === 0) {
+        missingAlt.push({ pageId: page.id, slug: page.slug, src });
+      }
+    };
+
+    // Collect this page's links + images from its block props AND, when a
+    // deep-scan index is supplied, from any referenced component's markup.
     walkBlocks(page.blocks, (block) => {
       const props = block.props as Record<string, unknown> | undefined;
 
-      for (const href of linkPathsInProps(props)) {
-        const targetId = pathToId.get(href);
-        if (targetId) {
-          linkedTo.add(targetId);
-        } else if (
-          isPublished &&
-          !validTargets.has(href) &&
-          !underWildcardPrefix(href, wildcardPrefixes, localeCodes)
-        ) {
-          brokenLinks.push({ pageId: page.id, slug: page.slug, href });
-        }
-      }
+      for (const href of linkPathsInProps(props)) checkHref(href);
 
       const src = imageSrc(props);
-      if (src !== null || hasImageBlock(props)) {
-        if (isPublished && imageAlt(props).length === 0) {
-          missingAlt.push({ pageId: page.id, slug: page.slug, src: src ?? "" });
-        }
+      if (src !== null || hasImageBlock(props)) checkImage(src ?? "", imageAlt(props));
+
+      // Deep scan: fold in the referenced component's (transitive) markup.
+      if (componentSeo && block.component && componentSeo.has(block.component)) {
+        const resolved = { hrefs: [] as string[], images: [] as Array<{ src: string; alt: string }> };
+        resolveComponentSeo(block.component, componentSeo, new Set(), resolved);
+        for (const href of resolved.hrefs) checkHref(href);
+        for (const im of resolved.images) checkImage(im.src, im.alt);
       }
     });
 

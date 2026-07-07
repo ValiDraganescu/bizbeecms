@@ -1018,3 +1018,24 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   needs dev server on :3602), pre-existing and unrelated to this change.
 - **Files:** CMS/src/lib/chat/jsonld-guide.ts (new), CMS/src/lib/chat/tool-dispatch.ts,
   CMS/src/lib/chat/tool-scopes.ts, CMS/scripts/jsonld-guide.test.mjs (new)
+
+## 2026-07-07 15:40 — SEO audit: deep component-tree scan
+- **Status:** DONE
+- **What I did:** Extended the read-only SEO audit to see links/images authored INSIDE referenced
+  component trees (previously only raw `page.blocks` props were scanned). Chose the DEP-LIGHT path
+  (a component-tree walk over the already-resolved `listComponents()` rows) over building the render
+  plan — the plan pulls next-intl/React and would break the dep-free `node --test` layer. New PURE
+  helpers in `seo-audit.ts`: `extractComponentSeo(tree)` (own hrefs + images{src,alt} + PascalCase
+  deps) and `buildComponentSeoIndex(rows)` (name→ComponentSeo map; skips `kind:"jsonld"` and
+  unparseable trees). `auditSeo` gained an OPTIONAL 3rd param `componentSeo`: when a block references
+  a component, its TRANSITIVE (nested-ref, cycle-safe via a `seen` set) markup hrefs/images feed the
+  SAME `checkHref`/`checkImage` broken-link + missing-alt logic (also counts inbound links so a page
+  linked only from inside a component isn't a false orphan). Admin route
+  (`settings/seo-audit/page.tsx`) now `listComponents()` + `buildComponentSeoIndex` and passes it in.
+  Backwards compatible: no index → old block-props-only scan. AI `audit_meta` left untouched (it
+  only surfaces `missingMeta`, which the deep scan doesn't affect).
+- **Verified:** `node --test seo-audit.test.ts` = 19 pass (10 new); `npx tsc --noEmit` exit 0; full
+  pure suite (excluding the known manual live-Chrome `live-ds-context-chip-check.mjs`) = 1914 pass /
+  0 fail. Live admin-page render unverified (needs dev server + seeded components — HITL).
+- **Files:** CMS/src/lib/render/seo-audit.ts, CMS/src/lib/render/seo-audit.test.ts,
+  CMS/src/app/(admin)/admin/settings/seo-audit/page.tsx

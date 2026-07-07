@@ -541,3 +541,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   page-builder + pages prompts END with the IDENTICAL sentence "Prefer ONE wildcard page bound to a
   collection over N near-identical static pages." — you CANNOT uniquely Edit on that tail; anchor on
   each prompt's distinct data-sources-guide pointer clause instead.
+
+- (2026-07-07) SEO audit DEEP component-tree scan: `auditSeo(pages, locales, componentSeo?)` now
+  takes an OPTIONAL `ComponentSeoIndex` (Map<name,{hrefs,images,deps}>). Built by PURE
+  `buildComponentSeoIndex(rows)` from `listComponents()` rows (each has a JSON `tree` + `kind`) — do
+  NOT build the render plan for this (it pulls next-intl/React → breaks dep-free `node --test`; that's
+  exactly why the OLD scan was block-props-only). A block referencing a component folds in that
+  component's TRANSITIVE markup (nested PascalCase-tag refs, cycle-safe via a `seen` set) into the
+  SAME checkHref/checkImage logic — so an inbound link authored inside a component also clears an
+  orphan. `kind:"jsonld"` components + unparseable trees are SKIPPED (jsonld emits no visitor HTML).
+  Component-tree images use the SAME heuristics as block props (imageSrc/imageAlt/looksLikeImage +
+  any node tagged `<img>`), so a custom image-prop NAME inside a component would still be missed
+  unless it's in IMAGE_SRC_KEYS — same extend-point as the block-prop scan. The AI `audit_meta` tool
+  (tool-dispatch handleAuditMeta) DELIBERATELY does NOT pass the index — it only surfaces
+  `missingMeta`, which the deep scan never touches; don't wire the index there.

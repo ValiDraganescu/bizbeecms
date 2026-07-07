@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { auditSeo, type AuditPage } from "./seo-audit.ts";
+import {
+  auditSeo,
+  buildComponentSeoIndex,
+  extractComponentSeo,
+  type AuditPage,
+} from "./seo-audit.ts";
 import type { ContentLocales } from "./localize.ts";
+import type { TreeNode } from "./plan-types.ts";
 
 const LOCALES: ContentLocales = { default: "en", locales: ["en", "fi"] };
 
@@ -146,6 +152,118 @@ test("missingAlt ignores non-image string props", () => {
     LOCALES,
   );
   assert.equal(r.missingAlt.length, 0);
+});
+
+// ── Deep component-tree scan ─────────────────────────────────────────────────
+
+const tree = (n: TreeNode): string => JSON.stringify(n);
+
+test("extractComponentSeo pulls hrefs, images (with alt) and deps from a tree", () => {
+  const seo = extractComponentSeo({
+    tag: "div",
+    children: [
+      { tag: "a", props: { href: "/pricing" }, children: ["Buy"] },
+      { tag: "img", props: { src: "/media/hero.png", alt: "" } },
+      { tag: "img", props: { src: "/media/ok.png", alt: "Good" } },
+      { tag: "AuthorCard", props: {} },
+      { tag: "a", props: { href: "https://x.com" } }, // external, dropped
+    ],
+  });
+  assert.deepEqual(seo.hrefs, ["/pricing"]);
+  assert.deepEqual(seo.images, [
+    { src: "/media/hero.png", alt: "" },
+    { src: "/media/ok.png", alt: "Good" },
+  ]);
+  assert.deepEqual(seo.deps, ["AuthorCard"]);
+});
+
+test("deep scan flags a broken link authored INSIDE a referenced component", () => {
+  const index = buildComponentSeoIndex([
+    { name: "Nav", tree: tree({ tag: "a", props: { href: "/ghost" } }) },
+  ]);
+  const r = auditSeo(
+    [
+      page({ id: "1", slug: "home", blocks: [{ id: "b", component: "Nav", props: {} }] }),
+      page({ id: "2", slug: "about" }),
+    ],
+    LOCALES,
+    index,
+  );
+  assert.equal(r.brokenLinks.length, 1);
+  assert.equal(r.brokenLinks[0].href, "/ghost");
+});
+
+test("deep scan flags a missing-alt image inside a referenced component", () => {
+  const index = buildComponentSeoIndex([
+    { name: "Card", tree: tree({ tag: "img", props: { src: "/media/x.png", alt: "" } }) },
+  ]);
+  const r = auditSeo(
+    [page({ id: "1", slug: "home", blocks: [{ id: "b", component: "Card", props: {} }] })],
+    LOCALES,
+    index,
+  );
+  assert.equal(r.missingAlt.length, 1);
+  assert.equal(r.missingAlt[0].src, "/media/x.png");
+});
+
+test("deep scan resolves a valid intra-component link (no false broken link) + counts inbound", () => {
+  const index = buildComponentSeoIndex([
+    { name: "Nav", tree: tree({ tag: "a", props: { href: "/about" } }) },
+  ]);
+  const r = auditSeo(
+    [
+      page({ id: "1", slug: "home", blocks: [{ id: "b", component: "Nav", props: {} }] }),
+      page({ id: "2", slug: "about" }),
+    ],
+    LOCALES,
+    index,
+  );
+  assert.equal(r.brokenLinks.length, 0);
+  // /about is now linked (from inside the component), so it isn't an orphan.
+  assert.equal(r.orphans.length, 0);
+});
+
+test("deep scan follows nested component refs transitively (cycle-safe)", () => {
+  const index = buildComponentSeoIndex([
+    { name: "Outer", tree: tree({ tag: "div", children: [{ tag: "Inner", props: {} }] }) },
+    { name: "Inner", tree: tree({ tag: "a", props: { href: "/ghost" } }) },
+    // Self-cycle must not infinite-loop.
+    { name: "Loopy", tree: tree({ tag: "div", children: [{ tag: "Loopy", props: {} }] }) },
+  ]);
+  const r = auditSeo(
+    [
+      page({ id: "1", slug: "home", blocks: [
+        { id: "b1", component: "Outer", props: {} },
+        { id: "b2", component: "Loopy", props: {} },
+      ] }),
+      page({ id: "2", slug: "about" }),
+    ],
+    LOCALES,
+    index,
+  );
+  assert.equal(r.brokenLinks.length, 1);
+  assert.equal(r.brokenLinks[0].href, "/ghost");
+});
+
+test("buildComponentSeoIndex skips jsonld components and unparseable trees", () => {
+  const index = buildComponentSeoIndex([
+    { name: "Json", tree: tree({ tag: "a", props: { href: "/ghost" } }), kind: "jsonld" },
+    { name: "Broken", tree: "{not json" },
+  ]);
+  assert.equal(index.has("Json"), false);
+  assert.equal(index.has("Broken"), false);
+});
+
+test("no index → deep scan is skipped (backwards compatible)", () => {
+  const r = auditSeo(
+    [
+      page({ id: "1", slug: "home", blocks: [{ id: "b", component: "Nav", props: {} }] }),
+      page({ id: "2", slug: "about" }),
+    ],
+    LOCALES,
+  );
+  // Nav's internal /ghost is invisible without the index → no broken link.
+  assert.equal(r.brokenLinks.length, 0);
 });
 
 test("nested children blocks are walked", () => {

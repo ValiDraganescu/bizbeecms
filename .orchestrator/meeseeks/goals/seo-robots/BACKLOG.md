@@ -23,12 +23,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
   Closes the LAST jsonld backlog item.
 
 ### Operator SEO tooling (admin) — audit report + AI bulk-meta shipped (see BACKLOG_ARCHIVE)
-- TODO: SEO audit — deep component-tree scan: the current audit only scans raw `page.blocks` prop
-  values, so links/images/alt authored INSIDE referenced component trees are not checked. Extend
-  by resolving each page's plan (or a lighter component-tree walk over `getComponentByName`) to
-  collect `<a href>` + `<img src/alt>` from component markup too. Needs the D1 component resolver
-  (not a pure input) — decide: build the plan (heavy, next-intl) vs a dep-light component-tree
-  href/img extractor fed the resolved component rows. Then feed those into the same auditSeo shape.
+- DONE (2026-07-07): SEO audit — deep component-tree scan. Took the DEP-LIGHT extractor path (NOT
+  the plan builder — that pulls next-intl and breaks node --test). New PURE `extractComponentSeo` +
+  `buildComponentSeoIndex` in seo-audit.ts build a `Map<name, {hrefs,images,deps}>` from the
+  already-resolved `listComponents()` rows (each carries a JSON `tree` + `kind`). `auditSeo` gained
+  an OPTIONAL `componentSeo` index param: a block referencing a component folds in that component's
+  transitive (nested-ref, cycle-safe) `<a href>`/`<img src alt>` into the SAME broken-link/missing-alt
+  logic. jsonld components + unparseable trees skipped. Admin route wires listComponents() in; AI
+  audit_meta unchanged (only uses missingMeta). +10 tests, suite 1914, tsc clean.
 
 ### Page-level SEO controls
 - TODO: Per-URL-locale branded 404 (follow-up to the shipped default-locale branded 404): make the

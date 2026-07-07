@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { listPagesForAudit } from "@/db/page-store";
+import { listComponents } from "@/db/component-store";
 import { getContentLocales } from "@/db/settings-store";
-import { auditSeo, type SeoAuditReport } from "@/lib/render/seo-audit";
+import { auditSeo, buildComponentSeoIndex, type SeoAuditReport } from "@/lib/render/seo-audit";
 import { defaultContentLocales } from "@/lib/render/localize";
 
 export const dynamic = "force-dynamic";
@@ -31,11 +32,12 @@ export default async function SeoAuditPage() {
 
   let report = EMPTY;
   try {
-    const [pages, locales] = await Promise.all([
+    const [pages, locales, components] = await Promise.all([
       listPagesForAudit(),
       getContentLocales().catch(() => defaultContentLocales()),
+      listComponents().catch(() => []),
     ]);
-    report = auditSeo(pages, locales);
+    report = auditSeo(pages, locales, buildComponentSeoIndex(components));
   } catch {
     /* unbound D1 offline — render an empty (all-clear) report */
   }
