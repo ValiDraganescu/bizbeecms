@@ -111,3 +111,28 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/app/(admin)/admin/settings/robots/page.tsx,
   CMS/src/components/settings/settings-nav.tsx,
   CMS/messages/{en,fi,et}.json
+
+## 2026-07-07 11:09 — 301 redirects: data model + serving
+- **Status:** DONE
+- **What I did:** Added a `redirect` D1 table (Drizzle: unique `from_path`,
+  `to_path`, `status` default 301, `created_at`) via `npm run db:generate` →
+  migration `0029_brief_malcolm_colcord.sql` → applied `--local`. Pure matcher
+  `lib/render/redirects.ts` (`normalizeRedirectPath` — strips origin/query/hash,
+  single leading slash, collapses `//`, drops trailing slash except root,
+  decode-once tolerant of bad escapes, case-SENSITIVE; `lookupRedirect` over an
+  array or Map, self-redirect guard, status clamp to 301/302). Thin store
+  `db/redirect-store.ts` (`getRedirect` = one indexed exact read on the unique
+  index for the hot path; `listRedirects`/`upsertRedirect`(onConflictDoUpdate,
+  drops self-redirects)/`deleteRedirect` for the later admin UI + auto-capture).
+  Wired into `(site)/[[...slug]]/page.tsx`: on a loadPlan miss it reconstructs
+  the request path from the catch-all segments, calls `getRedirect`, and throws
+  `permanentRedirect` (308) for 301 / `redirect` (307) for 302 BEFORE `notFound()`.
+- **Verified:** 12 new pure tests pass (normalize edge cases, lookup hits/miss/
+  self-redirect/Map/status-clamp, AND the caveat-required assert that 301/302/
+  307/308 responses are NOT edge-cache candidates via isEdgeCacheCandidate).
+  Full suite 1710→1722, `tsc --noEmit` clean, migration applied local. Could NOT
+  live-verify a real 301 on a deployed site (needs deploy + a captured redirect).
+- **Files:** CMS/src/db/schema.ts, CMS/src/db/redirect-store.ts,
+  CMS/src/lib/render/redirects.ts, CMS/src/lib/render/redirects.test.ts,
+  CMS/src/app/(site)/[[...slug]]/page.tsx,
+  CMS/migrations/0029_brief_malcolm_colcord.sql, CMS/migrations/meta/*

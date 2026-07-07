@@ -7,7 +7,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### 301 redirects (slug renames currently 404 all inbound links — biggest ranking-loss gap)
-- TODO: Redirects data model + serving: `redirect` table (unique from_path, to_path, 301) via Drizzle migration; the `(site)` catch-all consults it when `resolvePage` misses (redirect BEFORE rendering 404); pure lookup helper unit-tested. Redirect responses are non-200 so the worker.ts edge-cache gate already skips them — assert that in a test, don't add cache handling.
+- DONE: Redirects data model + serving: `redirect` table (unique from_path, to_path, 301) via Drizzle migration; the `(site)` catch-all consults it when `resolvePage` misses (redirect BEFORE rendering 404); pure lookup helper unit-tested. Redirect responses are non-200 so the worker.ts edge-cache gate already skips them — assert that in a test, don't add cache handling.
 - TODO: Auto-capture redirects on rename: when slug/parent/localized-slug changes (reuse the `pagePathInputsChanged` seam in upsertPageMeta), insert 301s old→new for EVERY affected locale path (pagePathsByLocale before+after); rewrite existing redirects pointing AT the old path to the new target (no chains); drop self-redirects. ALSO re-notify IndexNow with the OLD locale URLs via `notifyIndexNowUrls` (rename currently submits NEW URLs only — see IndexNow caveat). Pure diff helper unit-tested.
 - TODO: Manual redirects admin UI: list/add/delete redirects in the CMS admin (from-path, to-path), validation (no loops/chains, path shape), localized EN/FI/ET, stable server error codes.
 

@@ -572,6 +572,33 @@ export const dataSourceRequest = sqliteTable(
   (t) => [index("data_source_request_source_idx").on(t.sourceId)],
 );
 
+/**
+ * URL redirect (seo-robots) — a 301 (later maybe 302) from an old path to a new
+ * one. Slug/parent/localized-slug renames would otherwise 404 every inbound
+ * link + lose the ranking; auto-capture (later task) inserts old→new rows here.
+ * `fromPath` is the request path to match (leading-slash, no query, no origin),
+ * unique so one source maps to at most one target. `toPath` is where to send.
+ * The `(site)` catch-all consults this BEFORE rendering 404; non-200 responses
+ * are already skipped by the worker.ts edge-cache gate (GET-200-only).
+ */
+export const redirect = sqliteTable(
+  "redirect",
+  {
+    id: text("id").primaryKey(),
+    // Path to match, e.g. "/old-page" or "/fi/vanha". Normalized (leading /,
+    // no trailing slash except root, no query) by the app before insert.
+    fromPath: text("from_path").notNull(),
+    // Where to send the browser, e.g. "/new-page" (or an absolute URL).
+    toPath: text("to_path").notNull(),
+    // HTTP status: 301 permanent (default) or 302 temporary.
+    status: integer("status").notNull().default(301),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [uniqueIndex("redirect_from_path_unique").on(t.fromPath)],
+);
+
 export type Component = typeof component.$inferSelect;
 export type NewComponent = typeof component.$inferInsert;
 export type Page = typeof page.$inferSelect;
@@ -603,3 +630,5 @@ export type DataSource = typeof dataSource.$inferSelect;
 export type NewDataSource = typeof dataSource.$inferInsert;
 export type DataSourceRequest = typeof dataSourceRequest.$inferSelect;
 export type NewDataSourceRequest = typeof dataSourceRequest.$inferInsert;
+export type Redirect = typeof redirect.$inferSelect;
+export type NewRedirect = typeof redirect.$inferInsert;

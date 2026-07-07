@@ -54,3 +54,19 @@ Read every line before working. Each entry was learned the hard way by a previou
   content-change hook. DELETE must call `collectPageUrls(id)` BEFORE `deletePage` (the row +
   its path chain are gone after). Rename currently submits only the NEW URLs (old URLs 404 for
   crawlers until the 301-redirects task lands and re-notifies the old paths).
+
+- (2026-07-07) 301 redirects: `permanentRedirect()`/`redirect()` from
+  next/navigation emit HTTP **308/307**, NOT 301/302 (Next has no 301/302 helper
+  in a Server Component). Search engines treat 308≈301 and 307≈302, so this is
+  fine for SEO; the stored `status` (301/302) is the INTENT and picks which
+  helper. Don't "fix" it to literal 301 — you'd have to drop out of the RSC path
+  into a route handler / middleware. The redirect table + serving lives in
+  `(site)/[[...slug]]/page.tsx` (loadPlan miss → getRedirect → throw before
+  notFound). Pure matcher `lib/render/redirects.ts`, store `db/redirect-store.ts`.
+- (2026-07-07) Redirect path NORMALIZATION is case-SENSITIVE and lives in ONE
+  place (`normalizeRedirectPath`) used at BOTH insert (store) and lookup so the
+  unique index `redirect_from_path_unique` and the matcher agree. When you build
+  auto-capture (next task) + the admin UI, ALWAYS route paths through the store's
+  upsert (it normalizes + drops self-redirects) — never write raw paths, or the
+  index and the lookup diverge. The `getRedirect` hot read matches the
+  already-normalized fromPath directly (indexed), so no full-table scan.

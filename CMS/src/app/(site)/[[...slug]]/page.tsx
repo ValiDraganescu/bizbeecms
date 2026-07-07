@@ -10,8 +10,9 @@
  * edge-cache worker entrypoint `CMS/worker.ts`);
  * the pure walker is `lib/render/tree.ts`, slug matching `lib/render/slug.ts`.
  */
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { getRedirect } from "@/db/redirect-store";
 import { type LocaleContext, parseJsonColumn } from "@/lib/render/tree";
 import { resolveLocalized } from "@/lib/render/localize";
 import { RenderedPage } from "@/lib/render/render-page";
@@ -89,8 +90,24 @@ export default async function PublicPage({
   params: Promise<RouteParams>;
   searchParams: Promise<SearchParams>;
 }) {
-  const loaded = await loadPlan(await params, flattenSearchParams(await searchParams));
-  if (!loaded) notFound();
+  const { slug } = await params;
+  const loaded = await loadPlan({ slug }, flattenSearchParams(await searchParams));
+  if (!loaded) {
+    // No published page at this URL: consult the redirect table BEFORE 404 —
+    // slug/parent/localized-slug renames leave old inbound links pointing here.
+    // Request path = the catch-all segments (locale prefix included); query is
+    // dropped by normalizeRedirectPath in the store.
+    const requestPath = "/" + (slug ?? []).map((s) => encodeURIComponent(s)).join("/");
+    const hit = await getRedirect(requestPath);
+    if (hit) {
+      // permanentRedirect = 308, redirect = 307 by default; both throw. For SEO
+      // we want 301/302 — Next emits 308/307 which search engines treat
+      // equivalently, but pass the status explicitly to keep the intent clear.
+      if (hit.status === 301) permanentRedirect(hit.toPath);
+      redirect(hit.toPath);
+    }
+    notFound();
+  }
   // Identical render to the admin draft-preview route — see lib/render/render-page.
   return <RenderedPage plan={loaded.plan} />;
 }
