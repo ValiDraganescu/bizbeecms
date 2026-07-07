@@ -233,3 +233,28 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   CMS/src/lib/render/indexnow-notify.ts,
   CMS/src/components/page-builder/seo-form.tsx, CMS/src/lib/pages/page-picker.test.ts,
   CMS/messages/{en,fi,et}.json
+
+## 2026-07-07 11:40 — Full OG/Twitter cards
+- **Status:** DONE
+- **What I did:** Complete OpenGraph + Twitter card metadata on published pages.
+  - **Pure builders:** `lib/render/social-cards.ts` — `buildOpenGraph` (type:website,
+    og:title←metaTitle, og:description←metaDescription, og:site_name←brandName,
+    og:locale←active content locale, images from resolved metaImage) and
+    `buildTwitterCard` (card = summary_large_image iff a meta image exists, else
+    summary; title/desc mirror OG). Every field coerces empty/whitespace→undefined
+    so Next omits unset keys. Dep-free (node --test).
+  - **Wiring:** `generateMetadata` in `(site)/[[...slug]]/page.tsx` now reads
+    `getSiteIdentity()` for brandName (off the hot path, like resolveSiteOrigin —
+    generateMetadata is NOT the 429-sensitive render hot path) and returns
+    `openGraph: buildOpenGraph(...)` + `twitter: buildTwitterCard(...)`. Replaced the
+    old image-only `openGraph`. All inputs are stored page/site data → visitor-
+    independent, edge-cache-safe per the (site)-isolation caveat.
+  - No schema change, no new column, no next-intl/next-headers import.
+  - NOTE: there is NO separate page `title` column — page titles live per-locale in
+    `metaTitle`. So the OG title fallback the NEXT note mentioned collapses to
+    metaTitle (already the `title` var); dropped the unused pageTitle field.
+- **Verified:** `node --test social-cards.test.ts` 4/4; `npx tsc --noEmit` clean;
+  full `npm test` 1739/1739 (was 1735; +4). Did NOT run opennext build (heavy gate)
+  nor live-verify tags (HITL).
+- **Files:** CMS/src/lib/render/social-cards.ts (+ .test.ts),
+  CMS/src/app/(site)/[[...slug]]/page.tsx

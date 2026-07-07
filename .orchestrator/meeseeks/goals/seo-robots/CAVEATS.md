@@ -103,3 +103,16 @@ Read every line before working. Each entry was learned the hard way by a previou
   (a noindexed parent still lets an indexable child through — mirrors the
   unpublished-ancestor gate). `page.noindex` is INTEGER 0/1 in D1 (Drizzle `number`);
   `PageSummary.noindex` is the coerced `boolean`.
+
+- (2026-07-07) There is NO separate page `title` column — page titles are stored
+  per-locale in `page.metaTitle` (a JSON locale→string map). The `title` var in
+  `generateMetadata` IS the resolved metaTitle. Don't look for a `page.title`
+  fallback (an earlier NEXT note implied one existed); OG/Twitter titles fall back
+  to metaTitle and nothing more.
+- (2026-07-07) OG/Twitter cards: pure builders in `lib/render/social-cards.ts`
+  (`buildOpenGraph`/`buildTwitterCard`) fed by `generateMetadata`. brandName comes
+  from `getSiteIdentity()` (settings-store) — this is an EXTRA D1 read, deliberately
+  placed on the metadata path which is NOT the 429 rate-limit hot path (that's the
+  page RENDER path via worker.ts). If you add more metadata site-settings reads,
+  keep them here, not in the render/worker hot path. twitter:card =
+  summary_large_image ONLY when a per-locale metaImage resolves, else summary.

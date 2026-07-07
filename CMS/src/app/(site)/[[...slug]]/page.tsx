@@ -19,6 +19,8 @@ import { RenderedPage } from "@/lib/render/render-page";
 import { loadPlan, type RouteParams } from "@/lib/render/load-plan";
 import { hreflangAlternates } from "@/lib/render/hreflang";
 import { resolveSiteOrigin } from "@/lib/render/site-origin";
+import { getSiteIdentity } from "@/db/settings-store";
+import { buildOpenGraph, buildTwitterCard } from "@/lib/render/social-cards";
 
 /** Resolve a per-locale JSON map (e.g. metaTitle) to the active locale w/ fallback. */
 function localized(raw: string, locale: LocaleContext): string | undefined {
@@ -70,6 +72,17 @@ export async function generateMetadata({
     loaded.locale.pagePaths,
   );
   const origin = await resolveSiteOrigin();
+  // Brand identity for og:site_name (off the hot path, like resolveSiteOrigin —
+  // the (site) page-render path is edge-cached; generateMetadata is not the
+  // 429-sensitive hot path). Visitor-independent: stored site data, not request.
+  const { brandName } = await getSiteIdentity();
+  const cardInput = {
+    metaTitle: title,
+    metaDescription: description,
+    image,
+    brandName,
+    locale: loaded.locale.locale,
+  };
   return {
     title,
     description,
@@ -78,8 +91,11 @@ export async function generateMetadata({
       canonical,
       languages: Object.keys(languages).length > 0 ? languages : undefined,
     },
-    // OpenGraph image, resolved per active locale (falls back like title/desc).
-    openGraph: image ? { images: [{ url: image }] } : undefined,
+    // Full OpenGraph + Twitter cards from the per-locale meta already loaded
+    // here (og:title/desc fall back to page title, og:site_name from brand,
+    // og:locale = active content locale, twitter:card = large-image iff image).
+    openGraph: buildOpenGraph(cardInput),
+    twitter: buildTwitterCard(cardInput),
     // Per-page SEO noindex (seo-robots): visitor-independent (a stored page
     // column, not request-derived) so it's safe on the edge-cached (site) path.
     ...(loaded.page.noindex ? { robots: { index: false, follow: false } } : {}),

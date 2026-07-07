@@ -1,32 +1,36 @@
 # Note to the next Meeseeks (seo-robots)
 
-**Per-page noindex is DONE** (schema col + SEO-tab checkbox + robots meta +
-sitemap skip + IndexNow skip; preserve-when-absent so publish/slug edits don't
-clobber it). Migration `0030_misty_hydra.sql` applied --local. +3 tests → 1735.
+**Full OG/Twitter cards is DONE** (pure `lib/render/social-cards.ts` +
+`buildOpenGraph`/`buildTwitterCard` wired into `generateMetadata`). og:title/desc
+from per-locale meta, og:site_name from brand identity (`getSiteIdentity`),
+og:locale = active content locale, og:type website, twitter:card =
+summary_large_image iff a meta image exists. +4 tests → 1739. tsc clean.
+NOTE: there's no `page.title` column — titles live in `metaTitle` (see CAVEATS).
 
-**Take next — Full OG/Twitter cards** (backlog "Page-level SEO controls", 2nd item).
-Self-contained, no schema, no new D1 read (all data already loaded in
-`generateMetadata` at `(site)/[[...slug]]/page.tsx`):
-- og:title + og:description from the per-locale meta (fallback: page `title`).
-- og:site_name from brand identity (check how robots/sitemap read brand — likely
-  `getBrandIdentity`/settings-store; it's already read elsewhere — confirm no NEW
-  D1 read on the (site) path, or accept it's off the hot path like the origin read).
-- og:locale = active content locale (`loaded.locale`), og:type "website".
-- twitter:card = summary_large_image when a meta image exists, else summary.
-- Keep it visitor-independent (see CAVEATS: no next-intl / next/headers on (site)).
-- Extend `openGraph`/add `twitter` in the SAME return object; the image is already
-  wired. A pure "pick twitter card kind from hasImage" helper is easily unit-tested.
+**Take next — pick one, in rough priority order:**
 
-Alternatively: **JSON-LD component kind** (kind: jsonld) — the other big track,
-start with "render path first (tracer)"; or **Auto breadcrumb JSON-LD** (smaller,
-independent of the component kind).
+1. **IndexNow notify on noindex transition** (backlog "Page-level SEO controls",
+   1st TODO). In `api/pages/route.ts` PUT: when the SEO body flips `noindex`
+   false→true, capture page URLs BEFORE the meta write (the DELETE-route pattern —
+   `collectPageUrls` returns [] once noindexed) and `notifyIndexNowUrls` them so
+   engines recrawl and see the robots noindex. Best-effort, never fails the save.
+   Pure transition-detect helper unit-tested. Small, self-contained.
 
-**Patterns just used (copy them):** page-level (non-per-locale) SEO fields ride the
-cacheMaxAge "preserve-when-absent" contract — add to `PageMetaInput` as optional,
-thread ONLY through the body builder that edits it, guard the update `set` with
-`meta.x !== undefined`. SEO enforcement gates live in 3 places (metadata / sitemap /
-indexnow) — keep in sync (see CAVEATS).
+2. **Auto breadcrumb JSON-LD** (independent of the jsonld component kind). Emit a
+   schema.org `BreadcrumbList` script at plan time for every published page with
+   depth ≥ 1, from the ancestor chain (per-locale titles + reverse-resolved
+   localized paths — LocaleContext already has both). Pure builder unit-tested
+   (escaping incl. `</script>` breakout, locale paths).
 
-HITL pending (note, don't do): on a DEPLOYED site — toggle noindex on a published
-page, confirm `<meta name="robots" content="noindex,nofollow">` on the page, the URL
-gone from /sitemap.xml, and no IndexNow submit. No worker.ts edit → no r-* release.
+3. **JSON-LD component kind** (the other big track) — start with "render path first
+   (tracer)".
+
+**Patterns just used (copy):** pure dep-free builder in `lib/render/*.ts` +
+`.test.ts` (node --test), wired into `generateMetadata`. Extra site-settings D1
+reads for metadata go on the METADATA path (not the render/worker hot path — see
+CAVEATS). Keep everything on the (site) path visitor-independent: no next-intl,
+no next/headers, only stored page/site data.
+
+**HITL pending (note, don't do):** on a DEPLOYED site, view-source a published
+page and confirm the full `og:*`/`twitter:*` tags + og:site_name. No worker.ts
+edit → no r-* release.
