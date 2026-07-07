@@ -1,26 +1,29 @@
 # Note to the next Meeseeks (seo-robots)
 
-Run 1: sitemap audit. Run 2: IndexNow notify. Run 3 (this run): robots.txt **serving**
-DONE — pure builder `lib/render/robots-txt.ts`, D1 store `robots_config`
-(get/setRobotsConfig), route handler `app/robots.txt/route.ts` (force-dynamic, verbatim
-free-text override, auto `Sitemap:` pointer). 11 tests, suite 1699→1710. See JOURNAL/CAVEATS.
+robots.txt track is DONE end-to-end: serving route (run 3) + settings UI (this run,
+run 4). Sitemap audit + IndexNow notify also done (runs 1–2).
 
-**Take next — robots settings UI** (backlog: "robots.txt" task 2), the natural pair to what
-just shipped:
-- Admin page + `app/api/settings/robots/route.ts` (GET/PUT). Mirror an existing settings route
-  (e.g. `api/settings/content-locales` or `icon-set`) for the auth/validation shape.
-- Structured rule rows (user-agent + allow/disallow paths) + a free-text override textarea
-  ("advanced — replaces generated rules"). Write through `setRobotsConfig` (it normalizes;
-  DON'T re-implement the shape). The builder auto-appends `Sitemap:` — UI must not add one.
-- Localize EN/FI/ET; stable server error codes (see other settings routes for the pattern).
-- Config shape: `{ groups: {userAgent, disallow[], allow[]}[], freeText }`.
+**Take next — 301 redirects** (biggest ranking-loss gap; slug renames 404 every
+inbound link today). Three backlog tasks, do them in order — take the FIRST this run:
 
-**Alternative high-value pick — 301 redirects** (biggest ranking-loss gap; renames 404 all
-inbound links). 3 backlog tasks (data model+serving → auto-capture on rename → manual UI).
-When it lands, ALSO re-notify IndexNow with the OLD paths — `notifyIndexNowUrls(oldUrls)` is
-ready; the redirect table's before/after paths feed it (this project only submits NEW URLs on
-rename today; see IndexNow caveat).
+1. **Redirects data model + serving** (this run's pick):
+   - `redirect` table via Drizzle (`src/db/schema.ts` → `npm run db:generate` →
+     `npx wrangler d1 migrations apply bizbeecms-cms --local`). NEVER hand-write SQL
+     (see CMS/CLAUDE.md — ledger drift). Columns: unique `from_path`, `to_path`, 301.
+   - `(site)/[[...slug]]/page.tsx` (or its resolve helper) consults a pure lookup
+     BEFORE rendering the 404 — redirect wins over 404.
+   - Pure lookup helper unit-tested. Redirect responses are non-200 so the worker.ts
+     edge-cache gate already skips them — ASSERT that in a test, don't add cache handling.
+2. Auto-capture on rename (reuse the `pagePathInputsChanged`/`pagePathsByLocale` seam in
+   `upsertPageMeta`): insert 301s old→new for every affected locale; rewrite existing
+   redirects pointing AT the old path to the new target (no chains); drop self-redirects.
+   **When this lands, ALSO re-notify IndexNow with the OLD paths** — `notifyIndexNowUrls(oldUrls)`
+   is ready; today rename only submits NEW URLs (see IndexNow caveat).
+3. Manual redirects admin UI (list/add/delete, loop/chain validation, EN/FI/ET).
 
-HITL pending (note, don't do): live `/robots.txt` fetch needs a DEPLOYED site with APP_ORIGIN.
-No worker.ts edit this run (pure app route/store), so no r-* release needed. Local dev →
-resolveSiteOrigin null → Sitemap pointer omitted by design.
+**Patterns to mirror:** settings route auth/shape = `api/settings/content-locales` or the
+new `api/settings/robots`. Admin page = `admin/settings/robots/page.tsx`. Nav link =
+`settings-nav.tsx`.
+
+HITL pending (note, don't do): live click-test of the robots UI + `/robots.txt` fetch needs
+a DEPLOYED site with APP_ORIGIN. No worker.ts edit this run → no r-* release needed.

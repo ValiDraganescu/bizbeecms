@@ -185,6 +185,25 @@
     "saved": "Sisukeeled salvestatud.",
     "error": "Viga: {message}"
   },
+  "robots": {
+    "title": "robots.txt",
+    "subtitle": "Halda, millised roomajad pääsevad saidile. Serveeritakse aadressil /robots.txt.",
+    "rulesTitle": "Reeglid",
+    "userAgent": "User-agent",
+    "disallow": "Keela (üks tee rea kohta)",
+    "allow": "Luba (üks tee rea kohta)",
+    "pathPlaceholder": "/admin",
+    "addGroup": "Lisa user-agent'i rühm",
+    "removeGroup": "Eemalda",
+    "sitemapNote": "Sitemap:-rida aadressile /sitemap.xml lisatakse automaatselt — ära lisa oma.",
+    "overrideTitle": "Täpsem alistamine",
+    "overrideHelp": "Kui täidetud, serveeritakse see tekst muutmata kujul ja asendab ülalolevad reeglid. Reeglite kasutamiseks jäta tühjaks.",
+    "overridePlaceholder": "User-agent: *\nDisallow:",
+    "overrideActive": "Alistamine on aktiivne — allolevaid reegleid eiratakse.",
+    "save": "Salvesta",
+    "saving": "Salvestamine…",
+    "saved": "robots.txt salvestatud."
+  },
   "settingsNav": {
     "label": "Seadete jaotised",
     "groups": {
@@ -194,6 +213,7 @@
       "access": "Ligipääs"
     },
     "contentLocales": "Sisukeeled",
+    "robots": "robots.txt",
     "theme": "Teema",
     "brand": "Bränd ja AI",
     "apiKeys": "MCP",

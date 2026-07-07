@@ -185,6 +185,25 @@
     "saved": "Sisältökielet tallennettu.",
     "error": "Virhe: {message}"
   },
+  "robots": {
+    "title": "robots.txt",
+    "subtitle": "Hallitse, mitkä indeksoijat pääsevät sivustolle. Tarjoillaan osoitteesta /robots.txt.",
+    "rulesTitle": "Säännöt",
+    "userAgent": "User-agent",
+    "disallow": "Estä (yksi polku riviä kohden)",
+    "allow": "Salli (yksi polku riviä kohden)",
+    "pathPlaceholder": "/admin",
+    "addGroup": "Lisää user-agent-ryhmä",
+    "removeGroup": "Poista",
+    "sitemapNote": "Sitemap:-rivi osoitteeseen /sitemap.xml lisätään automaattisesti — älä lisää omaa.",
+    "overrideTitle": "Lisäasetus",
+    "overrideHelp": "Kun täytetty, tämä teksti tarjoillaan sellaisenaan ja korvaa yllä olevat säännöt. Jätä tyhjäksi käyttääksesi sääntöjä.",
+    "overridePlaceholder": "User-agent: *\nDisallow:",
+    "overrideActive": "Ohitus on käytössä — alla olevat säännöt ohitetaan.",
+    "save": "Tallenna",
+    "saving": "Tallennetaan…",
+    "saved": "robots.txt tallennettu."
+  },
   "settingsNav": {
     "label": "Asetusosiot",
     "groups": {
@@ -194,6 +213,7 @@
       "access": "Käyttöoikeudet"
     },
     "contentLocales": "Sisältökielet",
+    "robots": "robots.txt",
     "theme": "Teema",
     "brand": "Brändi ja tekoäly",
     "apiKeys": "MCP",

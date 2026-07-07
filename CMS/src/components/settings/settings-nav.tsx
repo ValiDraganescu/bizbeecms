@@ -16,6 +16,7 @@ const GROUPS = [
     key: "site",
     items: [
       { key: "contentLocales", href: "/admin/settings/content-locales" },
+      { key: "robots", href: "/admin/settings/robots" },
       { key: "exportImport", href: "/admin/settings/export-import" },
     ],
   },

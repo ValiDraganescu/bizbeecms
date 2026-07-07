@@ -81,3 +81,33 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   route mirrors proven force-dynamic pattern) nor live-fetch (needs deployed origin — HITL).
 - **Files:** CMS/src/lib/render/robots-txt.ts (+ .test.ts), CMS/src/db/settings-store.ts,
   CMS/src/app/robots.txt/route.ts
+
+## 2026-07-07 11:00 — robots.txt settings UI (robots.txt track, task 2)
+- **Status:** DONE
+- **What I did:** admin UI + REST route to edit the per-Site robots config the
+  serving route already reads.
+  - **REST** `app/api/settings/robots/route.ts` (force-dynamic; GET/PUT; requireAdmin).
+    PUT writes through `setRobotsConfig` (which calls normalizeRobotsConfig →
+    strips CR/LF/`:` injection, drops non-`/` paths, garbage→seeded default). No
+    purge on write: `/robots.txt` is force-dynamic + no-store + dotted-root
+    edge-cache-excluded. Mirrors the content-locales route auth/shape.
+  - **Editor** `components/settings/robots-editor.tsx` ("use client"): structured
+    rule groups (userAgent + Disallow/Allow textareas, one path per line via
+    `toLines`) + a free-text override textarea. When the override is non-blank the
+    structured section dims + disables (it's ignored server-side). Optimistic edit
+    → one PUT → adopt the server-normalized result. Note in UI: `Sitemap:` is
+    auto-appended by the builder, operator must NOT add one.
+  - **Page** `app/(admin)/admin/settings/robots/page.tsx` (force-dynamic; explicit
+    route beats the `[[...slug]]` catch-all; D1-unbound offline → defaultRobotsConfig).
+  - **Nav** `settings-nav.tsx`: added robots link to the "Site" group after
+    content-locales.
+  - **i18n** EN/FI/ET: `settingsNav.robots` label + a full `robots` namespace.
+- **Verified:** `npx tsc --noEmit` clean; full `npm test` 1710/1710 (UI adds no new
+  pure tests — the builder/normalizer are already covered by robots-txt.test.ts;
+  `toLines` is a trivial split/trim/filter). Did NOT run opennext build (heavy gate;
+  routes mirror proven force-dynamic patterns) nor click-test (needs live D1 — HITL).
+- **Files:** CMS/src/app/api/settings/robots/route.ts,
+  CMS/src/components/settings/robots-editor.tsx,
+  CMS/src/app/(admin)/admin/settings/robots/page.tsx,
+  CMS/src/components/settings/settings-nav.tsx,
+  CMS/messages/{en,fi,et}.json

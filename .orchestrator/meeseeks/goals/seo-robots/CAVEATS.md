@@ -41,6 +41,14 @@ Read every line before working. Each entry was learned the hard way by a previou
   line-oriented, so an un-sanitized path/UA could forge rules). If you add the robots settings
   UI (backlog task 2), write through setRobotsConfig (it normalizes) and don't re-invent the
   shape. `Sitemap:` pointer is auto-appended by buildRobotsTxt — the UI must NOT add its own.
+- (2026-07-07) robots settings PUT (`api/settings/robots`) validates by NORMALIZING, not
+  rejecting: `setRobotsConfig`→`normalizeRobotsConfig` silently drops bad paths/UAs and
+  strips CR/LF/`:` injection, so there are NO stable error codes to surface and the PUT
+  effectively never 400s on content. The editor therefore ADOPTS the server-returned
+  normalized config after save (so the user sees what actually got stored). If you ever need
+  a hard reject (e.g. "path must start with /"), add it in the route BEFORE setRobotsConfig —
+  don't expect normalize to reject. UI contract: a non-blank free-text override DIMS+DISABLES
+  the structured section (it's ignored server-side); keep that so operators aren't confused.
 - (2026-07-07) IndexNow submit is best-effort via `notifyIndexNowForPage` / `notifyIndexNowUrls`
   (indexnow-notify.ts, ctx.waitUntil so it never blocks the write) — mirror this for any new
   content-change hook. DELETE must call `collectPageUrls(id)` BEFORE `deletePage` (the row +

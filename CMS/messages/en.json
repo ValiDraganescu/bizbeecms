@@ -185,6 +185,25 @@
     "saved": "Content languages saved.",
     "error": "Error: {message}"
   },
+  "robots": {
+    "title": "robots.txt",
+    "subtitle": "Control which crawlers can access this site. Served at /robots.txt.",
+    "rulesTitle": "Rules",
+    "userAgent": "User-agent",
+    "disallow": "Disallow (one path per line)",
+    "allow": "Allow (one path per line)",
+    "pathPlaceholder": "/admin",
+    "addGroup": "Add user-agent group",
+    "removeGroup": "Remove",
+    "sitemapNote": "A Sitemap: line pointing at /sitemap.xml is added automatically — don't add your own.",
+    "overrideTitle": "Advanced override",
+    "overrideHelp": "When filled, this text is served verbatim and replaces the rules above. Leave empty to use the rules.",
+    "overridePlaceholder": "User-agent: *\nDisallow:",
+    "overrideActive": "Override is active — rules below are ignored.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "robots.txt saved."
+  },
   "settingsNav": {
     "label": "Settings sections",
     "groups": {
@@ -194,6 +213,7 @@
       "access": "Access"
     },
     "contentLocales": "Content languages",
+    "robots": "robots.txt",
     "theme": "Theme",
     "brand": "Brand & AI",
     "apiKeys": "MCP",
