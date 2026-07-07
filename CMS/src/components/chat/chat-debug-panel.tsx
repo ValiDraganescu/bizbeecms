@@ -22,9 +22,16 @@ import type { PromptVersion } from "@/lib/chat/prompt-version";
 /** What the export button needs from the live conversation. */
 type ChatDebugPanelProps = {
   /**
-   * Current transcript. Assistant turns carry their tool cards (`tools`) so the
-   * export can expand them into the real `tool_calls` + `role:"tool"` result
-   * messages the model receives — full visibility, not just the text turns.
+   * Current transcript — the FULL widget `ChatMsg[]` (user turns with `media`,
+   * assistant turns with `tools` AND `parts`/thinking). Two things ride on it:
+   * (1) `buildModelHistory` expands it into the model-facing `tool_calls` +
+   * `role:"tool"` messages; (2) it's forwarded VERBATIM as the export's raw
+   * `transcript` so the download is a complete, lossless record — every tool
+   * input/output, every uploaded image, every reasoning part — not just the
+   * reduced model projection. Typed as `HistoryMessage[]` (the fields
+   * buildModelHistory reads); the widget's ChatMsg carries extra keys (`media`,
+   * `parts`) that ride along into the forwarded `transcript` untouched — same
+   * value the widget already passes, now also echoed raw by the export.
    */
   messages?: HistoryMessage[];
   /** Selected model id, mirrored into the exported payload. */
@@ -203,16 +210,21 @@ export function ChatDebugPanel({
       const res = await fetch("/api/chat/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Expand the transcript into the EXACT model-facing history: each
-        // assistant tool card becomes a structured `tool_calls` entry + a paired
-        // `role:"tool"` result message (same transform the live chat replays via
-        // buildModelHistory). This is what gives the export full tool-call/result
-        // visibility instead of just the text turns. "" = no trailing user turn;
-        // it also drops empty/in-progress turns the route would 400 on.
+        // Two views of the SAME conversation ship together:
+        //  - `messages`: the EXACT model-facing history (buildModelHistory expands
+        //    each assistant tool card into a structured `tool_calls` entry + paired
+        //    `role:"tool"` result). "" = no trailing user turn; also drops
+        //    empty/in-progress turns the route would 400 on.
+        //  - `transcript`: the RAW widget transcript, verbatim — user `media`
+        //    (uploaded images), assistant `parts` (text + tool + any reasoning),
+        //    and each tool card's full `input`/`output`. The route echoes it back
+        //    untouched so the download is a COMPLETE, lossless record, not just the
+        //    reduced model projection.
         body: JSON.stringify({
           context,
           model,
           messages: buildModelHistory(messages, ""),
+          transcript: messages,
           lastError: lastError ?? undefined,
         }),
       });
