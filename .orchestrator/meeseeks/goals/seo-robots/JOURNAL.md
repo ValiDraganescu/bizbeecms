@@ -1152,3 +1152,38 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   manual metaImage AND no `og/<id>.<locale>.png` yet → best-effort `ctx.waitUntil(screenshotPageToR2(...))`;
   page delete removes its `og/` objects. Never blocks the publish (purge-edge/IndexNow pattern).
   Do NOT touch CMS/worker.ts or CMS/wrangler.jsonc this cycle (parallel rate-limit Meeseeks owns them).
+
+---
+
+## 2026-07-07 12:xx — Naughty-robot rate limiting (worker-level per-IP, backlog item 1/2)
+- **Status:** DONE
+- **What I did:** Worker-level per-IP rate limit on PUBLIC PAGE paths only, BEFORE the OpenNext
+  handler so a throttled bot never touches the render/D1 path.
+  - **wrangler.jsonc** (I owned it this cycle): added `unsafe.bindings` rate-limit binding
+    `PUBLIC_RATE_LIMITER` (`type:"ratelimit"`, `namespace_id:"1001"`, `simple:{limit:100,period:60}`)
+    — account-level like AI/IMAGES, no per-Site provision, deployer needs no override.
+  - **edge-cache.ts** (pure, node-testable): `isRateLimitCandidate({method,pathname})` reuses the
+    SAME `SKIP_SEGMENTS` + dotted-root gate as `isEdgeCacheCandidate` (single source of truth for
+    "public page path") — GET only, system paths (media/api/admin/preview/_next) exempt, dotted-root
+    files (sitemap/robots/llms/favicon) exempt. `rateLimitKey(headers)` = CF-Connecting-IP (edge-set,
+    unspoofable) → falls back to a `"shared"` global bucket, never null. `rateLimitedResponse()` =
+    429 + `Retry-After:60` + `Cache-Control:no-store`. `isVerifiedCrawler(cf)` = the verified-crawler
+    exemption investigation (see below + new CAVEAT).
+  - **worker.ts** (I owned it): checks the binding after the md-rewrite gate, before the 404-path
+    injection: `limiter && isRateLimitCandidate(...) && !isVerifiedCrawler(request.cf)` → `limit({key})`
+    → `success:false` returns the 429. Binding accessed via `(env as {PUBLIC_RATE_LIMITER?:RateLimit})`
+    so it needs no CloudflareEnv typegen; absent binding (local dev / pre-release) = no throttle.
+    Best-effort try/catch — a limiter error fails OPEN (never blocks serving).
+- **Verified crawler exemption (investigation):** `cf.verifiedBotCategory`/`cf.botManagement.verifiedBot`
+  are Bot-Management-gated (Enterprise add-on) → usually ABSENT on Free/Pro/workers.dev, so the helper
+  returns false and the IP limiter still applies. No reliable FREE verified-bot cf flag today; the free
+  alternative (reverse-DNS of CF-Connecting-IP vs googlebot.com PTR) is a per-request DNS round-trip —
+  too heavy for this hot gate. Shipped default = generous 100/min cap (legit crawlers stay under) PLUS
+  a cf-object exemption that "lights up for free" on any Site that DOES carry the signal.
+- **Tests:** +13 in edge-cache.test.ts (candidate gate, non-GET exempt, SKIP_SEGMENTS exempt, dotted-root
+  exempt, key extraction+fallback, 429 shape, crawler exemption). Suite 1919 → 1932, all pass.
+- **tsc:** clean re: my change — the only 3 errors are the PRE-EXISTING `CloudflareEnv.DB` misses (no
+  OpenNext-generated cloudflare-env.d.ts on a clean checkout; identical count on the stashed base).
+- **Release-gated:** worker.ts + wrangler.jsonc ship ONLY via a release tag (r-*) — invisible on
+  deployed Sites until a release is cut. Live 429/Retry-After behavior is HITL (needs a deployed Site +
+  a paid plan for the rate-limit binding + a release). Per-site configurable threshold is backlog item 2/2.

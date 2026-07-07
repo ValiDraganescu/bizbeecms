@@ -96,5 +96,25 @@
   },
   "observability": {
     "enabled": true
+  },
+  // Per-IP rate limit on PUBLIC PAGE GETs (seo-robots — naughty-robot throttle).
+  // worker.ts checks this BEFORE the OpenNext handler for public paths only
+  // (system routes + dotted-root files exempt); over the cap => 429 + Retry-After.
+  // The Workers rate-limiting binding is account-level (no resource to provision,
+  // like AI/IMAGES) — the deployer needs no override. `namespace_id` is a
+  // per-Worker integer id (arbitrary, must be unique among this Worker's rate
+  // limiters); 100 requests / 60s per key (CF-Connecting-IP) is a generous cap a
+  // human or a legit crawler stays well under. It ships via a release tag (r-*)
+  // like every other worker.ts change. Per-site configurable threshold is a
+  // filed follow-up (D1 setting read off the hot path).
+  "unsafe": {
+    "bindings": [
+      {
+        "name": "PUBLIC_RATE_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1001",
+        "simple": { "limit": 100, "period": 60 }
+      }
+    ]
   }
 }

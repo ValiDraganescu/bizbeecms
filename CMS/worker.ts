@@ -35,6 +35,10 @@ import {
   llmsTxtCacheHeaders,
   sitemapXmlCacheHeaders,
   REQUEST_PATH_HEADER,
+  isRateLimitCandidate,
+  rateLimitKey,
+  rateLimitedResponse,
+  isVerifiedCrawler,
 } from "./src/lib/render/edge-cache";
 
 export default {
@@ -49,6 +53,27 @@ export default {
       request.method === "GET" ? markdownVariantRewrite(request.url) : null;
     if (mdUrl) {
       return handler.fetch(new Request(mdUrl, request), env, ctx);
+    }
+    // Naughty-robot rate limiting (seo-robots): per-IP cap on PUBLIC PAGE GETs
+    // only (system paths + dotted-root files exempt — same gate as edge-cache).
+    // Runs BEFORE the OpenNext handler so a throttled bot never touches the
+    // render/D1 path. The binding (`PUBLIC_RATE_LIMITER`, wrangler.jsonc
+    // unsafe.bindings, 100 req/60s per key) is account-level like AI/IMAGES;
+    // absent binding (local dev / pre-release worker) => no throttle. Verified
+    // crawlers (Googlebot etc., IF the cf signal is present) are exempt so we
+    // never throttle a legit crawl. Best-effort: a limiter error falls through.
+    const limiter = (env as { PUBLIC_RATE_LIMITER?: RateLimit }).PUBLIC_RATE_LIMITER;
+    if (
+      limiter &&
+      isRateLimitCandidate({ method: request.method, pathname: new URL(request.url).pathname }) &&
+      !isVerifiedCrawler((request as { cf?: unknown }).cf)
+    ) {
+      try {
+        const { success } = await limiter.limit({ key: rateLimitKey(request.headers) });
+        if (!success) return rateLimitedResponse();
+      } catch {
+        /* limiter unavailable — fail open, never block serving */
+      }
     }
     // Inject the incoming pathname so the branded 404 (`not-found.tsx`, which
     // Next gives no params/pathname) can render in the visitor's URL locale

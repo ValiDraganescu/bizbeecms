@@ -617,6 +617,30 @@ Read every line before working. Each entry was learned the hard way by a previou
   social-cards.ts change was needed. NOTHING WRITES `og/` objects yet (the screenshotPageToR2 spike
   is unwired) — until the publish-wiring task lands, `autoExists` is always false on real sites, so
   precedence degrades to "manual metaImage or none" (correct, no-op). Live R2 = HITL.
+- (2026-07-07) Naughty-robot rate limiting: worker.ts throttles PUBLIC PAGE GETs per-IP via the
+  Workers rate-limit binding `PUBLIC_RATE_LIMITER` (`unsafe.bindings` in wrangler.jsonc,
+  `simple:{limit:100,period:60}`, `namespace_id:"1001"`). The public-page gate is the PURE
+  `isRateLimitCandidate` — it DELIBERATELY reuses the SAME SKIP_SEGMENTS + dotted-root(single-segment
+  with ".") rule as `isEdgeCacheCandidate` (one source of truth for "what is a public page path"). So
+  media/api/admin/preview/_next AND sitemap/robots/llms/favicon are exempt; only real page GETs are
+  limited (authoring POST/PUT never throttled). Binding is account-level (like AI/IMAGES) — NO per-Site
+  provision, deployer needs no override. worker.ts reads it via `(env as {PUBLIC_RATE_LIMITER?:RateLimit})`
+  (NOT off CloudflareEnv, so no typegen dependency); ABSENT binding (local dev / pre-release worker) =
+  no throttle. It's BEST-EFFORT: the whole check is in try/catch and FAILS OPEN (a limiter error never
+  blocks serving). Key = `rateLimitKey(headers)` = CF-Connecting-IP (edge-set, unspoofable) → `"shared"`
+  fallback (single global bucket, never null). The 429 carries `Retry-After:60` + `Cache-Control:no-store`
+  (never edge-cache a throttle). VERIFIED-CRAWLER EXEMPTION `isVerifiedCrawler(request.cf)`: reads
+  `cf.verifiedBotCategory` / `cf.botManagement.verifiedBot` — those are Bot-Management-gated (Enterprise
+  add-on), so USUALLY ABSENT on Free/Pro/workers.dev → returns false → the IP limiter still applies.
+  There is NO reliable FREE verified-bot cf flag today; reverse-DNS (googlebot.com PTR) is a per-request
+  DNS round-trip — too heavy for this hot gate. Do NOT add reverse-DNS here without a cache. If you raise
+  the cap, edit BOTH the wrangler `simple.limit` AND leave `RATE_LIMIT_RETRY_AFTER` (=period) in sync.
+  RELEASE-GATED (worker.ts + wrangler.jsonc, r-*) — invisible on deployed Sites until a release is cut;
+  live 429/Retry-After is HITL (deployed Site + paid plan for the binding). Per-site configurable
+  threshold (backlog item 2/2) must read the D1 setting OFF the hot path (in-isolate cache w/ TTL — the
+  edge-cache "extra D1 only on cache miss" precedent), never a per-request D1 read on this render gate.
+
+- (2026-07-07) Per-URL-locale branded 404: `not-found.tsx` now renders in the VISITOR's URL locale.
   It CANNOT read params (Next gives none), so worker.ts injects the incoming pathname as request
   header `REQUEST_PATH_HEADER` (`x-bizbee-path`, edge-cache.ts) BEFORE the OpenNext handler, GET-only,
   via `headers.set` (OVERWRITE not append — a client header can't spoof the locale). not-found.tsx
