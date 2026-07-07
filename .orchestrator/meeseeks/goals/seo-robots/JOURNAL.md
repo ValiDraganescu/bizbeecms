@@ -1068,3 +1068,31 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Files:** CMS/src/lib/render/edge-cache.ts, CMS/worker.ts, CMS/src/app/api/pages/route.ts,
   CMS/src/app/api/pages/[id]/publish/route.ts, CMS/src/lib/render/page-write-hooks.ts,
   CMS/src/lib/render/edge-cache.test.ts, CMS/src/lib/render/page-write-hooks.test.ts
+
+## 2026-07-07 12:xx — Per-URL-locale branded 404 (Page-level SEO controls)
+- **Status:** DONE
+- **What I did:** The branded 404 now renders in the VISITOR's URL locale (`/fi/missing` → 404 in
+  fi) instead of always the site default. Next gives `not-found.tsx` no params/pathname, so:
+  - **worker.ts:** injects the incoming pathname as request header `REQUEST_PATH_HEADER`
+    (`x-bizbee-path`) BEFORE the OpenNext handler runs. GET-only, and it OVERWRITES (`headers.set`)
+    so a client can't spoof a locale. Best-effort try/catch → falls back to the raw request. The
+    request clone is cast `as typeof request` (cloning drops the incoming-`cf` type; OpenNext only
+    reads standard headers/url so that's fine).
+  - **load-plan.ts:** new `peelActiveLocaleFromPath(pathname)` — sibling to the existing
+    `peelActiveLocale(params)` but takes a raw PATH STRING (what the header carries). Composes
+    `pathnameSegments` (imported from edge-cache.ts — pure) + `peelLocaleSegment` + getContentLocales.
+    Blank/absent path → site default locale.
+  - **not-found.tsx:** reads the header via `next/headers` `headers()`, peels the locale, and
+    `loadPlanById(pageId, locale)`. Absent header (pre-release worker / non-worker path) → site
+    default = old behavior. Still emits `robots noindex`.
+- **Why it's cache-safe:** a 404 is NEVER edge-cached (worker gate is GET-200-only —
+  isEdgeCacheCandidate rejects status 404), so reading a request header in the (site) group here can
+  never poison a cached published page. This is the explicitly-sanctioned exception in the CAVEATS.
+- **Verified:** `npx tsc --noEmit` clean (only pre-existing `env.DB` CloudflareEnv ambient noise);
+  full pure suite `npm test` 1919/1919 (+5: branded-404 locale composition in edge-cache.test.ts —
+  header constant shape + `/fi/missing`→fi, `/et/…`→et, and default-fallback for `/missing`,
+  `/en/missing`, `/`, `""`, `null`). Live render on a deployed Site is HITL/release-pending
+  (worker.ts ships only via an r-* release).
+- **Files:** CMS/worker.ts, CMS/src/lib/render/edge-cache.ts (REQUEST_PATH_HEADER const),
+  CMS/src/lib/render/load-plan.ts (peelActiveLocaleFromPath), CMS/src/app/(site)/not-found.tsx,
+  CMS/src/lib/render/edge-cache.test.ts

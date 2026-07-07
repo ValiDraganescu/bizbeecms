@@ -34,6 +34,7 @@ import {
   markdownVariantRewrite,
   llmsTxtCacheHeaders,
   sitemapXmlCacheHeaders,
+  REQUEST_PATH_HEADER,
 } from "./src/lib/render/edge-cache";
 
 export default {
@@ -49,7 +50,25 @@ export default {
     if (mdUrl) {
       return handler.fetch(new Request(mdUrl, request), env, ctx);
     }
-    const response: Response = await handler.fetch(request, env, ctx);
+    // Inject the incoming pathname so the branded 404 (`not-found.tsx`, which
+    // Next gives no params/pathname) can render in the visitor's URL locale
+    // (`/fi/missing` → 404 in fi). A GET-only, HTML-request injection: a 404 is
+    // never edge-cached (the gate below is GET-200-only), so this request header
+    // can never poison a cached page. Overwrite (don't append) so a client can't
+    // spoof it. Best-effort — a bad URL falls through to the plain request.
+    let handledRequest = request;
+    if (request.method === "GET") {
+      try {
+        // Cast: cloning drops the incoming-request `cf` type, but OpenNext only
+        // reads standard headers/url — the injected header is all that matters.
+        const injected = new Request(request) as typeof request;
+        injected.headers.set(REQUEST_PATH_HEADER, new URL(request.url).pathname);
+        handledRequest = injected;
+      } catch {
+        /* keep the original request */
+      }
+    }
+    const response: Response = await handler.fetch(handledRequest, env, ctx);
     try {
       // /llms.txt explicit carve-out (seo-robots): the dot gate excludes it
       // (isEdgeCacheCandidate rejects dotted root paths), so opt it back in with

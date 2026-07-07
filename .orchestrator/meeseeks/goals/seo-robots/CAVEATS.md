@@ -574,3 +574,17 @@ Read every line before working. Each entry was learned the hard way by a previou
   unless it's in IMAGE_SRC_KEYS — same extend-point as the block-prop scan. The AI `audit_meta` tool
   (tool-dispatch handleAuditMeta) DELIBERATELY does NOT pass the index — it only surfaces
   `missingMeta`, which the deep scan never touches; don't wire the index there.
+
+- (2026-07-07) Per-URL-locale branded 404: `not-found.tsx` now renders in the VISITOR's URL locale.
+  It CANNOT read params (Next gives none), so worker.ts injects the incoming pathname as request
+  header `REQUEST_PATH_HEADER` (`x-bizbee-path`, edge-cache.ts) BEFORE the OpenNext handler, GET-only,
+  via `headers.set` (OVERWRITE not append — a client header can't spoof the locale). not-found.tsx
+  reads it via `next/headers` + `peelActiveLocaleFromPath(pathname)` (load-plan.ts — the path-string
+  twin of `peelActiveLocale(params)`; blank/absent path → site default). This is the SANCTIONED
+  exception to the (site) cache-poison guard BECAUSE a 404 is never edge-cached (worker gate
+  GET-200-only). Header is RELEASE-GATED (worker.ts, r-*) — pre-release the header is absent and the
+  404 degrades to the site default locale (the OLD behavior), so nothing breaks before a release.
+  If you add ANOTHER not-found-style surface that needs the request path, reuse REQUEST_PATH_HEADER +
+  peelActiveLocaleFromPath — don't invent a second header or read Accept-Language/cookie (that WOULD
+  poison the cache on any surface that CAN be cached). The worker request-clone is cast
+  `as typeof request` (clone drops the incoming-`cf` type; OpenNext reads only standard headers/url).
