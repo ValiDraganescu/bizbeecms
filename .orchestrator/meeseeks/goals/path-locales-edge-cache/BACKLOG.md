@@ -7,6 +7,7 @@ Task states: TODO | DOING | DONE | BLOCKED.
 ## Tasks
 
 ### Docs
+- DONE: Regression lock for DEEPLY NESTED localized-slug sitemap seam (publishedPagePaths → createPathTranslator → pathForLocale, 3-level chains + mixed overrides). Defect hunt found no bug; the gap was coverage. 3 tests in localize-paths.test.ts.
 - DONE: Operator guide "URL locales + edge cache" (`CMS/docs/url-locales-and-edge-cache.md`, linked from CMS/README.md) — prefixes, localized slugs, cache opt-in, purge behavior. First user-facing doc for Stage 1/2. Facts cross-checked against code.
 
 ### Stage 1 — locale-prefixed routes (do first: kills the Vary: Cookie need before caching ships)

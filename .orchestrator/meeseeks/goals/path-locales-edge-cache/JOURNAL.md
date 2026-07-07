@@ -389,3 +389,22 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   grepping the source (page-meta.ts, page-settings.tsx, messages/en.json, the
   purge call sites). No build needed.
 - **Files:** CMS/docs/url-locales-and-edge-cache.md (new), CMS/README.md
+
+## 2026-07-07 09:09 — Defect hunt + regression lock: deeply-nested localized-slug sitemap seam
+- **Status:** DONE
+- **What I did:** Chased NEXT.md's flagged untested angle — sitemap/hreflang
+  under DEEPLY NESTED (parent-chain) localized slugs. Probed the real pipeline
+  (publishedPagePaths → createPathTranslator → pathForLocale) with 3-level chains
+  and mixed overrides via a throwaway tsx script: NO defect — every-segment
+  override, mid-chain-gap override, and wildcard-ancestor-with-deeper-override
+  all resolve correctly (`/about/team/lead` → `/fi/meista/tiimi/johtaja`, etc.).
+  The logic was sound; the GAP was coverage — the per-helper unit tests only
+  went 2 levels and never exercised the sitemap integration seam. Locked it in:
+  3 new regression tests in localize-paths.test.ts driving the actual
+  publishedPagePaths+translator+pathForLocale chain (imported both real modules,
+  no toy translator). Ponytail: no fix invented where no bug exists — the value
+  is the regression fence around a subtle multi-segment walk.
+- **Verified:** `node --test localize-paths.test.ts` 15/15; full `npm test`
+  1682/1682 (+3); `npx tsc --noEmit` clean. Test-only change (no source, no
+  docs) → no deploy-gate build needed.
+- **Files:** CMS/src/lib/render/localize-paths.test.ts

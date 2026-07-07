@@ -6,6 +6,8 @@ import {
   pagePathsByLocale,
   type PathPageRow,
 } from "./localize-paths.ts";
+import { pathForLocale } from "./hreflang.ts";
+import { publishedPagePaths } from "./sitemap-paths.ts";
 
 /** A small page tree:
  *  /home (fi: koti)          — top-level HOME
@@ -119,4 +121,49 @@ test("pagePathsByLocale: unreconstructible default path → undefined", () => {
     pagePathsByLocale(rows, "offers", {}, "en", ["en", "fi"], translate),
     undefined,
   );
+});
+
+// ── Sitemap seam: DEEPLY NESTED localized slugs (path-locales-edge-cache) ─────
+// Guards the real sitemap pipeline (publishedPagePaths → createPathTranslator →
+// pathForLocale) end-to-end for 3-level chains with MIXED overrides — the one
+// integration path the per-helper unit tests didn't cover (flagged in NEXT.md).
+// A per-segment override that drops out mid-chain must still translate the
+// segments that DO have overrides; a wildcard ancestor must pass its captured
+// value through while a deeper override still applies.
+test("sitemap: 3-level chain, every segment overridden → full localized path", () => {
+  const rows2 = [
+    { id: "about", slug: "about", parentPageId: null, localizedSlugs: '{"fi":"meista"}', publishStatus: "published" },
+    { id: "team", slug: "team", parentPageId: "about", localizedSlugs: '{"fi":"tiimi"}', publishStatus: "published" },
+    { id: "lead", slug: "lead", parentPageId: "team", localizedSlugs: '{"fi":"johtaja"}', publishStatus: "published" },
+  ];
+  const t = createPathTranslator(rows2, "en");
+  const leaf = publishedPagePaths(rows2).find((p) => p.segments.join("/") === "about/team/lead");
+  assert.ok(leaf, "leaf enumerated");
+  assert.equal(pathForLocale(leaf!.segments, "en", "en", t), "/about/team/lead");
+  assert.equal(pathForLocale(leaf!.segments, "fi", "en", t), "/fi/meista/tiimi/johtaja");
+});
+
+test("sitemap: 3-level chain, MID segment has no override → only overridden segments change", () => {
+  const rows2 = [
+    { id: "about", slug: "about", parentPageId: null, localizedSlugs: '{"fi":"meista"}', publishStatus: "published" },
+    { id: "team", slug: "team", parentPageId: "about", localizedSlugs: null, publishStatus: "published" },
+    { id: "lead", slug: "lead", parentPageId: "team", localizedSlugs: '{"fi":"johtaja"}', publishStatus: "published" },
+  ];
+  const t = createPathTranslator(rows2, "en");
+  const leaf = publishedPagePaths(rows2).find((p) => p.segments.join("/") === "about/team/lead");
+  assert.equal(pathForLocale(leaf!.segments, "fi", "en", t), "/fi/meista/team/johtaja");
+});
+
+test("sitemap: wildcard ancestor keeps concrete value; deeper override still applies (nested)", () => {
+  // /cities/:city/offers/detail — offers & detail override in fi; :city is
+  // locale-agnostic but skipped by the sitemap (wildcard chain has no URL),
+  // so translation is exercised via the translator directly on a concrete URL.
+  const rows2 = [
+    { id: "cities", slug: "cities", parentPageId: null, localizedSlugs: null },
+    { id: "city", slug: ":city", parentPageId: "cities", localizedSlugs: null },
+    { id: "offers", slug: "offers", parentPageId: "city", localizedSlugs: '{"fi":"tarjoukset"}' },
+    { id: "detail", slug: "detail", parentPageId: "offers", localizedSlugs: '{"fi":"tiedot"}' },
+  ];
+  const t = createPathTranslator(rows2, "en");
+  assert.equal(t("/cities/tampere/offers/detail", "fi"), "/cities/tampere/tarjoukset/tiedot");
 });

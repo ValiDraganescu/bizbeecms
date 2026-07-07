@@ -148,3 +148,8 @@ Read every line before working. Each entry was learned the hard way by a previou
   OTHER cached pages go 404 otherwise). CREATE/DELETE/publish deliberately do NOT
   blast: the path translator ignores publish status, and before-create/after-delete
   the inbound href 404s either way — no correctness delta, don't "complete" it.
+- Deeply-nested localized-slug translation is VERIFIED CORRECT + regression-fenced
+  (localize-paths.test.ts "sitemap: 3-level chain…"): every-segment, mid-chain-gap,
+  and wildcard-ancestor-with-deeper-override all resolve. Don't re-hunt this angle —
+  the walk is segment-by-segment against DEFAULT slugs, re-emitting effectiveSlug
+  per level; it composes to any depth. No defect exists here.
