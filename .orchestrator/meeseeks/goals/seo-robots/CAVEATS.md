@@ -435,3 +435,18 @@ Read every line before working. Each entry was learned the hard way by a previou
   re-decode step — filed as its own concern, don't retro-fit a render-time D1 read (forbidden on the
   edge-cached/429 hot path). Keep dims the FIRST query on the URL (withAssetDims won't stamp a URL
   that already has one — the /media route adds `?fmt=`).
+
+- (2026-07-07) RESPONSIVE IMAGES design (investigation): don't reach for Cloudflare Images
+  upload-time variants OR zone Image Resizing (`/cdn-cgi/image/`). The `IMAGES` binding already
+  wired for WebP transform-on-delivery (`getImages()` → `env.IMAGES`, media route
+  `.input(body).output({format,quality})`) ALSO resizes via `.transform({ width, height, fit })`
+  and runs on workers.dev (it's the Workers Images binding, NOT zone Image Resizing — the old
+  "workers.dev can't resize" blocker is STALE). Chosen impl: `/media/[...key]?w=<n>` clamped to a
+  FIXED width allowlist (pure `deliveryWidth`), `.transform({width})` before `.output`, fold `w`
+  into `cacheKeyFor` so each (key,fmt,width) edge-caches distinctly, transform-failure falls back to
+  original (mirror the WebP path). GOTCHA: the delivery-width `?w=` param spells the SAME as the
+  INTRINSIC-DIMS carrier `?w=&h=` (withAssetDims/readAssetDims). A variant URL (`/media/k?w=640`)
+  has NO `h`, so `readAssetDims` returns null for it (needs BOTH w+h) — but keep them reconciled in
+  ONE `mediaVariantUrl(key,width)` helper so srcset builders never emit a URL that a future
+  readAssetDims change could misread. R2 master untouched (export/import ships masters); billing =
+  one Images op per uncached variant per PoP (same class as the WebP transcode already shipping).

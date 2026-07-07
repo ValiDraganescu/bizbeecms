@@ -831,3 +831,43 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
 - **Verified:** `node --test scripts/list-assets-tool.test.mjs` 4/4 (2 new regression tests:
   dims-stamped when both present; plain URL when a dim is null/absent). `npx tsc --noEmit` clean.
 - **Files:** CMS/src/lib/chat/list-assets-tool.ts, CMS/scripts/list-assets-tool.test.mjs
+
+## 2026-07-07 14:31 — INVESTIGATION: responsive image variants (design note, unblocks BLOCKED srcset task)
+- **Status:** DONE
+- **What I did:** Design/decision only, no code. Evaluated the four candidate paths for responsive
+  image variants of `/media/[...key]` R2 assets on per-site Workers (incl. workers.dev). KEY FINDING
+  that reframes the whole task: the `IMAGES` binding is ALREADY wired and used
+  (`CMS/src/lib/ports/images.ts` → `env.IMAGES`, `wrangler.jsonc` `"images": {"binding":"IMAGES"}`),
+  and the media route already does transform-on-delivery PNG/JPEG→WebP via
+  `images.input(body).output({format,quality})`. That SAME binding also RESIZES via
+  `.transform({ width, height, fit })` — and it's the **Workers Images binding, which runs on ANY
+  Worker including workers.dev** (it is NOT zone-scoped Image Resizing). So the original backlog
+  premise ("workers.dev can't resize") is STALE — it predates this binding landing.
+  **CHOSEN PATH: extend the existing on-delivery transform with a width param.** Add a `?w=<n>`
+  query to `/media/[...key]`, clamp to a FIXED width ALLOWLIST (e.g. 320/640/960/1280/1920) via a new
+  PURE `deliveryWidth()` helper, and call `.transform({ width })` before `.output(...)`. The route's
+  cache key is already `request.url` (via `cacheKeyFor`) so folding `w` in gives each (key,fmt,width)
+  its own edge-cache entry — transform runs once per PoP per variant, not per request. R2 master is
+  never touched (export/import still ships masters); any transform failure falls back to the original
+  bytes (same graceful-degrade as the WebP path — unbound IMAGES = serve original, never 5xx).
+  Then `<img>` gets `srcset` = allowlist widths pointing at `/media/<key>?w=<n>` from a pure render
+  pass (sibling to `applyImageHygiene`), gated to widths ≤ the intrinsic width already carried in the
+  `?w=&h=` dims query. Filed two impl tasks (media `?w=` variants; render srcset/sizes).
+  **REJECTED alternatives:** (1) Cloudflare **Images** product upload-time named variants — a second
+  product with per-image storage+transform billing, and it duplicates masters (breaks the
+  R2-master/export story); the binding-transform path reuses the R2 master and only bills the
+  Images transform op we already pay for WebP. (2) Zone **Image Resizing** (`/cdn-cgi/image/...`) —
+  requires a zone / custom domain; workers.dev sites can't use it (the original blocker, still true
+  for THAT approach — but moot now). (3) In-Worker JS resize — no native image codecs on Workers
+  (same reason we can't decode dims server-side); dead end.
+  **Constraints noted:** the delivery-width `?w=` param COLLIDES in spelling with the intrinsic-dims
+  `?w=&h=` carrier (`withAssetDims`/`readAssetDims`) — the srcset URLs must carry the DELIVERY width,
+  and the two uses must be reconciled in one `mediaVariantUrl(key,width)` helper so a variant URL
+  isn't mistaken for a dims-carrier by `readAssetDims`. Images-binding transform cost = one Images
+  operation per uncached variant per PoP (same billing class as the WebP transcode already shipping).
+- **Verified:** Confirmed the `IMAGES` binding exists in `wrangler.jsonc` and is consumed via
+  `getImages()`; confirmed the route already does `.output({format,quality})` and edge-caches per
+  synthetic `fmt` key (so adding `w` to the key is a one-line extension). No code changed → no
+  build/test run needed. Live transform of a width variant is DEPLOY-ONLY (needs a real IMAGES
+  binding + R2) — unverifiable locally.
+- **Files:** (design note only) .orchestrator/meeseeks/goals/seo-robots/{JOURNAL,CAVEATS,BACKLOG,NEXT}.md

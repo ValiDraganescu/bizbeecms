@@ -19,8 +19,29 @@ Task states: TODO | DOING | DONE | BLOCKED.
   SKIP_SEGMENTS so no wildcard tag can land. 404s stay uncached. USER-QUEUED caching block (4/4) DONE.
 
 ### Performance — Core Web Vitals
-- TODO: INVESTIGATION (design note, not code): responsive image variants for `/media/[...key]` R2 assets on per-site Workers — evaluate Cloudflare Images API upload-time variants vs zone Image Resizing (custom-domain sites only; workers.dev sites can't) vs in-Worker resizing (no native codecs on Workers — likely dead end); deliverable = chosen path + cost/constraints written to this goal's JOURNAL + CAVEATS, and implementation tasks filed accordingly. NOTE: dims now ride asset URLs as `?w=&h=` — a responsive path could reuse that query carrier for width hints.
-- BLOCKED (on the investigation above): implement responsive images — srcset/sizes + modern format (WebP/AVIF) for asset images in published pages per the chosen design.
+- DONE (2026-07-07): INVESTIGATION — responsive image variants. CHOSEN PATH: the `IMAGES` binding
+  (`env.IMAGES.input().transform({width}).output({format,quality})`) already wired for WebP
+  transform-on-delivery ALSO does width resize — works on workers.dev (it's the Workers Images
+  binding, NOT zone Image Resizing). So the original "workers.dev can't" premise is stale. Plan:
+  add a `?w=` param to `/media/[...key]`, clamped to a fixed width ALLOWLIST, transform runs once
+  per (key,fmt,width) and edge-caches under a distinct key (request.url already the cache key).
+  Rejected: upload-time Cloudflare Images variants (2nd product, per-image billing, export/import
+  churn); zone Image Resizing (custom-domain only); in-Worker JS resize (no native codecs). Full
+  reasoning + cost/limits in JOURNAL + CAVEATS. Impl tasks filed below.
+- TODO (impl 1/2, unblocked by investigation): `/media/[...key]` `?w=` width variants — add a
+  `deliveryWidth(param, allowlist)` PURE helper (asset.ts) that floors/clamps the requested width to
+  a fixed ALLOWLIST (e.g. 320/640/960/1280/1920), null = original. Route calls
+  `.transform({ width })` when non-null; fold `w` into `cacheKeyFor` (alongside `fmt`) so each width
+  edge-caches distinctly. Original R2 bytes untouched; transform failure falls back to original (same
+  as WebP path). Pure helper unit-tested; no D1 read, no hot-path cost.
+- TODO (impl 2/2): render srcset/sizes — `applyImageHygiene` (or a sibling pure pass) emits
+  `srcset` = the allowlist widths as `/media/<key>?w=<n> <n>w` for `/media/` `<img>` srcs that carry
+  `?w=&h=` dims (skip widths above the intrinsic width from `readAssetDims`), plus a sane default
+  `sizes` (e.g. `100vw`, author `sizes` prop wins). Author-set `srcset` always wins. Keep it pure /
+  edge-cache-safe (reads only the built plan) — mirror the existing image-hygiene seam. GOTCHA: the
+  dims query (`?w=&h=`) and the delivery-width query (`?w=`) BOTH use `w` — the srcset URL must carry
+  the DELIVERY width param, distinct from the intrinsic-dims carrier; reconcile in one place (a
+  `mediaVariantUrl(key, width)` helper) so they don't collide.
 - DONE (2026-07-07): Stamp `?w=&h=` dims on asset URLs the AI inserts — `formatAssetList` (list_assets) now stamps via `withAssetDims(assetUrl(key),width,height)`; dispatch already hands full `Asset[]` rows so no route change. `generate_image` left as-is: its `putAsset` stores NULL dims (asset-dims caveat), nothing to stamp. 2 new regression tests in list-assets-tool.test.mjs. Authoring-time only, zero render cost.
 
 ### Operator SEO tooling (admin) — audit report + AI bulk-meta shipped (see BACKLOG_ARCHIVE)
