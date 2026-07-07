@@ -429,3 +429,20 @@ Every completed (or blocked) task, newest at the bottom. Never redo anything mar
   editor UI itself (kind toggle, JSON-template pane, save PUT) is still TODO — see NEXT.
 - **Files:** CMS/src/lib/components/portable.ts (+ .test.ts new),
   CMS/src/db/component-store.ts, CMS/src/app/api/components/route.ts
+
+## 2026-07-07 12:31 — JSON-LD × bindings (per-URL structured data) — verify + regress
+- **Status:** DONE
+- **What I did:** Verified (by reading the render host) that collection/data-source bindings AND
+  `:param`/`?query` route refs already interpolate into a jsonld component with NO new seam:
+  `hydrateBlockBindings` (render-page.tsx) is component-agnostic — it writes resolved values into
+  `block.props` (via `hydrateProps` for bindings + `resolveRouteProps` for route refs) BEFORE
+  planPage runs, and the jsonld branch in tree.ts reads that same hydrated `block.props` exactly
+  like html components do. Added `CMS/src/lib/render/jsonld-bindings.test.ts` (4 tests) that drives
+  the real hydrateProps→resolveRouteProps→planPage hand-off and asserts the emitted ld+json:
+  collection-bound row lands in the payload; a `:slug` route-param resolves to the URL segment; a
+  `</script>` breakout in a bound value is escaped through the full pipeline (still valid JSON);
+  an unresolved binding falls back to the schema default (no lying/broken structured data).
+- **Verified:** `node --test` on the new file (4/4); full `npm test` 1785/1785 (was 1781; +4);
+  `npx tsc --noEmit` exit 0. Did NOT run opennext build (test-only change, no runtime code touched)
+  nor live rich-results validation (needs an authored+published jsonld component + D1 — HITL).
+- **Files:** CMS/src/lib/render/jsonld-bindings.test.ts (new)

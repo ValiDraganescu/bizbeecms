@@ -207,3 +207,13 @@ Read every line before working. Each entry was learned the hard way by a previou
   `?draft=1` refetch returns the draft kind. The editor UI PROPER (kind toggle, JSON-template pane,
   save PUT kind:jsonld) is still TODO; it reads kind from that header. `listComponents` (the gallery
   list) still doesn't select kind — add it there if the rail ever needs to badge jsonld components.
+
+- (2026-07-07) JSON-LD × bindings needs NO special seam — `hydrateBlockBindings`
+  (render-page.tsx) resolves `block.bindings` + route `{param}`/`{query}` refs INTO
+  `block.props` BEFORE planPage, and the jsonld branch in tree.ts (~line 285) reads that
+  SAME hydrated `block.props`, so bound/route values flow into the JSON template exactly
+  like html content (fenced by `jsonld-bindings.test.ts`). LIST-kind blocks are the ONLY
+  binding path a jsonld component can't ride: planPage's jsonld branch handles a SINGLE
+  component instance, not the per-row List repeat — a "one JSON-LD script per collection
+  row" (ItemList) use case would need new work in planList, not hydrateProps. Single-item
+  binding + wildcard `:param` detail pages (the stated goal) are fully covered.

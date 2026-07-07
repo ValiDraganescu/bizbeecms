@@ -30,7 +30,14 @@ Task states: TODO | DOING | DONE | BLOCKED.
   the GET. One proof jsonld component authored via the UI → published → validated in Google Rich Results.
 - TODO: Builder canvas invisible-element CHIP for a jsonld block (renders no visible HTML — the
   `data-block-wrap` placeholder is empty; show a selectable/deletable chip so operators can manage it).
-- TODO: JSON-LD × bindings: collection/data-source bindings interpolate into jsonld components exactly like HTML content (wildcard `:param` detail pages get per-URL structured data); verify the existing bind machinery passes through or add the minimal seam; unit-test the interpolation escaping.
+- DONE (2026-07-07): JSON-LD × bindings — VERIFIED no seam needed. `hydrateBlockBindings`
+  (render-page.tsx) is component-AGNOSTIC: it resolves `block.bindings` (collection query via
+  `hydrateProps`) + route refs (`{param}`/`{query}` via `resolveRouteProps`) INTO `block.props`
+  BEFORE the pure walk; a jsonld block reads that same hydrated `block.props` in planPage exactly
+  like an html component. Regression: `jsonld-bindings.test.ts` (4 tests) drives the real
+  hydrateProps→resolveRouteProps→planPage hand-off — collection-bound row, `:slug` route-param,
+  `</script>` breakout escaped through the full pipeline, unresolved binding → schema default.
+  1785/1785, tsc clean.
 - TODO: Teach the AI the jsonld kind — REMAINING: the tool `kind` param + JSON/@context/@type
   validation with self-correcting errors are DONE (2026-07-07). Still TODO: an AUTHORING-GUIDE
   section (schema.org patterns per page type — Product/Article/FAQPage/Recipe — and the slot-quoting
