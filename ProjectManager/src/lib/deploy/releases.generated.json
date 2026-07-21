@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "1.25.3",
-      "tag": "r-1.25.3",
-      "markdown": "# CMS v1.25.3\n\n_2026-07-08 · changes since r-1.25.2_\n\n## Fixes\n- Publishing a component no longer leaves a phantom \"unpublished changes\" draft behind. Two things caused the notice to reappear the instant you published: pending edits to prop defaults were saved a moment too late (after the publish) and re-created the draft, and a formatting-only difference between how the Develop editor and the AI write the same markup was mistaken for a real change. Both are fixed — after you publish, the component is genuinely clean.\n"
+      "version": "1.25.4",
+      "tag": "r-1.25.4",
+      "markdown": "# CMS v1.25.4\n\n_2026-07-21 · changes since r-1.25.3_\n\n## Fixes\n- \"Sign in with BizbeeCMS\" works again on deployed Sites. The login page built\n  the SSO return URL with `http://` (the in-Worker proxy hop mis-reports the\n  protocol), which the manager rejected with `badReturn`. The return URL is now\n  always `https://`.\n\n## Other\n- OpenRouter is now the sole AI provider. The Workers AI fallback and the AI\n  Gateway plumbing were removed — every Site deploys with an OpenRouter key, so\n  the fallback was unreachable. If a Site somehow has no key, the AI assistant\n  endpoints now respond 503 instead of silently switching providers.\n"
     },
     {
       "version": "1.24.0",

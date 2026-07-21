@@ -1,6 +1,6 @@
 {
   "name": "bizbeecms-cms",
-  "version": "1.25.3",
+  "version": "1.25.4",
   "private": true,
   "scripts": {
     "dev": "next dev --port 3602",
