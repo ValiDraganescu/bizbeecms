@@ -1,12 +1,11 @@
 /**
  * Pure SSE plumbing for the CMS AI chat endpoint (Milestone 2, epic B1).
  *
- * The chat route calls Workers AI (`env.AI.run`, OpenAI-compatible, via AI
- * Gateway) with `stream: true`. Upstream emits an SSE byte stream of
+ * The chat route calls the `Ai` port (OpenRouter, OpenAI-compatible) with
+ * `stream: true`. Upstream emits an SSE byte stream of
  * `data: {<openai chunk>}` lines terminated by `data: [DONE]`. We re-frame
  * those into a small, stable client protocol so the browser never has to know
- * the upstream provider's wire format (swappable via the gateway — see B1 risk
- * note in BACKLOG):
+ * the upstream provider's wire format:
  *
  *   event: token   data: {"text": "<delta>"}              (0..N, streamed tokens)
  *   event: tool    data: {"name", "ok", action|errors}    (0..N, B2 tool results)
@@ -259,8 +258,8 @@ export class ToolCallAccumulator {
 
   /**
    * Return the assembled calls in index order, each with the provider's call `id`
-   * (synthesized from the index when a provider omits it — Workers AI sometimes
-   * does), and the raw concatenated `args` string parsed to JSON (or `null` if the
+   * (synthesized from the index when a provider omits it — some providers
+   * do), and the raw concatenated `args` string parsed to JSON (or `null` if the
    * model emitted invalid JSON).
    */
   finish(): { id: string; name: string; args: unknown }[] {

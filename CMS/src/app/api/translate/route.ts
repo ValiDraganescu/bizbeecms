@@ -4,7 +4,7 @@
  * `POST /api/translate` with
  *   `{ kind:"page"|"component", target, fields:{name:sourceText}, fromLocale, toLocales? }`
  * → translates each field's SOURCE text into the target locales using the SAME
- * AI Gateway / `Ai` port the chat assistant uses, validates the result via the
+ * `Ai` port the chat assistant uses, validates the result via the
  * EXISTING `validateTranslationInput`, writes via the EXISTING `applyTranslation`
  * (one translation write path), and returns the produced `{loc:text}` maps so the
  * caller can show them for optional review.
@@ -13,10 +13,10 @@
  * is NOT a chat conversation and does NOT add a second model client.
  *
  * REST-only, no server actions (PM directive). The model call + D1 write need a
- * real binding (HITL); the request shaping + response parsing are pure and
+ * real key + D1 (HITL); the request shaping + response parsing are pure and
  * unit-tested (`scripts/translate-request.test.mjs`).
  */
-import { getAi, getGatewayId } from "@/lib/ports/ai";
+import { getAi } from "@/lib/ports/ai";
 import { DEFAULT_TRANSLATE_MODEL } from "@/lib/chat/models";
 import {
   buildTranslateMessages,
@@ -57,7 +57,7 @@ export async function POST(request: Request): Promise<Response> {
   const ai = await getAi();
   if (!ai) {
     return Response.json(
-      { error: "AI binding not configured for this Site" },
+      { error: "AI not configured for this Site" },
       { status: 503 },
     );
   }
@@ -94,7 +94,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const upstream = await ai.chat(
       buildTranslateMessages(req.fromLocale, targetLocales, req.fields),
-      { model: translateModel, gatewayId: await getGatewayId() },
+      { model: translateModel },
     );
     modelText = await collectStreamText(upstream);
   } catch (err) {

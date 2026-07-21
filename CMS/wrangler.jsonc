@@ -24,13 +24,6 @@
       "migrations_dir": "migrations"
     }
   ],
-  // Workers AI binding for the per-Site AI assistant (Milestone 2, epic B1).
-  // No API key — billed via Cloudflare. The chat route calls `env.AI.run(...)`
-  // through AI Gateway (caching / per-Site spend caps / analytics / fallback).
-  // The gateway slug is read from the AI_GATEWAY var (code has a fallback).
-  "ai": {
-    "binding": "AI"
-  },
   // Per-Site R2 bucket for media assets (Milestone 2, epic D1). The upload
   // route writes bytes here; `/media/<key>` streams them back. Each deployed
   // CMS Worker gets its OWN bucket (the bucket IS the Site boundary). The PM
@@ -49,7 +42,6 @@
     "binding": "IMAGES"
   },
   "vars": {
-    "AI_GATEWAY": "bizbeecms-ai-gateway",
     // CMS admin-auth bridge (Sec1). The deployer OVERRIDES these per-Site at
     // `wrangler deploy` time (via --var); the placeholders here just declare the
     // shape and let the build/typegen see them.
@@ -65,7 +57,7 @@
     //    deploy. It must NOT be declared here: a var binding of the same name is
     //    created at deploy time and then `secret put` fails `10053: Binding name
     //    'OPENROUTER_API_KEY' already in use`. getAi() reads it via env regardless
-    //    (secret and var are both env.OPENROUTER_API_KEY); unset => CF `AI` fallback.
+    //    (secret and var are both env.OPENROUTER_API_KEY); unset => AI routes 503.
     //  - APP_ORIGIN: this CMS's own public origin, used to build trusted
     //    invite-accept links (cms-auth Slice 4). The deployer injects the
     //    per-Site worker URL. Empty here => dev falls back to the request host;
@@ -101,7 +93,7 @@
   // worker.ts checks this BEFORE the OpenNext handler for public paths only
   // (system routes + dotted-root files exempt); over the cap => 429 + Retry-After.
   // The Workers rate-limiting binding is account-level (no resource to provision,
-  // like AI/IMAGES) — the deployer needs no override. `namespace_id` is a
+  // like IMAGES) — the deployer needs no override. `namespace_id` is a
   // per-Worker integer id (arbitrary, must be unique among this Worker's rate
   // limiters); 100 requests / 60s per key (CF-Connecting-IP) is a generous cap a
   // human or a legit crawler stays well under. It ships via a release tag (r-*)

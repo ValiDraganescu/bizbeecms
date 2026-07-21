@@ -5,20 +5,19 @@
  * of our re-framed protocol (see `lib/chat/sse.ts`): `token` events as the model
  * streams, then a single `done` (or `error`).
  *
- * Provider = Cloudflare **Workers AI** (`env.AI`, no API key, billed via CF)
- * behind **AI Gateway** (caching / per-Site spend caps / analytics / provider
- * fallback). We call the OpenAI-compatible `env.AI.run(model, {messages, stream})`,
- * which returns an SSE `ReadableStream`; we parse + re-frame it.
+ * Provider = **OpenRouter** (the `Ai` port's only adapter — keyed per Site via
+ * `OPENROUTER_API_KEY` or the CMS-local user key). The OpenAI-compatible chat
+ * completion returns an SSE `ReadableStream`; we parse + re-frame it.
  *
  * REST-only, no server actions (PM directive — server actions 500 on
  * OpenNext/Workers; see project memory). This is a plain route handler taking a
  * `Request` and returning a streaming `Response`.
  *
  * The SSE parsing/framing + body validation are pure and unit-tested
- * (`scripts/chat-sse.test.mjs`); the live model call needs a real `AI` binding +
- * gateway (HITL — can't be exercised offline).
+ * (`scripts/chat-sse.test.mjs`); the live model call needs a real OpenRouter key
+ * (HITL — can't be exercised offline).
  */
-import { getAi, getGatewayId, type ChatMessage as AiChatMessage } from "@/lib/ports/ai";
+import { getAi, type ChatMessage as AiChatMessage } from "@/lib/ports/ai";
 import { frameEvent, parseChatBody } from "@/lib/chat/sse";
 import { prematureUpdateIds } from "@/lib/chat/premature-update";
 import {
@@ -40,8 +39,7 @@ import { requireAdmin, currentUserIsPmSso } from "@/lib/auth/guard";
 export const dynamic = "force-dynamic";
 
 // DEFAULT_MODEL + the curated allowlist live in `lib/chat/models.ts` (pure, so
-// the widget shares the same list). AI Gateway lets us point at a stronger model
-// without re-architecting if tool-calling needs it.
+// the widget shares the same list).
 //
 // The tool registry + handlers now live in `lib/chat/tool-dispatch.ts` (shared
 // with the cms-mcp MCP server). This route only owns the SSE framing around them.
@@ -68,8 +66,8 @@ export async function POST(request: Request): Promise<Response> {
 
   // Optional, UNTRUSTED `model` (the picker): validate against the cached
   // catalog ids (plus the static allowlist), fall back to DEFAULT_MODEL. Never
-  // a 400 (same contract as `context`); arbitrary strings never reach
-  // `env.AI.run`. The catalog cache is best-effort — a read failure just leaves
+  // a 400 (same contract as `context`); arbitrary strings never reach the
+  // model call. The catalog cache is best-effort — a read failure just leaves
   // the static allowlist as the trust set.
   let catalogIds: ReadonlySet<string> | undefined;
   let catalogModels: ReadonlyArray<{ id: string; contextLength?: number | null }> | undefined;
@@ -98,9 +96,9 @@ export async function POST(request: Request): Promise<Response> {
 
   const ai = await getAi();
   if (!ai) {
-    // Binding missing (not yet provisioned for this Site). Don't 500 silently.
+    // No OpenRouter key provisioned for this Site. Don't 500 silently.
     return Response.json(
-      { error: "AI binding not configured for this Site" },
+      { error: "AI not configured for this Site" },
       { status: 503 },
     );
   }
@@ -121,12 +119,11 @@ export async function POST(request: Request): Promise<Response> {
   const messages = await withSystemPrompt(parsed.messages, context, override, isPmSso);
 
   const tools = toolSchemasForContext(context);
-  const gatewayId = await getGatewayId();
   // One model turn. Reused for the initial call AND each tool-result follow-up so
-  // the loop re-asks with the SAME model/tool scope/gateway. Tools stay enabled on
+  // the loop re-asks with the SAME model/tool scope. Tools stay enabled on
   // every round so the model can chain (discover → act → act again).
   const turn = (msgs: TurnMessage[]) =>
-    ai.chat(msgs as AiChatMessage[], { model, tools, gatewayId, maxTokens });
+    ai.chat(msgs as AiChatMessage[], { model, tools, maxTokens });
 
   let upstream: ReadableStream<Uint8Array>;
   try {

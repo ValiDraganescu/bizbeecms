@@ -92,8 +92,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       e.CMS_AUTH_SECRET,
     );
     const host = verifiedHost ?? h.get("host");
-    const proto = h.get("x-forwarded-proto") ?? "https";
-    const returnUrl = `${proto}://${host}/api/auth/sso-callback`;
+    // Always https: OpenNext on Workers reports x-forwarded-proto as "http"
+    // (the in-Worker hop isn't TLS), and PM's open-redirect guard rejects any
+    // non-https return — so an http return URL can never complete the handoff.
+    const returnUrl = `https://${host}/api/auth/sso-callback`;
     ssoUrl =
       `${pmOrigin.replace(/\/+$/, "")}/api/auth/cms-sso` +
       `?return=${encodeURIComponent(returnUrl)}`;

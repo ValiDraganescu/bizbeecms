@@ -11,7 +11,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { OpenRouterAi, OPENROUTER_CHAT_URL, pickSelection } from "../src/lib/ports/ai.ts";
+import { OpenRouterAi, OPENROUTER_CHAT_URL } from "../src/lib/ports/ai.ts";
 
 /** Fake fetch: records the call, returns a controllable response. */
 function fakeFetch({ ok = true, status = 200, body = new ReadableStream(), text = "" } = {}) {
@@ -37,7 +37,6 @@ test("chat POSTs to OpenRouter with Bearer auth + OpenAI-compatible streaming bo
   const stream = await ai.chat(messages, {
     model: "openai/gpt-4o-mini",
     tools,
-    gatewayId: "ignored-for-openrouter",
   });
 
   assert.equal(f.calls.length, 1);
@@ -97,26 +96,4 @@ test("chat throws when the response has no body", async () => {
     () => ai.chat([{ role: "user", content: "x" }], { model: "m" }),
     /no body/,
   );
-});
-
-// --- getAi() provider selection (slice 2) — the ONE switch ---
-
-test("pickSelection prefers OpenRouter when the key is present (default)", () => {
-  const sel = pickSelection({ OPENROUTER_API_KEY: "sk-or-x", AI: {} });
-  assert.deepEqual(sel, { provider: "openrouter", apiKey: "sk-or-x" });
-});
-
-test("pickSelection falls back to CfAi when no key but AI binding exists", () => {
-  assert.deepEqual(pickSelection({ AI: {} }), { provider: "cf" });
-  // empty-string key is NOT a usable key → fall back
-  assert.deepEqual(pickSelection({ OPENROUTER_API_KEY: "", AI: {} }), {
-    provider: "cf",
-  });
-});
-
-test("pickSelection returns none when neither provider is provisioned", () => {
-  assert.deepEqual(pickSelection({}), { provider: "none" });
-  assert.deepEqual(pickSelection({ OPENROUTER_API_KEY: "" }), {
-    provider: "none",
-  });
 });

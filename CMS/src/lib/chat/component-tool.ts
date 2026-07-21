@@ -6,7 +6,7 @@
  * This module owns the two PURE, offline-testable concerns of that tool:
  *
  *  1. `CREATE_COMPONENT_TOOL` — the OpenAI-style function/tool schema we hand to
- *     `env.AI.run({ tools })` so the model knows how to call it.
+ *     the model call (`Ai.chat({ tools })`) so the model knows how to call it.
  *  2. `validateComponentArtifact` — the security/correctness gate. The model's
  *     output is UNTRUSTED structure: we re-validate the `tree` shape (via the
  *     same pure `planTree` the renderer uses — if it can't be planned it can't

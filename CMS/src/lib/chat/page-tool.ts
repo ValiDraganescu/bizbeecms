@@ -6,7 +6,7 @@
  * PURE, offline-testable concerns of that tool, mirroring `component-tool.ts`:
  *
  *  1. `CREATE_PAGE_TOOL` — the OpenAI-style function/tool schema handed to
- *     `env.AI.run({ tools })`.
+ *     the model call (`Ai.chat({ tools })`).
  *  2. `validatePageInput` — the security/correctness gate on the model's
  *     UNTRUSTED output. It validates the slug, optional parent slug, publish
  *     status, and the block tree's SHAPE (via the renderer's own `planPage`, so

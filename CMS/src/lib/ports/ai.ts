@@ -1,22 +1,20 @@
 /**
  * `Ai` port — the ports-and-adapters seam for the AI model call (binding-adapters
- * subgoal). CMS code depends on this small interface instead of touching the
- * Cloudflare `env.AI` Workers AI binding directly.
+ * subgoal). CMS code depends on this small interface instead of talking to the
+ * provider directly.
  *
- * In scope: the interface + TWO adapters — `CfAi` (wraps `env.AI.run(...)` 1:1)
- * and `OpenRouterAi` (OpenAI-compatible HTTP call to openrouter.ai). The ORIGINAL
- * note said "no second adapter — CF-native"; the ai-openrouter goal INTENTIONALLY
- * reverses that: OpenRouter becomes the default provider, `CfAi` stays as the
- * fallback. The point of the port is exactly this swappability.
+ * ONE adapter: `OpenRouterAi` (OpenAI-compatible HTTP call to openrouter.ai).
+ * OpenRouter is the ONLY provider — the old `CfAi` Workers-AI fallback (and its
+ * AI Gateway plumbing) was removed once every Site shipped with an OpenRouter
+ * key; no key now means the AI routes answer 503.
  *
  * The port exposes ONLY what the chat route actually needs: one streaming chat
- * completion. It is the OpenAI-compatible Workers AI call — `messages` in, an SSE
- * `ReadableStream` out — through AI Gateway, with optional tool definitions. The
- * adapter preserves streaming (`stream: true`); it does NOT buffer the response.
+ * completion — `messages` in, an SSE `ReadableStream` out — with optional tool
+ * definitions. The adapter preserves streaming (`stream: true`); it does NOT
+ * buffer the response.
  *
- * This module is the ONLY place that reads `env.AI`. The chat route takes an `Ai`
- * (via `getAi()`), which makes its stream-reframing logic unit-testable against a
- * fake binding (see `scripts/ai-port.test.mjs`).
+ * The chat route takes an `Ai` (via `getAi()`), which makes its stream-reframing
+ * logic unit-testable against a fake (see `scripts/openrouter-ai.test.mjs`).
  */
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getDecryptedOpenrouterUserKey } from "../../db/openrouter-key-store.ts";
@@ -50,8 +48,6 @@ export interface ChatMessage {
 export interface ChatOptions {
   model: string;
   tools?: unknown[];
-  /** AI Gateway slug — caching / per-Site spend caps / analytics / fallback. */
-  gatewayId?: string;
   /** Hard cap on tokens GENERATED per turn. Bounds cost + runaway output. */
   maxTokens?: number;
 }
@@ -67,52 +63,13 @@ export const DEFAULT_MAX_TOKENS = 8000;
 /**
  * AI as the CMS uses it: a single OpenAI-compatible streaming chat completion.
  * Returns the raw upstream SSE byte stream (deltas + tool-call fragments), which
- * the caller re-frames — exactly the Workers AI `run(..., { stream: true })`
- * contract, so the adapter is a pass-through.
+ * the caller re-frames — the adapter is a pass-through.
  */
 export interface Ai {
   chat(
     messages: ChatMessage[],
     options: ChatOptions,
   ): Promise<ReadableStream<Uint8Array>>;
-}
-
-/** The Cloudflare Workers AI binding surface this adapter wraps (its `run`). */
-type AiBinding = {
-  run(model: string, inputs: unknown, options?: unknown): Promise<unknown>;
-};
-
-/**
- * Cloudflare Workers AI adapter — wraps the `env.AI` binding as an `Ai`. The
- * `chat` call is the exact `ai.run(model, { messages, stream: true, tools }, {
- * gateway: { id } })` the chat route made before: streaming preserved, OpenAI
- * message + tool shape preserved, AI Gateway preserved. 1:1 pass-through.
- */
-export class CfAi implements Ai {
-  private readonly ai: AiBinding;
-  constructor(ai: AiBinding) {
-    this.ai = ai;
-  }
-
-  async chat(
-    messages: ChatMessage[],
-    options: ChatOptions,
-  ): Promise<ReadableStream<Uint8Array>> {
-    const inputs: Record<string, unknown> = {
-      messages,
-      stream: true,
-      max_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
-    };
-    if (options.tools) inputs.tools = options.tools;
-    const runOptions = options.gatewayId
-      ? { gateway: { id: options.gatewayId } }
-      : undefined;
-    return (await this.ai.run(
-      options.model,
-      inputs,
-      runOptions,
-    )) as ReadableStream<Uint8Array>;
-  }
 }
 
 /** OpenRouter's OpenAI-compatible chat-completions endpoint. */
@@ -135,13 +92,10 @@ type FetchLike = (
 }>;
 
 /**
- * OpenRouter adapter — same streaming OpenAI-compatible `Ai` contract as `CfAi`,
- * over HTTP. POSTs `{ messages, model, stream: true, tools? }` to OpenRouter with
+ * OpenRouter adapter — the streaming OpenAI-compatible `Ai` contract over HTTP.
+ * POSTs `{ messages, model, stream: true, tools? }` to OpenRouter with
  * `Authorization: Bearer <key>` and returns the raw upstream SSE byte stream
  * (`response.body`) UNCHANGED — no buffering, tool-calls round-trip as deltas.
- *
- * `gatewayId` is accepted for interface parity but unused here: OpenRouter has its
- * own gateway/spend controls; the CF AI Gateway slug doesn't apply.
  *
  * ponytail: injects `fetch` so the adapter is unit-testable against a fake; the
  * factory passes the global `fetch`.
@@ -197,26 +151,20 @@ export class OpenRouterAi implements Ai {
 }
 
 /**
- * The adapter factory + SOLE reader of `env.OPENROUTER_API_KEY` / `env.AI`.
- * Provider selection is ONE switch: prefer OpenRouter when its key is present
- * (the ai-openrouter default), else fall back to the CF Workers AI binding, else
- * `null` (neither provisioned) so the route answers 503 instead of 500 — matching
- * the previous in-route `if (!ai)` guard.
+ * The adapter factory + SOLE reader of `env.OPENROUTER_API_KEY`. OpenRouter is
+ * the only provider: a usable key yields an `OpenRouterAi`, no key yields `null`
+ * so the routes answer 503 instead of 500.
  *
- * ponytail: key-presence is the switch — no extra provider flag. Add an explicit
- * `AI_PROVIDER` var only if a Site ever needs CfAi despite having an OpenRouter key.
- *
- * CMS-local user key override (ai-openrouter): before selecting, the CMS-local
- * user key (encrypted in this Site's D1, KEK = `CMS_AUTH_SECRET`) is read and
- * PREFERRED over the deployer-injected `OPENROUTER_API_KEY`. So precedence is
- * CMS-local user key → env OPENROUTER_API_KEY (minted/global) → CfAi → null/503.
- * A missing/failed decrypt falls through to the env key — NEVER throws here.
+ * CMS-local user key override (ai-openrouter): the CMS-local user key (encrypted
+ * in this Site's D1, KEK = `CMS_AUTH_SECRET`) is read and PREFERRED over the
+ * deployer-injected `OPENROUTER_API_KEY`. So precedence is CMS-local user key →
+ * env OPENROUTER_API_KEY (minted/global) → null/503. A missing/failed decrypt
+ * falls through to the env key — NEVER throws here.
  */
 export async function getAi(): Promise<Ai | null> {
   const { env } = await getCloudflareContext({ async: true });
   const e = env as unknown as {
     OPENROUTER_API_KEY?: string;
-    AI?: AiBinding;
     CMS_AUTH_SECRET?: string;
   };
 
@@ -230,47 +178,5 @@ export async function getAi(): Promise<Ai | null> {
     }
   }
   const orKey = effectiveOpenrouterKey(userKey, e.OPENROUTER_API_KEY);
-
-  const key = pickSelection({ OPENROUTER_API_KEY: orKey, AI: e.AI });
-  if (key.provider === "openrouter") return new OpenRouterAi(key.apiKey);
-  if (key.provider === "cf") return new CfAi(e.AI as AiBinding);
-  return null;
-}
-
-/**
- * Pure provider-selection rule, separated so it's unit-testable without the
- * Cloudflare context. OpenRouter wins when its key is a non-empty string; else
- * CF when the `AI` binding exists; else none.
- */
-export function pickSelection(env: {
-  OPENROUTER_API_KEY?: string;
-  AI?: unknown;
-}): { provider: "openrouter"; apiKey: string } | { provider: "cf" | "none" } {
-  if (typeof env.OPENROUTER_API_KEY === "string" && env.OPENROUTER_API_KEY) {
-    return { provider: "openrouter", apiKey: env.OPENROUTER_API_KEY };
-  }
-  if (env.AI) return { provider: "cf" };
-  return { provider: "none" };
-}
-
-/**
- * Default AI Gateway slug — the gateway that actually exists on the account
- * (dashboard → AI → AI Gateway). MUST match a real gateway or `env.AI.run` fails
- * at runtime with `2001: Please configure AI Gateway`. Exported so a regression
- * test can pin it (the runtime call can't be exercised offline).
- *
- * ponytail: hardcoded default; per-Site override stays the `AI_GATEWAY` var.
- */
-export const DEFAULT_AI_GATEWAY = "bizbeecms-ai-gateway";
-
-/**
- * Resolve the AI Gateway slug for the current Site. Override at deploy time via
- * `AI_GATEWAY`; falls back to the default gateway so a freshly-provisioned Site
- * still works. Kept here so `env` reads stay in the port module.
- */
-export async function getGatewayId(): Promise<string> {
-  const { env } = await getCloudflareContext({ async: true });
-  return (
-    (env as unknown as { AI_GATEWAY?: string }).AI_GATEWAY ?? DEFAULT_AI_GATEWAY
-  );
+  return orKey ? new OpenRouterAi(orKey) : null;
 }

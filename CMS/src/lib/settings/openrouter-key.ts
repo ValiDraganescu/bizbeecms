@@ -7,7 +7,7 @@
  * encrypted in the CMS's own D1 (`site_settings` row `openrouter_user_key`) and
  * PREFERRED at AI request time over the deployer-injected `OPENROUTER_API_KEY`
  * secret (the PM-minted or deployer-global key). Precedence at request time:
- *   CMS-local user key → env.OPENROUTER_API_KEY (minted-or-global) → CfAi.
+ *   CMS-local user key → env.OPENROUTER_API_KEY (minted-or-global) → 503.
  *
  * The key is write-only: the UI shows "key set / no key" + a clear button, the
  * plaintext is never echoed back. These helpers validate what the operator typed,
@@ -64,7 +64,7 @@ export function toOpenrouterUserKeyStatus(
  * Pure request-time precedence: the CMS-local user key wins when present
  * (non-empty after trim), else the deployer-injected `OPENROUTER_API_KEY`.
  * Returns the effective OpenRouter key, or "" when neither is set (caller then
- * falls back to CfAi / 503). Tolerates undefined/null inputs.
+ * answers 503). Tolerates undefined/null inputs.
  */
 export function effectiveOpenrouterKey(
   userKey: string | null | undefined,

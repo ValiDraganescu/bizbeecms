@@ -4,8 +4,8 @@
  *
  * Db (page/settings/component/asset stores) and Storage (asset-store) are already
  * proven against mocked ports. The Ai port is the last unproven seam in a business
- * module. The adapter test (`ai-port.test.mjs`) only proves `CfAi` passes the
- * upstream stream THROUGH; this proves the CONSUMER — `reframe()` — correctly reads
+ * module. The adapter test (`openrouter-ai.test.mjs`) only proves the adapter passes
+ * the upstream stream THROUGH; this proves the CONSUMER — `reframe()` — correctly reads
  * a streamed OpenAI-compatible response from a FAKE `Ai` port and re-frames it.
  *
  * CRITICAL (per the task): exercise the STREAMING path. The fake Ai port returns a

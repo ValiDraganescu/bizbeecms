@@ -12,7 +12,7 @@
  * mirroring `component-tool.ts` / `page-tool.ts`:
  *
  *  1. `CREATE_TRANSLATION_TOOL` — the OpenAI-style function/tool schema handed
- *     to `env.AI.run({ tools })`.
+ *     to the model call (`Ai.chat({ tools })`).
  *  2. `validateTranslationInput` — the security/correctness gate on the model's
  *     UNTRUSTED output. It validates the target kind+name and the `fields` map:
  *     each value must be a LOCALE OBJECT (all keys valid locale codes, all leaf

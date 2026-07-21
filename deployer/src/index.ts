@@ -396,7 +396,7 @@ type CfCustomHostname = {
 /**
  * Pick the effective OPENROUTER_API_KEY for a deploy and whether to set it as a
  * Worker secret. Per-Site body key wins; else the deployer's own global; else
- * empty (CMS then falls back to Workers AI). Only set the secret when non-empty
+ * empty (the CMS AI routes then answer 503). Only set the secret when non-empty
  * (don't overwrite a real secret with a blank). Pure — unit-tested.
  */
 export function effectiveOpenrouterKey(
