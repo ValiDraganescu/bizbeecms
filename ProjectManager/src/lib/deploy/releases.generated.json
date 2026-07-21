@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "1.26.0",
+      "tag": "r-1.26.0",
+      "markdown": "# CMS v1.26.0\n\n_2026-07-21 · changes since r-1.25.4_\n\n## Features\n- **Guest chat agents.** A new *Chat Agents* admin page lets you configure chatbots that talk to logged-out visitors on your published pages. Each agent has its own system prompt, model, welcome message, usage limits, and an explicit allowlist of the data-source requests and collections it may touch.\n- **GuestChat block.** Place a chat agent on any page from the Page Builder — as an inline panel or a floating bubble. The visitor never sees or chooses the agent's model, prompt, or tools: the server re-reads the block from the published page and loads its configuration.\n- **Safe by default for guests.** A guest bot's queries only ever see published content, and anything it creates or updates lands as a draft for you to review. Per-IP and per-site rate limits (per minute, per day, per conversation) cap abuse and cost, and token usage is counted per day.\n- **The admin assistant can manage agents.** Ask the AI assistant on the Chat Agents page to list, create, update, or delete an agent; it has a built-in playbook covering limits, allowlist shapes, and the safety model.\n- **More file types in the media gallery.** PDF, plain text, Markdown, CSV, and JSON uploads are now accepted alongside images. Files whose type the browser doesn't report — `.md` most often — are recognised from their filename instead of being rejected.\n"
+    },
+    {
       "version": "1.25.4",
       "tag": "r-1.25.4",
       "markdown": "# CMS v1.25.4\n\n_2026-07-21 · changes since r-1.25.3_\n\n## Fixes\n- \"Sign in with BizbeeCMS\" works again on deployed Sites. The login page built\n  the SSO return URL with `http://` (the in-Worker proxy hop mis-reports the\n  protocol), which the manager rejected with `badReturn`. The return URL is now\n  always `https://`.\n\n## Other\n- OpenRouter is now the sole AI provider. The Workers AI fallback and the AI\n  Gateway plumbing were removed — every Site deploys with an OpenRouter key, so\n  the fallback was unreachable. If a Site somehow has no key, the AI assistant\n  endpoints now respond 503 instead of silently switching providers.\n"
@@ -19,11 +24,6 @@
       "version": "1.22.0",
       "tag": "r-1.22.0",
       "markdown": "# CMS v1.22.0\n\n_2026-07-06 · changes since r-1.21.0_\n\n## Features\n- Components gallery: a redesigned components view. The old fixed starter kits (blog / docs / landing / portfolio / pricing) are gone — instead you export and import component kits as a single `.zip` (component definitions plus their asset bytes), so you can move a curated set between Sites.\n- Google Fonts in theme settings: a fonts editor lets you pick Google fonts for the Site; they're wired into the rendered pages.\n- Settings restructure: settings now has a proper landing page and a shared layout across the settings sections.\n"
-    },
-    {
-      "version": "1.21.0",
-      "tag": "r-1.21.0",
-      "markdown": "# CMS v1.21.0\n\n_2026-07-03 · changes since r-1.20.0_\n\n## Features\n- Page builder: every sizing control now has a rem/px unit picker, and every block's settings panel starts with standard spacing controls (per-side padding & margin). Existing pages keep their current look — legacy defaults are preserved.\n- A more reliable number input across the page builder: fields can be fully cleared while typing (no more values snapping back mid-edit).\n- Chat assistant context engineering: the assistant's system prompt now scopes to the tools available on the current page, and long lists (components, collections) are capped — cutting token cost substantially (e.g. data-sources admin ~17.7k → ~1.9k tokens) with no loss of capability. Old, cold chat threads are compacted on load so they no longer blow up context.\n- Component authoring now lints generated HTML and scripts and reconciles CSS classes, catching malformed output before it ships.\n\n## Fixes\n- SSO: closed a `redirect_uri_mismatch` on login (the shared app-origin fix), verified live.\n"
     },
     {
       "version": "0.11.0",
