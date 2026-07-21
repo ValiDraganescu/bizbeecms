@@ -584,13 +584,15 @@
       "settings": "Content languages, theme color overrides, and brand & AI persona.",
       "pageBuilder": "Compose pages visually from blocks and components.",
       "collections": "Define typed data collections, fill them with content, and query them.",
-      "dataSources": "Define external APIs as data sources and manage their saved requests."
+      "dataSources": "Define external APIs as data sources and manage their saved requests.",
+      "chatAgents": "Configure guest-facing chatbots: prompt, model, limits, and what they may query."
     },
     "pageBuilder": "Page Builder",
     "collections": "Collections",
     "componentsImportExport": "Import / Export",
     "componentsDevelop": "Develop",
-    "dataSources": "Data sources"
+    "dataSources": "Data sources",
+    "chatAgents": "Chat agents"
   },
   "pageBuilder": {
     "title": "Page Builder",

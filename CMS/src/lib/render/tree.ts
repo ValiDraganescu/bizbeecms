@@ -41,6 +41,7 @@ import {
   LIST_COMPONENT,
   FORM_COMPONENT,
   LANGUAGE_SWITCHER_COMPONENT,
+  GUEST_CHAT_COMPONENT,
   placeholder,
 } from "./plan-types.ts";
 import { planTree, declaredProps, schemaDefaults, bindTree, type IconMap } from "./plan-tree.ts";
@@ -53,6 +54,12 @@ import {
   LANGUAGE_SWITCHER_SCRIPT,
   LANGUAGE_SWITCHER_ASSET_KEY,
 } from "./plan-language-switcher.ts";
+import {
+  planGuestChat,
+  GUEST_CHAT_SCRIPT,
+  GUEST_CHAT_CSS,
+  GUEST_CHAT_ASSET_KEY,
+} from "./plan-guest-chat.ts";
 import { resolveLocalized } from "./localize.ts";
 import { localizePlanLinks } from "./localize-links.ts";
 import { applyImageHygiene } from "./image-hygiene.ts";
@@ -77,12 +84,18 @@ export {
   LIST_COMPONENT,
   FORM_COMPONENT,
   LANGUAGE_SWITCHER_COMPONENT,
+  GUEST_CHAT_COMPONENT,
   BUILTIN_COMPONENTS,
   isBuiltinComponent,
   placeholder,
 } from "./plan-types.ts";
 export { planTree, type IconMap } from "./plan-tree.ts";
-export { stampFormPageId, FORM_SUBMIT_PATH } from "./plan-form.ts";
+export { stampFormPageId, stampBuiltinPageIds, FORM_SUBMIT_PATH } from "./plan-form.ts";
+export {
+  planGuestChat,
+  PUBLIC_CHAT_PATH,
+  GUEST_CHAT_ASSET_KEY,
+} from "./plan-guest-chat.ts";
 export {
   columnStyle,
   columnVisibilityClass,
@@ -219,6 +232,15 @@ export function planPage(
     scripts.push(LANGUAGE_SWITCHER_SCRIPT);
   }
 
+  // Ship the GuestChat client script + CSS once, only if a hydrated (published)
+  // GuestChat shell renders. The inert preview placeholder doesn't call this.
+  function useGuestChatAssets(): void {
+    if (seenAssets.has(GUEST_CHAT_ASSET_KEY)) return;
+    seenAssets.add(GUEST_CHAT_ASSET_KEY);
+    scripts.push(GUEST_CHAT_SCRIPT);
+    styles.push(GUEST_CHAT_CSS);
+  }
+
   // Resolve a PascalCase tag naming a renderer built-in (used inside component
   // trees via composition-by-tag). Only LanguageSwitcher is embeddable this way;
   // Section/Row/Column/List are page-block layout primitives, not tags.
@@ -327,6 +349,13 @@ export function planPage(
     // by-tag (`<LanguageSwitcher/>`) — handled in planTree, which shares this host.
     if (block.component === LANGUAGE_SWITCHER_COMPONENT) {
       return planLanguageSwitcher(locale, useLanguageSwitcherAssets);
+    }
+    // A GuestChat renders a chat shell whose one client script POSTs the
+    // transcript to the public-chat endpoint (external chatbots epic). The page
+    // id was stamped onto the block by buildPlanFromPage (stampBuiltinPageIds);
+    // un-stamped (preview) GuestChats render an inert placeholder (no script).
+    if (block.component === GUEST_CHAT_COMPONENT) {
+      return planGuestChat(block, useGuestChatAssets);
     }
     const artifact = components.get(block.component);
     if (!artifact) {

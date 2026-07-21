@@ -22,7 +22,13 @@
  * GRACEFUL: no target / un-hydrated page id → the children still render inside
  * a plain container (no dead `<form>` posting nowhere). PURE — no I/O.
  */
-import { type Block, type ElementPlan, FORM_COMPONENT, str } from "./plan-types.ts";
+import {
+  type Block,
+  type ElementPlan,
+  FORM_COMPONENT,
+  GUEST_CHAT_COMPONENT,
+  str,
+} from "./plan-types.ts";
 
 /** The one submit endpoint both modes post to. */
 export const FORM_SUBMIT_PATH = "/api/forms/submit";
@@ -81,18 +87,28 @@ export const FORM_ENHANCE_SCRIPT = `
 `.trim();
 
 /**
- * Stamp the hosting page's id onto every Form block (recursively) so `planForm`
- * can emit the hidden identity input. Renderer-host concern (buildPlanFromPage
- * knows the page; the pure walk doesn't). PURE — returns the same array when no
- * Form block exists (zero-cost for the common page).
+ * Stamp the hosting page's id onto every identity-carrying built-in block
+ * (recursively) so its planner can emit the hidden identity field:
+ *   - Form      → `formPageId`      (hidden `__bb_page` input)
+ *   - GuestChat → `guestChatPageId` (chat shell's identity data-attr)
+ *
+ * Renderer-host concern (buildPlanFromPage knows the page; the pure walk
+ * doesn't). Both endpoints re-read the block from the PUBLISHED page server-side,
+ * so the browser only ever carries page + block ids — never the target/agent.
+ * PURE — returns the SAME array when no such block exists (zero-cost common page).
  */
-export function stampFormPageId(blocks: Block[], pageId: string): Block[] {
+export function stampBuiltinPageIds(blocks: Block[], pageId: string): Block[] {
   let changed = false;
   const out = blocks.map((b) => {
-    const children = b.children ? stampFormPageId(b.children, pageId) : b.children;
+    const children = b.children ? stampBuiltinPageIds(b.children, pageId) : b.children;
+    const withChildren = children ? { children } : {};
     if (b.component === FORM_COMPONENT) {
       changed = true;
-      return { ...b, formPageId: pageId, ...(children ? { children } : {}) };
+      return { ...b, formPageId: pageId, ...withChildren };
+    }
+    if (b.component === GUEST_CHAT_COMPONENT) {
+      changed = true;
+      return { ...b, guestChatPageId: pageId, ...withChildren };
     }
     if (children !== b.children) {
       changed = true;
@@ -101,6 +117,15 @@ export function stampFormPageId(blocks: Block[], pageId: string): Block[] {
     return b;
   });
   return changed ? out : blocks;
+}
+
+/**
+ * Back-compat alias — the original Form-only name. Now that GuestChat needs the
+ * same stamping walk, the generalized `stampBuiltinPageIds` is the canonical
+ * entry point; this wrapper keeps the existing Form call sites/tests working.
+ */
+export function stampFormPageId(blocks: Block[], pageId: string): Block[] {
+  return stampBuiltinPageIds(blocks, pageId);
 }
 
 /** Hidden input element plan. */

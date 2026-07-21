@@ -85,6 +85,20 @@ export const LANGUAGE_SWITCHER_COMPONENT = "LanguageSwitcher";
  */
 export const FORM_COMPONENT = "Form";
 
+/**
+ * Reserved component name for a GuestChat — a BUILT-IN block (public guest-facing
+ * chatbots epic), modeled on the Form primitive: special-cased in the renderer
+ * (`planGuestChat`), NOT a D1 component. A GuestChat renders as a chat shell
+ * (inline panel or floating bubble per `props.mode`) whose one client script
+ * POSTs the transcript to the Worker's public-chat endpoint and streams the
+ * reply. SECURITY (mirrors Form): the shell carries only the PAGE + BLOCK
+ * identity — the referenced `agent` is NEVER emitted to the DOM. The endpoint
+ * re-reads the block from the PUBLISHED page server-side and loads its agent, so
+ * a visitor can never choose the model, prompt, or tools. Like Section/List/Form,
+ * the block PUT route excludes it from the component-existence check.
+ */
+export const GUEST_CHAT_COMPONENT = "GuestChat";
+
 /** The reserved built-in block component names (not D1 component rows). */
 export const BUILTIN_COMPONENTS = [
   SECTION_COMPONENT,
@@ -93,6 +107,7 @@ export const BUILTIN_COMPONENTS = [
   LIST_COMPONENT,
   FORM_COMPONENT,
   LANGUAGE_SWITCHER_COMPONENT,
+  GUEST_CHAT_COMPONENT,
 ] as const;
 
 /** Is this block component a built-in renderer primitive (no D1 row needed)? */
@@ -338,6 +353,14 @@ export type Block = {
    * resolve the block from the published page. NOT authored.
    */
   formPageId?: string;
+  /**
+   * GuestChat block ONLY, set by the renderer host (`buildPlanFromPage` via
+   * `stampBuiltinPageIds`): the page id stamped onto the chat shell's identity
+   * data-attr so the public-chat endpoint can resolve the block (and its agent)
+   * from the PUBLISHED page. NOT authored. Un-stamped (preview/Develop) → the
+   * shell renders an inert placeholder that posts nowhere.
+   */
+  guestChatPageId?: string;
 };
 
 /**

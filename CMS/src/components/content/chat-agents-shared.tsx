@@ -1,0 +1,528 @@
+"use client";
+
+/**
+ * public-guest-chatbots Slice 7 — shared shapes + sub-panels for the ChatAgents
+ * admin UI, split out of `chat-agents-manager.tsx` to keep either file well under
+ * the size ceiling. Holds the client-side wire types (matching the REST
+ * serializer), the design-system class tokens, the limits fields (via the shared
+ * `NumberInput`), the data-source + collection allowlist row editors (fed by the
+ * existing sources/requests/collections endpoints), and the last-7-days usage
+ * panel. Copy is hardcoded English (this minimal surface predates a key set).
+ */
+
+import { useEffect, useState } from "react";
+import { NumberInput } from "@/components/ui/number-input";
+import {
+  DEFAULT_LIMITS,
+  LIMIT_CEILINGS,
+  type ChatAgentLimits,
+  type CollectionAllowEntry,
+  type DataSourceAllowEntry,
+} from "@/lib/public-chat/core";
+
+/* ---------------------------------------------------------------- wire types */
+
+/** An agent as returned by GET /api/chat-agents (config already parsed). */
+export type Agent = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  model: string | null;
+  welcomeMessage: string | null;
+  systemPrompt: string;
+  limits: ChatAgentLimits;
+  dataSources: DataSourceAllowEntry[];
+  collections: CollectionAllowEntry[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** A data source (GET /api/data-sources). */
+export type Source = { id: string; name: string };
+/** A saved request under a source (GET /api/data-sources/:id/requests). */
+export type SavedRequest = { id: string; name: string };
+/** A collection (GET /api/collections). */
+export type Collection = { name: string; tableName: string };
+
+export type UsageRow = { day: string; messages: number; tokens: number };
+
+/* -------------------------------------------------------------- class tokens */
+
+export const inputCls =
+  "rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground";
+export const labelCls = "text-sm font-medium text-foreground";
+export const helpCls = "text-xs text-foreground-muted";
+export const primaryBtn =
+  "rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50";
+export const ghostBtn =
+  "rounded-md border border-border px-3 py-1.5 text-sm text-foreground disabled:opacity-40";
+export const dangerBtn =
+  "rounded-md border border-border px-3 py-1.5 text-sm text-danger disabled:opacity-40";
+
+export async function readError(res: Response): Promise<string> {
+  try {
+    const j = (await res.json()) as { error?: string; errors?: string[] };
+    if (j.errors && j.errors.length > 0) return j.errors.join("; ");
+    if (j.error) return j.error;
+  } catch {
+    /* non-JSON */
+  }
+  return `HTTP ${res.status}`;
+}
+
+/* --------------------------------------------------------------- limits form */
+
+/** Human labels for the seven limit knobs, in a stable display order. */
+const LIMIT_LABELS: Array<{ key: keyof ChatAgentLimits; label: string }> = [
+  { key: "perIpPerMinute", label: "Messages per IP / minute" },
+  { key: "perIpPerDay", label: "Messages per IP / day" },
+  { key: "siteMessagesPerDay", label: "Site messages / day" },
+  { key: "maxMessagesPerConversation", label: "Messages per conversation" },
+  { key: "maxUserMessageLen", label: "Max user message length" },
+  { key: "maxToolRounds", label: "Max tool rounds" },
+  { key: "maxTokensPerResponse", label: "Max tokens per response" },
+];
+
+/**
+ * The seven numeric limits. Each field is EMPTY when the value equals its default
+ * (the default shows as the placeholder), so operators only see the knobs they
+ * actually moved; helper text names the ceiling. Uses the shared `NumberInput`
+ * (never a hand-rolled number input — CLAUDE.md rule).
+ */
+export function LimitsFields({
+  limits,
+  onChange,
+}: {
+  limits: Partial<ChatAgentLimits>;
+  onChange: (next: Partial<ChatAgentLimits>) => void;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className={labelCls}>Usage limits</legend>
+      <p className={helpCls}>
+        Leave a field blank to use its default. Values are clamped to safe
+        ceilings server-side.
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {LIMIT_LABELS.map(({ key, label }) => (
+          <label key={key} className="flex flex-col gap-1">
+            <span className={labelCls}>{label}</span>
+            <NumberInput
+              value={limits[key]}
+              min={1}
+              max={LIMIT_CEILINGS[key]}
+              step={1}
+              placeholder={`default ${DEFAULT_LIMITS[key]}`}
+              ariaLabel={label}
+              className={inputCls}
+              onValue={(v) => {
+                const next = { ...limits };
+                if (v === undefined) delete next[key];
+                else next[key] = Math.floor(v);
+                onChange(next);
+              }}
+            />
+            <span className={helpCls}>
+              {key === "maxTokensPerResponse"
+                ? `max ${LIMIT_CEILINGS[key]} — also capped by the selected model's own output limit`
+                : `max ${LIMIT_CEILINGS[key]}`}
+            </span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/* ------------------------------------------------------ data-source allowlist */
+
+/**
+ * Data-source allowlist rows. Each row picks a source, then one of its saved
+ * requests (loaded lazily per source), plus a tool name, description, and an
+ * optional per-conversation call cap. Sources are passed in; saved requests are
+ * fetched here keyed by the selected source.
+ */
+export function DataSourceRows({
+  entries,
+  sources,
+  onChange,
+}: {
+  entries: DataSourceAllowEntry[];
+  sources: Source[];
+  onChange: (next: DataSourceAllowEntry[]) => void;
+}) {
+  const [requestsBySource, setRequestsBySource] = useState<
+    Record<string, SavedRequest[]>
+  >({});
+
+  // Lazily load saved requests for every source referenced by a row.
+  useEffect(() => {
+    const needed = new Set(entries.map((e) => e.sourceId).filter(Boolean));
+    for (const sourceId of needed) {
+      if (requestsBySource[sourceId]) continue;
+      void (async () => {
+        try {
+          const res = await fetch(`/api/data-sources/${sourceId}/requests`);
+          if (!res.ok) return;
+          const reqs = (await res.json()) as SavedRequest[];
+          setRequestsBySource((cur) => ({ ...cur, [sourceId]: reqs }));
+        } catch {
+          /* offline — leave the request picker empty */
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries]);
+
+  function patch(i: number, p: Partial<DataSourceAllowEntry>) {
+    onChange(entries.map((e, idx) => (idx === i ? { ...e, ...p } : e)));
+  }
+
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className={labelCls}>Data-source tools</legend>
+      <p className={helpCls}>
+        Each row exposes one saved request as a guest tool the bot may call.
+      </p>
+      {entries.map((entry, i) => (
+        <div
+          key={i}
+          className="flex flex-col gap-3 rounded-md border border-border bg-surface p-3"
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1">
+              <span className={labelCls}>Source</span>
+              <select
+                className={inputCls}
+                value={entry.sourceId}
+                onChange={(e) =>
+                  patch(i, { sourceId: e.target.value, requestId: "" })
+                }
+              >
+                <option value="">Select a source…</option>
+                {sources.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelCls}>Saved request</span>
+              <select
+                className={inputCls}
+                value={entry.requestId}
+                disabled={!entry.sourceId}
+                onChange={(e) => patch(i, { requestId: e.target.value })}
+              >
+                <option value="">Select a request…</option>
+                {(requestsBySource[entry.sourceId] ?? []).map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className={labelCls}>Tool name</span>
+            <input
+              className={inputCls}
+              value={entry.toolName}
+              maxLength={100}
+              placeholder="check_availability"
+              onChange={(e) => patch(i, { toolName: e.target.value })}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={labelCls}>Description</span>
+            <input
+              className={inputCls}
+              value={entry.description}
+              maxLength={500}
+              placeholder="Tells the bot what this tool does"
+              onChange={(e) => patch(i, { description: e.target.value })}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={labelCls}>Max calls per conversation (optional)</span>
+            <NumberInput
+              value={entry.maxCallsPerConversation}
+              min={1}
+              step={1}
+              placeholder="unlimited"
+              ariaLabel="Max calls per conversation"
+              className={inputCls + " w-40"}
+              onValue={(v) =>
+                patch(i, {
+                  maxCallsPerConversation:
+                    v === undefined ? undefined : Math.floor(v),
+                })
+              }
+            />
+          </label>
+          <div>
+            <button
+              type="button"
+              className={dangerBtn}
+              onClick={() => onChange(entries.filter((_, idx) => idx !== i))}
+            >
+              Remove tool
+            </button>
+          </div>
+        </div>
+      ))}
+      <div>
+        <button
+          type="button"
+          className={ghostBtn}
+          onClick={() =>
+            onChange([
+              ...entries,
+              { sourceId: "", requestId: "", toolName: "", description: "" },
+            ])
+          }
+        >
+          Add data-source tool
+        </button>
+      </div>
+    </fieldset>
+  );
+}
+
+/* ------------------------------------------------------- collection allowlist */
+
+/**
+ * Collection allowlist rows. Each row picks a collection, a description, the
+ * query/create/update permissions, and — only when update is enabled — the
+ * exact-match lookup fields that scope an update to one item.
+ */
+export function CollectionRows({
+  entries,
+  collections,
+  onChange,
+}: {
+  entries: CollectionAllowEntry[];
+  collections: Collection[];
+  onChange: (next: CollectionAllowEntry[]) => void;
+}) {
+  function patch(i: number, p: Partial<CollectionAllowEntry>) {
+    onChange(entries.map((e, idx) => (idx === i ? { ...e, ...p } : e)));
+  }
+
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className={labelCls}>Collection tools</legend>
+      <p className={helpCls}>
+        Grant the bot scoped access to a collection. Updates require exact-match
+        lookup fields so they only ever touch one item.
+      </p>
+      {entries.map((entry, i) => {
+        const lookupFields = entry.lookupFields ?? [];
+        return (
+          <div
+            key={i}
+            className="flex flex-col gap-3 rounded-md border border-border bg-surface p-3"
+          >
+            <label className="flex flex-col gap-1">
+              <span className={labelCls}>Collection</span>
+              <select
+                className={inputCls}
+                value={entry.collection}
+                onChange={(e) => patch(i, { collection: e.target.value })}
+              >
+                <option value="">Select a collection…</option>
+                {collections.map((c) => (
+                  <option key={c.tableName} value={c.tableName}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className={labelCls}>Description</span>
+              <input
+                className={inputCls}
+                value={entry.description}
+                maxLength={500}
+                placeholder="Tells the bot what this collection holds"
+                onChange={(e) => patch(i, { description: e.target.value })}
+              />
+            </label>
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={entry.canQuery}
+                  onChange={(e) => patch(i, { canQuery: e.target.checked })}
+                />
+                Can query
+              </label>
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={entry.canCreate}
+                  onChange={(e) => patch(i, { canCreate: e.target.checked })}
+                />
+                Can create
+              </label>
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={entry.canUpdate}
+                  onChange={(e) => patch(i, { canUpdate: e.target.checked })}
+                />
+                Can update
+              </label>
+            </div>
+            {entry.canUpdate && (
+              <label className="flex flex-col gap-1">
+                <span className={labelCls}>Lookup fields</span>
+                <input
+                  className={inputCls + " font-mono"}
+                  value={lookupFields.join(", ")}
+                  placeholder="email, booking_ref"
+                  onChange={(e) =>
+                    patch(i, {
+                      lookupFields: e.target.value
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter((s) => s !== ""),
+                    })
+                  }
+                />
+                <span className={helpCls}>
+                  Comma-separated. An update must match exactly one item on these
+                  fields, or it is refused.
+                </span>
+              </label>
+            )}
+            <div>
+              <button
+                type="button"
+                className={dangerBtn}
+                onClick={() => onChange(entries.filter((_, idx) => idx !== i))}
+              >
+                Remove collection
+              </button>
+            </div>
+          </div>
+        );
+      })}
+      <div>
+        <button
+          type="button"
+          className={ghostBtn}
+          onClick={() =>
+            onChange([
+              ...entries,
+              {
+                collection: "",
+                description: "",
+                canQuery: true,
+                canCreate: false,
+                canUpdate: false,
+                lookupFields: [],
+              },
+            ])
+          }
+        >
+          Add collection tool
+        </button>
+      </div>
+    </fieldset>
+  );
+}
+
+/* ----------------------------------------------------------------- usage panel */
+
+/** Today's message count for a list row, from GET …/usage?days=1. */
+export function TodayMessages({ agentId }: { agentId: string }) {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/chat-agents/${agentId}/usage?days=1`);
+        if (!res.ok) return;
+        const j = (await res.json()) as { usage: UsageRow[] };
+        if (!cancelled) setCount(j.usage[0]?.messages ?? 0);
+      } catch {
+        /* offline — leave blank */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId]);
+
+  if (count === null) return null;
+  return <span className={helpCls}>{count} today</span>;
+}
+
+/** Last-N-days messages/tokens for a saved agent, from GET …/usage?days=7. */
+export function UsagePanel({ agentId }: { agentId: string }) {
+  const [usage, setUsage] = useState<UsageRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/chat-agents/${agentId}/usage?days=7`);
+        if (!res.ok) throw new Error(await readError(res));
+        const j = (await res.json()) as { usage: UsageRow[] };
+        if (!cancelled) setUsage(j.usage);
+      } catch (err) {
+        if (!cancelled) setError((err as Error).message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId]);
+
+  if (error)
+    return (
+      <p role="alert" className="text-sm text-danger">
+        {error}
+      </p>
+    );
+  if (!usage)
+    return (
+      <p role="status" className={helpCls}>
+        Loading usage…
+      </p>
+    );
+
+  const totalMessages = usage.reduce((n, r) => n + r.messages, 0);
+  const totalTokens = usage.reduce((n, r) => n + r.tokens, 0);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className={labelCls}>Last 7 days</p>
+      <p className={helpCls}>
+        {totalMessages} messages · {totalTokens} tokens
+      </p>
+      <table className="text-sm text-foreground">
+        <thead>
+          <tr className="text-left text-foreground-muted">
+            <th className="pr-4 font-medium">Day</th>
+            <th className="pr-4 font-medium">Messages</th>
+            <th className="font-medium">Tokens</th>
+          </tr>
+        </thead>
+        <tbody>
+          {usage.map((r) => (
+            <tr key={r.day}>
+              <td className="pr-4 tabular-nums">{r.day}</td>
+              <td className="pr-4 tabular-nums">{r.messages}</td>
+              <td className="tabular-nums">{r.tokens}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

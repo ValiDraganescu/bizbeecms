@@ -14,6 +14,7 @@ import {
   ALLOWED_ASSET_TYPES,
   MAX_ASSET_SIZE,
   MAX_ASSET_DIMENSION,
+  inferAssetContentType,
   validateAsset,
   buildAssetKey,
   isValidAssetKey,
@@ -75,9 +76,31 @@ test("validateAsset: accepts allowed image types within size", () => {
   }
 });
 
-test("validateAsset: rejects unsupported type", () => {
-  const r = validateAsset("application/pdf", 1024);
-  assert.equal(r.valid, false);
+test("validateAsset: rejects unsupported / script-capable types", () => {
+  // text/html would be stored XSS on the site origin — must NEVER validate.
+  for (const type of ["text/html", "application/javascript", "application/zip", ""]) {
+    assert.equal(validateAsset(type, 1024).valid, false, type);
+  }
+});
+
+test("validateAsset: accepts the inert document types (chat attachments)", () => {
+  for (const type of ["application/pdf", "text/plain", "text/markdown", "text/csv", "application/json"]) {
+    assert.deepEqual(validateAsset(type, 1024), { valid: true }, type);
+  }
+});
+
+// ── inferAssetContentType ─────────────────────────────────────────────────────
+test("inferAssetContentType: maps known extensions, '' for unknown", () => {
+  assert.equal(inferAssetContentType("bookings-guide (1).md"), "text/markdown");
+  assert.equal(inferAssetContentType("data.JSON"), "application/json");
+  assert.equal(inferAssetContentType("notes.txt"), "text/plain");
+  assert.equal(inferAssetContentType("rows.csv"), "text/csv");
+  assert.equal(inferAssetContentType("doc.pdf"), "application/pdf");
+  assert.equal(inferAssetContentType("photo.jpeg"), "image/jpeg");
+  // Unknown / script-capable extensions never infer to an allowed type.
+  assert.equal(inferAssetContentType("page.html"), "");
+  assert.equal(inferAssetContentType("script.js"), "");
+  assert.equal(inferAssetContentType("noextension"), "");
 });
 
 test("validateAsset: rejects empty + oversize", () => {

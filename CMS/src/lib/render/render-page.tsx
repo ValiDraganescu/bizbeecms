@@ -43,7 +43,7 @@ import {
   SECTION_COLUMN_COMPONENT,
   LIST_COMPONENT,
   FORM_COMPONENT,
-  stampFormPageId,
+  stampBuiltinPageIds,
   collectComponentNames,
   collectTreeComponentTags,
   collectPlanClasses,
@@ -54,6 +54,11 @@ import {
 import { resolveLocalized } from "@/lib/render/localize";
 import { scanIconSlots } from "@/lib/render/icons";
 import { resolveIcons } from "@/db/icon-store";
+import { getChatAgent } from "@/db/chat-agent-store";
+import {
+  collectGuestChatAgentRefs,
+  applyGuestChatWelcome,
+} from "./plan-guest-chat";
 import { getIconSet } from "@/db/settings-store";
 import { renderPlans } from "@/lib/render/react";
 import { ClientScripts } from "@/lib/render/client-scripts";
@@ -326,12 +331,13 @@ export async function buildPlanFromPage(
   // any failed/empty query leaves the bound props blank (never throws / 500s).
   // external-data-sources Slice 3: api-kind bindings hydrate at the SAME seam
   // (locale is passed so `{placeholder}` params can read localized block props).
-  // Form slice: stamp the hosting page's id onto Form blocks so planForm can
-  // emit the hidden identity input the submit endpoint resolves the target from.
-  // No-op (same array back) on pages without a Form.
+  // Form + GuestChat slices: stamp the hosting page's id onto identity-carrying
+  // built-in blocks so their planners can emit the hidden page-id the submit /
+  // public-chat endpoints resolve the target/agent from. No-op (same array back)
+  // on pages without any such block.
   const routeMiss = { hit: false };
   const hydratedBlocks = await hydrateBlockBindings(
-    stampFormPageId(blocks, pageRow.id),
+    await hydrateGuestChatWelcome(stampBuiltinPageIds(blocks, pageRow.id)),
     locale,
     routeContext,
     routeMiss,
@@ -577,6 +583,31 @@ export async function buildPlanFromComponent(
   const icons = await resolvePageIcons([block], components, locale);
   const plan = planPage([block], components, locale, icons);
   return { plan, locale };
+}
+
+/**
+ * Hydrate GuestChat blocks' welcome text from their agents' configured
+ * `welcomeMessage` (same hydrate-before-walk seam as bindings/icons). A
+ * non-empty block prop `welcome` is an explicit per-placement override — the
+ * pure `applyGuestChatWelcome` merge respects it. GRACEFUL: no GuestChat
+ * blocks → zero D1 reads and the same array back; a failed agent read just
+ * leaves that welcome blank (never throws / 500s the render).
+ */
+async function hydrateGuestChatWelcome(blocks: Block[]): Promise<Block[]> {
+  const refs = collectGuestChatAgentRefs(blocks);
+  if (refs.length === 0) return blocks;
+  const welcomeByRef = new Map<string, string>();
+  await Promise.all(
+    refs.map(async (ref) => {
+      try {
+        const agent = await getChatAgent(ref);
+        if (agent?.welcomeMessage) welcomeByRef.set(ref, agent.welcomeMessage);
+      } catch {
+        /* unreadable agent → no welcome for this ref */
+      }
+    }),
+  );
+  return applyGuestChatWelcome(blocks, welcomeByRef);
 }
 
 /**

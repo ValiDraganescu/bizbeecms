@@ -116,6 +116,27 @@ import {
   GET_DATA_SOURCES_GUIDE_TOOL,
   DATA_SOURCES_GUIDE,
 } from "./data-sources-guide";
+import {
+  LIST_CHAT_AGENTS_TOOL,
+  CREATE_CHAT_AGENT_TOOL,
+  UPDATE_CHAT_AGENT_TOOL,
+  DELETE_CHAT_AGENT_TOOL,
+  validateCreateChatAgent,
+  validateUpdateChatAgent,
+  formatAgentForModel,
+} from "./chat-agent-tools";
+import {
+  GET_CHAT_AGENTS_GUIDE_TOOL,
+  CHAT_AGENTS_GUIDE,
+} from "./chat-agents-guide";
+import {
+  listChatAgents,
+  getChatAgent,
+  createChatAgent,
+  updateChatAgent,
+  deleteChatAgent,
+} from "@/db/chat-agent-store";
+import { parseAgentConfig } from "@/lib/public-chat/core";
 import { GET_JSONLD_GUIDE_TOOL, JSONLD_GUIDE } from "./jsonld-guide";
 import {
   listDataSources,
@@ -295,6 +316,11 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   bind_form: BIND_FORM_TOOL,
   get_data_sources_guide: GET_DATA_SOURCES_GUIDE_TOOL,
   get_jsonld_guide: GET_JSONLD_GUIDE_TOOL,
+  list_chat_agents: LIST_CHAT_AGENTS_TOOL,
+  create_chat_agent: CREATE_CHAT_AGENT_TOOL,
+  update_chat_agent: UPDATE_CHAT_AGENT_TOOL,
+  delete_chat_agent: DELETE_CHAT_AGENT_TOOL,
+  get_chat_agents_guide: GET_CHAT_AGENTS_GUIDE_TOOL,
 };
 
 /** The tool SCHEMAS the assistant may use in this admin-page context (chat route). */
@@ -1306,6 +1332,116 @@ async function handleTestDataSource(args: unknown): Promise<Record<string, unkno
   }
 }
 
+// ── public-guest-chatbots (Slice 6): guest-facing CHAT AGENT tools ────────────
+// Pure validation in chat-agent-tools.ts (schemas + arg shaping + the model DTO);
+// the config validator itself lives in the pure public-chat core. The store keeps
+// the limits/dataSources/collections columns as RAW JSON strings, so a handler
+// stringifies the validated config in, and parseAgentConfig's out for the summary.
+// Admins configure the agent here; the guest bot only ever gets the allowlisted
+// tools (a separate, locked-down public path — never this registry).
+
+/** Stringify a validated config into the three JSON columns the store expects. */
+function configColumns(config: {
+  limits: unknown;
+  dataSources: unknown;
+  collections: unknown;
+}): { limits: string; dataSources: string; collections: string } {
+  return {
+    limits: JSON.stringify(config.limits),
+    dataSources: JSON.stringify(config.dataSources),
+    collections: JSON.stringify(config.collections),
+  };
+}
+
+/** Shape a stored row for the model: identity + limit summary + allowlist counts. */
+function summarizeAgent(row: {
+  id: string;
+  name: string;
+  enabled: boolean;
+  model: string | null;
+  limits: string;
+  dataSources: string;
+  collections: string;
+}): Record<string, unknown> {
+  const config = parseAgentConfig(row.limits, row.dataSources, row.collections);
+  return formatAgentForModel(row, config);
+}
+
+/** "no such agent" error listing the existing agent names (AI error philosophy). */
+async function unknownAgentMessage(ref: string): Promise<string> {
+  const names = (await listChatAgents()).map((a) => a.name);
+  if (names.length === 0) {
+    return `no chat agent "${ref}" — this site has no chat agents yet (create one with create_chat_agent).`;
+  }
+  return `no chat agent "${ref}". Existing agents (id or name): ${names.join(", ")}.`;
+}
+
+async function handleListChatAgents(): Promise<Record<string, unknown>> {
+  try {
+    const rows = await listChatAgents();
+    return { ok: true, agents: rows.map(summarizeAgent) };
+  } catch (err) {
+    return { ok: false, errors: [`failed to list chat agents: ${(err as Error).message}`] };
+  }
+}
+
+async function handleCreateChatAgent(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateCreateChatAgent(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const v = valid.value;
+  try {
+    const res = await createChatAgent({
+      name: v.name,
+      systemPrompt: v.systemPrompt,
+      model: v.model,
+      enabled: v.enabled,
+      welcomeMessage: v.welcomeMessage,
+      ...configColumns(v.config),
+    });
+    if (!res.ok) return { ok: false, errors: [res.error] };
+    return { ok: true, action: "created", agent: summarizeAgent(res.agent) };
+  } catch (err) {
+    return { ok: false, errors: [`failed to create chat agent: ${(err as Error).message}`] };
+  }
+}
+
+async function handleUpdateChatAgent(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateUpdateChatAgent(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const v = valid.value;
+  try {
+    const existing = await getChatAgent(v.ref);
+    if (!existing) return { ok: false, errors: [await unknownAgentMessage(v.ref)] };
+    const res = await updateChatAgent(existing.id, {
+      name: v.name,
+      systemPrompt: v.systemPrompt,
+      model: v.model,
+      enabled: v.enabled,
+      welcomeMessage: v.welcomeMessage,
+      ...configColumns(v.config),
+    });
+    if (res === null) return { ok: false, errors: [await unknownAgentMessage(v.ref)] };
+    if (!res.ok) return { ok: false, errors: [res.error] };
+    return { ok: true, action: "updated", agent: summarizeAgent(res.agent) };
+  } catch (err) {
+    return { ok: false, errors: [`failed to update chat agent: ${(err as Error).message}`] };
+  }
+}
+
+async function handleDeleteChatAgent(args: unknown): Promise<Record<string, unknown>> {
+  const ref = coerceIdArg(args, "agent");
+  if (!ref) return { ok: false, errors: ["agent (id or name) is required — list_chat_agents shows them"] };
+  try {
+    const existing = await getChatAgent(ref);
+    if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+    const deleted = await deleteChatAgent(existing.id);
+    if (!deleted) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+    return { ok: true, action: "deleted", agent: existing.name };
+  } catch (err) {
+    return { ok: false, errors: [`failed to delete chat agent: ${(err as Error).message}`] };
+  }
+}
+
 // ── content-collections (Slice D): component↔collection BINDING tools ─────────
 // These mutate a PAGE's draft block tree (NOT a collection store): load the
 // blocks, find the target block, validate the binding against the registry + the
@@ -1978,9 +2114,14 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   test_data_source: handleTestDataSource,
   create_form: handleCreateForm,
   bind_form: handleBindForm,
+  list_chat_agents: () => handleListChatAgents(),
+  create_chat_agent: handleCreateChatAgent,
+  update_chat_agent: handleUpdateChatAgent,
+  delete_chat_agent: handleDeleteChatAgent,
   // Static playbook — no store/CF work, so the handler is a constant payload.
   get_data_sources_guide: async () => ({ ok: true, guide: DATA_SOURCES_GUIDE }),
   get_jsonld_guide: async () => ({ ok: true, guide: JSONLD_GUIDE }),
+  get_chat_agents_guide: async () => ({ ok: true, guide: CHAT_AGENTS_GUIDE }),
 };
 
 /**

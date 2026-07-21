@@ -150,6 +150,18 @@ export type RunToolsRound = (
 export type NextTurn = (messages: ChatMessage[]) => Promise<ReadableStream<Uint8Array>>;
 
 /**
+ * Optional token-usage observer. Invoked once per turn that reports a `usage`
+ * event (same numbers already framed to the client), so a caller can record
+ * per-day token totals out-of-band. Additive + default-absent: when omitted the
+ * behavior is EXACTLY the pre-existing one (the admin route passes nothing).
+ */
+export type OnUsage = (usage: {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+}) => void;
+
+/**
  * Consume ONE upstream model turn: forward text deltas as `token` frames and
  * collect the turn's text + tool calls. Does NOT emit `done` — the loop decides
  * whether to continue. Returns the accumulated assistant text and assembled tool
@@ -162,6 +174,7 @@ async function consumeTurn(
   upstream: ReadableStream<Uint8Array>,
   controller: ReadableStreamDefaultController<Uint8Array>,
   encoder: TextEncoder,
+  onUsage?: OnUsage,
 ): Promise<{ text: string; calls: { id: string; name: string; args: unknown }[] }> {
   const decoder = new TextDecoder();
   const parser = new SseDeltaParser();
@@ -199,6 +212,19 @@ async function consumeTurn(
               }),
             ),
           );
+          // Out-of-band observer (guest route records per-day token totals). A
+          // throwing observer must never break the stream — swallow it.
+          if (onUsage) {
+            try {
+              onUsage({
+                promptTokens: ev.promptTokens,
+                completionTokens: ev.completionTokens,
+                totalTokens: ev.totalTokens,
+              });
+            } catch {
+              /* observer failure never affects the stream */
+            }
+          }
         } else {
           sawDone = true;
         }
@@ -245,6 +271,7 @@ export function streamChatRounds(
   nextTurn: NextTurn,
   runTools: RunToolsRound,
   maxRounds = 4,
+  onUsage?: OnUsage,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   const transcript = [...messages];
@@ -265,7 +292,7 @@ export function streamChatRounds(
           const turn = upstream;
           upstream = null;
           if (!turn) break;
-          const { text, calls } = await consumeTurn(turn, controller, encoder);
+          const { text, calls } = await consumeTurn(turn, controller, encoder, onUsage);
 
           if (calls.length === 0) {
             // Empty turn right after a failed tool → nudge once, don't end on the error.

@@ -16,6 +16,7 @@ import { deleteAsset, listAssets, putAsset, setAssetTags } from "@/db/asset-stor
 import {
   assetUrl,
   buildAssetKey,
+  inferAssetContentType,
   isValidAssetKey,
   parseAssetDimension,
   validateAsset,
@@ -131,21 +132,24 @@ export async function POST(request: Request): Promise<Response> {
   const width = parseAssetDimension(form.get("width"));
   const height = parseAssetDimension(form.get("height"));
 
-  const check = validateAsset(file.type, file.size);
+  // Browsers report an EMPTY type for some extensions (`.md` notably) — infer
+  // from the filename so those don't bounce off the allowlist as "(none)".
+  const contentType = file.type || inferAssetContentType(file.name);
+  const check = validateAsset(contentType, file.size);
   if (!check.valid) {
     return Response.json({ error: check.error }, { status: 400 });
   }
 
-  const key = buildAssetKey(file.name, file.type, crypto.randomUUID().slice(0, 8));
+  const key = buildAssetKey(file.name, contentType, crypto.randomUUID().slice(0, 8));
   try {
     const bytes = await file.arrayBuffer();
     // Describe the image synchronously so it's searchable the moment it's listed.
     // A describe failure returns "" and never blocks the upload.
-    const description = await describeUpload(file.type, bytes, thumbDataUrl);
+    const description = await describeUpload(contentType, bytes, thumbDataUrl);
     const row = await putAsset({
       key,
       filename: file.name,
-      contentType: file.type,
+      contentType,
       bytes,
       description,
       width,

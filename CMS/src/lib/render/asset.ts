@@ -13,13 +13,27 @@
  * aws4fetch because it runs off-Cloudflare).
  */
 
-/** Image types the gallery accepts. Components need images first (per GOAL D1). */
+/**
+ * Types the gallery accepts. Images came first (GOAL D1); the plain-text /
+ * document types were added for AI-chat file attachments (the chat reuses this
+ * upload path). All of these are INERT when served with `x-content-type-options:
+ * nosniff` (see assetServeHeaders) — markdown/JSON/CSV/plain text render as text,
+ * PDF opens in the browser's isolated viewer. NEVER add `text/html` (or any
+ * script-capable type): /media serves from the site origin, so stored HTML would
+ * be stored XSS. SVG (the one active-content exception) is already locked down
+ * with a sandbox CSP + attachment disposition on serve.
+ */
 export const ALLOWED_ASSET_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/gif",
   "image/svg+xml",
+  "application/pdf",
+  "text/plain",
+  "text/markdown",
+  "text/csv",
+  "application/json",
 ] as const;
 
 export type AssetContentType = (typeof ALLOWED_ASSET_TYPES)[number];
@@ -36,7 +50,30 @@ const EXT_BY_TYPE: Record<string, string> = {
   "image/webp": "webp",
   "image/gif": "gif",
   "image/svg+xml": "svg",
+  "application/pdf": "pdf",
+  "text/plain": "txt",
+  "text/markdown": "md",
+  "text/csv": "csv",
+  "application/json": "json",
 };
+
+/** The inverse map, for extension-based MIME inference on typeless uploads. */
+const TYPE_BY_EXT: Record<string, string> = Object.fromEntries(
+  Object.entries(EXT_BY_TYPE).map(([type, ext]) => [ext, type]),
+);
+TYPE_BY_EXT.jpeg = "image/jpeg";
+
+/**
+ * Infer an allowed content type from a filename's extension, for uploads whose
+ * `File.type` is EMPTY — browsers/OSes commonly report no MIME for `.md` (and
+ * sometimes `.json`/`.csv`), which would otherwise bounce off the allowlist as
+ * `unsupported type: (none)`. Only maps to types validateAsset already accepts;
+ * unknown/missing extension → "" (the caller's validation then rejects). PURE.
+ */
+export function inferAssetContentType(filename: string): string {
+  const ext = filename.toLowerCase().split(".").pop() ?? "";
+  return TYPE_BY_EXT[ext] ?? "";
+}
 
 export type ValidationResult = { valid: true } | { valid: false; error: string };
 

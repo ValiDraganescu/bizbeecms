@@ -30,7 +30,11 @@
  */
 
 // Relative (not @/) import so this stays node-testable — only the reserved names.
-import { SECTION_COMPONENT, LANGUAGE_SWITCHER_COMPONENT } from "../render/tree.ts";
+import {
+  SECTION_COMPONENT,
+  LANGUAGE_SWITCHER_COMPONENT,
+  GUEST_CHAT_COMPONENT,
+} from "../render/tree.ts";
 
 // ── Tool schemas (OpenAI/Workers-AI function-calling shape) ───────────────────
 
@@ -249,6 +253,21 @@ export function builtinBlockTypes(): { name: string; description: string }[] {
         "embed it INSIDE a component's tree by writing the tag `<LanguageSwitcher/>` " +
         "(composition-by-tag) — e.g. put it in a NavBar component. It renders nothing on " +
         "single-locale Sites. Shape as a block: { component:'LanguageSwitcher' }.",
+    },
+    {
+      name: GUEST_CHAT_COMPONENT,
+      description:
+        "A built-in guest-facing AI chat panel: places a chatbot on the published " +
+        "page. It renders a chat UI (message list + input) whose replies stream " +
+        "from a server-side agent — the visitor can never choose the model, prompt, " +
+        "or tools. It has NO children. Props: { agent: '<chat-agent id or name>' " +
+        "(REQUIRED — must reference an EXISTING chat agent; call list_chat_agents to " +
+        "get valid ids/names, never invent one), mode: 'inline'|'floating' (inline " +
+        "shows the panel in place; floating shows a launcher bubble bottom-right; " +
+        "default 'inline'), title: '<header label>', placeholder: '<input hint>' }. " +
+        "The welcome message comes from the agent's config; an optional `welcome` prop overrides it for this placement only. Shape: " +
+        "{ component:'GuestChat', props:{ agent:'booking-assistant', mode:'floating', " +
+        "title:'Ask us anything' } }.",
     },
   ];
 }

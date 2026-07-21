@@ -31,6 +31,7 @@ export const ADMIN_SECTIONS: readonly AdminSection[] = [
   },
   { key: "collections", href: "/admin/collections" },
   { key: "dataSources", href: "/admin/data-sources" },
+  { key: "chatAgents", href: "/admin/chat-agents" },
   { key: "media", href: "/admin/media" },
   { key: "settings", href: "/admin/settings/content-locales" },
 ];

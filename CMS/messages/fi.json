@@ -584,13 +584,15 @@
       "settings": "Sisältökielet, teeman väriasetukset sekä brändi ja tekoälypersoona.",
       "pageBuilder": "Koosta sivuja visuaalisesti lohkoista ja komponenteista.",
       "collections": "Määritä tyypitettyjä tietokokoelmia, täytä ne sisällöllä ja tee kyselyitä.",
-      "dataSources": "Määritä ulkoiset API:t tietolähteiksi ja hallitse niiden tallennettuja pyyntöjä."
+      "dataSources": "Määritä ulkoiset API:t tietolähteiksi ja hallitse niiden tallennettuja pyyntöjä.",
+      "chatAgents": "Määritä vieraille näkyvät chatbotit: kehote, malli, rajat ja mitä ne saavat kysellä."
     },
     "pageBuilder": "Sivurakentaja",
     "collections": "Kokoelmat",
     "componentsImportExport": "Tuonti / vienti",
     "componentsDevelop": "Kehitä",
-    "dataSources": "Tietolähteet"
+    "dataSources": "Tietolähteet",
+    "chatAgents": "Chat-agentit"
   },
   "pageBuilder": {
     "title": "Sivurakentaja",

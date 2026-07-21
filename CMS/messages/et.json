@@ -584,13 +584,15 @@
       "settings": "Sisukeeled, teema värvialistamised ning bränd ja tehisintellekti persoon.",
       "pageBuilder": "Koosta lehti visuaalselt plokkidest ja komponentidest.",
       "collections": "Defineeri tüübitud andmekogumikke, täida need sisuga ja teosta päringuid.",
-      "dataSources": "Määra välised API-d andmeallikatena ja halda nende salvestatud päringuid."
+      "dataSources": "Määra välised API-d andmeallikatena ja halda nende salvestatud päringuid.",
+      "chatAgents": "Seadista külastajatele suunatud vestlusrobotid: viip, mudel, piirid ja mida nad võivad pärida."
     },
     "pageBuilder": "Lehe koostaja",
     "collections": "Kogumikud",
     "componentsImportExport": "Import / eksport",
     "componentsDevelop": "Arenda",
-    "dataSources": "Andmeallikad"
+    "dataSources": "Andmeallikad",
+    "chatAgents": "Vestlusagendid"
   },
   "pageBuilder": {
     "title": "Lehe koostaja",

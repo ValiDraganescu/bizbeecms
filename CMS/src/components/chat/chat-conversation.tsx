@@ -68,7 +68,7 @@ import {
   type InlineAttachment,
   type ReferencedAsset,
 } from "@/lib/chat/attachments";
-import { MAX_ASSET_SIZE } from "@/lib/render/asset";
+import { MAX_ASSET_SIZE, inferAssetContentType } from "@/lib/render/asset";
 import { GalleryPicker, type GalleryAsset } from "@/components/media/gallery-picker";
 import { subscribeChatAttachments } from "@/lib/chat/chat-attach-bus";
 
@@ -585,12 +585,16 @@ export function ChatConversation({
     setAttachError(null);
     const list = Array.from(files);
     for (const file of list) {
+      // Browsers report an empty `type` for some extensions (`.md` notably) —
+      // infer from the filename so the gate + the inlined part get a real MIME
+      // (mirrors the /api/assets server-side fallback).
+      const mime = file.type || inferAssetContentType(file.name);
       if (!canAttach) {
         setAttachError(t("attach.textOnly"));
         return;
       }
-      if (!acceptsFile(mods, file.type)) {
-        setAttachError(t("attach.rejected", { name: file.name, kind: kindLabel(file.type) }));
+      if (!acceptsFile(mods, mime)) {
+        setAttachError(t("attach.rejected", { name: file.name, kind: kindLabel(mime) }));
         continue;
       }
       if (file.size > MAX_ASSET_SIZE) {
@@ -609,7 +613,7 @@ export function ChatConversation({
         const row = (await res.json()) as { key: string; url: string };
         setAttachments((cur) => [
           ...cur,
-          { key: row.key, url: row.url, name: file.name, mime: file.type },
+          { key: row.key, url: row.url, name: file.name, mime },
         ]);
       } catch {
         setAttachError(t("attach.uploadFailed", { name: file.name }));

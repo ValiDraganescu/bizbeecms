@@ -24,6 +24,7 @@ export type AdminPageContext =
   | "media"
   | "collections"
   | "data-sources"
+  | "chat-agents"
   | "general";
 
 const KNOWN_CONTEXTS: AdminPageContext[] = [
@@ -34,6 +35,7 @@ const KNOWN_CONTEXTS: AdminPageContext[] = [
   "media",
   "collections",
   "data-sources",
+  "chat-agents",
 ];
 
 // The tools that EXIST in bizbee today (must match each tool's function.name).
@@ -100,6 +102,12 @@ export const KNOWN_TOOL_NAMES = [
   "get_data_sources_guide",
   // On-demand JSON-LD (schema.org structured data) authoring playbook (static).
   "get_jsonld_guide",
+  // public-guest-chatbots Slice 6: guest-facing chat-agent CRUD + playbook.
+  "list_chat_agents",
+  "create_chat_agent",
+  "update_chat_agent",
+  "delete_chat_agent",
+  "get_chat_agents_guide",
 ] as const;
 export type ToolName = (typeof KNOWN_TOOL_NAMES)[number];
 
@@ -194,6 +202,9 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "get_data_sources_guide",
     // JSON-LD structured-data authoring playbook (seo-robots).
     "get_jsonld_guide",
+    // Discover guest chat agents so a GuestChat block can reference a real one
+    // (agents are created/edited on the Chat Agents page, not here).
+    "list_chat_agents",
     "edit_text",
     "generate_image",
     "search_icons",
@@ -243,6 +254,8 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "get_data_sources_guide",
     // JSON-LD structured-data authoring playbook (seo-robots).
     "get_jsonld_guide",
+    // Discover guest chat agents to reference from a GuestChat block placed here.
+    "list_chat_agents",
     "generate_image",
   ],
   // Settings: read + UPDATE brand/theme, read locales, translate into site locales.
@@ -276,6 +289,20 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "test_data_source",
     "get_data_sources_guide",
   ],
+  // Chat Agents admin: CRUD guest-facing chatbots + discover what to allowlist.
+  // Placing a GuestChat block on a page is a page-building job (no block surface
+  // here) — the context prompt points the operator to Page Builder/Pages.
+  "chat-agents": [
+    "list_chat_agents",
+    "create_chat_agent",
+    "update_chat_agent",
+    "delete_chat_agent",
+    "get_chat_agents_guide",
+    // Discover what to allowlist: existing sources/saved requests + collections.
+    "list_data_sources",
+    "query_collection",
+    "get_data_sources_guide",
+  ],
   // Anywhere else: full toolset.
   general: [...KNOWN_TOOL_NAMES],
 };
@@ -301,6 +328,8 @@ const CONTEXT_PROMPTS: Record<AdminPageContext, string> = {
   collections: `You are in Collections — the site's structured data. You can define a new typed collection (create_collection: name + typed fields; each collection gets system fields id/slug/status/created_at/updated_at automatically). You can add, update, archive/unarchive/delete items (add_collection_item / update_collection_item / archive_collection_item), and find items with structured filters/sort/search (query_collection — collections are addressed by their content_<slug> table name). You can also evolve a collection's schema: add a new field (add_collection_field — one call per field; this is how you add a property to an EXISTING collection, never create_collection again), drop a user field (drop_collection_field — permanent, data lost), or rename one keeping its data (rename_collection_field). System fields can't be dropped or renamed. Prefer query_collection to discover a collection's table name and item ids before editing. Prefer archiving over deleting.`,
 
   "data-sources": `You are on the Data Sources page — external APIs this site can pull data from. Configured sources and their saved requests are already listed in this prompt's context when any exist — don't call list_data_sources to rediscover them. You can define a new source with saved requests (create_data_source — its secret is write-only, never readable back) and fetch a live sample of a saved request (test_data_source — its result's paths array lists the mappable response dot-paths). Before any non-trivial work, call get_data_sources_guide for the full playbook (auth modes, placeholders, caching/retries). Binding this data into page blocks, Lists, or forms happens in the Page Builder or Pages assistant, not here — point the operator there for that.`,
+
+  "chat-agents": `You are on the Chat Agents page — guest-facing chatbots that run on the site's PUBLISHED pages. A logged-out visitor talks to an agent you configure; the visitor never chooses its model, prompt, or tools. You can list agents (list_chat_agents), create one (create_chat_agent — name + systemPrompt required, plus optional model, welcome message, usage limits, and the allowlist of what it may touch), update one (update_chat_agent — address by id or name; FULL-REPLACE for supplied fields, so pass the whole config, not a delta) and delete one (delete_chat_agent). Before non-trivial config work, call get_chat_agents_guide for the full playbook (limit meanings + defaults, the dataSources/collections allowlist shapes, the safety model). The allowlist must reference REAL targets: data-source saved requests by their EXISTING ids (list_data_sources) and collections by their content_<slug> table names (query_collection) — never invent ids. The guest bot only ever gets the allowlisted tools; its queries see published items only, and its creates/updates land as drafts for operator review. PLACING the agent on a page (a GuestChat block) happens in the Page Builder or Pages assistant, not here — point the operator there once the agent is configured.`,
 
   general: `You are the site's AI assistant. You can author components, compose pages, translate content, and reference uploaded media. Help the operator with whatever they need.`,
 };

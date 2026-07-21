@@ -617,6 +617,74 @@ export const redirect = sqliteTable(
   (t) => [uniqueIndex("redirect_from_path_unique").on(t.fromPath)],
 );
 
+/**
+ * Chat agent — a guest-facing chatbot configuration an operator (or the admin
+ * AI assistant) registers so a published page can embed a locked-down bot
+ * (public-guest-chatbots Slice 1). Holds the PERSONA + the allowlist of what a
+ * visitor's conversation may touch: saved data-source requests and collections.
+ * A visitor never chooses model, prompt, or tools — the public endpoint re-reads
+ * the published page's GuestChat block, resolves the referenced agent, and runs
+ * the conversation entirely server-side.
+ *
+ * `limits`, `dataSources`, and `collections` are stored as RAW JSON strings.
+ * This module keeps them opaque on purpose — the pure, dep-free core in
+ * `src/lib/public-chat/core.ts` parses/validates them and applies defaults, so
+ * the DB layer never encodes config semantics. Shapes (validated by the core):
+ *   - `limits`: `{ perIpPerMinute?, perIpPerDay?, siteMessagesPerDay?,
+ *      maxMessagesPerConversation?, maxUserMessageLen?, maxToolRounds?,
+ *      maxTokensPerResponse? }` — all optional, defaults live in the core.
+ *   - `dataSources` (allowlist): `{ sourceId, requestId, toolName, description,
+ *      maxCallsPerConversation? }[]`.
+ *   - `collections` (allowlist): `{ collection, description, canQuery, canCreate,
+ *      canUpdate, lookupFields?: string[] }[]`.
+ * `model` null → the site default from `lib/chat/models.ts`. The DB IS the Site
+ * boundary — no siteId column.
+ */
+export const chatAgent = sqliteTable(
+  "chat_agent",
+  {
+    id: text("id").primaryKey(),
+    // Operator-facing name; also usable as the GuestChat block's `agent` ref, so
+    // it must be unique (see the uniqueIndex below).
+    name: text("name").notNull(),
+    // The persona/instructions prepended to every guest conversation. The core
+    // wraps this with fixed guardrails before it reaches the model.
+    systemPrompt: text("system_prompt").notNull(),
+    // OpenRouter model id; null → site default (resolved against the catalog).
+    model: text("model"),
+    // Whether the endpoint will serve this agent at all. Disabled agents 404.
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    // Optional opening line the widget shows before the first user message.
+    welcomeMessage: text("welcome_message"),
+    // RAW JSON — parsed/validated by src/lib/public-chat/core.ts (opaque here).
+    limits: text("limits").notNull().default("{}"),
+    // RAW JSON allowlist of saved data-source requests the bot may call.
+    dataSources: text("data_sources").notNull().default("[]"),
+    // RAW JSON allowlist of collections the bot may query/create/update.
+    collections: text("collections").notNull().default("[]"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [uniqueIndex("chat_agent_name_unique").on(t.name)],
+);
+
+/**
+ * Usage counter — a generic atomic counter keyed by an opaque string, used to
+ * meter guest-chat abuse/cost per day (public-guest-chatbots Slice 1). Keys are
+ * `chat:<agentId>:<YYYY-MM-DD>:messages` (enforced against the site-day budget)
+ * and `chat:<agentId>:<YYYY-MM-DD>:tokens` (recorded for visibility only). The
+ * store increments via `INSERT … ON CONFLICT DO UPDATE count = count + n` so
+ * concurrent requests never lose a bump. The DB IS the Site boundary.
+ */
+export const usageCounter = sqliteTable("usage_counter", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+});
+
 export type Component = typeof component.$inferSelect;
 export type NewComponent = typeof component.$inferInsert;
 export type Page = typeof page.$inferSelect;
@@ -650,3 +718,7 @@ export type DataSourceRequest = typeof dataSourceRequest.$inferSelect;
 export type NewDataSourceRequest = typeof dataSourceRequest.$inferInsert;
 export type Redirect = typeof redirect.$inferSelect;
 export type NewRedirect = typeof redirect.$inferInsert;
+export type ChatAgent = typeof chatAgent.$inferSelect;
+export type NewChatAgent = typeof chatAgent.$inferInsert;
+export type UsageCounter = typeof usageCounter.$inferSelect;
+export type NewUsageCounter = typeof usageCounter.$inferInsert;

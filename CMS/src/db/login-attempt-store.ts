@@ -19,7 +19,7 @@ import { windowStart } from "../lib/auth/throttle-core.ts";
  *  public Form-block submissions — the `email` column then holds `form:<ip>`
  *  (same sliding-window shape; the form window ⊂ the 15-min store window, so
  *  the shared read filter + prune stay correct). */
-export type AttemptKind = "login" | "forgot" | "form";
+export type AttemptKind = "login" | "forgot" | "form" | "chat";
 
 /**
  * Failure timestamps (epoch ms) recorded for `email`/`kind` inside the current
