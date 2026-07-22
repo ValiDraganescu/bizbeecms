@@ -40,3 +40,36 @@ export function signalPageMutation(toolName: string): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(PAGE_MUTATION_EVENT, { detail: { tool: toolName } }));
 }
+
+// ── Chat-agent mutations (Chat Agents admin) ──────────────────────────────────
+// Same sibling problem, different surface: when an AI tool changes a chat
+// agent, the Chat Agents list/edit pages must refetch (and republish their
+// attached context) or the operator's form clobbers the assistant's change on
+// the next full-replace save.
+
+export const CHAT_AGENT_MUTATION_EVENT = "cms:chat-agent-mutated";
+
+const AGENT_MUTATING_TOOLS = new Set<string>([
+  "create_chat_agent",
+  "update_chat_agent",
+  "delete_chat_agent",
+  "update_chat_agent_settings",
+  "set_chat_agent_limits",
+  "set_chat_agent_data_source",
+  "remove_chat_agent_data_source",
+  "set_chat_agent_collection",
+  "remove_chat_agent_collection",
+]);
+
+/** Does a successful call of this tool change a stored chat agent? */
+export function mutatesChatAgents(toolName: string, ok: boolean): boolean {
+  return ok && AGENT_MUTATING_TOOLS.has(toolName);
+}
+
+/** Fire the chat-agent reload signal (no-op outside the browser). */
+export function signalChatAgentMutation(toolName: string): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(CHAT_AGENT_MUTATION_EVENT, { detail: { tool: toolName } }),
+  );
+}

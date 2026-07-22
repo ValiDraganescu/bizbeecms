@@ -18,6 +18,7 @@ import {
   toolsForContext,
   contextPrompt,
 } from "../src/lib/chat/tool-scopes.ts";
+import { LOCAL_TIME_TO_UTC_TOOL } from "../src/lib/public-chat/guest-tools.ts";
 
 test("tool schema: zero-arg function named get_chat_agents_guide", () => {
   const fn = GET_CHAT_AGENTS_GUIDE_TOOL.function;
@@ -31,9 +32,16 @@ test("tool schema: zero-arg function named get_chat_agents_guide", () => {
 test("guide covers the full shipped chat-agent tool surface", () => {
   for (const tool of [
     "list_chat_agents",
+    "get_chat_agent",
     "create_chat_agent",
     "update_chat_agent",
     "delete_chat_agent",
+    "update_chat_agent_settings",
+    "set_chat_agent_limits",
+    "set_chat_agent_data_source",
+    "remove_chat_agent_data_source",
+    "set_chat_agent_collection",
+    "remove_chat_agent_collection",
     "list_data_sources",
     "query_collection",
   ]) {
@@ -59,26 +67,50 @@ test("guide covers the full shipped chat-agent tool surface", () => {
 });
 
 test("every tool name the guide references exists (no drift on renames)", () => {
-  const known = new Set(KNOWN_TOOL_NAMES);
+  // Admin tool names PLUS the guest-facing builtin the guide documents — imported
+  // from its defining module so renaming the builtin breaks this test too.
+  const known = new Set([...KNOWN_TOOL_NAMES, LOCAL_TIME_TO_UTC_TOOL]);
   const mentioned = CHAT_AGENTS_GUIDE.match(/\b[a-z]+(?:_[a-z]+)+\b/g) ?? [];
   for (const t of mentioned) {
     assert.ok(known.has(t), `guide mentions unknown tool-like token "${t}" — renamed tool or typo?`);
   }
+  // The guide must name the builtin by its REAL model-facing name.
+  assert.ok(
+    CHAT_AGENTS_GUIDE.includes(LOCAL_TIME_TO_UTC_TOOL),
+    "guide should document the builtin local-time→UTC tool by its real name",
+  );
 });
 
 test("registered in the pure tool scopes + surfaced in the context prompt", () => {
   assert.ok(KNOWN_TOOL_NAMES.includes("get_chat_agents_guide"));
-  // The chat-agents context exposes the full agent CRUD + the guide + discovery.
+  // The chat-agents context exposes the full agent CRUD + the granular edit
+  // family + the guide + discovery.
   for (const t of [
     "list_chat_agents",
+    "get_chat_agent",
     "create_chat_agent",
     "update_chat_agent",
     "delete_chat_agent",
+    "update_chat_agent_settings",
+    "set_chat_agent_limits",
+    "set_chat_agent_data_source",
+    "remove_chat_agent_data_source",
+    "set_chat_agent_collection",
+    "remove_chat_agent_collection",
     "get_chat_agents_guide",
     "list_data_sources",
     "query_collection",
   ]) {
     assert.ok(toolsForContext("chat-agents").includes(t), `chat-agents should expose ${t}`);
+  }
+  // The context prompt steers the model to the granular tools over full-replace.
+  for (const t of [
+    "update_chat_agent_settings",
+    "set_chat_agent_limits",
+    "set_chat_agent_data_source",
+    "set_chat_agent_collection",
+  ]) {
+    assert.ok(contextPrompt("chat-agents").includes(t), `context prompt should steer to ${t}`);
   }
   // Page-building assistants can discover agents to reference from a block.
   assert.ok(toolsForContext("page-builder").includes("list_chat_agents"));

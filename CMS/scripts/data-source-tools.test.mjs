@@ -40,6 +40,10 @@ test("create_data_source: header/query/basic auth REQUIRE a secret", () => {
   });
   assert.equal(noSecret.ok, false);
   assert.match(noSecret.error, /secret/);
+  // Self-correcting: the error must name the no-credential fallback so the
+  // model creates with a dummy secret instead of stalling the conversation.
+  assert.match(noSecret.error, /"PLACEHOLDER"/);
+  assert.match(noSecret.error, /Admin → Data Sources/);
 
   const withSecret = validateCreateDataSource({
     name: "w", baseUrl: "https://api.example.com", authType: "header", authParam: "X-API-Key", secret: "k1",

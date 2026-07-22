@@ -673,6 +673,48 @@ export const chatAgent = sqliteTable(
 );
 
 /**
+ * Guest chat conversation — one persisted row per client-generated conversation
+ * (public-guest-chatbots persistence epic). The `id` IS the client conversationId
+ * (a UUID the widget mints); the endpoint upserts the full conversation after each
+ * turn. `payload` holds the FULL gateway-fidelity JSON (system prompt + tool
+ * schemas + the verbatim transcript incl. tool_calls / tool-role entries + usage)
+ * so an operator can later replay exactly what the model saw. The list-view
+ * columns (`messageCount`, token counts, `timezone`, timestamps) are denormalized
+ * out of `payload` so the admin viewer's list never parses the JSON blob.
+ *
+ * Scoped to one agent (`agentId`, indexed): the store REJECTS an upsert whose id
+ * already belongs to a DIFFERENT agent, so a guessed UUID can't let one agent's
+ * visitor overwrite another's record.
+ */
+export const chatConversation = sqliteTable(
+  "chat_conversation",
+  {
+    // The client-generated conversationId (a validated UUID).
+    id: text("id").primaryKey(),
+    agentId: text("agent_id").notNull(),
+    pageId: text("page_id"),
+    blockId: text("block_id"),
+    // The visitor's IANA timezone + UTC offset (minutes), for the admin viewer.
+    timezone: text("timezone"),
+    utcOffsetMinutes: integer("utc_offset_minutes"),
+    // The OpenRouter model id the conversation ran against.
+    model: text("model"),
+    messageCount: integer("message_count").notNull().default(0),
+    promptTokens: integer("prompt_tokens").default(0),
+    completionTokens: integer("completion_tokens").default(0),
+    // The full gateway-fidelity conversation JSON (opaque here; the route builds it).
+    payload: text("payload").notNull().default("{}"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [index("chat_conversation_agent_idx").on(t.agentId)],
+);
+
+/**
  * Usage counter — a generic atomic counter keyed by an opaque string, used to
  * meter guest-chat abuse/cost per day (public-guest-chatbots Slice 1). Keys are
  * `chat:<agentId>:<YYYY-MM-DD>:messages` (enforced against the site-day budget)

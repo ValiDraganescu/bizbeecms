@@ -55,6 +55,7 @@ test("guide covers the full shipped surface", () => {
     'type="submit"', // native form semantics
     "itemsPath", // nested rows arrays
     "BY NAME", // form field mapping contract
+    '"PLACEHOLDER"', // dummy-secret fallback when the operator has no key yet
     // Dynamic-pages route refs moved here (dedup slice): the guide is now the
     // canonical home; schemas/context prompts carry only terse pointers.
     '{ "param": "city-slug" }',

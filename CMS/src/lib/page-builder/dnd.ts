@@ -5,6 +5,7 @@
  *  - `{kind:"section"}`            — the LAYOUT Section primitive
  *  - `{kind:"list"}`              — the built-in List block
  *  - `{kind:"form"}`              — the built-in Form block
+ *  - `{kind:"guestChat"}`          — the built-in GuestChat block
  *  - `{kind:"component", name}`    — a component from the components rail
  *  - `{kind:"move", id}`           — reorder/move an existing Layers node
  * Drop targets read it back via `readDragPayload`.
@@ -16,6 +17,7 @@ export type DragPayload =
   | { kind: "section" }
   | { kind: "list" }
   | { kind: "form" }
+  | { kind: "guestChat" }
   | { kind: "component"; name: string }
   | { kind: "move"; id: string };
 

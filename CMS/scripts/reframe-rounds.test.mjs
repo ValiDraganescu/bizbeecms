@@ -181,6 +181,54 @@ test("a SUCCESSFUL tool then a silent turn ends normally (no spurious nudge)", a
   assert.equal(events.filter((e) => e.event === "token").length, 0);
 });
 
+test("onComplete fires once before done with the FULL transcript + final text", async () => {
+  // Round 1 calls a tool; round 2 is the final answer. onComplete must receive the
+  // whole gateway transcript (system + user + assistant tool_calls + tool result +
+  // final assistant answer) and the final text.
+  const round1 = turnStream([toolLine(0, "list_pages", "{}", "call_1"), "data: [DONE]\n"]);
+  const round2 = turnStream([deltaLine("All done."), "data: [DONE]\n"]);
+  const nextTurn = async () => round2;
+
+  let seenTranscript;
+  let seenFinal;
+  let calls = 0;
+  const onComplete = (transcript, finalText) => {
+    calls++;
+    seenTranscript = transcript;
+    seenFinal = finalText;
+  };
+
+  const initialMessages = [
+    { role: "system", content: "sys" },
+    { role: "user", content: "hi" },
+  ];
+  const events = await drain(
+    streamChatRounds(round1, initialMessages, nextTurn, runToolsRound, 4, undefined, onComplete),
+  );
+
+  assert.equal(calls, 1, "onComplete fires exactly once");
+  assert.equal(events.at(-1).event, "done");
+  assert.equal(seenFinal, "All done.");
+  const roles = seenTranscript.map((m) => m.role);
+  assert.deepEqual(roles, ["system", "user", "assistant", "tool", "assistant"]);
+  // The final assistant answer is appended verbatim.
+  assert.equal(seenTranscript.at(-1).content, "All done.");
+  // The tool-call round is present with the provider id round-tripped.
+  const toolCallTurn = seenTranscript.find((m) => m.role === "assistant" && m.tool_calls);
+  assert.equal(toolCallTurn.tool_calls[0].id, "call_1");
+});
+
+test("a throwing onComplete never breaks the stream (still emits done)", async () => {
+  const initial = turnStream([deltaLine("hi"), "data: [DONE]\n"]);
+  const nextTurn = async () => { throw new Error("no second turn"); };
+  const events = await drain(
+    streamChatRounds(initial, [], nextTurn, runToolsRound, 4, undefined, () => {
+      throw new Error("observer boom");
+    }),
+  );
+  assert.equal(events.at(-1).event, "done");
+});
+
 test("a mid-stream upstream error frames an error event, not done", async () => {
   const boom = new ReadableStream({ pull() { throw new Error("upstream exploded"); } });
   const nextTurn = async () => boom;

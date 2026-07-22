@@ -121,9 +121,27 @@ import {
   CREATE_CHAT_AGENT_TOOL,
   UPDATE_CHAT_AGENT_TOOL,
   DELETE_CHAT_AGENT_TOOL,
+  GET_CHAT_AGENT_TOOL,
+  UPDATE_CHAT_AGENT_SETTINGS_TOOL,
+  SET_CHAT_AGENT_LIMITS_TOOL,
+  SET_CHAT_AGENT_DATA_SOURCE_TOOL,
+  REMOVE_CHAT_AGENT_DATA_SOURCE_TOOL,
+  SET_CHAT_AGENT_COLLECTION_TOOL,
+  REMOVE_CHAT_AGENT_COLLECTION_TOOL,
   validateCreateChatAgent,
   validateUpdateChatAgent,
+  validateUpdateChatAgentSettings,
+  validateSetChatAgentLimits,
+  validateSetChatAgentDataSource,
+  validateSetChatAgentCollection,
+  validateRemoveKey,
+  applyLimitsPatch,
+  upsertDataSourceEntry,
+  removeDataSourceEntry,
+  upsertCollectionEntry,
+  removeCollectionEntry,
   formatAgentForModel,
+  formatAgentDetailForModel,
 } from "./chat-agent-tools";
 import {
   GET_CHAT_AGENTS_GUIDE_TOOL,
@@ -321,6 +339,13 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   update_chat_agent: UPDATE_CHAT_AGENT_TOOL,
   delete_chat_agent: DELETE_CHAT_AGENT_TOOL,
   get_chat_agents_guide: GET_CHAT_AGENTS_GUIDE_TOOL,
+  get_chat_agent: GET_CHAT_AGENT_TOOL,
+  update_chat_agent_settings: UPDATE_CHAT_AGENT_SETTINGS_TOOL,
+  set_chat_agent_limits: SET_CHAT_AGENT_LIMITS_TOOL,
+  set_chat_agent_data_source: SET_CHAT_AGENT_DATA_SOURCE_TOOL,
+  remove_chat_agent_data_source: REMOVE_CHAT_AGENT_DATA_SOURCE_TOOL,
+  set_chat_agent_collection: SET_CHAT_AGENT_COLLECTION_TOOL,
+  remove_chat_agent_collection: REMOVE_CHAT_AGENT_COLLECTION_TOOL,
 };
 
 /** The tool SCHEMAS the assistant may use in this admin-page context (chat route). */
@@ -1442,6 +1467,176 @@ async function handleDeleteChatAgent(args: unknown): Promise<Record<string, unkn
   }
 }
 
+async function handleGetChatAgent(args: unknown): Promise<Record<string, unknown>> {
+  const ref = coerceIdArg(args, "agent");
+  if (!ref) return { ok: false, errors: ["agent (id or name) is required — list_chat_agents shows them"] };
+  try {
+    const row = await getChatAgent(ref);
+    if (!row) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+    const config = parseAgentConfig(row.limits, row.dataSources, row.collections);
+    return { ok: true, agent: formatAgentDetailForModel(row, config) };
+  } catch (err) {
+    return { ok: false, errors: [`failed to read chat agent: ${(err as Error).message}`] };
+  }
+}
+
+// ── Granular chat-agent patches ───────────────────────────────────────────────
+// Shared skeleton: resolve the agent, parse its stored config, let the pure
+// applier produce the DELTA'd row fields, persist via the same full-row store
+// update the full-replace path uses (one write path, no forked semantics).
+
+type AgentPatch = {
+  name?: string;
+  systemPrompt?: string;
+  model?: string | null;
+  enabled?: boolean;
+  welcomeMessage?: string | null;
+  config?: { limits: unknown; dataSources: unknown; collections: unknown };
+};
+
+/** Apply a patch on top of an existing row and persist. Never throws. */
+async function persistAgentPatch(
+  ref: string,
+  patch: AgentPatch,
+): Promise<
+  | { ok: true; agent: Record<string, unknown> }
+  | { ok: false; errors: string[] }
+> {
+  const existing = await getChatAgent(ref);
+  if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+  const config =
+    patch.config ??
+    parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
+  const res = await updateChatAgent(existing.id, {
+    name: patch.name ?? existing.name,
+    systemPrompt: patch.systemPrompt ?? existing.systemPrompt,
+    model: patch.model !== undefined ? patch.model : existing.model,
+    enabled: patch.enabled ?? existing.enabled,
+    welcomeMessage:
+      patch.welcomeMessage !== undefined ? patch.welcomeMessage : existing.welcomeMessage,
+    ...configColumns(config),
+  });
+  if (res === null) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+  if (!res.ok) return { ok: false, errors: [res.error] };
+  return { ok: true, agent: summarizeAgent(res.agent) };
+}
+
+async function handleUpdateChatAgentSettings(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateUpdateChatAgentSettings(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const { ref, patch } = valid.value;
+  try {
+    const res = await persistAgentPatch(ref, patch);
+    if (!res.ok) return res;
+    return { ok: true, action: "updated", changed: Object.keys(patch), agent: res.agent };
+  } catch (err) {
+    return { ok: false, errors: [`failed to update chat agent settings: ${(err as Error).message}`] };
+  }
+}
+
+async function handleSetChatAgentLimits(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateSetChatAgentLimits(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const { ref, patch } = valid.value;
+  try {
+    const existing = await getChatAgent(ref);
+    if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+    const config = parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
+    const limits = applyLimitsPatch(config.limits, patch);
+    const res = await persistAgentPatch(ref, { config: { ...config, limits } });
+    if (!res.ok) return res;
+    return { ok: true, action: "updated", changed: Object.keys(patch), limits, agent: res.agent };
+  } catch (err) {
+    return { ok: false, errors: [`failed to set chat agent limits: ${(err as Error).message}`] };
+  }
+}
+
+async function handleSetChatAgentDataSource(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateSetChatAgentDataSource(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const { ref, entry } = valid.value;
+  try {
+    // The entry must reference a REAL source + saved request; accept id OR name
+    // refs and store the resolved ids (self-correcting errors list what exists).
+    const resolved = await resolveSourceAndRequest(entry.sourceId, entry.requestId);
+    if (!resolved.ok) return { ok: false, errors: [resolved.error] };
+    entry.sourceId = resolved.source.id;
+    entry.requestId = resolved.request.id;
+    const existing = await getChatAgent(ref);
+    if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+    const config = parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
+    const { list, action } = upsertDataSourceEntry(config.dataSources, entry);
+    const res = await persistAgentPatch(ref, { config: { ...config, dataSources: list } });
+    if (!res.ok) return res;
+    return { ok: true, action, toolName: entry.toolName, agent: res.agent };
+  } catch (err) {
+    return { ok: false, errors: [`failed to set chat agent data source: ${(err as Error).message}`] };
+  }
+}
+
+async function handleRemoveChatAgentDataSource(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateRemoveKey(args, "toolName");
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const { ref, value: toolName } = valid.value;
+  try {
+    const existing = await getChatAgent(ref);
+    if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+    const config = parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
+    const removed = removeDataSourceEntry(config.dataSources, toolName);
+    if (!removed.ok) return { ok: false, errors: [removed.error] };
+    const res = await persistAgentPatch(ref, { config: { ...config, dataSources: removed.list } });
+    if (!res.ok) return res;
+    return { ok: true, action: "removed", toolName, agent: res.agent };
+  } catch (err) {
+    return { ok: false, errors: [`failed to remove chat agent data source: ${(err as Error).message}`] };
+  }
+}
+
+async function handleSetChatAgentCollection(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateSetChatAgentCollection(args);
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const { ref, entry } = valid.value;
+  try {
+    // The entry must name a REAL collection table (self-correcting otherwise).
+    const view = await getCollection(entry.collection);
+    if (!view) {
+      return {
+        ok: false,
+        errors: [
+          `no collection "${entry.collection}" — discover the real content_<slug> table names with query_collection`,
+        ],
+      };
+    }
+    const existing = await getChatAgent(ref);
+    if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+    const config = parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
+    const { list, action } = upsertCollectionEntry(config.collections, entry);
+    const res = await persistAgentPatch(ref, { config: { ...config, collections: list } });
+    if (!res.ok) return res;
+    return { ok: true, action, collection: entry.collection, agent: res.agent };
+  } catch (err) {
+    return { ok: false, errors: [`failed to set chat agent collection: ${(err as Error).message}`] };
+  }
+}
+
+async function handleRemoveChatAgentCollection(args: unknown): Promise<Record<string, unknown>> {
+  const valid = validateRemoveKey(args, "collection");
+  if (!valid.ok) return { ok: false, errors: [valid.error] };
+  const { ref, value: collection } = valid.value;
+  try {
+    const existing = await getChatAgent(ref);
+    if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+    const config = parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
+    const removed = removeCollectionEntry(config.collections, collection);
+    if (!removed.ok) return { ok: false, errors: [removed.error] };
+    const res = await persistAgentPatch(ref, { config: { ...config, collections: removed.list } });
+    if (!res.ok) return res;
+    return { ok: true, action: "removed", collection, agent: res.agent };
+  } catch (err) {
+    return { ok: false, errors: [`failed to remove chat agent collection: ${(err as Error).message}`] };
+  }
+}
+
 // ── content-collections (Slice D): component↔collection BINDING tools ─────────
 // These mutate a PAGE's draft block tree (NOT a collection store): load the
 // blocks, find the target block, validate the binding against the registry + the
@@ -2118,6 +2313,13 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   create_chat_agent: handleCreateChatAgent,
   update_chat_agent: handleUpdateChatAgent,
   delete_chat_agent: handleDeleteChatAgent,
+  get_chat_agent: handleGetChatAgent,
+  update_chat_agent_settings: handleUpdateChatAgentSettings,
+  set_chat_agent_limits: handleSetChatAgentLimits,
+  set_chat_agent_data_source: handleSetChatAgentDataSource,
+  remove_chat_agent_data_source: handleRemoveChatAgentDataSource,
+  set_chat_agent_collection: handleSetChatAgentCollection,
+  remove_chat_agent_collection: handleRemoveChatAgentCollection,
   // Static playbook — no store/CF work, so the handler is a constant payload.
   get_data_sources_guide: async () => ({ ok: true, guide: DATA_SOURCES_GUIDE }),
   get_jsonld_guide: async () => ({ ok: true, guide: JSONLD_GUIDE }),

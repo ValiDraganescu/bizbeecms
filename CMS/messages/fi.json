@@ -644,6 +644,7 @@
     },
     "layoutList": "Lista (tietolähteestä)",
     "layoutForm": "Lomake (lähettää tietolähteeseen)",
+    "layoutGuestChat": "Tekoälychat",
     "bind": {
       "title": "Sido tietolähteeseen",
       "help": "Täytä tämän lohkon ominaisuudet tietolähteestä — ensimmäisestä osuvasta kokoelman kohteesta tai API-vastauksesta.",
@@ -762,6 +763,23 @@
       "redirect": "Uudelleenohjaus lähetyksen jälkeen (valinnainen)",
       "redirectHint": "Saman sivuston polku, joka alkaa /-merkillä — käytetään ilman JavaScriptiä tehdyn lähetyksen jälkeen sivulle palaamisen sijaan.",
       "redirectInvalid": "On oltava saman sivuston polku, joka alkaa yhdellä /-merkillä — muuten arvo ohitetaan."
+    },
+    "guestChat": {
+      "title": "Tekoälychat",
+      "agent": "Chat-agentti",
+      "agentNone": "Valitse agentti…",
+      "agentDisabled": "{name} (poistettu käytöstä)",
+      "agentMissing": "Tuntematon agentti ({id})",
+      "noAgents": "Ei vielä chat-agentteja — luo sellainen kohdassa",
+      "manageAgents": "Chat-agentit",
+      "mode": "Näyttö",
+      "modeInline": "Upotettu paneeli",
+      "modeFloating": "Kelluva kupla",
+      "label": "Otsikko",
+      "placeholder": "Syöttökentän ohjeteksti",
+      "welcome": "Tervetuloviesti",
+      "welcomeHelp": "Jätä tyhjäksi käyttääksesi agentin tervetuloviestiä",
+      "showIcon": "Näytä chat-kuvake"
     },
     "componentsEmpty": "Ei vielä komponentteja — tuo paketti tai komponentti.",
     "componentsNoMatch": "Mikään komponentti ei vastaa hakuasi.",

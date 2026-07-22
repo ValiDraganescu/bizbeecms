@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { ConfirmModal } from "@/components/content/confirm-modal";
 import { NumberInput } from "@/components/ui/number-input";
 import {
   DEFAULT_LIMITS,
@@ -45,6 +46,17 @@ export type SavedRequest = { id: string; name: string };
 export type Collection = { name: string; tableName: string };
 
 export type UsageRow = { day: string; messages: number; tokens: number };
+
+/** A conversation summary row (GET …/conversations — no heavy payload). */
+export type ConversationSummary = {
+  id: string;
+  messageCount: number;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  timezone: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 
 /* -------------------------------------------------------------- class tokens */
 
@@ -523,6 +535,192 @@ export function UsagePanel({ agentId }: { agentId: string }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/* --------------------------------------------------------- conversations panel */
+
+const PAGE_SIZE = 25;
+
+/** Compact local date-time for a conversation timestamp (falls back to raw ISO). */
+function fmtWhen(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+}
+
+/**
+ * Recent guest conversations for a saved agent (GET …/conversations, paginated by
+ * limit/offset + total). Each row shows started / last-activity / message count /
+ * tokens / timezone, a Download link (plain <a> to the download route — no fetch),
+ * and a Delete guarded by the shared ConfirmModal. Prev/next paging over `total`.
+ */
+export function ConversationsPanel({ agentId }: { agentId: string }) {
+  const [rows, setRows] = useState<ConversationSummary[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<ConversationSummary | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/chat-agents/${agentId}/conversations?limit=${PAGE_SIZE}&offset=${offset}`,
+      );
+      if (!res.ok) throw new Error(await readError(res));
+      const j = (await res.json()) as {
+        conversations: ConversationSummary[];
+        total: number;
+      };
+      setRows(j.conversations);
+      setTotal(j.total);
+    } catch (err) {
+      setError((err as Error).message);
+      setRows([]);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentId, offset]);
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/chat-agents/${agentId}/conversations/${deleting.id}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error(await readError(res));
+      setDeleting(null);
+      // Deleting the last row of the final page steps back a page.
+      if (rows && rows.length === 1 && offset > 0) setOffset((o) => o - PAGE_SIZE);
+      else await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (error)
+    return (
+      <p role="alert" className="text-sm text-danger">
+        {error}
+      </p>
+    );
+  if (!rows)
+    return (
+      <p role="status" className={helpCls}>
+        Loading conversations…
+      </p>
+    );
+
+  const from = total === 0 ? 0 : offset + 1;
+  const to = offset + rows.length;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className={labelCls}>Conversations</p>
+      {rows.length === 0 ? (
+        <p className={helpCls}>No guest conversations recorded yet.</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-foreground">
+              <thead>
+                <tr className="text-left text-foreground-muted">
+                  <th className="pr-4 font-medium">Started</th>
+                  <th className="pr-4 font-medium">Last activity</th>
+                  <th className="pr-4 font-medium">Messages</th>
+                  <th className="pr-4 font-medium">Tokens</th>
+                  <th className="pr-4 font-medium">Timezone</th>
+                  <th className="font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((c) => (
+                  <tr key={c.id} className="border-t border-border">
+                    <td className="py-1 pr-4 whitespace-nowrap">{fmtWhen(c.createdAt)}</td>
+                    <td className="py-1 pr-4 whitespace-nowrap">{fmtWhen(c.updatedAt)}</td>
+                    <td className="py-1 pr-4 tabular-nums">{c.messageCount}</td>
+                    <td className="py-1 pr-4 tabular-nums">
+                      {(c.promptTokens ?? 0) + (c.completionTokens ?? 0)}
+                    </td>
+                    <td className="py-1 pr-4 whitespace-nowrap">{c.timezone ?? "—"}</td>
+                    <td className="py-1">
+                      <div className="flex gap-2">
+                        <a
+                          className={ghostBtn}
+                          href={`/api/chat-agents/${agentId}/conversations/${c.id}`}
+                        >
+                          Download
+                        </a>
+                        <button
+                          type="button"
+                          className={dangerBtn}
+                          aria-label={`Delete conversation ${c.id}`}
+                          onClick={() => setDeleting(c)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className={helpCls}>
+              {from}–{to} of {total}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={ghostBtn}
+                disabled={offset === 0}
+                onClick={() => setOffset((o) => Math.max(o - PAGE_SIZE, 0))}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className={ghostBtn}
+                disabled={to >= total}
+                onClick={() => setOffset((o) => o + PAGE_SIZE)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {deleting && (
+        <ConfirmModal
+          message="Delete this conversation? The stored transcript will be permanently removed."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          danger
+          busy={busy}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setDeleting(null)}
+        />
+      )}
     </div>
   );
 }

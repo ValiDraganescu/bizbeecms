@@ -62,6 +62,8 @@ import {
   addListBlock,
   isForm,
   addFormBlock,
+  isGuestChat,
+  addGuestChatBlock,
   listSections,
   sectionName,
   renameSection,
@@ -90,6 +92,7 @@ import { SectionSettings } from "./section-settings";
 import { RowSettings } from "./row-settings";
 import { ComponentSettings } from "./component-settings";
 import { BindingPanel, ListSettings, FormSettings } from "./binding-panels";
+import { GuestChatSettings } from "./guest-chat-settings";
 import { PageSettings } from "./page-settings";
 import { VersionHistory } from "./version-history";
 
@@ -420,6 +423,12 @@ export function PageBuilderShell({
   // Drop the built-in `Form` primitive into a specific Section column (DnD).
   function onDropFormToColumn(sectionId: string, colIndex: number, rowId: string) {
     setBlocks((b) => addFormBlock(b, sectionId, colIndex, rowId));
+    setDirty(true);
+  }
+
+  // Drop the built-in `GuestChat` leaf into a specific Section column (DnD).
+  function onDropGuestChatToColumn(sectionId: string, colIndex: number, rowId: string) {
+    setBlocks((b) => addGuestChatBlock(b, sectionId, colIndex, rowId));
     setDirty(true);
   }
 
@@ -992,11 +1001,13 @@ export function PageBuilderShell({
                 <LayersTree
                   blocks={blocks}
                   draftComponents={draftComponents}
+                  pageId={selected.id}
                   selectedId={selectedBlockId}
                   onSelect={setSelectedBlockId}
                   onDropComponent={onDropComponentToColumn}
                   onDropList={onDropListToColumn}
                   onDropForm={onDropFormToColumn}
+                  onDropGuestChat={onDropGuestChatToColumn}
                   onMoveNode={onMoveNode}
                   onDeleteColumn={onDeleteColumn}
                   onDeleteNode={onDeleteNode}
@@ -1208,6 +1219,16 @@ export function PageBuilderShell({
                       apiSources={apiSources}
                       propsSchemas={propsSchemas}
                       onChange={(patch) => onUpdateForm(sel.id, patch)}
+                      onProps={(patch) => onPatchBlockProps(sel.id, patch)}
+                    />
+                  );
+                }
+                // A built-in GuestChat leaf: agent picker + mode + copy panel.
+                if (sel && isGuestChat(sel)) {
+                  return (
+                    <GuestChatSettings
+                      key={sel.id}
+                      block={sel}
                       onProps={(patch) => onPatchBlockProps(sel.id, patch)}
                     />
                   );

@@ -29,12 +29,53 @@ export const GUEST_QUERY_LIMIT_MAX = 20;
 
 const CONTENT_PREFIX = "content_";
 
+/** A builtin tool has no operator config entry — just its description. */
+export interface BuiltinToolEntry {
+  description: string;
+}
+
 export interface GuestToolDef {
   name: string;
   /** The OpenAI `{ type:"function", function:{…} }` object handed to the model. */
   schema: unknown;
-  kind: "datasource" | "query" | "create" | "update";
-  entry: DataSourceAllowEntry | CollectionAllowEntry;
+  kind: "datasource" | "query" | "create" | "update" | "builtin";
+  entry: DataSourceAllowEntry | CollectionAllowEntry | BuiltinToolEntry;
+}
+
+/** The always-present builtin: local→UTC conversion for the model. */
+export const LOCAL_TIME_TO_UTC_TOOL = "local_time_to_utc";
+
+const LOCAL_TIME_TO_UTC_DESCRIPTION =
+  "Convert a local wall-clock time to UTC (Zulu). Call this whenever an " +
+  "integration, tool, or record needs a UTC/Zulu timestamp — never guess the " +
+  "conversion yourself. Message timestamps are in the visitor's local time.";
+
+/** Build the builtin `local_time_to_utc` tool def (always added to every agent). */
+function localTimeToUtcTool(): GuestToolDef {
+  return {
+    name: LOCAL_TIME_TO_UTC_TOOL,
+    kind: "builtin",
+    entry: { description: LOCAL_TIME_TO_UTC_DESCRIPTION },
+    schema: {
+      type: "function" as const,
+      function: {
+        name: LOCAL_TIME_TO_UTC_TOOL,
+        description: LOCAL_TIME_TO_UTC_DESCRIPTION,
+        parameters: {
+          type: "object",
+          properties: {
+            local_time: {
+              type: "string",
+              description:
+                "The local time as ISO-8601 (e.g. \"2026-07-22T15:48:59\"); the " +
+                "offset is optional — omit it to use the visitor's timezone.",
+            },
+          },
+          required: ["local_time"],
+        },
+      },
+    },
+  };
 }
 
 // ── Slugging + collision-free naming ──────────────────────────────────────────
@@ -164,8 +205,10 @@ export function buildGuestTools(
   savedRequests: Map<string, { placeholders: string[] }>,
   collectionFields: Map<string, string[]>,
 ): GuestToolDef[] {
-  const taken = new Set<string>();
-  const tools: GuestToolDef[] = [];
+  // The builtin always exists and its name is reserved first, so an operator's
+  // tool can never shadow `local_time_to_utc` (a collision gets suffixed instead).
+  const taken = new Set<string>([LOCAL_TIME_TO_UTC_TOOL]);
+  const tools: GuestToolDef[] = [localTimeToUtcTool()];
 
   for (const entry of config.dataSources) {
     const saved = savedRequests.get(`${entry.sourceId}:${entry.requestId}`);
@@ -234,9 +277,14 @@ export function assembleGuestPrompt(
       ? "You have no tools available; answer from your own knowledge only."
       : ["You can use these tools:", ...tools.map(toolLine)].join("\n");
 
+  const timeNote =
+    "Message timestamps (shown as `[at <time>]`) are in the visitor's local time. " +
+    `Whenever a tool or record needs UTC/Zulu, call ${LOCAL_TIME_TO_UTC_TOOL} to convert — never convert by hand.`;
+
   return [
     agent.systemPrompt.trim(),
     listing,
+    timeNote,
     ["Guardrails:", ...GUARDRAILS.map((g) => `- ${g}`)].join("\n"),
   ].join("\n\n");
 }

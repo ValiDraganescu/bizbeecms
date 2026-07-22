@@ -83,6 +83,19 @@ test("build: query placeholders encoded once via URLSearchParams", () => {
   assert.equal(u.searchParams.get("pair"), "60.17,24.94");
 });
 
+test("build: empty-substituted query params are omitted, not sent as `?k=`", () => {
+  const b = buildRequest(
+    src(),
+    req({ query: { sort: "{sort}", status: "{status}", page: "{page}" } }),
+    { sort: "", status: "reserved", page: "" },
+  );
+  assert.equal(b.ok, true);
+  const u = new URL(b.value.url);
+  assert.equal(u.searchParams.has("sort"), false);
+  assert.equal(u.searchParams.has("page"), false);
+  assert.equal(u.searchParams.get("status"), "reserved");
+});
+
 test("build: missing param fails gracefully", () => {
   const b = buildRequest(src(), req({ path: "/city/{city}" }), {});
   assert.equal(b.ok, false);
@@ -164,6 +177,23 @@ test("fetch: never retries other 4xx", async () => {
   assert.equal(r.ok, false);
   assert.equal(r.status, 404);
   assert.equal(f.calls.length, 1);
+});
+
+test("fetch: 4xx error carries a capped excerpt of the upstream body", async () => {
+  const f = mockFetch([{ status: 400, body: { error: "sort must be time_asc or time_desc" } }]);
+  const r = await fetchSource(src(), req(), {}, { fetch: f, sleep: noSleep });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /upstream responded 400/);
+  assert.match(r.error, /sort must be time_asc or time_desc/);
+});
+
+test("fetch: exhausted 5xx error carries the upstream body excerpt", async () => {
+  const f = mockFetch([{ status: 500, body: { error: "boom" } }]);
+  const r = await fetchSource(src(), req({ method: "POST" }), {}, { fetch: f, sleep: noSleep });
+  assert.equal(r.ok, false);
+  assert.equal(r.status, 500);
+  assert.match(r.error, /upstream responded 500/);
+  assert.match(r.error, /boom/);
 });
 
 test("fetch: POST does not retry unless marked retryable", async () => {

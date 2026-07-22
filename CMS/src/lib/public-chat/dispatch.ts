@@ -30,12 +30,13 @@ import { createItem, updateItem } from "@/db/item-store";
 import { sampleForModel } from "@/lib/chat/data-source-tools";
 import { apiParamsFromFields, collectionBodyFromFields } from "@/lib/forms/submit-core";
 import type { GuestToolDef } from "./guest-tools";
-import { GUEST_QUERY_LIMIT_MAX } from "./guest-tools";
+import { GUEST_QUERY_LIMIT_MAX, LOCAL_TIME_TO_UTC_TOOL } from "./guest-tools";
 import type {
   ChatAgentConfig,
   DataSourceAllowEntry,
   CollectionAllowEntry,
 } from "./core";
+import { localTimeToUtc } from "./core";
 import { guestQuerySpec, updateLookupFilters, guestBody } from "./dispatch-core";
 
 /** Max chars of a tool result fed back to the model (context-safety bound). */
@@ -52,6 +53,8 @@ export interface GuestToolContext {
   callCounts: Map<string, number>;
   /** The secret-box KEK (`CMS_AUTH_SECRET`); "" when unset. */
   kek: string;
+  /** The visitor's UTC offset (minutes) — the fallback for `local_time_to_utc`. */
+  offsetMinutes: number;
 }
 
 /** Every guest tool result is this shape (`ok` + name; error list on failure). */
@@ -76,6 +79,8 @@ export async function runGuestTool(
 
   try {
     switch (tool.kind) {
+      case "builtin":
+        return runBuiltin(ctx, name, args);
       case "datasource":
         return await runDataSource(ctx, name, tool.entry as DataSourceAllowEntry, args);
       case "query":
@@ -92,6 +97,24 @@ export async function runGuestTool(
     // generic tool error (internals stay server-side, out of the model context).
     return fail(name, "the tool failed — please try again");
   }
+}
+
+// ── builtin tools ─────────────────────────────────────────────────────────────
+
+/**
+ * Run a builtin tool (currently only `local_time_to_utc`). Pure logic lives in
+ * the core (`localTimeToUtc`); the conversation's offset is the fallback when the
+ * model passes a bare (offset-less) local time. A self-correcting error on bad
+ * input degrades to `{ok:false}` like every other guest tool.
+ */
+function runBuiltin(ctx: GuestToolContext, name: string, args: unknown): GuestToolResult {
+  if (name !== LOCAL_TIME_TO_UTC_TOOL) return fail(name, "unknown tool");
+  const rec = args && typeof args === "object" && !Array.isArray(args)
+    ? (args as Record<string, unknown>)
+    : {};
+  const res = localTimeToUtc(rec.local_time, ctx.offsetMinutes);
+  if (!res.ok) return fail(name, res.error);
+  return { name, ok: true, utc: res.utc };
 }
 
 // ── data-source tool ──────────────────────────────────────────────────────────
@@ -155,7 +178,9 @@ async function runDataSource(
     params.params,
     { cache: null },
   );
-  if (!result.ok) return fail(name, "the request could not be completed");
+  // Surface the engine's error (upstream status + capped body excerpt) so the
+  // model can self-correct — a masked "could not be completed" leaves it blind.
+  if (!result.ok) return fail(name, `the request could not be completed (${result.error})`);
   return { name, ok: true, data: sampleForModel(result.data, GUEST_RESULT_MAX_CHARS) };
 }
 

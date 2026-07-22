@@ -162,6 +162,16 @@ export type OnUsage = (usage: {
 }) => void;
 
 /**
+ * Optional completion observer. Invoked ONCE, right before the final `done`
+ * frame, with the FULL accumulated transcript (system + user/assistant turns +
+ * synthesized assistant `tool_calls` turns + `role:"tool"` results) and the final
+ * assistant text. Additive + default-absent: when omitted the behavior is EXACTLY
+ * the pre-existing one (the admin route passes nothing). A throwing observer must
+ * never break the stream — the caller swallows it.
+ */
+export type OnComplete = (transcript: ChatMessage[], finalText: string) => void;
+
+/**
  * Consume ONE upstream model turn: forward text deltas as `token` frames and
  * collect the turn's text + tool calls. Does NOT emit `done` — the loop decides
  * whether to continue. Returns the accumulated assistant text and assembled tool
@@ -272,6 +282,7 @@ export function streamChatRounds(
   runTools: RunToolsRound,
   maxRounds = 4,
   onUsage?: OnUsage,
+  onComplete?: OnComplete,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   const transcript = [...messages];
@@ -282,6 +293,10 @@ export function streamChatRounds(
     async start(controller) {
       if (started) return;
       started = true;
+      // The final assistant answer text (the turn that requested no tools). Fed to
+      // `onComplete` and appended to the transcript so the persisted record is the
+      // full gateway conversation.
+      let finalText = "";
       try {
         // True when the round we just fed back contained a FAILED tool result. If
         // the model then goes silent (empty turn) we nudge it once to retry instead
@@ -307,12 +322,28 @@ export function streamChatRounds(
               upstream = await nextTurn(transcript);
               continue;
             }
-            break; // final answer — no tools requested
+            finalText = text; // final answer — no tools requested
+            break;
           }
 
           const results = await runTools(calls, controller, encoder);
 
-          if (round === maxRounds - 1) break; // cap: ran the tools, but no follow-up turn
+          if (round === maxRounds - 1) {
+            // Cap: ran the tools, but no follow-up turn. The assistant's tool_calls
+            // turn is still part of the record; append it so the persisted
+            // transcript matches what was sent to the gateway.
+            transcript.push(assistantToolCallMessage(text, calls));
+            results.forEach((r, i) => {
+              transcript.push({
+                role: "tool",
+                tool_call_id: calls[i].id,
+                name: r.name,
+                content: JSON.stringify(r.data),
+              });
+            });
+            finalText = text;
+            break;
+          }
 
           // Feed the round back: the assistant's tool_calls, then each result,
           // each keyed by the SAME provider call id (OpenAI/Claude require the
@@ -332,6 +363,17 @@ export function streamChatRounds(
             (r) => (r.data as { ok?: unknown } | null)?.ok === false,
           );
           upstream = await nextTurn(transcript);
+        }
+        if (onComplete) {
+          // Append the final assistant answer so the transcript is the WHOLE
+          // conversation, then hand the caller the full record + final text. A
+          // throwing observer must never break the stream.
+          if (finalText !== "") transcript.push({ role: "assistant", content: finalText });
+          try {
+            onComplete(transcript, finalText);
+          } catch {
+            /* observer failure never affects the stream */
+          }
         }
         controller.enqueue(encoder.encode(frameEvent("done", {})));
         controller.close();

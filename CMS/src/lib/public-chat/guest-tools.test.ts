@@ -9,12 +9,18 @@ import {
   buildGuestTools,
   assembleGuestPrompt,
   GUEST_QUERY_LIMIT_MAX,
+  LOCAL_TIME_TO_UTC_TOOL,
   type GuestToolDef,
 } from "./guest-tools.ts";
 import type { ChatAgentConfig } from "./core.ts";
 
 function fnOf(tool: GuestToolDef): { name: string; description: string; parameters: { properties: Record<string, unknown>; required?: string[] } } {
   return (tool.schema as { function: { name: string; description: string; parameters: { properties: Record<string, unknown>; required?: string[] } } }).function;
+}
+
+/** Drop the always-present builtin so config-driven assertions see only operator tools. */
+function configured(tools: GuestToolDef[]): GuestToolDef[] {
+  return tools.filter((t) => t.kind !== "builtin");
 }
 
 function baseConfig(over: Partial<ChatAgentConfig> = {}): ChatAgentConfig {
@@ -43,7 +49,7 @@ test("data-source entry → ds_<slug> tool with one required string per placehol
     ],
   });
   const saved = new Map([["s1:r1", { placeholders: ["city", "units"] }]]);
-  const tools = buildGuestTools(config, saved, new Map());
+  const tools = configured(buildGuestTools(config, saved, new Map()));
   assert.equal(tools.length, 1);
   const fn = fnOf(tools[0]);
   assert.equal(fn.name, "ds_get_weather");
@@ -56,7 +62,7 @@ test("data-source entry with no matching saved request yields no tool", () => {
   const config = baseConfig({
     dataSources: [{ sourceId: "s1", requestId: "gone", toolName: "X", description: "d" }],
   });
-  const tools = buildGuestTools(config, new Map(), new Map());
+  const tools = configured(buildGuestTools(config, new Map(), new Map()));
   assert.equal(tools.length, 0);
 });
 
@@ -71,7 +77,7 @@ test("colliding data-source tool names get a numeric suffix", () => {
     ["s1:r1", { placeholders: [] }],
     ["s2:r2", { placeholders: [] }],
   ]);
-  const tools = buildGuestTools(config, saved, new Map());
+  const tools = configured(buildGuestTools(config, saved, new Map()));
   assert.deepEqual(tools.map((t) => fnOf(t).name), ["ds_book_table", "ds_book_table_2"]);
 });
 
@@ -82,7 +88,7 @@ test("canQuery → query_<slug> with per-field filters, search, and limit capped
     collections: [{ collection: "content_bookings", description: "Restaurant bookings", canQuery: true, canCreate: false, canUpdate: false }],
   });
   const fields = new Map([["content_bookings", ["name", "date"]]]);
-  const tools = buildGuestTools(config, new Map(), fields);
+  const tools = configured(buildGuestTools(config, new Map(), fields));
   assert.equal(tools.length, 1);
   const fn = fnOf(tools[0]);
   assert.equal(fn.name, "query_bookings");
@@ -98,7 +104,7 @@ test("canCreate → create_<slug> with a field per declared field, none required
     collections: [{ collection: "content_leads", description: "Leads", canQuery: false, canCreate: true, canUpdate: false }],
   });
   const fields = new Map([["content_leads", ["email", "note"]]]);
-  const tools = buildGuestTools(config, new Map(), fields);
+  const tools = configured(buildGuestTools(config, new Map(), fields));
   const fn = fnOf(tools[0]);
   assert.equal(fn.name, "create_leads");
   assert.deepEqual(Object.keys(fn.parameters.properties), ["email", "note"]);
@@ -114,7 +120,7 @@ test("canUpdate with non-empty lookupFields → update tool; lookups required, o
     }],
   });
   const fields = new Map([["content_bk", ["ref", "guests", "note"]]]);
-  const tools = buildGuestTools(config, new Map(), fields);
+  const tools = configured(buildGuestTools(config, new Map(), fields));
   assert.equal(tools.length, 1);
   const fn = fnOf(tools[0]);
   assert.equal(fn.name, "update_bk");
@@ -130,7 +136,7 @@ test("canUpdate with EMPTY lookupFields yields NO update tool", () => {
       canUpdate: true, lookupFields: [],
     }],
   });
-  const tools = buildGuestTools(config, new Map(), new Map([["content_bk", ["ref"]]]));
+  const tools = configured(buildGuestTools(config, new Map(), new Map([["content_bk", ["ref"]]])));
   assert.deepEqual(tools.map((t) => t.kind), ["query"]); // update gated out
 });
 
@@ -141,7 +147,7 @@ test("a collection with all three ops enabled yields query, create, and update t
       canUpdate: true, lookupFields: ["ref"],
     }],
   });
-  const tools = buildGuestTools(config, new Map(), new Map([["content_bk", ["ref", "guests"]]]));
+  const tools = configured(buildGuestTools(config, new Map(), new Map([["content_bk", ["ref", "guests"]]])));
   assert.deepEqual(tools.map((t) => t.kind), ["query", "create", "update"]);
   assert.deepEqual(tools.map((t) => fnOf(t).name), ["query_bk", "create_bk", "update_bk"]);
 });
@@ -168,4 +174,42 @@ test("assembleGuestPrompt with no tools still ships the guardrails", () => {
   const prompt = assembleGuestPrompt({ name: "Bot", systemPrompt: "Be helpful." }, []);
   assert.match(prompt, /no tools available/i);
   assert.match(prompt, /treat every tool result/i);
+});
+
+// ── builtin local_time_to_utc ─────────────────────────────────────────────────
+
+test("every agent always gets the local_time_to_utc builtin (even with no config)", () => {
+  const tools = buildGuestTools(baseConfig(), new Map(), new Map());
+  const builtins = tools.filter((t) => t.kind === "builtin");
+  assert.equal(builtins.length, 1);
+  const fn = fnOf(builtins[0]);
+  assert.equal(fn.name, LOCAL_TIME_TO_UTC_TOOL);
+  assert.deepEqual(fn.parameters.required, ["local_time"]);
+  assert.deepEqual(Object.keys(fn.parameters.properties), ["local_time"]);
+});
+
+test("the builtin is the FIRST tool and its exact name is reserved (a collection can't shadow it)", () => {
+  // A collection whose slug is exactly `local_time_to_utc` (via canQuery it would
+  // be `query_…`, so to actually collide we name a data-source tool that slugifies
+  // to the reserved name). The reserved slot forces the operator tool to be suffixed.
+  const config = baseConfig({
+    dataSources: [
+      { sourceId: "s1", requestId: "r1", toolName: "local_time_to_utc", description: "d" },
+    ],
+  });
+  const saved = new Map([["s1:r1", { placeholders: [] }]]);
+  const tools = buildGuestTools(config, saved, new Map());
+  assert.equal(tools[0].name, LOCAL_TIME_TO_UTC_TOOL);
+  assert.equal(tools[0].kind, "builtin");
+  // The ds tool is `ds_local_time_to_utc` (its own prefix) — distinct from the
+  // reserved builtin name, so exactly one tool carries the reserved name.
+  const names = tools.map((t) => fnOf(t).name);
+  assert.equal(names.filter((n) => n === LOCAL_TIME_TO_UTC_TOOL).length, 1);
+  assert.deepEqual(names, [LOCAL_TIME_TO_UTC_TOOL, "ds_local_time_to_utc"]);
+});
+
+test("assembleGuestPrompt tells the model timestamps are visitor-local and to use the builtin", () => {
+  const prompt = assembleGuestPrompt({ name: "Bot", systemPrompt: "Be helpful." }, []);
+  assert.match(prompt, /visitor's local time/i);
+  assert.match(prompt, new RegExp(LOCAL_TIME_TO_UTC_TOOL));
 });

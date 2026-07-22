@@ -13,7 +13,18 @@ import assert from "node:assert/strict";
 import {
   validateCreateChatAgent,
   validateUpdateChatAgent,
+  validateUpdateChatAgentSettings,
+  validateSetChatAgentLimits,
+  validateSetChatAgentDataSource,
+  validateSetChatAgentCollection,
+  validateRemoveKey,
+  applyLimitsPatch,
+  upsertDataSourceEntry,
+  removeDataSourceEntry,
+  upsertCollectionEntry,
+  removeCollectionEntry,
   formatAgentForModel,
+  formatAgentDetailForModel,
 } from "../src/lib/chat/chat-agent-tools.ts";
 import { DEFAULT_LIMITS, parseAgentConfig } from "../src/lib/public-chat/core.ts";
 
@@ -117,4 +128,159 @@ test("formatAgentForModel returns counts + a limit summary, never raw JSON", () 
   assert.equal(out.limits.perIpPerMinute, 5);
   // No raw JSON strings leak into the DTO.
   assert.ok(!Object.values(out).some((v) => typeof v === "string" && v.trim().startsWith("[")));
+});
+
+// ── Granular edit surface (get + patch tools) ─────────────────────────────────
+
+test("formatAgentDetailForModel returns the FULL config incl. prompt + allowlists", () => {
+  const config = parseAgentConfig(
+    JSON.stringify({ maxToolRounds: 4 }),
+    JSON.stringify([{ sourceId: "s1", requestId: "r1", toolName: "w", description: "d", maxCallsPerConversation: 2 }]),
+    JSON.stringify([{ collection: "content_a", description: "a", canQuery: true }]),
+  );
+  const out = formatAgentDetailForModel(
+    {
+      id: "id1", name: "Booking", enabled: false, model: null,
+      systemPrompt: "You book tables.", welcomeMessage: "Hi!",
+    },
+    config,
+  );
+  assert.equal(out.systemPrompt, "You book tables.");
+  assert.equal(out.welcomeMessage, "Hi!");
+  assert.equal(out.limits.maxToolRounds, 4);
+  assert.equal(out.limits.maxUserMessageLen, DEFAULT_LIMITS.maxUserMessageLen);
+  assert.deepEqual(out.dataSources, [
+    { sourceId: "s1", requestId: "r1", toolName: "w", description: "d", maxCallsPerConversation: 2 },
+  ]);
+  assert.equal(out.collections.length, 1);
+  assert.equal(out.collections[0].canQuery, true);
+});
+
+test("settings patch: requires the ref and at least one field", () => {
+  assert.equal(validateUpdateChatAgentSettings(null).ok, false);
+  assert.equal(validateUpdateChatAgentSettings({ name: "x" }).ok, false); // no agent
+  const empty = validateUpdateChatAgentSettings({ agent: "id1" });
+  assert.equal(empty.ok, false);
+  assert.match(empty.error, /at least one/);
+});
+
+test("settings patch: only supplied fields land in the patch; null clears model/welcome", () => {
+  const r = validateUpdateChatAgentSettings({
+    agent: "Booking", model: null, welcomeMessage: null, enabled: false,
+  });
+  assert.ok(r.ok);
+  assert.equal(r.value.ref, "Booking");
+  assert.deepEqual(r.value.patch, { model: null, welcomeMessage: null, enabled: false });
+  assert.ok(!("name" in r.value.patch));
+  assert.ok(!("systemPrompt" in r.value.patch));
+});
+
+test("settings patch: an empty name/systemPrompt is rejected with the fix named", () => {
+  const badName = validateUpdateChatAgentSettings({ agent: "id1", name: "  " });
+  assert.equal(badName.ok, false);
+  assert.match(badName.error, /name/);
+  const badPrompt = validateUpdateChatAgentSettings({ agent: "id1", systemPrompt: "" });
+  assert.equal(badPrompt.ok, false);
+  assert.match(badPrompt.error, /systemPrompt/);
+});
+
+test("limits patch: unknown keys and out-of-range values are named exactly", () => {
+  const unknown = validateSetChatAgentLimits({ agent: "id1", limits: { bogusKey: 3 } });
+  assert.equal(unknown.ok, false);
+  assert.match(unknown.error, /bogusKey/);
+  assert.match(unknown.error, /perIpPerMinute/); // lists the valid keys
+  const over = validateSetChatAgentLimits({ agent: "id1", limits: { maxToolRounds: 999 } });
+  assert.equal(over.ok, false);
+  assert.match(over.error, /maxToolRounds/);
+  const empty = validateSetChatAgentLimits({ agent: "id1", limits: {} });
+  assert.equal(empty.ok, false);
+});
+
+test("limits patch: numbers set, null resets, omitted keys keep the stored value", () => {
+  const r = validateSetChatAgentLimits({
+    agent: "id1", limits: { maxToolRounds: 5, perIpPerDay: null },
+  });
+  assert.ok(r.ok);
+  const current = { ...DEFAULT_LIMITS, maxToolRounds: 2, perIpPerDay: 42, perIpPerMinute: 7 };
+  const next = applyLimitsPatch(current, r.value.patch);
+  assert.equal(next.maxToolRounds, 5); // set
+  assert.equal(next.perIpPerDay, DEFAULT_LIMITS.perIpPerDay); // reset
+  assert.equal(next.perIpPerMinute, 7); // untouched
+});
+
+test("data-source entry validator reuses the strict core with flat arg names", () => {
+  const bad = validateSetChatAgentDataSource({ agent: "id1", sourceId: "s1", requestId: "r1", toolName: "w" });
+  assert.equal(bad.ok, false);
+  assert.match(bad.error, /description/);
+  assert.ok(!bad.error.includes("dataSources[0]"), "errors should speak in flat arg names");
+  const good = validateSetChatAgentDataSource({
+    agent: "id1", sourceId: "s1", requestId: "r1", toolName: "w", description: "d",
+  });
+  assert.ok(good.ok);
+  assert.equal(good.value.entry.toolName, "w");
+});
+
+test("collection entry validator enforces canUpdate ⇒ lookupFields", () => {
+  const bad = validateSetChatAgentCollection({
+    agent: "id1", collection: "content_a", description: "a", canUpdate: true,
+  });
+  assert.equal(bad.ok, false);
+  assert.match(bad.error, /lookupFields/);
+  const good = validateSetChatAgentCollection({
+    agent: "id1", collection: "content_a", description: "a", canQuery: true,
+  });
+  assert.ok(good.ok);
+  assert.equal(good.value.entry.canQuery, true);
+});
+
+test("upsert appliers add new entries and replace by key, leaving the rest intact", () => {
+  const base = [
+    { sourceId: "s1", requestId: "r1", toolName: "a", description: "A" },
+    { sourceId: "s1", requestId: "r2", toolName: "b", description: "B" },
+  ];
+  const added = upsertDataSourceEntry(base, { sourceId: "s1", requestId: "r3", toolName: "c", description: "C" });
+  assert.equal(added.action, "added");
+  assert.equal(added.list.length, 3);
+  const replaced = upsertDataSourceEntry(base, { sourceId: "s9", requestId: "r9", toolName: "b", description: "B2" });
+  assert.equal(replaced.action, "replaced");
+  assert.equal(replaced.list.length, 2);
+  assert.equal(replaced.list[1].description, "B2");
+  assert.equal(replaced.list[0].description, "A"); // untouched
+  assert.equal(base[1].description, "B"); // input not mutated
+
+  const cols = [{ collection: "content_a", description: "a", canQuery: true, canCreate: false, canUpdate: false, lookupFields: [] }];
+  const colAdd = upsertCollectionEntry(cols, { collection: "content_b", description: "b", canQuery: true, canCreate: false, canUpdate: false, lookupFields: [] });
+  assert.equal(colAdd.action, "added");
+  const colRep = upsertCollectionEntry(cols, { collection: "content_a", description: "a2", canQuery: false, canCreate: true, canUpdate: false, lookupFields: [] });
+  assert.equal(colRep.action, "replaced");
+  assert.equal(colRep.list[0].description, "a2");
+});
+
+test("remove appliers drop by key; unknown keys error listing what exists", () => {
+  const base = [
+    { sourceId: "s1", requestId: "r1", toolName: "a", description: "A" },
+    { sourceId: "s1", requestId: "r2", toolName: "b", description: "B" },
+  ];
+  const ok = removeDataSourceEntry(base, "a");
+  assert.ok(ok.ok);
+  assert.deepEqual(ok.list.map((e) => e.toolName), ["b"]);
+  const miss = removeDataSourceEntry(base, "zzz");
+  assert.equal(miss.ok, false);
+  assert.match(miss.error, /"a", "b"/); // self-correcting: lists the real names
+
+  const cols = [{ collection: "content_a", description: "a", canQuery: true, canCreate: false, canUpdate: false, lookupFields: [] }];
+  const colMiss = removeCollectionEntry(cols, "content_zzz");
+  assert.equal(colMiss.ok, false);
+  assert.match(colMiss.error, /content_a/);
+  const colOk = removeCollectionEntry(cols, "content_a");
+  assert.ok(colOk.ok);
+  assert.equal(colOk.list.length, 0);
+});
+
+test("validateRemoveKey requires the ref and the key", () => {
+  assert.equal(validateRemoveKey({ toolName: "a" }, "toolName").ok, false);
+  assert.equal(validateRemoveKey({ agent: "id1" }, "toolName").ok, false);
+  const r = validateRemoveKey({ agent: "id1", toolName: " a " }, "toolName");
+  assert.ok(r.ok);
+  assert.equal(r.value.value, "a");
 });

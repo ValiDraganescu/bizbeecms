@@ -150,10 +150,15 @@ export function buildRequest(
     return { ok: false, error: "could not build request URL" };
   }
 
-  // Query: substitute raw (URLSearchParams encodes on serialization).
+  // Query: substitute raw (URLSearchParams encodes on serialization). A param
+  // whose substituted value is empty means "no filter" and is OMITTED — every
+  // placeholder is required, so "" is the only way a caller can skip an
+  // optional filter, and upstreams commonly reject `?sort=` where they would
+  // accept omission.
   for (const [k, tpl] of Object.entries(request.query)) {
     const v = substitute(tpl, params, (s) => s);
     if (!v.ok) return v;
+    if (v.value === "") continue;
     url.searchParams.set(k, v.value);
   }
 
@@ -367,6 +372,24 @@ async function readBodyCapped(
   return { ok: true, text };
 }
 
+/** Cap on the upstream error-body excerpt carried in an error message. */
+const ERROR_EXCERPT_MAX_CHARS = 600;
+
+/**
+ * Read a capped, whitespace-collapsed excerpt of an error response's body so
+ * `upstream responded 400` can carry the upstream's own explanation (e.g. a
+ * validation message naming the bad field) — the difference between a caller
+ * that can self-correct and one that can only retry blindly.
+ */
+async function errorExcerpt(res: Response): Promise<string> {
+  try {
+    const text = (await res.text()).slice(0, ERROR_EXCERPT_MAX_CHARS).replace(/\s+/g, " ").trim();
+    return text ? `: ${text}` : "";
+  } catch {
+    return "";
+  }
+}
+
 function isIdempotentSafe(request: FetchRequestConfig): boolean {
   return request.method === "GET" || request.retryable === true;
 }
@@ -497,7 +520,7 @@ export async function fetchSource(
     }
 
     if (res.status >= 500 || res.status === 429) {
-      lastError = `upstream responded ${res.status}`;
+      lastError = `upstream responded ${res.status}${await errorExcerpt(res)}`;
       lastStatus = res.status;
       continue; // retryable status
     }
@@ -514,7 +537,11 @@ export async function fetchSource(
     }
     if (!res.ok) {
       // other 4xx: our request is wrong — retrying can't fix it
-      return { ok: false, status: res.status, error: `upstream responded ${res.status}` };
+      return {
+        ok: false,
+        status: res.status,
+        error: `upstream responded ${res.status}${await errorExcerpt(res)}`,
+      };
     }
 
     // Size cap — reject oversized bodies before/after buffering (never retry:

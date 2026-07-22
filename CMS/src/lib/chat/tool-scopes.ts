@@ -108,6 +108,16 @@ export const KNOWN_TOOL_NAMES = [
   "update_chat_agent",
   "delete_chat_agent",
   "get_chat_agents_guide",
+  // Granular chat-agent editing: read one agent's full config + patch exactly
+  // one aspect (scalars / limits / one allowlist entry) so full-replace updates
+  // stop being the norm for small changes.
+  "get_chat_agent",
+  "update_chat_agent_settings",
+  "set_chat_agent_limits",
+  "set_chat_agent_data_source",
+  "remove_chat_agent_data_source",
+  "set_chat_agent_collection",
+  "remove_chat_agent_collection",
 ] as const;
 export type ToolName = (typeof KNOWN_TOOL_NAMES)[number];
 
@@ -294,10 +304,18 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
   // here) — the context prompt points the operator to Page Builder/Pages.
   "chat-agents": [
     "list_chat_agents",
+    "get_chat_agent",
     "create_chat_agent",
     "update_chat_agent",
     "delete_chat_agent",
     "get_chat_agents_guide",
+    // Granular edits — the preferred surface for changing an existing agent.
+    "update_chat_agent_settings",
+    "set_chat_agent_limits",
+    "set_chat_agent_data_source",
+    "remove_chat_agent_data_source",
+    "set_chat_agent_collection",
+    "remove_chat_agent_collection",
     // Discover what to allowlist: existing sources/saved requests + collections.
     "list_data_sources",
     "query_collection",
@@ -329,7 +347,7 @@ const CONTEXT_PROMPTS: Record<AdminPageContext, string> = {
 
   "data-sources": `You are on the Data Sources page — external APIs this site can pull data from. Configured sources and their saved requests are already listed in this prompt's context when any exist — don't call list_data_sources to rediscover them. You can define a new source with saved requests (create_data_source — its secret is write-only, never readable back) and fetch a live sample of a saved request (test_data_source — its result's paths array lists the mappable response dot-paths). Before any non-trivial work, call get_data_sources_guide for the full playbook (auth modes, placeholders, caching/retries). Binding this data into page blocks, Lists, or forms happens in the Page Builder or Pages assistant, not here — point the operator there for that.`,
 
-  "chat-agents": `You are on the Chat Agents page — guest-facing chatbots that run on the site's PUBLISHED pages. A logged-out visitor talks to an agent you configure; the visitor never chooses its model, prompt, or tools. You can list agents (list_chat_agents), create one (create_chat_agent — name + systemPrompt required, plus optional model, welcome message, usage limits, and the allowlist of what it may touch), update one (update_chat_agent — address by id or name; FULL-REPLACE for supplied fields, so pass the whole config, not a delta) and delete one (delete_chat_agent). Before non-trivial config work, call get_chat_agents_guide for the full playbook (limit meanings + defaults, the dataSources/collections allowlist shapes, the safety model). The allowlist must reference REAL targets: data-source saved requests by their EXISTING ids (list_data_sources) and collections by their content_<slug> table names (query_collection) — never invent ids. The guest bot only ever gets the allowlisted tools; its queries see published items only, and its creates/updates land as drafts for operator review. PLACING the agent on a page (a GuestChat block) happens in the Page Builder or Pages assistant, not here — point the operator there once the agent is configured.`,
+  "chat-agents": `You are on the Chat Agents page — guest-facing chatbots that run on the site's PUBLISHED pages. A logged-out visitor talks to an agent you configure; the visitor never chooses its model, prompt, or tools. The existing agents are ALREADY attached to this conversation's context — a roster on the list page, or the ONE agent being edited with its FULL config on an agent's edit page. Use that context; do NOT call list_chat_agents or get_chat_agent to rediscover what it already shows (call get_chat_agent only when the context lacks a detail you need, e.g. a truncated prompt or a different agent). To CHANGE an existing agent, PREFER THE GRANULAR TOOLS — they change only what you pass and cannot clobber the rest of the config: update_chat_agent_settings (name/systemPrompt/model/enabled/welcomeMessage), set_chat_agent_limits (patch individual limits; null resets one to its default), set_chat_agent_data_source / remove_chat_agent_data_source (one API-tool allowlist entry, upserted by toolName), set_chat_agent_collection / remove_chat_agent_collection (one collection entry, upserted by table name). Reserve update_chat_agent (FULL-REPLACE of every supplied field — a big re-send is where config bugs creep in) for full reconfigurations; create_chat_agent makes a new agent (name + systemPrompt required) and delete_chat_agent removes one. Before non-trivial config work, call get_chat_agents_guide for the full playbook (limit meanings + defaults, the dataSources/collections allowlist shapes, the safety model). The allowlist must reference REAL targets: data-source saved requests by their EXISTING ids (list_data_sources) and collections by their content_<slug> table names (query_collection) — never invent ids. The guest bot only ever gets the allowlisted tools; its queries see published items only, and its creates/updates land as drafts for operator review. PLACING the agent on a page (a GuestChat block) happens in the Page Builder or Pages assistant, not here — point the operator there once the agent is configured.`,
 
   general: `You are the site's AI assistant. You can author components, compose pages, translate content, and reference uploaded media. Help the operator with whatever they need.`,
 };

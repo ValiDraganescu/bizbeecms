@@ -7,6 +7,8 @@ import {
   GUEST_CHAT_SCRIPT,
   GUEST_CHAT_CSS,
   PUBLIC_CHAT_PATH,
+  GUEST_CHAT_IDLE_RESET_MS,
+  GUEST_CHAT_MD_SOURCE,
 } from "./plan-guest-chat.ts";
 import { stampBuiltinPageIds, stampFormPageId } from "./plan-form.ts";
 import { planPage } from "./tree.ts";
@@ -43,6 +45,17 @@ test("floating mode sets the floating class + mode attr", () => {
   const plan = elem(planGuestChat(stamped({ mode: "floating" }), () => {}));
   assert.equal(plan.props["data-bb-mode"], "floating");
   assert.equal(plan.props.className, "bb-gc-floating");
+});
+
+test("showIcon opts into the icon attr (boolean or string form); absent by default", () => {
+  const on = elem(planGuestChat(stamped({ showIcon: true }), () => {}));
+  assert.equal(on.props["data-bb-icon"], "");
+  const str = elem(planGuestChat(stamped({ showIcon: "true" }), () => {}));
+  assert.equal(str.props["data-bb-icon"], "");
+  const off = elem(planGuestChat(stamped(), () => {}));
+  assert.equal("data-bb-icon" in off.props, false);
+  const falsy = elem(planGuestChat(stamped({ showIcon: false }), () => {}));
+  assert.equal("data-bb-icon" in falsy.props, false);
 });
 
 test("welcome prop is emitted only when present", () => {
@@ -89,6 +102,113 @@ test("the client script is self-contained and posts to the public-chat endpoint"
   assert.ok(GUEST_CHAT_SCRIPT.includes("aria-live"), "message list is a live region");
   // No leaked build-time interpolation placeholders.
   assert.equal(GUEST_CHAT_SCRIPT.includes("undefined"), false);
+});
+
+test("the POST body carries the new wire-contract fields", () => {
+  assert.ok(GUEST_CHAT_SCRIPT.includes("conversationId:"), "conversationId in the body");
+  assert.ok(GUEST_CHAT_SCRIPT.includes("timezone:"), "timezone in the body");
+  assert.ok(GUEST_CHAT_SCRIPT.includes("utcOffsetMinutes:"), "utcOffsetMinutes in the body");
+  // The offset uses the sign the contract mandates (east of UTC positive).
+  assert.ok(GUEST_CHAT_SCRIPT.includes("-new Date().getTimezoneOffset()"), "offset sign flipped");
+});
+
+test("idle reset: 30-min window inlined, stale transcripts dropped on load AND on send", () => {
+  assert.equal(GUEST_CHAT_IDLE_RESET_MS, 30 * 60 * 1000);
+  assert.ok(
+    GUEST_CHAT_SCRIPT.includes(`var IDLE_RESET_MS = ${GUEST_CHAT_IDLE_RESET_MS};`),
+    "timeout constant inlined into the script",
+  );
+  assert.ok(GUEST_CHAT_SCRIPT.includes("lastAt: lastAt"), "persist stamps the activity time");
+  // The expiry check must gate BOTH entry points: restore-on-load and the next
+  // send in a tab left open past the window (load + send call sites).
+  const checks = GUEST_CHAT_SCRIPT.match(/idleExpired\(\)/g) ?? [];
+  assert.ok(checks.length >= 3, "idleExpired defined and called on load + send");
+});
+
+// The tokenizer ships as source text (interpolated into the widget script);
+// evaluate that exact repo constant here so ONE implementation is under test.
+type Tok = { t: string; s?: string; href?: string; kids?: Tok[] };
+type MdBlock = { t: string; s?: string; items?: Tok[][]; lines?: Tok[][]; kids?: Tok[] };
+const { mdParse, mdInline, mdSafeHref } = new Function(
+  `${GUEST_CHAT_MD_SOURCE}; return { mdParse, mdInline, mdSafeHref };`,
+)() as {
+  mdParse: (t: unknown) => MdBlock[];
+  mdInline: (t: string) => Tok[];
+  mdSafeHref: (h: unknown) => string;
+};
+
+test("markdown: source interpolated into the script + assistant-only rendering", () => {
+  assert.ok(GUEST_CHAT_SCRIPT.includes(GUEST_CHAT_MD_SOURCE), "tokenizer source shipped in the script");
+  assert.ok(GUEST_CHAT_SCRIPT.includes("mdInto(assistantEl, assistantText)"), "streamed bubble re-renders as markdown");
+  assert.ok(GUEST_CHAT_SCRIPT.includes('if (role !== "assistant")'), "user/system bubbles stay literal text");
+  assert.ok(GUEST_CHAT_CSS.includes(".bb-gc-msg code"), "markdown CSS shipped");
+});
+
+test("markdown: bold inside list items (the screenshot case)", () => {
+  const blocks = mdParse("For **2 guests tomorrow**, open:\n\n- **18:00**\n- **18:30**\n\nWhich time?");
+  assert.deepEqual(blocks.map((b) => b.t), ["p", "ul", "p"]);
+  const ul = blocks[1];
+  assert.equal(ul.items?.length, 2);
+  assert.deepEqual(ul.items?.[0], [{ t: "strong", kids: [{ t: "text", s: "18:00" }] }]);
+  const para = blocks[0].lines?.[0];
+  assert.deepEqual(para?.map((tk) => tk.t), ["text", "strong", "text"]);
+});
+
+test("markdown: paragraphs split on blank lines; single newlines stay in one block", () => {
+  const blocks = mdParse("line one\nline two\n\nsecond para");
+  assert.deepEqual(blocks.map((b) => b.t), ["p", "p"]);
+  assert.equal(blocks[0].lines?.length, 2, "soft-wrapped lines kept (rendered with <br>)");
+});
+
+test("markdown: ordered lists, headings, fenced code, inline code, em variants", () => {
+  const blocks = mdParse("## Times\n1. first\n2) second\n```\nraw <b>kept</b>\n```\ncall `now()` or *soon* or _later_");
+  assert.deepEqual(blocks.map((b) => b.t), ["h", "ol", "pre", "p"]);
+  assert.equal(blocks[1].items?.length, 2);
+  assert.equal(blocks[2].s, "raw <b>kept</b>", "fence content untouched (lands in a text node)");
+  const inline = blocks[3].lines?.[0] ?? [];
+  assert.deepEqual(inline.filter((tk) => tk.t !== "text").map((tk) => tk.t), ["code", "em", "em"]);
+});
+
+test("markdown: snake_case and bare asterisks are NOT emphasis; no-md text passes through", () => {
+  assert.deepEqual(mdInline("use snake_case_name and 2 * 3 * 4"), [
+    { t: "text", s: "use snake_case_name and 2 * 3 * 4" },
+  ]);
+  assert.deepEqual(mdParse("just a plain reply"), [
+    { t: "p", lines: [[{ t: "text", s: "just a plain reply" }]] },
+  ]);
+  assert.deepEqual(mdParse(null), [], "null/undefined → no blocks");
+});
+
+test("markdown: link hrefs are allowlisted — dangerous schemes degrade to text", () => {
+  assert.deepEqual(mdInline("see [our menu](https://x.y/menu)")[1], {
+    t: "link",
+    s: "our menu",
+    href: "https://x.y/menu",
+  });
+  assert.equal(mdSafeHref("https://x.y/menu"), "https://x.y/menu");
+  assert.equal(mdSafeHref("mailto:hi@x.y"), "mailto:hi@x.y");
+  assert.equal(mdSafeHref("/contact"), "/contact");
+  // eslint-disable-next-line no-script-url
+  assert.equal(mdSafeHref("javascript:alert(1)"), "");
+  assert.equal(mdSafeHref("data:text/html,x"), "");
+  assert.equal(mdSafeHref("//evil.example"), "", "protocol-relative rejected");
+  assert.equal(mdSafeHref(undefined), "");
+});
+
+test("typing indicator: animated dots shipped, always-on while streaming (no toggling)", () => {
+  assert.ok(GUEST_CHAT_CSS.includes(".bb-gc-dot"), "dot class in the CSS");
+  assert.ok(GUEST_CHAT_CSS.includes("@keyframes bb-gc-blink"), "pulse animation defined");
+  assert.ok(GUEST_CHAT_CSS.includes("prefers-reduced-motion"), "reduced-motion fallback");
+  assert.ok(GUEST_CHAT_SCRIPT.includes('el("span", "bb-gc-dot")'), "script builds the dots");
+  // The indicator lives for the whole request (visible during tool-call pauses):
+  // nothing hides it mid-stream; it is only removed when the stream settles.
+  assert.equal(GUEST_CHAT_SCRIPT.includes('working.classList.add("bb-gc-hidden")'), false);
+  assert.ok(GUEST_CHAT_SCRIPT.includes("working.remove()"), "removed when the stream settles");
+});
+
+test("timestamps: the CSS defines a .bb-gc-time class and the script stamps `at`", () => {
+  assert.ok(GUEST_CHAT_CSS.includes(".bb-gc-time"), "time label class shipped in the CSS");
+  assert.ok(GUEST_CHAT_SCRIPT.includes("localIso"), "an `at` timestamp helper exists");
 });
 
 test("stampBuiltinPageIds stamps nested GuestChat blocks and no-ops without one", () => {

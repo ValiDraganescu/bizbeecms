@@ -121,6 +121,17 @@ export function ComponentsRail({
               {t("layoutForm")}
             </button>
           </li>
+          <li>
+            <button
+              type="button"
+              disabled={!canEdit}
+              draggable={canEdit}
+              onDragStart={(e) => setDragPayload(e, { kind: "guestChat" })}
+              className={dragBtn}
+            >
+              {t("layoutGuestChat")}
+            </button>
+          </li>
         </ul>
       </div>
 

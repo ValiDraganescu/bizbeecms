@@ -51,8 +51,14 @@ import {
   parseAgentConfig,
   sanitizeGuestMessages,
   decideChatRate,
+  parseConversationMeta,
+  stampForModel,
+  timeContextLine,
+  capConversationPayload,
   type ChatAgentConfig,
+  type ConversationPayload,
 } from "@/lib/public-chat/core";
+import { upsertConversation } from "@/db/chat-conversation-store";
 import { buildGuestTools, assembleGuestPrompt } from "@/lib/public-chat/guest-tools";
 import { findGuestChatBlock } from "@/lib/public-chat/find-block";
 import {
@@ -102,6 +108,9 @@ export async function POST(request: Request): Promise<Response> {
     if (!pageId || !blockId) {
       return Response.json({ error: "chat not available" }, { status: 404 });
     }
+    // Conversation meta (pure validation): an invalid conversationId → "" makes
+    // the request anonymous — still answered, just never persisted.
+    const meta = parseConversationMeta(body);
 
     // ── Resolve the agent from the PUBLISHED page (never from the client) ───
     const agentRow = await resolveAgent(pageId, blockId);
@@ -153,13 +162,21 @@ export async function POST(request: Request): Promise<Response> {
 
     // ── Build the guest tools + system prompt from the allowlist ───────────
     const { tools, collectionFields } = await buildTools(config);
-    const systemPrompt = assembleGuestPrompt(
-      { name: agentRow.name, systemPrompt: agentRow.systemPrompt },
-      tools,
-    );
+    // System prompt = the operator prompt + tool listing + guardrails, then a
+    // time-context line giving the model the visitor's current local time/zone.
+    const systemPrompt =
+      assembleGuestPrompt(
+        { name: agentRow.name, systemPrompt: agentRow.systemPrompt },
+        tools,
+      ) +
+      "\n\n" +
+      timeContextLine(new Date().toISOString(), meta.timezone, meta.utcOffsetMinutes);
+    // The model sees each turn's local timestamp suffixed onto its content — this
+    // stamped transcript IS the gateway payload.
+    const modelMessages = stampForModel(sanitized.messages, meta.utcOffsetMinutes);
     const messages: TurnMessage[] = [
       { role: "system", content: systemPrompt },
-      ...sanitized.messages,
+      ...modelMessages,
     ];
 
     // ── Model + AI port ────────────────────────────────────────────────────
@@ -199,17 +216,62 @@ export async function POST(request: Request): Promise<Response> {
       collectionFields,
       callCounts: new Map(),
       kek: await guestKek(),
+      offsetMinutes: meta.utcOffsetMinutes,
     };
     const tokensKey = `chat:${agentRow.id}:${day}:tokens`;
     // Tokens are RECORDED for visibility, not enforced. Fire-and-forget in the
     // usage callback (`.catch` swallow) rather than `waitUntil`: the callback
     // fires mid-stream, before the response settles, so a per-turn increment is
-    // simplest and can't be dropped by an early stream close.
-    const onUsage = (u: { totalTokens?: number }) => {
+    // simplest and can't be dropped by an early stream close. The LAST usage
+    // event's counts (full-context prompt + this turn's completion) are also kept
+    // for the persisted conversation row.
+    let lastUsage: { promptTokens: number; completionTokens: number } = {
+      promptTokens: 0,
+      completionTokens: 0,
+    };
+    const onUsage = (u: {
+      totalTokens?: number;
+      promptTokens?: number;
+      completionTokens?: number;
+    }) => {
       if (u.totalTokens && u.totalTokens > 0) {
         incrementCounter(tokensKey, u.totalTokens).catch(() => {});
       }
+      lastUsage = {
+        promptTokens: u.promptTokens ?? lastUsage.promptTokens,
+        completionTokens: u.completionTokens ?? lastUsage.completionTokens,
+      };
     };
+
+    // Persist the full gateway-fidelity conversation after the model finishes.
+    // Skipped entirely when the conversationId is invalid (anonymous request).
+    // Fire-and-forget: a persistence failure must never break the visitor's stream.
+    const onComplete =
+      meta.conversationId === ""
+        ? undefined
+        : (transcript: TurnMessage[]) => {
+            const payload = buildConversationPayload(
+              transcript,
+              systemPrompt,
+              toolSchemas,
+              model,
+              meta,
+              lastUsage,
+            );
+            upsertConversation({
+              id: meta.conversationId,
+              agentId: agentRow.id,
+              pageId,
+              blockId,
+              timezone: meta.timezone || null,
+              utcOffsetMinutes: meta.utcOffsetMinutes,
+              model,
+              messageCount: payload.messages.length,
+              promptTokens: lastUsage.promptTokens,
+              completionTokens: lastUsage.completionTokens,
+              payload: JSON.stringify(payload),
+            }).catch(() => {});
+          };
 
     const stream = streamChatRounds(
       upstream,
@@ -218,11 +280,52 @@ export async function POST(request: Request): Promise<Response> {
       guestRunToolsRound(toolCtx),
       config.limits.maxToolRounds,
       onUsage,
+      onComplete,
     );
     return new Response(stream, { headers: SSE_HEADERS });
   } catch {
     return Response.json({ error: "chat failed" }, { status: 500 });
   }
+}
+
+/**
+ * Assemble the persisted conversation payload from the reframe transcript.
+ *
+ * Drops the leading system turn (kept separately in `payload.system`). Each
+ * remaining entry is verbatim as sent/received (incl. `tool_calls` / `role:"tool"`
+ * entries); the client `at` on user/assistant turns is preserved, and a server
+ * UTC `at` is stamped on entries the model/tools produced (which carry no client
+ * timestamp). Finally the whole payload is size-capped by the pure helper.
+ */
+function buildConversationPayload(
+  transcript: TurnMessage[],
+  systemPrompt: string,
+  toolSchemas: unknown[],
+  model: string,
+  meta: { timezone: string; utcOffsetMinutes: number },
+  usage: { promptTokens: number; completionTokens: number },
+): ConversationPayload {
+  const nowUtc = new Date().toISOString();
+  const messages = transcript
+    .filter((m) => m.role !== "system")
+    .map((m) => {
+      const at = (m as { at?: string }).at;
+      // Client `at` (user/assistant visitor turns) wins; tool + model-produced
+      // entries have none, so stamp the server UTC time they were recorded.
+      return { ...m, at: at ?? nowUtc };
+    });
+
+  const payload: ConversationPayload = {
+    version: 1,
+    system: systemPrompt,
+    tools: toolSchemas,
+    model,
+    timezone: meta.timezone,
+    utcOffsetMinutes: meta.utcOffsetMinutes,
+    messages,
+    usage,
+  };
+  return capConversationPayload(payload);
 }
 
 /**

@@ -644,6 +644,7 @@
     },
     "layoutList": "List (from data source)",
     "layoutForm": "Form (submits to data source)",
+    "layoutGuestChat": "AI chat",
     "bind": {
       "title": "Bind to data source",
       "help": "Fill this block's props from a data source — the first matching collection item, or a mapped API response.",
@@ -762,6 +763,23 @@
       "redirect": "Redirect after submit (optional)",
       "redirectHint": "A same-site path starting with / — used after a no-JavaScript submit instead of returning to the page.",
       "redirectInvalid": "Must be a same-site path starting with a single / — this value will be ignored."
+    },
+    "guestChat": {
+      "title": "AI chat",
+      "agent": "Chat agent",
+      "agentNone": "Select an agent…",
+      "agentDisabled": "{name} (disabled)",
+      "agentMissing": "Unknown agent ({id})",
+      "noAgents": "No chat agents yet — create one in",
+      "manageAgents": "Chat agents",
+      "mode": "Display",
+      "modeInline": "Inline panel",
+      "modeFloating": "Floating bubble",
+      "label": "Title",
+      "placeholder": "Input placeholder",
+      "welcome": "Welcome message",
+      "welcomeHelp": "Leave blank to use the agent's welcome message",
+      "showIcon": "Show chat icon"
     },
     "componentsEmpty": "No components yet — import a kit or component.",
     "componentsNoMatch": "No components match your search.",

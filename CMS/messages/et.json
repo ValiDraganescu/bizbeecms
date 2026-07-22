@@ -644,6 +644,7 @@
     },
     "layoutList": "Loend (andmeallikast)",
     "layoutForm": "Vorm (saadab andmeallikasse)",
+    "layoutGuestChat": "AI-vestlus",
     "bind": {
       "title": "Seo andmeallikaga",
       "help": "Täida selle ploki atribuudid andmeallikast — esimese sobiva kogumiku üksuse või API vastuse põhjal.",
@@ -762,6 +763,23 @@
       "redirect": "Ümbersuunamine pärast esitamist (valikuline)",
       "redirectHint": "Sama saidi tee, mis algab /-märgiga — kasutatakse ilma JavaScriptita esitamise järel lehele naasmise asemel.",
       "redirectInvalid": "Peab olema sama saidi tee, mis algab ühe /-märgiga — muidu väärtust eiratakse."
+    },
+    "guestChat": {
+      "title": "AI-vestlus",
+      "agent": "Vestlusagent",
+      "agentNone": "Vali agent…",
+      "agentDisabled": "{name} (keelatud)",
+      "agentMissing": "Tundmatu agent ({id})",
+      "noAgents": "Vestlusagente pole veel — loo see kohas",
+      "manageAgents": "Vestlusagendid",
+      "mode": "Kuva",
+      "modeInline": "Sisseehitatud paneel",
+      "modeFloating": "Hõljuv mull",
+      "label": "Pealkiri",
+      "placeholder": "Sisestusvälja vihjetekst",
+      "welcome": "Tervitussõnum",
+      "welcomeHelp": "Jäta tühjaks, et kasutada agendi tervitussõnumit",
+      "showIcon": "Näita vestlusikooni"
     },
     "componentsEmpty": "Komponente pole veel — impordi komplekt või komponent.",
     "componentsNoMatch": "Ükski komponent ei vasta otsingule.",

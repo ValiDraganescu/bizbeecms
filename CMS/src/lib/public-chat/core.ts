@@ -349,7 +349,24 @@ export function validateAgentConfigInput(args: unknown): ConfigValidation {
 
 // ── Guest transcript sanitizer (trust boundary) ───────────────────────────────
 
-export type GuestMessage = { role: "user" | "assistant"; content: string };
+export type GuestMessage = { role: "user" | "assistant"; content: string; at?: string };
+
+/** Max chars for a validated `at` timestamp (contract: ISO-8601 with offset). */
+const AT_MAX_LEN = 40;
+
+/**
+ * Validate a per-message `at` timestamp against the contract: an ISO-8601 string
+ * WITH an explicit offset (a trailing `Z` or `±HH:MM`), at most `AT_MAX_LEN`
+ * chars, that `Date` can parse. Anything else → undefined (the message is still
+ * accepted; only the timestamp is dropped). Pure — no `Date.now()`.
+ */
+function validateAt(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || raw.length === 0 || raw.length > AT_MAX_LEN) return undefined;
+  // Must carry an explicit offset: trailing Z, or ±HH:MM after the time.
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/.test(raw)) return undefined;
+  if (Number.isNaN(Date.parse(raw))) return undefined;
+  return raw;
+}
 
 export type SanitizedMessages =
   | { ok: true; messages: GuestMessage[] }
@@ -388,7 +405,8 @@ export function sanitizeGuestMessages(
         error: `message too long — keep it under ${limits.maxUserMessageLen} characters`,
       };
     }
-    messages.push({ role: rec.role, content });
+    const at = validateAt(rec.at);
+    messages.push(at ? { role: rec.role, content, at } : { role: rec.role, content });
   }
   if (messages.length > limits.maxMessagesPerConversation) {
     return {
@@ -421,4 +439,195 @@ export function decideChatRate(
   const inDay = timestamps.filter((t) => t > now - CHAT_DAY_MS).length;
   if (inDay >= limits.perIpPerDay) return { locked: true, reason: "day" };
   return { locked: false };
+}
+
+// ── Conversation meta + time-awareness (pure) ─────────────────────────────────
+
+/** Client conversationId: a lowercase-or-upper hex UUID (8-4-4-4-12). */
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+/** IANA timezone: `Area/Location` segments, letters/digits/_/+/-, up to 3 parts. */
+const TZ_RE = /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){0,2}$/;
+const TZ_MAX_LEN = 64;
+/** UTC offset bounds in minutes (±14h — the widest real-world zone span). */
+const OFFSET_MIN = -840;
+const OFFSET_MAX = 840;
+
+export interface ConversationMeta {
+  /** A valid UUID, or "" when the body's `conversationId` is absent/invalid. */
+  conversationId: string;
+  /** A valid IANA timezone, or "" when absent/invalid. */
+  timezone: string;
+  /** Offset minutes in [-840, 840]; 0 when absent/invalid. */
+  utcOffsetMinutes: number;
+}
+
+/**
+ * Extract + validate the conversation meta from the request body, per the widget
+ * contract. Every field degrades to a safe empty/zero value on absence or
+ * violation (an invalid `conversationId` → "" makes the request anonymous:
+ * still answered, never persisted). Pure — no I/O.
+ */
+export function parseConversationMeta(body: unknown): ConversationMeta {
+  const rec = asRecord(body) ?? {};
+
+  const rawId = rec.conversationId;
+  const conversationId = typeof rawId === "string" && UUID_RE.test(rawId) ? rawId : "";
+
+  const rawTz = rec.timezone;
+  const timezone =
+    typeof rawTz === "string" && rawTz.length <= TZ_MAX_LEN && TZ_RE.test(rawTz) ? rawTz : "";
+
+  const rawOffset = rec.utcOffsetMinutes;
+  const utcOffsetMinutes =
+    typeof rawOffset === "number" &&
+    Number.isInteger(rawOffset) &&
+    rawOffset >= OFFSET_MIN &&
+    rawOffset <= OFFSET_MAX
+      ? rawOffset
+      : 0;
+
+  return { conversationId, timezone, utcOffsetMinutes };
+}
+
+/** Format an offset in minutes as `±HH:MM` (e.g. 180 → "+03:00", -330 → "-05:30"). */
+function formatOffset(offsetMinutes: number): string {
+  const sign = offsetMinutes < 0 ? "-" : "+";
+  const abs = Math.abs(offsetMinutes);
+  const hh = String(Math.floor(abs / 60)).padStart(2, "0");
+  const mm = String(abs % 60).padStart(2, "0");
+  return `${sign}${hh}:${mm}`;
+}
+
+/**
+ * Copy each message with its `content` suffixed `\n[at <at>]` when it carries a
+ * valid `at`, so the model sees each turn's local timestamp. NEVER mutates the
+ * originals (returns fresh objects, `at`/role preserved). The offset is accepted
+ * for symmetry with the conversation context but the `at` already carries its own
+ * offset, so it is not re-applied here.
+ */
+export function stampForModel(
+  messages: GuestMessage[],
+  _offsetMinutes: number,
+): GuestMessage[] {
+  return messages.map((m) =>
+    m.at
+      ? { ...m, content: `${m.content}\n[at ${m.at}]` }
+      : { ...m },
+  );
+}
+
+/**
+ * One system-prompt line telling the model the visitor's current local time +
+ * zone, so it can reason about "today"/"now" in the visitor's frame. `nowUtcIso`
+ * is injected by the caller (`new Date().toISOString()`) so this stays pure and
+ * testable — no `Date.now()` inside. Local time = UTC + offset, formatted to the
+ * minute with the offset suffix.
+ */
+export function timeContextLine(
+  nowUtcIso: string,
+  timezone: string,
+  utcOffsetMinutes: number,
+): string {
+  const nowMs = Date.parse(nowUtcIso);
+  const localMs = nowMs + utcOffsetMinutes * 60_000;
+  // Slice to minute precision from the shifted ISO string; append the offset.
+  const localIso = new Date(localMs).toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
+  const offset = formatOffset(utcOffsetMinutes);
+  const zoneLabel = timezone ? `${timezone}, UTC${offset}` : `UTC${offset}`;
+  return `Current time for the visitor: ${localIso}${offset} (${zoneLabel}). Message timestamps are in the visitor's local time.`;
+}
+
+/**
+ * Convert a local ISO-8601 time to UTC. If `localTime` carries an explicit offset
+ * (trailing `Z` or `±HH:MM`) that offset is used; otherwise `fallbackOffsetMinutes`
+ * (the conversation's offset) is applied. Returns a self-correcting error naming
+ * the exact expected format on unparseable input. Pure — the model calls this via
+ * the builtin `local_time_to_utc` tool.
+ */
+export function localTimeToUtc(
+  localTime: unknown,
+  fallbackOffsetMinutes: number,
+): { ok: true; utc: string } | { ok: false; error: string } {
+  if (typeof localTime !== "string" || localTime.trim() === "") {
+    return {
+      ok: false,
+      error:
+        "local_time is required — pass an ISO-8601 time like \"2026-07-22T15:48:59\" (offset optional, e.g. \"…+03:00\" or \"…Z\").",
+    };
+  }
+  const raw = localTime.trim();
+  const hasOffset = /(?:Z|[+-]\d{2}:\d{2})$/.test(raw);
+  if (hasOffset) {
+    const ms = Date.parse(raw);
+    if (Number.isNaN(ms)) {
+      return {
+        ok: false,
+        error: `could not parse "${raw}" — expected ISO-8601 like "2026-07-22T15:48:59+03:00" or "2026-07-22T12:48:59Z".`,
+      };
+    }
+    return { ok: true, utc: new Date(ms).toISOString() };
+  }
+  // No offset: parse the wall-clock as if it were UTC, then subtract the fallback
+  // offset to recover the true UTC instant. `Date.parse` treats a bare date-time
+  // (no offset) as UTC in Node/V8 ISO mode, so parsing `${raw}Z` is deterministic.
+  const asUtcMs = Date.parse(raw.endsWith("Z") ? raw : `${raw}Z`);
+  if (Number.isNaN(asUtcMs)) {
+    return {
+      ok: false,
+      error: `could not parse "${raw}" — expected ISO-8601 like "2026-07-22T15:48:59" (date and time, T-separated).`,
+    };
+  }
+  const utcMs = asUtcMs - fallbackOffsetMinutes * 60_000;
+  return { ok: true, utc: new Date(utcMs).toISOString() };
+}
+
+// ── Persisted payload cap (pure) ──────────────────────────────────────────────
+
+/** Max serialized size of the stored conversation payload (D1 row cost bound). */
+export const MAX_PAYLOAD_BYTES = 512 * 1024;
+
+/**
+ * A stored conversation payload. `messages` is the verbatim gateway transcript
+ * (user/assistant/tool_calls/tool entries). Kept structurally loose — the route
+ * builds it from the reframe transcript; this module only caps its size.
+ */
+export interface ConversationPayload {
+  version: number;
+  system: string;
+  tools: unknown[];
+  model: string;
+  timezone: string;
+  utcOffsetMinutes: number;
+  messages: unknown[];
+  usage: { promptTokens: number; completionTokens: number };
+  truncated?: boolean;
+}
+
+/** UTF-8 byte length of a string (payload cap is measured in bytes, not chars). */
+function byteLength(s: string): number {
+  return new TextEncoder().encode(s).length;
+}
+
+/**
+ * Cap the serialized payload at `MAX_PAYLOAD_BYTES` by dropping the OLDEST
+ * messages until it fits, marking `truncated: true` when anything was dropped.
+ * Returns the (possibly trimmed) payload — never mutates the input. Pure so the
+ * route's fire-and-forget persist can rely on a tested bound.
+ */
+export function capConversationPayload(payload: ConversationPayload): ConversationPayload {
+  if (byteLength(JSON.stringify(payload)) <= MAX_PAYLOAD_BYTES) return payload;
+
+  const messages = [...payload.messages];
+  let truncated = false;
+  // Drop oldest messages one at a time until the whole payload fits. Even an
+  // empty transcript may still exceed the cap (huge system/tools) — then we stop
+  // and flag it truncated rather than loop forever.
+  while (messages.length > 0) {
+    truncated = true;
+    messages.shift();
+    if (byteLength(JSON.stringify({ ...payload, messages, truncated })) <= MAX_PAYLOAD_BYTES) {
+      break;
+    }
+  }
+  return { ...payload, messages, truncated };
 }

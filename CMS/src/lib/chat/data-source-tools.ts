@@ -86,7 +86,7 @@ export const CREATE_DATA_SOURCE_TOOL = {
         baseUrl: { type: "string", description: "Absolute http(s) base URL, e.g. https://api.open-meteo.com" },
         authType: { type: "string", enum: [...AUTH_TYPES], description: "Auth method (default 'none')." },
         authParam: { type: "string", description: "Header name (authType 'header'), query key (authType 'query'), or token URL (authType 'oauth2')." },
-        secret: { type: "string", description: "The API key / 'user:password' / 'client_id:client_secret'. WRITE-ONLY — stored encrypted, never shown again." },
+        secret: { type: "string", description: "The API key / 'user:password' / 'client_id:client_secret'. WRITE-ONLY — stored encrypted, never shown again. Required for any authType except 'none'; if the operator hasn't provided the real credential, don't block — pass the literal placeholder 'PLACEHOLDER' and tell them to paste the real key in Admin → Data Sources (requests fail auth until then)." },
         requests: {
           type: "array",
           description: "Saved requests to create on this source (each is what you test/bind).",
@@ -159,7 +159,7 @@ export function validateCreateDataSource(args: unknown): ArgResult<CreateDataSou
     secret = rec.secret;
   }
   if (source.value.authType !== "none" && !secret) {
-    return { ok: false, error: `authType "${source.value.authType}" needs a secret (the API key / user:password / client_id:client_secret)` };
+    return { ok: false, error: `authType "${source.value.authType}" needs a secret (the API key / user:password / client_id:client_secret). If the operator hasn't provided the real credential, retry the SAME call with secret "PLACEHOLDER" and tell them to paste the real key in Admin → Data Sources.` };
   }
 
   const requests: RequestInput[] = [];

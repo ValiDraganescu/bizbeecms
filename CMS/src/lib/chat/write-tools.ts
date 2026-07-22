@@ -265,7 +265,7 @@ export function builtinBlockTypes(): { name: string; description: string }[] {
         "get valid ids/names, never invent one), mode: 'inline'|'floating' (inline " +
         "shows the panel in place; floating shows a launcher bubble bottom-right; " +
         "default 'inline'), title: '<header label>', placeholder: '<input hint>' }. " +
-        "The welcome message comes from the agent's config; an optional `welcome` prop overrides it for this placement only. Shape: " +
+        "The welcome message comes from the agent's config; an optional `welcome` prop overrides it for this placement only. Optional boolean `showIcon` adds a chat-bubble icon to the launcher and panel header. Shape: " +
         "{ component:'GuestChat', props:{ agent:'booking-assistant', mode:'floating', " +
         "title:'Ask us anything' } }.",
     },

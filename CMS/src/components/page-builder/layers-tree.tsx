@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { setDragPayload, readDragPayload } from "@/lib/page-builder/dnd";
 import {
@@ -101,14 +101,43 @@ function DeleteNodeControl({
  * fixed levels (section → component) — matches the section model; deeper nesting
  * isn't a thing the editor exposes yet.
  */
+/** localStorage key for a page's expanded-sections set (Layers tree view state). */
+function expandedStorageKey(pageId: string): string {
+  return `bb:layers-expanded:${pageId}`;
+}
+
+/** Read the persisted expanded-section ids for a page ([] on miss/parse error/SSR). */
+function loadExpanded(pageId: string | undefined): Set<string> {
+  if (!pageId || typeof window === "undefined") return new Set();
+  try {
+    const raw = window.localStorage.getItem(expandedStorageKey(pageId));
+    const ids = raw ? (JSON.parse(raw) as unknown) : [];
+    return new Set(Array.isArray(ids) ? ids.filter((v): v is string => typeof v === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Persist a page's expanded-section ids (best-effort; quota/SSR failures ignored). */
+function saveExpanded(pageId: string | undefined, expanded: Set<string>): void {
+  if (!pageId || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(expandedStorageKey(pageId), JSON.stringify([...expanded]));
+  } catch {
+    /* storage full/unavailable — collapse state is best-effort UI sugar */
+  }
+}
+
 export function LayersTree({
   blocks,
   draftComponents,
+  pageId,
   selectedId,
   onSelect,
   onDropComponent,
   onDropList,
   onDropForm,
+  onDropGuestChat,
   onMoveNode,
   onDeleteColumn,
   onDeleteNode,
@@ -120,11 +149,14 @@ export function LayersTree({
   blocks: Block[];
   /** Component names with an unpublished draft — their blocks get a badge. */
   draftComponents?: Set<string>;
+  /** Current page id — keys the persisted expand/collapse state per page. */
+  pageId?: string;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onDropComponent: (sectionId: string, colIndex: number, name: string, rowId: string) => void;
   onDropList: (sectionId: string, colIndex: number, rowId: string) => void;
   onDropForm: (sectionId: string, colIndex: number, rowId: string) => void;
+  onDropGuestChat: (sectionId: string, colIndex: number, rowId: string) => void;
   onMoveNode: (dragId: string, targetId: string, position: "before" | "after" | "into") => void;
   onDeleteColumn: (columnId: string) => void;
   onDeleteNode: (nodeId: string) => void;
@@ -153,17 +185,39 @@ export function LayersTree({
   const draggingRow =
     draggingId != null &&
     blocks.some((s) => (s.children ?? []).some((r) => r.id === draggingId && isSectionRow(r)));
-  // Collapsed Sections (ids). Purely a Layers-tree VIEW state — never persisted
-  // (collapse is per-operator UI noise, not page content). Default expanded.
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  function toggleCollapsed(id: string) {
-    setCollapsed((cur) => {
+  // EXPANDED Sections (ids) — everything else renders collapsed, so a freshly
+  // opened page starts fully collapsed (USER DECISION 2026-07-21). View-only
+  // state, but persisted per page in localStorage so it survives refreshes and
+  // page switches; never part of page content.
+  const [expanded, setExpanded] = useState<Set<string>>(() => loadExpanded(pageId));
+  // Re-seed from storage when the operator switches pages.
+  useEffect(() => {
+    setExpanded(loadExpanded(pageId));
+  }, [pageId]);
+  function toggleExpanded(id: string) {
+    setExpanded((cur) => {
       const next = new Set(cur);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      saveExpanded(pageId, next);
       return next;
     });
   }
+  // Selecting a node buried in a collapsed Section (canvas click, AI edit) must
+  // never leave the selection invisible — expand its ancestor Section.
+  useEffect(() => {
+    if (!selectedId) return;
+    const holds = (b: Block): boolean =>
+      b.id === selectedId || (b.children ?? []).some(holds);
+    const ancestor = blocks.find((b) => isSection(b) && b.id !== selectedId && holds(b));
+    if (!ancestor) return;
+    setExpanded((cur) => {
+      if (cur.has(ancestor.id)) return cur;
+      const next = new Set(cur).add(ancestor.id);
+      saveExpanded(pageId, next);
+      return next;
+    });
+  }, [selectedId, blocks, pageId]);
   // Which column's delete is awaiting in-app confirm (NOT native window.confirm).
   const [confirmDeleteCol, setConfirmDeleteCol] = useState<string | null>(null);
   // Which node (Section or component leaf) is awaiting in-app delete confirm.
@@ -341,18 +395,18 @@ export function LayersTree({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleCollapsed(b.id);
+                  toggleExpanded(b.id);
                 }}
-                aria-expanded={!collapsed.has(b.id)}
-                aria-label={t(collapsed.has(b.id) ? "section.expand" : "section.collapse")}
-                title={t(collapsed.has(b.id) ? "section.expand" : "section.collapse")}
+                aria-expanded={expanded.has(b.id)}
+                aria-label={t(expanded.has(b.id) ? "section.collapse" : "section.expand")}
+                title={t(expanded.has(b.id) ? "section.collapse" : "section.expand")}
                 className="mt-1.5 rounded p-1 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
               >
                 <svg
                   viewBox="0 0 24 24"
                   className={
                     "h-3.5 w-3.5 transition-transform " +
-                    (collapsed.has(b.id) ? "-rotate-90" : "")
+                    (expanded.has(b.id) ? "" : "-rotate-90")
                   }
                   fill="none"
                   stroke="currentColor"
@@ -426,7 +480,7 @@ export function LayersTree({
               onDelete={onDeleteNode}
             />
           </div>
-          {isSection(b) && !collapsed.has(b.id) && (
+          {isSection(b) && expanded.has(b.id) && (
             <div className="mt-2 flex flex-col gap-2 border-l border-border pl-4">
               {sectionRows(b).map((row, ri) => {
                 // A grandfathered (row-less) section acts as its own single row —
@@ -536,6 +590,9 @@ export function LayersTree({
                               } else if (payload?.kind === "form") {
                                 e.preventDefault();
                                 onDropForm(b.id, ci, rowId);
+                              } else if (payload?.kind === "guestChat") {
+                                e.preventDefault();
+                                onDropGuestChat(b.id, ci, rowId);
                               } else if (payload?.kind === "move") {
                                 e.preventDefault();
                                 onMoveNode(payload.id, col.id, "into");

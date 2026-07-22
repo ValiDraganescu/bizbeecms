@@ -28,6 +28,7 @@ import {
   SECTION_COLUMN_COMPONENT,
   LIST_COMPONENT,
   FORM_COMPONENT,
+  GUEST_CHAT_COMPONENT,
   isBuiltinComponent,
   type Block,
 } from "../render/tree.ts";
@@ -35,7 +36,7 @@ import { isLocaleObject } from "../render/localize.ts";
 
 // Re-export so the editor/UI keeps importing the reserved names from here (the
 // renderer in tree.ts owns the single definitions, so both layers agree).
-export { SECTION_COMPONENT, SECTION_ROW_COMPONENT, SECTION_COLUMN_COMPONENT, LIST_COMPONENT, FORM_COMPONENT };
+export { SECTION_COMPONENT, SECTION_ROW_COMPONENT, SECTION_COLUMN_COMPONENT, LIST_COMPONENT, FORM_COMPONENT, GUEST_CHAT_COMPONENT };
 
 const ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
 
@@ -1308,6 +1309,53 @@ export function addFormBlock(
 /** Append a Form into a Section's FIRST column (click-insert shim, like addListToSection). */
 export function addFormToSection(blocks: Block[], sectionId: string): Block[] {
   return addFormBlock(blocks, sectionId, 0);
+}
+
+/** True if a block is the built-in `GuestChat` block (public guest-chatbots epic). */
+export function isGuestChat(block: Block): boolean {
+  return block.component === GUEST_CHAT_COMPONENT;
+}
+
+/**
+ * Append a built-in `GuestChat` block into a Section's column (immutable). Unlike
+ * List/Form, a GuestChat is a LEAF (no `children` slot) — it drops exactly like a
+ * component, so this mirrors `addComponentToColumn` but seeds the reserved
+ * `component` name + the default `props.mode = "inline"` (the operator picks the
+ * agent + the rest in the settings panel; empty title/placeholder/welcome fall
+ * back to the renderer defaults / the agent's welcome). No-op for a non-Section
+ * id / out-of-range column. Id unique tree-wide. PURE.
+ */
+export function addGuestChatBlock(
+  blocks: Block[],
+  sectionId: string,
+  colIndex: number,
+  rowId?: string,
+): Block[] {
+  const chat: Block = {
+    id: uniqueIdAcrossTree(GUEST_CHAT_COMPONENT, blocks),
+    component: GUEST_CHAT_COMPONENT,
+    props: { mode: "inline" },
+  };
+  return blocks.map((section) => {
+    if (section.id !== sectionId || !isSection(section)) return section;
+    const holder = resolveRowHolder(section, rowId);
+    if (!holder) return section;
+    const cols = rowColumns(holder);
+    if (colIndex < 0 || colIndex >= cols.length) return section;
+    const targetId = cols[colIndex].id;
+    const nextHolder: Block = {
+      ...holder,
+      children: (holder.children ?? []).map((c) =>
+        c.id === targetId ? { ...c, children: [...(c.children ?? []), chat] } : c,
+      ),
+    };
+    return holder === section
+      ? nextHolder
+      : {
+          ...section,
+          children: (section.children ?? []).map((c) => (c.id === holder.id ? nextHolder : c)),
+        };
+  });
 }
 
 /**

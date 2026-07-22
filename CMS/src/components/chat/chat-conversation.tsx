@@ -24,7 +24,12 @@ import {
 } from "react";
 import { useTranslations } from "next-intl";
 import { ChatEventParser, type ToolResult } from "@/lib/chat/client-sse";
-import { mutatesRenderedPage, signalPageMutation } from "@/lib/chat/page-mutation-signal";
+import {
+  mutatesRenderedPage,
+  signalPageMutation,
+  mutatesChatAgents,
+  signalChatAgentMutation,
+} from "@/lib/chat/page-mutation-signal";
 import { buildModelHistory } from "@/lib/chat/build-history";
 import { parseMarkdown, type Block, type Inline, type ListBlock } from "@/lib/chat/markdown";
 import { toolSummary, blobView } from "@/lib/chat/tool-card";
@@ -331,6 +336,10 @@ export function useChat(
             // signal it to refetch (cross-sibling, via a window event).
             if (mutatesRenderedPage(ev.result.name, ev.result.ok)) {
               signalPageMutation(ev.result.name);
+            }
+            // Likewise a chat-agent write staleness-signals the Chat Agents admin.
+            if (mutatesChatAgents(ev.result.name, ev.result.ok)) {
+              signalChatAgentMutation(ev.result.name);
             }
           } else if (ev.type === "usage") {
             setUsage({

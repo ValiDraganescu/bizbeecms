@@ -57,7 +57,12 @@ export const DATA_SOURCES_GUIDE = `# External data sources, bindings, and visito
 2. \`create_data_source\` — define a source AND its saved requests in one call
    (\`name\`, \`baseUrl\`, \`authType\`, \`authParam\`, \`secret\`, \`requests\`). There is
    NO update tool — changing an existing source/request is done by the operator
-   in Admin → Data Sources.
+   in Admin → Data Sources. Any auth type except \`none\` REQUIRES \`secret\` at
+   create time — but a missing credential must NOT stall the work: if the
+   operator hasn't shared the real key (or asks for a dummy), create with the
+   literal secret "PLACEHOLDER" and tell them to paste the real key in
+   Admin → Data Sources (the secret is editable there; requests simply fail
+   auth until it's replaced).
 3. \`test_data_source\` — run a saved request LIVE (cache bypassed): pass
    \`source\` and \`request\` (id OR name) + \`params\` for every placeholder. The
    result's \`paths\` array lists every leaf dot-path in the response (e.g.

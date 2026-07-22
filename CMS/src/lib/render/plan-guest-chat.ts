@@ -38,11 +38,93 @@ const BLOCK_ATTR = "data-bb-block";
 /** Presentation + copy data-attrs the script reads to build the UI. */
 const MODE_ATTR = "data-bb-mode";
 const TITLE_ATTR = "data-bb-title";
+
+/** Present (empty value) when the block opts into the chat icon (props.showIcon). */
+const ICON_ATTR = "data-bb-icon";
 const PLACEHOLDER_ATTR = "data-bb-placeholder";
 const WELCOME_ATTR = "data-bb-welcome";
 
 /** Client-side hard cap on a single user message (server re-enforces its own). */
 const MAX_USER_LEN = 2000;
+
+/**
+ * A stored conversation is abandoned after this much visitor inactivity: on the
+ * next load OR the next send in a long-idle open tab, the transcript is
+ * discarded and a fresh conversationId minted (each turn stamps `lastAt`).
+ */
+export const GUEST_CHAT_IDLE_RESET_MS = 30 * 60 * 1000;
+
+/**
+ * DOM-free markdown tokenizer for assistant bubbles (models format replies in
+ * markdown). Shared verbatim between the widget script (interpolated below) and
+ * the pure tests (evaluated via `new Function`) so there is ONE implementation.
+ * Deliberately tiny: paragraphs, #-headings, dash/star and 1. lists, fenced
+ * code, \`code\`, **bold**, star or underscore emphasis, [links](url). Emits a
+ * token TREE only — the
+ * DOM is built element-by-element in the script (model text never reaches
+ * innerHTML), and mdSafeHref allowlists http(s)/mailto/site-relative hrefs
+ * (NOT protocol-relative //host, which would leave the site).
+ */
+export const GUEST_CHAT_MD_SOURCE = `
+  function mdSafeHref(h) {
+    return /^(https?:\\/\\/|mailto:|\\/(?!\\/))/i.test(h || "") ? h : "";
+  }
+  function mdInline(s) {
+    var out = [];
+    var re = /(\`([^\`]+)\`)|(\\*\\*([^*]+)\\*\\*)|(\\[([^\\]]+)\\]\\(([^)\\s]+)\\))|(\\*([^*\\s][^*]*)\\*)|(\\b_([^_]+)_\\b)/;
+    while (s) {
+      var m = re.exec(s);
+      if (!m) { out.push({ t: "text", s: s }); break; }
+      if (m.index > 0) out.push({ t: "text", s: s.slice(0, m.index) });
+      if (m[2]) out.push({ t: "code", s: m[2] });
+      else if (m[4]) out.push({ t: "strong", kids: mdInline(m[4]) });
+      else if (m[6]) out.push({ t: "link", s: m[6], href: m[7] });
+      else if (m[9]) out.push({ t: "em", kids: mdInline(m[9]) });
+      else out.push({ t: "em", kids: mdInline(m[11]) });
+      s = s.slice(m.index + m[0].length);
+    }
+    return out;
+  }
+  function mdParse(text) {
+    var blocks = [];
+    var lines = String(text == null ? "" : text).replace(/\\r\\n?/g, "\\n").split("\\n");
+    var i = 0, m;
+    var structural = /^(\`\`\`|#{1,6}\\s|\\s*[-*]\\s+|\\s*\\d+[.)]\\s+)/;
+    while (i < lines.length) {
+      var line = lines[i];
+      if (/^\`\`\`/.test(line)) {
+        var buf = [];
+        i++;
+        while (i < lines.length && !/^\`\`\`/.test(lines[i])) { buf.push(lines[i]); i++; }
+        i++;
+        blocks.push({ t: "pre", s: buf.join("\\n") });
+        continue;
+      }
+      if (!line.trim()) { i++; continue; }
+      if ((m = /^(#{1,6})\\s+(.*)$/.exec(line))) {
+        blocks.push({ t: "h", kids: mdInline(m[2]) });
+        i++;
+        continue;
+      }
+      if (/^\\s*[-*]\\s+/.test(line)) {
+        var items = [];
+        while (i < lines.length && (m = /^\\s*[-*]\\s+(.*)$/.exec(lines[i]))) { items.push(mdInline(m[1])); i++; }
+        blocks.push({ t: "ul", items: items });
+        continue;
+      }
+      if (/^\\s*\\d+[.)]\\s+/.test(line)) {
+        var oItems = [];
+        while (i < lines.length && (m = /^\\s*\\d+[.)]\\s+(.*)$/.exec(lines[i]))) { oItems.push(mdInline(m[1])); i++; }
+        blocks.push({ t: "ol", items: oItems });
+        continue;
+      }
+      var para = [];
+      while (i < lines.length && lines[i].trim() && !structural.test(lines[i])) { para.push(mdInline(lines[i])); i++; }
+      blocks.push({ t: "p", lines: para });
+    }
+    return blocks;
+  }
+`;
 
 /** Stable asset key so planPage ships the script + CSS at most once per page. */
 export const GUEST_CHAT_ASSET_KEY = "__builtin_guest_chat__";
@@ -64,7 +146,14 @@ export const GUEST_CHAT_CSS = `
 [${CHAT_ATTR}].bb-gc-floating { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 2147482000; }
 [${CHAT_ATTR}] .bb-gc-launcher { display: inline-flex; align-items: center; gap: 0.5rem; border: none; border-radius: 9999px; background: var(--color-primary); color: var(--color-on-primary, #fff); padding: 0.625rem 1rem; font: inherit; font-weight: 600; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(0,0,0,.2); }
 [${CHAT_ATTR}] .bb-gc-panel { display: flex; flex-direction: column; width: 100%; max-width: 24rem; height: 28rem; max-height: 70vh; border: 1px solid var(--color-border); background: var(--color-surface); border-radius: 0.75rem; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,.1); }
-[${CHAT_ATTR}].bb-gc-floating .bb-gc-panel { position: absolute; right: 0; bottom: calc(100% + 0.75rem); }
+/* Floating: the panel is absolutely positioned inside the fixed root, and once
+   the launcher hides the root has NO in-flow content — its width collapses to 0
+   and a percentage width would resolve to 0 (the zero-width-panel bug). So the
+   floating panel sizes ITSELF: 24rem, clamped to the viewport on small screens. */
+[${CHAT_ATTR}].bb-gc-floating .bb-gc-panel { position: absolute; right: 0; bottom: calc(100% + 0.75rem); width: min(24rem, calc(100vw - 2.5rem)); max-width: none; }
+[${CHAT_ATTR}] .bb-gc-htitle { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
+[${CHAT_ATTR}] .bb-gc-icon { display: inline-flex; flex: none; }
+[${CHAT_ATTR}] .bb-gc-icon svg { width: 1.125em; height: 1.125em; }
 [${CHAT_ATTR}] .bb-gc-header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--color-border); font-weight: 600; }
 [${CHAT_ATTR}] .bb-gc-close { border: none; background: transparent; color: var(--color-foreground-muted); font-size: 1.25rem; line-height: 1; cursor: pointer; padding: 0 0.25rem; }
 [${CHAT_ATTR}] .bb-gc-messages { flex: 1 1 0%; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -72,7 +161,26 @@ export const GUEST_CHAT_CSS = `
 [${CHAT_ATTR}] .bb-gc-msg-user { align-self: flex-end; background: var(--color-primary); color: var(--color-on-primary, #fff); }
 [${CHAT_ATTR}] .bb-gc-msg-assistant { align-self: flex-start; background: var(--color-background); border: 1px solid var(--color-border); }
 [${CHAT_ATTR}] .bb-gc-msg-system { align-self: center; background: transparent; color: var(--color-foreground-muted); font-size: 0.8125rem; text-align: center; }
-[${CHAT_ATTR}] .bb-gc-working { align-self: flex-start; color: var(--color-foreground-muted); font-size: 0.8125rem; font-style: italic; }
+/* Markdown inside assistant bubbles (built from the safe token tree). */
+[${CHAT_ATTR}] .bb-gc-msg p { margin: 0; }
+[${CHAT_ATTR}] .bb-gc-msg p + p, [${CHAT_ATTR}] .bb-gc-msg p + ul, [${CHAT_ATTR}] .bb-gc-msg p + ol, [${CHAT_ATTR}] .bb-gc-msg p + pre, [${CHAT_ATTR}] .bb-gc-msg ul + p, [${CHAT_ATTR}] .bb-gc-msg ol + p, [${CHAT_ATTR}] .bb-gc-msg pre + p { margin-top: 0.5em; }
+[${CHAT_ATTR}] .bb-gc-msg ul, [${CHAT_ATTR}] .bb-gc-msg ol { margin: 0.25em 0; padding-left: 1.25em; }
+[${CHAT_ATTR}] .bb-gc-msg li { margin: 0.125em 0; }
+[${CHAT_ATTR}] .bb-gc-msg code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; background: color-mix(in srgb, currentColor 10%, transparent); border-radius: 0.25rem; padding: 0.0625rem 0.25rem; }
+[${CHAT_ATTR}] .bb-gc-msg pre { margin: 0.25em 0; padding: 0.5rem 0.625rem; overflow-x: auto; background: color-mix(in srgb, currentColor 8%, transparent); border-radius: 0.5rem; }
+[${CHAT_ATTR}] .bb-gc-msg pre code { background: transparent; padding: 0; }
+[${CHAT_ATTR}] .bb-gc-msg a { color: inherit; text-decoration: underline; }
+[${CHAT_ATTR}] .bb-gc-time { font-size: 0.6875rem; color: var(--color-foreground-muted); margin-top: 0.125rem; }
+[${CHAT_ATTR}] .bb-gc-time-user { align-self: flex-end; text-align: right; }
+[${CHAT_ATTR}] .bb-gc-time-assistant { align-self: flex-start; text-align: left; }
+/* Typing indicator: three pulsing dots below the streamed text, visible from
+   send until the stream ends (covers pauses between tool calls). */
+[${CHAT_ATTR}] .bb-gc-working { align-self: flex-start; display: flex; gap: 0.25rem; padding: 0.25rem 0.125rem; color: var(--color-foreground-muted); }
+[${CHAT_ATTR}] .bb-gc-dot { width: 0.375rem; height: 0.375rem; border-radius: 9999px; background: currentColor; animation: bb-gc-blink 1.2s ease-in-out infinite; }
+[${CHAT_ATTR}] .bb-gc-dot:nth-child(2) { animation-delay: 0.2s; }
+[${CHAT_ATTR}] .bb-gc-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bb-gc-blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { [${CHAT_ATTR}] .bb-gc-dot { animation: none; opacity: 0.6; } }
 [${CHAT_ATTR}] .bb-gc-form { display: flex; gap: 0.5rem; padding: 0.75rem; border-top: 1px solid var(--color-border); }
 [${CHAT_ATTR}] .bb-gc-input { flex: 1 1 0%; resize: none; min-height: 2.5rem; max-height: 8rem; border: 1px solid var(--color-border); background: var(--color-background); color: var(--color-foreground); border-radius: 0.5rem; padding: 0.5rem 0.625rem; font: inherit; }
 [${CHAT_ATTR}] .bb-gc-input:focus { outline: none; border-color: var(--color-primary); }
@@ -90,12 +198,105 @@ export const GUEST_CHAT_SCRIPT = `
 (function () {
   var ENDPOINT = ${JSON.stringify(PUBLIC_CHAT_PATH)};
   var MAX_LEN = ${MAX_USER_LEN};
+  var IDLE_RESET_MS = ${GUEST_CHAT_IDLE_RESET_MS};
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
     if (text != null) n.textContent = text;
     return n;
+  }
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+  // A random 8-4-4-4-12 hex string when crypto.randomUUID is unavailable.
+  function randomId() {
+    try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+    var s = "";
+    for (var i = 0; i < 36; i++) {
+      if (i === 8 || i === 13 || i === 18 || i === 23) { s += "-"; }
+      else { s += Math.floor(Math.random() * 16).toString(16); }
+    }
+    return s;
+  }
+
+  // IANA time-zone name, "" when the browser can't resolve one.
+  function tz() {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; }
+  }
+
+  // ISO-8601 LOCAL time with numeric offset, e.g. "2026-07-22T15:48:59+03:00".
+  // Built by hand from the local date parts + getTimezoneOffset (toISOString is
+  // UTC, which is NOT what the contract wants).
+  function localIso() {
+    var d = new Date();
+    var off = -d.getTimezoneOffset(); // east of UTC positive
+    var sign = off >= 0 ? "+" : "-";
+    var abs = Math.abs(off);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
+      "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()) +
+      sign + pad(Math.floor(abs / 60)) + ":" + pad(abs % 60);
+  }
+
+  // Display HH:MM straight from a stored 'at' string's time part — no Date
+  // re-parse (avoids tz drift). Returns "" for a missing/unparseable value.
+  function clockOf(at) {
+    if (typeof at !== "string") return "";
+    var m = /T(\\d{2}):(\\d{2})/.exec(at);
+    return m ? m[1] + ":" + m[2] : "";
+  }
+
+${GUEST_CHAT_MD_SOURCE}
+  // Markdown token tree → DOM, element-by-element (model text only ever lands in
+  // text nodes — never innerHTML). Unsafe link hrefs degrade to plain text.
+  function mdInlineInto(node, toks) {
+    toks.forEach(function (tk) {
+      if (tk.t === "code") { node.appendChild(el("code", null, tk.s)); }
+      else if (tk.t === "strong" || tk.t === "em") {
+        var e = el(tk.t);
+        mdInlineInto(e, tk.kids);
+        node.appendChild(e);
+      } else if (tk.t === "link") {
+        var href = mdSafeHref(tk.href);
+        if (!href) { node.appendChild(document.createTextNode(tk.s)); return; }
+        var a = el("a", null, tk.s);
+        a.setAttribute("href", href);
+        a.setAttribute("target", "_blank");
+        a.setAttribute("rel", "noopener noreferrer");
+        node.appendChild(a);
+      } else { node.appendChild(document.createTextNode(tk.s)); }
+    });
+  }
+  function mdInto(node, text) {
+    node.innerHTML = "";
+    mdParse(text).forEach(function (b) {
+      if (b.t === "pre") {
+        var pre = el("pre");
+        pre.appendChild(el("code", null, b.s));
+        node.appendChild(pre);
+      } else if (b.t === "ul" || b.t === "ol") {
+        var listNode = el(b.t);
+        b.items.forEach(function (it) {
+          var li = el("li");
+          mdInlineInto(li, it);
+          listNode.appendChild(li);
+        });
+        node.appendChild(listNode);
+      } else if (b.t === "h") {
+        var hp = el("p");
+        var st = el("strong");
+        mdInlineInto(st, b.kids);
+        hp.appendChild(st);
+        node.appendChild(hp);
+      } else {
+        var p = el("p");
+        b.lines.forEach(function (ln, idx) {
+          if (idx) p.appendChild(el("br"));
+          mdInlineInto(p, ln);
+        });
+        node.appendChild(p);
+      }
+    });
   }
 
   // Minimal SSE frame parser: frames separated by a blank line; each frame has an
@@ -123,14 +324,50 @@ export const GUEST_CHAT_SCRIPT = `
     var title = root.getAttribute(${JSON.stringify(TITLE_ATTR)}) || ${JSON.stringify(DEFAULT_TITLE)};
     var placeholder = root.getAttribute(${JSON.stringify(PLACEHOLDER_ATTR)}) || ${JSON.stringify(DEFAULT_PLACEHOLDER)};
     var welcome = root.getAttribute(${JSON.stringify(WELCOME_ATTR)}) || "";
+    var showIcon = root.getAttribute(${JSON.stringify(ICON_ATTR)}) !== null;
     var storeKey = "bb-guest-chat:" + blockId;
 
+    // Static chat-bubble glyph (no user data — innerHTML is safe here).
+    var ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+    function chatIcon() {
+      var s = el("span", "bb-gc-icon");
+      s.innerHTML = ICON_SVG;
+      return s;
+    }
+
     // transcript = server-visible turns only (welcome is display-only, never sent).
+    // Persisted shape: { conversationId, lastAt (epoch ms), messages:
+    // [{role,content,at?}] }. Old stored blobs were a BARE ARRAY of messages (no
+    // conversationId, no 'at', no lastAt) — still accepted here; a fresh
+    // conversationId is minted for them and lastAt is stamped on next persist.
+    // A conversation idle past IDLE_RESET_MS is abandoned: transcript dropped,
+    // new conversationId (stale blobs without lastAt are kept — never reset a
+    // conversation we can't date).
     var transcript = [];
+    var conversationId = "";
+    var lastAt = 0;
     try {
       var saved = sessionStorage.getItem(storeKey);
-      if (saved) { var p = JSON.parse(saved); if (Array.isArray(p)) transcript = p; }
+      if (saved) {
+        var p = JSON.parse(saved);
+        if (Array.isArray(p)) { transcript = p; }
+        else if (p && Array.isArray(p.messages)) {
+          transcript = p.messages;
+          if (typeof p.conversationId === "string") conversationId = p.conversationId;
+          if (typeof p.lastAt === "number") lastAt = p.lastAt;
+        }
+      }
     } catch (e) {}
+    function idleExpired() {
+      return transcript.length > 0 && lastAt > 0 && Date.now() - lastAt > IDLE_RESET_MS;
+    }
+    if (idleExpired()) {
+      transcript = [];
+      conversationId = "";
+      lastAt = 0;
+      try { sessionStorage.removeItem(storeKey); } catch (e) {}
+    }
+    if (!conversationId) conversationId = randomId();
 
     // ── build the shell ──────────────────────────────────────────────────────
     var panel = el("div", "bb-gc-panel");
@@ -138,7 +375,10 @@ export const GUEST_CHAT_SCRIPT = `
     panel.setAttribute("aria-label", title);
 
     var header = el("div", "bb-gc-header");
-    header.appendChild(el("span", null, title));
+    var htitle = el("span", "bb-gc-htitle");
+    if (showIcon) htitle.appendChild(chatIcon());
+    htitle.appendChild(el("span", null, title));
+    header.appendChild(htitle);
     var closeBtn = null;
     if (mode === "floating") {
       closeBtn = el("button", "bb-gc-close", "\\u00d7");
@@ -167,18 +407,39 @@ export const GUEST_CHAT_SCRIPT = `
     panel.appendChild(form);
 
     // ── message rendering ────────────────────────────────────────────────────
+    // Assistant text is model-authored markdown → rendered via the safe token
+    // tree; user/system text stays literal.
     function bubble(role, text) {
-      return el("div", "bb-gc-msg bb-gc-msg-" + role, text);
+      if (role !== "assistant") return el("div", "bb-gc-msg bb-gc-msg-" + role, text);
+      var b = el("div", "bb-gc-msg bb-gc-msg-assistant");
+      if (text) mdInto(b, text);
+      return b;
+    }
+    // A muted HH:MM label under a user/assistant bubble, derived from a stored
+    // 'at'. No label when 'at' is missing (old transcripts / streaming bubble).
+    function timeLabel(role, at) {
+      var clock = clockOf(at);
+      return clock ? el("div", "bb-gc-time bb-gc-time-" + role, clock) : null;
+    }
+    // Append a bubble and (when the turn is timestamped) its time label. The
+    // welcome bubble and system notices pass no 'at' → no label.
+    function appendTurn(role, text, at) {
+      list.appendChild(bubble(role, text));
+      var t = timeLabel(role, at);
+      if (t) list.appendChild(t);
     }
     function scrollDown() { list.scrollTop = list.scrollHeight; }
     function render() {
       list.innerHTML = "";
       if (welcome) list.appendChild(bubble("assistant", welcome));
-      transcript.forEach(function (m) { list.appendChild(bubble(m.role, m.content)); });
+      transcript.forEach(function (m) { appendTurn(m.role, m.content, m.at); });
       scrollDown();
     }
     function persist() {
-      try { sessionStorage.setItem(storeKey, JSON.stringify(transcript)); } catch (e) {}
+      lastAt = Date.now();
+      try {
+        sessionStorage.setItem(storeKey, JSON.stringify({ conversationId: conversationId, lastAt: lastAt, messages: transcript }));
+      } catch (e) {}
     }
     render();
 
@@ -195,15 +456,29 @@ export const GUEST_CHAT_SCRIPT = `
       text = (text || "").trim();
       if (!text) return;
       if (text.length > MAX_LEN) text = text.slice(0, MAX_LEN);
-      transcript.push({ role: "user", content: text });
+      // A tab left open past the idle window starts over: the stale transcript
+      // is dropped and this message opens a fresh conversation.
+      if (idleExpired()) {
+        transcript = [];
+        conversationId = randomId();
+        render();
+      }
+      var at = localIso();
+      transcript.push({ role: "user", content: text, at: at });
       persist();
-      list.appendChild(bubble("user", text));
+      appendTurn("user", text, at);
       input.value = "";
       setBusy(true);
 
-      var working = el("div", "bb-gc-working", "working\\u2026");
-      working.classList.add("bb-gc-hidden");
+      // Animated-ellipsis typing indicator, shown for the WHOLE request (it sits
+      // after the assistant bubble, so it reads as "more coming" during pauses
+      // between tool calls); removed when the stream settles.
+      var working = el("div", "bb-gc-working");
+      working.setAttribute("role", "status");
+      working.setAttribute("aria-label", "Assistant is typing");
+      for (var di = 0; di < 3; di++) working.appendChild(el("span", "bb-gc-dot"));
       list.appendChild(working);
+      scrollDown();
 
       var assistantEl = null;
       var assistantText = "";
@@ -218,7 +493,14 @@ export const GUEST_CHAT_SCRIPT = `
       fetch(ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pageId: pageId, blockId: blockId, messages: transcript }),
+        body: JSON.stringify({
+          pageId: pageId,
+          blockId: blockId,
+          conversationId: conversationId,
+          timezone: tz(),
+          utcOffsetMinutes: -new Date().getTimezoneOffset(),
+          messages: transcript,
+        }),
       }).then(function (resp) {
         if (!resp.ok || !resp.body) {
           return resp.json().then(function (j) {
@@ -237,10 +519,9 @@ export const GUEST_CHAT_SCRIPT = `
           if (fr.event === "token" && typeof fr.data.text === "string") {
             ensureAssistant();
             assistantText += fr.data.text;
-            assistantEl.textContent = assistantText;
+            mdInto(assistantEl, assistantText);
             scrollDown();
           } else if (fr.event === "tool") {
-            working.classList.remove("bb-gc-hidden");
             scrollDown();
           } else if (fr.event === "error") {
             notice((fr.data && fr.data.message) || "Something went wrong.");
@@ -258,7 +539,6 @@ export const GUEST_CHAT_SCRIPT = `
               handle(parseFrame(buffer.slice(0, sep)));
               buffer = buffer.slice(sep + 2);
             }
-            working.classList.add("bb-gc-hidden");
             return pump();
           });
         }
@@ -266,8 +546,17 @@ export const GUEST_CHAT_SCRIPT = `
       }).then(function () {
         working.remove();
         if (assistantText) {
-          transcript.push({ role: "assistant", content: assistantText });
+          // Stamp 'at' when the stream completes (the 'done' frame). The bubble
+          // grew live without a timestamp; add its label now, next to it.
+          var at = localIso();
+          transcript.push({ role: "assistant", content: assistantText, at: at });
           persist();
+          var t = timeLabel("assistant", at);
+          if (t) {
+            if (assistantEl && assistantEl.parentNode) assistantEl.parentNode.insertBefore(t, assistantEl.nextSibling);
+            else list.appendChild(t);
+            scrollDown();
+          }
         }
       }).catch(function (err) {
         working.remove();
@@ -294,7 +583,9 @@ export const GUEST_CHAT_SCRIPT = `
 
     // ── mount: inline shows the panel in place; floating toggles it ──────────
     if (mode === "floating") {
-      var launcher = el("button", "bb-gc-launcher", title);
+      var launcher = el("button", "bb-gc-launcher");
+      if (showIcon) launcher.appendChild(chatIcon());
+      launcher.appendChild(el("span", null, title));
       launcher.setAttribute("type", "button");
       launcher.setAttribute("aria-label", title);
       panel.classList.add("bb-gc-hidden");
@@ -420,6 +711,9 @@ export function planGuestChat(block: Block, onUse?: () => void): ElementPlan {
 
   const placeholder = str(props.placeholder, DEFAULT_PLACEHOLDER);
   const welcome = str(props.welcome, "");
+  // Opt-in chat icon (launcher + header). Accept the boolean or its string form
+  // (props travel through JSON columns and tool args interchangeably).
+  const showIcon = props.showIcon === true || props.showIcon === "true";
 
   return {
     kind: "element",
@@ -433,6 +727,7 @@ export function planGuestChat(block: Block, onUse?: () => void): ElementPlan {
       [TITLE_ATTR]: title,
       [PLACEHOLDER_ATTR]: placeholder,
       ...(welcome ? { [WELCOME_ATTR]: welcome } : {}),
+      ...(showIcon ? { [ICON_ATTR]: "" } : {}),
     },
     children: [],
   };

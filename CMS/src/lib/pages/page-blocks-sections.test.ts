@@ -18,6 +18,9 @@ import {
   normalizeSectionColumns,
   addComponentToColumn,
   addComponentToSection,
+  addGuestChatBlock,
+  isGuestChat,
+  GUEST_CHAT_COMPONENT,
   mergeSectionProps,
   targetSectionId,
   moveNode,
@@ -82,6 +85,34 @@ test("addComponentToColumn is a no-op for bad section id or column index", () =>
   assert.deepEqual(addComponentToColumn(t1, "nope", 0, "Hero"), t1);
   assert.deepEqual(addComponentToColumn(t1, sid, 1, "Hero"), t1, "out-of-range col");
   assert.deepEqual(addComponentToColumn(t1, sid, -1, "Hero"), t1, "negative col");
+});
+
+test("addGuestChatBlock drops a leaf GuestChat with default inline mode into a column", () => {
+  const t1 = addSection([]);
+  const sid = t1[0].id;
+  const t2 = addGuestChatBlock(t1, sid, 0);
+  const chat = sectionColumns(t2[0])[0].children?.[0];
+  assert.ok(chat && isGuestChat(chat));
+  assert.equal(chat.component, GUEST_CHAT_COMPONENT);
+  assert.equal(chat.props?.mode, "inline");
+  // A leaf — no children slot (unlike List/Form containers).
+  assert.equal(chat.children, undefined);
+  // agent/title/placeholder/welcome are left for the operator to fill.
+  assert.equal(chat.props?.agent, undefined);
+  assert.equal(sectionColumns(t1[0])[0].children?.length, 0, "input not mutated");
+
+  // The renderer-primitive name is dropped from the D1 component-existence check.
+  const gate = validateBlocks(t2);
+  assert.ok(gate.ok);
+  assert.ok(gate.ok && !gate.componentNames.includes(GUEST_CHAT_COMPONENT));
+});
+
+test("addGuestChatBlock is a no-op for bad section id or column index", () => {
+  const t1 = addSection([]);
+  const sid = t1[0].id;
+  assert.deepEqual(addGuestChatBlock(t1, "nope", 0), t1);
+  assert.deepEqual(addGuestChatBlock(t1, sid, 1), t1, "out-of-range col");
+  assert.deepEqual(addGuestChatBlock(t1, sid, -1), t1, "negative col");
 });
 
 test("setSectionColumns grows by appending empty columns (clamped 1..4)", () => {

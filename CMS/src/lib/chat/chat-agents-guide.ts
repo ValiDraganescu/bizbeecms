@@ -6,8 +6,10 @@
  * prompt carrying it (context prompts stay short; the full playbook costs tokens
  * only when the task is actually about chat agents).
  *
- * STATIC content documenting the SHIPPED tool surface (list/create/update/
- * delete_chat_agent) + the config shape, safety model, and placement workflow —
+ * STATIC content documenting the SHIPPED tool surface (list/get/create/update/
+ * delete_chat_agent + the granular update_chat_agent_settings /
+ * set_chat_agent_limits / set_chat_agent_data_source / set_chat_agent_collection
+ * family) + the config shape, safety model, and placement workflow —
  * NOT live site data (list_chat_agents / list_data_sources / query_collection
  * cover that). PURE module (no `@/`/React/CF imports) so it runs under the
  * dep-free `node --test` convention; the CF wiring is one trivial handler in
@@ -47,12 +49,33 @@ export const CHAT_AGENTS_GUIDE = `# Guest-facing chatbots (chat agents) — the 
 ## Tools
 - \`list_chat_agents\` — the agents (id, name, enabled, model, limit summary, tool
   counts). Discover what exists before editing.
+- \`get_chat_agent\` — ONE agent's FULL config by \`agent\` (id OR name): the
+  systemPrompt, welcome message, every limit, and the complete allowlists. Read
+  this (or use the attached page context) before editing — never guess at what's
+  stored.
 - \`create_chat_agent\` — define one (\`name\` + \`systemPrompt\` required; the rest
   optional). Returns the created agent's summary.
-- \`update_chat_agent\` — address by \`agent\` (id OR name); FULL-REPLACE for supplied
-  fields (pass the WHOLE config — a supplied array REPLACES the stored one, it does
-  not merge; omitted top-level fields keep their stored value).
 - \`delete_chat_agent\` — remove by \`agent\` (id OR name).
+
+### Editing an existing agent — PREFER the granular tools
+Each changes ONLY what you pass and cannot clobber the rest of the config (the
+failure mode of re-sending a whole config):
+- \`update_chat_agent_settings\` — patch scalars: name, systemPrompt, model
+  (null → site default), enabled, welcomeMessage (null → clear). Omitted = kept.
+- \`set_chat_agent_limits\` — patch individual limit keys; number sets, null
+  resets that key to its default, omitted keys keep their stored value.
+- \`set_chat_agent_data_source\` — upsert ONE dataSources allowlist entry,
+  matched by \`toolName\`; other entries untouched. The source/request refs must
+  resolve to real records (id or name accepted; stored as ids).
+- \`remove_chat_agent_data_source\` — drop ONE entry by \`toolName\`.
+- \`set_chat_agent_collection\` — upsert ONE collections entry, matched by the
+  \`content_<slug>\` table name; other entries untouched.
+- \`remove_chat_agent_collection\` — drop ONE entry by table name.
+
+\`update_chat_agent\` remains for FULL reconfigurations only: address by \`agent\`
+(id OR name); FULL-REPLACE for supplied fields (pass the WHOLE config — a
+supplied array REPLACES the stored one, it does not merge; omitted top-level
+fields keep their stored value, but name + systemPrompt must always be passed).
 
 ## limits (abuse prevention — all optional, omit a key for its default)
 Message-count based (the per-response token cap is separate). Each value is clamped
@@ -99,6 +122,19 @@ Each entry names a \`content_<slug>\` table (discover via \`query_collection\`) 
   operator reviews. The bot can never publish.
 - The visitor's transcript is sanitized server-side (system roles stripped, counts
   + lengths capped) — the operator's systemPrompt always wins.
+
+## Conversations (visibility + export)
+- EVERY guest conversation is stored with full gateway fidelity: the system
+  prompt, the tool definitions, and the whole message list — including tool calls
+  and their results — plus per-message timestamps. Nothing is summarized away.
+- Message timestamps are in the VISITOR's LOCAL time (the widget reports the
+  visitor's timezone / UTC offset), not the server's. Every agent also ALWAYS gets
+  a builtin \`local_time_to_utc\` tool so it can convert a visitor-local time to UTC
+  before booking or comparing against server data — you never configure it.
+- Operators review and DOWNLOAD any conversation as a single JSON document from the
+  per-agent Conversations page (the Conversations button next to each agent in the
+  Chat agents admin); there is no assistant tool for this — point the operator at
+  that page.
 
 ## Placement workflow (create agent → place block → publish)
 1. \`create_chat_agent\` here (reference real sources/requests + collections).
