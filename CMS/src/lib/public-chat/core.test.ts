@@ -16,6 +16,9 @@ import {
   stampForModel,
   timeContextLine,
   localTimeToUtc,
+  parseStoredWelcome,
+  validateWelcomeMessage,
+  rehydrateGuestTranscript,
   capConversationPayload,
   MAX_PAYLOAD_BYTES,
   CHAT_MINUTE_MS,
@@ -105,6 +108,28 @@ test("validateAgentConfigInput rejects a data-source entry missing requestId", (
   assert.ok(r.errors.some((e) => /dataSources\[0\]\.requestId is required/.test(e)));
 });
 
+test("requiredParams round-trip: tolerant parse keeps valid names, drops garbage; strict validate rejects bad shapes", () => {
+  const entry = { sourceId: "s", requestId: "r", toolName: "t", description: "d" };
+  // Tolerant read path.
+  const parsed = parseAgentConfig(
+    "{}",
+    JSON.stringify([
+      { ...entry, requiredParams: [" from ", "to", "", 7] },
+      { ...entry, toolName: "t2", requiredParams: "from" },
+    ]),
+    "[]",
+  );
+  assert.deepEqual(parsed.dataSources[0].requiredParams, ["from", "to"]);
+  assert.equal(parsed.dataSources[1].requiredParams, undefined);
+  // Strict write path.
+  const bad = validateAgentConfigInput({ dataSources: [{ ...entry, requiredParams: ["from", ""] }] });
+  assert.ok(!bad.ok);
+  if (!bad.ok) assert.match(bad.errors[0], /requiredParams must be an array of non-empty param-name strings/);
+  const good = validateAgentConfigInput({ dataSources: [{ ...entry, requiredParams: ["from", "to"] }] });
+  assert.ok(good.ok);
+  if (good.ok) assert.deepEqual(good.value.dataSources[0].requiredParams, ["from", "to"]);
+});
+
 test("validateAgentConfigInput rejects canUpdate with no lookupFields", () => {
   const r = validateAgentConfigInput({
     collections: [{ collection: "content_x", description: "d", canUpdate: true, lookupFields: [] }],
@@ -173,6 +198,36 @@ test("sanitizeGuestMessages rejects a non-array body with 400", () => {
 });
 
 // ── decideChatRate ────────────────────────────────────────────────────────────
+
+test("validateWelcomeMessage: string trims, empty/null → null, locale object → JSON with empties dropped", () => {
+  assert.deepEqual(validateWelcomeMessage("  Hi!  "), { ok: true, value: "Hi!" });
+  assert.deepEqual(validateWelcomeMessage(""), { ok: true, value: null });
+  assert.deepEqual(validateWelcomeMessage(undefined), { ok: true, value: null });
+  const obj = validateWelcomeMessage({ EN: "Hello", fi: " Hei ", et: "" });
+  assert.ok(obj.ok);
+  if (obj.ok) assert.deepEqual(JSON.parse(obj.value ?? ""), { en: "Hello", fi: "Hei" });
+  assert.deepEqual(validateWelcomeMessage({ en: "" }), { ok: true, value: null });
+});
+
+test("validateWelcomeMessage rejects non-locale keys, non-string values, and non-object shapes by name", () => {
+  const badKey = validateWelcomeMessage({ english: "Hello" });
+  assert.ok(!badKey.ok);
+  if (!badKey.ok) assert.match(badKey.error, /"english" is not one/);
+  const badVal = validateWelcomeMessage({ en: 7 });
+  assert.ok(!badVal.ok);
+  if (!badVal.ok) assert.match(badVal.error, /welcomeMessage\.en must be a string/);
+  const badShape = validateWelcomeMessage(["Hello"]);
+  assert.ok(!badShape.ok);
+  if (!badShape.ok) assert.match(badShape.error, /string or a locale object/);
+});
+
+test("parseStoredWelcome round-trips: JSON locale object → object, plain text (even JSON-ish) → string", () => {
+  assert.deepEqual(parseStoredWelcome('{"en":"Hello","fi":"Hei"}'), { en: "Hello", fi: "Hei" });
+  assert.equal(parseStoredWelcome("Hello there"), "Hello there");
+  // Braces that are NOT a locale object stay a literal greeting.
+  assert.equal(parseStoredWelcome('{"greeting":"Hello"}'), '{"greeting":"Hello"}');
+  assert.equal(parseStoredWelcome("{not json"), "{not json");
+});
 
 test("decideChatRate locks on the minute window first", () => {
   const now = 1_000_000_000;
@@ -293,20 +348,23 @@ test("stampForModel suffixes each message's own `at` and never mutates the origi
 
 // ── timeContextLine ───────────────────────────────────────────────────────────
 
-test("timeContextLine renders positive offset local time + zone label", () => {
-  const line = timeContextLine("2026-07-22T12:48:00.000Z", "Europe/Helsinki", 180);
-  assert.match(line, /Current time for the visitor: 2026-07-22T15:48\+03:00 \(Europe\/Helsinki, UTC\+03:00\)/);
-  assert.match(line, /visitor's local time/);
+test("timeContextLine renders the zone label and points 'now' at the newest [at] stamp", () => {
+  const line = timeContextLine("Europe/Helsinki", 180);
+  assert.match(line, /Visitor timezone: Europe\/Helsinki, UTC\+03:00/);
+  assert.match(line, /newest user message's \[at …\] stamp as the current moment/);
 });
 
 test("timeContextLine renders a negative offset", () => {
-  const line = timeContextLine("2026-07-22T12:00:00.000Z", "America/New_York", -300);
-  assert.match(line, /2026-07-22T07:00-05:00 \(America\/New_York, UTC-05:00\)/);
+  const line = timeContextLine("America/New_York", -300);
+  assert.match(line, /America\/New_York, UTC-05:00/);
 });
 
-test("timeContextLine renders a zero offset and omits an empty zone name", () => {
-  const line = timeContextLine("2026-07-22T12:00:00.000Z", "", 0);
-  assert.match(line, /2026-07-22T12:00\+00:00 \(UTC\+00:00\)/);
+test("timeContextLine omits an empty zone name and carries NO wall-clock time (cache-stable)", () => {
+  const line = timeContextLine("", 0);
+  assert.match(line, /Visitor timezone: UTC\+00:00/);
+  // The provider prompt-cache prefix must not change between messages: no
+  // date/time digits belong in this line, ever.
+  assert.doesNotMatch(line, /\d{4}-\d{2}-\d{2}/);
 });
 
 // ── localTimeToUtc ────────────────────────────────────────────────────────────
@@ -342,6 +400,111 @@ test("localTimeToUtc rejects garbage with a self-correcting error naming the for
   assert.ok(!bad.ok);
   if (bad.ok) return;
   assert.match(bad.error, /ISO-8601/);
+});
+
+// ── rehydrateGuestTranscript ──────────────────────────────────────────────────
+
+/** A stored payload JSON whose transcript has one full tool round + final answer. */
+function storedJson(messages: unknown[]): string {
+  return JSON.stringify({ version: 1, messages });
+}
+
+const TOOL_ROUND = [
+  { role: "user", content: "find my booking\n[at 2026-07-22T15:44:43+03:00]", at: "2026-07-22T15:44:43+03:00" },
+  {
+    role: "assistant",
+    content: "",
+    tool_calls: [{ id: "c1", type: "function", function: { name: "ds_search", arguments: "{}" } }],
+    at: "2026-07-22T12:45:50.246Z",
+  },
+  { role: "tool", tool_call_id: "c1", name: "ds_search", content: '{"ok":true,"data":{"id":"bkg_1"}}', at: "2026-07-22T12:45:50.246Z" },
+  { role: "assistant", content: "Found booking bkg_1.", at: "2026-07-22T15:45:09+03:00" },
+];
+
+test("rehydrateGuestTranscript returns stored transcript (tool rounds intact) + the stamped new user turn", () => {
+  const client = [
+    { role: "user" as const, content: "find my booking" },
+    { role: "assistant" as const, content: "Found booking bkg_1." },
+    { role: "user" as const, content: "move it to 18:00", at: "2026-07-22T15:46:00+03:00" },
+  ];
+  const out = rehydrateGuestTranscript(storedJson(TOOL_ROUND), client);
+  assert.ok(out);
+  if (!out) return;
+  assert.equal(out.length, 5);
+  // Tool fidelity survives: the tool_calls turn and the tool result are in context.
+  assert.equal((out[1] as { tool_calls?: unknown }).tool_calls !== undefined, true);
+  assert.equal(out[2].role, "tool");
+  // Only the NEW user turn is appended, stamped with its own `at`.
+  assert.deepEqual(out[4], {
+    role: "user",
+    content: "move it to 18:00\n[at 2026-07-22T15:46:00+03:00]",
+    at: "2026-07-22T15:46:00+03:00",
+  });
+});
+
+test("rehydrateGuestTranscript falls back (null) on garbage JSON, empty messages, or a last turn that isn't user", () => {
+  const client = [{ role: "user" as const, content: "hi" }];
+  assert.equal(rehydrateGuestTranscript("not json", client), null);
+  assert.equal(rehydrateGuestTranscript(storedJson([]), client), null);
+  assert.equal(
+    rehydrateGuestTranscript(storedJson(TOOL_ROUND), [
+      { role: "user", content: "hi" },
+      { role: "assistant", content: "hello" },
+    ]),
+    null,
+  );
+  assert.equal(rehydrateGuestTranscript(storedJson(TOOL_ROUND), []), null);
+});
+
+test("rehydrateGuestTranscript falls back on a store/client desync (assistant counts differ)", () => {
+  // Client claims TWO assistant replies; the store only completed one — a failed
+  // write or a guessed conversationId must not resurrect a different context.
+  const client = [
+    { role: "user" as const, content: "find my booking" },
+    { role: "assistant" as const, content: "Found booking bkg_1." },
+    { role: "user" as const, content: "and?" },
+    { role: "assistant" as const, content: "It is at 19:00." },
+    { role: "user" as const, content: "move it" },
+  ];
+  assert.equal(rehydrateGuestTranscript(storedJson(TOOL_ROUND), client), null);
+});
+
+test("rehydrateGuestTranscript beheads a cap-truncated transcript to the first user turn", () => {
+  // The size cap dropped the oldest entries mid-round: an orphan tool result
+  // leads. It must not reach the gateway.
+  const truncated = [
+    { role: "tool", tool_call_id: "c0", name: "ds_search", content: "{}" },
+    ...TOOL_ROUND,
+  ];
+  const client = [
+    { role: "user" as const, content: "find my booking" },
+    { role: "assistant" as const, content: "Found booking bkg_1." },
+    { role: "user" as const, content: "move it" },
+  ];
+  const out = rehydrateGuestTranscript(storedJson(truncated), client);
+  assert.ok(out);
+  if (!out) return;
+  assert.equal(out[0].role, "user");
+  assert.equal(out.length, 5);
+});
+
+test("rehydrateGuestTranscript ignores synthetic nudge user turns in the count guard", () => {
+  // The round loop can inject a `role:"user"` retry nudge; the guard counts
+  // FINAL assistant turns, not user turns, so the nudge doesn't desync.
+  const withNudge = [
+    ...TOOL_ROUND.slice(0, 3),
+    { role: "user", content: "A tool call just failed with the error above." },
+    { role: "assistant", content: "Found booking bkg_1." },
+  ];
+  const client = [
+    { role: "user" as const, content: "find my booking" },
+    { role: "assistant" as const, content: "Found booking bkg_1." },
+    { role: "user" as const, content: "move it" },
+  ];
+  const out = rehydrateGuestTranscript(storedJson(withNudge), client);
+  assert.ok(out);
+  if (!out) return;
+  assert.equal(out.length, 6);
 });
 
 // ── capConversationPayload ────────────────────────────────────────────────────

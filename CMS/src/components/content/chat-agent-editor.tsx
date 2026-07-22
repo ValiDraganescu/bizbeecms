@@ -16,13 +16,18 @@
  * a translated key set).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ModelPicker } from "@/components/chat/model-picker";
-import type {
-  ChatAgentLimits,
-  CollectionAllowEntry,
-  DataSourceAllowEntry,
+import {
+  LocalePicker,
+  useLocalePicker,
+} from "@/components/page-builder/locale-picker";
+import {
+  parseStoredWelcome,
+  type ChatAgentLimits,
+  type CollectionAllowEntry,
+  type DataSourceAllowEntry,
 } from "@/lib/public-chat/core";
 import {
   CollectionRows,
@@ -40,17 +45,27 @@ import {
   type Source,
 } from "@/components/content/chat-agents-shared";
 
-/** The editable draft — limits are partial (blank = default). */
+/** The editable draft — limits are partial (blank = default). The welcome
+ *  message is edited PER CONTENT LOCALE (a locale → text map); the "" key holds
+ *  a legacy plain-string welcome until the site's locales load and it is
+ *  re-homed under the default locale. */
 type Draft = {
   name: string;
   enabled: boolean;
   model: string | null;
-  welcomeMessage: string;
+  welcomeMessage: Record<string, string>;
   systemPrompt: string;
   limits: Partial<ChatAgentLimits>;
   dataSources: DataSourceAllowEntry[];
   collections: CollectionAllowEntry[];
 };
+
+/** Seed the per-locale welcome map from the stored value (string or JSON locale object). */
+function welcomeDraft(stored: string | null | undefined): Record<string, string> {
+  if (!stored) return {};
+  const parsed = parseStoredWelcome(stored);
+  return typeof parsed === "string" ? { "": parsed } : { ...parsed };
+}
 
 /**
  * Seed a draft from an existing agent, or blank for a new one. Existing limits
@@ -63,7 +78,7 @@ function draftFrom(agent?: Agent): Draft {
     name: agent?.name ?? "",
     enabled: agent?.enabled ?? true,
     model: agent?.model ?? null,
-    welcomeMessage: agent?.welcomeMessage ?? "",
+    welcomeMessage: welcomeDraft(agent?.welcomeMessage),
     systemPrompt: agent?.systemPrompt ?? "",
     limits: agent ? { ...agent.limits } : {},
     dataSources: agent ? agent.dataSources.map((e) => ({ ...e })) : [],
@@ -88,6 +103,42 @@ export function AgentEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Site content locales for the per-locale welcome input (default first, the
+  // shape /api/settings/content-locales serves). Until the fetch lands the
+  // editor shows a single unlabeled field, same as a one-locale site.
+  const [localesCfg, setLocalesCfg] = useState<{ default: string; locales: string[] }>({
+    default: "en",
+    locales: ["en"],
+  });
+  const picker = useLocalePicker(localesCfg.locales);
+  const { setActive: setPickerActive } = picker;
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/settings/content-locales");
+        if (!res.ok) return;
+        const j = (await res.json()) as { default?: string; locales?: string[] };
+        if (!alive || !j.default || !j.locales?.length) return;
+        setLocalesCfg({ default: j.default, locales: j.locales });
+        setPickerActive(j.default);
+        // Re-home a legacy plain-string welcome under the default locale so it
+        // is edited (and saved) as that locale's text.
+        setDraft((d) => {
+          const plain = d.welcomeMessage[""];
+          if (plain === undefined) return d;
+          const { "": _legacy, ...rest } = d.welcomeMessage;
+          return { ...d, welcomeMessage: { [j.default as string]: plain, ...rest } };
+        });
+      } catch {
+        /* locale fetch failed → single-field editing still works */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [setPickerActive]);
+
   const canSave =
     draft.name.trim() !== "" && draft.systemPrompt.trim() !== "" && !busy;
 
@@ -99,11 +150,24 @@ export function AgentEditor({
     setBusy(true);
     setError(null);
     try {
+      // Per-locale welcome → the API's welcomeMessage: null when empty, a plain
+      // string when only one value exists (single-locale site or legacy field),
+      // else the locale object the render walk localizes.
+      const welcomeEntries = Object.entries(draft.welcomeMessage)
+        .map(([k, v]) => [k, v.trim()] as const)
+        .filter(([, v]) => v !== "");
+      const welcomeMessage =
+        welcomeEntries.length === 0
+          ? null
+          : welcomeEntries.length === 1 &&
+              (welcomeEntries[0][0] === "" || localesCfg.locales.length === 1)
+            ? welcomeEntries[0][1]
+            : Object.fromEntries(welcomeEntries.filter(([k]) => k !== ""));
       const payload = {
         name: draft.name.trim(),
         enabled: draft.enabled,
         model: draft.model,
-        welcomeMessage: draft.welcomeMessage.trim() || null,
+        welcomeMessage,
         systemPrompt: draft.systemPrompt.trim(),
         limits: draft.limits,
         dataSources: draft.dataSources,
@@ -181,16 +245,32 @@ export function AgentEditor({
         />
       </label>
 
-      <label className="flex flex-col gap-1">
-        <span className={labelCls}>Welcome message</span>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className={labelCls}>Welcome message</span>
+          <LocalePicker state={picker} label="Welcome message language" />
+        </div>
         <input
           className={inputCls}
-          value={draft.welcomeMessage}
+          value={
+            draft.welcomeMessage[picker.active] ?? draft.welcomeMessage[""] ?? ""
+          }
           maxLength={500}
           placeholder="Hi! How can I help you today?"
-          onChange={(e) => set("welcomeMessage", e.target.value)}
+          onChange={(e) =>
+            set("welcomeMessage", {
+              ...draft.welcomeMessage,
+              [picker.active]: e.target.value,
+            })
+          }
         />
-      </label>
+        {localesCfg.locales.length > 1 && (
+          <span className={helpCls}>
+            Shown in the visitor&apos;s language. A locale left empty falls back
+            to the default ({localesCfg.default}).
+          </span>
+        )}
+      </div>
 
       <LimitsFields limits={draft.limits} onChange={(l) => set("limits", l)} />
 

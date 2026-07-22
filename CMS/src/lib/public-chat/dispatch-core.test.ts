@@ -5,7 +5,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { guestQuerySpec, updateLookupFilters, guestBody } from "./dispatch-core.ts";
+import { guestQuerySpec, updateLookupFilters, guestBody, missingRequiredParams } from "./dispatch-core.ts";
 
 // ── guestQuerySpec ────────────────────────────────────────────────────────────
 
@@ -82,4 +82,20 @@ test("guestBody keeps only declared fields and drops excluded/unknown", () => {
 
 test("guestBody omits absent declared fields (PATCH semantics)", () => {
   assert.deepEqual(guestBody({ name: "Sam" }, ["name", "note"]), { name: "Sam" });
+});
+
+test("missingRequiredParams names required params left missing, empty, or whitespace", () => {
+  assert.deepEqual(
+    missingRequiredParams(["from", "to"], { email: "a@b.c", from: "", to: "  " }),
+    ["from", "to"],
+  );
+  assert.deepEqual(
+    missingRequiredParams(["from", "to"], { from: "2026-08-01", to: "2026-08-02" }),
+    [],
+  );
+});
+
+test("missingRequiredParams is a no-op for entries without requiredParams", () => {
+  assert.deepEqual(missingRequiredParams(undefined, {}), []);
+  assert.deepEqual(missingRequiredParams([], { from: "" }), []);
 });

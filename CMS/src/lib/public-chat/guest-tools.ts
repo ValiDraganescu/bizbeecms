@@ -113,10 +113,20 @@ function uniqueName(base: string, taken: Set<string>): string {
 
 // ── Schema builders ───────────────────────────────────────────────────────────
 
-function dataSourceSchema(name: string, description: string, placeholders: string[]) {
+function dataSourceSchema(
+  name: string,
+  description: string,
+  placeholders: string[],
+  requiredParams: string[] = [],
+) {
   const properties: Record<string, unknown> = {};
   for (const p of placeholders) {
-    properties[p] = { type: "string", description: `Value for the {${p}} parameter.` };
+    // Every placeholder is schema-required; the "" convention covers unused ones.
+    // Params the OPERATOR marked required must additionally be non-empty — the
+    // dispatcher rejects "" for them, so say so where the model reads it.
+    properties[p] = requiredParams.includes(p)
+      ? { type: "string", description: `Value for the {${p}} parameter. Must be a real, non-empty value — "" is rejected.` }
+      : { type: "string", description: `Value for the {${p}} parameter.` };
   }
   return {
     type: "function" as const,
@@ -216,7 +226,7 @@ export function buildGuestTools(
     const name = uniqueName(`ds_${slugify(entry.toolName)}`, taken);
     tools.push({
       name,
-      schema: dataSourceSchema(name, entry.description, saved.placeholders),
+      schema: dataSourceSchema(name, entry.description, saved.placeholders, entry.requiredParams),
       kind: "datasource",
       entry,
     });

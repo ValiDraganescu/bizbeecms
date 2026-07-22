@@ -52,6 +52,7 @@ import {
   type IconMap,
 } from "@/lib/render/tree";
 import { resolveLocalized } from "@/lib/render/localize";
+import { parseStoredWelcome } from "@/lib/public-chat/core";
 import { scanIconSlots } from "@/lib/render/icons";
 import { resolveIcons } from "@/db/icon-store";
 import { getChatAgent } from "@/db/chat-agent-store";
@@ -596,12 +597,14 @@ export async function buildPlanFromComponent(
 async function hydrateGuestChatWelcome(blocks: Block[]): Promise<Block[]> {
   const refs = collectGuestChatAgentRefs(blocks);
   if (refs.length === 0) return blocks;
-  const welcomeByRef = new Map<string, string>();
+  const welcomeByRef = new Map<string, string | Record<string, string>>();
   await Promise.all(
     refs.map(async (ref) => {
       try {
         const agent = await getChatAgent(ref);
-        if (agent?.welcomeMessage) welcomeByRef.set(ref, agent.welcomeMessage);
+        // A stored locale-object welcome hydrates as the OBJECT — the plan walk
+        // then resolves it to the active content locale like any localized prop.
+        if (agent?.welcomeMessage) welcomeByRef.set(ref, parseStoredWelcome(agent.welcomeMessage));
       } catch {
         /* unreadable agent → no welcome for this ref */
       }

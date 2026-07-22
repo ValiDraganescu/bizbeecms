@@ -18,7 +18,11 @@ import {
   listChatAgents,
   type ChatAgentRow,
 } from "@/db/chat-agent-store";
-import { parseAgentConfig, validateAgentConfigInput } from "@/lib/public-chat/core";
+import {
+  parseAgentConfig,
+  validateAgentConfigInput,
+  validateWelcomeMessage,
+} from "@/lib/public-chat/core";
 
 export const dynamic = "force-dynamic";
 
@@ -64,16 +68,17 @@ export function buildAgentInput(
     collections: obj.collections,
   });
   if (!checked.ok) errors.push(...checked.errors);
-  if (errors.length > 0 || !checked.ok) {
+  // Plain string or a locale object ({"en":"Hello","fi":"Hei"}) — stored as its
+  // string form; the render walk localizes it per visitor content locale.
+  const welcome = validateWelcomeMessage(obj.welcomeMessage);
+  if (!welcome.ok) errors.push(welcome.error);
+  if (errors.length > 0 || !checked.ok || !welcome.ok) {
     return { ok: false, status: 400, payload: { errors } };
   }
 
   const model =
     typeof obj.model === "string" && obj.model.trim() !== "" ? obj.model.trim() : null;
-  const welcomeMessage =
-    typeof obj.welcomeMessage === "string" && obj.welcomeMessage.trim() !== ""
-      ? obj.welcomeMessage.trim()
-      : null;
+  const welcomeMessage = welcome.value;
 
   return {
     ok: true,

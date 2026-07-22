@@ -122,3 +122,18 @@ export function guestBody(
   }
   return body;
 }
+
+/**
+ * The params an entry's `requiredParams` marks mandatory that the call left
+ * missing or empty ("" or whitespace). Non-empty result → the dispatcher
+ * refuses the call with a self-correcting error naming exactly these params —
+ * an under-specified call is then not an option at the TOOL level, whatever
+ * the prompt says (e.g. an operator forcing a date window on a search tool).
+ */
+export function missingRequiredParams(
+  requiredParams: string[] | undefined,
+  fields: Record<string, string>,
+): string[] {
+  if (!requiredParams || requiredParams.length === 0) return [];
+  return requiredParams.filter((p) => (fields[p] ?? "").trim() === "");
+}

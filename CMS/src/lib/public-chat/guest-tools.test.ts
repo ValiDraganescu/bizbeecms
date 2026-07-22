@@ -58,6 +58,26 @@ test("data-source entry → ds_<slug> tool with one required string per placehol
   assert.deepEqual(fn.parameters.required, ["city", "units"]);
 });
 
+test("requiredParams annotate their schema properties as non-empty (\"\" rejected)", () => {
+  const config = baseConfig({
+    dataSources: [
+      {
+        sourceId: "s1",
+        requestId: "r1",
+        toolName: "Search bookings",
+        description: "Find bookings",
+        requiredParams: ["from", "to"],
+      },
+    ],
+  });
+  const saved = new Map([["s1:r1", { placeholders: ["email", "from", "to"] }]]);
+  const fn = fnOf(configured(buildGuestTools(config, saved, new Map()))[0]);
+  const desc = (p: string) => (fn.parameters.properties[p] as { description: string }).description;
+  assert.match(desc("from"), /non-empty value — "" is rejected/);
+  assert.match(desc("to"), /non-empty value — "" is rejected/);
+  assert.doesNotMatch(desc("email"), /rejected/);
+});
+
 test("data-source entry with no matching saved request yields no tool", () => {
   const config = baseConfig({
     dataSources: [{ sourceId: "s1", requestId: "gone", toolName: "X", description: "d" }],

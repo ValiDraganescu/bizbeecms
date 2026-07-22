@@ -45,6 +45,9 @@ export const CHAT_AGENTS_GUIDE = `# Guest-facing chatbots (chat agents) — the 
 - An agent has: \`name\` (unique), \`systemPrompt\` (persona/instructions), optional
   \`model\` (omit → site default) and \`welcomeMessage\`, \`enabled\` (default true), plus
   three config blocks: \`limits\`, \`dataSources\`, \`collections\`.
+- \`welcomeMessage\` is a plain string OR a locale object ({"en":"Hello","fi":"Hei"})
+  — provide EVERY site content locale (\`list_locales\`) so the widget greets each
+  visitor in their language; a missing locale falls back to the site default.
 
 ## Tools
 - \`list_chat_agents\` — the agents (id, name, enabled, model, limit summary, tool
@@ -101,6 +104,9 @@ Each entry becomes ONE guest tool (\`ds_<slug>\` from \`toolName\`).
 - \`description\` — what the tool does; the guest bot reads THIS to decide when to
   call it, so make it clear and task-scoped.
 - \`maxCallsPerConversation\` (optional) — per-conversation call cap for this tool.
+- \`requiredParams\` (optional) — request params the bot must always pass NON-EMPTY;
+  the dispatcher rejects "" for them with an error naming the params. Use it to
+  make an unbounded call impossible (e.g. ["from","to"] on a search tool).
 The request's saved secret stays server-side; the visitor never sees it.
 
 ## collections allowlist (collection ops the bot may perform)

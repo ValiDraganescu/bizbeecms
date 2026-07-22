@@ -10,7 +10,10 @@
  * blocks server-side (`findGuestChatBlock`), so a visitor can NEVER choose the
  * model, prompt, or tools — only talk to an agent an operator published. The
  * client transcript is sanitized (system roles stripped); tool SSE frames carry
- * ONLY `{name, ok, id}` — never args or results.
+ * ONLY `{name, ok, id}` — never args or results. When the conversation has a
+ * STORED transcript, the model context is rehydrated from it (full tool
+ * fidelity, agent-scoped read) and the client transcript only contributes the
+ * new user turn — see `rehydrateGuestTranscript` for the desync fallback.
  *
  * LAYERED abuse limits (message-count based; tokens recorded, not enforced):
  *  - per-IP minute sliding window (login_attempt table, kind "chat" — that
@@ -52,13 +55,14 @@ import {
   sanitizeGuestMessages,
   decideChatRate,
   parseConversationMeta,
+  rehydrateGuestTranscript,
   stampForModel,
   timeContextLine,
   capConversationPayload,
   type ChatAgentConfig,
   type ConversationPayload,
 } from "@/lib/public-chat/core";
-import { upsertConversation } from "@/db/chat-conversation-store";
+import { getConversation, upsertConversation } from "@/db/chat-conversation-store";
 import { buildGuestTools, assembleGuestPrompt } from "@/lib/public-chat/guest-tools";
 import { findGuestChatBlock } from "@/lib/public-chat/find-block";
 import {
@@ -163,17 +167,36 @@ export async function POST(request: Request): Promise<Response> {
     // ── Build the guest tools + system prompt from the allowlist ───────────
     const { tools, collectionFields } = await buildTools(config);
     // System prompt = the operator prompt + tool listing + guardrails, then a
-    // time-context line giving the model the visitor's current local time/zone.
+    // time-context line giving the model the visitor's zone. Everything here is
+    // STABLE across a conversation's requests (provider prompt-cache prefix) —
+    // "now" travels in each user turn's [at …] stamp, never in the system prompt.
     const systemPrompt =
       assembleGuestPrompt(
         { name: agentRow.name, systemPrompt: agentRow.systemPrompt },
         tools,
       ) +
       "\n\n" +
-      timeContextLine(new Date().toISOString(), meta.timezone, meta.utcOffsetMinutes);
+      timeContextLine(meta.timezone, meta.utcOffsetMinutes);
+    // ── Model context: rehydrate the STORED transcript when we have one ────
+    // The stored conversation carries full gateway fidelity (tool_calls + tool
+    // results), so the model keeps what its tools already learned across turns
+    // instead of re-fetching it. Any miss — anonymous request, no stored row,
+    // a store/client desync — falls back to the client's text transcript
+    // (the pre-rehydration behavior). Read failures are treated as a miss.
+    let rehydrated: TurnMessage[] | null = null;
+    if (meta.conversationId !== "") {
+      const prior = await getConversation(agentRow.id, meta.conversationId).catch(() => null);
+      if (prior) {
+        rehydrated = rehydrateGuestTranscript(
+          prior.payload,
+          sanitized.messages,
+        ) as TurnMessage[] | null;
+      }
+    }
     // The model sees each turn's local timestamp suffixed onto its content — this
     // stamped transcript IS the gateway payload.
-    const modelMessages = stampForModel(sanitized.messages, meta.utcOffsetMinutes);
+    const modelMessages =
+      rehydrated ?? stampForModel(sanitized.messages, meta.utcOffsetMinutes);
     const messages: TurnMessage[] = [
       { role: "system", content: systemPrompt },
       ...modelMessages,

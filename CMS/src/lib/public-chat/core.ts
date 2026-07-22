@@ -20,6 +20,11 @@
  * stream, the attempt recording.
  */
 import { MAX_OUTPUT_CEILING } from "../chat/models.ts";
+import {
+  isLocaleObject,
+  isValidLocaleCode,
+  normalizeLocaleCode,
+} from "../render/localize.ts";
 
 // ── Config shapes ─────────────────────────────────────────────────────────────
 
@@ -43,6 +48,13 @@ export interface DataSourceAllowEntry {
   description: string;
   /** Per-conversation call cap for this tool (enforced in the dispatcher). */
   maxCallsPerConversation?: number;
+  /**
+   * Request params the bot MUST pass non-empty (enforced in the dispatcher with
+   * a self-correcting error; annotated in the tool schema). For params the ""
+   * convention would otherwise let the bot skip — e.g. forcing a date window on
+   * a search tool so an unbounded query is not an option.
+   */
+  requiredParams?: string[];
 }
 
 /** One allowlisted collection + the guest operations permitted against it. */
@@ -144,6 +156,10 @@ function parseDataSourceEntries(raw: unknown): DataSourceAllowEntry[] {
     if (typeof rec.maxCallsPerConversation === "number" && Number.isFinite(rec.maxCallsPerConversation)) {
       const cap = Math.floor(rec.maxCallsPerConversation);
       if (cap > 0) entry.maxCallsPerConversation = cap;
+    }
+    if (Array.isArray(rec.requiredParams)) {
+      const required = rec.requiredParams.filter(isNonEmptyStr).map((s) => s.trim());
+      if (required.length > 0) entry.requiredParams = required;
     }
     out.push(entry);
   }
@@ -257,6 +273,13 @@ function validateDataSourceEntry(item: unknown, i: number, errors: string[]): Da
     }
     entry.maxCallsPerConversation = cap;
   }
+  if (rec.requiredParams !== undefined) {
+    if (!Array.isArray(rec.requiredParams) || !rec.requiredParams.every(isNonEmptyStr)) {
+      errors.push(`dataSources[${i}].requiredParams must be an array of non-empty param-name strings (the request params the bot must always pass non-empty)`);
+      return null;
+    }
+    entry.requiredParams = rec.requiredParams.map((s) => (s as string).trim());
+  }
   return entry;
 }
 
@@ -345,6 +368,71 @@ export function validateAgentConfigInput(args: unknown): ConfigValidation {
 
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, value: { limits, dataSources, collections } };
+}
+
+// ── Localized welcome message (pure) ──────────────────────────────────────────
+//
+// A chat agent's `welcomeMessage` column stores either a plain string (one
+// greeting for every visitor) or a JSON LOCALE OBJECT ({"en":"Hello","fi":
+// "Hei"}) — the same inline localization model as block props, resolved per
+// active content locale by the render walk (lib/render/localize.ts).
+
+/**
+ * Parse a STORED welcomeMessage into what the render hydration injects as the
+ * GuestChat block's `welcome` prop: a JSON locale object round-trips to the
+ * OBJECT (the plan walk then resolves it per locale); anything else stays the
+ * plain string.
+ */
+export function parseStoredWelcome(stored: string): string | Record<string, string> {
+  const trimmed = stored.trim();
+  if (!trimmed.startsWith("{")) return stored;
+  const parsed = parseJsonLoose(trimmed);
+  if (isLocaleObject(parsed)) {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof v === "string" && v.trim() !== "") out[normalizeLocaleCode(k)] = v;
+    }
+    if (Object.keys(out).length > 0) return out;
+  }
+  return stored;
+}
+
+/**
+ * Validate an INCOMING welcomeMessage (write path — REST and MCP): a plain
+ * string, or a locale object of locale code → greeting. Returns the STORED
+ * string form (locale objects serialize to JSON; empty values drop; all-empty →
+ * null, i.e. no welcome). Self-correcting errors name the exact bad key.
+ */
+export function validateWelcomeMessage(
+  raw: unknown,
+): { ok: true; value: string | null } | { ok: false; error: string } {
+  if (raw === undefined || raw === null) return { ok: true, value: null };
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    return { ok: true, value: t === "" ? null : t };
+  }
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (!isValidLocaleCode(k)) {
+        return {
+          ok: false,
+          error: `welcomeMessage keys must be locale codes (like "en" or "pt-br") — "${k}" is not one`,
+        };
+      }
+      if (typeof v !== "string") {
+        return { ok: false, error: `welcomeMessage.${k} must be a string` };
+      }
+      if (v.trim() !== "") out[normalizeLocaleCode(k)] = v.trim();
+    }
+    if (Object.keys(out).length === 0) return { ok: true, value: null };
+    return { ok: true, value: JSON.stringify(out) };
+  }
+  return {
+    ok: false,
+    error:
+      'welcomeMessage must be a string or a locale object like {"en":"Hello","fi":"Hei"}',
+  };
 }
 
 // ── Guest transcript sanitizer (trust boundary) ───────────────────────────────
@@ -517,24 +605,19 @@ export function stampForModel(
 }
 
 /**
- * One system-prompt line telling the model the visitor's current local time +
- * zone, so it can reason about "today"/"now" in the visitor's frame. `nowUtcIso`
- * is injected by the caller (`new Date().toISOString()`) so this stays pure and
- * testable — no `Date.now()` inside. Local time = UTC + offset, formatted to the
- * minute with the offset suffix.
+ * One system-prompt line telling the model the visitor's time frame. DELIBERATELY
+ * STABLE within a conversation (timezone + offset only — no wall-clock time):
+ * the system prompt is the provider's cache-prefix byte 0, so anything volatile
+ * here re-ingests the whole conversation every message. "Now" is instead read
+ * from the newest user message's `[at …]` stamp (every user turn carries one).
  */
 export function timeContextLine(
-  nowUtcIso: string,
   timezone: string,
   utcOffsetMinutes: number,
 ): string {
-  const nowMs = Date.parse(nowUtcIso);
-  const localMs = nowMs + utcOffsetMinutes * 60_000;
-  // Slice to minute precision from the shifted ISO string; append the offset.
-  const localIso = new Date(localMs).toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
   const offset = formatOffset(utcOffsetMinutes);
   const zoneLabel = timezone ? `${timezone}, UTC${offset}` : `UTC${offset}`;
-  return `Current time for the visitor: ${localIso}${offset} (${zoneLabel}). Message timestamps are in the visitor's local time.`;
+  return `Visitor timezone: ${zoneLabel}. Message timestamps are in the visitor's local time; treat the newest user message's [at …] stamp as the current moment.`;
 }
 
 /**
@@ -606,6 +689,70 @@ export interface ConversationPayload {
 /** UTF-8 byte length of a string (payload cap is measured in bytes, not chars). */
 function byteLength(s: string): number {
   return new TextEncoder().encode(s).length;
+}
+
+/**
+ * Rebuild the model context from the STORED gateway transcript (full fidelity —
+ * assistant `tool_calls` turns and `role:"tool"` results included) plus the
+ * client's NEW user turn. Without this, every request rebuilds context from the
+ * widget's text-only transcript and the model loses what its tools already
+ * learned (booking ids, channel policy), re-fetching it turn after turn.
+ *
+ * The client transcript stays the source of truth for what the visitor SAW; the
+ * stored transcript must agree with it or the caller falls back to the client
+ * transcript. Returns null unless:
+ *  - `payloadJson` parses and its `messages` is a non-empty array,
+ *  - the client's LAST message is the new `user` turn,
+ *  - the stored FINAL assistant turns (role assistant, no `tool_calls`,
+ *    non-empty content — one per completed request) count exactly the client's
+ *    assistant turns. A desynced store (failed write, idle reset, a guessed
+ *    conversationId) must never resurrect a different conversation.
+ *
+ * The size cap can behead the stored transcript mid-round, so leading entries
+ * are dropped to the first `user` turn — the gateway never sees an orphan tool
+ * result. Stored contents are already `[at …]`-stamped; only the new user turn
+ * is stamped here.
+ */
+export function rehydrateGuestTranscript(
+  payloadJson: string,
+  clientMessages: GuestMessage[],
+): Array<Record<string, unknown>> | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payloadJson);
+  } catch {
+    return null;
+  }
+  const payload = asRecord(parsed);
+  const raw = payload?.messages;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+
+  const newTurn = clientMessages[clientMessages.length - 1];
+  if (!newTurn || newTurn.role !== "user") return null;
+
+  const entries: Record<string, unknown>[] = [];
+  for (const e of raw) {
+    const rec = asRecord(e);
+    if (rec) entries.push(rec);
+  }
+  const start = entries.findIndex((e) => e.role === "user");
+  if (start === -1) return null;
+  const stored = entries.slice(start);
+
+  const storedFinals = stored.filter(
+    (e) =>
+      e.role === "assistant" &&
+      e.tool_calls === undefined &&
+      typeof e.content === "string" &&
+      e.content !== "",
+  ).length;
+  const clientAssistants = clientMessages
+    .slice(0, -1)
+    .filter((m) => m.role === "assistant").length;
+  if (storedFinals !== clientAssistants) return null;
+
+  const [stamped] = stampForModel([newTurn], 0);
+  return [...stored, stamped as unknown as Record<string, unknown>];
 }
 
 /**

@@ -37,6 +37,7 @@
  */
 import {
   validateAgentConfigInput,
+  validateWelcomeMessage,
   DEFAULT_LIMITS,
   LIMIT_CEILINGS,
   type ChatAgentConfig,
@@ -94,6 +95,14 @@ const DATA_SOURCES_SCHEMA = {
       toolName: { type: "string", description: "Short label for the guest tool (slugified into the bot's `ds_<slug>` tool name)." },
       description: { type: "string", description: "What this tool does — the guest bot reads this to decide when to call it." },
       maxCallsPerConversation: { type: "number", description: "Optional per-conversation call cap for this tool." },
+      requiredParams: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Request params the guest bot must always pass NON-EMPTY (the dispatcher " +
+          "rejects \"\" for them with an error naming the params). Use to make an " +
+          "unbounded call impossible — e.g. [\"from\",\"to\"] on a search tool.",
+      },
     },
     required: ["sourceId", "requestId", "toolName", "description"],
   },
@@ -132,7 +141,13 @@ const AGENT_CORE_PROPERTIES = {
   systemPrompt: { type: "string", description: "The bot's persona/instructions — what it is, its tone, and what it should/shouldn't do." },
   model: { type: "string", description: "Optional model id; omit/null to use the site's default chat model." },
   enabled: { type: "boolean", description: "Whether the bot is live on published pages (default true). A disabled agent's block shows nothing." },
-  welcomeMessage: { type: "string", description: "Optional greeting the widget shows before the visitor's first message." },
+  welcomeMessage: {
+    type: ["string", "object"],
+    description:
+      "Optional greeting the widget shows before the visitor's first message. " +
+      "A plain string, or a locale object {\"en\":\"Hello\",\"fi\":\"Hei\"} shown " +
+      "per visitor content locale (list_locales shows the site's set).",
+  },
   limits: LIMITS_SCHEMA,
   dataSources: DATA_SOURCES_SCHEMA,
   collections: COLLECTIONS_SCHEMA,
@@ -244,8 +259,9 @@ function shapeAgentFields(
 
   let welcomeMessage: string | null = null;
   if (rec.welcomeMessage !== undefined && rec.welcomeMessage !== null && rec.welcomeMessage !== "") {
-    if (typeof rec.welcomeMessage !== "string") return { ok: false, error: "welcomeMessage must be a string" };
-    welcomeMessage = rec.welcomeMessage;
+    const w = validateWelcomeMessage(rec.welcomeMessage);
+    if (!w.ok) return { ok: false, error: w.error };
+    welcomeMessage = w.value;
   }
 
   const config = validateAgentConfigInput({
@@ -420,8 +436,11 @@ export const UPDATE_CHAT_AGENT_SETTINGS_TOOL = {
         },
         enabled: { type: "boolean", description: "Whether the bot is live on published pages." },
         welcomeMessage: {
-          type: ["string", "null"],
-          description: "New widget greeting, or null to clear it.",
+          type: ["string", "object", "null"],
+          description:
+            "New widget greeting — a plain string or a locale object " +
+            "{\"en\":\"Hello\",\"fi\":\"Hei\"} shown per visitor content locale " +
+            "— or null to clear it.",
         },
       },
       required: ["agent"],
@@ -490,6 +509,14 @@ export const SET_CHAT_AGENT_DATA_SOURCE_TOOL = {
         toolName: { type: "string", description: "Short label for the guest tool (slugified into the bot's `ds_<slug>` tool name); the upsert key." },
         description: { type: "string", description: "What this tool does — the guest bot reads this to decide when to call it." },
         maxCallsPerConversation: { type: "number", description: "Optional per-conversation call cap for this tool." },
+        requiredParams: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Request params the guest bot must always pass NON-EMPTY (\"\" is " +
+            "rejected with a self-correcting error). Use to make an unbounded " +
+            "call impossible — e.g. [\"from\",\"to\"] on a search tool.",
+        },
       },
       required: ["agent", "sourceId", "requestId", "toolName", "description"],
     },
@@ -619,11 +646,9 @@ export function validateUpdateChatAgentSettings(
     patch.enabled = rec.enabled;
   }
   if (rec.welcomeMessage !== undefined) {
-    if (rec.welcomeMessage !== null && typeof rec.welcomeMessage !== "string") {
-      return { ok: false, error: "welcomeMessage must be a string, or null to clear it" };
-    }
-    patch.welcomeMessage =
-      rec.welcomeMessage === null || rec.welcomeMessage === "" ? null : rec.welcomeMessage;
+    const w = validateWelcomeMessage(rec.welcomeMessage);
+    if (!w.ok) return { ok: false, error: `${w.error} — or null to clear it` };
+    patch.welcomeMessage = w.value;
   }
 
   if (Object.keys(patch).length === 0) {
@@ -706,6 +731,7 @@ export function validateSetChatAgentDataSource(
     ...(rec.maxCallsPerConversation !== undefined
       ? { maxCallsPerConversation: rec.maxCallsPerConversation }
       : {}),
+    ...(rec.requiredParams !== undefined ? { requiredParams: rec.requiredParams } : {}),
   };
   const config = validateAgentConfigInput({ dataSources: [entry] });
   if (!config.ok) {

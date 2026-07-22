@@ -27,7 +27,7 @@ import {
 } from "@/lib/data-sources/validate";
 import { queryCollection } from "@/db/query-store";
 import { createItem, updateItem } from "@/db/item-store";
-import { sampleForModel } from "@/lib/chat/data-source-tools";
+import { MAX_SAMPLE_CHARS, sampleForModel } from "@/lib/chat/data-source-tools";
 import { apiParamsFromFields, collectionBodyFromFields } from "@/lib/forms/submit-core";
 import type { GuestToolDef } from "./guest-tools";
 import { GUEST_QUERY_LIMIT_MAX, LOCAL_TIME_TO_UTC_TOOL } from "./guest-tools";
@@ -37,10 +37,14 @@ import type {
   CollectionAllowEntry,
 } from "./core";
 import { localTimeToUtc } from "./core";
-import { guestQuerySpec, updateLookupFilters, guestBody } from "./dispatch-core";
+import { guestQuerySpec, updateLookupFilters, guestBody, missingRequiredParams } from "./dispatch-core";
 
-/** Max chars of a tool result fed back to the model (context-safety bound). */
-const GUEST_RESULT_MAX_CHARS = 4_000;
+/**
+ * Truncation hint for guest tool results — the guest result carries no `paths`
+ * array (unlike the admin tool result the shared default hint refers to), so
+ * the self-correction names the one move a guest bot can make.
+ */
+const GUEST_TRUNCATION_HINT = "repeat the call with narrower filters to see the rest";
 
 /** Everything a guest tool call needs, assembled once per request by the route. */
 export interface GuestToolContext {
@@ -148,6 +152,15 @@ async function runDataSource(
     if (typeof v === "string") fields[k] = v;
     else if (typeof v === "number" || typeof v === "boolean") fields[k] = String(v);
   }
+  // Operator-required params refuse "" — the "" convention is for params the
+  // operator left optional, never for these.
+  const missing = missingRequiredParams(entry.requiredParams, fields);
+  if (missing.length > 0) {
+    return fail(
+      name,
+      `these parameters are required and cannot be empty: ${missing.join(", ")} — call again with real values for them`,
+    );
+  }
   const params = apiParamsFromFields(
     requestPlaceholders({ path: saved.path, query: saved.query, bodyTemplate: saved.bodyTemplate }),
     fields,
@@ -181,7 +194,7 @@ async function runDataSource(
   // Surface the engine's error (upstream status + capped body excerpt) so the
   // model can self-correct — a masked "could not be completed" leaves it blind.
   if (!result.ok) return fail(name, `the request could not be completed (${result.error})`);
-  return { name, ok: true, data: sampleForModel(result.data, GUEST_RESULT_MAX_CHARS) };
+  return { name, ok: true, data: sampleForModel(result.data, MAX_SAMPLE_CHARS, GUEST_TRUNCATION_HINT) };
 }
 
 // ── query tool ────────────────────────────────────────────────────────────────
@@ -199,7 +212,7 @@ async function runQuery(
   return {
     name,
     ok: true,
-    items: sampleForModel(res.plan.items, GUEST_RESULT_MAX_CHARS),
+    items: sampleForModel(res.plan.items, MAX_SAMPLE_CHARS, GUEST_TRUNCATION_HINT),
     total: res.plan.total,
   };
 }

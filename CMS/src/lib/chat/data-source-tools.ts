@@ -255,7 +255,14 @@ export function formatSource(source: SourceLike, requests: RequestLike[]): Recor
  */
 export const MAX_SAMPLE_CHARS = 15_000;
 
-export function sampleForModel(data: unknown, maxChars = MAX_SAMPLE_CHARS): unknown {
+export function sampleForModel(
+  data: unknown,
+  maxChars = MAX_SAMPLE_CHARS,
+  // The self-correction the reader can actually perform: the admin tool result
+  // carries a `paths` array; callers whose result has no `paths` (guest chat)
+  // pass their own hint.
+  hint = "use `paths` for the complete shape",
+): unknown {
   let json: string;
   try {
     json = JSON.stringify(data) ?? "null";
@@ -263,5 +270,5 @@ export function sampleForModel(data: unknown, maxChars = MAX_SAMPLE_CHARS): unkn
     return "(unserializable response)";
   }
   if (json.length <= maxChars) return data;
-  return `${json.slice(0, maxChars)}… (truncated — full response was ${json.length} chars; use \`paths\` for the complete shape)`;
+  return `${json.slice(0, maxChars)}… (truncated — full response was ${json.length} chars; ${hint})`;
 }

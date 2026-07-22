@@ -144,6 +144,17 @@ test("markdown: source interpolated into the script + assistant-only rendering",
   assert.ok(GUEST_CHAT_CSS.includes(".bb-gc-msg code"), "markdown CSS shipped");
 });
 
+test("streaming: text after a tool round starts a new paragraph in the same bubble", () => {
+  // One reply spans several model rounds separated by tool calls; without the
+  // break the post-tool text runs on inline ("…for you now.Your table is booked").
+  assert.ok(GUEST_CHAT_SCRIPT.includes("var pendingBreak = false;"), "break flag exists");
+  assert.ok(GUEST_CHAT_SCRIPT.includes('pendingBreak = true;'), "tool frame arms the break");
+  assert.ok(
+    GUEST_CHAT_SCRIPT.includes('if (assistantText) assistantText += "\\n\\n";'),
+    "next token after a tool inserts a paragraph break (only between text segments)",
+  );
+});
+
 test("markdown: bold inside list items (the screenshot case)", () => {
   const blocks = mdParse("For **2 guests tomorrow**, open:\n\n- **18:00**\n- **18:30**\n\nWhich time?");
   assert.deepEqual(blocks.map((b) => b.t), ["p", "ul", "p"]);
@@ -280,6 +291,23 @@ test("applyGuestChatWelcome writes the agent welcome; a block-prop welcome overr
   assert.equal(out[0].children?.[1].props?.welcome, "Local override");
   // Original untouched (pure walk).
   assert.equal(blocks[0].children?.[0].props?.welcome, undefined);
+});
+
+test("applyGuestChatWelcome hydrates a LOCALE-OBJECT agent welcome; a locale-object block welcome counts as set", () => {
+  const localized = { en: "Hello!", fi: "Hei!" };
+  const blocks: Block[] = [
+    { id: "a", component: GUEST_CHAT_COMPONENT, props: { agent: "bot-1" } },
+    {
+      id: "b",
+      component: GUEST_CHAT_COMPONENT,
+      props: { agent: "bot-1", welcome: { en: "Own", fi: "Oma" } },
+    },
+  ];
+  const out = applyGuestChatWelcome(blocks, new Map([["bot-1", localized]]));
+  // The OBJECT lands on the prop — the plan walk localizes it later, like any prop.
+  assert.deepEqual(out[0].props?.welcome, localized);
+  // A block whose own welcome is a locale object is SET — the agent's must not clobber it.
+  assert.deepEqual(out[1].props?.welcome, { en: "Own", fi: "Oma" });
 });
 
 test("applyGuestChatWelcome returns the SAME array when nothing changes", () => {

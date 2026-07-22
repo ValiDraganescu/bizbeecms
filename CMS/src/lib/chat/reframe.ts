@@ -121,6 +121,14 @@ export interface ChatMessage {
   /** Present only on a `role:"tool"` result message. */
   tool_call_id?: string;
   name?: string;
+  /**
+   * Timestamp carried on client turns and stamped (server UTC) on every entry
+   * this loop appends — AT PRODUCTION TIME, so a persisted transcript is
+   * byte-identical to what the gateway was sent. A conversation replayed from
+   * storage (guest-route rehydration) then extends the provider's cached prompt
+   * prefix instead of invalidating it. Providers ignore the extra field.
+   */
+  at?: string;
 }
 
 /** One executed tool's result, used both to frame a `tool` event AND to feed the model. */
@@ -261,6 +269,7 @@ function assistantToolCallMessage(
       type: "function",
       function: { name: c.name, arguments: JSON.stringify(c.args ?? {}) },
     })),
+    at: new Date().toISOString(),
   };
 }
 
@@ -318,6 +327,7 @@ export function streamChatRounds(
                 content:
                   "A tool call just failed with the error above. Read it, fix the " +
                   "exact problem it names, and call the tool again to finish the task.",
+                at: new Date().toISOString(),
               });
               upstream = await nextTurn(transcript);
               continue;
@@ -339,6 +349,7 @@ export function streamChatRounds(
                 tool_call_id: calls[i].id,
                 name: r.name,
                 content: JSON.stringify(r.data),
+                at: new Date().toISOString(),
               });
             });
             finalText = text;
@@ -355,6 +366,7 @@ export function streamChatRounds(
               tool_call_id: calls[i].id,
               name: r.name,
               content: JSON.stringify(r.data),
+              at: new Date().toISOString(),
             });
           });
           // Did any tool in this round fail? (`{ok:false}` is the tool-handler's
@@ -368,7 +380,8 @@ export function streamChatRounds(
           // Append the final assistant answer so the transcript is the WHOLE
           // conversation, then hand the caller the full record + final text. A
           // throwing observer must never break the stream.
-          if (finalText !== "") transcript.push({ role: "assistant", content: finalText });
+          if (finalText !== "")
+            transcript.push({ role: "assistant", content: finalText, at: new Date().toISOString() });
           try {
             onComplete(transcript, finalText);
           } catch {

@@ -20,6 +20,7 @@
  */
 
 import { type Block, type ElementPlan, GUEST_CHAT_COMPONENT, str } from "./plan-types.ts";
+import { isLocaleObject } from "./localize.ts";
 
 /** The one public endpoint the widget POSTs to (server builds it in parallel).
  *  Contract: POST JSON `{ pageId, blockId, messages: [{role,content}] }`; the
@@ -482,6 +483,10 @@ ${GUEST_CHAT_MD_SOURCE}
 
       var assistantEl = null;
       var assistantText = "";
+      // One reply can span several model rounds separated by tool calls; the
+      // text after a tool round is a NEW message and must start its own
+      // paragraph, not run on inline after the previous sentence.
+      var pendingBreak = false;
       function ensureAssistant() {
         if (!assistantEl) { assistantEl = bubble("assistant", ""); list.insertBefore(assistantEl, working); }
       }
@@ -518,10 +523,15 @@ ${GUEST_CHAT_MD_SOURCE}
           if (!fr) return;
           if (fr.event === "token" && typeof fr.data.text === "string") {
             ensureAssistant();
+            if (pendingBreak) {
+              pendingBreak = false;
+              if (assistantText) assistantText += "\\n\\n";
+            }
             assistantText += fr.data.text;
             mdInto(assistantEl, assistantText);
             scrollDown();
           } else if (fr.event === "tool") {
+            pendingBreak = true;
             scrollDown();
           } else if (fr.event === "error") {
             notice((fr.data && fr.data.message) || "Something went wrong.");
@@ -639,19 +649,24 @@ export function collectGuestChatAgentRefs(blocks: Block[]): string[] {
 /**
  * Hydrate each GuestChat block's welcome text from its AGENT's configured
  * `welcomeMessage` (the primary source — see the builtin description): a
- * non-empty block prop `welcome` is an explicit per-placement override and
- * wins; otherwise the agent's welcome (by `props.agent` ref) is written into
- * `props.welcome` for `planGuestChat` to emit. PURE — same array back when
- * nothing changes (zero-cost for pages without a GuestChat block).
+ * non-empty block prop `welcome` — a plain string OR an inline locale object —
+ * is an explicit per-placement override and wins; otherwise the agent's welcome
+ * (by `props.agent` ref; itself a string or locale object, parsed by
+ * `parseStoredWelcome`) is written into `props.welcome`. A locale-object
+ * welcome is resolved to the active content locale by the plan walk like any
+ * localized prop. PURE — same array back when nothing changes (zero-cost for
+ * pages without a GuestChat block).
  */
 export function applyGuestChatWelcome(
   blocks: Block[],
-  welcomeByRef: ReadonlyMap<string, string>,
+  welcomeByRef: ReadonlyMap<string, string | Record<string, string>>,
 ): Block[] {
   let changed = false;
   const out = blocks.map((b) => {
     const children = b.children ? applyGuestChatWelcome(b.children, welcomeByRef) : b.children;
-    if (b.component === GUEST_CHAT_COMPONENT && str(b.props?.welcome, "") === "") {
+    const hasOwnWelcome =
+      str(b.props?.welcome, "") !== "" || isLocaleObject(b.props?.welcome);
+    if (b.component === GUEST_CHAT_COMPONENT && !hasOwnWelcome) {
       const ref = b.props?.agent;
       const welcome = typeof ref === "string" ? (welcomeByRef.get(ref) ?? "") : "";
       if (welcome !== "") {
