@@ -32,7 +32,7 @@ import { CHAT_MODELS, DEFAULT_MODEL, type CatalogModel } from "@/lib/chat/models
 import { coerceCatalog } from "@/lib/chat/catalog-coerce";
 import { ModelPicker } from "@/components/chat/model-picker";
 import { resolveInitialModel, loadModel, saveModel } from "@/lib/chat/selected-model";
-import { formatUsd } from "@/lib/chat/credit";
+import { formatUsd } from "@/lib/public-chat/core";
 import { nextUnread } from "@/lib/chat/unread-badge";
 import { compactStaleThreadMessages } from "@/lib/chat/compact-stale";
 import { CHAT_OPEN_EVENT } from "@/lib/chat/chat-attach-bus";
@@ -153,12 +153,13 @@ export function ChatWidget() {
   // viewport so a panel sized big on one screen is clamped, never lost.
   const [panel, setPanel] = useState<PanelSize | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
-  // In-use OpenRouter key credit (ai-openrouter): only set when the env/minted
-  // key is in use; null (and the line is hidden) for CMS-local user keys or no key.
+  // This Site's monthly AI budget (ai-cost-quotas): spend vs the quota PM
+  // curates, in customer dollars. Null — and the chip is hidden — when no quota
+  // is configured, i.e. there is nothing to count against.
   const [credit, setCredit] = useState<{
-    usage: number;
-    limit: number | null;
-    remaining: number | null;
+    usedUsd: number;
+    quotaUsd: number;
+    remainingUsd: number;
   } | null>(null);
   const pathname = usePathname();
   // The conversation lives at the widget level so it SURVIVES minimize (closing
@@ -422,8 +423,8 @@ export function ChatWidget() {
     );
   }
 
-  // Load the in-use key's remaining credit when the panel opens (ai-openrouter).
-  // Only the env/minted key reports credit; the route returns null otherwise.
+  // Load this month's AI budget when the panel opens (ai-cost-quotas). The route
+  // returns null when the Site has no quota configured — the chip stays hidden.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -432,7 +433,7 @@ export function ChatWidget() {
         const res = await fetch("/api/chat/credit");
         if (!res.ok) return;
         const j = (await res.json()) as {
-          credit?: { usage: number; limit: number | null; remaining: number | null } | null;
+          credit?: { usedUsd: number; quotaUsd: number; remainingUsd: number } | null;
         };
         if (!cancelled) setCredit(j.credit ?? null);
       } catch {
@@ -770,12 +771,10 @@ export function ChatWidget() {
                       </div>
                       {credit && (
                         <span className="shrink-0 tabular-nums" title={t("creditTitle")}>
-                          {credit.limit != null && credit.remaining != null
-                            ? t("creditOf", {
-                                remaining: formatUsd(credit.remaining),
-                                limit: formatUsd(credit.limit),
-                              })
-                            : t("creditUsage", { usage: formatUsd(credit.usage) })}
+                          {t("creditUsed", {
+                            used: formatUsd(credit.usedUsd),
+                            quota: formatUsd(credit.quotaUsd),
+                          })}
                         </span>
                       )}
                       {chat.usage && (

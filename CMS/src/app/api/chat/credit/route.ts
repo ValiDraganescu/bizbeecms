@@ -1,76 +1,47 @@
 /**
- * OpenRouter per-KEY credit endpoint (ai-openrouter goal — surface the minted PM
- * key's remaining spend in the chat widget).
+ * The chat widget's credit chip — this Site's monthly AI budget (ai-cost-quotas,
+ * Contract D).
  *
- *   GET /api/chat/credit  → { credit: { usage, limit, remaining } | null }
+ *   GET /api/chat/credit → { credit: { usedUsd, quotaUsd, remainingUsd } | null }
  *
- * Returns the in-use key's spend-vs-limit for whatever key is actually in use —
- * the env/minted/deployer-global `OPENROUTER_API_KEY` OR a CMS-local user key —
- * determined via the SAME precedence as the Ai port (`effectiveOpenrouterKey`:
- * CMS-local user key wins). Source is OpenRouter's per-KEY `/api/v1/key` (no
- * management key needed), which reports usage/limit for any key; we NEVER log the
- * key and NEVER echo it. Only `{ credit: null }` when no key is configured.
+ * Reads LOCAL counters only: the `ai:<YYYY-MM>:billable` meter vs the quota PM
+ * curates for this Site. Those are the numbers the operator is actually billed
+ * for and the numbers the enforcement gate refuses on, so the chip can never
+ * disagree with what the assistant does. (It previously reported OpenRouter's
+ * per-KEY spend — the provider's raw cost on a key whose limit is now just a
+ * circuit breaker, not the customer's quota.)
  *
- * Admin-only (CMS-internal). REST-only (PM directive). Never 500 on a settings/
- * upstream failure — degrade to `{ credit: null }`.
+ * `{ credit: null }` when no quota is configured (or the config is unreachable):
+ * there is nothing to count against, so the chip hides rather than showing a
+ * meaningless "used $X of $?".
+ *
+ * Admin-only (CMS-internal). REST-only (PM directive). Never 500 — a read
+ * failure degrades to `{ credit: null }` and the widget simply omits the chip.
  */
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { requireAdmin } from "@/lib/auth/guard";
-import {
-  OPENROUTER_KEY_URL,
-  parseKeyCredit,
-  type KeyCredit,
-} from "@/lib/chat/credit";
-import { getDecryptedOpenrouterUserKey } from "@/db/openrouter-key-store";
-import { effectiveOpenrouterKey } from "@/lib/settings/openrouter-key";
+import { checkAiQuota } from "@/db/ai-usage-store";
+import { usdFromNano } from "@/lib/public-chat/core";
 
 export const dynamic = "force-dynamic";
-
-/** Fetch + parse the in-use key's credit from OpenRouter, or null on any failure. */
-async function fetchKeyCredit(apiKey: string): Promise<KeyCredit | null> {
-  try {
-    const res = await fetch(OPENROUTER_KEY_URL, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (!res.ok) return null;
-    return parseKeyCredit(await res.json());
-  } catch {
-    return null;
-  }
-}
 
 export async function GET(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);
   if (denied) return denied;
 
   try {
-    const { env } = await getCloudflareContext({ async: true });
-    const e = env as unknown as {
-      OPENROUTER_API_KEY?: string;
-      CMS_AUTH_SECRET?: string;
-    };
+    const { usedNanoUsd, quotaUsd } = await checkAiQuota();
+    if (quotaUsd === null) return Response.json({ credit: null });
 
-    // Mirror getAi() precedence: CMS-local user key wins over the env key.
-    let userKey: string | null = null;
-    if (typeof e.CMS_AUTH_SECRET === "string" && e.CMS_AUTH_SECRET) {
-      try {
-        userKey = await getDecryptedOpenrouterUserKey(e.CMS_AUTH_SECRET);
-      } catch {
-        userKey = null;
-      }
-    }
-    const envKey = typeof e.OPENROUTER_API_KEY === "string" ? e.OPENROUTER_API_KEY : "";
-    const inUse = effectiveOpenrouterKey(userKey, envKey);
-
-    // Surface credit for whatever key is actually in use — env/minted OR a
-    // CMS-local user key. OpenRouter's per-KEY /api/v1/key reports usage/limit for
-    // any key, so a user-supplied key shows its own balance too. No key → nothing.
-    if (!inUse) {
-      return Response.json({ credit: null });
-    }
-
-    const credit = await fetchKeyCredit(inUse);
-    return Response.json({ credit });
+    const usedUsd = usdFromNano(usedNanoUsd);
+    return Response.json({
+      credit: {
+        usedUsd,
+        quotaUsd,
+        // Never negative: an overshooting in-flight turn reads as "$0 left",
+        // not as a debt.
+        remainingUsd: Math.max(0, Math.round((quotaUsd - usedUsd) * 100) / 100),
+      },
+    });
   } catch {
     // Never break the widget — degrade to no credit info.
     return Response.json({ credit: null });

@@ -846,3 +846,35 @@ export function formatUsdFromNano(nanoUsd: number): string {
   if (usd >= 0.0001) return `$${usd.toFixed(4)}`;
   return "<$0.0001";
 }
+
+// ── Monthly quota (nano-USD meter vs USD quota) ───────────────────────────────
+
+/**
+ * Has this month's metered BILLABLE spend reached the Site's monthly quota?
+ *
+ * The meter is integer nano-USD, the quota is plain USD (PM's
+ * `sites.openrouterMonthlyLimitUsd`) — this is the ONE place the two units meet,
+ * so no call site ever hand-converts. A null / non-finite / negative quota means
+ * "no quota configured" → never exceeded (the config-unavailable fallback: the
+ * CMS behaves exactly as it did before quotas existed). A quota of exactly 0 IS
+ * a quota — it blocks every call, which is what setting one to 0 must mean.
+ */
+export function quotaExceeded(usedNanoUsd: number, quotaUsd: number | null): boolean {
+  if (quotaUsd === null || !Number.isFinite(quotaUsd) || quotaUsd < 0) return false;
+  return usedNanoUsd >= quotaUsd * NANO_USD_PER_USD;
+}
+
+/**
+ * The nano-USD meter as plain USD, rounded to cents — the customer-dollar figure
+ * the credit chip and PM payloads speak in. Sub-cent spend rounds to 0.00 by
+ * design: a chip reading "$0.00 of $10" is honest at that scale.
+ */
+export function usdFromNano(nanoUsd: number): number {
+  return Math.round((nanoUsd / NANO_USD_PER_USD) * 100) / 100;
+}
+
+/** Format a plain USD amount to 2 decimals (1.5 → "1.50") — the credit chip's
+ *  budget figures, which are already whole customer dollars/cents. */
+export function formatUsd(amount: number): string {
+  return amount.toFixed(2);
+}

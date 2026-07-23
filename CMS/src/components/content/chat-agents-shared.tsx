@@ -50,7 +50,12 @@ export type UsageRow = {
   day: string;
   messages: number;
   tokens: number;
-  /** Integer nano-USD (0 also for days recorded before cost tracking). */
+  /**
+   * BILLABLE cost in integer nano-USD — what this agent's traffic charges the
+   * Site against its monthly quota (provider cost × the alias margin), not a
+   * token×price estimate (ai-cost-quotas). 0 also for days recorded before cost
+   * tracking existed, and for turns where the provider reported no cost.
+   */
   costNanoUsd: number;
 };
 
@@ -480,7 +485,11 @@ export function TodayMessages({ agentId }: { agentId: string }) {
   return <span className={helpCls}>{count} today</span>;
 }
 
-/** Last-N-days messages/tokens for a saved agent, from GET …/usage?days=7. */
+/**
+ * Last-N-days messages/tokens/BILLABLE cost for a saved agent, from
+ * GET …/usage?days=7. The Cost column is customer dollars — the same figure
+ * this agent's traffic burns from the Site's monthly AI quota.
+ */
 export function UsagePanel({ agentId }: { agentId: string }) {
   const [usage, setUsage] = useState<UsageRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -532,7 +541,9 @@ export function UsagePanel({ agentId }: { agentId: string }) {
             <th className="pr-4 font-medium">Day</th>
             <th className="pr-4 font-medium">Messages</th>
             <th className="pr-4 font-medium">Tokens</th>
-            <th className="font-medium">Cost</th>
+            <th className="font-medium" title="Charged against this Site's monthly AI quota">
+              Billable cost
+            </th>
           </tr>
         </thead>
         <tbody>

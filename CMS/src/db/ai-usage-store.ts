@@ -21,6 +21,7 @@ import { getAiConfig, marginPctForModel, type AiPurpose } from "../lib/ai-config
 import {
   aiUsageMonth,
   billableNanoUsd,
+  quotaExceeded,
   rawNanoUsd,
 } from "../lib/public-chat/core.ts";
 import { getCounter, incrementCounter } from "./usage-counter-store.ts";
@@ -93,5 +94,45 @@ export async function meterAiCall(
     return billableNanoUsd(costUsd, marginPct);
   } catch {
     return 0; // metering is best-effort — never surfaces to the caller
+  }
+}
+
+/** This month's spend against the Site's quota (Contract D). */
+export interface AiQuotaStatus {
+  /** May another AI call be made? False only when a quota exists and is spent. */
+  ok: boolean;
+  /** This month's BILLABLE spend, integer nano-USD. */
+  usedNanoUsd: number;
+  /** The Site's monthly quota in customer USD; null when none is configured. */
+  quotaUsd: number | null;
+}
+
+/**
+ * THE quota gate — every AI entry point calls this BEFORE the model call and
+ * refuses (429 / tool error) when `ok` is false. Also the one read behind the
+ * credit chip and the PM usage endpoint, so all three always agree.
+ *
+ * SOFT quota by design: the check happens once per request, so a turn already
+ * in flight may overshoot. The circuit breaker on the OpenRouter key (Contract
+ * F) is what bounds real spend; this bounds the customer's bill.
+ *
+ * Fails OPEN. No quota configured, an unreachable curated config, or an unbound
+ * D1 all yield `ok: true` — a Site whose PM is down keeps answering visitors
+ * rather than going dark on an unknown quota (docs/ai-cost-quotas.md).
+ */
+export async function checkAiQuota(now: Date = new Date()): Promise<AiQuotaStatus> {
+  try {
+    const [config, usage] = await Promise.all([
+      getAiConfig(),
+      readMonthlyAiUsage(now),
+    ]);
+    const quotaUsd = config?.quota.monthlyUsd ?? null;
+    return {
+      ok: !quotaExceeded(usage.billableNanoUsd, quotaUsd),
+      usedNanoUsd: usage.billableNanoUsd,
+      quotaUsd,
+    };
+  } catch {
+    return { ok: true, usedNanoUsd: 0, quotaUsd: null };
   }
 }

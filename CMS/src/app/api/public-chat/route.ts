@@ -35,6 +35,7 @@ import { parseJsonColumn, type Block } from "@/lib/render/tree";
 import { getChatAgent } from "@/db/chat-agent-store";
 import { getCounter, incrementCounter } from "@/db/usage-counter-store";
 import { meterAiCall } from "@/db/ai-usage-store";
+import { guestAiQuotaDenial } from "@/lib/ai-quota/guard";
 import {
   recentFailureTimestamps,
   recordFailure,
@@ -147,6 +148,14 @@ export async function POST(request: Request): Promise<Response> {
     if (!sanitized.ok) {
       return Response.json({ error: sanitized.error }, { status: sanitized.status });
     }
+
+    // ── Site's MONTHLY AI budget (ai-cost-quotas) ──────────────────────────
+    // Alongside the other pre-model refusals, so a refused visitor doesn't burn
+    // their day budget on a turn we were never going to answer. The message is
+    // resolved into the visitor's content locale server-side — the guest script
+    // renders `error` verbatim.
+    const overQuota = await guestAiQuotaDenial(request);
+    if (overQuota) return overQuota;
 
     // ── Per-IP/day + per-site/day message budgets (usage_counter buckets) ──
     const day = new Date().toISOString().slice(0, 10);

@@ -28,6 +28,7 @@ import {
 import { validateTranslationInput } from "@/lib/chat/translate-tool";
 import { applyTranslation } from "@/db/translate-store";
 import { meterAiCall } from "@/db/ai-usage-store";
+import { aiQuotaDenial } from "@/lib/ai-quota/guard";
 import { getContentLocales, getTranslateModel } from "@/db/settings-store";
 import { requireAdmin } from "@/lib/auth/guard";
 
@@ -41,6 +42,9 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);
   if (denied) return denied;
+  // Monthly AI quota (ai-cost-quotas): refuse BEFORE the model call, never after.
+  const overQuota = await aiQuotaDenial();
+  if (overQuota) return overQuota;
 
   let body: unknown;
   try {

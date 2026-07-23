@@ -25,6 +25,9 @@ import {
   rawNanoUsd,
   billableNanoUsd,
   aiUsageMonth,
+  quotaExceeded,
+  usdFromNano,
+  formatUsd,
   NANO_USD_PER_USD,
   MAX_PAYLOAD_BYTES,
   CHAT_MINUTE_MS,
@@ -632,4 +635,36 @@ test("aiUsageMonth buckets by UTC month, rolling over at the UTC boundary", () =
   assert.equal(aiUsageMonth(new Date("2026-08-01T00:00:00Z")), "2026-08");
   // A local-time-late-July instant that is ALREADY August in UTC meters as August.
   assert.equal(aiUsageMonth(new Date("2026-07-31T21:00:00-04:00")), "2026-08");
+});
+
+// ── Quota comparison: quotaExceeded / usdFromNano ─────────────────────────────
+
+test("quotaExceeded compares the nano-USD meter against the USD quota", () => {
+  const tenUsd = 10 * NANO_USD_PER_USD;
+  assert.equal(quotaExceeded(tenUsd - 1, 10), false);
+  assert.equal(quotaExceeded(tenUsd, 10), true); // reaching the quota exhausts it
+  assert.equal(quotaExceeded(tenUsd + 1, 10), true);
+});
+
+test("quotaExceeded: no quota configured never blocks", () => {
+  assert.equal(quotaExceeded(999 * NANO_USD_PER_USD, null), false);
+  assert.equal(quotaExceeded(999 * NANO_USD_PER_USD, Number.NaN), false);
+  assert.equal(quotaExceeded(999 * NANO_USD_PER_USD, -5), false);
+});
+
+test("quotaExceeded: a zero quota blocks every call, including the first", () => {
+  assert.equal(quotaExceeded(0, 0), true);
+});
+
+test("usdFromNano converts the meter to customer dollars, rounded to cents", () => {
+  assert.equal(usdFromNano(1_234_567_890), 1.23);
+  assert.equal(usdFromNano(0), 0);
+  assert.equal(usdFromNano(5_000_000), 0.01); // half a cent rounds up
+  assert.equal(usdFromNano(4_000_000), 0); // sub-cent spend reads as $0.00
+});
+
+test("formatUsd renders a plain USD amount with 2 decimals", () => {
+  assert.equal(formatUsd(1.5), "1.50");
+  assert.equal(formatUsd(0), "0.00");
+  assert.equal(formatUsd(10), "10.00");
 });
