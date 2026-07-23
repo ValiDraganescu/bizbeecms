@@ -495,6 +495,27 @@
       "dcvBody": "Lisa see CNAME, mis delegeerib sertifikaadi valideerimise Cloudflare'ile. Seejärel uueneb sertifikaat automaatselt igavesti, ilma edasiste DNS-muudatusteta.",
       "txtAlternative": "Või ühekordne valideerimine (TXT):",
       "txtOnly": "Valideeri sertifikaat:"
+    },
+    "dangerZone": {
+      "title": "Ohutsoon",
+      "cardDescription": "Kustuta see sait ja kõik selle ressursid jäädavalt.",
+      "description": "Saidi kustutamine eemaldab jäädavalt selle avaldatud Workeri, andmebaasi, kõik meediafailid, oma domeenid ja seaded. Teisi saite see ei mõjuta. Seda ei saa tagasi võtta.",
+      "button": "Kustuta see sait",
+      "dialogTitle": "Kas kustutada {name}?",
+      "dialogBody": "See kustutab jäädavalt saidi avaldatud Workeri, andmebaasi ja kogu meedia, eemaldab oma domeenid ning kustutab saidi haldusest. Seda ei saa tagasi võtta.",
+      "confirmLabel": "Kinnitamiseks kirjuta {slug}",
+      "cancel": "Loobu",
+      "confirm": "Kustuta sait",
+      "errors": {
+        "notAllowed": "Sul pole õigust seda saiti kustutada.",
+        "notFound": "Saiti ei leitud.",
+        "confirmMismatch": "Sisestatud tekst ei vasta saidi slugile.",
+        "deployInProgress": "Avaldamine on pooleli. Tühista see või oota lõpuni, seejärel kustuta.",
+        "notConfigured": "Deployer pole seadistatud, seega saidi Cloudflare'i ressursse ei saa eemaldada.",
+        "teardownFailed": "Saidi Cloudflare'i ressursside eemaldamine jäi pooleli. Haldusest ei kustutatud midagi — proovi uuesti.",
+        "deployerUnreachable": "Avaldamisteenusega ei saadud ühendust. Midagi ei kustutatud — proovi uuesti.",
+        "unknown": "Midagi läks valesti. Proovi uuesti."
+      }
     }
   },
   "designSystem": {

@@ -486,11 +486,13 @@ export function TodayMessages({ agentId }: { agentId: string }) {
 }
 
 /**
- * Last-N-days messages/tokens/BILLABLE cost for a saved agent, from
- * GET …/usage?days=7. The Cost column is customer dollars — the same figure
- * this agent's traffic burns from the Site's monthly AI quota.
+ * Last-N-days messages/tokens/BILLABLE cost from GET <api>/usage?days=7. The
+ * Cost column is customer dollars — the same figure this traffic burns from the
+ * Site's monthly AI quota. `api` is the endpoint base: an agent passes
+ * `/api/chat-agents/<id>`, the CMS assistant passes `/api/chat` (same wire
+ * contract on both).
  */
-export function UsagePanel({ agentId }: { agentId: string }) {
+export function UsagePanel({ api }: { api: string }) {
   const [usage, setUsage] = useState<UsageRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -498,7 +500,7 @@ export function UsagePanel({ agentId }: { agentId: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/chat-agents/${agentId}/usage?days=7`);
+        const res = await fetch(`${api}/usage?days=7`);
         if (!res.ok) throw new Error(await readError(res));
         const j = (await res.json()) as { usage: UsageRow[] };
         if (!cancelled) setUsage(j.usage);
@@ -509,7 +511,7 @@ export function UsagePanel({ agentId }: { agentId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [agentId]);
+  }, [api]);
 
   if (error)
     return (
@@ -580,12 +582,14 @@ function fmtWhen(iso: string): string {
 }
 
 /**
- * Recent guest conversations for a saved agent (GET …/conversations, paginated by
- * limit/offset + total). Each row shows started / last-activity / message count /
- * tokens / timezone, a Download link (plain <a> to the download route — no fetch),
- * and a Delete guarded by the shared ConfirmModal. Prev/next paging over `total`.
+ * Recent conversations (GET <api>/conversations, paginated by limit/offset +
+ * total). Each row shows started / last-activity / message count / tokens /
+ * timezone, a Download link (plain <a> to the download route — no fetch), and a
+ * Delete guarded by the shared ConfirmModal. Prev/next paging over `total`.
+ * `api` is the endpoint base: an agent passes `/api/chat-agents/<id>`, the CMS
+ * assistant passes `/api/chat` (same wire contract on both).
  */
-export function ConversationsPanel({ agentId }: { agentId: string }) {
+export function ConversationsPanel({ api }: { api: string }) {
   const [rows, setRows] = useState<ConversationSummary[] | null>(null);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -597,7 +601,7 @@ export function ConversationsPanel({ agentId }: { agentId: string }) {
     setError(null);
     try {
       const res = await fetch(
-        `/api/chat-agents/${agentId}/conversations?limit=${PAGE_SIZE}&offset=${offset}`,
+        `${api}/conversations?limit=${PAGE_SIZE}&offset=${offset}`,
       );
       if (!res.ok) throw new Error(await readError(res));
       const j = (await res.json()) as {
@@ -615,17 +619,16 @@ export function ConversationsPanel({ agentId }: { agentId: string }) {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentId, offset]);
+  }, [api, offset]);
 
   async function confirmDelete() {
     if (!deleting) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/chat-agents/${agentId}/conversations/${deleting.id}`,
-        { method: "DELETE" },
-      );
+      const res = await fetch(`${api}/conversations/${deleting.id}`, {
+        method: "DELETE",
+      });
       if (!res.ok) throw new Error(await readError(res));
       setDeleting(null);
       // Deleting the last row of the final page steps back a page.
@@ -685,10 +688,7 @@ export function ConversationsPanel({ agentId }: { agentId: string }) {
                     <td className="py-1 pr-4 whitespace-nowrap">{c.timezone ?? "—"}</td>
                     <td className="py-1">
                       <div className="flex gap-2">
-                        <a
-                          className={ghostBtn}
-                          href={`/api/chat-agents/${agentId}/conversations/${c.id}`}
-                        >
+                        <a className={ghostBtn} href={`${api}/conversations/${c.id}`}>
                           Download
                         </a>
                         <button

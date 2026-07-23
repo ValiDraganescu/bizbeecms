@@ -335,6 +335,7 @@
     "users": "Users",
     "google": "Google sign-in",
     "media": "AI models",
+    "assistantChats": "Assistant chats",
     "iconSet": "Icons",
     "exportImport": "Export / Import",
     "llms": "llms.txt"
@@ -1383,6 +1384,10 @@
     "label": "Translation model",
     "hint": "This AI model translates page and component text into the site’s other languages.",
     "saved": "Saved"
+  },
+  "assistantChats": {
+    "title": "Assistant chats",
+    "subtitle": "Conversations with the CMS AI assistant — daily usage, and every stored transcript with all messages and tool calls, ready to review, download, or delete."
   },
   "exportImport": {
     "title": "Export / Import",

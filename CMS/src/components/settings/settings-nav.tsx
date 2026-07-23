@@ -38,6 +38,7 @@ const GROUPS = [
     key: "ai",
     items: [
       { key: "media", href: "/admin/settings/media" },
+      { key: "assistantChats", href: "/admin/settings/assistant" },
       { key: "apiKeys", href: "/admin/settings/api-keys" },
     ],
   },

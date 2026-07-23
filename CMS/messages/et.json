@@ -335,6 +335,7 @@
     "users": "Kasutajad",
     "google": "Google'i sisselogimine",
     "media": "AI mudelid",
+    "assistantChats": "Assistendi vestlused",
     "iconSet": "Ikoonid",
     "exportImport": "Eksport / Import",
     "llms": "llms.txt"
@@ -1383,6 +1384,10 @@
     "label": "Tõlkemudel",
     "hint": "See AI-mudel tõlgib lehtede ja komponentide teksti saidi teistesse keeltesse.",
     "saved": "Salvestatud"
+  },
+  "assistantChats": {
+    "title": "Assistendi vestlused",
+    "subtitle": "Vestlused CMS-i AI-assistendiga — igapäevane kasutus ja iga salvestatud vestlus kõigi sõnumite ja tööriistakutsetega, valmis ülevaatamiseks, allalaadimiseks või kustutamiseks."
   },
   "exportImport": {
     "title": "Eksport / Import",

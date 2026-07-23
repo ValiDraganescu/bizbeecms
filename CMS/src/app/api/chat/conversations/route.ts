@@ -1,25 +1,24 @@
 /**
- * public-guest-chatbots — per-agent conversation LIST for the admin viewer.
+ * assistant-conversations — CMS-assistant conversation LIST for the admin viewer.
  *
  *   GET ?limit=&offset= → { conversations, total }
  *     `limit` clamps to [1, 100] (default 25); a missing / unparseable value uses
  *     the default. `offset` clamps to ≥ 0. Summaries only (no `payload`); newest
- *     first. 404 when the agent is unknown.
+ *     first.
  *
- * Admin-gated, REST-only. Reads the `chat_conversation` rows via the store.
+ * Same contract as GET /api/chat-agents/[id]/conversations, but scoped to the
+ * reserved assistant agent id (the rows live in the same `chat_conversation`
+ * table). Admin-gated, REST-only.
  */
 import { requireAdmin } from "@/lib/auth/guard";
-import { getChatAgent } from "@/db/chat-agent-store";
+import { ASSISTANT_AGENT_ID } from "@/lib/chat/assistant-conversation";
 import { listConversations } from "@/db/chat-conversation-store";
 
 export const dynamic = "force-dynamic";
 
-type Params = { params: Promise<{ id: string }> };
-
-export async function GET(request: Request, { params }: Params): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);
   if (denied) return denied;
-  const { id } = await params;
 
   const search = new URL(request.url).searchParams;
   // `Number(null)` is 0, so an ABSENT limit must be caught before coercion or
@@ -32,9 +31,10 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
   const offset = Number.isFinite(rawOffset) ? Math.max(Math.floor(rawOffset), 0) : 0;
 
   try {
-    const agent = await getChatAgent(id);
-    if (!agent) return Response.json({ error: "not found" }, { status: 404 });
-    const { rows, total } = await listConversations(agent.id, { limit, offset });
+    const { rows, total } = await listConversations(ASSISTANT_AGENT_ID, {
+      limit,
+      offset,
+    });
     return Response.json({ conversations: rows, total });
   } catch (err) {
     return Response.json(

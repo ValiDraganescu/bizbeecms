@@ -16,6 +16,15 @@
  * The SSE parsing/framing + body validation are pure and unit-tested
  * (`scripts/chat-sse.test.mjs`); the live model call needs a real OpenRouter key
  * (HITL — can't be exercised offline).
+ *
+ * Conversation persistence (assistant-conversations): when the widget sends a
+ * `conversationId`, the finished conversation is upserted with full gateway
+ * fidelity into `chat_conversation` under the reserved assistant agent id, and
+ * the NEXT request's model context is rehydrated from that stored transcript
+ * (verbatim replay + append the new user turn only — provider prompt-cache
+ * friendly). Daily message/token/cost counters feed /api/chat/usage, and
+ * /api/chat/conversations serves the admin list/download/delete — chat-agent
+ * parity for the operator assistant.
  */
 import { getAi, type ChatMessage as AiChatMessage } from "@/lib/ports/ai";
 import { frameEvent, parseChatBody } from "@/lib/chat/sse";
@@ -33,6 +42,14 @@ import { runTool, toolSchemasForContext } from "@/lib/chat/tool-dispatch";
 import { assembleSystemPrompt } from "@/lib/chat/assemble-prompt";
 import { effectiveSystemPrompt } from "@/lib/chat/prompt-version";
 import { resolveModel, outputCapFor } from "@/lib/chat/models";
+import {
+  ASSISTANT_AGENT_ID,
+  parseAssistantConversationId,
+  rehydrateAssistantHistory,
+  buildAssistantPayload,
+} from "@/lib/chat/assistant-conversation";
+import { getConversation, upsertConversation } from "@/db/chat-conversation-store";
+import { incrementCounter } from "@/db/usage-counter-store";
 import { getModelCatalogCache } from "@/db/settings-store";
 import { meterAiCall } from "@/db/ai-usage-store";
 import { aiQuotaDenial } from "@/lib/ai-quota/guard";
@@ -69,6 +86,11 @@ export async function POST(request: Request): Promise<Response> {
   // `context` (one of the AdminPageContext values) or a `pathname` to derive it
   // from. Untrusted → validate / detect; unknown falls back to "general".
   const context = resolveContext(body);
+
+  // Conversation persistence (assistant-conversations): an invalid/absent
+  // `conversationId` → "" makes the request anonymous — still answered, never
+  // persisted or rehydrated (same degradation as the guest widget).
+  const conversationId = parseAssistantConversationId(body);
 
   // Optional, UNTRUSTED `model` (the picker). On a CURATED site it must name an
   // `assistant` alias — the platform pays for these calls, so only curated
@@ -128,7 +150,24 @@ export async function POST(request: Request): Promise<Response> {
       ? (body as { systemPromptOverride?: unknown }).systemPromptOverride
       : undefined;
   const isPmSso = override != null ? await currentUserIsPmSso() : false;
-  const messages = await withSystemPrompt(parsed.messages, context, override, isPmSso);
+
+  // Rehydrate the model context from the STORED conversation when we have one
+  // (assistant-conversations, same contract as guest chat): the stored gateway
+  // transcript is replayed VERBATIM with only the new user turn appended, so the
+  // provider's prompt-cache prefix stays byte-stable across turns. Any miss —
+  // anonymous request, no stored row, a store/client desync (failed persist,
+  // retried turn) — falls back to the client-built history unchanged.
+  let modelMessages = parsed.messages;
+  if (conversationId !== "") {
+    const prior = await getConversation(ASSISTANT_AGENT_ID, conversationId).catch(
+      () => null,
+    );
+    if (prior) {
+      const rehydrated = rehydrateAssistantHistory(prior.payload, parsed.messages);
+      if (rehydrated) modelMessages = rehydrated as unknown as typeof parsed.messages;
+    }
+  }
+  const messages = await withSystemPrompt(modelMessages, context, override, isPmSso);
 
   const tools = toolSchemasForContext(context);
   // One model turn. Reused for the initial call AND each tool-result follow-up so
@@ -147,13 +186,81 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  // Assistant analytics counters (assistant-conversations): one message per
+  // POST, tokens/cost from the stream's usage events — the exact key scheme the
+  // guest agents use (`chat:<agentId>:<day>:…`), under the reserved assistant
+  // agent id, so `readAgentUsage` serves both. Fire-and-forget, never blocking.
+  const day = new Date().toISOString().slice(0, 10);
+  incrementCounter(`chat:${ASSISTANT_AGENT_ID}:${day}:messages`).catch(() => {});
+  const tokensKey = `chat:${ASSISTANT_AGENT_ID}:${day}:tokens`;
+  const costKey = `chat:${ASSISTANT_AGENT_ID}:${day}:cost`;
+  // The LAST usage event's counts (full-context prompt + that turn's completion)
+  // are kept for the persisted conversation row, like the guest route.
+  let lastUsage: { promptTokens: number; completionTokens: number } = {
+    promptTokens: 0,
+    completionTokens: 0,
+  };
+
+  // Persist the full gateway-fidelity conversation after the model finishes
+  // (assistant-conversations). Skipped for anonymous requests; fire-and-forget —
+  // a persistence failure must never break the operator's stream.
+  const onComplete =
+    conversationId === ""
+      ? undefined
+      : (transcript: TurnMessage[]) => {
+          const systemTurn = transcript.find((m) => m.role === "system");
+          const payload = buildAssistantPayload({
+            transcript: transcript as unknown as ReadonlyArray<Record<string, unknown>>,
+            system:
+              typeof systemTurn?.content === "string" ? systemTurn.content : "",
+            tools,
+            model,
+            context,
+            usage: lastUsage,
+          });
+          upsertConversation({
+            id: conversationId,
+            agentId: ASSISTANT_AGENT_ID,
+            pageId: null,
+            blockId: null,
+            timezone: null,
+            utcOffsetMinutes: 0,
+            model,
+            messageCount: payload.messages.length,
+            promptTokens: lastUsage.promptTokens,
+            completionTokens: lastUsage.completionTokens,
+            payload: JSON.stringify(payload),
+          }).catch(() => {});
+        };
+
   // Multi-turn tool loop (round-tripping): a turn that calls tools gets its results
   // fed back so the model can chain. A turn with no tool call is the final answer.
   // Each turn's provider cost is metered into this month's spend counters
-  // (ai-cost-quotas) — fire-and-forget, never delaying or failing the stream.
-  const stream = streamChatRounds(upstream, messages, turn, runToolsRound, undefined, (u) => {
-    meterAiCall("assistant", model, u.cost).catch(() => {});
-  });
+  // (ai-cost-quotas) — fire-and-forget, never delaying or failing the stream. The
+  // metered BILLABLE amount also feeds the assistant's daily cost counter so the
+  // analytics page and the quota meter agree (guest-route pattern).
+  const stream = streamChatRounds(
+    upstream,
+    messages,
+    turn,
+    runToolsRound,
+    undefined,
+    (u) => {
+      if (u.totalTokens && u.totalTokens > 0) {
+        incrementCounter(tokensKey, u.totalTokens).catch(() => {});
+      }
+      meterAiCall("assistant", model, u.cost)
+        .then((billableNano) => {
+          if (billableNano > 0) return incrementCounter(costKey, billableNano);
+        })
+        .catch(() => {});
+      lastUsage = {
+        promptTokens: u.promptTokens ?? lastUsage.promptTokens,
+        completionTokens: u.completionTokens ?? lastUsage.completionTokens,
+      };
+    },
+    onComplete,
+  );
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",

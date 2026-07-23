@@ -335,6 +335,7 @@
     "users": "Käyttäjät",
     "google": "Google-kirjautuminen",
     "media": "AI-mallit",
+    "assistantChats": "Avustajan keskustelut",
     "iconSet": "Kuvakkeet",
     "exportImport": "Vienti / Tuonti",
     "llms": "llms.txt"
@@ -1383,6 +1384,10 @@
     "label": "Käännösmalli",
     "hint": "Tämä tekoälymalli kääntää sivujen ja komponenttien tekstit sivuston muille kielille.",
     "saved": "Tallennettu"
+  },
+  "assistantChats": {
+    "title": "Avustajan keskustelut",
+    "subtitle": "Keskustelut CMS-tekoälyavustajan kanssa — päivittäinen käyttö sekä jokainen tallennettu keskustelu kaikkine viesteineen ja työkalukutsuineen, valmiina tarkasteltavaksi, ladattavaksi tai poistettavaksi."
   },
   "exportImport": {
     "title": "Vienti / Tuonti",

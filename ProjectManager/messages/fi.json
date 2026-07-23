@@ -495,6 +495,27 @@
       "dcvBody": "Lisää tämä CNAME, joka delegoi varmenteen vahvistuksen Cloudflarelle. Varmenne uusitaan tämän jälkeen automaattisesti ikuisesti ilman uusia DNS-muutoksia.",
       "txtAlternative": "Tai kertaluonteinen vahvistus (TXT):",
       "txtOnly": "Vahvista varmenne:"
+    },
+    "dangerZone": {
+      "title": "Vaaravyöhyke",
+      "cardDescription": "Poista tämä sivusto ja kaikki sen omistamat resurssit pysyvästi.",
+      "description": "Sivuston poistaminen poistaa pysyvästi sen julkaistun Workerin, tietokannan, kaikki mediatiedostot, omat verkkotunnukset ja asetukset. Muihin sivustoihin ei kosketa. Tätä ei voi perua.",
+      "button": "Poista tämä sivusto",
+      "dialogTitle": "Poistetaanko {name}?",
+      "dialogBody": "Tämä poistaa pysyvästi sivuston julkaistun Workerin, tietokannan ja kaikki mediat, irrottaa omat verkkotunnukset ja poistaa sivuston hallinnasta. Tätä ei voi perua.",
+      "confirmLabel": "Vahvista kirjoittamalla {slug}",
+      "cancel": "Peruuta",
+      "confirm": "Poista sivusto",
+      "errors": {
+        "notAllowed": "Sinulla ei ole oikeutta poistaa tätä sivustoa.",
+        "notFound": "Sivustoa ei löytynyt.",
+        "confirmMismatch": "Kirjoittamasi teksti ei vastaa sivuston slugia.",
+        "deployInProgress": "Julkaisu on käynnissä. Peruuta se tai odota sen valmistumista ennen poistamista.",
+        "notConfigured": "Deployeria ei ole määritetty, joten sivuston Cloudflare-resursseja ei voida poistaa.",
+        "teardownFailed": "Sivuston Cloudflare-resurssien poisto jäi kesken. Mitään ei poistettu hallinnasta — yritä uudelleen.",
+        "deployerUnreachable": "Julkaisupalveluun ei saatu yhteyttä. Mitään ei poistettu — yritä uudelleen.",
+        "unknown": "Jokin meni pieleen. Yritä uudelleen."
+      }
     }
   },
   "designSystem": {

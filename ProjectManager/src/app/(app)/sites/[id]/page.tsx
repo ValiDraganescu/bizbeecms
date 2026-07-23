@@ -30,6 +30,7 @@ import { SiteTagsForm } from "../site-tags-form";
 import { DeployForm } from "../deploy-form";
 import { DeployTimeline } from "../deploy-timeline";
 import { CustomDomainForm } from "../custom-domain-form";
+import { DeleteSiteForm } from "../delete-site-form";
 import { isDeployStuck } from "@/lib/deploy";
 import { getGlobalBuildTimeoutMin } from "@/lib/deploy/settings";
 import { SiteForm } from "../site-form";
@@ -281,6 +282,26 @@ export default async function SiteDetailPage({
                     label: tag.label,
                   }))}
                   assigned={await getSiteTagIds(site.id)}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {canUserCreateSite(user) ? (
+            <Card className="border-danger/40">
+              <CardHeader>
+                <CardTitle className="text-danger">
+                  {t("dangerZone.title")}
+                </CardTitle>
+                <CardDescription>
+                  {t("dangerZone.cardDescription")}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DeleteSiteForm
+                  siteId={site.id}
+                  slug={site.slug}
+                  siteName={site.name}
                 />
               </CardContent>
             </Card>

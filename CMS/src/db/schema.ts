@@ -685,6 +685,12 @@ export const chatAgent = sqliteTable(
  * Scoped to one agent (`agentId`, indexed): the store REJECTS an upsert whose id
  * already belongs to a DIFFERENT agent, so a guessed UUID can't let one agent's
  * visitor overwrite another's record.
+ *
+ * ALSO holds the CMS-assistant's operator conversations, under the reserved
+ * agentId `cms-assistant` (assistant-conversations; real agents mint UUID ids so
+ * it can never collide — see `lib/chat/assistant-conversation.ts`). Those rows
+ * leave `pageId`/`blockId`/`timezone` null and record the admin page context
+ * inside the payload instead.
  */
 export const chatConversation = sqliteTable(
   "chat_conversation",

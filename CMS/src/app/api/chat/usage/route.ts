@@ -1,27 +1,24 @@
 /**
- * public-guest-chatbots Slice 7 — per-agent usage counters.
+ * assistant-conversations — daily usage counters for the CMS assistant.
  *
  *   GET ?days=7 → { usage: [{ day, messages, tokens, costNanoUsd }, …] } for the
  *                 last N days (most-recent-first; costNanoUsd is the BILLABLE
- *                 cost in integer nano-USD — customer dollars charged against
- *                 the Site's monthly AI quota, not a token-price estimate).
- *                 `days` is clamped to [1, 90]; a missing / unparseable value
- *                 defaults to 7. 404 when the agent is unknown.
+ *                 cost in integer nano-USD — the same figure charged against the
+ *                 Site's monthly AI quota). `days` clamps to [1, 90]; default 7.
  *
- * Admin-gated, REST-only. Reads the atomic `usage_counter` rows via the store.
+ * Same contract as GET /api/chat-agents/[id]/usage — the counters share the
+ * `chat:<agentId>:<day>:…` key scheme under the reserved assistant agent id.
+ * Admin-gated, REST-only.
  */
 import { requireAdmin } from "@/lib/auth/guard";
-import { getChatAgent } from "@/db/chat-agent-store";
+import { ASSISTANT_AGENT_ID } from "@/lib/chat/assistant-conversation";
 import { readAgentUsage } from "@/db/usage-counter-store";
 
 export const dynamic = "force-dynamic";
 
-type Params = { params: Promise<{ id: string }> };
-
-export async function GET(request: Request, { params }: Params): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);
   if (denied) return denied;
-  const { id } = await params;
 
   // `Number(null)` is 0, so an ABSENT param must be caught before coercion or
   // the documented default 7 silently becomes the clamp floor 1.
@@ -32,9 +29,7 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     : 7;
 
   try {
-    const agent = await getChatAgent(id);
-    if (!agent) return Response.json({ error: "not found" }, { status: 404 });
-    return Response.json({ usage: await readAgentUsage(agent.id, days) });
+    return Response.json({ usage: await readAgentUsage(ASSISTANT_AGENT_ID, days) });
   } catch (err) {
     return Response.json(
       { error: (err as Error).message ?? "failed to read usage" },

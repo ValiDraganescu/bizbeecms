@@ -495,6 +495,27 @@
       "dcvBody": "Add this CNAME to delegate certificate validation to Cloudflare. The certificate then renews automatically forever, with no further DNS changes.",
       "txtAlternative": "Or, one-time validation (TXT):",
       "txtOnly": "Validate the certificate:"
+    },
+    "dangerZone": {
+      "title": "Danger zone",
+      "cardDescription": "Permanently delete this Site and everything it owns.",
+      "description": "Deleting this Site permanently removes its deployed Worker, its database, all media files, its custom domains and its settings. Other Sites are not affected. This cannot be undone.",
+      "button": "Delete this Site",
+      "dialogTitle": "Delete {name}?",
+      "dialogBody": "This permanently deletes the Site's deployed Worker, its database and all media, detaches its custom domains, and removes the Site from the Project Manager. This cannot be undone.",
+      "confirmLabel": "Type {slug} to confirm",
+      "cancel": "Cancel",
+      "confirm": "Delete Site",
+      "errors": {
+        "notAllowed": "You're not allowed to delete this Site.",
+        "notFound": "Site not found.",
+        "confirmMismatch": "The text you typed doesn't match this Site's slug.",
+        "deployInProgress": "A deploy is in progress. Cancel it or wait for it to finish, then delete.",
+        "notConfigured": "The deployer isn't configured, so the Site's Cloudflare resources can't be removed.",
+        "teardownFailed": "Removing the Site's Cloudflare resources didn't finish. Nothing was deleted from the Project Manager — please try again.",
+        "deployerUnreachable": "The deploy service is unreachable. Nothing was deleted — please try again.",
+        "unknown": "Something went wrong. Please try again."
+      }
     }
   },
   "designSystem": {

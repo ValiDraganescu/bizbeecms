@@ -1,5 +1,11 @@
 import { getSandbox, type Sandbox } from "@cloudflare/sandbox";
 import { chooseAppOrigin } from "./origin-core";
+import {
+  parseDeleteSiteBody,
+  teardownOk,
+  type DeleteSitePlan,
+  type TeardownResults,
+} from "./delete-core";
 
 // Required re-export: the Sandbox Durable Object class the container runs in.
 export { Sandbox } from "@cloudflare/sandbox";
@@ -232,6 +238,32 @@ export default {
       return attachDomain(request, env);
     }
 
+    if (url.pathname === "/delete-site" && request.method === "POST") {
+      const auth = request.headers.get("authorization") ?? "";
+      const token = auth.replace(/^Bearer\s+/i, "");
+      if (!env.DEPLOYER_SECRET || token !== env.DEPLOYER_SECRET) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return Response.json({ error: "badRequest" }, { status: 400 });
+      }
+      const parsed = parseDeleteSiteBody(body);
+      if (!parsed.ok) {
+        return Response.json({ error: parsed.error }, { status: 400 });
+      }
+      const results = await deleteSiteResources(env, parsed.value);
+      const ok = teardownOk(results);
+      // Non-ok carries the per-step results so PM can log exactly what leaked;
+      // every step is idempotent, so PM retries the whole call until ok.
+      return Response.json(
+        { ok, slug: parsed.value.resourceSlug, results },
+        { status: ok ? 200 : 502 },
+      );
+    }
+
     return new Response("Not found", { status: 404 });
   },
 };
@@ -364,6 +396,179 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
       txt,
     },
   });
+}
+
+/**
+ * Tear down every Cloudflare resource a Site owns: its build container, Worker
+ * script (secrets die with it), D1 database, R2 media bucket (drained first —
+ * CF refuses to delete a non-empty bucket), CF-for-SaaS custom hostnames, and
+ * the router's HOST_MAP entries. All names are per-Site (derived from the
+ * deploy-time slug in parseDeleteSiteBody), so nothing shared or belonging to
+ * another Site is ever touched — the global build-cache bucket in particular.
+ *
+ * Every step is idempotent (absent = "ok") and failures are isolated per step,
+ * so PM can safely re-call until everything reports ok. R2 draining is capped
+ * per call to stay inside the Worker subrequest budget; a very large media
+ * bucket reports "partial" and finishes over retries.
+ */
+async function deleteSiteResources(
+  env: Env,
+  plan: DeleteSitePlan,
+): Promise<TeardownResults> {
+  const results: TeardownResults = {};
+  const api = "https://api.cloudflare.com/client/v4";
+  const acct = `${api}/accounts/${env.CF_ACCOUNT_ID}`;
+  const headers = { Authorization: `Bearer ${env.CF_API_TOKEN}` };
+
+  // In-flight build container first, so a running deploy can't re-create
+  // resources mid-teardown. destroy() on a never-started sandbox is fine.
+  try {
+    await getSandbox(env.Sandbox, `deploy-${plan.resourceSlug}`).destroy();
+    results.container = "ok";
+  } catch {
+    results.container = "ok"; // already gone is success here
+  }
+
+  // Worker script. force=true drops it even with live bindings/schedules.
+  results.worker = await cfDelete(
+    `${acct}/workers/scripts/${plan.workerName}?force=true`,
+    headers,
+  );
+
+  // D1 deletes by uuid, so resolve the per-Site database name first. The
+  // ?name= filter matches substrings, so re-check for the exact name (guards
+  // e.g. `acme` vs `acme-2` — never delete another Site's database).
+  try {
+    const list = (await (
+      await fetch(
+        `${acct}/d1/database?name=${encodeURIComponent(plan.dbName)}&per_page=100`,
+        { headers },
+      )
+    ).json()) as {
+      success: boolean;
+      result?: { uuid: string; name: string }[];
+    };
+    const dbs = (list.result ?? []).filter((d) => d.name === plan.dbName);
+    if (dbs.length === 0) {
+      results.d1 = "ok"; // never provisioned, or already deleted
+    } else {
+      let outcome = "ok";
+      for (const d of dbs) {
+        const r = await cfDelete(`${acct}/d1/database/${d.uuid}`, headers);
+        if (r !== "ok") outcome = r;
+      }
+      results.d1 = outcome;
+    }
+  } catch (err) {
+    results.d1 = `failed: ${String(err).slice(0, 120)}`;
+  }
+
+  results.r2 = await deleteR2Bucket(acct, headers, plan.bucketName);
+
+  // Custom hostnames: deregister the CF-for-SaaS record (stops cert renewal)
+  // and drop the router's Host->slug mapping. Hostnames are globally unique
+  // per Site (site_domains unique index), so these only ever belong to us.
+  if (plan.hostnames.length === 0) {
+    results.domains = "ok";
+  } else {
+    let outcome = "ok";
+    for (const hostname of plan.hostnames) {
+      try {
+        if (env.CF_ZONE_ID) {
+          const zone = `${api}/zones/${env.CF_ZONE_ID}/custom_hostnames`;
+          const look = (await (
+            await fetch(`${zone}?hostname=${encodeURIComponent(hostname)}`, {
+              headers,
+            })
+          ).json()) as { result?: { id: string }[] };
+          const rec = look.result?.[0];
+          if (rec?.id) {
+            const r = await cfDelete(`${zone}/${rec.id}`, headers);
+            if (r !== "ok") outcome = r;
+          }
+        }
+        await env.HOST_MAP?.delete(hostname);
+      } catch (err) {
+        outcome = `failed: ${String(err).slice(0, 120)}`;
+      }
+    }
+    results.domains = outcome;
+  }
+
+  return results;
+}
+
+/**
+ * DELETE a CF API resource, treating "already gone" as success so teardown is
+ * idempotent: HTTP 404, or a success:false body whose error reads not-found.
+ */
+async function cfDelete(
+  url: string,
+  headers: Record<string, string>,
+): Promise<string> {
+  try {
+    const res = await fetch(url, { method: "DELETE", headers });
+    if (res.ok) return "ok";
+    if (res.status === 404) return "ok";
+    const json = (await res.json().catch(() => null)) as {
+      errors?: { code: number; message: string }[];
+    } | null;
+    const msgs = json?.errors?.map((e) => e.message).join("; ") ?? `HTTP ${res.status}`;
+    if (/not.?found|does not exist/i.test(msgs)) return "ok";
+    return `failed: ${msgs.slice(0, 120)}`;
+  } catch (err) {
+    return `failed: ${String(err).slice(0, 120)}`;
+  }
+}
+
+// Per-call cap on R2 object deletions — one subrequest each; keeps the whole
+// teardown far below the Workers subrequest limit. Bigger buckets finish over
+// PM retries ("partial" → re-call; already-deleted objects stay deleted).
+const R2_DRAIN_CAP = 400;
+
+/**
+ * Delete a per-Site R2 bucket: drain its objects (CF refuses to delete a
+ * non-empty bucket), then delete the bucket itself. Missing bucket = "ok".
+ */
+async function deleteR2Bucket(
+  acct: string,
+  headers: Record<string, string>,
+  bucketName: string,
+): Promise<string> {
+  const base = `${acct}/r2/buckets/${bucketName}`;
+  try {
+    let deleted = 0;
+    for (;;) {
+      const res = await fetch(`${base}/objects?per_page=500`, { headers });
+      if (res.status === 404) return "ok"; // bucket never provisioned / gone
+      const json = (await res.json().catch(() => null)) as {
+        success?: boolean;
+        result?: { key: string }[];
+        errors?: { message: string }[];
+      } | null;
+      if (!json?.success) {
+        const msgs = json?.errors?.map((e) => e.message).join("; ") ?? `HTTP ${res.status}`;
+        if (/not.?found|does not exist/i.test(msgs)) return "ok";
+        return `failed: ${msgs.slice(0, 120)}`;
+      }
+      const keys = json.result ?? [];
+      if (keys.length === 0) break;
+      for (const o of keys) {
+        if (deleted >= R2_DRAIN_CAP) return "partial";
+        const del = await fetch(`${base}/objects/${encodeURIComponent(o.key)}`, {
+          method: "DELETE",
+          headers,
+        });
+        if (!del.ok && del.status !== 404) {
+          return `failed: object delete HTTP ${del.status}`;
+        }
+        deleted++;
+      }
+    }
+    return cfDelete(base, headers);
+  } catch (err) {
+    return `failed: ${String(err).slice(0, 120)}`;
+  }
 }
 
 type CfCustomHostname = {

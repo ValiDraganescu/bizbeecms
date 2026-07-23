@@ -68,6 +68,18 @@ export async function createSite(input: CreateSiteInput): Promise<Site> {
   return site;
 }
 
+/**
+ * Delete a Site row. Every child table (site_domains, deploy_events,
+ * site_users, site_tags) declares `onDelete: cascade`, so this one delete
+ * clears all of them — same pattern as user deletion. External resources
+ * (Cloudflare worker/D1/R2, OpenRouter key) are torn down by the DELETE route
+ * BEFORE this runs; this only removes the PM's own records.
+ */
+export async function deleteSite(id: string): Promise<void> {
+  const db = await getDb();
+  await db.delete(schema.sites).where(eq(schema.sites.id, id));
+}
+
 export type UpdateSiteInput = {
   name: string;
   slug: string;

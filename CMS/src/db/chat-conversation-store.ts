@@ -10,6 +10,10 @@
  * SCOPING: every read is scoped by `agentId`, and `upsertConversation` REJECTS an
  * id that already belongs to a DIFFERENT agent — a guessed UUID can never let one
  * agent's visitor overwrite (or read) another agent's conversation.
+ *
+ * The CMS assistant's conversations live here too, under the reserved agentId
+ * `cms-assistant` (assistant-conversations) — the same scoping guard keeps them
+ * and guest rows from ever crossing.
  */
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, schema, type Db } from "../lib/ports/db.ts";

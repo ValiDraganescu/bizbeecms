@@ -151,12 +151,18 @@ function bubbleText(
  * Page Builder's currently-selected page, plus the resolved contents of any
  * `@section` the message mentions. Receives the user's trimmed message text so it
  * can resolve those mentions. Read fresh per `send`. Omit / "" → nothing prepended.
+ *
+ * `getConversationId` (optional, assistant-conversations) returns the stable id
+ * this conversation persists + rehydrates under server-side (the widget mints a
+ * UUID per conversation / reuses the saved-thread id). Read fresh per `send`.
+ * Omit / undefined → the request is anonymous (answered, never persisted).
  */
 export function useChat(
   getContext?: () => string | undefined,
   getModel?: () => string | undefined,
   getOverride?: () => string | undefined,
   getInlineContext?: (message: string) => string | undefined,
+  getConversationId?: () => string | undefined,
 ) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [busy, setBusy] = useState(false);
@@ -287,10 +293,12 @@ export function useChat(
       const context = getContext?.();
       const model = getModel?.();
       const override = getOverride?.();
+      const cid = getConversationId?.();
       const payload: Record<string, unknown> = { messages: history };
       if (context) payload.context = context;
       if (model) payload.model = model;
       if (override) payload.systemPromptOverride = override;
+      if (cid) payload.conversationId = cid;
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

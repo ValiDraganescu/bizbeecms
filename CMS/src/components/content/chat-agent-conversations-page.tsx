@@ -72,7 +72,7 @@ export function ChatAgentConversationsPage({ id }: { id: string }) {
         <>
           <h2 className="text-lg font-medium text-foreground">{agent.name}</h2>
           <div className="rounded-lg border border-border bg-surface-raised p-4">
-            <ConversationsPanel agentId={agent.id} />
+            <ConversationsPanel api={`/api/chat-agents/${agent.id}`} />
           </div>
         </>
       )}

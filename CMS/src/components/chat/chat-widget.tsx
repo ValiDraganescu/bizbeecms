@@ -171,6 +171,13 @@ export function ChatWidget() {
     remainingUsd: number;
   } | null>(null);
   const pathname = usePathname();
+  // Server-side conversation id (assistant-conversations): the id the route
+  // persists + rehydrates the gateway-fidelity transcript under (analytics /
+  // download, chat-agent parity). Minted lazily on the first send of a fresh
+  // conversation; an opened saved thread reuses ITS id so history and the stored
+  // conversation stay one record (the history save below passes it as the thread
+  // id too).
+  const conversationId = useRef<string | null>(null);
   // The conversation lives at the widget level so it SURVIVES minimize (closing
   // the panel just hides it; the transcript is intact when reopened).
   // Page-awareness (Slice 2): tell the route which admin page we're on, read
@@ -196,6 +203,12 @@ export function ChatWidget() {
       ]
         .filter((s) => s !== "")
         .join("\n\n") || undefined,
+    // Conversation id, minted on the first send of a fresh conversation so the
+    // route persists (and later rehydrates) this conversation server-side.
+    () => {
+      if (!conversationId.current) conversationId.current = crypto.randomUUID();
+      return conversationId.current;
+    },
   );
 
   // History (Slice 4 sub-slice 3): the current thread's server id (null = a new,
@@ -260,7 +273,9 @@ export function ChatWidget() {
     // A reply just landed; flag it unread if the panel is closed.
     setUnread((cur) => nextUnread(cur, { open, replyFinished: true }));
     const payload = {
-      id: threadId.current,
+      // A fresh conversation saves under its CONVERSATION id, so the saved
+      // thread and the server-persisted gateway conversation share one id.
+      id: threadId.current ?? conversationId.current,
       messages: messages.map((m) =>
         m.role === "assistant"
           ? { role: m.role, content: m.content, tools: m.tools, parts: m.parts }
@@ -309,6 +324,10 @@ export function ChatWidget() {
       // live thread's replayed history (it breaks provider prompt caching).
       chat.seed(compactStaleThreadMessages(j.thread.messages, j.thread.updatedAt ?? NaN));
       threadId.current = j.thread.id;
+      // Continue persisting/rehydrating under the thread's id. A legacy thread
+      // with no stored server conversation just falls back to the client-built
+      // history on its first send, then persists from there.
+      conversationId.current = j.thread.id;
       try {
         sessionStorage.setItem(THREAD_KEY, j.thread.id);
       } catch {
@@ -329,6 +348,7 @@ export function ChatWidget() {
     setThreads((prev) => prev.filter((th) => th.id !== id));
     if (threadId.current === id) {
       threadId.current = null;
+      conversationId.current = null;
       forgetThread();
       chat.reset();
     }
@@ -344,6 +364,7 @@ export function ChatWidget() {
 
   function newConversation() {
     threadId.current = null;
+    conversationId.current = null; // a fresh id is minted on the next send
     forgetThread();
     chat.reset();
     setHistoryOpen(false);

@@ -681,6 +681,8 @@ export interface ConversationPayload {
   model: string;
   timezone: string;
   utcOffsetMinutes: number;
+  // The admin page context an ASSISTANT conversation ran in (guest payloads omit it).
+  context?: string;
   messages: unknown[];
   usage: { promptTokens: number; completionTokens: number };
   truncated?: boolean;
