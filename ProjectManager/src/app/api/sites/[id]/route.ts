@@ -3,6 +3,7 @@ import { checkOversell } from "@/lib/ai/settings";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { authorizeSiteCountry, canManageSiteByCountry, canUserCreateSite } from "@/lib/site/authz";
 import { findSiteById, isSlugTaken, updateSite } from "@/lib/site/site";
+import { getProvisioningKey, syncKeyCap } from "@/lib/openrouter/key-cap";
 import { parseSiteBody, type SiteBody } from "../route";
 
 /**
@@ -81,7 +82,23 @@ export async function PATCH(
       buildTimeoutMin,
     });
 
-    return NextResponse.json({ savedId: siteId });
+    // The minted key's OpenRouter limit is a circuit breaker derived from the
+    // quota, so a quota change has to drag it along (Contract F). Best-effort:
+    // the quota itself is already saved and the CMS enforces it locally, so an
+    // OpenRouter failure is a WARNING on a successful save, never a 500.
+    let capWarning: string | null = null;
+    if (site.openrouterKeyHash && openrouterMonthlyLimitUsd !== site.openrouterMonthlyLimitUsd) {
+      capWarning = await syncKeyCap(
+        await getProvisioningKey(),
+        site.openrouterKeyHash,
+        openrouterMonthlyLimitUsd,
+      );
+      if (capWarning) {
+        console.warn(`[sites] Site ${siteId}: key cap update failed. ${capWarning}`);
+      }
+    }
+
+    return NextResponse.json({ savedId: siteId, ...(capWarning ? { capWarning } : {}) });
   } catch {
     return NextResponse.json({ error: "unknown" }, { status: 500 });
   }

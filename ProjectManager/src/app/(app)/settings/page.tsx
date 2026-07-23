@@ -25,6 +25,7 @@ import { BuildTimeoutForm } from "./build-timeout-form";
 export default async function SettingsPage() {
   const t = await getTranslations("settings");
   const tAi = await getTranslations("settings.aiModels");
+  const tUsage = await getTranslations("settings.aiUsage");
   const actor = (await getCurrentUser())!;
   if (actor.role !== "SuperAdmin" && actor.role !== "Admin") redirect("/");
 
@@ -68,6 +69,21 @@ export default async function SettingsPage() {
             className="inline-flex h-10 items-center rounded-md border border-border bg-surface-muted px-4 text-sm font-medium text-foreground outline-none hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-ring"
           >
             {tAi("open")}
+          </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{tUsage("title")}</CardTitle>
+          <CardDescription>{tUsage("description")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link
+            href="/settings/ai-usage"
+            className="inline-flex h-10 items-center rounded-md border border-border bg-surface-muted px-4 text-sm font-medium text-foreground outline-none hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {tUsage("open")}
           </Link>
         </CardContent>
       </Card>

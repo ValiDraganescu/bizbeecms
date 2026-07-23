@@ -57,7 +57,7 @@ export default async function SitesPage() {
       const domain = customDomains.get(site.id);
       const url = domain
         ? `https://${domain}`
-        : await cmsWorkerUrl(site.workerName);
+        : cmsWorkerUrl(site.workerName);
       if (url) urls.set(site.id, url);
     }
   }
