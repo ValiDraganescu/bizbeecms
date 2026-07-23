@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "2.2.0",
+      "tag": "r-2.2.0",
+      "markdown": "# CMS v2.2.0\n\n_2026-07-23 · changes since r-2.1.1_\n\n## Features\n- **Assistant chat history.** The CMS AI assistant now saves your conversations. A new *Settings → Assistant chats* page shows daily usage and every stored transcript — with all messages and tool calls — ready to review, download, or delete. Your saved threads carry over between sessions.\n- **Delete a Site.** You can now delete a Site from ProjectManager. Deletion tears down the Site's deployed Cloudflare resources — its Worker, database, media bucket, and any custom domains — derived from the actually-deployed name so a later slug rename can't leave resources behind.\n"
+    },
+    {
       "version": "2.1.1",
       "tag": "r-2.1.1",
       "markdown": "# CMS v2.1.1\n\n_2026-07-23 · changes since r-2.1.0_\n\n## Fixes\n- Security/staleness fix: admin and API responses are now explicitly marked uncacheable at the worker, so no edge or intermediary cache can ever store and re-serve them. Previously, zone-level cache settings could cache an admin API response and serve it stale — and to unauthenticated visitors — until its edge TTL expired (seen as the AI model list not updating after changes in the Project Manager). Public endpoints that deliberately opt into caching (published pages, the markdown page variants, sitemap/llms.txt) are unaffected.\n"
