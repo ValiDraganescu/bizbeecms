@@ -26,17 +26,15 @@ import { requireAdmin } from "@/lib/auth/guard";
 import { describeImage } from "@/lib/chat/describe-image";
 import { getImageModel } from "@/db/settings-store";
 import { DEFAULT_IMAGE_MODEL } from "@/lib/chat/models";
-import { effectiveOpenrouterKey } from "@/lib/settings/openrouter-key";
-import { getDecryptedOpenrouterUserKey } from "@/db/openrouter-key-store";
 import { meterAiCall } from "@/db/ai-usage-store";
+import { getAiConfig, effectiveModel } from "@/lib/ai-config";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Describe an uploaded image via the operator-selected vision model, for search.
- * Resolves the OpenRouter key the SAME way the chat does (CMS-local user key wins
- * over the deployer env key). Returns "" on any failure — the caller never fails
- * the upload over a missing description. Non-images are skipped by the caller.
+ * Returns "" on any failure — the caller never fails the upload over a missing
+ * description. Non-images are skipped by the caller.
  */
 async function describeUpload(
   contentType: string,
@@ -46,19 +44,17 @@ async function describeUpload(
   if (!contentType.toLowerCase().startsWith("image/")) return "";
   try {
     const { env } = await getCloudflareContext({ async: true });
-    const e = env as unknown as { OPENROUTER_API_KEY?: string; CMS_AUTH_SECRET?: string };
-    let userKey: string | null = null;
-    if (typeof e.CMS_AUTH_SECRET === "string" && e.CMS_AUTH_SECRET) {
-      try {
-        userKey = await getDecryptedOpenrouterUserKey(e.CMS_AUTH_SECRET);
-      } catch {
-        userKey = null;
-      }
-    }
-    const key = effectiveOpenrouterKey(userKey, e.OPENROUTER_API_KEY);
+    const e = env as unknown as { OPENROUTER_API_KEY?: string };
+    const key = typeof e.OPENROUTER_API_KEY === "string" ? e.OPENROUTER_API_KEY.trim() : "";
     if (!key) return ""; // no OpenRouter key → describe disabled (still uploads)
-    const stored = await getImageModel();
-    const model = stored || DEFAULT_IMAGE_MODEL;
+    // The stored value is a curated alias key (new) or a legacy raw model id —
+    // both resolve; no curated config (local dev) → the legacy default.
+    const model = effectiveModel(
+      await getAiConfig(),
+      "imageDescribe",
+      await getImageModel(),
+      DEFAULT_IMAGE_MODEL,
+    );
     // Prefer the small client-made thumbnail (≤512px JPEG) so the describe call
     // ships a tiny payload, not the full-res original. Fall back to inlining the
     // original bytes if the client didn't send one (older client / non-canvas).

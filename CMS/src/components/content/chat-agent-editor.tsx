@@ -4,8 +4,8 @@
  * The chat-agent editor form, shared by the "Add chat agent" flow on
  * /admin/chat-agents and the per-agent edit sub-page /admin/chat-agents/[id]
  * (split out of `chat-agents-manager.tsx` when the edit flow moved to its own
- * route). Name, enabled, system prompt, model (the shared searchable
- * `ModelPicker`), welcome message, the seven usage limits (via `NumberInput`),
+ * route). Name, enabled, system prompt, model (the curated `AliasPicker`),
+ * welcome message, the seven usage limits (via `NumberInput`),
  * and the data-source + collection allowlists. Usage analytics and transcripts
  * live on their own sub-pages (/admin/chat-agents/[id]/analytics and
  * …/conversations), reached from the agents list — not here.
@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { ModelPicker } from "@/components/chat/model-picker";
+import { AliasPicker } from "@/components/settings/alias-picker";
 import {
   LocalePicker,
   useLocalePicker,
@@ -222,8 +222,9 @@ export function AgentEditor({
 
       <div className="flex flex-col gap-1">
         <span className={labelCls}>Model</span>
-        <ModelPicker
+        <AliasPicker
           value={draft.model ?? ""}
+          purpose="chatAgent"
           direction="down"
           onChange={(id) => set("model", id || null)}
         />

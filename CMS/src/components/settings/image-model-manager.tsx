@@ -2,10 +2,10 @@
 
 /**
  * Image-description model picker (searchable media library). Talks to
- * `GET/PATCH /api/settings/image-model`. Reuses the chat's `ModelPicker` (search
- * + per-model pricing + modality icons), pre-filtered to image-capable models,
- * so the operator picks from the SAME rich selector as the chat — never a plain
- * dropdown. The chosen model describes each uploaded image for media search.
+ * `GET/PATCH /api/settings/image-model`. Offers the PM-curated `imageDescribe`
+ * aliases (`AliasPicker`), degrading on an uncurated site to the chat's free
+ * `ModelPicker` pre-filtered to image-capable models. The chosen model describes
+ * each uploaded image for media search.
  *
  * REST-only (no server actions). next-intl copy. Saves on selection (no separate
  * Save button — pick = persist, like the chat's model picker).
@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ModelPicker } from "@/components/chat/model-picker";
+import { AliasPicker } from "@/components/settings/alias-picker";
 import { DEFAULT_IMAGE_MODEL } from "@/lib/chat/models";
 
 export function ImageModelManager() {
@@ -67,9 +67,10 @@ export function ImageModelManager() {
       )}
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-foreground">{t("label")}</span>
-        <ModelPicker
+        <AliasPicker
           value={model}
           onChange={(id) => void choose(id)}
+          purpose="imageDescribe"
           requireModalities={["image"]}
           direction="down"
         />

@@ -1,11 +1,11 @@
 /**
  * Image-description model setting (searchable media library).
  *
- *   GET   → { model, default, options } — the selected id (resolved), the
+ *   GET   → { model, default, options } — the selected value (resolved), the
  *           default id, and the image-capable catalog models for the picker.
- *   PATCH → store `{ model }` (validated against the image-capable catalog;
- *           unknown/non-image ids fall back to the default — never 400 on the
- *           untrusted id, matching the chat-model discipline).
+ *   PATCH → store `{ model }` — a curated `imageDescribe` alias key OR an
+ *           image-capable catalog id; unknown values fall back to the default
+ *           (never 400 on the untrusted id, matching the chat-model discipline).
  *
  * Admin/Manager only. REST-only (PM directive). The model used to DESCRIBE an
  * uploaded image (see `lib/chat/describe-image.ts`) is read from here.
@@ -19,8 +19,18 @@ import {
   type CatalogModel,
 } from "@/lib/chat/models";
 import { getImageModel, setImageModel, getModelCatalogCache } from "@/db/settings-store";
+import { getAiConfig, allowedModelValues } from "@/lib/ai-config";
 
 export const dynamic = "force-dynamic";
+
+/** Image-capable catalog ids widened with the curated `imageDescribe` aliases. */
+async function allowedValues(options: CatalogModel[]): Promise<Set<string>> {
+  return allowedModelValues(
+    await getAiConfig(),
+    "imageDescribe",
+    options.map((m) => m.id),
+  );
+}
 
 /** Image-capable catalog (cache when present, static fallback otherwise). */
 async function imageCapableModels(): Promise<CatalogModel[]> {
@@ -45,7 +55,7 @@ export async function GET(request: Request): Promise<Response> {
   if (denied) return denied;
   try {
     const options = await imageCapableModels();
-    const allowed = new Set(options.map((m) => m.id));
+    const allowed = await allowedValues(options);
     const stored = await getImageModel();
     return Response.json({
       model: resolveImageModel(stored, allowed),
@@ -71,7 +81,7 @@ export async function PATCH(request: Request): Promise<Response> {
   }
   try {
     const options = await imageCapableModels();
-    const allowed = new Set(options.map((m) => m.id));
+    const allowed = await allowedValues(options);
     const resolved = resolveImageModel(body.model, allowed);
     await setImageModel(resolved);
     return Response.json({ model: resolved });

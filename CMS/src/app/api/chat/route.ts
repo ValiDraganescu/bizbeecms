@@ -6,8 +6,8 @@
  * streams, then a single `done` (or `error`).
  *
  * Provider = **OpenRouter** (the `Ai` port's only adapter — keyed per Site via
- * `OPENROUTER_API_KEY` or the CMS-local user key). The OpenAI-compatible chat
- * completion returns an SSE `ReadableStream`; we parse + re-frame it.
+ * `OPENROUTER_API_KEY`). The OpenAI-compatible chat completion returns an SSE
+ * `ReadableStream`; we parse + re-frame it.
  *
  * REST-only, no server actions (PM directive — server actions 500 on
  * OpenNext/Workers; see project memory). This is a plain route handler taking a
@@ -35,6 +35,7 @@ import { effectiveSystemPrompt } from "@/lib/chat/prompt-version";
 import { resolveModel, outputCapFor } from "@/lib/chat/models";
 import { getModelCatalogCache } from "@/db/settings-store";
 import { meterAiCall } from "@/db/ai-usage-store";
+import { getAiConfig, resolveModelForPurpose } from "@/lib/ai-config";
 import { requireAdmin, currentUserIsPmSso } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -65,11 +66,13 @@ export async function POST(request: Request): Promise<Response> {
   // from. Untrusted → validate / detect; unknown falls back to "general".
   const context = resolveContext(body);
 
-  // Optional, UNTRUSTED `model` (the picker): validate against the cached
-  // catalog ids (plus the static allowlist), fall back to DEFAULT_MODEL. Never
-  // a 400 (same contract as `context`); arbitrary strings never reach the
-  // model call. The catalog cache is best-effort — a read failure just leaves
-  // the static allowlist as the trust set.
+  // Optional, UNTRUSTED `model` (the picker). On a CURATED site it must name an
+  // `assistant` alias — the platform pays for these calls, so only curated
+  // models may run. Uncurated sites keep the legacy trust set: the cached
+  // catalog ids plus the static allowlist, falling back to DEFAULT_MODEL. Never
+  // a 400 (same contract as `context`); arbitrary strings never reach the model
+  // call. The catalog cache is best-effort — a read failure just leaves the
+  // static allowlist as the trust set.
   let catalogIds: ReadonlySet<string> | undefined;
   let catalogModels: ReadonlyArray<{ id: string; contextLength?: number | null }> | undefined;
   try {
@@ -81,12 +84,16 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     /* cache read failed — static allowlist still validates */
   }
-  const model = resolveModel(
+  const requestedModel =
     typeof body === "object" && body !== null
       ? (body as { model?: unknown }).model
-      : undefined,
-    catalogIds,
+      : undefined;
+  const curated = resolveModelForPurpose(
+    await getAiConfig(),
+    "assistant",
+    typeof requestedModel === "string" ? requestedModel : undefined,
   );
+  const model = curated?.model ?? resolveModel(requestedModel, catalogIds);
 
   // Cap generated tokens off the SELECTED model's own context window, not a fixed
   // number. The window covers input+output, so reserve most of it for the prompt

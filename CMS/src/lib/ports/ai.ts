@@ -17,8 +17,6 @@
  * logic unit-testable against a fake (see `scripts/openrouter-ai.test.mjs`).
  */
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { getDecryptedOpenrouterUserKey } from "../../db/openrouter-key-store.ts";
-import { effectiveOpenrouterKey } from "../settings/openrouter-key.ts";
 
 /**
  * A chat message in the OpenAI-compatible shape Workers AI / OpenRouter accept.
@@ -159,28 +157,13 @@ export class OpenRouterAi implements Ai {
  * the only provider: a usable key yields an `OpenRouterAi`, no key yields `null`
  * so the routes answer 503 instead of 500.
  *
- * CMS-local user key override (ai-openrouter): the CMS-local user key (encrypted
- * in this Site's D1, KEK = `CMS_AUTH_SECRET`) is read and PREFERRED over the
- * deployer-injected `OPENROUTER_API_KEY`. So precedence is CMS-local user key →
- * env OPENROUTER_API_KEY (minted/global) → null/503. A missing/failed decrypt
- * falls through to the env key — NEVER throws here.
+ * The key is ALWAYS the deployer-injected `OPENROUTER_API_KEY` (PM-minted per
+ * Site, or the deployer-global fallback). Customer-supplied keys were removed
+ * with the ai-cost-quotas work — the platform bills for AI, so it owns the key.
  */
 export async function getAi(): Promise<Ai | null> {
   const { env } = await getCloudflareContext({ async: true });
-  const e = env as unknown as {
-    OPENROUTER_API_KEY?: string;
-    CMS_AUTH_SECRET?: string;
-  };
-
-  // CMS-local user key wins over the deployer-injected env key.
-  let userKey: string | null = null;
-  if (typeof e.CMS_AUTH_SECRET === "string" && e.CMS_AUTH_SECRET) {
-    try {
-      userKey = await getDecryptedOpenrouterUserKey(e.CMS_AUTH_SECRET);
-    } catch {
-      userKey = null; // never let a settings read break the chat route
-    }
-  }
-  const orKey = effectiveOpenrouterKey(userKey, e.OPENROUTER_API_KEY);
+  const e = env as unknown as { OPENROUTER_API_KEY?: string };
+  const orKey = typeof e.OPENROUTER_API_KEY === "string" ? e.OPENROUTER_API_KEY.trim() : "";
   return orKey ? new OpenRouterAi(orKey) : null;
 }
