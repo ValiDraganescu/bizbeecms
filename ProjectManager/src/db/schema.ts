@@ -328,6 +328,14 @@ export const appSettings = sqliteTable("app_settings", {
 // app_settings.value. Single source of truth for readers/writers.
 export const BUILD_TIMEOUT_MIN_KEY = "build_timeout_min";
 
+// Curated AI model catalog served to the CMS fleet — JSON, the Contract A
+// `purposes` object (see src/lib/ai/curated.ts).
+export const AI_CURATED_MODELS_KEY = "ai_curated_models";
+
+// Global monthly AI credit pool in USD (stringified number, "" = unset). Site
+// quotas must not oversell it.
+export const AI_CREDIT_POOL_USD_KEY = "ai_credit_pool_usd";
+
 export type AppSetting = typeof appSettings.$inferSelect;
 export type NewAppSetting = typeof appSettings.$inferInsert;
 export type User = typeof users.$inferSelect;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkOversell } from "@/lib/ai/settings";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { authorizeSiteCountry, canManageSiteByCountry, canUserCreateSite } from "@/lib/site/authz";
 import { findSiteById, isSlugTaken, updateSite } from "@/lib/site/site";
@@ -55,6 +56,17 @@ export async function PATCH(
 
   if (await isSlugTaken(slug, siteId)) {
     return NextResponse.json({ error: "slugTaken" }, { status: 409 });
+  }
+
+  // No oversell: this Site's monthly quota plus every other Site's must stay
+  // within the configured AI credit pool (docs/ai-cost-quotas.md, decision 3).
+  // No pool configured → no constraint.
+  const oversell = await checkOversell({
+    siteId,
+    quotaUsd: openrouterMonthlyLimitUsd,
+  });
+  if (oversell) {
+    return NextResponse.json({ error: "oversell", message: oversell }, { status: 400 });
   }
 
   try {

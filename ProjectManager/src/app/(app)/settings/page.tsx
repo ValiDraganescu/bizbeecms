@@ -18,12 +18,13 @@ import { BuildTimeoutForm } from "./build-timeout-form";
 
 /**
  * Global settings — operator-tunable, account-wide knobs. Admin+ only (same gate
- * as /users); Manager/Editor are redirected and the API re-enforces. Currently
- * just the global build timeout (deploy anti-stall); the page is the home for
- * future global settings.
+ * as /users); Manager/Editor are redirected and the API re-enforces. The global
+ * build timeout (deploy anti-stall) lives here inline; bigger settings get their
+ * own sub-page (AI model curation), linked from a card.
  */
 export default async function SettingsPage() {
   const t = await getTranslations("settings");
+  const tAi = await getTranslations("settings.aiModels");
   const actor = (await getCurrentUser())!;
   if (actor.role !== "SuperAdmin" && actor.role !== "Admin") redirect("/");
 
@@ -53,6 +54,21 @@ export default async function SettingsPage() {
             min={MIN_BUILD_TIMEOUT_MIN}
             max={MAX_BUILD_TIMEOUT_MIN}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{tAi("title")}</CardTitle>
+          <CardDescription>{tAi("description")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link
+            href="/settings/ai-models"
+            className="inline-flex h-10 items-center rounded-md border border-border bg-surface-muted px-4 text-sm font-medium text-foreground outline-none hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {tAi("open")}
+          </Link>
         </CardContent>
       </Card>
     </main>

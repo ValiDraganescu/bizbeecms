@@ -75,6 +75,9 @@ export function SiteForm({
   const tSettings = useTranslations("settings.siteOverride");
   const router = useRouter();
   const [error, setError] = useState<SiteErrorKey | null>(null);
+  // Server-composed detail (currently only the oversell rejection, which needs
+  // the actual dollar figures); rendered verbatim in place of the i18n string.
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -154,6 +157,7 @@ export function SiteForm({
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setErrorMessage(null);
     setPending(true);
     const payload: Record<string, unknown> = {
       name,
@@ -183,6 +187,7 @@ export function SiteForm({
             });
       const data = (await res.json().catch(() => ({}))) as {
         error?: SiteErrorKey;
+        message?: string;
         savedId?: string;
       };
       if (res.ok && data.savedId) {
@@ -190,6 +195,7 @@ export function SiteForm({
         return;
       }
       setError(data.error ?? "unknown");
+      setErrorMessage(data.message ?? null);
     } catch {
       setError("unknown");
     } finally {
@@ -202,8 +208,10 @@ export function SiteForm({
 
   const formError =
     error &&
-    ["notAllowed", "countryNotAllowed", "notFound", "unknown"].includes(error)
-      ? t(`errors.${error}`)
+    ["notAllowed", "countryNotAllowed", "notFound", "oversell", "unknown"].includes(
+      error,
+    )
+      ? (errorMessage ?? t(`errors.${error}`))
       : null;
 
   return (
