@@ -742,6 +742,49 @@
           "title": "Translation",
           "description": "Models used to translate content between locales."
         }
+      },
+      "applyCaps": {
+        "title": "Key spend caps",
+        "description": "Each Site’s minted OpenRouter key carries a hard spend cap of 2.5× its monthly quota, reset monthly. It is a circuit breaker, not the meter — quotas are enforced inside each CMS. Run this once to bring keys minted before this feature up to date.",
+        "action": "Apply caps to existing keys",
+        "done": "{ok} key(s) updated, {failed} failed.",
+        "error": "Couldn’t apply the caps. Try again.",
+        "failuresIntro": "These Sites’ keys were not updated:"
+      }
+    },
+    "aiUsage": {
+      "back": "Back to settings",
+      "title": "AI usage",
+      "description": "Live AI spend across every Site: billable usage against each Site's quota, the fleet total against the credit pool, and drift between what we metered and what OpenRouter billed.",
+      "open": "View AI usage",
+      "subtitle": "Polled from each Site's CMS when this page loads. Nothing is stored here.",
+      "loading": "Polling the fleet…",
+      "loadError": "Couldn’t load fleet usage. Try again.",
+      "empty": "No Sites yet.",
+      "unreachable": "Unreachable",
+      "noQuota": "No quota",
+      "noKey": "No key",
+      "noPool": "No pool",
+      "overQuota": "Over quota",
+      "driftFlag": "Drift",
+      "poolExceeded": "Fleet AI spend has passed the monthly credit pool.",
+      "driftAlert": "{count} Site(s) report AI spend that differs materially from OpenRouter’s figure. Check metering.",
+      "totals": {
+        "billable": "Fleet billable",
+        "pool": "Credit pool",
+        "poolUsed": "{percent}% of the pool used",
+        "quotas": "Quotas allocated",
+        "reporting": "Sites reporting",
+        "unreachableCount": "{count} unreachable"
+      },
+      "columns": {
+        "site": "Site",
+        "month": "Month",
+        "billable": "Billable",
+        "quota": "Quota",
+        "raw": "Raw (metered)",
+        "openRouter": "Raw (OpenRouter)",
+        "drift": "Drift"
       }
     }
   }

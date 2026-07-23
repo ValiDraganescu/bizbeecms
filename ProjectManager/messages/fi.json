@@ -742,6 +742,49 @@
           "title": "Käännökset",
           "description": "Mallit, joilla sisältöä käännetään kielten välillä."
         }
+      },
+      "applyCaps": {
+        "title": "Avainten kulukatot",
+        "description": "Jokaisen sivuston luodulla OpenRouter-avaimella on kova kulukatto 2,5× kuukausikiintiöstä, ja se nollautuu kuukausittain. Se on varoventtiili, ei mittari — kiintiöitä valvotaan kunkin CMS:n sisällä. Aja tämä kerran, jotta ennen tätä ominaisuutta luodut avaimet päivittyvät.",
+        "action": "Aseta katot olemassa oleviin avaimiin",
+        "done": "{ok} avainta päivitetty, {failed} epäonnistui.",
+        "error": "Kattojen asetus epäonnistui. Yritä uudelleen.",
+        "failuresIntro": "Näiden sivustojen avaimia ei päivitetty:"
+      }
+    },
+    "aiUsage": {
+      "back": "Takaisin asetuksiin",
+      "title": "Tekoälyn käyttö",
+      "description": "Tekoälykulut kaikilla sivustoilla: laskutettava käyttö suhteessa sivuston kiintiöön, koko kannan summa suhteessa krediittipooliin sekä ero mittaamamme ja OpenRouterin laskuttaman kulun välillä.",
+      "open": "Näytä tekoälyn käyttö",
+      "subtitle": "Haetaan jokaisen sivuston CMS:stä sivun latautuessa. Mitään ei tallenneta tänne.",
+      "loading": "Kysellään sivustoilta…",
+      "loadError": "Käyttötietojen lataus epäonnistui. Yritä uudelleen.",
+      "empty": "Ei vielä sivustoja.",
+      "unreachable": "Ei tavoiteta",
+      "noQuota": "Ei kiintiötä",
+      "noKey": "Ei avainta",
+      "noPool": "Ei poolia",
+      "overQuota": "Kiintiö ylitetty",
+      "driftFlag": "Poikkeama",
+      "poolExceeded": "Tekoälykulut ovat ylittäneet kuukausittaisen krediittipoolin.",
+      "driftAlert": "{count} sivuston ilmoittama kulu poikkeaa merkittävästi OpenRouterin luvusta. Tarkista mittaus.",
+      "totals": {
+        "billable": "Laskutettava yhteensä",
+        "pool": "Krediittipooli",
+        "poolUsed": "{percent} % poolista käytetty",
+        "quotas": "Kiintiöitä varattu",
+        "reporting": "Sivustoja raportoi",
+        "unreachableCount": "{count} ei tavoiteta"
+      },
+      "columns": {
+        "site": "Sivusto",
+        "month": "Kuukausi",
+        "billable": "Laskutettava",
+        "quota": "Kiintiö",
+        "raw": "Raaka (mitattu)",
+        "openRouter": "Raaka (OpenRouter)",
+        "drift": "Poikkeama"
       }
     }
   }

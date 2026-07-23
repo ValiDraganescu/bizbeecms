@@ -199,6 +199,37 @@ export async function listSitesForUser(user: User): Promise<Site[]> {
     .orderBy(desc(schema.sites.createdAt));
 }
 
+/** The columns the AI fleet views need from every Site (Contract F). */
+export type FleetSiteRow = {
+  id: string;
+  name: string;
+  slug: string;
+  workerName: string | null;
+  openrouterKeyHash: string | null;
+  openrouterMonthlyLimitUsd: number | null;
+};
+
+/**
+ * Every Site, unscoped — for the ADMIN-ONLY AI fleet views (usage dashboard,
+ * circuit-breaker cap backfill). Deliberately not `listSitesForUser`: those
+ * views are account-wide operator reports whose routes gate on Admin+, and a
+ * per-country subset would silently under-report fleet spend against the pool.
+ */
+export async function listAllSitesForFleet(): Promise<FleetSiteRow[]> {
+  const db = await getDb();
+  return db
+    .select({
+      id: schema.sites.id,
+      name: schema.sites.name,
+      slug: schema.sites.slug,
+      workerName: schema.sites.workerName,
+      openrouterKeyHash: schema.sites.openrouterKeyHash,
+      openrouterMonthlyLimitUsd: schema.sites.openrouterMonthlyLimitUsd,
+    })
+    .from(schema.sites)
+    .orderBy(desc(schema.sites.createdAt));
+}
+
 /** Site ids carrying at least one of the given tag ids (pm-roles Slice 3). */
 async function getSiteIdsWithAnyTag(tagIds: string[]): Promise<string[]> {
   if (tagIds.length === 0) return [];

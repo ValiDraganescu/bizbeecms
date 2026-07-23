@@ -80,7 +80,7 @@ export default async function SiteDetailPage({
     site.status === "deployed" && site.workerName
       ? servingDomain
         ? `https://${servingDomain.hostname}`
-        : await cmsWorkerUrl(site.workerName)
+        : cmsWorkerUrl(site.workerName)
       : null;
 
   return (

@@ -9,28 +9,23 @@ import {
   CardTitle,
 } from "@/components/ui";
 import { getCurrentUser } from "@/lib/auth/user";
-import { getCreditPoolUsd, getCuratedPurposes } from "@/lib/ai/settings";
-import { AiModelsForm } from "./ai-models-form";
-import { ApplyCapsButton } from "./apply-caps-button";
+import { FleetUsageTable } from "./fleet-usage-table";
 
 /**
- * AI model curation — the operator picks, per purpose, the aliases every Site's
- * CMS may use (label + OpenRouter model + margin), plus the global monthly
- * credit pool. Admin+ only (same gate as the rest of /settings); the API
- * re-enforces. See docs/ai-cost-quotas.md.
+ * Fleet AI usage (Contract F). Admin+ only — same gate as the rest of
+ * /settings, re-enforced by /api/settings/ai-usage.
+ *
+ * The page shell renders instantly and the table polls the fleet from the
+ * browser: the poll fans out to every Site's Worker plus OpenRouter, so doing it
+ * during SSR would stall the whole page behind the slowest unreachable site.
  */
-export default async function AiModelsSettingsPage() {
-  const t = await getTranslations("settings.aiModels");
+export default async function AiUsagePage() {
+  const t = await getTranslations("settings.aiUsage");
   const actor = (await getCurrentUser())!;
   if (actor.role !== "SuperAdmin" && actor.role !== "Admin") redirect("/");
 
-  const [purposes, poolUsd] = await Promise.all([
-    getCuratedPurposes(),
-    getCreditPoolUsd(),
-  ]);
-
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-10">
+    <main className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-10">
       <header className="flex flex-col gap-1">
         <Link
           href="/settings"
@@ -48,17 +43,7 @@ export default async function AiModelsSettingsPage() {
           <CardDescription>{t("description")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <AiModelsForm initialPurposes={purposes} initialPoolUsd={poolUsd} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("applyCaps.title")}</CardTitle>
-          <CardDescription>{t("applyCaps.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ApplyCapsButton />
+          <FleetUsageTable />
         </CardContent>
       </Card>
     </main>

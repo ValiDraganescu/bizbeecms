@@ -23,7 +23,12 @@
   ],
   "vars": {
     "APP_ORIGIN": "https://manager.bizbeecms.com",
-    "DEPLOYER_URL": "https://deployer.bizbeecms.com"
+    "DEPLOYER_URL": "https://deployer.bizbeecms.com",
+    // Our Cloudflare account's workers.dev subdomain — every per-Site CMS Worker
+    // lives at `bizbeecms-cms-<slug>.<this>.workers.dev`. PM polls that URL for
+    // the fleet AI-usage dashboard. Same var the router and deployer already
+    // carry; unset falls back to the compiled-in default in lib/config/hosts.ts.
+    "WORKERS_SUBDOMAIN": "vali-draganescu88"
   },
   // SECRET (not a var — never commit a value): SITE_SECRET_KEY is the 32-byte
   // base64 KEK that AES-256-GCM-encrypts each Site's OpenRouter API key at rest

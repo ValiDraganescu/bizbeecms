@@ -15,6 +15,7 @@ import { decryptSecret, encryptSecret } from "@/lib/crypto/secret-box";
 import { decideDeployOpenrouterField } from "@/lib/site/deploy-openrouter-key";
 import { shouldMintOnDeploy } from "@/lib/site/mint-on-deploy";
 import { mintKey } from "@/lib/openrouter/provision";
+import { circuitBreakerLimitUsd } from "@/lib/ai/usage";
 import { setSiteMintedOpenrouterKey } from "@/lib/site/site";
 
 export type DeployError =
@@ -102,7 +103,11 @@ export async function POST(
     try {
       const minted = await mintKey(provKey, {
         name: site.slug,
-        limit: site.openrouterMonthlyLimitUsd ?? undefined,
+        // NOT the raw quota: the quota is the customer's billable allowance,
+        // metered and enforced in the CMS. The KEY limit is a circuit breaker —
+        // a generous multiple of it that only trips when soft enforcement was
+        // bypassed (docs/ai-cost-quotas.md).
+        limit: circuitBreakerLimitUsd(site.openrouterMonthlyLimitUsd),
       });
       const ciphertext = await encryptSecret(minted.key, kek);
       await setSiteMintedOpenrouterKey(siteId, ciphertext, minted.hash);

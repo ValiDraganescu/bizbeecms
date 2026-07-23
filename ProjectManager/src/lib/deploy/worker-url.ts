@@ -1,4 +1,4 @@
-import { WORKERS_DEV_SUFFIX } from "../config/hosts.ts";
+import { ACCOUNT_WORKERS_SUBDOMAIN } from "../config/hosts.ts";
 
 /**
  * Public URL of a deployed CMS Worker.
@@ -10,8 +10,18 @@ import { WORKERS_DEV_SUFFIX } from "../config/hosts.ts";
  * cert can't cover two levels, and a bare `*.bizbeecms.com` route shadows our
  * infra custom domains). Customer-owned custom domains still work via
  * /attach-domain + HOST_MAP + router.
+ *
+ * The account subdomain is injectable because PM's own service-to-service calls
+ * to the fleet (the AI usage poll) read `WORKERS_SUBDOMAIN` from the Worker env
+ * — the router and deployer already treat it as a var, so PM shouldn't be the
+ * one place it's hard-coded. Blank → the compiled-in account default, so a
+ * missing var degrades to today's URL instead of `https://name..workers.dev`.
  */
-export async function cmsWorkerUrl(workerName: string): Promise<string | null> {
+export function cmsWorkerUrl(
+  workerName: string,
+  subdomain: string = ACCOUNT_WORKERS_SUBDOMAIN,
+): string | null {
   if (!workerName) return null;
-  return `https://${workerName}${WORKERS_DEV_SUFFIX}`;
+  const sub = subdomain.trim() || ACCOUNT_WORKERS_SUBDOMAIN;
+  return `https://${workerName}.${sub}.workers.dev`;
 }

@@ -742,6 +742,49 @@
           "title": "Tõlkimine",
           "description": "Mudelid, millega sisu keelte vahel tõlgitakse."
         }
+      },
+      "applyCaps": {
+        "title": "Võtmete kulupiirid",
+        "description": "Iga saidi loodud OpenRouteri võtmel on kõva kulupiir 2,5× kuukvoodist, mis lähtestub igal kuul. See on kaitselüliti, mitte mõõdik — kvoote jõustatakse iga CMS-i sees. Käivita see korra, et enne seda funktsiooni loodud võtmed ajakohastada.",
+        "action": "Rakenda piirid olemasolevatele võtmetele",
+        "done": "{ok} võtit uuendatud, {failed} ebaõnnestus.",
+        "error": "Piiride rakendamine ebaõnnestus. Proovi uuesti.",
+        "failuresIntro": "Nende saitide võtmeid ei uuendatud:"
+      }
+    },
+    "aiUsage": {
+      "back": "Tagasi seadetesse",
+      "title": "AI kasutus",
+      "description": "AI kulud kõigil saitidel: arveldatav kasutus saidi kvoodi suhtes, kogu pargi summa krediidipoolile ning erinevus meie mõõdetud ja OpenRouteri arvestatud kulu vahel.",
+      "open": "Vaata AI kasutust",
+      "subtitle": "Küsitakse iga saidi CMS-ist lehe laadimisel. Siia midagi ei salvestata.",
+      "loading": "Küsitleme saite…",
+      "loadError": "Kasutusandmete laadimine ebaõnnestus. Proovi uuesti.",
+      "empty": "Saite pole veel.",
+      "unreachable": "Kättesaamatu",
+      "noQuota": "Kvooti pole",
+      "noKey": "Võtit pole",
+      "noPool": "Pooli pole",
+      "overQuota": "Kvoot ületatud",
+      "driftFlag": "Hälve",
+      "poolExceeded": "AI kulud on ületanud kuise krediidipooli.",
+      "driftAlert": "{count} saidi teatatud kulu erineb oluliselt OpenRouteri näidust. Kontrolli mõõtmist.",
+      "totals": {
+        "billable": "Arveldatav kokku",
+        "pool": "Krediidipool",
+        "poolUsed": "{percent}% poolist kasutatud",
+        "quotas": "Kvoote eraldatud",
+        "reporting": "Saite raporteerib",
+        "unreachableCount": "{count} kättesaamatut"
+      },
+      "columns": {
+        "site": "Sait",
+        "month": "Kuu",
+        "billable": "Arveldatav",
+        "quota": "Kvoot",
+        "raw": "Toorkulu (mõõdetud)",
+        "openRouter": "Toorkulu (OpenRouter)",
+        "drift": "Hälve"
       }
     }
   }
