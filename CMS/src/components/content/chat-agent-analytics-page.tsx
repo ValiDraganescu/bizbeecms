@@ -1,24 +1,24 @@
 "use client";
 
 /**
- * Client body of /admin/chat-agents/[id]/conversations — the per-agent guest
- * CONVERSATIONS page (the paginated conversation list with download/delete),
- * promoted out of the edit form so transcripts are one click from the agents
- * list instead of buried in the editor. Usage lives on the sibling analytics
- * page. Fetches the agent only to headline its name; the panel owns its own
- * data. REST-only; hardcoded English copy (list-page pattern).
+ * Client body of /admin/chat-agents/[id]/analytics — the per-agent usage
+ * ANALYTICS page (the last-7-days messages/tokens panel), promoted out of the
+ * edit form so usage is one click from the agents list instead of buried in the
+ * editor (same promotion the conversations page got). Fetches the agent only to
+ * headline its name; the panel owns its own data. REST-only; hardcoded English
+ * copy (list-page pattern).
  */
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  ConversationsPanel,
+  UsagePanel,
   ghostBtn,
   readError,
   type Agent,
 } from "@/components/content/chat-agents-shared";
 
-export function ChatAgentConversationsPage({ id }: { id: string }) {
+export function ChatAgentAnalyticsPage({ id }: { id: string }) {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,8 +48,8 @@ export function ChatAgentConversationsPage({ id }: { id: string }) {
         <Link href={`/admin/chat-agents/${id}`} className={ghostBtn}>
           Edit this agent
         </Link>
-        <Link href={`/admin/chat-agents/${id}/analytics`} className={ghostBtn}>
-          Analytics
+        <Link href={`/admin/chat-agents/${id}/conversations`} className={ghostBtn}>
+          Conversations
         </Link>
       </div>
 
@@ -72,7 +72,7 @@ export function ChatAgentConversationsPage({ id }: { id: string }) {
         <>
           <h2 className="text-lg font-medium text-foreground">{agent.name}</h2>
           <div className="rounded-lg border border-border bg-surface-raised p-4">
-            <ConversationsPanel agentId={agent.id} />
+            <UsagePanel agentId={agent.id} />
           </div>
         </>
       )}

@@ -3,8 +3,9 @@
  * (per-Site D1).
  *
  * A generic key→count table meters guest-chat abuse/cost per day. Keys follow
- * `chat:<agentId>:<YYYY-MM-DD>:messages` (enforced against the site-day budget)
- * and `chat:<agentId>:<YYYY-MM-DD>:tokens` (recorded for visibility only). The
+ * `chat:<agentId>:<YYYY-MM-DD>:messages` (enforced against the site-day budget),
+ * `…:tokens` (recorded for visibility only), and `…:cost` (integer nano-USD,
+ * priced at record time from the model catalog — see `usageCostNanoUsd`). The
  * store never encodes those semantics — the endpoint composes the keys.
  *
  * Increments are atomic: `INSERT … ON CONFLICT DO UPDATE count = count + n`, so
@@ -58,16 +59,18 @@ function dayKey(today: Date, offset: number): string {
 }
 
 /**
- * The last `days` days of message/token usage for one agent, most-recent-first.
- * Computes the day keys in code and batch-reads all of them in one query; days
- * with no activity report zeros (never absent).
+ * The last `days` days of message/token/cost usage for one agent,
+ * most-recent-first. Computes the day keys in code and batch-reads all of them
+ * in one query; days with no activity report zeros (never absent).
+ * `costNanoUsd` is the `:cost` counter (integer nano-USD; 0 also for days
+ * recorded before cost tracking existed).
  */
 export async function readAgentUsage(
   agentId: string,
   days: number,
   injectedDb?: Db,
   now: Date = new Date(),
-): Promise<Array<{ day: string; messages: number; tokens: number }>> {
+): Promise<Array<{ day: string; messages: number; tokens: number; costNanoUsd: number }>> {
   const db = injectedDb ?? (await getDb());
   const span = Math.max(1, days);
   const dayList = Array.from({ length: span }, (_, i) => dayKey(now, i));
@@ -76,6 +79,7 @@ export async function readAgentUsage(
   for (const day of dayList) {
     keys.push(`chat:${agentId}:${day}:messages`);
     keys.push(`chat:${agentId}:${day}:tokens`);
+    keys.push(`chat:${agentId}:${day}:cost`);
   }
 
   const rows = await db
@@ -88,5 +92,6 @@ export async function readAgentUsage(
     day,
     messages: counts.get(`chat:${agentId}:${day}:messages`) ?? 0,
     tokens: counts.get(`chat:${agentId}:${day}:tokens`) ?? 0,
+    costNanoUsd: counts.get(`chat:${agentId}:${day}:cost`) ?? 0,
   }));
 }

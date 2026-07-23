@@ -59,6 +59,7 @@ import {
   stampForModel,
   timeContextLine,
   capConversationPayload,
+  usageCostNanoUsd,
   type ChatAgentConfig,
   type ConversationPayload,
 } from "@/lib/public-chat/core";
@@ -214,8 +215,10 @@ export async function POST(request: Request): Promise<Response> {
     );
     // Model-based output cap: the operator's configured number is a cost knob,
     // but the SELECTED model's own output cap (a fraction of its context
-    // window, same rule as the admin chat route) always bounds it.
-    const contextLength = catalog?.find((m) => m.id === model)?.contextLength ?? null;
+    // window, same rule as the admin chat route) always bounds it. The entry
+    // also carries the per-token prices the usage callback bills against.
+    const catalogEntry = catalog?.find((m) => m.id === model);
+    const contextLength = catalogEntry?.contextLength ?? null;
     const modelCap = outputCapFor(contextLength);
     const maxTokens = modelCap
       ? Math.min(config.limits.maxTokensPerResponse, modelCap)
@@ -242,12 +245,14 @@ export async function POST(request: Request): Promise<Response> {
       offsetMinutes: meta.utcOffsetMinutes,
     };
     const tokensKey = `chat:${agentRow.id}:${day}:tokens`;
-    // Tokens are RECORDED for visibility, not enforced. Fire-and-forget in the
-    // usage callback (`.catch` swallow) rather than `waitUntil`: the callback
-    // fires mid-stream, before the response settles, so a per-turn increment is
-    // simplest and can't be dropped by an early stream close. The LAST usage
-    // event's counts (full-context prompt + this turn's completion) are also kept
-    // for the persisted conversation row.
+    const costKey = `chat:${agentRow.id}:${day}:cost`;
+    // Tokens and cost are RECORDED for visibility, not enforced. Fire-and-forget
+    // in the usage callback (`.catch` swallow) rather than `waitUntil`: the
+    // callback fires mid-stream, before the response settles, so a per-turn
+    // increment is simplest and can't be dropped by an early stream close. Each
+    // usage event is one upstream call (full-context prompt + that turn's
+    // completion), so pricing events independently and summing is exact. The
+    // LAST event's counts are also kept for the persisted conversation row.
     let lastUsage: { promptTokens: number; completionTokens: number } = {
       promptTokens: 0,
       completionTokens: 0,
@@ -259,6 +264,10 @@ export async function POST(request: Request): Promise<Response> {
     }) => {
       if (u.totalTokens && u.totalTokens > 0) {
         incrementCounter(tokensKey, u.totalTokens).catch(() => {});
+      }
+      const costNano = usageCostNanoUsd(u, catalogEntry);
+      if (costNano > 0) {
+        incrementCounter(costKey, costNano).catch(() => {});
       }
       lastUsage = {
         promptTokens: u.promptTokens ?? lastUsage.promptTokens,
@@ -423,12 +432,19 @@ async function buildTools(config: ChatAgentConfig) {
 }
 
 /**
- * Cached model catalog for `resolveModel` (ids) + the model-based output cap
- * (contextLength). Best-effort: unreadable cache → undefined (static allowlist
- * validates, adapter default caps output).
+ * Cached model catalog for `resolveModel` (ids), the model-based output cap
+ * (contextLength), and the per-token USD prices the cost counter bills against.
+ * Best-effort: unreadable cache → undefined (static allowlist validates,
+ * adapter default caps output, cost goes unrecorded).
  */
 async function catalogModels(): Promise<
-  ReadonlyArray<{ id: string; contextLength?: number | null }> | undefined
+  | ReadonlyArray<{
+      id: string;
+      contextLength?: number | null;
+      inputPrice?: number | null;
+      outputPrice?: number | null;
+    }>
+  | undefined
 > {
   try {
     const cache = await getModelCatalogCache();

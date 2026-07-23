@@ -717,8 +717,9 @@ export const chatConversation = sqliteTable(
 /**
  * Usage counter — a generic atomic counter keyed by an opaque string, used to
  * meter guest-chat abuse/cost per day (public-guest-chatbots Slice 1). Keys are
- * `chat:<agentId>:<YYYY-MM-DD>:messages` (enforced against the site-day budget)
- * and `chat:<agentId>:<YYYY-MM-DD>:tokens` (recorded for visibility only). The
+ * `chat:<agentId>:<YYYY-MM-DD>:messages` (enforced against the site-day budget),
+ * `…:tokens` (recorded for visibility only), and `…:cost` (integer nano-USD,
+ * priced at record time from the model catalog). The
  * store increments via `INSERT … ON CONFLICT DO UPDATE count = count + n` so
  * concurrent requests never lose a bump. The DB IS the Site boundary.
  */

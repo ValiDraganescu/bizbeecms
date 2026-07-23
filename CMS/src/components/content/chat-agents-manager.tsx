@@ -161,6 +161,13 @@ export function ChatAgentsManager() {
               </div>
               <div className="flex shrink-0 gap-2">
                 <Link
+                  href={`/admin/chat-agents/${agent.id}/analytics`}
+                  className={ghostBtn}
+                  aria-label={`Analytics — ${agent.name}`}
+                >
+                  Analytics
+                </Link>
+                <Link
                   href={`/admin/chat-agents/${agent.id}/conversations`}
                   className={ghostBtn}
                   aria-label={`Conversations — ${agent.name}`}

@@ -778,3 +778,39 @@ export function capConversationPayload(payload: ConversationPayload): Conversati
   }
   return { ...payload, messages, truncated };
 }
+
+// ── Usage cost (nano-USD counters) ────────────────────────────────────────────
+
+/** 1 USD in the integer nano-USD unit the `:cost` usage counter accumulates. */
+export const NANO_USD_PER_USD = 1_000_000_000;
+
+/**
+ * Integer nano-USD (1e-9 USD) cost of one usage event: the event's prompt /
+ * completion token counts priced at the model's per-token USD catalog prices.
+ * Priced at RECORD time — each turn is billed at the model actually used, so a
+ * later model/price change never rewrites history. A missing/null price
+ * contributes 0 (the counter under-reports rather than guessing). Integer so
+ * the atomic `usage_counter` bump stays exact.
+ */
+export function usageCostNanoUsd(
+  usage: { promptTokens?: number; completionTokens?: number },
+  prices?: { inputPrice?: number | null; outputPrice?: number | null },
+): number {
+  const usd =
+    (usage.promptTokens ?? 0) * (prices?.inputPrice ?? 0) +
+    (usage.completionTokens ?? 0) * (prices?.outputPrice ?? 0);
+  return Math.round(usd * NANO_USD_PER_USD);
+}
+
+/**
+ * Display formatter for an accumulated nano-USD count. Cents and up render as
+ * "$1.23"; below a cent, four decimals so small per-day costs don't flatten to
+ * $0.00; a nonzero amount below $0.0001 shows "<$0.0001"; exact zero is "$0".
+ */
+export function formatUsdFromNano(nanoUsd: number): string {
+  if (nanoUsd === 0) return "$0";
+  const usd = nanoUsd / NANO_USD_PER_USD;
+  if (usd >= 0.01) return `$${usd.toFixed(2)}`;
+  if (usd >= 0.0001) return `$${usd.toFixed(4)}`;
+  return "<$0.0001";
+}

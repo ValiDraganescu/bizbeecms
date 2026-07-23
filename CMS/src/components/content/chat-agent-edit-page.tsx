@@ -102,9 +102,15 @@ export function ChatAgentEditPage({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
+      <div className="flex flex-wrap gap-2">
         <Link href="/admin/chat-agents" className={ghostBtn}>
           ← All chat agents
+        </Link>
+        <Link href={`/admin/chat-agents/${id}/analytics`} className={ghostBtn}>
+          Analytics
+        </Link>
+        <Link href={`/admin/chat-agents/${id}/conversations`} className={ghostBtn}>
+          Conversations
         </Link>
       </div>
 

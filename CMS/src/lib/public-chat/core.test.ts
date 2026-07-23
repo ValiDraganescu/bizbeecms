@@ -20,6 +20,9 @@ import {
   validateWelcomeMessage,
   rehydrateGuestTranscript,
   capConversationPayload,
+  usageCostNanoUsd,
+  formatUsdFromNano,
+  NANO_USD_PER_USD,
   MAX_PAYLOAD_BYTES,
   CHAT_MINUTE_MS,
   CHAT_DAY_MS,
@@ -542,4 +545,45 @@ test("capConversationPayload drops OLDEST messages until under the cap and flags
   assert.ok(out.messages.length < 400 && out.messages.length > 0);
   const firstKept = (out.messages[0] as { content: string }).content;
   assert.ok(!firstKept.startsWith("0:"), firstKept.slice(0, 8));
+});
+
+// ── usageCostNanoUsd / formatUsdFromNano ──────────────────────────────────────
+
+test("usageCostNanoUsd prices prompt and completion tokens independently", () => {
+  // 1000 prompt @ $0.25/M + 500 completion @ $1/M = $0.00025 + $0.0005.
+  const nano = usageCostNanoUsd(
+    { promptTokens: 1000, completionTokens: 500 },
+    { inputPrice: 0.25 / 1_000_000, outputPrice: 1 / 1_000_000 },
+  );
+  assert.equal(nano, Math.round(0.00075 * NANO_USD_PER_USD));
+});
+
+test("usageCostNanoUsd treats missing counts and null/absent prices as zero", () => {
+  assert.equal(usageCostNanoUsd({}, { inputPrice: 1e-6, outputPrice: 1e-6 }), 0);
+  assert.equal(usageCostNanoUsd({ promptTokens: 1000, completionTokens: 1000 }, undefined), 0);
+  // Null output price under-reports (prompt side still billed).
+  assert.equal(
+    usageCostNanoUsd(
+      { promptTokens: 1000, completionTokens: 1000 },
+      { inputPrice: 1e-6, outputPrice: null },
+    ),
+    Math.round(0.001 * NANO_USD_PER_USD),
+  );
+});
+
+test("usageCostNanoUsd returns an integer (rounded nano-USD)", () => {
+  const nano = usageCostNanoUsd(
+    { promptTokens: 7, completionTokens: 0 },
+    { inputPrice: 1.5e-7, outputPrice: null },
+  );
+  assert.equal(nano, Math.round(7 * 1.5e-7 * NANO_USD_PER_USD));
+  assert.ok(Number.isInteger(nano));
+});
+
+test("formatUsdFromNano: zero, sub-cent, cent-and-up, and sub-0.0001 floors", () => {
+  assert.equal(formatUsdFromNano(0), "$0");
+  assert.equal(formatUsdFromNano(1_230_000_000), "$1.23");
+  assert.equal(formatUsdFromNano(10_000_000), "$0.01");
+  assert.equal(formatUsdFromNano(2_500_000), "$0.0025");
+  assert.equal(formatUsdFromNano(50_000), "<$0.0001");
 });

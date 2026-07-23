@@ -6,9 +6,9 @@
  * (split out of `chat-agents-manager.tsx` when the edit flow moved to its own
  * route). Name, enabled, system prompt, model (the shared searchable
  * `ModelPicker`), welcome message, the seven usage limits (via `NumberInput`),
- * and the data-source + collection allowlists; existing agents also get the
- * usage panel and a link to the per-agent conversations page
- * (/admin/chat-agents/[id]/conversations — transcripts live there, not here).
+ * and the data-source + collection allowlists. Usage analytics and transcripts
+ * live on their own sub-pages (/admin/chat-agents/[id]/analytics and
+ * …/conversations), reached from the agents list — not here.
  *
  * REST-only (no server actions); server validation (lib/public-chat/core) is
  * the source of truth — the client disables incomplete forms and surfaces
@@ -17,7 +17,6 @@
  */
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { ModelPicker } from "@/components/chat/model-picker";
 import {
   LocalePicker,
@@ -33,7 +32,6 @@ import {
   CollectionRows,
   DataSourceRows,
   LimitsFields,
-  UsagePanel,
   ghostBtn,
   helpCls,
   inputCls,
@@ -285,27 +283,6 @@ export function AgentEditor({
         collections={collections}
         onChange={(c) => set("collections", c)}
       />
-
-      {agent && (
-        <div className="rounded-md border border-border bg-surface p-3">
-          <UsagePanel agentId={agent.id} />
-        </div>
-      )}
-
-      {agent && (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface p-3">
-          <span className={helpCls}>
-            Guest conversations live on their own page — review, download, or
-            delete transcripts there.
-          </span>
-          <Link
-            href={`/admin/chat-agents/${agent.id}/conversations`}
-            className={ghostBtn + " shrink-0"}
-          >
-            View conversations
-          </Link>
-        </div>
-      )}
 
       {error && (
         <p

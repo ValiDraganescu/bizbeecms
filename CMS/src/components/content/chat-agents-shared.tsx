@@ -16,6 +16,7 @@ import { NumberInput } from "@/components/ui/number-input";
 import {
   DEFAULT_LIMITS,
   LIMIT_CEILINGS,
+  formatUsdFromNano,
   type ChatAgentLimits,
   type CollectionAllowEntry,
   type DataSourceAllowEntry,
@@ -45,7 +46,13 @@ export type SavedRequest = { id: string; name: string };
 /** A collection (GET /api/collections). */
 export type Collection = { name: string; tableName: string };
 
-export type UsageRow = { day: string; messages: number; tokens: number };
+export type UsageRow = {
+  day: string;
+  messages: number;
+  tokens: number;
+  /** Integer nano-USD (0 also for days recorded before cost tracking). */
+  costNanoUsd: number;
+};
 
 /** A conversation summary row (GET …/conversations — no heavy payload). */
 export type ConversationSummary = {
@@ -510,19 +517,22 @@ export function UsagePanel({ agentId }: { agentId: string }) {
 
   const totalMessages = usage.reduce((n, r) => n + r.messages, 0);
   const totalTokens = usage.reduce((n, r) => n + r.tokens, 0);
+  const totalCostNano = usage.reduce((n, r) => n + (r.costNanoUsd ?? 0), 0);
 
   return (
     <div className="flex flex-col gap-2">
       <p className={labelCls}>Last 7 days</p>
       <p className={helpCls}>
-        {totalMessages} messages · {totalTokens} tokens
+        {totalMessages} messages · {totalTokens} tokens ·{" "}
+        {formatUsdFromNano(totalCostNano)}
       </p>
       <table className="text-sm text-foreground">
         <thead>
           <tr className="text-left text-foreground-muted">
             <th className="pr-4 font-medium">Day</th>
             <th className="pr-4 font-medium">Messages</th>
-            <th className="font-medium">Tokens</th>
+            <th className="pr-4 font-medium">Tokens</th>
+            <th className="font-medium">Cost</th>
           </tr>
         </thead>
         <tbody>
@@ -530,7 +540,8 @@ export function UsagePanel({ agentId }: { agentId: string }) {
             <tr key={r.day}>
               <td className="pr-4 tabular-nums">{r.day}</td>
               <td className="pr-4 tabular-nums">{r.messages}</td>
-              <td className="tabular-nums">{r.tokens}</td>
+              <td className="pr-4 tabular-nums">{r.tokens}</td>
+              <td className="tabular-nums">{formatUsdFromNano(r.costNanoUsd ?? 0)}</td>
             </tr>
           ))}
         </tbody>
