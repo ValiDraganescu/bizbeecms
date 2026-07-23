@@ -15,6 +15,8 @@ export type SiteErrorKey =
   | "notAllowed"
   | "countryNotAllowed"
   | "notFound"
+  /** The monthly quota would push all sites' quotas past the AI credit pool. */
+  | "oversell"
   | "unknown";
 
 export type SiteBody = {

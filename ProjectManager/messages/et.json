@@ -439,6 +439,7 @@
       "notAllowed": "Sul pole õigust seda teha.",
       "countryNotAllowed": "Sa ei saa luua saiti sellele riigile.",
       "notFound": "Saiti ei leitud.",
+      "oversell": "See kuine kvoot viiks kõik saidid ühisest tehisintellekti krediidilimiidist üle.",
       "unknown": "Midagi läks valesti. Proovi uuesti."
     },
     "customDomain": {
@@ -678,7 +679,7 @@
     "navLink": "Seaded",
     "back": "Tagasi töölauale",
     "title": "Seaded",
-    "subtitle": "Kontoülesed juurutamise seaded.",
+    "subtitle": "Kontoülesed juurutamise ja tehisintellekti seaded.",
     "buildTimeout": {
       "title": "Ehituse ajalõpp",
       "description": "Maksimaalne aeg, mille jooksul CMS-i ehitus ja juurutus võib töötada, enne kui see peatatakse. Hoiab ära olukorra, kus seiskunud ehitus hoiab konteinerit (ja arveldust) lõputult töös. Rakendub alates järgmisest juurutamisest.",
@@ -694,6 +695,54 @@
       "label": "Ajalõpu alistamine",
       "hint": "Minutites. Jäta tühjaks, et kasutada üldist seadet. Kehtiv ajalõpp on selle ja üldise suurem.",
       "placeholderGlobal": "Üldine ({min} min)"
+    },
+    "aiModels": {
+      "back": "Tagasi seadetesse",
+      "title": "Tehisintellekti mudelid",
+      "description": "Vali, milliseid mudeleid iga saidi CMS kasutada tohib, ja kõigi ühine kuine krediidilimiit.",
+      "open": "Halda tehisintellekti mudeleid",
+      "subtitle": "Üks loend kasutusotstarbe kohta. Saidid salvestavad aliase, nii et selle taga oleva mudeli saab igal ajal välja vahetada.",
+      "labelField": "Nimi",
+      "modelField": "OpenRouteri mudel",
+      "marginField": "Juurdehindlus %",
+      "add": "Lisa mudel",
+      "remove": "Eemalda",
+      "moveUp": "Liiguta üles",
+      "moveDown": "Liiguta alla",
+      "defaultBadge": "vaikimisi",
+      "empty": "Mudeleid veel pole — saidid kasutavad selleks otstarbeks CMS-i sisseehitatud vaikeväärtust.",
+      "orderHint": "Esimene kirje on selle otstarbe vaikevalik.",
+      "newEntryLabel": "Uus mudel",
+      "save": "Salvesta",
+      "saved": "Salvestatud.",
+      "error": "Salvestamine ebaõnnestus. Proovi uuesti.",
+      "pool": {
+        "label": "Kuine krediidilimiit (USD)",
+        "placeholder": "nt 500",
+        "hint": "Kõigi saitide kuine tehisintellekti kogukulu. Saitide kvootide summa ei tohi seda ületada. Jäta tühjaks, kui limiiti pole."
+      },
+      "purposes": {
+        "chatAgent": {
+          "title": "Külastajate vestlusagendid",
+          "description": "Mudelid, millel avaliku saidi vestlusagendid töötada võivad."
+        },
+        "assistant": {
+          "title": "CMS-i assistent",
+          "description": "Mudelid, millel CMS-i haldusassistent töötada võib."
+        },
+        "imageDescribe": {
+          "title": "Piltide kirjeldamine",
+          "description": "Mudelid, millega luuakse alt-tekste ja pildikirjeldusi."
+        },
+        "imageGenerate": {
+          "title": "Piltide loomine",
+          "description": "Mudelid, millega pilte luuakse."
+        },
+        "translate": {
+          "title": "Tõlkimine",
+          "description": "Mudelid, millega sisu keelte vahel tõlgitakse."
+        }
+      }
     }
   }
 }

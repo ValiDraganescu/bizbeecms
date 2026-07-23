@@ -439,6 +439,7 @@
       "notAllowed": "Sinulla ei ole oikeutta tehdä tätä.",
       "countryNotAllowed": "Et voi luoda sivustoa tälle maalle.",
       "notFound": "Sivustoa ei löytynyt.",
+      "oversell": "Tämä kuukausikiintiö ylittäisi kaikkien sivustojen yhteisen tekoälybudjetin.",
       "unknown": "Jotain meni pieleen. Yritä uudelleen."
     },
     "customDomain": {
@@ -678,7 +679,7 @@
     "navLink": "Asetukset",
     "back": "Takaisin koontinäyttöön",
     "title": "Asetukset",
-    "subtitle": "Koko tilin laajuiset julkaisuasetukset.",
+    "subtitle": "Koko tilin laajuiset julkaisu- ja tekoälyasetukset.",
     "buildTimeout": {
       "title": "Käännöksen aikakatkaisu",
       "description": "Enimmäisaika, jonka CMS-käännös ja -julkaisu saa kestää ennen sen lopettamista. Estää jumiutunutta käännöstä pitämästä konttia käynnissä (ja laskutuksessa) loputtomiin. Tulee voimaan seuraavasta julkaisusta alkaen.",
@@ -694,6 +695,54 @@
       "label": "Aikakatkaisun ohitus",
       "hint": "Minuutteja. Jätä tyhjäksi käyttääksesi yleistä asetusta. Voimassa oleva aikakatkaisu on tämän ja yleisen suurempi.",
       "placeholderGlobal": "Yleinen ({min} min)"
+    },
+    "aiModels": {
+      "back": "Takaisin asetuksiin",
+      "title": "Tekoälymallit",
+      "description": "Valitse, mitä malleja kunkin sivuston CMS saa käyttää, sekä kaikkien jakama kuukausittainen budjetti.",
+      "open": "Hallitse tekoälymalleja",
+      "subtitle": "Yksi lista käyttötarkoitusta kohden. Sivustot tallentavat aliaksen, joten sen taustalla olevan mallin voi vaihtaa milloin tahansa.",
+      "labelField": "Nimi",
+      "modelField": "OpenRouter-malli",
+      "marginField": "Kate %",
+      "add": "Lisää malli",
+      "remove": "Poista",
+      "moveUp": "Siirrä ylös",
+      "moveDown": "Siirrä alas",
+      "defaultBadge": "oletus",
+      "empty": "Ei vielä malleja — sivustot käyttävät tähän tarkoitukseen CMS:n sisäänrakennettua oletusta.",
+      "orderHint": "Ensimmäinen rivi on tämän käyttötarkoituksen oletus.",
+      "newEntryLabel": "Uusi malli",
+      "save": "Tallenna",
+      "saved": "Tallennettu.",
+      "error": "Tallennus epäonnistui. Yritä uudelleen.",
+      "pool": {
+        "label": "Kuukausittainen budjetti (USD)",
+        "placeholder": "esim. 500",
+        "hint": "Kaikkien sivustojen yhteenlaskettu kuukausittainen tekoälykulutus. Sivustojen kiintiöiden summa ei saa ylittää tätä. Jätä tyhjäksi, jos budjettia ei ole."
+      },
+      "purposes": {
+        "chatAgent": {
+          "title": "Vieraschatin agentit",
+          "description": "Mallit, joilla julkisen sivuston chat-agentit voivat toimia."
+        },
+        "assistant": {
+          "title": "CMS-avustaja",
+          "description": "Mallit, joilla CMS:n ylläpitoavustaja voi toimia."
+        },
+        "imageDescribe": {
+          "title": "Kuvien kuvaus",
+          "description": "Mallit, joilla luodaan vaihtoehtoiset tekstit ja kuvakuvaukset."
+        },
+        "imageGenerate": {
+          "title": "Kuvien luonti",
+          "description": "Mallit, joilla luodaan kuvia."
+        },
+        "translate": {
+          "title": "Käännökset",
+          "description": "Mallit, joilla sisältöä käännetään kielten välillä."
+        }
+      }
     }
   }
 }

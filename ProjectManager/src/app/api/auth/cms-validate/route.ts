@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { hasValidCmsSecret } from "@/lib/auth/cms-secret";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canManageSiteByCountry } from "@/lib/site/authz";
 import { findSiteById, isUserAssignedToSite } from "@/lib/site/site";
@@ -28,13 +28,7 @@ import { findSiteById, isUserAssignedToSite } from "@/lib/site/site";
 type Body = { siteId?: unknown };
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const { env } = await getCloudflareContext({ async: true });
-  const secret = (env as unknown as Record<string, unknown>).CMS_AUTH_SECRET;
-  const auth = (request.headers.get("authorization") ?? "").replace(
-    /^Bearer\s+/i,
-    "",
-  );
-  if (typeof secret !== "string" || !secret || auth !== secret) {
+  if (!(await hasValidCmsSecret(request))) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 

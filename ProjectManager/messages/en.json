@@ -439,6 +439,7 @@
       "notAllowed": "You're not allowed to do that.",
       "countryNotAllowed": "You can't create a Site for that country.",
       "notFound": "Site not found.",
+      "oversell": "That monthly quota would push all Sites past the AI credit pool.",
       "unknown": "Something went wrong. Please try again."
     },
     "customDomain": {
@@ -678,7 +679,7 @@
     "navLink": "Settings",
     "back": "Back to dashboard",
     "title": "Settings",
-    "subtitle": "Account-wide settings for deploys.",
+    "subtitle": "Account-wide settings for deploys and AI.",
     "buildTimeout": {
       "title": "Build timeout",
       "description": "Maximum time a CMS build+deploy may run before it is killed. Prevents a stalled build from keeping a container running (and billing) indefinitely. Applies starting with the next deploy.",
@@ -694,6 +695,54 @@
       "label": "Build timeout override",
       "hint": "Minutes. Leave blank to use the global setting. The effective timeout is the larger of this and the global.",
       "placeholderGlobal": "Global ({min} min)"
+    },
+    "aiModels": {
+      "back": "Back to settings",
+      "title": "AI models",
+      "description": "Curate which models each Site's CMS may use, and the monthly credit pool they all share.",
+      "open": "Curate AI models",
+      "subtitle": "One list per purpose. Sites store the alias, so you can swap the model behind it at any time.",
+      "labelField": "Label",
+      "modelField": "OpenRouter model",
+      "marginField": "Margin %",
+      "add": "Add model",
+      "remove": "Remove",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "defaultBadge": "default",
+      "empty": "No models yet — Sites for this purpose fall back to the CMS built-in default.",
+      "orderHint": "The first entry is the default for this purpose.",
+      "newEntryLabel": "New model",
+      "save": "Save",
+      "saved": "Saved.",
+      "error": "Couldn’t save. Try again.",
+      "pool": {
+        "label": "Monthly credit pool (USD)",
+        "placeholder": "e.g. 500",
+        "hint": "Total monthly AI spend across all Sites. Site quotas may not add up to more than this. Leave blank for no pool."
+      },
+      "purposes": {
+        "chatAgent": {
+          "title": "Guest chat agents",
+          "description": "Models the public site chat agents may run on."
+        },
+        "assistant": {
+          "title": "CMS assistant",
+          "description": "Models the in-CMS admin assistant may run on."
+        },
+        "imageDescribe": {
+          "title": "Image description",
+          "description": "Models used to generate alt text and image descriptions."
+        },
+        "imageGenerate": {
+          "title": "Image generation",
+          "description": "Models used to generate images."
+        },
+        "translate": {
+          "title": "Translation",
+          "description": "Models used to translate content between locales."
+        }
+      }
     }
   }
 }
