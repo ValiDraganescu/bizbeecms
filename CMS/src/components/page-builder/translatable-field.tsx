@@ -34,12 +34,17 @@ const LOCALE_TABS_MAX = 6;
 
 export function TranslatableField({
   field,
+  schema,
   block,
   props,
   locales,
   onChange,
 }: {
   field: PropField;
+  /** The FULL component prop schema — mergeTranslations re-validates the whole
+   *  props against it, so validation must not narrow to the one translated field
+   *  (that would strip every sibling prop). */
+  schema: PropField[];
   block: Block;
   props: Record<string, unknown>;
   /** Site content locales, default (source) first. */
@@ -106,7 +111,7 @@ export function TranslatableField({
         setError(j.error ?? j.errors?.join("; ") ?? `HTTP ${res.status}`);
         return;
       }
-      onChange(mergeTranslations(props, j.translations, [field], locales));
+      onChange(mergeTranslations(props, j.translations, schema, locales));
       // Jump the view to the locale we just filled (or the first target).
       if (!targets.includes(loc)) setActive(targets[0]);
     } catch (err) {

@@ -120,6 +120,7 @@ export function ComponentSettings({
             <TranslatableField
               key={f.name}
               field={f}
+              schema={schema}
               block={block}
               props={props}
               locales={locales}

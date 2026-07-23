@@ -26,6 +26,8 @@ import {
   applyTranslatableFromSlots,
   setLocalizedProp,
   localeFieldValue,
+  mergeTranslations,
+  type PropField,
   SECTION_COMPONENT,
   SECTION_COLUMN_COMPONENT,
 } from "./page-blocks.ts";
@@ -307,6 +309,58 @@ test("translatable prop round-trips per locale; non-translatable stays bare", ()
   // Single-locale site → bare string (no locale object).
   const bare = setLocalizedProp(undefined, "en", "Solo", ["en"]);
   assert.equal(bare, "Solo");
+});
+
+// ── mergeTranslations (AI-translate merge back into block props) ────────────
+
+function headingSchema(): PropField[] {
+  return parsePropsSchema(
+    JSON.stringify({
+      title: { type: "string", translatable: true, label: "Title" },
+      subtitle: { type: "richtext", translatable: true, label: "Subtitle" },
+    }),
+  );
+}
+
+test("mergeTranslations: a single field's translations DON'T strip sibling props", () => {
+  // Regression: translating one field passed [field] as the schema, so
+  // validateBlockProps narrowed to that one field and dropped every sibling —
+  // translating the title wiped the subtitle (and vice versa). The full schema
+  // must be passed so all declared props survive.
+  const locales = ["en", "fi", "et"];
+  const props = { title: "Best restaurants", subtitle: "Find one you like" };
+
+  const merged = mergeTranslations(
+    props,
+    { title: { fi: "Parhaat ravintolat", et: "Parimad restoranid" } },
+    headingSchema(),
+    locales,
+  );
+
+  // The translated field gained its locale object …
+  assert.deepEqual(merged.title, {
+    en: "Best restaurants",
+    fi: "Parhaat ravintolat",
+    et: "Parimad restoranid",
+  });
+  // … and the untouched sibling is preserved verbatim.
+  assert.equal(merged.subtitle, "Find one you like");
+});
+
+test("mergeTranslations: ignores locales outside the site list and empty strings", () => {
+  const merged = mergeTranslations(
+    { title: "Hi" },
+    { title: { fi: "Hei", de: "Hallo", et: "" } }, // de not a site locale; et empty
+    headingSchema(),
+    ["en", "fi", "et"],
+  );
+  assert.deepEqual(merged.title, { en: "Hi", fi: "Hei" });
+});
+
+test("mergeTranslations: PURE — does not mutate the input props", () => {
+  const props = { title: "Hi", subtitle: "Sub" };
+  mergeTranslations(props, { title: { fi: "Hei" } }, headingSchema(), ["en", "fi"]);
+  assert.deepEqual(props, { title: "Hi", subtitle: "Sub" });
 });
 
 // ── findBlock / mergeBlockProps (tree-walk) ─────────────────────────────────
