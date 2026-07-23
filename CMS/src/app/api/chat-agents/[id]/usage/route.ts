@@ -2,9 +2,11 @@
  * public-guest-chatbots Slice 7 — per-agent usage counters.
  *
  *   GET ?days=7 → { usage: [{ day, messages, tokens, costNanoUsd }, …] } for the
- *                 last N days (most-recent-first; costNanoUsd is integer
- *                 nano-USD). `days` is clamped to [1, 90]; a missing /
- *                 unparseable value defaults to 7. 404 when the agent is unknown.
+ *                 last N days (most-recent-first; costNanoUsd is the BILLABLE
+ *                 cost in integer nano-USD — customer dollars charged against
+ *                 the Site's monthly AI quota, not a token-price estimate).
+ *                 `days` is clamped to [1, 90]; a missing / unparseable value
+ *                 defaults to 7. 404 when the agent is unknown.
  *
  * Admin-gated, REST-only. Reads the atomic `usage_counter` rows via the store.
  */

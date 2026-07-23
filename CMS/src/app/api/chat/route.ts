@@ -35,6 +35,7 @@ import { effectiveSystemPrompt } from "@/lib/chat/prompt-version";
 import { resolveModel, outputCapFor } from "@/lib/chat/models";
 import { getModelCatalogCache } from "@/db/settings-store";
 import { meterAiCall } from "@/db/ai-usage-store";
+import { aiQuotaDenial } from "@/lib/ai-quota/guard";
 import { requireAdmin, currentUserIsPmSso } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,9 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request): Promise<Response> {
   const denied = await requireAdmin(request);
   if (denied) return denied;
+  // Monthly AI quota (ai-cost-quotas): refuse BEFORE the model call, never after.
+  const overQuota = await aiQuotaDenial();
+  if (overQuota) return overQuota;
   let body: unknown;
   try {
     body = await request.json();

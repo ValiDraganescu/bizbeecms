@@ -62,8 +62,11 @@ function dayKey(today: Date, offset: number): string {
  * The last `days` days of message/token/cost usage for one agent,
  * most-recent-first. Computes the day keys in code and batch-reads all of them
  * in one query; days with no activity report zeros (never absent).
- * `costNanoUsd` is the `:cost` counter (integer nano-USD; 0 also for days
- * recorded before cost tracking existed).
+ * `costNanoUsd` is the `:cost` counter (integer nano-USD): the BILLABLE cost
+ * this agent's traffic charged the Site against its monthly AI quota — provider
+ * cost × the alias margin (ai-cost-quotas), falling back to the token×catalog
+ * estimate only when the provider reported no cost. 0 also for days recorded
+ * before cost tracking existed.
  */
 export async function readAgentUsage(
   agentId: string,

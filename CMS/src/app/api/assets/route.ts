@@ -29,6 +29,7 @@ import { DEFAULT_IMAGE_MODEL } from "@/lib/chat/models";
 import { effectiveOpenrouterKey } from "@/lib/settings/openrouter-key";
 import { getDecryptedOpenrouterUserKey } from "@/db/openrouter-key-store";
 import { meterAiCall } from "@/db/ai-usage-store";
+import { aiQuotaSpent } from "@/lib/ai-quota/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,10 @@ async function describeUpload(
     }
     const key = effectiveOpenrouterKey(userKey, e.OPENROUTER_API_KEY);
     if (!key) return ""; // no OpenRouter key → describe disabled (still uploads)
+    // Monthly AI quota (ai-cost-quotas): a spent budget disables the describe
+    // the same way a missing key does — an upload is not an AI request, so it
+    // must never fail over the quota, it just arrives without a description.
+    if (await aiQuotaSpent()) return "";
     const stored = await getImageModel();
     const model = stored || DEFAULT_IMAGE_MODEL;
     // Prefer the small client-made thumbnail (≤512px JPEG) so the describe call

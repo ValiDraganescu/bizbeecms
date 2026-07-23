@@ -189,6 +189,7 @@ import { withWhiteBackgroundInstruction } from "./cutout";
 import { removeBackgroundFromPng } from "./png-cutout";
 import { describeImage } from "./describe-image";
 import { meterAiCall } from "@/db/ai-usage-store";
+import { aiQuotaToolError } from "@/lib/ai-quota/guard";
 import { applyEdit } from "./apply-edit";
 import { reconcileComponentClasses } from "./reconcile-classes";
 import { lintComponentScript } from "./lint-component-script";
@@ -760,6 +761,12 @@ function bufferToBase64(buf: ArrayBuffer): string {
 async function handleGenerateImage(args: unknown): Promise<Record<string, unknown>> {
   const valid = validateGenerateImage(args);
   if (!valid.ok) return { ok: false, errors: [valid.error] };
+
+  // Monthly AI quota (ai-cost-quotas): refuse BEFORE the generation call. A tool
+  // error (not an HTTP status) so the model relays it to the operator, like any
+  // other recoverable tool failure here.
+  const overQuota = await aiQuotaToolError();
+  if (overQuota) return overQuota;
 
   const key = await resolveOpenrouterKey();
   if (!key) {
