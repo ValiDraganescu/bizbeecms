@@ -52,6 +52,10 @@ import {
   DEFAULT_RATE_LIMIT_PRESET,
   normalizeRateLimitPreset,
 } from "../lib/render/rate-limit-config.ts";
+import {
+  type AiConfigCache,
+  parseAiConfigCache,
+} from "../lib/ai-config/parse.ts";
 
 const CONTENT_LOCALES_KEY = "content_locales";
 const THEME_OVERRIDES_KEY = "theme_overrides";
@@ -59,6 +63,7 @@ const THEME_OVERRIDES_DARK_KEY = "theme_overrides_dark";
 const THEME_FONTS_KEY = "theme_fonts";
 const SITE_IDENTITY_KEY = "site_identity";
 const MODEL_CATALOG_KEY = "model_catalog";
+const AI_CONFIG_KEY = "ai_config";
 const IMAGE_MODEL_KEY = "image_model";
 const TRANSLATE_MODEL_KEY = "translate_model";
 const IMAGE_GEN_MODEL_KEY = "image_gen_model";
@@ -273,6 +278,40 @@ export async function setModelCatalogCache(
   injectedDb?: Db,
 ): Promise<void> {
   await upsertSetting(MODEL_CATALOG_KEY, JSON.stringify(cache), injectedDb);
+}
+
+/**
+ * Read the cached PM-curated AI config (docs/ai-cost-quotas.md), or null if
+ * unset / unparseable. Same one-JSON-row shape as the model catalog above:
+ * `ai_config` holds `{ fetchedAt, config }`, refreshed lazily by `getAiConfig()`
+ * (lib/ai-config/cache.ts) and served stale whenever PM is unreachable.
+ * Validation lives in the pure `parseAiConfigCache` — a row written by an older
+ * build is simply "no cache", never a throw on the AI hot path.
+ */
+export async function getAiConfigCache(
+  injectedDb?: Db,
+): Promise<AiConfigCache | null> {
+  const db = injectedDb ?? (await getDb());
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, AI_CONFIG_KEY))
+    .limit(1);
+  const raw = rows[0]?.value;
+  if (!raw) return null;
+  try {
+    return parseAiConfigCache(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+/** Upsert the cached AI config (only ever called after a successful fetch). */
+export async function setAiConfigCache(
+  cache: AiConfigCache,
+  injectedDb?: Db,
+): Promise<void> {
+  await upsertSetting(AI_CONFIG_KEY, JSON.stringify(cache), injectedDb);
 }
 
 /**
