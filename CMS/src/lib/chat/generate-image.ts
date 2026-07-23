@@ -16,6 +16,8 @@
  * `Ai` port — same shape as describeImage.
  */
 
+import { parseUsageCost } from "./sse.ts";
+
 /** OpenRouter's OpenAI-compatible chat-completions endpoint (same as chat/describe). */
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -79,9 +81,20 @@ export function decodeDataUrl(dataUrl: string): GeneratedImage | null {
 }
 
 /**
+ * A completed generation attempt: the decoded image (null on any failure — no
+ * key/model, HTTP error, no image in the reply, bad data URL) plus what the
+ * provider charged. The cost is reported EVEN when the image is null: a reply
+ * we couldn't use was still billed, and the meter must see it.
+ */
+export interface GenerateImageResult {
+  image: GeneratedImage | null;
+  /** `usage.cost` in USD; undefined when upstream reported none. */
+  cost?: number;
+}
+
+/**
  * Generate one image from a text prompt via a non-streaming OpenRouter completion.
- * Returns the decoded image, or null on any failure (no key/model, HTTP error, no
- * image in the reply, bad data URL) — the caller surfaces a recoverable error.
+ * Never throws — the caller surfaces a recoverable error when `image` is null.
  * `key`/`model` are resolved by the caller; `fetchImpl` is injectable for tests.
  */
 export async function generateImage(
@@ -89,8 +102,8 @@ export async function generateImage(
   model: string,
   key: string,
   fetchImpl: FetchLike = fetch as unknown as FetchLike,
-): Promise<GeneratedImage | null> {
-  if (!key || !model || !prompt.trim()) return null;
+): Promise<GenerateImageResult> {
+  if (!key || !model || !prompt.trim()) return { image: null };
   try {
     const res = await fetchImpl(OPENROUTER_CHAT_URL, {
       method: "POST",
@@ -103,13 +116,20 @@ export async function generateImage(
         messages: buildGenerateMessages(prompt),
         modalities: ["image", "text"],
         stream: false,
+        // Actual charged cost in the reply body — image pricing is per-image,
+        // which token math cannot express. (docs/ai-cost-quotas.md)
+        usage: { include: true },
       }),
     });
-    if (!res.ok) return null;
-    const url = parseGeneratedImageUrl(await res.text());
-    if (!url) return null;
-    return decodeDataUrl(url);
+    if (!res.ok) return { image: null };
+    const raw = await res.text();
+    const cost = parseUsageCost(raw);
+    const url = parseGeneratedImageUrl(raw);
+    return {
+      image: url ? decodeDataUrl(url) : null,
+      ...(cost === undefined ? {} : { cost }),
+    };
   } catch {
-    return null;
+    return { image: null };
   }
 }

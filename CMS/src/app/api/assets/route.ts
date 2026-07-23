@@ -28,6 +28,7 @@ import { getImageModel } from "@/db/settings-store";
 import { DEFAULT_IMAGE_MODEL } from "@/lib/chat/models";
 import { effectiveOpenrouterKey } from "@/lib/settings/openrouter-key";
 import { getDecryptedOpenrouterUserKey } from "@/db/openrouter-key-store";
+import { meterAiCall } from "@/db/ai-usage-store";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,11 @@ async function describeUpload(
       thumbDataUrl && thumbDataUrl.startsWith("data:image/")
         ? thumbDataUrl
         : `data:${contentType};base64,${bufferToBase64(bytes)}`;
-    return describeImage(imageUrl, model, key);
+    const { description, cost } = await describeImage(imageUrl, model, key);
+    // Meter the month's AI spend (ai-cost-quotas) — fire-and-forget so the
+    // upload never waits on (or fails because of) the counter write.
+    meterAiCall("imageDescribe", model, cost).catch(() => {});
+    return description;
   } catch {
     return "";
   }

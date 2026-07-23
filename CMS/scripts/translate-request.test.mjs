@@ -106,8 +106,20 @@ test("collectStreamText: concatenates deltas, ignores keep-alives", async () => 
     'data: {"choices":[{"delta":{"content":"{\\"fi\\":\\"Hinnoittelu\\"}}"}}]}\n\n',
     "data: [DONE]\n\n",
   ]);
-  const text = await collectStreamText(stream);
-  assert.equal(text, '{"metaTitle":{"fi":"Hinnoittelu"}}');
+  const collected = await collectStreamText(stream);
+  assert.equal(collected.text, '{"metaTitle":{"fi":"Hinnoittelu"}}');
+  assert.equal(collected.cost, undefined, "no usage chunk → nothing to meter");
+});
+
+test("collectStreamText: surfaces the final usage chunk's cost for metering", async () => {
+  const stream = fakeSseStream([
+    'data: {"choices":[{"delta":{"content":"{}"}}]}\n\n',
+    'data: {"choices":[],"usage":{"prompt_tokens":40,"completion_tokens":8,"cost":0.00031}}\n\n',
+    "data: [DONE]\n\n",
+  ]);
+  const collected = await collectStreamText(stream);
+  assert.equal(collected.text, "{}");
+  assert.equal(collected.cost, 0.00031);
 });
 
 // ── parseTranslateResponse ───────────────────────────────────────────────────

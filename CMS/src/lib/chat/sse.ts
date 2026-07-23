@@ -22,27 +22,75 @@ export type UpstreamEvent =
   | { type: "delta"; text: string }
   | { type: "tool_call"; index: number; id?: string; name?: string; argsFragment?: string }
   | { type: "error"; message: string }
-  | { type: "usage"; promptTokens: number; completionTokens: number; totalTokens: number }
+  | {
+      type: "usage";
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+      /**
+       * Actual USD OpenRouter charged for the turn (`usage.cost`) — the metering
+       * source of truth (docs/ai-cost-quotas.md). Absent upstream → undefined
+       * (NEVER 0, which would look like a genuinely free turn).
+       */
+      cost?: number;
+    }
   | { type: "done" };
 
 /**
  * Pull the token-usage tally out of an OpenAI/OpenRouter streaming chunk. When the
  * request sets `stream_options.include_usage`, the provider emits a final chunk
  * carrying `usage: { prompt_tokens, completion_tokens, total_tokens }` (often with
- * empty `choices`). We surface it so the route can report context usage to the
- * widget. Returns null for normal chunks (no `usage`).
+ * empty `choices`) — plus `cost`, the dollars actually charged. We surface both:
+ * tokens go to the widget's context meter, cost to the monthly spend meter.
+ * Returns null for normal chunks (no `usage`) and for a usage chunk carrying
+ * neither tokens nor cost.
  */
-function extractUsage(chunk: unknown): Extract<UpstreamEvent, { type: "usage" }> | null {
+export function extractUsage(
+  chunk: unknown,
+): Extract<UpstreamEvent, { type: "usage" }> | null {
   if (typeof chunk !== "object" || chunk === null) return null;
   const u = (chunk as { usage?: unknown }).usage;
   if (typeof u !== "object" || u === null) return null;
-  const o = u as { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown };
+  const o = u as {
+    prompt_tokens?: unknown;
+    completion_tokens?: unknown;
+    total_tokens?: unknown;
+    cost?: unknown;
+  };
   const prompt = typeof o.prompt_tokens === "number" ? o.prompt_tokens : 0;
   const completion = typeof o.completion_tokens === "number" ? o.completion_tokens : 0;
   const total =
     typeof o.total_tokens === "number" ? o.total_tokens : prompt + completion;
-  if (total === 0) return null; // usage:null or all-zero → nothing to report
-  return { type: "usage", promptTokens: prompt, completionTokens: completion, totalTokens: total };
+  // The dollars OpenRouter actually charged for this turn. Only a positive
+  // finite number counts — a missing/zero/garbage `cost` stays undefined so
+  // the meter records nothing instead of a fake $0 turn.
+  const cost =
+    typeof o.cost === "number" && Number.isFinite(o.cost) && o.cost > 0
+      ? o.cost
+      : undefined;
+  // usage:null or all-zero AND no cost → nothing to report.
+  if (total === 0 && cost === undefined) return null;
+  return {
+    type: "usage",
+    promptTokens: prompt,
+    completionTokens: completion,
+    totalTokens: total,
+    ...(cost === undefined ? {} : { cost }),
+  };
+}
+
+/**
+ * The provider's charged cost (USD) out of a NON-streaming completion body (the
+ * raw JSON text). Same `usage` shape as the streaming final chunk, so it goes
+ * through the same extractor — the image/describe paths can't drift from the
+ * chat path. Undefined when the body is unparseable or carries no cost.
+ */
+export function parseUsageCost(rawBody: string): number | undefined {
+  try {
+    return extractUsage(JSON.parse(rawBody))?.cost;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

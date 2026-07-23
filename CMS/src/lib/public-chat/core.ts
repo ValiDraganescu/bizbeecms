@@ -803,6 +803,38 @@ export function usageCostNanoUsd(
 }
 
 /**
+ * The UTC `YYYY-MM` bucket an AI call is metered into. Month rollover IS the
+ * monthly reset of the `ai:<month>:*` counters — no cron, no reset job. UTC
+ * everywhere so a Worker's timezone can never split one month in two.
+ */
+export function aiUsageMonth(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 7);
+}
+
+/**
+ * Integer nano-USD of a provider-reported cost (`usage.cost`, USD). This is the
+ * RAW number OpenRouter actually charged — billing-grade truth, unlike the
+ * token×catalog estimate above. Non-positive / non-finite input (absent usage,
+ * NaN from a malformed body) meters nothing rather than guessing.
+ */
+export function rawNanoUsd(costUsd: number): number {
+  if (!Number.isFinite(costUsd) || costUsd <= 0) return 0;
+  return Math.round(costUsd * NANO_USD_PER_USD);
+}
+
+/**
+ * Integer nano-USD CHARGED to the customer for a provider cost: raw × (1 +
+ * marginPct/100), the `ai:<YYYY-MM>:billable` meter (docs/ai-cost-quotas.md).
+ * A missing/invalid margin means "no margin configured" → billable == raw, so
+ * an unreachable curated config can never over- or under-charge.
+ */
+export function billableNanoUsd(costUsd: number, marginPct: number): number {
+  if (!Number.isFinite(costUsd) || costUsd <= 0) return 0;
+  const pct = Number.isFinite(marginPct) && marginPct > 0 ? marginPct : 0;
+  return Math.round(costUsd * (1 + pct / 100) * NANO_USD_PER_USD);
+}
+
+/**
  * Display formatter for an accumulated nano-USD count. Cents and up render as
  * "$1.23"; below a cent, four decimals so small per-day costs don't flatten to
  * $0.00; a nonzero amount below $0.0001 shows "<$0.0001"; exact zero is "$0".

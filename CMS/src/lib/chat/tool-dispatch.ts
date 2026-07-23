@@ -188,6 +188,7 @@ import { imageDimensionsFromBytes } from "../media/image-dimensions";
 import { withWhiteBackgroundInstruction } from "./cutout";
 import { removeBackgroundFromPng } from "./png-cutout";
 import { describeImage } from "./describe-image";
+import { meterAiCall } from "@/db/ai-usage-store";
 import { applyEdit } from "./apply-edit";
 import { reconcileComponentClasses } from "./reconcile-classes";
 import { lintComponentScript } from "./lint-component-script";
@@ -774,7 +775,11 @@ async function handleGenerateImage(args: unknown): Promise<Record<string, unknow
     : valid.prompt;
   let image;
   try {
-    image = await generateImage(genPrompt, genModel, key);
+    const generated = await generateImage(genPrompt, genModel, key);
+    // Meter what the provider charged even when the reply carried no usable
+    // image — we were billed either way. Fire-and-forget (ai-cost-quotas).
+    meterAiCall("imageGenerate", genModel, generated.cost).catch(() => {});
+    image = generated.image;
   } catch (err) {
     return { ok: false, errors: [`image generation failed: ${(err as Error).message}`] };
   }
@@ -801,7 +806,9 @@ async function handleGenerateImage(args: unknown): Promise<Record<string, unknow
   let description = "";
   try {
     const describeModel = (await getImageModel()) || DEFAULT_IMAGE_MODEL;
-    description = await describeImage(dataUrl, describeModel, key);
+    const described = await describeImage(dataUrl, describeModel, key);
+    meterAiCall("imageDescribe", describeModel, described.cost).catch(() => {});
+    description = described.description;
   } catch {
     description = "";
   }

@@ -58,28 +58,47 @@ test("describeImage returns the parsed text on a 200", async () => {
       JSON.stringify({ choices: [{ message: { content: "A blue mug on a desk." } }] }),
   });
   const out = await describeImage("data:image/png;base64,AAA", "vendor/model", "k", fakeFetch);
-  assert.equal(out, "A blue mug on a desk.");
+  assert.deepEqual(out, { description: "A blue mug on a desk." });
 });
 
-test("describeImage returns '' on a non-ok response (upload must still succeed)", async () => {
+test("describeImage surfaces usage.cost for metering and asks for it", async () => {
+  let sentBody;
+  const fakeFetch = async (_url, init) => {
+    sentBody = JSON.parse(init.body);
+    return {
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          choices: [{ message: { content: "A cat." } }],
+          usage: { prompt_tokens: 900, completion_tokens: 12, cost: 0.00042 },
+        }),
+    };
+  };
+  const out = await describeImage("u", "vendor/model", "k", fakeFetch);
+  assert.deepEqual(out, { description: "A cat.", cost: 0.00042 });
+  assert.deepEqual(sentBody.usage, { include: true });
+});
+
+test("describeImage returns no description/cost on a non-ok response (upload must still succeed)", async () => {
   const fakeFetch = async () => ({ ok: false, status: 402, text: async () => "no credits" });
-  assert.equal(await describeImage("u", "m", "k", fakeFetch), "");
+  assert.deepEqual(await describeImage("u", "m", "k", fakeFetch), { description: "" });
 });
 
-test("describeImage returns '' when key or model is missing (no call made)", async () => {
+test("describeImage returns no description when key or model is missing (no call made)", async () => {
   let called = false;
   const fakeFetch = async () => {
     called = true;
     return { ok: true, status: 200, text: async () => "{}" };
   };
-  assert.equal(await describeImage("u", "m", "", fakeFetch), "");
-  assert.equal(await describeImage("u", "", "k", fakeFetch), "");
+  assert.deepEqual(await describeImage("u", "m", "", fakeFetch), { description: "" });
+  assert.deepEqual(await describeImage("u", "", "k", fakeFetch), { description: "" });
   assert.equal(called, false, "no HTTP call without key+model");
 });
 
-test("describeImage swallows a thrown fetch (network error → '')", async () => {
+test("describeImage swallows a thrown fetch (network error → empty result)", async () => {
   const fakeFetch = async () => {
     throw new Error("network down");
   };
-  assert.equal(await describeImage("u", "m", "k", fakeFetch), "");
+  assert.deepEqual(await describeImage("u", "m", "k", fakeFetch), { description: "" });
 });

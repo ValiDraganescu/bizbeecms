@@ -158,15 +158,18 @@ export type RunToolsRound = (
 export type NextTurn = (messages: ChatMessage[]) => Promise<ReadableStream<Uint8Array>>;
 
 /**
- * Optional token-usage observer. Invoked once per turn that reports a `usage`
- * event (same numbers already framed to the client), so a caller can record
- * per-day token totals out-of-band. Additive + default-absent: when omitted the
- * behavior is EXACTLY the pre-existing one (the admin route passes nothing).
+ * Optional usage observer. Invoked once per turn that reports a `usage` event
+ * (the token numbers already framed to the client, PLUS the provider's actual
+ * `cost` in USD, which is NOT framed to the client), so a caller can record
+ * per-day tokens and monthly spend out-of-band. Additive + default-absent: when
+ * omitted the behavior is EXACTLY the pre-existing one.
  */
 export type OnUsage = (usage: {
   promptTokens?: number;
   completionTokens?: number;
   totalTokens?: number;
+  /** USD charged for this turn; undefined when upstream reported none. */
+  cost?: number;
 }) => void;
 
 /**
@@ -238,6 +241,9 @@ async function consumeTurn(
                 promptTokens: ev.promptTokens,
                 completionTokens: ev.completionTokens,
                 totalTokens: ev.totalTokens,
+                // Provider cost stays server-side (metering) — deliberately NOT
+                // part of the client `usage` frame above.
+                cost: ev.cost,
               });
             } catch {
               /* observer failure never affects the stream */

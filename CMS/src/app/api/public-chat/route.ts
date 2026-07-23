@@ -34,6 +34,7 @@ import { pickRenderBlocks } from "@/lib/pages/page-version";
 import { parseJsonColumn, type Block } from "@/lib/render/tree";
 import { getChatAgent } from "@/db/chat-agent-store";
 import { getCounter, incrementCounter } from "@/db/usage-counter-store";
+import { meterAiCall } from "@/db/ai-usage-store";
 import {
   recentFailureTimestamps,
   recordFailure,
@@ -261,13 +262,28 @@ export async function POST(request: Request): Promise<Response> {
       totalTokens?: number;
       promptTokens?: number;
       completionTokens?: number;
+      cost?: number;
     }) => {
       if (u.totalTokens && u.totalTokens > 0) {
         incrementCounter(tokensKey, u.totalTokens).catch(() => {});
       }
-      const costNano = usageCostNanoUsd(u, catalogEntry);
-      if (costNano > 0) {
-        incrementCounter(costKey, costNano).catch(() => {});
+      if (u.cost !== undefined) {
+        // The provider told us what it actually charged: meter the month's
+        // raw+billable spend and bill this agent's daily counter the SAME
+        // billable amount, so analytics and the quota meter agree.
+        meterAiCall("chatAgent", model, u.cost)
+          .then((billableNano) => {
+            if (billableNano > 0) return incrementCounter(costKey, billableNano);
+          })
+          .catch(() => {});
+      } else {
+        // No cost upstream → fall back to the legacy token × catalog-price
+        // estimate for the agent counter (monthly spend records nothing rather
+        // than guessing).
+        const costNano = usageCostNanoUsd(u, catalogEntry);
+        if (costNano > 0) {
+          incrementCounter(costKey, costNano).catch(() => {});
+        }
       }
       lastUsage = {
         promptTokens: u.promptTokens ?? lastUsage.promptTokens,

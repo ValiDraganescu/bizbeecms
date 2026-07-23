@@ -22,6 +22,9 @@ import {
   capConversationPayload,
   usageCostNanoUsd,
   formatUsdFromNano,
+  rawNanoUsd,
+  billableNanoUsd,
+  aiUsageMonth,
   NANO_USD_PER_USD,
   MAX_PAYLOAD_BYTES,
   CHAT_MINUTE_MS,
@@ -586,4 +589,47 @@ test("formatUsdFromNano: zero, sub-cent, cent-and-up, and sub-0.0001 floors", ()
   assert.equal(formatUsdFromNano(10_000_000), "$0.01");
   assert.equal(formatUsdFromNano(2_500_000), "$0.0025");
   assert.equal(formatUsdFromNano(50_000), "<$0.0001");
+});
+
+// ── AI spend meter: rawNanoUsd / billableNanoUsd / aiUsageMonth ───────────────
+
+test("rawNanoUsd converts a provider cost to integer nano-USD", () => {
+  assert.equal(rawNanoUsd(0.00042), 420_000);
+  assert.equal(rawNanoUsd(1), NANO_USD_PER_USD);
+  assert.ok(Number.isInteger(rawNanoUsd(0.000_000_000_37)));
+});
+
+test("rawNanoUsd meters nothing for non-positive or non-finite costs", () => {
+  assert.equal(rawNanoUsd(0), 0);
+  assert.equal(rawNanoUsd(-0.5), 0);
+  assert.equal(rawNanoUsd(Number.NaN), 0);
+  assert.equal(rawNanoUsd(Number.POSITIVE_INFINITY), 0);
+});
+
+test("billableNanoUsd applies the per-alias margin on top of the raw cost", () => {
+  assert.equal(billableNanoUsd(0.001, 30), 1_300_000);
+  assert.equal(billableNanoUsd(0.001, 0), rawNanoUsd(0.001));
+  assert.equal(billableNanoUsd(2, 50), 3 * NANO_USD_PER_USD);
+});
+
+test("billableNanoUsd falls back to raw when the margin is missing or nonsense", () => {
+  const raw = rawNanoUsd(0.004);
+  assert.equal(billableNanoUsd(0.004, Number.NaN), raw);
+  assert.equal(billableNanoUsd(0.004, -20), raw);
+});
+
+test("billableNanoUsd meters nothing when there is no cost to bill", () => {
+  assert.equal(billableNanoUsd(0, 30), 0);
+  assert.equal(billableNanoUsd(-1, 30), 0);
+  assert.equal(billableNanoUsd(Number.NaN, 30), 0);
+});
+
+test("aiUsageMonth buckets by UTC month, rolling over at the UTC boundary", () => {
+  assert.equal(aiUsageMonth(new Date("2026-07-23T08:30:00Z")), "2026-07");
+  // 2026-07-31 23:59Z is still July; one minute later is a fresh August bucket
+  // (= the monthly reset of the ai:<month>:* counters).
+  assert.equal(aiUsageMonth(new Date("2026-07-31T23:59:59Z")), "2026-07");
+  assert.equal(aiUsageMonth(new Date("2026-08-01T00:00:00Z")), "2026-08");
+  // A local-time-late-July instant that is ALREADY August in UTC meters as August.
+  assert.equal(aiUsageMonth(new Date("2026-07-31T21:00:00-04:00")), "2026-08");
 });
