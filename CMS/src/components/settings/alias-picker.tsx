@@ -20,10 +20,14 @@
  * operator's stored choice until they pick a curated alias.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ModelPicker } from "@/components/chat/model-picker";
 import type { AiPurpose } from "@/lib/ai-config/types";
-import { matchAlias, selectValueFor, type AliasOption } from "@/lib/ai-config/alias-options";
+import {
+  aliasCatalog,
+  selectValueFor,
+  type AliasOption,
+} from "@/lib/ai-config/alias-options";
 
 /**
  * Load the curated aliases for a purpose. Empty on any failure — every caller
@@ -77,6 +81,11 @@ export function AliasPicker({
 }) {
   const { aliases, loading } = useCuratedAliases(purpose);
 
+  // Curated aliases rendered through the SAME rich picker UI as the free
+  // catalog: searchable, grouped by the underlying model's provider, and
+  // showing the CUSTOMER-facing (margin-adjusted) in/out prices from the wire.
+  const curatedCatalog = useMemo(() => aliasCatalog(aliases), [aliases]);
+
   // Don't flash the full catalog picker while we're still finding out whether
   // this site is curated — that would offer models the operator may not pick.
   if (loading) {
@@ -103,22 +112,16 @@ export function AliasPicker({
     );
   }
 
-  // A stored value from before curation (or from a since-removed alias) is kept
-  // as its own option so the select never silently re-points to another model.
-  const uncurated = value !== "" && matchAlias(aliases, value) === null;
-
+  // A stored value from before curation (or from a since-removed alias) maps to
+  // its alias key when one wraps it; otherwise it stays verbatim — the picker
+  // then shows the raw id on the trigger rather than silently re-pointing the
+  // operator's stored choice at another model.
   return (
-    <select
+    <ModelPicker
       value={selectValueFor(aliases, value)}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full min-w-0 rounded-md border border-border bg-surface px-2 py-1 text-foreground"
-    >
-      {uncurated && <option value={value}>{value}</option>}
-      {aliases.map((a) => (
-        <option key={a.key} value={a.key}>
-          {a.label}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      models={curatedCatalog}
+      direction={direction}
+    />
   );
 }

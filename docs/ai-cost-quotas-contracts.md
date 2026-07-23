@@ -195,6 +195,17 @@ W1-C and wave-2 slices import from `@/lib/ai-config` and never edit it.
   stored raw model ids keep working via `resolveModelForPurpose` (already
   matches legacy ids); server routes that persist model choices accept
   alias keys OR (for backward compat) previously-stored raw ids.
+  - Wire shape (extended 2026-07-23): each alias is
+    `{ key, label, model, inputPrice?, outputPrice?, inputModalities?,
+    outputModalities?, contextLength? }`. The prices are CUSTOMER-facing
+    USD-per-token rates — the OpenRouter catalog price already adjusted by
+    the alias `marginPct` server-side (`projectAliasOptions` in
+    `lib/ai-config/alias-options.ts`, joined via `lib/chat/catalog-loader.ts`).
+    `marginPct` itself is still never projected to the browser. The join
+    fields are optional: absent when the model isn't in the (possibly
+    stale/empty) catalog cache. Curated pickers render these through the same
+    rich `ModelPicker` UI as the free catalog (`aliasCatalog` maps alias →
+    `CatalogModel` with the alias key as the entry id).
 - Server-side resolution: everywhere a model id is read for an AI call
   (`chat_agent.model`, `image_model`, `image_gen_model`, `translate_model`,
   assistant request body), pass the stored value through

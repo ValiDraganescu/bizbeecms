@@ -27,6 +27,14 @@ const REQUIRED_TABLE_KEYS = [
   "asset",
 ] as const;
 
+/**
+ * `tables.*` keys added AFTER v1 shipped — OPTIONAL on import (older artifacts
+ * simply don't have them; missing → treated as empty), but if present they must
+ * still be arrays. Keeps version 1 backward-compatible instead of hard-failing
+ * every pre-chat-agent export.
+ */
+const OPTIONAL_TABLE_KEYS = ["chatAgent"] as const;
+
 export const MAX_COLLECTIONS = 100;
 
 export interface DryRunCounts {
@@ -37,6 +45,7 @@ export interface DryRunCounts {
   assets: number;
   dataSources: number;
   promptVersions: number;
+  chatAgents: number;
 }
 
 /** Injected by the route: counts of the TARGET's current rows in every table
@@ -62,6 +71,7 @@ const EMPTY_DESTROY: DryRunCounts = {
   assets: 0,
   dataSources: 0,
   promptVersions: 0,
+  chatAgents: 0,
 };
 
 function hardFail(error: string): DryRunReport {
@@ -106,6 +116,11 @@ export async function validateSiteImport(
       return hardFail(`tables.${key} must be an array`);
     }
   }
+  for (const key of OPTIONAL_TABLE_KEYS) {
+    if (key in t && !Array.isArray(t[key])) {
+      return hardFail(`tables.${key} must be an array when present`);
+    }
+  }
 
   const collections = t.collection as unknown[];
   const collectionCapOk = collections.length <= MAX_COLLECTIONS;
@@ -130,6 +145,7 @@ export async function validateSiteImport(
     dataSources: (t.dataSource as unknown[]).length,
     dataSourceRequests: (t.dataSourceRequest as unknown[]).length,
     promptVersions: (t.promptVersion as unknown[]).length,
+    chatAgents: Array.isArray(t.chatAgent) ? t.chatAgent.length : 0,
   };
 
   const warnings: string[] = [];

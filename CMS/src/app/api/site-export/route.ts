@@ -34,6 +34,7 @@ export async function GET(request: Request): Promise<Response> {
     dataSources,
     dataSourceRequests,
     assets,
+    chatAgents,
   ] = await Promise.all([
     db.select().from(schema.page),
     db.select().from(schema.pageVersion),
@@ -44,6 +45,9 @@ export async function GET(request: Request): Promise<Response> {
     db.select().from(schema.dataSource),
     db.select().from(schema.dataSourceRequest),
     db.select().from(schema.asset),
+    // Agent CONFIG only — chat_conversation/usage_counter (history/analytics)
+    // are deliberately not exported (see ChatAgentRow's doc in site-export.ts).
+    db.select().from(schema.chatAgent),
   ]);
 
   // Every content_* table's rows, via the fenced read path (FORMAT.md §3's
@@ -67,6 +71,7 @@ export async function GET(request: Request): Promise<Response> {
     dataSources,
     dataSourceRequests,
     assets,
+    chatAgents,
     collectionData,
     exportedAt: new Date().toISOString(),
     cmsVersion: process.env.NEXT_PUBLIC_CMS_VERSION ?? "",

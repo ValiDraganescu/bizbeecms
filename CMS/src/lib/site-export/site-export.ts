@@ -134,6 +134,29 @@ export interface AssetRow {
   createdAt: Date | number;
 }
 
+/**
+ * Chat agent CONFIG only — the persona, model, limits and tool allowlists an
+ * operator set up. Conversation history (`chat_conversation`) and usage
+ * counters (`usage_counter`) are analytics/history and are NEVER exported.
+ * `limits`/`dataSources`/`collections` stay the RAW JSON strings the DB holds
+ * (opaque here, same as the schema layer — `public-chat/core.ts` owns their
+ * semantics). The allowlists reference data-source/request ids, which survive
+ * import verbatim, so the references stay valid on the target.
+ */
+export interface ChatAgentRow {
+  id: string;
+  name: string;
+  systemPrompt: string;
+  model: string | null;
+  enabled: boolean;
+  welcomeMessage: string | null;
+  limits: string;
+  dataSources: string;
+  collections: string;
+  createdAt: Date | number;
+  updatedAt: Date | number;
+}
+
 /** A collection's rows as exported: `SELECT *` result, one generic object per row. */
 export type CollectionDataRow = Record<string, unknown>;
 
@@ -147,6 +170,7 @@ export interface SiteExportInput {
   dataSources: DataSourceRow[];
   dataSourceRequests: DataSourceRequestRow[];
   assets: AssetRow[];
+  chatAgents: ChatAgentRow[];
   /** tableName → rows (already `SELECT *`'d by the caller via `contentSelect`). */
   collectionData: Record<string, CollectionDataRow[]>;
   /** Injected so the envelope is reproducible in tests; route passes `new Date().toISOString()`. */
@@ -169,6 +193,7 @@ export interface SiteEnvelope {
     dataSources: number;
     dataSourceRequests: number;
     promptVersions: number;
+    chatAgents: number;
   };
   tables: {
     page: Array<Record<string, unknown>>;
@@ -180,6 +205,7 @@ export interface SiteEnvelope {
     dataSource: Array<Record<string, unknown> & { hasSecret: boolean }>;
     dataSourceRequest: Array<Record<string, unknown>>;
     asset: Array<Record<string, unknown>>;
+    chatAgent: Array<Record<string, unknown>>;
   };
   collectionData: Record<string, { schema: unknown[]; rows: CollectionDataRow[] }>;
 }
@@ -246,6 +272,7 @@ export function buildSiteExport(input: SiteExportInput): SiteEnvelope {
       dataSources: input.dataSources.length,
       dataSourceRequests: input.dataSourceRequests.length,
       promptVersions: input.promptVersions.length,
+      chatAgents: input.chatAgents.length,
     },
     tables: {
       page: input.pages.map((r) => ({
@@ -334,6 +361,20 @@ export function buildSiteExport(input: SiteExportInput): SiteEnvelope {
         cacheEnabled: r.cacheEnabled,
         cacheTtlSec: r.cacheTtlSec,
         retryable: r.retryable,
+        createdAt: toEpochMs(r.createdAt),
+        updatedAt: toEpochMs(r.updatedAt),
+      })),
+      // Config only — conversation history + usage counters never exported.
+      chatAgent: input.chatAgents.map((r) => ({
+        id: r.id,
+        name: r.name,
+        systemPrompt: r.systemPrompt,
+        model: r.model,
+        enabled: r.enabled,
+        welcomeMessage: r.welcomeMessage,
+        limits: r.limits,
+        dataSources: r.dataSources,
+        collections: r.collections,
         createdAt: toEpochMs(r.createdAt),
         updatedAt: toEpochMs(r.updatedAt),
       })),

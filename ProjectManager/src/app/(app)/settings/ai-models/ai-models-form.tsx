@@ -18,7 +18,8 @@ import {
   type CuratedModel,
   type CuratedPurposes,
 } from "@/lib/ai/curated";
-import { MODEL_IDS_DATALIST, PurposeEditor } from "./purpose-editor";
+import type { CatalogModel } from "@/lib/ai/model-catalog";
+import { PurposeEditor } from "./purpose-editor";
 
 /**
  * Curated-model editor. PUTs the whole catalog + pool to
@@ -43,20 +44,21 @@ export function AiModelsForm({
   );
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [modelIds, setModelIds] = useState<string[]>([]);
+  const [catalog, setCatalog] = useState<CatalogModel[]>([]);
 
-  // Model-id suggestions for the picker (public OpenRouter catalog, proxied).
-  // Best-effort: on failure the inputs stay plain free text.
+  // The OpenRouter catalog for the model pickers (public catalog, proxied),
+  // fetched ONCE for the whole page. Best-effort: on failure the model fields
+  // stay plain free text.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const res = await fetch("/api/settings/openrouter-models");
         if (!res.ok) return;
-        const data = (await res.json()) as { models?: string[] };
-        if (!cancelled) setModelIds(data.models ?? []);
+        const data = (await res.json()) as { models?: CatalogModel[] };
+        if (!cancelled) setCatalog(data.models ?? []);
       } catch {
-        /* suggestions are optional */
+        /* the picker is optional */
       }
     })();
     return () => {
@@ -139,6 +141,7 @@ export function AiModelsForm({
             key={purpose}
             purpose={purpose}
             models={purposes[purpose].models}
+            catalog={catalog}
             onChange={(models) => updatePurpose(purpose, models)}
             onAdd={() => addEntry(purpose)}
           />
@@ -159,12 +162,6 @@ export function AiModelsForm({
           <p className="text-xs font-medium text-success">{t("saved")}</p>
         ) : null}
       </div>
-
-      <datalist id={MODEL_IDS_DATALIST}>
-        {modelIds.map((id) => (
-          <option key={id} value={id} />
-        ))}
-      </datalist>
     </form>
   );
 }

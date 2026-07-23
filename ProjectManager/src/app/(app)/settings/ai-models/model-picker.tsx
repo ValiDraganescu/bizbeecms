@@ -1,29 +1,28 @@
-/**
- * In-house searchable model picker (ai-assistant goal — model picker over the
- * full Workers-AI catalog). Replaces the plain `<select>` in the chat widget.
- *
- * Loads the catalog from `GET /api/chat/models` (cached + lazily refreshed in
- * D1), groups by PROVIDER (the `@cf/<vendor>/...` segment), orders each group
- * LOW→HIGH price, and supports a SEARCH/filter box + keyboard nav. No dropdown/
- * combobox dependency — a button + an absolutely-positioned panel, design-system
- * tokens. Falls back to the static `CHAT_MODELS` if the fetch fails so it's
- * never empty.
- */
 "use client";
+
+/**
+ * Searchable OpenRouter model picker for the curation page — a port of the
+ * CMS's `components/chat/model-picker.tsx` (same UX: search box, modality
+ * filter chips, provider groups low→high price, in/out $ per 1M tokens), fed
+ * the catalog by the parent form (one fetch for the whole page) instead of
+ * fetching its own.
+ *
+ * `value` is the raw OpenRouter model id the curation stores; an id missing
+ * from the catalog (retired model, filtered out) still shows verbatim on the
+ * trigger so nothing silently changes what an alias points at.
+ */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
-  CHAT_MODELS,
-  filterCatalog,
+  catalogModalities,
   filterByModalities,
   filterByOutputModalities,
-  catalogModalities,
+  filterCatalog,
   groupByProvider,
   pricePerMillion,
   type CatalogModel,
-} from "@/lib/chat/models";
-import { coerceCatalog } from "@/lib/chat/catalog-coerce";
+} from "@/lib/ai/model-catalog";
 
 /** Minimal inline glyph per input modality (design-system stroke icons). */
 function ModalityIcon({ modality, label }: { modality: string; label: string }) {
@@ -87,69 +86,26 @@ export function ModelPicker({
   models,
   requireModalities,
   requireOutputModalities,
-  direction = "up",
+  id,
 }: {
   value: string;
   onChange: (id: string) => void;
-  /**
-   * Pre-supplied catalog (e.g. the curated aliases mapped through
-   * `aliasCatalog`). When given, the picker renders EXACTLY these entries and
-   * never fetches `/api/chat/models`. Omit → the full OpenRouter catalog.
-   */
-  models?: ReadonlyArray<CatalogModel>;
-  /**
-   * Pre-filter the catalog to models accepting EVERY listed input modality (e.g.
-   * `["image"]` for the media image-describe picker). Applied before search +
-   * the in-picker modality toggles. Omit → the full catalog (chat default).
-   */
+  /** The full catalog, fetched once by the parent form. */
+  models: ReadonlyArray<CatalogModel>;
+  /** Pre-filter to models accepting EVERY listed input modality. */
   requireModalities?: string[];
-  /**
-   * Pre-filter to models that PRODUCE every listed output modality (e.g.
-   * `["image"]` for the image-GENERATION picker). Composes with requireModalities.
-   */
+  /** Pre-filter to models PRODUCING every listed output modality. */
   requireOutputModalities?: string[];
-  /**
-   * Which way the panel opens. "up" (default) suits the chat widget (input at the
-   * bottom of the panel); "down" suits a picker near the top of a page where
-   * there's no room above (e.g. the media settings page).
-   */
-  direction?: "up" | "down";
+  /** Trigger element id, so a `FieldLabel htmlFor` can target the picker. */
+  id?: string;
 }) {
-  const t = useTranslations("chat.widget");
-  const [fetched, setFetched] = useState<ReadonlyArray<CatalogModel>>(CHAT_MODELS);
-  const catalog = models ?? fetched;
+  const t = useTranslations("settings.aiModels.picker");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [modFilter, setModFilter] = useState<string[]>([]);
   const [active, setActive] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Load the catalog once on mount; keep the static fallback on failure. A
-  // pre-supplied `models` catalog skips the fetch entirely (curated pickers).
-  useEffect(() => {
-    if (models) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/chat/models");
-        if (!res.ok) return;
-        const j = (await res.json()) as { models?: unknown };
-        // Coerce the wire shape: a D1-CACHED payload may come from an older
-        // bundle missing fields the renderer reads (e.g. inputModalities) →
-        // BUG [P1] `.map` of undefined. Backfill so every entry is render-safe.
-        const loaded = coerceCatalog(j.models);
-        if (!cancelled && loaded.length > 0) {
-          setFetched(loaded);
-        }
-      } catch {
-        /* offline / no binding — keep the static fallback */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [models]);
 
   // Close on outside click.
   useEffect(() => {
@@ -168,11 +124,10 @@ export function ModelPicker({
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  // Base catalog: optionally pre-filtered to required modalities (e.g. image for
-  // the media describe-model picker), so search + toggles only ever see eligible
-  // models. Omitted → the whole catalog (chat default).
+  // Base catalog: pre-filtered to the purpose's required modalities, so search
+  // + toggles only ever see eligible models.
   const baseCatalog = useMemo(() => {
-    let c: ReadonlyArray<CatalogModel> = catalog;
+    let c: ReadonlyArray<CatalogModel> = models;
     if (requireModalities && requireModalities.length > 0) {
       c = filterByModalities(c, requireModalities);
     }
@@ -180,12 +135,10 @@ export function ModelPicker({
       c = filterByOutputModalities(c, requireOutputModalities);
     }
     return c;
-  }, [catalog, requireModalities, requireOutputModalities]);
+  }, [models, requireModalities, requireOutputModalities]);
 
-  // Distinct modalities available in the catalog → the toggle bar (text alone is
-  // every model's default, so it's not worth a toggle; only offer the rest).
-  // Drop any modality that's already forced by `requireModalities` (no point
-  // toggling a filter that's always on).
+  // Distinct modalities available → the toggle bar (text alone is every model's
+  // default; a modality already forced by `requireModalities` isn't offered).
   const modalities = useMemo(
     () =>
       catalogModalities(baseCatalog).filter(
@@ -201,11 +154,11 @@ export function ModelPicker({
   // Flat list of ids in display order, for keyboard nav across groups.
   const flat = useMemo(() => groups.flatMap((g) => g.models), [groups]);
 
-  const selected = catalog.find((m) => m.id === value);
+  const selected = models.find((m) => m.id === value);
   const buttonLabel = selected ? selected.label : value;
 
-  function choose(id: string) {
-    onChange(id);
+  function choose(modelId: string) {
+    onChange(modelId);
     setOpen(false);
     setQuery("");
   }
@@ -234,15 +187,18 @@ export function ModelPicker({
   }
 
   return (
-    <div ref={rootRef} className="relative min-w-0 flex-1">
+    <div ref={rootRef} className="relative min-w-0">
       <button
         type="button"
+        id={id}
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-surface px-2 py-1 text-left text-foreground"
+        className="flex min-h-10 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-1.5 text-left text-sm text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-primary"
       >
-        <span className="truncate">{buttonLabel}</span>
+        <span className={`truncate ${value ? "" : "text-foreground-muted"}`}>
+          {value ? buttonLabel : t("placeholder")}
+        </span>
         <svg
           width="12"
           height="12"
@@ -256,15 +212,10 @@ export function ModelPicker({
         </svg>
       </button>
 
-      {/* Width: at least as wide as the trigger, grows to fit the longest
-          model name, capped so it never runs off-screen. Wider than the old
-          fixed w-72 so names like "Claude Opus 4.6 (Fast)" read in full. */}
+      {/* At least as wide as the trigger, grows to fit long model names,
+          capped so it never runs off-screen. */}
       {open && (
-        <div
-          className={`absolute left-0 z-50 max-h-72 w-max min-w-full max-w-md overflow-hidden rounded-md border border-border bg-surface shadow-lg ${
-            direction === "down" ? "top-full mt-1" : "bottom-full mb-1"
-          }`}
-        >
+        <div className="absolute left-0 top-full z-50 mt-1 max-h-80 w-max min-w-full max-w-md overflow-hidden rounded-md border border-border bg-surface shadow-lg">
           <div className="border-b border-border p-2">
             <input
               ref={inputRef}
@@ -275,12 +226,12 @@ export function ModelPicker({
                 setActive(0);
               }}
               onKeyDown={onKeyDown}
-              placeholder={t("modelSearch")}
-              aria-label={t("modelSearch")}
-              className="w-full rounded border border-border bg-background px-2 py-1 text-foreground"
+              placeholder={t("search")}
+              aria-label={t("search")}
+              className="w-full rounded border border-border bg-background px-2 py-1 text-sm text-foreground"
             />
             {modalities.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label={t("modelModalityFilter")}>
+              <div className="mt-2 flex flex-wrap gap-1" role="group" aria-label={t("modalityFilter")}>
                 {modalities.map((mod) => {
                   const on = modFilter.includes(mod);
                   const label = t(`modality${mod.charAt(0).toUpperCase()}${mod.slice(1)}`);
@@ -304,9 +255,9 @@ export function ModelPicker({
               </div>
             )}
           </div>
-          <ul className="max-h-56 overflow-y-auto py-1" role="listbox">
+          <ul className="max-h-64 overflow-y-auto py-1" role="listbox">
             {flat.length === 0 ? (
-              <li className="px-3 py-2 text-foreground-muted">{t("modelNoResults")}</li>
+              <li className="px-3 py-2 text-sm text-foreground-muted">{t("noResults")}</li>
             ) : (
               groups.map((g) => (
                 <li key={g.provider}>
@@ -324,11 +275,16 @@ export function ModelPicker({
                             aria-selected={m.id === value}
                             onClick={() => choose(m.id)}
                             onMouseEnter={() => setActive(idx)}
-                            className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left ${
+                            className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm ${
                               idx === active ? "bg-primary/10" : ""
                             } ${m.id === value ? "font-semibold text-primary" : "text-foreground"}`}
                           >
-                            <span className="min-w-0 truncate">{m.label}</span>
+                            <span className="flex min-w-0 flex-col">
+                              <span className="truncate">{m.label}</span>
+                              <span className="truncate font-mono text-[10px] text-foreground-muted">
+                                {m.id}
+                              </span>
+                            </span>
                             {(() => {
                               const inP = pricePerMillion(m.inputPrice);
                               const outP = pricePerMillion(m.outputPrice);
@@ -336,13 +292,13 @@ export function ModelPicker({
                               return (
                                 <span
                                   className="shrink-0 text-[10px] tabular-nums text-foreground-muted"
-                                  title={t("modelPriceTitle")}
+                                  title={t("priceTitle")}
                                 >
-                                  {inP != null && `${t("modelPriceIn")} $${inP}`}
+                                  {inP != null && `${t("priceIn")} $${inP}`}
                                   {inP != null && outP != null && " / "}
-                                  {outP != null && `${t("modelPriceOut")} $${outP}`}
+                                  {outP != null && `${t("priceOut")} $${outP}`}
                                   {" "}
-                                  {t("modelPricePerMillion")}
+                                  {t("pricePerMillion")}
                                 </span>
                               );
                             })()}

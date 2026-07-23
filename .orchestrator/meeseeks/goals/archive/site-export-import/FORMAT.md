@@ -20,6 +20,7 @@ later slice needs a different shape — don't quietly drift the wire format.
 | `data_source` | yes, **minus secret** | `id,name,baseUrl,authType,authParam` — NEVER `secretEnc`. Emit a `hasSecret: boolean` (`authType !== "none"`) per row instead. |
 | `data_source_request` | yes | full rows (method/path/query/bodyTemplate/cache/retry config) — no secrets live here |
 | `asset` | yes (metadata) | full row (`key,filename,contentType,size,description,tags,createdAt`) — the R2 BYTES travel separately, see §4 |
+| `chat_agent` (added 2026-07-23) | yes | full config row (`id,name,systemPrompt,model,enabled,welcomeMessage,limits,dataSources,collections`) — the JSON-string columns travel verbatim; the allowlists' `sourceId`/`requestId` refs stay valid because data-source ids import verbatim. `tables.chatAgent` is OPTIONAL on import (pre-chat-agent artifacts stay valid at version 1; missing → `[]`, present-but-not-array → hard-fail). |
 | R2 bytes (`MEDIA` bucket, keyed by `asset.key`) | yes | not a D1 table; fetched via the `Storage` port per asset key |
 
 **1a. `site_settings` keys** (from `CMS/src/db/settings-store.ts`, the complete `_KEY` constant list — export the whole table as `{key: value}`, no allowlist needed since it's a generic store):
@@ -28,7 +29,7 @@ Export ALL rows found (don't hardcode the key list into the export code — new 
 
 ### DO NOT export (instance identity / transients — default decision per GOAL.md)
 
-`user`, `session`, `invite`, `password_reset`, `login_attempt`, `api_key`, `icon_cache`, `chat_thread`. Flag this list in the import report so an operator isn't surprised auth/history didn't move.
+`user`, `session`, `invite`, `password_reset`, `login_attempt`, `api_key`, `icon_cache`, `chat_thread`, `chat_conversation`, `usage_counter` (the last two added 2026-07-23: guest-chat conversation history + usage/cost counters are analytics, never exported and never wiped by import — a same-site re-import keeps agent ids so existing history stays linked). Flag this list in the import report so an operator isn't surprised auth/history didn't move.
 
 ### Data-source secrets — hard constraint (not a choice)
 
@@ -65,7 +66,8 @@ Mirrors the **existing** `bizbeecms.component` / `bizbeecms.kit` envelope discip
     "promptVersion": [ /* full rows */ ],
     "dataSource": [ /* rows minus secretEnc, plus hasSecret:boolean */ ],
     "dataSourceRequest": [ /* full rows */ ],
-    "asset": [ /* full rows (metadata only; bytes are separate, see §4) */ ]
+    "asset": [ /* full rows (metadata only; bytes are separate, see §4) */ ],
+    "chatAgent": [ /* full config rows (added 2026-07-23; OPTIONAL on import — see §1). counts.chatAgents mirrors it. */ ]
   },
   "collectionData": {
     "content_offers": {

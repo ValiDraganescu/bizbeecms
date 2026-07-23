@@ -796,7 +796,7 @@ export function ChatWidget() {
                       {chat.usage && (
                         <ContextMeter
                           used={chat.usage.promptTokens}
-                          max={catalog.find((m) => m.id === model)?.contextLength ?? null}
+                          max={catalog.find((m) => m.id === selectedModelId)?.contextLength ?? null}
                           label={t("contextUsage", {
                             used: formatTokens(chat.usage.promptTokens),
                           })}

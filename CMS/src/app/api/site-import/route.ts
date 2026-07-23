@@ -103,7 +103,8 @@ export async function POST(request: Request): Promise<Response> {
   }
   // 2 + 3. Delete all rows from every builtin table the wipe touches, in order.
   // Never touches user/session/invite/password_reset/login_attempt/api_key/
-  // icon_cache/chat_thread (not in WIPE_BUILTIN_TABLES).
+  // icon_cache/chat_thread/chat_conversation/usage_counter (not in
+  // WIPE_BUILTIN_TABLES — conversation history/analytics survive an import).
   await db.delete(schema.collection);
   await db.delete(schema.pageVersion);
   await db.delete(schema.page);
@@ -113,6 +114,7 @@ export async function POST(request: Request): Promise<Response> {
   await db.delete(schema.promptVersion);
   await db.delete(schema.asset);
   await db.delete(schema.siteSettings);
+  await db.delete(schema.chatAgent);
 
   // --- RESTORE (§6 Step C, dependency order) ---
   // 4. Recreate each collection's content_* table (fenced DDL, never hand-authored)
@@ -177,6 +179,11 @@ export async function POST(request: Request): Promise<Response> {
     (rows) => db.insert(schema.asset).values(rows as (typeof schema.asset.$inferInsert)[]),
     plan.restoreAssets.map((r) => withDates(r, ["createdAt"])),
   );
+  // 10. Chat agents (config only — history/analytics preserved, see the wipe note).
+  await insertRows(
+    (rows) => db.insert(schema.chatAgent).values(rows as (typeof schema.chatAgent.$inferInsert)[]),
+    plan.restoreChatAgents.map((r) => withDates(r, ["createdAt", "updatedAt"])),
+  );
 
   return Response.json({
     ok: true,
@@ -190,6 +197,7 @@ export async function POST(request: Request): Promise<Response> {
       dataSources: plan.restoreDataSources.length,
       dataSourceRequests: plan.restoreDataSourceRequests.length,
       promptVersions: plan.restorePromptVersions.length,
+      chatAgents: plan.restoreChatAgents.length,
     },
     assetKeysToUpload: plan.restoreAssets
       .map((a) => (typeof a.key === "string" ? a.key : null))

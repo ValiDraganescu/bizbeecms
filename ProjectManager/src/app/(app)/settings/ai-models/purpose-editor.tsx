@@ -3,9 +3,23 @@
 import { useTranslations } from "next-intl";
 import { Button, Field, FieldHint, FieldLabel, Input } from "@/components/ui";
 import type { AiPurpose, CuratedModel } from "@/lib/ai/curated";
+import type { CatalogModel } from "@/lib/ai/model-catalog";
+import { ModelPicker } from "./model-picker";
 
-/** Shared datalist of OpenRouter model ids; rendered once by the parent form. */
-export const MODEL_IDS_DATALIST = "openrouter-model-ids";
+/**
+ * Capability pre-filters per purpose: the picker only offers models the
+ * purpose's runtime can actually use (mirrors the CMS's own pickers).
+ */
+const PURPOSE_FILTERS: Record<
+  AiPurpose,
+  { input?: string[]; output?: string[] }
+> = {
+  chatAgent: {},
+  assistant: {},
+  imageDescribe: { input: ["image"] },
+  imageGenerate: { output: ["image"] },
+  translate: {},
+};
 
 /**
  * One purpose's ordered alias list. Order is the preference order — the FIRST
@@ -16,15 +30,19 @@ export const MODEL_IDS_DATALIST = "openrouter-model-ids";
 export function PurposeEditor({
   purpose,
   models,
+  catalog,
   onChange,
   onAdd,
 }: {
   purpose: AiPurpose;
   models: CuratedModel[];
+  /** The OpenRouter catalog, fetched once by the form; empty → free-text. */
+  catalog: ReadonlyArray<CatalogModel>;
   onChange: (models: CuratedModel[]) => void;
   onAdd: () => void;
 }) {
   const t = useTranslations("settings.aiModels");
+  const filters = PURPOSE_FILTERS[purpose];
 
   function patch(index: number, fields: Partial<CuratedModel>) {
     onChange(models.map((m, i) => (i === index ? { ...m, ...fields } : m)));
@@ -103,14 +121,25 @@ export function PurposeEditor({
             </Field>
             <Field>
               <FieldLabel htmlFor={`${purpose}-${entry.key}-model`}>{t("modelField")}</FieldLabel>
-              <Input
-                id={`${purpose}-${entry.key}-model`}
-                list={MODEL_IDS_DATALIST}
-                value={entry.model}
-                onChange={(e) => patch(index, { model: e.target.value })}
-                placeholder="openai/gpt-4o-mini"
-                className="font-mono text-sm"
-              />
+              {catalog.length > 0 ? (
+                <ModelPicker
+                  id={`${purpose}-${entry.key}-model`}
+                  value={entry.model}
+                  onChange={(model) => patch(index, { model })}
+                  models={catalog}
+                  requireModalities={filters.input}
+                  requireOutputModalities={filters.output}
+                />
+              ) : (
+                // Catalog fetch failed → plain free-text entry still works.
+                <Input
+                  id={`${purpose}-${entry.key}-model`}
+                  value={entry.model}
+                  onChange={(e) => patch(index, { model: e.target.value })}
+                  placeholder="openai/gpt-4o-mini"
+                  className="font-mono text-sm"
+                />
+              )}
             </Field>
             <Field>
               <FieldLabel htmlFor={`${purpose}-${entry.key}-margin`}>{t("marginField")}</FieldLabel>

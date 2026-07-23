@@ -31,14 +31,16 @@ export async function POST(request: Request): Promise<Response> {
 
   const report = await validateSiteImport(artifact, async (): Promise<DryRunCounts> => {
     const db = await getDb();
-    const [pages, components, collections, dataSources, promptVersions, assets] = await Promise.all([
-      db.select().from(schema.page),
-      db.select().from(schema.component),
-      db.select().from(schema.collection),
-      db.select().from(schema.dataSource),
-      db.select().from(schema.promptVersion),
-      db.select().from(schema.asset),
-    ]);
+    const [pages, components, collections, dataSources, promptVersions, assets, chatAgents] =
+      await Promise.all([
+        db.select().from(schema.page),
+        db.select().from(schema.component),
+        db.select().from(schema.collection),
+        db.select().from(schema.dataSource),
+        db.select().from(schema.promptVersion),
+        db.select().from(schema.asset),
+        db.select().from(schema.chatAgent),
+      ]);
 
     // contentSelectAll pages past the 1000-row single-call cap so the dry-run's
     // "existing rows to be destroyed" count is accurate for large collections too.
@@ -56,6 +58,7 @@ export async function POST(request: Request): Promise<Response> {
       assets: assets.length,
       dataSources: dataSources.length,
       promptVersions: promptVersions.length,
+      chatAgents: chatAgents.length,
     };
   });
 

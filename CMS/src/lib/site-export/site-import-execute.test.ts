@@ -30,6 +30,7 @@ function baseArtifact(overrides: Record<string, unknown> = {}) {
       dataSource: [],
       dataSourceRequest: [],
       asset: [],
+      chatAgent: [],
     },
     collectionData: {},
     ...overrides,
@@ -169,5 +170,41 @@ test("WIPE_BUILTIN_TABLES matches FORMAT.md §6 Step C's exact order", () => {
     "prompt_version",
     "asset",
     "site_settings",
+    "chat_agent",
   ]);
+});
+
+test("planImport: chat agents restore from tables.chatAgent, and a pre-chat-agent artifact (missing key) plans []", () => {
+  const artifact = baseArtifact();
+  (artifact.tables as Record<string, unknown>).chatAgent = [
+    { id: "ag1", name: "Support bot", systemPrompt: "p", enabled: true },
+  ];
+  const r = planImport(artifact, "Test Site");
+  assert.equal(r.ok, true);
+  if (!r.ok) return;
+  assert.deepEqual(r.plan.restoreChatAgents, [
+    { id: "ag1", name: "Support bot", systemPrompt: "p", enabled: true },
+  ]);
+
+  const legacy = baseArtifact();
+  delete (legacy.tables as Record<string, unknown>).chatAgent;
+  const rLegacy = planImport(legacy, "Test Site");
+  assert.equal(rLegacy.ok, true);
+  if (!rLegacy.ok) return;
+  assert.deepEqual(rLegacy.plan.restoreChatAgents, []);
+});
+
+test("planImport: a PRESENT non-array tables.chatAgent is rejected by name", () => {
+  const artifact = baseArtifact();
+  (artifact.tables as Record<string, unknown>).chatAgent = "not-an-array";
+  const r = planImport(artifact, "Test Site");
+  assert.equal(r.ok, false);
+  if (!r.ok) assert.match(r.error, /tables\.chatAgent must be an array when present/);
+});
+
+test("PRESERVED_TABLES covers guest-chat history/analytics (never wiped by import)", () => {
+  const preserved = new Set<string>(PRESERVED_TABLES);
+  assert.equal(preserved.has("chat_conversation"), true);
+  assert.equal(preserved.has("usage_counter"), true);
+  assert.equal(preserved.has("chat_agent"), false);
 });

@@ -48,6 +48,8 @@ export interface SiteArtifact {
     dataSource: Record<string, unknown>[];
     dataSourceRequest: Record<string, unknown>[];
     asset: Record<string, unknown>[];
+    /** Added after v1 shipped — optional so pre-chat-agent artifacts still import. */
+    chatAgent?: Record<string, unknown>[];
   };
   collectionData: Record<string, { schema: unknown[]; rows: Record<string, unknown>[] }>;
 }
@@ -73,6 +75,8 @@ export interface ImportPlan {
   restoreDataSources: Array<Record<string, unknown> & { secretEnc: null }>;
   restoreDataSourceRequests: Record<string, unknown>[];
   restoreAssets: Record<string, unknown>[];
+  /** `[]` for pre-chat-agent artifacts (the key is optional in the envelope). */
+  restoreChatAgents: Record<string, unknown>[];
 }
 
 /**
@@ -90,9 +94,16 @@ export const WIPE_BUILTIN_TABLES = [
   "prompt_version",
   "asset",
   "site_settings",
+  "chat_agent",
 ] as const;
 
-/** Never touched by import — the DO-NOT-export list, symmetric on the import side. */
+/**
+ * Never touched by import — the DO-NOT-export list, symmetric on the import
+ * side. `chat_conversation` + `usage_counter` are guest-chat HISTORY/analytics:
+ * never exported, and never destroyed by an import either (a same-site
+ * re-import keeps agent ids, so existing conversations stay linked; on a
+ * cross-instance import orphaned history is just invisible, not broken).
+ */
 export const PRESERVED_TABLES = [
   "user",
   "session",
@@ -102,6 +113,8 @@ export const PRESERVED_TABLES = [
   "api_key",
   "icon_cache",
   "chat_thread",
+  "chat_conversation",
+  "usage_counter",
 ] as const;
 
 function fail(status: number, error: string): PlanResult {
@@ -189,6 +202,10 @@ export function planImport(
       return fail(400, `tables.${key} must be an array`);
     }
   }
+  // Optional post-v1 key: missing → empty, but a present non-array is still junk.
+  if ("chatAgent" in t && !Array.isArray(t.chatAgent)) {
+    return fail(400, "tables.chatAgent must be an array when present");
+  }
 
   const meta = (a.meta ?? {}) as { siteName?: unknown };
   const siteName = typeof meta.siteName === "string" ? meta.siteName : "";
@@ -229,6 +246,7 @@ export function planImport(
       restoreDataSources,
       restoreDataSourceRequests: t.dataSourceRequest,
       restoreAssets: t.asset,
+      restoreChatAgents: t.chatAgent ?? [],
     },
   };
 }

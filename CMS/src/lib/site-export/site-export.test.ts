@@ -18,6 +18,7 @@ function baseInput(overrides: Partial<SiteExportInput> = {}): SiteExportInput {
     dataSources: [],
     dataSourceRequests: [],
     assets: [],
+    chatAgents: [],
     collectionData: {},
     exportedAt: "2026-07-02T19:00:00.000Z",
     cmsVersion: "1.19.0",
@@ -189,4 +190,36 @@ test("buildSiteExport: asset table is metadata only (no bytes field)", () => {
   assert.equal(env.tables.asset.length, 1);
   assert.equal(env.tables.asset[0].key, "assets/foo_123_abc.png");
   assert.equal("bytes" in env.tables.asset[0], false);
+});
+
+test("buildSiteExport: chat agents export full config with epoch-ms dates", () => {
+  const env = buildSiteExport(
+    baseInput({
+      chatAgents: [
+        {
+          id: "ag1",
+          name: "Support bot",
+          systemPrompt: "You are the support assistant.",
+          model: "x-ai/grok-4.5",
+          enabled: true,
+          welcomeMessage: '{"en":"Hi!"}',
+          limits: '{"perIpPerMinute":5}',
+          dataSources: '[{"sourceId":"d1","requestId":"r1","toolName":"lookup","description":"x"}]',
+          collections: '[{"collection":"offers","description":"y","canQuery":true,"canCreate":false,"canUpdate":false}]',
+          createdAt: new Date(5000),
+          updatedAt: 6000,
+        },
+      ],
+    }),
+  );
+  assert.equal(env.counts.chatAgents, 1);
+  assert.equal(env.tables.chatAgent.length, 1);
+  const agent = env.tables.chatAgent[0];
+  assert.equal(agent.name, "Support bot");
+  assert.equal(agent.systemPrompt, "You are the support assistant.");
+  assert.equal(agent.model, "x-ai/grok-4.5");
+  assert.equal(agent.enabled, true);
+  assert.equal(agent.limits, '{"perIpPerMinute":5}');
+  assert.equal(agent.createdAt, 5000);
+  assert.equal(agent.updatedAt, 6000);
 });

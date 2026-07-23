@@ -20,6 +20,7 @@ const ZERO_DESTROY: DryRunCounts = {
   assets: 0,
   dataSources: 0,
   promptVersions: 0,
+  chatAgents: 0,
 };
 
 function noDestroy(): DryRunCounts {
@@ -52,6 +53,7 @@ function baseArtifact(overrides: Record<string, unknown> = {}) {
       dataSource: [],
       dataSourceRequest: [],
       asset: [],
+      chatAgent: [],
     },
     collectionData: {},
     ...overrides,
@@ -156,6 +158,30 @@ test("validateSiteImport: secretsToReenter lists only hasSecret:true data source
   assert.deepEqual(r.secretsToReenter, [{ name: "OpenWeather", authType: "query" }]);
 });
 
+test("validateSiteImport: tables.chatAgent is OPTIONAL — a pre-chat-agent artifact still validates", async () => {
+  const artifact = baseArtifact();
+  delete (artifact.tables as Record<string, unknown>).chatAgent;
+  const r = await validateSiteImport(artifact, noDestroy);
+  assert.equal(r.ok, true);
+  assert.equal(r.willCreate.chatAgents, 0);
+});
+
+test("validateSiteImport: a PRESENT non-array tables.chatAgent still hard-fails by name", async () => {
+  const artifact = baseArtifact();
+  (artifact.tables as Record<string, unknown>).chatAgent = "not-an-array";
+  const r = await validateSiteImport(artifact, noDestroy);
+  assert.equal(r.ok, false);
+  assert.match(r.error ?? "", /tables\.chatAgent must be an array when present/);
+});
+
+test("validateSiteImport: willCreate.chatAgents counts the artifact's agents", async () => {
+  const artifact = baseArtifact();
+  (artifact.tables as Record<string, unknown>).chatAgent = [{ id: "ag1" }, { id: "ag2" }];
+  const r = await validateSiteImport(artifact, noDestroy);
+  assert.equal(r.ok, true);
+  assert.equal(r.willCreate.chatAgents, 2);
+});
+
 test("validateSiteImport: willDestroy comes from the injected count-provider, unmodified", async () => {
   const destroy: DryRunCounts = {
     pages: 9,
@@ -165,6 +191,7 @@ test("validateSiteImport: willDestroy comes from the injected count-provider, un
     assets: 30,
     dataSources: 1,
     promptVersions: 0,
+    chatAgents: 3,
   };
   const r = await validateSiteImport(baseArtifact(), async () => destroy);
   assert.equal(r.ok, true);
