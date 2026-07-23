@@ -2,10 +2,10 @@
 
 /**
  * Translation model picker (AI content translation). Talks to
- * `GET/PATCH /api/settings/translate-model`. Reuses the chat's `ModelPicker`
- * (search + pricing) with NO modality filter — translation is text→text, so any
- * catalog model qualifies. The chosen model is what /api/translate uses to render
- * page/component text into the Site's other locales.
+ * `GET/PATCH /api/settings/translate-model`. Offers the PM-curated `translate`
+ * aliases (`AliasPicker`), degrading to the free catalog picker on an uncurated
+ * site. The chosen model is what /api/translate uses to render page/component
+ * text into the Site's other locales.
  *
  * REST-only (no server actions). next-intl copy. Saves on selection (pick =
  * persist), mirroring the image-model manager.
@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ModelPicker } from "@/components/chat/model-picker";
+import { AliasPicker } from "@/components/settings/alias-picker";
 import { DEFAULT_TRANSLATE_MODEL } from "@/lib/chat/models";
 
 export function TranslateModelManager() {
@@ -67,7 +67,12 @@ export function TranslateModelManager() {
       )}
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-foreground">{t("label")}</span>
-        <ModelPicker value={model} onChange={(id) => void choose(id)} direction="down" />
+        <AliasPicker
+          value={model}
+          onChange={(id) => void choose(id)}
+          purpose="translate"
+          direction="down"
+        />
         <span className="text-xs text-foreground-muted">{t("hint")}</span>
       </div>
       {saved && <span className="text-sm text-success">{t("saved")}</span>}

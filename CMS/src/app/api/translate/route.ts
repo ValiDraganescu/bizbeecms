@@ -30,6 +30,7 @@ import { applyTranslation } from "@/db/translate-store";
 import { meterAiCall } from "@/db/ai-usage-store";
 import { aiQuotaDenial } from "@/lib/ai-quota/guard";
 import { getContentLocales, getTranslateModel } from "@/db/settings-store";
+import { getAiConfig, effectiveModel } from "@/lib/ai-config";
 import { requireAdmin } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -84,12 +85,18 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // The operator-selected translation model (Settings → AI models), falling back
-  // to DEFAULT_TRANSLATE_MODEL when unset. A stored id was already validated against
-  // the catalog at PATCH time (resolveTranslateModel), so it's trusted here.
+  // The operator-selected translation model (Settings → AI models). The stored
+  // value is a curated alias key or a legacy raw model id — `effectiveModel`
+  // resolves both, and falls back to DEFAULT_TRANSLATE_MODEL when this site has
+  // no curated config.
   let translateModel = DEFAULT_TRANSLATE_MODEL;
   try {
-    translateModel = (await getTranslateModel()) || DEFAULT_TRANSLATE_MODEL;
+    translateModel = effectiveModel(
+      await getAiConfig(),
+      "translate",
+      await getTranslateModel(),
+      DEFAULT_TRANSLATE_MODEL,
+    );
   } catch {
     /* no D1 → default */
   }

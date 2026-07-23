@@ -334,7 +334,6 @@
     "apiKeys": "MCP",
     "users": "Kasutajad",
     "google": "Google'i sisselogimine",
-    "openrouterKey": "OpenRouteri võti",
     "media": "AI mudelid",
     "iconSet": "Ikoonid",
     "exportImport": "Eksport / Import",
@@ -1290,25 +1289,6 @@
     "saved": "Salvestatud",
     "clear": "Tühjenda",
     "clearConfirm": "Eemaldada salvestatud Google'i kliendi mandaadid? Google'i sisselogimine keelatakse, kuni need uuesti lisate.",
-    "cancel": "Tühista"
-  },
-  "openrouterKey": {
-    "title": "OpenRouteri võti",
-    "subtitle": "Kasuta selle saidi AI-assistendi jaoks oma OpenRouteri võtit.",
-    "forbidden": "Sul puudub õigus OpenRouteri võtit hallata.",
-    "loading": "Laadimine…",
-    "help": "Kleebi oma OpenRouteri API-võti (algab \"sk-or-\"). See salvestatakse krüpteeritult ja seda eelistatakse sisseehitatud võtmele. Jäta tühjaks, et kasutada juurutuse võtit.",
-    "statusLabel": "Olek",
-    "keySet": "Võti määratud",
-    "noKey": "Võti puudub",
-    "keyLabel": "OpenRouteri API-võti",
-    "keyPlaceholder": "sk-or-…",
-    "keySetPlaceholder": "Võti on salvestatud — kleebi uus selle asendamiseks",
-    "save": "Salvesta",
-    "saving": "Salvestamine…",
-    "saved": "Salvestatud",
-    "clear": "Tühjenda",
-    "clearConfirm": "Eemaldada salvestatud OpenRouteri võti? AI-assistent kasutab juurutuse võtit.",
     "cancel": "Tühista"
   },
   "mediaSettings": {

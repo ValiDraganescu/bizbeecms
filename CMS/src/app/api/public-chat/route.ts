@@ -36,6 +36,7 @@ import { getChatAgent } from "@/db/chat-agent-store";
 import { getCounter, incrementCounter } from "@/db/usage-counter-store";
 import { meterAiCall } from "@/db/ai-usage-store";
 import { guestAiQuotaDenial } from "@/lib/ai-quota/guard";
+import { getAiConfig, resolveModelForPurpose } from "@/lib/ai-config";
 import {
   recentFailureTimestamps,
   recordFailure,
@@ -219,10 +220,20 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: "chat not available" }, { status: 503 });
     }
     const catalog = await catalogModels();
-    const model = resolveModel(
+    // The agent's stored model is a curated alias key (new) or a legacy raw
+    // model id. A curated match wins; with no curated config we keep the legacy
+    // catalog-validated behavior (unknown → DEFAULT_MODEL).
+    const curated = resolveModelForPurpose(
+      await getAiConfig(),
+      "chatAgent",
       agentRow.model ?? undefined,
-      catalog ? new Set(catalog.map((m) => m.id)) : undefined,
     );
+    const model =
+      curated?.model ??
+      resolveModel(
+        agentRow.model ?? undefined,
+        catalog ? new Set(catalog.map((m) => m.id)) : undefined,
+      );
     // Model-based output cap: the operator's configured number is a cost knob,
     // but the SELECTED model's own output cap (a fraction of its context
     // window, same rule as the admin chat route) always bounds it. The entry

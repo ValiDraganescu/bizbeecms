@@ -53,8 +53,7 @@ import { assembleSystemPrompt } from "./assemble-prompt";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { putAsset, setAssetTags } from "@/db/asset-store";
 import { buildAssetKey, assetUrl, filenameFromText } from "@/lib/render/asset";
-import { effectiveOpenrouterKey } from "@/lib/settings/openrouter-key";
-import { getDecryptedOpenrouterUserKey } from "@/db/openrouter-key-store";
+import { getAiConfig, effectiveModel } from "@/lib/ai-config";
 import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_IMAGE_GEN_MODEL,
@@ -715,23 +714,14 @@ async function handleGetAuthoringGuide(args: unknown): Promise<Record<string, un
 }
 
 /**
- * Resolve the effective OpenRouter key the SAME way the chat + describe routes do
- * (CMS-local user key beats the deployer env key), reading the Worker env via the
- * CF context. Returns "" when no key/context — callers treat that as "AI disabled".
+ * The deployer-injected OpenRouter key from the Worker env, read via the CF
+ * context. Returns "" when no key/context — callers treat that as "AI disabled".
  */
 async function resolveOpenrouterKey(): Promise<string> {
   try {
     const { env } = await getCloudflareContext({ async: true });
-    const e = env as unknown as { OPENROUTER_API_KEY?: string; CMS_AUTH_SECRET?: string };
-    let userKey: string | null = null;
-    if (typeof e.CMS_AUTH_SECRET === "string" && e.CMS_AUTH_SECRET) {
-      try {
-        userKey = await getDecryptedOpenrouterUserKey(e.CMS_AUTH_SECRET);
-      } catch {
-        userKey = null;
-      }
-    }
-    return effectiveOpenrouterKey(userKey, e.OPENROUTER_API_KEY);
+    const e = env as unknown as { OPENROUTER_API_KEY?: string };
+    return typeof e.OPENROUTER_API_KEY === "string" ? e.OPENROUTER_API_KEY.trim() : "";
   } catch {
     return "";
   }
@@ -770,11 +760,18 @@ async function handleGenerateImage(args: unknown): Promise<Record<string, unknow
 
   const key = await resolveOpenrouterKey();
   if (!key) {
-    return { ok: false, errors: ["no OpenRouter key configured — set one in Settings → OpenRouter key"] };
+    return { ok: false, errors: ["no OpenRouter key configured for this site — AI is unavailable"] };
   }
 
-  // The image-GENERATION model (operator-selected; falls back to the default).
-  const genModel = (await getImageGenModel()) || DEFAULT_IMAGE_GEN_MODEL;
+  // The image-GENERATION model. The stored value is a curated alias key (new) or
+  // a legacy raw model id — both resolve; no curated config → legacy default.
+  const aiConfig = await getAiConfig();
+  const genModel = effectiveModel(
+    aiConfig,
+    "imageGenerate",
+    await getImageGenModel(),
+    DEFAULT_IMAGE_GEN_MODEL,
+  );
   // For a transparent cut-out: tell the model to render on a flat white background
   // (so the flood-fill has a clean key), then strip it after generation below.
   const genPrompt = valid.transparentBackground
@@ -812,7 +809,12 @@ async function handleGenerateImage(args: unknown): Promise<Record<string, unknow
   const dataUrl = `data:${image.contentType};base64,${bufferToBase64(image.bytes)}`;
   let description = "";
   try {
-    const describeModel = (await getImageModel()) || DEFAULT_IMAGE_MODEL;
+    const describeModel = effectiveModel(
+      aiConfig,
+      "imageDescribe",
+      await getImageModel(),
+      DEFAULT_IMAGE_MODEL,
+    );
     const described = await describeImage(dataUrl, describeModel, key);
     meterAiCall("imageDescribe", describeModel, described.cost).catch(() => {});
     description = described.description;

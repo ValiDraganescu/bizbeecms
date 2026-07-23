@@ -6,9 +6,9 @@
  * searched by what an image DEPICTS, not just its filename.
  *
  * This module is PURE (no React/D1/CF imports) so it's node-testable like its
- * peers: the route resolves the model + OpenRouter key (via the existing
- * `effectiveOpenrouterKey` path) and passes them in. The live HTTP call is HITL
- * (can't run offline); the prompt-build + response-parse are unit-tested.
+ * peers: the route resolves the model (via `effectiveModel`) + the env
+ * OpenRouter key and passes them in. The live HTTP call is HITL (can't run
+ * offline); the prompt-build + response-parse are unit-tested.
  *
  * ponytail: a standalone NON-STREAMING helper, not a method on the `Ai` port
  * (that port is streaming-only by contract). One small `fetch` POST.

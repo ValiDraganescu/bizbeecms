@@ -8,8 +8,8 @@ import { useTranslations } from "next-intl";
  * Settings sub-sidebar — a page-builder-style second rail with GROUPED links
  * to every settings page, rendered ONCE by the settings layout (content on the
  * right). Replaces the old top tab bar. Groups: Site (locales, export/import),
- * Appearance (theme, brand, icons), AI (OpenRouter key, AI models, MCP API
- * keys — all AI integration & management), Access (users, Google sign-in).
+ * Appearance (theme, brand, icons), AI (AI models, MCP API keys — all AI
+ * integration & management), Access (users, Google sign-in).
  */
 const GROUPS = [
   {
@@ -37,7 +37,6 @@ const GROUPS = [
   {
     key: "ai",
     items: [
-      { key: "openrouterKey", href: "/admin/settings/openrouter-key" },
       { key: "media", href: "/admin/settings/media" },
       { key: "apiKeys", href: "/admin/settings/api-keys" },
     ],

@@ -30,7 +30,8 @@ import { getActiveDataSourcesContext } from "@/lib/chat/data-sources-context";
 import { getActiveChatAgentsContext } from "@/lib/chat/chat-agents-context";
 import { CHAT_MODELS, DEFAULT_MODEL, type CatalogModel } from "@/lib/chat/models";
 import { coerceCatalog } from "@/lib/chat/catalog-coerce";
-import { ModelPicker } from "@/components/chat/model-picker";
+import { AliasPicker, useCuratedAliases } from "@/components/settings/alias-picker";
+import { matchAlias } from "@/lib/ai-config/alias-options";
 import { resolveInitialModel, loadModel, saveModel } from "@/lib/chat/selected-model";
 import { formatUsd } from "@/lib/public-chat/core";
 import { nextUnread } from "@/lib/chat/unread-badge";
@@ -130,8 +131,16 @@ export function ChatWidget() {
   // input modalities so the attachment `+`/drop-zone gates correctly. Seeded with
   // the static fallback; replaced once /api/chat/models loads.
   const [catalog, setCatalog] = useState<ReadonlyArray<CatalogModel>>(CHAT_MODELS);
+  // Curated `assistant` aliases (ai-cost-quotas). Empty on an uncurated site,
+  // where the picker degrades to the free catalog and `model` stays a raw id.
+  const { aliases: assistantAliases, loading: aliasesLoading } =
+    useCuratedAliases("assistant");
+  // `model` may be an alias key, so map it through the alias to the real model
+  // id before reading catalog metadata — otherwise the attachment `+`/drop-zone
+  // would see no modalities and wrongly gate to text-only.
+  const selectedModelId = matchAlias(assistantAliases, model)?.model ?? model;
   const selectedModalities =
-    catalog.find((m) => m.id === model)?.inputModalities ?? ["text"];
+    catalog.find((m) => m.id === selectedModelId)?.inputModalities ?? ["text"];
   function setModel(id: string) {
     setModelState(id);
     saveModel(id);
@@ -341,10 +350,17 @@ export function ChatWidget() {
   }
 
   // Restore the persisted model once on mount, validated against the live
-  // catalog so a model that's no longer offered falls back to the default.
+  // catalog so a model that's no longer offered falls back to the default. A
+  // curated alias key isn't a catalog id, so it's restored as-is and the
+  // catalog gate only applies to raw model ids (uncurated sites).
   useEffect(() => {
     const stored = loadModel();
     if (!stored) return;
+    if (aliasesLoading) return; // wait: we can't yet tell an alias from a raw id
+    if (matchAlias(assistantAliases, stored)) {
+      setModelState(stored);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       let ids: string[] = [];
@@ -367,7 +383,7 @@ export function ChatWidget() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [aliasesLoading, assistantAliases]);
 
   // Clear the unread badge whenever the panel is open.
   useEffect(() => {
@@ -767,7 +783,7 @@ export function ChatWidget() {
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <div className="flex items-center gap-2">
                         <span className="shrink-0">{t("model")}</span>
-                        <ModelPicker value={model} onChange={setModel} />
+                        <AliasPicker value={model} onChange={setModel} purpose="assistant" />
                       </div>
                       {credit && (
                         <span className="shrink-0 tabular-nums" title={t("creditTitle")}>
