@@ -34,6 +34,7 @@ import { assembleSystemPrompt } from "@/lib/chat/assemble-prompt";
 import { effectiveSystemPrompt } from "@/lib/chat/prompt-version";
 import { resolveModel, outputCapFor } from "@/lib/chat/models";
 import { getModelCatalogCache } from "@/db/settings-store";
+import { meterAiCall } from "@/db/ai-usage-store";
 import { requireAdmin, currentUserIsPmSso } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
@@ -137,7 +138,11 @@ export async function POST(request: Request): Promise<Response> {
 
   // Multi-turn tool loop (round-tripping): a turn that calls tools gets its results
   // fed back so the model can chain. A turn with no tool call is the final answer.
-  const stream = streamChatRounds(upstream, messages, turn, runToolsRound);
+  // Each turn's provider cost is metered into this month's spend counters
+  // (ai-cost-quotas) — fire-and-forget, never delaying or failing the stream.
+  const stream = streamChatRounds(upstream, messages, turn, runToolsRound, undefined, (u) => {
+    meterAiCall("assistant", model, u.cost).catch(() => {});
+  });
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",

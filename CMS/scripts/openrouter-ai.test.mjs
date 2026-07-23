@@ -55,6 +55,8 @@ test("chat POSTs to OpenRouter with Bearer auth + OpenAI-compatible streaming bo
   assert.equal(typeof sent.max_tokens, "number");
   assert.ok(sent.max_tokens > 0);
   assert.deepEqual(sent.stream_options, { include_usage: true });
+  // Actual charged cost in the final usage chunk — the spend meter's input.
+  assert.deepEqual(sent.usage, { include: true });
 
   // Upstream stream returned as-is — NOT buffered/consumed.
   assert.equal(stream, sentinel);

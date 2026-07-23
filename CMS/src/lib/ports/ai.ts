@@ -119,6 +119,10 @@ export class OpenRouterAi implements Ai {
       // Ask OpenRouter to emit a final usage chunk (prompt/completion/total
       // tokens) so the route can surface context usage to the widget.
       stream_options: { include_usage: true },
+      // Ask OpenRouter to include the ACTUAL charged cost (`usage.cost`, USD) in
+      // that final chunk — the metering source of truth (docs/ai-cost-quotas.md).
+      // Belt-and-braces: OpenRouter includes it by default now.
+      usage: { include: true },
       max_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
     };
     if (options.tools) body.tools = options.tools;

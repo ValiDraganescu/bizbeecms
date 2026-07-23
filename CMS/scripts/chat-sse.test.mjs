@@ -13,6 +13,7 @@ import {
   extractDelta,
   frameEvent,
   parseChatBody,
+  parseUsageCost,
 } from "../src/lib/chat/sse.ts";
 
 const chunk = (text) =>
@@ -97,6 +98,61 @@ test("parseLine: usage:null or all-zero usage → null (nothing to report)", () 
   assert.equal(
     parseLine(`data: ${JSON.stringify({ usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } })}`),
     null,
+  );
+});
+
+test("parseLine: usage.cost surfaces the charged dollars for metering", () => {
+  const line = `data: ${JSON.stringify({
+    choices: [],
+    usage: { prompt_tokens: 1200, completion_tokens: 340, total_tokens: 1540, cost: 0.0123 },
+  })}`;
+  assert.deepEqual(parseLine(line), {
+    type: "usage",
+    promptTokens: 1200,
+    completionTokens: 340,
+    totalTokens: 1540,
+    cost: 0.0123,
+  });
+});
+
+test("parseLine: absent/zero/garbage cost stays undefined (never a fake $0 turn)", () => {
+  const usageWith = (extra) =>
+    parseLine(
+      `data: ${JSON.stringify({
+        usage: { prompt_tokens: 10, completion_tokens: 5, ...extra },
+      })}`,
+    );
+  assert.equal(usageWith({}).cost, undefined);
+  assert.equal(usageWith({ cost: 0 }).cost, undefined);
+  assert.equal(usageWith({ cost: "0.02" }).cost, undefined);
+  assert.equal(usageWith({ cost: -1 }).cost, undefined);
+});
+
+test("parseLine: a cost-only usage chunk still reports (zero tokens, real money)", () => {
+  const line = `data: ${JSON.stringify({ choices: [], usage: { cost: 0.04 } })}`;
+  assert.deepEqual(parseLine(line), {
+    type: "usage",
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    cost: 0.04,
+  });
+});
+
+test("parseUsageCost: reads the cost of a NON-streaming completion body", () => {
+  const body = JSON.stringify({
+    choices: [{ message: { content: "hi" } }],
+    usage: { prompt_tokens: 20, completion_tokens: 3, cost: 0.000_9 },
+  });
+  assert.equal(parseUsageCost(body), 0.0009);
+});
+
+test("parseUsageCost: unparseable body or no usage → undefined", () => {
+  assert.equal(parseUsageCost("not json"), undefined);
+  assert.equal(parseUsageCost(JSON.stringify({ choices: [] })), undefined);
+  assert.equal(
+    parseUsageCost(JSON.stringify({ usage: { prompt_tokens: 5, completion_tokens: 1 } })),
+    undefined,
   );
 });
 

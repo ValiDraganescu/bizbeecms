@@ -27,6 +27,7 @@ import {
 } from "@/lib/chat/translate-request";
 import { validateTranslationInput } from "@/lib/chat/translate-tool";
 import { applyTranslation } from "@/db/translate-store";
+import { meterAiCall } from "@/db/ai-usage-store";
 import { getContentLocales, getTranslateModel } from "@/db/settings-store";
 import { requireAdmin } from "@/lib/auth/guard";
 
@@ -96,7 +97,11 @@ export async function POST(request: Request): Promise<Response> {
       buildTranslateMessages(req.fromLocale, targetLocales, req.fields),
       { model: translateModel },
     );
-    modelText = await collectStreamText(upstream);
+    const collected = await collectStreamText(upstream);
+    modelText = collected.text;
+    // Meter this month's AI spend (ai-cost-quotas) — fire-and-forget, so a
+    // metering failure never costs the operator their translation.
+    meterAiCall("translate", translateModel, collected.cost).catch(() => {});
   } catch (err) {
     return Response.json(
       { error: `AI request failed: ${(err as Error).message}` },

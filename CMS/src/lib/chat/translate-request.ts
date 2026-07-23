@@ -171,20 +171,28 @@ export function buildTranslateMessages(
 }
 
 /**
- * Drain a streaming `Ai.chat` SSE byte stream into the full assistant text.
+ * Drain a streaming `Ai.chat` SSE byte stream into the full assistant text plus
+ * the provider's reported `usage.cost` (USD) from the final usage chunk — the
+ * non-streaming callers meter that cost like the streaming routes do
+ * (ai-cost-quotas). `cost` is undefined when upstream reported none.
+ *
  * Reuses the same `SseDeltaParser` the chat route streams through, so the
  * non-streaming path can't drift from the streaming one. Never throws on a
  * malformed chunk (the parser tolerates keep-alives / partial garbage).
  */
 export async function collectStreamText(
   stream: ReadableStream<Uint8Array>,
-): Promise<string> {
+): Promise<{ text: string; cost?: number }> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   const parser = new SseDeltaParser();
   let text = "";
+  let cost: number | undefined;
   const take = (events: ReturnType<SseDeltaParser["push"]>) => {
-    for (const ev of events) if (ev.type === "delta") text += ev.text;
+    for (const ev of events) {
+      if (ev.type === "delta") text += ev.text;
+      else if (ev.type === "usage" && ev.cost !== undefined) cost = ev.cost;
+    }
   };
   for (;;) {
     const { done, value } = await reader.read();
@@ -192,7 +200,7 @@ export async function collectStreamText(
     if (done) break;
   }
   take(parser.flush());
-  return text;
+  return { text, cost };
 }
 
 /**

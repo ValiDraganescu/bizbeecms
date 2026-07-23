@@ -14,6 +14,8 @@
  * (that port is streaming-only by contract). One small `fetch` POST.
  */
 
+import { parseUsageCost } from "./sse.ts";
+
 /** OpenRouter's OpenAI-compatible chat-completions endpoint (same as the chat). */
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -86,18 +88,27 @@ export function parseDescription(rawBody: string): string {
     : clean;
 }
 
+/** A completed describe call: the cleaned text + what the provider charged (USD). */
+export interface DescribeResult {
+  /** Cleaned description; "" on any failure (the upload must still succeed). */
+  description: string;
+  /** `usage.cost` in USD, for metering; undefined when upstream reported none. */
+  cost?: number;
+}
+
 /**
- * Describe one image via a non-streaming OpenRouter completion. Returns the
- * cleaned description, or "" on any failure (the upload must still succeed).
- * `key`/`model` are resolved by the caller; `fetchImpl` is injectable for tests.
+ * Describe one image via a non-streaming OpenRouter completion. Never throws:
+ * any failure yields an empty description (and no cost), so an upload can't
+ * fail over a bad describe. `key`/`model` are resolved by the caller;
+ * `fetchImpl` is injectable for tests.
  */
 export async function describeImage(
   imageUrl: string,
   model: string,
   key: string,
   fetchImpl: FetchLike = fetch as unknown as FetchLike,
-): Promise<string> {
-  if (!key || !model) return "";
+): Promise<DescribeResult> {
+  if (!key || !model) return { description: "" };
   try {
     const res = await fetchImpl(OPENROUTER_CHAT_URL, {
       method: "POST",
@@ -110,11 +121,15 @@ export async function describeImage(
         messages: buildDescribeMessages(imageUrl),
         stream: false,
         max_tokens: 300,
+        // Actual charged cost in the reply body — the metering source of truth.
+        usage: { include: true },
       }),
     });
-    if (!res.ok) return "";
-    return parseDescription(await res.text());
+    if (!res.ok) return { description: "" };
+    const raw = await res.text();
+    const cost = parseUsageCost(raw);
+    return { description: parseDescription(raw), ...(cost === undefined ? {} : { cost }) };
   } catch {
-    return "";
+    return { description: "" };
   }
 }
