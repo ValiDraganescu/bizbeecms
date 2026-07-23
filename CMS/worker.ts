@@ -31,6 +31,7 @@ import {
 import { peelLocaleSegment, resolveSlugPath } from "./src/lib/render/slug";
 import { resolvePage } from "./src/lib/render/resolve-page";
 import {
+  adminApiNoStore,
   isEdgeCacheCandidate,
   pathnameSegments,
   edgeCacheHeaders,
@@ -117,6 +118,21 @@ export default {
     }
     const response: Response = await handler.fetch(handledRequest, env, ctx);
     try {
+      // Default-deny caching for /api + /admin: the SaaS zone's edge cached a
+      // header-less admin API 200 and served it to unauthenticated requests
+      // (2026-07-23). Any response on these surfaces that didn't opt in with
+      // its own Cache-Control is stamped uncacheable, whatever the zone does.
+      // Uses the ORIGINAL request pathname (pre-.md-rewrite), i.e. the URL the
+      // edge would cache under.
+      const noStore = adminApiNoStore({
+        pathname: new URL(request.url).pathname,
+        hasCacheControl: response.headers.has("Cache-Control"),
+      });
+      if (noStore) {
+        const out = new Response(response.body, response);
+        out.headers.set("Cache-Control", noStore);
+        return out;
+      }
       // Component-preview Cache-Control (/preview/component/<name>): gallery
       // requests (?v=<updatedAt>) cache immutable in the browser; version-less
       // (Develop iframe, page-builder rail, AI capture) are ALWAYS no-store —

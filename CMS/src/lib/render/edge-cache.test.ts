@@ -29,6 +29,7 @@ import {
   isVerifiedCrawler,
   RATE_LIMIT_RETRY_AFTER,
   componentPreviewCacheControl,
+  adminApiNoStore,
 } from "./edge-cache.ts";
 import { peelLocaleSegment } from "./slug.ts";
 import { SKIP_SEGMENTS } from "./localize-links.ts";
@@ -428,5 +429,48 @@ test("componentPreviewCacheControl leaves every other path alone", () => {
     "/api/components/palette",
   ]) {
     assert.equal(componentPreviewCacheControl({ pathname, hasVersion: true, status: 200 }), null);
+  }
+});
+
+// ── adminApiNoStore ──────────────────────────────────────────────────────────
+
+test("adminApiNoStore stamps /api and /admin responses lacking Cache-Control", () => {
+  for (const pathname of [
+    "/api/ai-config/aliases",
+    "/api/pages",
+    "/admin",
+    "/admin/settings/media",
+    "/API/pages", // case-insensitive segment match
+  ]) {
+    assert.equal(
+      adminApiNoStore({ pathname, hasCacheControl: false }),
+      "private, no-store",
+    );
+  }
+});
+
+test("adminApiNoStore respects a route's own Cache-Control (opt-in stays opt-in)", () => {
+  // The public /api/md page variant and the chat streams set their own header.
+  assert.equal(
+    adminApiNoStore({ pathname: "/api/md/about", hasCacheControl: true }),
+    null,
+  );
+  assert.equal(
+    adminApiNoStore({ pathname: "/admin/settings", hasCacheControl: true }),
+    null,
+  );
+});
+
+test("adminApiNoStore leaves public surfaces alone", () => {
+  for (const pathname of [
+    "/",
+    "/about",
+    "/fi/blog/hello",
+    "/media/assets/x.png",
+    "/preview/component/Header",
+    "/sitemap.xml",
+    "/apidocs", // merely STARTS with 'api' — not the /api segment
+  ]) {
+    assert.equal(adminApiNoStore({ pathname, hasCacheControl: false }), null);
   }
 });

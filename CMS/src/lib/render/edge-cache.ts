@@ -211,6 +211,27 @@ export function isEdgeCacheCandidate(input: {
 }
 
 /**
+ * Default-deny Cache-Control for the admin/API surfaces (`/api/*`, `/admin/*`).
+ * Deployed Sites sit behind the SaaS zone's edge, and a 200 that carries NO
+ * Cache-Control can be cached by zone-level cache config the CMS doesn't
+ * control — which served a stale, auth-gated `/api/ai-config/aliases` response
+ * to UNAUTHENTICATED requests for its whole edge TTL (2026-07-23 incident).
+ * So caching on these surfaces is opt-in per route: a response that set its own
+ * Cache-Control keeps it (the public `/api/md` page variant, the chat streams'
+ * `no-cache, no-transform`), and everything else gets `private, no-store`.
+ * Applies to every method and status — an error body is no safer to cache.
+ */
+export function adminApiNoStore(input: {
+  pathname: string;
+  hasCacheControl: boolean;
+}): string | null {
+  if (input.hasCacheControl) return null;
+  const first = pathnameSegments(input.pathname)[0]?.trim().toLowerCase() ?? "";
+  if (first !== "api" && first !== "admin") return null;
+  return "private, no-store";
+}
+
+/**
  * Naughty-robot rate limiting (seo-robots): default cap advertised to crawlers
  * that blow past the Workers rate-limit binding. The binding's actual
  * period/limit is configured in wrangler.jsonc (`unsafe.bindings` — 100 req /
