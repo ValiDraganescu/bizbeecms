@@ -189,6 +189,7 @@ import { removeBackgroundFromPng } from "./png-cutout";
 import { describeImage } from "./describe-image";
 import { meterAiCall } from "@/db/ai-usage-store";
 import { aiQuotaToolError } from "@/lib/ai-quota/guard";
+import { waitUntilOrInline } from "@/lib/cf/wait-until";
 import { applyEdit } from "./apply-edit";
 import { reconcileComponentClasses } from "./reconcile-classes";
 import { lintComponentScript } from "./lint-component-script";
@@ -781,8 +782,9 @@ async function handleGenerateImage(args: unknown): Promise<Record<string, unknow
   try {
     const generated = await generateImage(genPrompt, genModel, key);
     // Meter what the provider charged even when the reply carried no usable
-    // image — we were billed either way. Fire-and-forget (ai-cost-quotas).
-    meterAiCall("imageGenerate", genModel, generated.cost).catch(() => {});
+    // image — we were billed either way. Under waitUntil: a merely-dangling
+    // promise is cancelled when the response settles (ai-cost-quotas).
+    waitUntilOrInline(meterAiCall("imageGenerate", genModel, generated.cost).catch(() => {}));
     image = generated.image;
   } catch (err) {
     return { ok: false, errors: [`image generation failed: ${(err as Error).message}`] };
@@ -816,7 +818,7 @@ async function handleGenerateImage(args: unknown): Promise<Record<string, unknow
       DEFAULT_IMAGE_MODEL,
     );
     const described = await describeImage(dataUrl, describeModel, key);
-    meterAiCall("imageDescribe", describeModel, described.cost).catch(() => {});
+    waitUntilOrInline(meterAiCall("imageDescribe", describeModel, described.cost).catch(() => {}));
     description = described.description;
   } catch {
     description = "";

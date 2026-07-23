@@ -62,10 +62,37 @@ async function readCache(): Promise<AiConfigCache | null> {
 }
 
 /**
+ * Isolate-level micro-memo + single-flight. One AI request touches the config
+ * several times (quota guard, model resolution, per-turn metering) and each
+ * touch was a D1 read — and past the 15-min TTL, EVERY concurrent request
+ * would dial PM at once. A few-second memo makes repeat reads free, and the
+ * shared in-flight promise collapses a TTL-expiry burst into one refresh.
+ * Config staleness tolerance is minutes, so seconds of memo change nothing.
+ */
+const MEMO_MS = 5_000;
+let memo: { at: number; value: AiConfig | null } | null = null;
+let inflight: Promise<AiConfig | null> | null = null;
+
+/**
  * The curated AI config for this Site, or null when it has never been fetched
  * successfully. The first read past the TTL pays for the refresh.
  */
 export async function getAiConfig(): Promise<AiConfig | null> {
+  if (memo && Date.now() - memo.at < MEMO_MS) return memo.value;
+  if (inflight) return inflight;
+
+  inflight = loadAiConfig()
+    .then((value) => {
+      memo = { at: Date.now(), value };
+      return value;
+    })
+    .finally(() => {
+      inflight = null;
+    });
+  return inflight;
+}
+
+async function loadAiConfig(): Promise<AiConfig | null> {
   const cached = await readCache();
   if (cached && isAiConfigFresh(cached.fetchedAt, Date.now())) return cached.config;
 

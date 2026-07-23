@@ -28,6 +28,7 @@ import {
 import { validateTranslationInput } from "@/lib/chat/translate-tool";
 import { applyTranslation } from "@/db/translate-store";
 import { meterAiCall } from "@/db/ai-usage-store";
+import { waitUntilOrInline } from "@/lib/cf/wait-until";
 import { aiQuotaDenial } from "@/lib/ai-quota/guard";
 import { getContentLocales, getTranslateModel } from "@/db/settings-store";
 import { getAiConfig, effectiveModel } from "@/lib/ai-config";
@@ -110,9 +111,11 @@ export async function POST(request: Request): Promise<Response> {
     );
     const collected = await collectStreamText(upstream);
     modelText = collected.text;
-    // Meter this month's AI spend (ai-cost-quotas) — fire-and-forget, so a
-    // metering failure never costs the operator their translation.
-    meterAiCall("translate", translateModel, collected.cost).catch(() => {});
+    // Meter this month's AI spend (ai-cost-quotas) — under waitUntil, so a
+    // metering failure never costs the operator their translation and the
+    // write still lands after the response settles (a dangling promise would
+    // be cancelled on Workers).
+    waitUntilOrInline(meterAiCall("translate", translateModel, collected.cost).catch(() => {}));
   } catch (err) {
     return Response.json(
       { error: `AI request failed: ${(err as Error).message}` },

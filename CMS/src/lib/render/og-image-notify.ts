@@ -23,7 +23,7 @@
  * Remove every `og/<id>.<locale>.png` the page could have carried (Storage has
  * no list, so we derive the keys from the configured locales). Best-effort.
  */
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { waitUntilOrInline } from "@/lib/cf/wait-until";
 
 import { getDb } from "@/db";
 import { page as pageTable } from "@/db/schema";
@@ -198,14 +198,4 @@ export async function deleteOgImagesForPage(pageId: string): Promise<void> {
     }
   })();
   waitUntilOrInline(work);
-}
-
-/** Run `work` after the response flushes when a CF ctx exists; else inline. */
-function waitUntilOrInline(work: Promise<unknown>): void {
-  try {
-    const { ctx } = getCloudflareContext();
-    (ctx as { waitUntil?: (p: Promise<unknown>) => void }).waitUntil?.(work);
-  } catch {
-    void work; // no CF context (local dev / tests) — let it settle; errors swallowed.
-  }
 }

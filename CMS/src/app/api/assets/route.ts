@@ -28,6 +28,7 @@ import { getImageModel } from "@/db/settings-store";
 import { DEFAULT_IMAGE_MODEL } from "@/lib/chat/models";
 import { meterAiCall } from "@/db/ai-usage-store";
 import { aiQuotaSpent } from "@/lib/ai-quota/guard";
+import { waitUntilOrInline } from "@/lib/cf/wait-until";
 import { getAiConfig, effectiveModel } from "@/lib/ai-config";
 
 export const dynamic = "force-dynamic";
@@ -68,9 +69,10 @@ async function describeUpload(
         ? thumbDataUrl
         : `data:${contentType};base64,${bufferToBase64(bytes)}`;
     const { description, cost } = await describeImage(imageUrl, model, key);
-    // Meter the month's AI spend (ai-cost-quotas) — fire-and-forget so the
-    // upload never waits on (or fails because of) the counter write.
-    meterAiCall("imageDescribe", model, cost).catch(() => {});
+    // Meter the month's AI spend (ai-cost-quotas) — under waitUntil so the
+    // upload never waits on the counter write AND the write still lands after
+    // the response settles (a dangling promise would be cancelled on Workers).
+    waitUntilOrInline(meterAiCall("imageDescribe", model, cost).catch(() => {}));
     return description;
   } catch {
     return "";

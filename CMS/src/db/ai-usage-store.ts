@@ -14,44 +14,20 @@
  *
  * Metering must NEVER fail or delay a user-facing AI call: `meterAiCall` is the
  * one entry point call sites use and it swallows everything (missing config,
- * unbound D1, absent cost). The money math + month derivation are pure helpers
- * in `lib/public-chat/core.ts` (node-tested); this file is only the D1 seam.
+ * unbound D1, absent cost). What gets recorded is decided by the pure
+ * `decideAiMeter` (lib/ai-quota/decision.ts, node-tested); this file is only
+ * the D1 seam. Both counters bump together (atomic upserts, run in parallel)
+ * so raw and billable can't drift by a call.
  */
-import { getAiConfig, marginPctForModel, type AiPurpose } from "../lib/ai-config/index.ts";
-import {
-  aiUsageMonth,
-  billableNanoUsd,
-  quotaExceeded,
-  rawNanoUsd,
-} from "../lib/public-chat/core.ts";
+import { getAiConfig, type AiPurpose } from "../lib/ai-config/index.ts";
+import { decideAiMeter } from "../lib/ai-quota/decision.ts";
+import { aiUsageMonth, quotaExceeded } from "../lib/public-chat/core.ts";
 import { getCounter, incrementCounter } from "./usage-counter-store.ts";
 
 /** The two counter keys for a UTC month bucket. */
 function monthKeys(now: Date): { month: string; raw: string; billable: string } {
   const month = aiUsageMonth(now);
   return { month, raw: `ai:${month}:raw`, billable: `ai:${month}:billable` };
-}
-
-/**
- * Accrue one AI call's provider cost into the current month's raw + billable
- * counters. No-op when the provider reported no cost (`costUsd <= 0`) — an
- * un-costed turn is recorded as nothing rather than a fabricated $0.
- */
-export async function recordAiUsage(
-  costUsd: number,
-  marginPct: number,
-  now: Date = new Date(),
-): Promise<void> {
-  const raw = rawNanoUsd(costUsd);
-  if (raw <= 0) return;
-  const billable = billableNanoUsd(costUsd, marginPct);
-  const keys = monthKeys(now);
-  // Both counters bump together (independent atomic upserts, run in parallel) so
-  // raw and billable can't drift by a call.
-  await Promise.all([
-    incrementCounter(keys.raw, raw),
-    incrementCounter(keys.billable, billable),
-  ]);
 }
 
 /** This month's metered spend (both counters, integer nano-USD; 0 when unused). */
@@ -86,12 +62,15 @@ export async function meterAiCall(
   modelId: string | null | undefined,
   costUsd: number | undefined,
 ): Promise<number> {
-  if (costUsd === undefined || rawNanoUsd(costUsd) <= 0) return 0;
   try {
-    const config = await getAiConfig();
-    const marginPct = marginPctForModel(config, purpose, modelId);
-    await recordAiUsage(costUsd, marginPct);
-    return billableNanoUsd(costUsd, marginPct);
+    const decision = decideAiMeter(await getAiConfig(), purpose, modelId, costUsd);
+    if (!decision) return 0;
+    const keys = monthKeys(new Date());
+    await Promise.all([
+      incrementCounter(keys.raw, decision.rawNanoUsd),
+      incrementCounter(keys.billable, decision.billableNanoUsd),
+    ]);
+    return decision.billableNanoUsd;
   } catch {
     return 0; // metering is best-effort — never surfaces to the caller
   }
