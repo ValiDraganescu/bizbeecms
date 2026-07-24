@@ -180,8 +180,32 @@ export function buildTranslateMessages(
  * non-streaming path can't drift from the streaming one. Never throws on a
  * malformed chunk (the parser tolerates keep-alives / partial garbage).
  */
+/** Thrown by `collectStreamText` when the upstream stream stalls (no bytes for
+ *  `idleTimeoutMs`). Distinct type so the route can map it to a 504 (gateway
+ *  timeout) instead of a generic 502, and log the stall specifically. */
+export class StreamStallError extends Error {
+  // Plain field + assignment (NOT a `public readonly` parameter property): node's
+  // strip-only TS mode used by `node --test` rejects parameter properties.
+  readonly idleMs: number;
+  constructor(idleMs: number) {
+    super(`upstream stream stalled: no data for ${idleMs}ms`);
+    this.name = "StreamStallError";
+    this.idleMs = idleMs;
+  }
+}
+
+/**
+ * Idle (not total) timeout for reading the model stream. Reset on every chunk,
+ * so a slow-but-progressing translation is never killed — only a genuinely
+ * stalled stream (connection open, no bytes) trips it. A stalled OpenRouter
+ * stream is exactly the "spinner never stops" bug: without this the read loop
+ * awaits forever and the route never responds.
+ */
+export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 45_000;
+
 export async function collectStreamText(
   stream: ReadableStream<Uint8Array>,
+  idleTimeoutMs: number = DEFAULT_STREAM_IDLE_TIMEOUT_MS,
 ): Promise<{ text: string; cost?: number }> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -194,13 +218,47 @@ export async function collectStreamText(
       else if (ev.type === "usage" && ev.cost !== undefined) cost = ev.cost;
     }
   };
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (value) take(parser.push(decoder.decode(value, { stream: true })));
-    if (done) break;
+  // A non-positive timeout disables the guard (existing tests pass fully-buffered
+  // fake streams that never stall and don't want a timer left dangling).
+  const guarded = idleTimeoutMs > 0;
+  try {
+    for (;;) {
+      const read = reader.read();
+      const { done, value } = guarded
+        ? await withIdleTimeout(read, idleTimeoutMs)
+        : await read;
+      if (value) take(parser.push(decoder.decode(value, { stream: true })));
+      if (done) break;
+    }
+  } catch (err) {
+    // On a stall, cancel the reader so the underlying connection is released
+    // (don't leave a dangling socket on the Worker). cancel() may itself reject
+    // on an already-broken stream — ignore that, the stall is what matters.
+    if (err instanceof StreamStallError) {
+      try {
+        await reader.cancel();
+      } catch {
+        /* stream already torn down */
+      }
+    }
+    throw err;
   }
   take(parser.flush());
   return { text, cost };
+}
+
+/**
+ * Race a `reader.read()` promise against an idle timer. Resolves with the read
+ * result if it wins; rejects with a `StreamStallError` if `ms` elapses first.
+ * The timer is always cleared (win or lose) so no handle dangles. PURE-ish (only
+ * effect is the timer, always cleaned up).
+ */
+function withIdleTimeout<T>(read: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new StreamStallError(ms)), ms);
+  });
+  return Promise.race([read, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**

@@ -24,6 +24,7 @@ import {
   parseTranslateRequest,
   parseTranslateResponse,
   resolveTargetLocales,
+  StreamStallError,
 } from "@/lib/chat/translate-request";
 import { validateTranslationInput } from "@/lib/chat/translate-tool";
 import { applyTranslation } from "@/db/translate-store";
@@ -102,8 +103,33 @@ export async function POST(request: Request): Promise<Response> {
     /* no D1 → default */
   }
 
-  // Ask the model for the translations.
+  // Structured log context for this request — every log line below carries it so
+  // a Worker-tail / dashboard search can reconstruct exactly what happened (which
+  // Site model, how many fields/locales, where it failed). No secrets, no source
+  // text (only counts + ids), so it's safe to log.
+  const startedAt = Date.now();
+  const logCtx = {
+    at: "api/translate",
+    kind: req.kind,
+    target: req.target,
+    model: translateModel,
+    fromLocale: req.fromLocale,
+    toLocales: targetLocales,
+    fieldCount: Object.keys(req.fields).length,
+  };
+  const log = (event: string, extra: Record<string, unknown> = {}) => {
+    // One JSON line per event → greppable in `wrangler tail` and Workers Logs.
+    console.log(JSON.stringify({ ...logCtx, event, ms: Date.now() - startedAt, ...extra }));
+  };
+
+  log("model_request");
+
+  // Ask the model for the translations. Distinguish the failure modes so both the
+  // response status AND the logs tell them apart: a STALL (stream opened then went
+  // silent — the "spinner never stops" bug) → 504, any other model/transport error
+  // → 502.
   let modelText: string;
+  let modelCost: number | undefined;
   try {
     const upstream = await ai.chat(
       buildTranslateMessages(req.fromLocale, targetLocales, req.fields),
@@ -111,17 +137,36 @@ export async function POST(request: Request): Promise<Response> {
     );
     const collected = await collectStreamText(upstream);
     modelText = collected.text;
-    // Meter this month's AI spend (ai-cost-quotas) — under waitUntil, so a
-    // metering failure never costs the operator their translation and the
-    // write still lands after the response settles (a dangling promise would
-    // be cancelled on Workers).
-    waitUntilOrInline(meterAiCall("translate", translateModel, collected.cost).catch(() => {}));
+    modelCost = collected.cost;
+    log("model_response", { textLen: modelText.length, cost: modelCost ?? null });
   } catch (err) {
+    if (err instanceof StreamStallError) {
+      log("model_stall", { error: err.message, idleMs: err.idleMs });
+      return Response.json(
+        {
+          error:
+            `The translation model (${translateModel}) stopped responding mid-stream. ` +
+            `This usually clears on a retry; if it keeps happening, pick a different ` +
+            `translation model in Settings → AI models.`,
+        },
+        { status: 504 },
+      );
+    }
+    log("model_error", { error: (err as Error).message });
     return Response.json(
       { error: `AI request failed: ${(err as Error).message}` },
       { status: 502 },
     );
   }
+
+  // Meter this month's AI spend (ai-cost-quotas) — under waitUntil, so a metering
+  // failure never costs the operator their translation and the write still lands
+  // after the response settles (a dangling promise would be cancelled on Workers).
+  waitUntilOrInline(
+    meterAiCall("translate", translateModel, modelCost).catch((err) => {
+      log("meter_failed", { error: (err as Error).message });
+    }),
+  );
 
   const { fields, missing } = parseTranslateResponse(
     modelText,
@@ -137,13 +182,24 @@ export async function POST(request: Request): Promise<Response> {
     { allowedLocales: locales?.locales },
   );
   if (!valid.ok) {
+    // The model responded but the output wasn't usable (non-JSON, wrong shape, or
+    // empty) — log a preview of the raw text so we can see WHAT the model returned
+    // without dumping the whole (possibly large) body.
+    log("output_invalid", {
+      errors: valid.errors,
+      missing,
+      textPreview: modelText.slice(0, 300),
+    });
     return Response.json({ errors: valid.errors, missing }, { status: 422 });
   }
+
+  if (missing.length > 0) log("output_partial", { missing });
 
   // Non-persisting caller (the page-builder per-block field) only wants the
   // produced maps — it merges them into the BLOCK's props and autosaves itself.
   // Skip the artifact write (a component target has nowhere to persist anyway).
   if (!req.persist) {
+    log("done", { persisted: false, missing: missing.length });
     return Response.json({
       ok: true,
       action: "translated",
@@ -158,8 +214,10 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const res = await applyTranslation(valid.input);
     if (!res.ok) {
+      log("apply_rejected", { errors: res.errors, missing });
       return Response.json({ errors: res.errors, missing }, { status: 422 });
     }
+    log("done", { persisted: true, fieldsWritten: res.fields, missing: missing.length });
     return Response.json({
       ok: true,
       action: res.action,
@@ -169,6 +227,7 @@ export async function POST(request: Request): Promise<Response> {
       missing,
     });
   } catch (err) {
+    log("apply_failed", { error: (err as Error).message });
     return Response.json(
       { error: `failed to apply translation: ${(err as Error).message}` },
       { status: 500 },

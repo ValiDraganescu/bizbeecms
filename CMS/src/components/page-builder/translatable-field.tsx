@@ -32,6 +32,11 @@ import type { Block } from "@/lib/render/tree";
  *  sites would wrap tabs into an unusable strip). Mirrors LocalePicker's threshold. */
 const LOCALE_TABS_MAX = 6;
 
+/** Abort a translate `fetch` that hasn't resolved by now, so the spinner can't
+ *  hang forever. A touch above the server's DEFAULT_STREAM_IDLE_TIMEOUT_MS (45s)
+ *  so a genuine server-side stall surfaces as its 504 rather than this abort. */
+const CLIENT_TIMEOUT_MS = 60_000;
+
 export function TranslatableField({
   field,
   schema,
@@ -86,10 +91,18 @@ export function TranslatableField({
     if (sourceText === "" || targets.length === 0) return;
     setError(null);
     setBusy(targets.length === 1 ? targets[0] : "all");
+    // Client-side backstop: even though the server now bounds its model read, a
+    // dropped connection / hung Worker could still leave `fetch` pending forever
+    // (the "spinner never stops" bug). Abort after CLIENT_TIMEOUT_MS so the
+    // spinner always clears with a message instead of hanging. The window is a
+    // touch above the server's idle timeout so a real server 504 wins the race.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
     try {
       const res = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           kind: "component",
           target: block.component,
@@ -115,8 +128,13 @@ export function TranslatableField({
       // Jump the view to the locale we just filled (or the first target).
       if (!targets.includes(loc)) setActive(targets[0]);
     } catch (err) {
-      setError((err as Error).message);
+      setError(
+        (err as Error).name === "AbortError"
+          ? t("translateField.timeout")
+          : (err as Error).message,
+      );
     } finally {
+      clearTimeout(timer);
       setBusy(null);
     }
   }

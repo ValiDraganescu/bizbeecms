@@ -997,7 +997,8 @@
       "all": "Käännä kaikille kielille",
       "one": "Käännä: {locale}",
       "emptyHint": "Ei {locale}-tekstiä vielä — käytä Käännä tai kirjoita se.",
-      "emptyHintShort": "Ei {locale}-tekstiä vielä."
+      "emptyHintShort": "Ei {locale}-tekstiä vielä.",
+      "timeout": "Kääntäminen aikakatkaistiin — malli ei vastannut. Yritä uudelleen."
     },
     "link": {
       "newTab": "Avaa uuteen välilehteen",

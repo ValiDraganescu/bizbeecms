@@ -997,7 +997,8 @@
       "all": "Tõlgi kõikidesse keeltesse",
       "one": "Tõlgi: {locale}",
       "emptyHint": "{locale} teksti veel pole — kasuta Tõlgi või kirjuta ise.",
-      "emptyHintShort": "{locale} teksti veel pole."
+      "emptyHintShort": "{locale} teksti veel pole.",
+      "timeout": "Tõlkimine aegus — mudel ei vastanud. Proovi uuesti."
     },
     "link": {
       "newTab": "Ava uuel vahelehel",

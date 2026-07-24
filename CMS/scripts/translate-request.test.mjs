@@ -16,6 +16,7 @@ import {
   buildTranslateMessages,
   collectStreamText,
   parseTranslateResponse,
+  StreamStallError,
 } from "../src/lib/chat/translate-request.ts";
 
 // ── parseTranslateRequest ────────────────────────────────────────────────────
@@ -120,6 +121,77 @@ test("collectStreamText: surfaces the final usage chunk's cost for metering", as
   const collected = await collectStreamText(stream);
   assert.equal(collected.text, "{}");
   assert.equal(collected.cost, 0.00031);
+});
+
+// A stream that emits `chunks`, then NEVER closes (its pull hangs) — models an
+// OpenRouter connection that opens and then goes silent (the "spinner forever"
+// bug). Records whether it was cancelled so we can assert cleanup.
+function stallingStream(chunks) {
+  const enc = new TextEncoder();
+  let i = 0;
+  const state = { cancelled: false };
+  const stream = new ReadableStream({
+    pull(controller) {
+      if (i < chunks.length) controller.enqueue(enc.encode(chunks[i++]));
+      // else: return nothing and never close → the reader's next read() hangs.
+    },
+    cancel() {
+      state.cancelled = true;
+    },
+  });
+  return { stream, state };
+}
+
+test("collectStreamText: a stalled stream throws StreamStallError and cancels the reader", async () => {
+  const { stream, state } = stallingStream([
+    'data: {"choices":[{"delta":{"content":"{\\"fi\\":"}}]}\n\n',
+  ]);
+  await assert.rejects(
+    // Tiny idle timeout so the test is fast; the stream sends one chunk then hangs.
+    () => collectStreamText(stream, 30),
+    (err) => {
+      assert.ok(err instanceof StreamStallError, "is a StreamStallError");
+      assert.equal(err.idleMs, 30);
+      assert.match(err.message, /stalled/);
+      return true;
+    },
+  );
+  // The reader was cancelled so the underlying connection is released.
+  assert.equal(state.cancelled, true, "stalled reader is cancelled");
+});
+
+test("collectStreamText: idle timeout RESETS per chunk — slow-but-progressing stream completes", async () => {
+  // Chunks arrive 20ms apart with a 50ms idle timeout: each gap is under the
+  // timeout, so a progressing stream must NOT be killed even though its total
+  // duration exceeds the timeout.
+  const enc = new TextEncoder();
+  const pieces = [
+    'data: {"choices":[{"delta":{"content":"{\\"fi\\":"}}]}\n\n',
+    'data: {"choices":[{"delta":{"content":"\\"Hei\\"}"}}]}\n\n',
+    "data: [DONE]\n\n",
+  ];
+  let i = 0;
+  const stream = new ReadableStream({
+    async pull(controller) {
+      if (i < pieces.length) {
+        await new Promise((r) => setTimeout(r, 20));
+        controller.enqueue(enc.encode(pieces[i++]));
+      } else {
+        controller.close();
+      }
+    },
+  });
+  const collected = await collectStreamText(stream, 50);
+  assert.equal(collected.text, '{"fi":"Hei"}');
+});
+
+test("collectStreamText: idleTimeoutMs<=0 disables the guard (fully-buffered stream)", async () => {
+  const stream = fakeSseStream([
+    'data: {"choices":[{"delta":{"content":"{}"}}]}\n\n',
+    "data: [DONE]\n\n",
+  ]);
+  const collected = await collectStreamText(stream, 0);
+  assert.equal(collected.text, "{}");
 });
 
 // ── parseTranslateResponse ───────────────────────────────────────────────────

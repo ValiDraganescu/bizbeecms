@@ -997,7 +997,8 @@
       "all": "Translate to all languages",
       "one": "Translate to {locale}",
       "emptyHint": "No {locale} text yet — use Translate, or type it in.",
-      "emptyHintShort": "No {locale} text yet."
+      "emptyHintShort": "No {locale} text yet.",
+      "timeout": "Translation timed out — the model didn't respond. Try again."
     },
     "link": {
       "newTab": "Open in new tab",
