@@ -22,7 +22,9 @@ import { detectAdminContext } from "@/lib/chat/tool-scopes";
 import {
   getActivePageContext,
   getActiveSections,
+  getActiveSelectedSection,
   formatMentionedSections,
+  formatSelectedSection,
 } from "@/lib/chat/page-context";
 import { getActiveComponentContext } from "@/lib/chat/component-context";
 import { getActiveCollectionContext } from "@/lib/chat/collection-context";
@@ -190,12 +192,14 @@ export function ChatWidget() {
     // Inline context for the next message: page context (Page Builder) and/or
     // component context (Develop workbench), plus the RESOLVED CONTENTS of any
     // @section the message mentions (so the assistant targets the right nested
-    // block id instead of guessing). Only one base context is set at a time in
-    // practice (different routes), but combine defensively.
+    // block id instead of guessing) and of the section the user has SELECTED in
+    // the editor (so "this section" needs no @mention). Only one base context is
+    // set at a time in practice (different routes), but combine defensively.
     (message) =>
       [
         getActivePageContext(),
         formatMentionedSections(message, getActiveSections()),
+        formatSelectedSection(message, getActiveSelectedSection()),
         getActiveComponentContext(),
         getActiveCollectionContext(),
         getActiveDataSourcesContext(),

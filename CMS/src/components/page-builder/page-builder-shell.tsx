@@ -298,11 +298,14 @@ export function PageBuilderShell({
             // Republishes on every block edit so renames / new sections reach the
             // assistant context and the @section autocomplete immediately.
             sections: listSections(blocks),
+            // The selection too — the assistant is told which section/block the
+            // user is working on, and gets that section's contents at send time.
+            selectedBlockId,
           }
         : null,
     );
     return () => setActivePageContext(null);
-  }, [selected, blocks]);
+  }, [selected, blocks, selectedBlockId]);
 
   // Versioning slice 4: restore a past version into a new draft, then re-load the
   // draft into the editor so it shows the restored blocks. Source untouched.

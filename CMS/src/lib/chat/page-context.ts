@@ -30,6 +30,13 @@ export interface PageContextInput {
    * section's resolved contents into context. Omitted/empty → no section list.
    */
   sections?: SectionMention[];
+  /**
+   * The block currently selected in the editor (a Section itself or any block
+   * nested inside one). When it resolves to a section, the context names that
+   * selection and the section's contents are injected into the next message —
+   * so "this section" / "the selected block" requests land on the right ids.
+   */
+  selectedBlockId?: string | null;
 }
 
 /** A page section the user can @-mention in chat (incl. its full block subtree). */
@@ -44,13 +51,52 @@ export type SectionMention = { id: string; name: string; block: Block };
 export function formatPageContext(page: PageContextInput | null | undefined): string {
   if (!page) return "";
   const status = page.published ? "published" : "draft";
-  return (
+  let out =
     `[Page Builder context] The user is editing the page "${page.path}" ` +
     `(id: "${page.id}", slug: "${page.slug}", status: ${status}). ` +
     `Use this id directly for page tools (update_page_blocks, bind_component, ` +
     `create_list, bind_list) — do NOT call list_pages or get_page to find it. ` +
-    `Apply page-related requests to this page unless they say otherwise.`
-  );
+    `Apply page-related requests to this page unless they say otherwise.`;
+  const sel = findSelectedSection(page.sections ?? [], page.selectedBlockId);
+  if (sel) {
+    out +=
+      sel.block.id === sel.section.id
+        ? ` The user currently has the section "${sel.section.name}" (id: "${sel.section.id}") ` +
+          `selected in the editor — "this section" refers to it.`
+        : ` The user currently has a ${sel.block.component} block (id: "${sel.block.id}") ` +
+          `selected in the editor, inside the section "${sel.section.name}" ` +
+          `(id: "${sel.section.id}") — "this block" / "this section" refer to these.`;
+  }
+  return out;
+}
+
+/**
+ * Resolve the editor's selected block id to the top-level section that contains
+ * it (or IS it), plus the selected block itself. Null when nothing is selected
+ * or the id isn't inside any section (e.g. stale after a delete). PURE.
+ */
+export function findSelectedSection(
+  sections: ReadonlyArray<SectionMention>,
+  selectedBlockId: string | null | undefined,
+): SelectedSection | null {
+  if (!selectedBlockId) return null;
+  for (const s of sections) {
+    const block = findInSubtree(s.block, selectedBlockId);
+    if (block) return { section: s, block };
+  }
+  return null;
+}
+
+/** The editor's selection resolved to its enclosing section + the block itself. */
+export type SelectedSection = { section: SectionMention; block: Block };
+
+function findInSubtree(block: Block, id: string): Block | null {
+  if (block.id === id) return block;
+  for (const c of block.children ?? []) {
+    const hit = findInSubtree(c, id);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 /**
@@ -95,11 +141,7 @@ export function formatMentionedSections(
   if (sections.length === 0) return "";
   const matched: SectionMention[] = [];
   for (const s of sections) {
-    // Match `@Name` whether or not it's wrapped in backticks; word-ish boundary
-    // so "@Hero" doesn't also match a section literally named "Her".
-    const esc = s.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp("@" + esc + "(?![\\w-])", "i");
-    if (re.test(message) && !matched.some((m) => m.id === s.id)) matched.push(s);
+    if (mentionRe(s.name).test(message) && !matched.some((m) => m.id === s.id)) matched.push(s);
   }
   if (matched.length === 0) return "";
   const blocks = matched
@@ -116,11 +158,43 @@ export function formatMentionedSections(
   );
 }
 
+/**
+ * Match `@Name` whether or not it's wrapped in backticks; word-ish boundary so
+ * "@Hero" doesn't also match a section literally named "Her".
+ */
+function mentionRe(name: string): RegExp {
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp("@" + esc + "(?![\\w-])", "i");
+}
+
+/**
+ * Per-message context for the editor's SELECTED section: the same contents
+ * outline an @mention injects, so the assistant sees what the user is working
+ * on without them having to @-name it. Returns "" when nothing is selected, and
+ * defers to `formatMentionedSections` (no duplicate outline) when the message
+ * @-mentions the selected section anyway.
+ */
+export function formatSelectedSection(message: string, sel: SelectedSection | null): string {
+  if (!sel) return "";
+  if (mentionRe(sel.section.name).test(message)) return "";
+  const selectedLine =
+    sel.block.id === sel.section.id
+      ? ""
+      : `The selected block within it is ${sel.block.component} (id: ${sel.block.id}).\n`;
+  return (
+    `[Selected section] The user has the section "${sel.section.name}" (id: ${sel.section.id}) ` +
+    `selected in the editor — its current contents:\n${selectedLine}${summarizeBlock(sel.section.block)}\n` +
+    `Operate on the exact block id shown — to change a select/list, target the List block's id, ` +
+    `NOT the Section. If the section has no block matching the request, say so instead of guessing.`
+  );
+}
+
 // Module-level latest value + subscribers. `send` reads the string fresh; the UI
 // chip + the @section autocomplete subscribe so they update as the user navigates
 // or edits sections. `activeSections` is the structured mirror of `active`.
 let active = "";
 let activeSections: SectionMention[] = [];
+let activeSelectedBlockId: string | null = null;
 const listeners = new Set<() => void>();
 
 /** Publish the current page context (or clear it with null). Notifies subscribers. */
@@ -129,11 +203,13 @@ export function setActivePageContext(page: PageContextInput | null | undefined):
   const nextSections = page?.sections ?? [];
   // Always store the freshest sections (their block subtrees change on every edit;
   // send-time reads them for @mention resolution). Only NOTIFY when the
-  // autocomplete-visible shape (id+name list) or the prose string actually changes,
-  // so typing-in-a-section doesn't thrash subscribers.
+  // autocomplete-visible shape (id+name list) or the prose string actually changes
+  // (selection changes land here — the prose names the selected ids), so
+  // typing-in-a-section doesn't thrash subscribers.
   const shapeChanged = next !== active || !sameSections(activeSections, nextSections);
   active = next;
   activeSections = nextSections;
+  activeSelectedBlockId = page?.selectedBlockId ?? null;
   if (shapeChanged) for (const fn of listeners) fn();
 }
 
@@ -146,6 +222,14 @@ function sameSections(a: SectionMention[], b: SectionMention[]): boolean {
 /** The active page's sections (for the @section autocomplete). Empty when none. */
 export function getActiveSections(): SectionMention[] {
   return activeSections;
+}
+
+/**
+ * The editor's current selection resolved against the freshest sections (for the
+ * send-time [Selected section] context). Null when nothing (in a section) is selected.
+ */
+export function getActiveSelectedSection(): SelectedSection | null {
+  return findSelectedSection(activeSections, activeSelectedBlockId);
 }
 
 /** The latest published context block, or "" when nothing is selected. */
