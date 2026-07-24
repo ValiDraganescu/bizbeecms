@@ -335,6 +335,7 @@
     "users": "Users",
     "google": "Google sign-in",
     "media": "AI models",
+    "aiUsage": "Credits & usage",
     "assistantChats": "Assistant chats",
     "iconSet": "Icons",
     "exportImport": "Export / Import",
@@ -1168,6 +1169,37 @@
     "purgeAll": "Purge all API cache",
     "purgeAllAction": "Purge all",
     "purgeAllConfirm": "Purge every cached API response? Pages will fetch fresh data from the external APIs on their next render."
+  },
+  "aiUsage": {
+    "title": "AI credits & usage",
+    "subtitle": "This site's allocated monthly AI credits and what its AI features have spent — the same numbers the AI quota enforces on.",
+    "loading": "Loading usage…",
+    "error": "Could not load AI usage. Reload the page to try again.",
+    "unavailable": "This figure is temporarily unavailable.",
+    "hero": {
+      "title": "Monthly credits ({month})",
+      "allocated": "Allocated",
+      "used": "Used this month",
+      "remaining": "Remaining",
+      "noQuota": "No monthly credit quota is allocated to this site — AI features are not limited by a budget here."
+    },
+    "allTime": {
+      "title": "All-time spend"
+    },
+    "daily": {
+      "title": "Last 30 days",
+      "today": "Today",
+      "chartLabel": "Daily AI spend for the last 30 days"
+    },
+    "purposes": {
+      "title": "By feature ({month})",
+      "assistant": "Admin assistant",
+      "chatAgent": "Chat agents",
+      "translate": "Translation",
+      "imageDescribe": "Image descriptions",
+      "imageGenerate": "Image generation"
+    },
+    "accrualNote": "Daily and per-feature history starts accruing from the release that introduced this page; earlier spend is included in the monthly and all-time totals only."
   },
   "apiKeys": {
     "title": "MCP",

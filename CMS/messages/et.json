@@ -335,6 +335,7 @@
     "users": "Kasutajad",
     "google": "Google'i sisselogimine",
     "media": "AI mudelid",
+    "aiUsage": "Krediidid ja kasutus",
     "assistantChats": "Assistendi vestlused",
     "iconSet": "Ikoonid",
     "exportImport": "Eksport / Import",
@@ -1168,6 +1169,37 @@
     "purgeAll": "Tühjenda kogu API puhver",
     "purgeAllAction": "Tühjenda kõik",
     "purgeAllConfirm": "Kas tühjendada kõik puhverdatud API vastused? Lehed pärivad järgmisel laadimisel värsked andmed välistest liidestest."
+  },
+  "aiUsage": {
+    "title": "AI krediidid ja kasutus",
+    "subtitle": "Saidile eraldatud igakuised AI-krediidid ja mida AI-funktsioonid on kulutanud — samad numbrid, mille alusel AI-kvoot kehtib.",
+    "loading": "Kasutusandmete laadimine…",
+    "error": "AI kasutusandmeid ei õnnestunud laadida. Proovi uuesti, laadides lehe uuesti.",
+    "unavailable": "See näitaja pole ajutiselt saadaval.",
+    "hero": {
+      "title": "Kuu krediidid ({month})",
+      "allocated": "Eraldatud",
+      "used": "Kasutatud sel kuul",
+      "remaining": "Järel",
+      "noQuota": "Sellele saidile pole igakuist krediidikvooti eraldatud — eelarve ei piira siin AI-funktsioone."
+    },
+    "allTime": {
+      "title": "Kogukulu"
+    },
+    "daily": {
+      "title": "Viimased 30 päeva",
+      "today": "Täna",
+      "chartLabel": "Päevane AI-kulu viimase 30 päeva jooksul"
+    },
+    "purposes": {
+      "title": "Funktsioonide kaupa ({month})",
+      "assistant": "Halduse assistent",
+      "chatAgent": "Vestlusagendid",
+      "translate": "Tõlkimine",
+      "imageDescribe": "Piltide kirjeldused",
+      "imageGenerate": "Piltide loomine"
+    },
+    "accrualNote": "Päevane ja funktsioonipõhine ajalugu hakkab kogunema selle lehe väljalaskest; varasem kulu sisaldub ainult kuu- ja kogusummades."
   },
   "apiKeys": {
     "title": "MCP",

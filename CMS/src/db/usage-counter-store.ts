@@ -15,7 +15,7 @@
  * Reads D1 ONLY via the `Db` port (`getDb()`), never `env.DB` (sole-reader
  * guard); `injectedDb` keeps it node-testable.
  */
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray, like, sql } from "drizzle-orm";
 import { getDb, schema, type Db } from "../lib/ports/db.ts";
 
 /**
@@ -48,6 +48,24 @@ export async function getCounter(key: string, injectedDb?: Db): Promise<number> 
     .where(eq(schema.usageCounter.key, key))
     .limit(1);
   return rows[0]?.count ?? 0;
+}
+
+/**
+ * Read every counter whose key matches a SQL LIKE `pattern` (e.g.
+ * `ai:%:billable` for all monthly billable meters, `ai:d:2026-07-%` for a
+ * month of daily meters). The caller must still strict-filter the returned
+ * keys — LIKE is a coarse index-friendly prefilter, not the contract.
+ * Semantics-free like the rest of the store: the caller composes the pattern.
+ */
+export async function readCountersLike(
+  pattern: string,
+  injectedDb?: Db,
+): Promise<Array<{ key: string; count: number }>> {
+  const db = injectedDb ?? (await getDb());
+  return db
+    .select({ key: schema.usageCounter.key, count: schema.usageCounter.count })
+    .from(schema.usageCounter)
+    .where(like(schema.usageCounter.key, pattern));
 }
 
 /** A local `YYYY-MM-DD` day key for `offset` days before `today` (UTC). */

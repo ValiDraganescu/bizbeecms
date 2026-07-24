@@ -335,6 +335,7 @@
     "users": "Käyttäjät",
     "google": "Google-kirjautuminen",
     "media": "AI-mallit",
+    "aiUsage": "Krediitit ja käyttö",
     "assistantChats": "Avustajan keskustelut",
     "iconSet": "Kuvakkeet",
     "exportImport": "Vienti / Tuonti",
@@ -1168,6 +1169,37 @@
     "purgeAll": "Tyhjennä koko API-välimuisti",
     "purgeAllAction": "Tyhjennä kaikki",
     "purgeAllConfirm": "Tyhjennetäänkö kaikki välimuistiin tallennetut API-vastaukset? Sivut hakevat tuoreet tiedot ulkoisista rajapinnoista seuraavalla latauksella."
+  },
+  "aiUsage": {
+    "title": "Tekoälykrediitit ja käyttö",
+    "subtitle": "Sivustolle varatut kuukausittaiset tekoälykrediitit ja mitä tekoälyominaisuudet ovat kuluttaneet — samat luvut, joihin tekoälykiintiö perustuu.",
+    "loading": "Ladataan käyttötietoja…",
+    "error": "Tekoälyn käyttötietoja ei voitu ladata. Yritä uudelleen lataamalla sivu.",
+    "unavailable": "Tämä luku ei ole tilapäisesti saatavilla.",
+    "hero": {
+      "title": "Kuukauden krediitit ({month})",
+      "allocated": "Varattu",
+      "used": "Käytetty tässä kuussa",
+      "remaining": "Jäljellä",
+      "noQuota": "Tälle sivustolle ei ole varattu kuukausittaista krediittikiintiötä — budjetti ei rajoita tekoälyominaisuuksia."
+    },
+    "allTime": {
+      "title": "Kokonaiskulutus"
+    },
+    "daily": {
+      "title": "Viimeiset 30 päivää",
+      "today": "Tänään",
+      "chartLabel": "Päivittäinen tekoälykulutus viimeisen 30 päivän ajalta"
+    },
+    "purposes": {
+      "title": "Ominaisuuksittain ({month})",
+      "assistant": "Ylläpidon avustaja",
+      "chatAgent": "Chat-agentit",
+      "translate": "Kääntäminen",
+      "imageDescribe": "Kuvien kuvaukset",
+      "imageGenerate": "Kuvien luonti"
+    },
+    "accrualNote": "Päivittäinen ja ominaisuuskohtainen historia alkaa kertyä tämän sivun julkaisusta; aiempi kulutus näkyy vain kuukausi- ja kokonaissummissa."
   },
   "apiKeys": {
     "title": "MCP",
