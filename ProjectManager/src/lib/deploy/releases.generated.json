@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "2.4.0",
+      "tag": "r-2.4.0",
+      "markdown": "# CMS v2.4.0\n\n_2026-07-24 · changes since r-2.3.1_\n\n## Features\n- **Translate everything missing in one click.** Three new actions fill every absent translation at once — existing translations are never touched, only gaps are filled:\n  - **Item editor**: \"Translate missing\" fills all empty languages across every translatable field of the open item into your draft (you still press Save).\n  - **Collection toolbar**: \"Translate all missing\" sweeps the whole collection — skips already-complete items without spending AI budget, shows \"Item 3/6\" progress, saves each item as it finishes, and ends with a summary (updated / added / skipped / failed). One item failing doesn't stop the rest; running out of AI quota stops the sweep cleanly.\n  - **Page builder**: \"Translate missing\" covers the page's SEO title/description and every translatable component text on the page.\n- Adding a new language to your site is now a one-click backfill per collection or page instead of one translate per field.\n\n## Fixes\n- Bulk and per-field translations can no longer overwrite content edited while a translation is running — the latest saved text always wins, and saves re-read the current item first.\n\n## Other\n- Large admin screens decomposed for maintainability (collection content screen, page-builder shell); shared translate networking unified into one client with a single timeout/error path.\n"
+    },
+    {
       "version": "2.3.1",
       "tag": "r-2.3.1",
       "markdown": "# CMS v2.3.1\n\n_2026-07-24 · changes since r-2.3.0_\n\n## Fixes\n- **AI translation no longer hangs forever.** If the translation model opened its response but then went silent, the Page Builder field's translate spinner would spin indefinitely. It now times out with a clear, actionable message (\"the model stopped responding — try again, or pick a different translation model in Settings → AI models\") instead of hanging. Added on both the server (a 504 after the stream stalls) and the browser (a fetch timeout backstop), so the spinner always clears.\n\n## Other\n- Added structured, greppable logging to the translate endpoint (every step and failure mode) to make diagnosing model/streaming issues straightforward from Worker logs.\n"
