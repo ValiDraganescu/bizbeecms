@@ -19,6 +19,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { Spinner } from "@/components/ui/spinner";
 import {
   localeFieldValue,
   setLocalizedProp,
@@ -196,7 +197,7 @@ export function TranslatableField({
                 }
               >
                 {busy ? (
-                  <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+                  <Spinner />
                 ) : (
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" />

@@ -29,8 +29,10 @@ import {
   setDraftLocaleText,
 } from "@/lib/content/item-locale-fields";
 import { executeTranslateCall } from "@/lib/content/translate-client";
+import { Spinner } from "@/components/ui/spinner";
 
-const INPUT =
+/** The standard admin input styling — shared by the content-collection forms. */
+export const INPUT =
   "rounded-md border border-border bg-surface px-3 py-2 text-foreground";
 
 export type FieldValue = string | boolean | string[] | LocalizedDraft;
@@ -244,7 +246,7 @@ export function TranslatableFieldInput({
     setBusy(targets.length === 1 ? targets[0] : "all");
     const res = await executeTranslateCall(
       { fields: { [field.name]: sourceText }, toLocales: targets },
-      { target: tableName, fromLocale: defaultLocale },
+      { target: tableName, fromLocale: defaultLocale, timeoutMessage: tp("translateField.timeout") },
     );
     if (res.ok) {
       // Hand the raw translations up; the parent merges them into the LATEST
@@ -253,7 +255,7 @@ export function TranslatableFieldInput({
       onMergeTranslations(res.translations);
       if (!targets.includes(loc)) setActive(targets[0]);
     } else {
-      setError(res.timeout ? tp("translateField.timeout") : res.message);
+      setError(res.message);
     }
     setBusy(null);
   }
@@ -314,7 +316,7 @@ export function TranslatableFieldInput({
                 }
               >
                 {busy ? (
-                  <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+                  <Spinner />
                 ) : (
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" />

@@ -36,19 +36,13 @@ import {
   type TranslationSlots,
 } from "@/lib/content/bulk-translate-run";
 import { executeTranslateCall } from "@/lib/content/translate-client";
+import { errorOf } from "@/lib/api-error";
+import { Spinner } from "@/components/ui/spinner";
 
-/** Wrap the fetch executor so a client timeout carries the i18n copy the
- *  per-field translate shows (server errors already arrive user-readable). */
-function translateExec(
-  target: string,
-  fromLocale: string,
-  timeoutMessage: string,
-): TranslateCallRunner {
-  return async (call) => {
-    const res = await executeTranslateCall(call, { target, fromLocale });
-    if (!res.ok && res.timeout) return { ...res, message: timeoutMessage };
-    return res;
-  };
+/** The fetch executor for this collection: a client timeout carries the i18n
+ *  copy the per-field translate shows (server errors arrive user-readable). */
+function translateExec(target: string, fromLocale: string, timeoutMessage: string): TranslateCallRunner {
+  return (call) => executeTranslateCall(call, { target, fromLocale, timeoutMessage });
 }
 
 function toContentLocales(locales: string[]): ContentLocales {
@@ -114,9 +108,7 @@ export function TranslateMissingButton({
         title={plan.calls.length === 0 ? t("translateMissingNone") : undefined}
         onClick={() => void run()}
       >
-        {busy && (
-          <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
-        )}
+        {busy && <Spinner />}
         {busy ? t("translating") : t("translateMissing")}
       </button>
     </div>
@@ -196,9 +188,7 @@ export function TranslateAllMissingButton({
         disabled={disabled || running}
         onClick={() => void run()}
       >
-        {running && (
-          <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
-        )}
+        {running && <Spinner />}
         {running
           ? progress
             ? t("translateSweepProgress", { done: progress.done, total: progress.total })
@@ -252,14 +242,4 @@ async function fetchAllLiveItems(tableName: string): Promise<SweepItem[]> {
     out.push(...data.items.map((it) => ({ id: String(it.id), values: it })));
     if (out.length >= data.total || data.items.length === 0) return out;
   }
-}
-
-async function errorOf(res: Response): Promise<string> {
-  try {
-    const j = (await res.json()) as { error?: string };
-    if (j.error) return j.error;
-  } catch {
-    /* non-JSON body */
-  }
-  return `HTTP ${res.status}`;
 }

@@ -29,6 +29,7 @@ import {
 import { planTranslateCalls } from "@/lib/content/bulk-translate-plan";
 import { runTranslatePlan, type TranslationSlots } from "@/lib/content/bulk-translate-run";
 import { executeTranslateCall } from "@/lib/content/translate-client";
+import { Spinner } from "@/components/ui/spinner";
 import type { Block } from "@/lib/render/tree";
 
 export function PageTranslateMissingButton({
@@ -97,13 +98,12 @@ export function PageTranslateMissingButton({
       plan,
       async (call) => {
         if (!alive.current) return { ok: false, message: "cancelled" };
-        const res = await executeTranslateCall(call, {
+        return executeTranslateCall(call, {
           kind: "page",
           target: page.slug,
           fromLocale: locales[0],
+          timeoutMessage: t("translateField.timeout"),
         });
-        if (!res.ok && res.timeout) return { ...res, message: t("translateField.timeout") };
-        return res;
       },
       (picked) => {
         if (!alive.current) return;
@@ -171,9 +171,7 @@ export function PageTranslateMissingButton({
         title={plan.calls.length === 0 ? t("translateMissingNone") : undefined}
         onClick={() => void run()}
       >
-        {busy && (
-          <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
-        )}
+        {busy && <Spinner />}
         {busy ? t("translating") : t("translateMissing")}
       </button>
     </div>

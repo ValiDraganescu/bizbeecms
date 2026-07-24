@@ -25,6 +25,9 @@ export async function executeTranslateCall(
     target: string;
     /** The site's default content locale (the source language). */
     fromLocale: string;
+    /** i18n copy to use as `message` when OUR client timeout fires (server
+     *  errors already arrive user-readable). Defaults to the raw abort text. */
+    timeoutMessage?: string;
   },
 ): Promise<TranslateCallResult> {
   const controller = new AbortController();
@@ -58,11 +61,12 @@ export async function executeTranslateCall(
     }
     return { ok: true, translations: j.translations };
   } catch (err) {
-    // AbortError = OUR client timeout fired; callers show the i18n timeout copy.
+    // AbortError = OUR client timeout fired → show the i18n timeout copy.
+    const timeout = (err as Error).name === "AbortError";
     return {
       ok: false,
-      timeout: (err as Error).name === "AbortError",
-      message: (err as Error).message,
+      timeout,
+      message: (timeout && opts.timeoutMessage) || (err as Error).message,
     };
   } finally {
     clearTimeout(timer);
