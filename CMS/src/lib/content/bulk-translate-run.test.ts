@@ -279,6 +279,33 @@ test("sweep: quota denial aborts — later items never fetched, planned or calle
   assert.deepEqual(summary.failures, []);
 });
 
+test("sweep: quota mid-item saves the slots already produced, then aborts", async () => {
+  // Item x needs TWO calls (title→fi,et and body→et). Call 1 succeeds, call 2
+  // hits the quota: the paid-for title slots must be saved and counted, the
+  // sweep must stop, and item y must never even be fetched (let alone planned).
+  const { fetched, fetchItem } = fakeFetch({
+    x: { title: "Hello", body: { en: "World", fi: "Maailma" } },
+  });
+  const { calls, exec } = fakeExec([
+    okResult({ title: { fi: "Hei", et: "Tere" } }),
+    { ok: false, message: "monthly AI quota reached", quota: true },
+  ]);
+  const { saved, save } = fakeSave();
+
+  const summary = await sweepTranslateItems(["x", "y"], FIELDS, LOCALES, { fetchItem, exec, save });
+
+  assert.deepEqual(fetched, ["x"]); // y untouched
+  assert.equal(calls.length, 2);
+  assert.deepEqual(saved, [
+    { id: "x", changes: { title: { en: "Hello", fi: "Hei", et: "Tere" } } },
+  ]);
+  assert.equal(summary.updated, 1);
+  assert.equal(summary.translationsAdded, 2);
+  assert.equal(summary.quotaStopped, true);
+  // The quota stop is the flag's job, not a per-item failure entry.
+  assert.deepEqual(summary.failures, []);
+});
+
 test("sweep: partial slots produced before a mid-item failure are still saved", async () => {
   // Two groups → two calls: title(fi,et) and body(et).
   const { fetchItem } = fakeFetch({

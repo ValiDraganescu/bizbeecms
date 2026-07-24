@@ -12,7 +12,6 @@ import {
   pickRequestedSlots,
   retryPlan,
   CALL_BUDGET_UNITS,
-  type PlanEntry,
 } from "./bulk-translate-plan.ts";
 import { MAX_FIELD_TEXT_BYTES } from "../chat/translate-request.ts";
 import type { CollectionField } from "./collection-schema.ts";
