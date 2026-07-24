@@ -8,11 +8,13 @@
  *    and merges each response's vetted slots into the draft via the parent's
  *    concurrency-safe functional merge — the user still hits Save.
  *
- *  - `TranslateAllMissingButton` sits in the collection toolbar: fetches every
- *    non-archived item, sweeps them via the dep-free sweep core (skip complete
- *    items, retry-once, quota-abort) and saves each changed item DIRECTLY
- *    through the item PATCH endpoint (published items go live). Progress +
- *    final summary render on their own toolbar row.
+ *  - `TranslateAllMissingButton` sits in the collection toolbar: enumerates
+ *    every non-archived item's ID up-front (progress total), then sweeps them
+ *    via the dep-free sweep core, which re-fetches each item FRESH right
+ *    before planning it (a stale base would revert concurrent edits), skips
+ *    complete items, retries once, aborts on quota, and saves each changed
+ *    item DIRECTLY through the item PATCH endpoint (published items go live).
+ *    Progress + final summary render on their own toolbar row.
  *
  * Both return null on single-locale sites (AC10). All decision logic lives in
  * `lib/content/bulk-translate-plan.ts` / `bulk-translate-run.ts`; this file is
@@ -30,7 +32,6 @@ import {
 import {
   runTranslatePlan,
   sweepTranslateItems,
-  type SweepItem,
   type SweepSummary,
   type TranslateCallRunner,
   type TranslationSlots,
@@ -153,18 +154,22 @@ export function TranslateAllMissingButton({
     setSummary(null);
     setError(null);
     try {
-      const items = await fetchAllLiveItems(tableName);
-      const result = await sweepTranslateItems(items, fields, toContentLocales(locales), {
+      const ids = await fetchAllLiveItemIds(tableName);
+      const result = await sweepTranslateItems(ids, fields, toContentLocales(locales), {
+        // Fresh read right before planning — the id enumeration can be minutes
+        // old by item N; planning/merging from it would revert concurrent edits.
+        fetchItem: async (id) => {
+          const res = await fetch(itemUrl(tableName, id));
+          if (!res.ok) return { ok: false, message: await errorOf(res) };
+          return { ok: true, values: (await res.json()) as Record<string, unknown> };
+        },
         exec: translateExec(tableName, locales[0], tp("translateField.timeout")),
         save: async (id, changes) => {
-          const res = await fetch(
-            `/api/collections/${encodeURIComponent(tableName)}/items/${encodeURIComponent(id)}`,
-            {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(changes),
-            },
-          );
+          const res = await fetch(itemUrl(tableName, id), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(changes),
+          });
           return res.ok ? { ok: true } : { ok: false, message: await errorOf(res) };
         },
         onProgress: (done, total) => setProgress({ done, total }),
@@ -230,16 +235,22 @@ export function TranslateAllMissingButton({
   );
 }
 
-/** Every non-archived item in the collection, paged past the route's 1000 cap. */
-async function fetchAllLiveItems(tableName: string): Promise<SweepItem[]> {
-  const out: SweepItem[] = [];
+/** The single-item endpoint — the sweep's fresh GET and its PATCH save. */
+function itemUrl(tableName: string, id: string): string {
+  return `/api/collections/${encodeURIComponent(tableName)}/items/${encodeURIComponent(id)}`;
+}
+
+/** Every non-archived item ID in the collection, paged past the route's 1000
+ *  cap. IDs only — the sweep re-fetches each item fresh when its turn comes. */
+async function fetchAllLiveItemIds(tableName: string): Promise<string[]> {
+  const out: string[] = [];
   for (;;) {
     const res = await fetch(
       `/api/collections/${encodeURIComponent(tableName)}/query?archived=live&limit=1000&offset=${out.length}`,
     );
     if (!res.ok) throw new Error(await errorOf(res));
     const data = (await res.json()) as { items: Record<string, unknown>[]; total: number };
-    out.push(...data.items.map((it) => ({ id: String(it.id), values: it })));
+    out.push(...data.items.map((it) => String(it.id)));
     if (out.length >= data.total || data.items.length === 0) return out;
   }
 }

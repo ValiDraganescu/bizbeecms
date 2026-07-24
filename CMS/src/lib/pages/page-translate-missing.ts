@@ -92,12 +92,21 @@ export function splitPageSlots(
   return { meta, block };
 }
 
-/** Merge vetted meta slots into the page's current maps (adds missing locales
- *  only — the slots were filtered to requested-missing upstream). PURE. */
+/** Merge vetted meta slots into the page's current maps, filling ABSENT (or
+ *  blank) locales only. The slots were requested-missing at plan time, but the
+ *  base is read fresh at save time — a slot an operator filled mid-run must win
+ *  over the model's translation (never-overwrite). PURE. */
 export function mergePageMeta(meta: PageMeta, slots: TranslationSlots): PageMeta {
+  const fill = (base: Record<string, string>, add?: Record<string, string>) => {
+    const out = { ...base };
+    for (const [locale, text] of Object.entries(add ?? {})) {
+      if ((out[locale] ?? "") === "") out[locale] = text;
+    }
+    return out;
+  };
   return {
-    metaTitle: { ...meta.metaTitle, ...slots.metaTitle },
-    metaDescription: { ...meta.metaDescription, ...slots.metaDescription },
+    metaTitle: fill(meta.metaTitle, slots.metaTitle),
+    metaDescription: fill(meta.metaDescription, slots.metaDescription),
   };
 }
 

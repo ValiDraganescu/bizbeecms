@@ -12,12 +12,15 @@
  *     this directly, applying slots into their draft as they arrive.
  *
  *   - `sweepTranslateItems` runs the collection-level "Translate all missing"
- *     over a list of items: plan per item (an already-complete item is skipped
- *     WITHOUT a model call, AC5), run, merge the produced slots into each
- *     item's locale objects, and save through an injected writer. One item's
- *     failure doesn't stop the sweep; a quota denial (HTTP 429) does (AC6).
- *     Slots a partially-failed item DID produce are still saved — the model
- *     calls were already paid for.
+ *     over a list of item IDS: fetch each item FRESH through an injected
+ *     reader immediately before planning it (the enumeration can be minutes
+ *     old by then — planning/merging from a stale base would wholesale-revert
+ *     a concurrent edit), plan (an already-complete item is skipped WITHOUT a
+ *     model call, AC5), run, merge the produced slots into the fresh locale
+ *     objects, and save through an injected writer. One item's failure doesn't
+ *     stop the sweep; a quota denial (HTTP 429) does (AC6). Slots a
+ *     partially-failed item DID produce are still saved — the model calls were
+ *     already paid for.
  *
  * Everything is dep-free (executor + writer are injected) so the whole
  * decision surface runs under `node --test`; the fetch adapters live in
@@ -117,13 +120,6 @@ export async function runTranslatePlan(
   return outcome;
 }
 
-/** One collection item as the sweep sees it: id + parsed row values. */
-export interface SweepItem {
-  id: string;
-  /** The query route's parsed row (translatable columns → locale objects). */
-  values: Record<string, unknown>;
-}
-
 export interface SweepFailure {
   id: string;
   message: string;
@@ -146,6 +142,12 @@ export interface SweepSummary {
 }
 
 export interface SweepPorts {
+  /** Fetch one item's CURRENT parsed row values (translatable columns → locale
+   *  objects) — called immediately before planning that item, so the plan and
+   *  merge base are fresh, not the possibly-stale enumeration snapshot. */
+  fetchItem: (
+    id: string,
+  ) => Promise<{ ok: true; values: Record<string, unknown> } | { ok: false; message: string }>;
   exec: TranslateCallRunner;
   /** Persist merged locale objects for the CHANGED fields only (PATCH semantics). */
   save: (
@@ -157,12 +159,13 @@ export interface SweepPorts {
 }
 
 /**
- * The collection sweep: for each item, plan → run → merge → save. Sequential on
- * purpose (one model call in flight; progress reads "item 3/6"). Never touches
- * an item with an empty plan beyond counting it as skipped.
+ * The collection sweep: for each item id, fetch fresh → plan → run → merge →
+ * save. Sequential on purpose (one model call in flight; progress reads
+ * "item 3/6"). Never touches an item with an empty plan beyond counting it as
+ * skipped; a fetch failure is a per-item failure and the sweep continues.
  */
 export async function sweepTranslateItems(
-  items: SweepItem[],
+  ids: string[],
   fields: CollectionField[],
   locales: ContentLocales,
   ports: SweepPorts,
@@ -176,11 +179,18 @@ export async function sweepTranslateItems(
     quotaStopped: false,
   };
 
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    ports.onProgress?.(i + 1, items.length);
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    ports.onProgress?.(i + 1, ids.length);
 
-    const plan = planTranslateCalls(collectionItemPlanEntries(item.values, fields, locales));
+    const fetched = await ports.fetchItem(id);
+    if (!fetched.ok) {
+      summary.failures.push({ id, message: fetched.message });
+      continue;
+    }
+    const values = fetched.values;
+
+    const plan = planTranslateCalls(collectionItemPlanEntries(values, fields, locales));
     summary.skippedFields += plan.skipped.length;
     if (plan.calls.length === 0) {
       summary.skipped += 1;
@@ -196,13 +206,13 @@ export async function sweepTranslateItems(
       const changes: Record<string, unknown> = {};
       for (const name of Object.keys(outcome.translations)) {
         changes[name] = mergeItemTranslations(
-          toLocalizedDraft(item.values[name]),
+          toLocalizedDraft(values[name]),
           name,
           outcome.translations,
           locales.locales,
         );
       }
-      const saved = await ports.save(item.id, changes);
+      const saved = await ports.save(id, changes);
       if (saved.ok) {
         summary.updated += 1;
         summary.translationsAdded += outcome.slotsFilled;
@@ -219,7 +229,7 @@ export async function sweepTranslateItems(
         failure = `${outcome.unfilled.length} translation(s) still missing after retry`;
       }
     }
-    if (failure !== null) summary.failures.push({ id: item.id, message: failure });
+    if (failure !== null) summary.failures.push({ id, message: failure });
 
     if (outcome.failure?.quota) {
       summary.quotaStopped = true;

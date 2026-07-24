@@ -11,7 +11,6 @@ import assert from "node:assert/strict";
 import {
   runTranslatePlan,
   sweepTranslateItems,
-  type SweepItem,
   type TranslateCallResult,
 } from "./bulk-translate-run.ts";
 import type { TranslateCall, TranslatePlan } from "./bulk-translate-plan.ts";
@@ -163,6 +162,25 @@ test("runTranslatePlan: a retry-call failure keeps the primary call's slots", as
 
 // ── sweepTranslateItems ──────────────────────────────────────────────────────
 
+/** The fresh-read port: serves each item's CURRENT values (or a scripted
+ *  failure), recording the order items were actually fetched in. */
+function fakeFetch(
+  valuesById: Record<string, Record<string, unknown>>,
+  failFor: Record<string, string> = {},
+) {
+  const fetched: string[] = [];
+  return {
+    fetched,
+    fetchItem: async (id: string) => {
+      fetched.push(id);
+      if (failFor[id] !== undefined) return { ok: false as const, message: failFor[id] };
+      const values = valuesById[id];
+      if (!values) throw new Error(`fetchItem called for unscripted id ${id}`);
+      return { ok: true as const, values };
+    },
+  };
+}
+
 function fakeSave(failFor: Record<string, string> = {}) {
   const saved: { id: string; changes: Record<string, unknown> }[] = [];
   return {
@@ -177,10 +195,10 @@ function fakeSave(failFor: Record<string, string> = {}) {
 }
 
 test("sweep: complete item is skipped without a model call; missing item is planned, run and saved", async () => {
-  const items: SweepItem[] = [
-    { id: "1", values: { title: { en: "Done", fi: "Valmis", et: "Tehtud" }, price: 3 } },
-    { id: "2", values: { title: "Hello", body: { en: "World", fi: "Maailma" } } },
-  ];
+  const { fetchItem } = fakeFetch({
+    "1": { title: { en: "Done", fi: "Valmis", et: "Tehtud" }, price: 3 },
+    "2": { title: "Hello", body: { en: "World", fi: "Maailma" } },
+  });
   const { calls, exec } = fakeExec([
     okResult({ title: { fi: "Hei", et: "Tere" } }),
     okResult({ body: { et: "Maailm" } }),
@@ -188,7 +206,8 @@ test("sweep: complete item is skipped without a model call; missing item is plan
   const { saved, save } = fakeSave();
   const progress: string[] = [];
 
-  const summary = await sweepTranslateItems(items, FIELDS, LOCALES, {
+  const summary = await sweepTranslateItems(["1", "2"], FIELDS, LOCALES, {
+    fetchItem,
     exec,
     save,
     onProgress: (done, total) => progress.push(`${done}/${total}`),
@@ -222,17 +241,17 @@ test("sweep: complete item is skipped without a model call; missing item is plan
 });
 
 test("sweep: one item's failure is recorded and the sweep continues", async () => {
-  const items: SweepItem[] = [
-    { id: "a", values: { title: "First" } },
-    { id: "b", values: { title: "Second" } },
-  ];
+  const { fetchItem } = fakeFetch({
+    a: { title: "First" },
+    b: { title: "Second" },
+  });
   const { exec } = fakeExec([
     { ok: false, message: "AI request failed: 502" },
     okResult({ title: { fi: "Toinen", et: "Teine" } }),
   ]);
   const { saved, save } = fakeSave();
 
-  const summary = await sweepTranslateItems(items, FIELDS, LOCALES, { exec, save });
+  const summary = await sweepTranslateItems(["a", "b"], FIELDS, LOCALES, { fetchItem, exec, save });
 
   assert.deepEqual(saved.map((s) => s.id), ["b"]);
   assert.equal(summary.updated, 1);
@@ -240,18 +259,19 @@ test("sweep: one item's failure is recorded and the sweep continues", async () =
   assert.equal(summary.quotaStopped, false);
 });
 
-test("sweep: quota denial aborts — later items never planned or called", async () => {
-  const items: SweepItem[] = [
-    { id: "a", values: { title: "First" } },
-    { id: "b", values: { title: "Second" } },
-  ];
+test("sweep: quota denial aborts — later items never fetched, planned or called", async () => {
+  const { fetched, fetchItem } = fakeFetch({
+    a: { title: "First" },
+    b: { title: "Second" },
+  });
   const { calls, exec } = fakeExec([
     { ok: false, message: "monthly AI quota reached", quota: true },
   ]);
   const { saved, save } = fakeSave();
 
-  const summary = await sweepTranslateItems(items, FIELDS, LOCALES, { exec, save });
+  const summary = await sweepTranslateItems(["a", "b"], FIELDS, LOCALES, { fetchItem, exec, save });
 
+  assert.deepEqual(fetched, ["a"]);
   assert.equal(calls.length, 1);
   assert.equal(saved.length, 0);
   assert.equal(summary.quotaStopped, true);
@@ -260,17 +280,17 @@ test("sweep: quota denial aborts — later items never planned or called", async
 });
 
 test("sweep: partial slots produced before a mid-item failure are still saved", async () => {
-  const items: SweepItem[] = [
-    // Two groups → two calls: title(fi,et) and body(et).
-    { id: "x", values: { title: "Hello", body: { en: "World", fi: "Maailma" } } },
-  ];
+  // Two groups → two calls: title(fi,et) and body(et).
+  const { fetchItem } = fakeFetch({
+    x: { title: "Hello", body: { en: "World", fi: "Maailma" } },
+  });
   const { exec } = fakeExec([
     okResult({ title: { fi: "Hei", et: "Tere" } }),
     { ok: false, message: "stalled", timeout: true },
   ]);
   const { saved, save } = fakeSave();
 
-  const summary = await sweepTranslateItems(items, FIELDS, LOCALES, { exec, save });
+  const summary = await sweepTranslateItems(["x"], FIELDS, LOCALES, { fetchItem, exec, save });
 
   // The paid-for title slots land; the item is ALSO reported failed (body call).
   assert.deepEqual(saved, [
@@ -282,11 +302,11 @@ test("sweep: partial slots produced before a mid-item failure are still saved", 
 });
 
 test("sweep: save failure is recorded per item and doesn't count as updated", async () => {
-  const items: SweepItem[] = [{ id: "x", values: { title: "Hello" } }];
+  const { fetchItem } = fakeFetch({ x: { title: "Hello" } });
   const { exec } = fakeExec([okResult({ title: { fi: "Hei", et: "Tere" } })]);
   const { save } = fakeSave({ x: "slug already exists" });
 
-  const summary = await sweepTranslateItems(items, FIELDS, LOCALES, { exec, save });
+  const summary = await sweepTranslateItems(["x"], FIELDS, LOCALES, { fetchItem, exec, save });
 
   assert.equal(summary.updated, 0);
   assert.equal(summary.translationsAdded, 0);
@@ -294,14 +314,14 @@ test("sweep: save failure is recorded per item and doesn't count as updated", as
 });
 
 test("sweep: slots unfilled after retry mark the item failed but keep what arrived", async () => {
-  const items: SweepItem[] = [{ id: "x", values: { title: "Hello" } }];
+  const { fetchItem } = fakeFetch({ x: { title: "Hello" } });
   const { calls, exec } = fakeExec([
     okResult({ title: { fi: "Hei" } }),
     okResult({}), // retry for et yields nothing
   ]);
   const { saved, save } = fakeSave();
 
-  const summary = await sweepTranslateItems(items, FIELDS, LOCALES, { exec, save });
+  const summary = await sweepTranslateItems(["x"], FIELDS, LOCALES, { fetchItem, exec, save });
 
   assert.equal(calls.length, 2);
   assert.deepEqual(saved, [{ id: "x", changes: { title: { en: "Hello", fi: "Hei" } } }]);
@@ -311,14 +331,12 @@ test("sweep: slots unfilled after retry mark the item failed but keep what arriv
 });
 
 test("sweep: planner-skipped fields (empty/oversized source) are counted", async () => {
-  const items: SweepItem[] = [
-    // body's source is over the 16KB/field route cap → the planner skips it.
-    { id: "x", values: { title: "Hello", body: "x".repeat(17 * 1024) } },
-  ];
+  // body's source is over the 16KB/field route cap → the planner skips it.
+  const { fetchItem } = fakeFetch({ x: { title: "Hello", body: "x".repeat(17 * 1024) } });
   const { exec } = fakeExec([okResult({ title: { fi: "Hei", et: "Tere" } })]);
   const { save } = fakeSave();
 
-  const summary = await sweepTranslateItems(items, FIELDS, LOCALES, { exec, save });
+  const summary = await sweepTranslateItems(["x"], FIELDS, LOCALES, { fetchItem, exec, save });
 
   assert.equal(summary.skippedFields, 1);
   assert.equal(summary.updated, 1);
@@ -326,13 +344,53 @@ test("sweep: planner-skipped fields (empty/oversized source) are counted", async
 
 test("sweep: single content locale plans nothing — no calls, everything skipped", async () => {
   const single: ContentLocales = { default: "en", locales: ["en"] };
-  const items: SweepItem[] = [{ id: "x", values: { title: "Hello" } }];
+  const { fetchItem } = fakeFetch({ x: { title: "Hello" } });
   const { calls, exec } = fakeExec([]);
   const { saved, save } = fakeSave();
 
-  const summary = await sweepTranslateItems(items, FIELDS, single, { exec, save });
+  const summary = await sweepTranslateItems(["x"], FIELDS, single, { fetchItem, exec, save });
 
   assert.equal(calls.length, 0);
   assert.equal(saved.length, 0);
   assert.equal(summary.skipped, 1);
+});
+
+test("sweep: each item is planned and merged from its FRESH values, not the enumeration snapshot", async () => {
+  // Between enumeration and this item's turn, another admin edited item "a"
+  // (new source text + a fi translation) and fully translated item "b". The
+  // sweep must plan from the FRESH state: a's call carries the new source and
+  // only the still-missing et; b is skipped without a model call; and the save
+  // merges into a's fresh locale object (the concurrent fi edit survives).
+  const { fetched, fetchItem } = fakeFetch({
+    a: { title: { en: "New source", fi: "Uusi lähde" } }, // stale was { en: "Old" }
+    b: { title: { en: "Done", fi: "Valmis", et: "Tehtud" } }, // stale had et missing
+  });
+  const { calls, exec } = fakeExec([okResult({ title: { et: "Uus allikas" } })]);
+  const { saved, save } = fakeSave();
+
+  const summary = await sweepTranslateItems(["a", "b"], FIELDS, LOCALES, { fetchItem, exec, save });
+
+  assert.deepEqual(fetched, ["a", "b"]);
+  assert.deepEqual(calls, [{ fields: { title: "New source" }, toLocales: ["et"] }]);
+  assert.deepEqual(saved, [
+    { id: "a", changes: { title: { en: "New source", fi: "Uusi lähde", et: "Uus allikas" } } },
+  ]);
+  assert.equal(summary.updated, 1);
+  assert.equal(summary.skipped, 1);
+});
+
+test("sweep: a fetch failure is a per-item failure — no call, no save, sweep continues", async () => {
+  const { fetchItem } = fakeFetch(
+    { b: { title: "Second" } },
+    { a: "item not found" },
+  );
+  const { calls, exec } = fakeExec([okResult({ title: { fi: "Toinen", et: "Teine" } })]);
+  const { saved, save } = fakeSave();
+
+  const summary = await sweepTranslateItems(["a", "b"], FIELDS, LOCALES, { fetchItem, exec, save });
+
+  assert.equal(calls.length, 1); // only b's call
+  assert.deepEqual(saved.map((s) => s.id), ["b"]);
+  assert.equal(summary.updated, 1);
+  assert.deepEqual(summary.failures, [{ id: "a", message: "item not found" }]);
 });

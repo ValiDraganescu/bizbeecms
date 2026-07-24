@@ -69,6 +69,15 @@ export function PageTranslateMissingButton({
       alive.current = false;
     };
   }, []);
+  // A run outlives the click by minutes while the SEO/Page tabs stay usable —
+  // any save there refreshes the shell's `pages`, re-rendering us with a fresh
+  // `page` prop. The end-of-run meta PUT must build on THAT page, not the
+  // click-time closure snapshot, or it would revert the mid-run edit (title,
+  // noindex, metaImage — the whole SEO body). Track the latest prop in a ref.
+  const latestPage = useRef(page);
+  useEffect(() => {
+    latestPage.current = page;
+  });
 
   // Re-planned from the live draft + page meta, so the button enables/disables
   // as edits or per-field translates fill slots. Cheap string scans.
@@ -129,20 +138,23 @@ export function PageTranslateMissingButton({
 
   /** PUT the merged meta maps through the SEO form's existing `/api/pages` body
    *  (slug/parent/publish/noindex preserved; edge cache purged by the route).
+   *  Builds on the LATEST page (see `latestPage`), and `mergePageMeta` fills
+   *  absent slots only — so a mid-run SEO save is never reverted or overwritten.
    *  Returns the error message, or null on success. */
   async function saveMeta(slots: TranslationSlots): Promise<string | null> {
-    const merged = mergePageMeta(page, slots);
+    const current = latestPage.current;
+    const merged = mergePageMeta(current, slots);
     try {
       const res = await fetch("/api/pages", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           buildSeoMetaBody(
-            page,
+            current,
             merged.metaTitle,
             merged.metaDescription,
-            page.metaImage,
-            page.noindex,
+            current.metaImage,
+            current.noindex,
           ),
         ),
       });

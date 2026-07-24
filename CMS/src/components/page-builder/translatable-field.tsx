@@ -27,16 +27,12 @@ import {
   isLongText,
   type PropField,
 } from "@/lib/pages/page-blocks";
+import { executeTranslateCall } from "@/lib/content/translate-client";
 import type { Block } from "@/lib/render/tree";
 
 /** Show locale TABS up to this count; beyond it, a compact <select> (20-locale
  *  sites would wrap tabs into an unusable strip). Mirrors LocalePicker's threshold. */
 const LOCALE_TABS_MAX = 6;
-
-/** Abort a translate `fetch` that hasn't resolved by now, so the spinner can't
- *  hang forever. A touch above the server's DEFAULT_STREAM_IDLE_TIMEOUT_MS (45s)
- *  so a genuine server-side stall surfaces as its 504 rather than this abort. */
-const CLIENT_TIMEOUT_MS = 60_000;
 
 export function TranslatableField({
   field,
@@ -88,56 +84,25 @@ export function TranslatableField({
 
   // Translate the default-locale text into `targets` (one locale or all others),
   // merge the returned maps into props. Source is ALWAYS the default locale.
+  // The fetch/timeout/error mapping lives in `executeTranslateCall` — the one
+  // browser-side /api/translate caller (persist:false: we merge into THIS
+  // block's props and autosave; component artifacts can't hold per-use text).
   async function translate(targets: string[]) {
     if (sourceText === "" || targets.length === 0) return;
     setError(null);
     setBusy(targets.length === 1 ? targets[0] : "all");
-    // Client-side backstop: even though the server now bounds its model read, a
-    // dropped connection / hung Worker could still leave `fetch` pending forever
-    // (the "spinner never stops" bug). Abort after CLIENT_TIMEOUT_MS so the
-    // spinner always clears with a message instead of hanging. The window is a
-    // touch above the server's idle timeout so a real server 504 wins the race.
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
-    try {
-      const res = await fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          kind: "component",
-          target: block.component,
-          fields: { [field.name]: sourceText },
-          fromLocale: defaultLocale,
-          toLocales: targets,
-          // Don't persist at the component — we merge the returned maps into THIS
-          // block's props and autosave (component artifacts can't hold per-use text).
-          persist: false,
-        }),
-      });
-      const j = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        translations?: Record<string, Record<string, string>>;
-        error?: string;
-        errors?: string[];
-      };
-      if (!res.ok || !j.ok || !j.translations) {
-        setError(j.error ?? j.errors?.join("; ") ?? `HTTP ${res.status}`);
-        return;
-      }
-      onChange(mergeTranslations(props, j.translations, schema, locales));
+    const res = await executeTranslateCall(
+      { fields: { [field.name]: sourceText }, toLocales: targets },
+      { target: block.component, fromLocale: defaultLocale },
+    );
+    if (res.ok) {
+      onChange(mergeTranslations(props, res.translations, schema, locales));
       // Jump the view to the locale we just filled (or the first target).
       if (!targets.includes(loc)) setActive(targets[0]);
-    } catch (err) {
-      setError(
-        (err as Error).name === "AbortError"
-          ? t("translateField.timeout")
-          : (err as Error).message,
-      );
-    } finally {
-      clearTimeout(timer);
-      setBusy(null);
+    } else {
+      setError(res.timeout ? t("translateField.timeout") : res.message);
     }
+    setBusy(null);
   }
 
   const multi = locales.length > 1;

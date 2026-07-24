@@ -130,6 +130,22 @@ test("mergePageMeta adds slots and keeps every existing locale text", () => {
   });
 });
 
+test("mergePageMeta never overwrites a base slot filled after planning (blank counts as absent)", () => {
+  // The slot was missing at plan time, but the base is read FRESH at save time:
+  // an operator's mid-run edit ("Kodu!") must win over the model's translation.
+  const meta: PageMeta = {
+    metaTitle: { en: "Home", et: "Kodu!" },
+    metaDescription: { en: "Welcome", et: "" },
+  };
+  assert.deepEqual(
+    mergePageMeta(meta, { metaTitle: { et: "Kodu" }, metaDescription: { et: "Tere tulemast" } }),
+    {
+      metaTitle: { en: "Home", et: "Kodu!" },
+      metaDescription: { en: "Welcome", et: "Tere tulemast" },
+    },
+  );
+});
+
 // ── applyBlockTranslations ───────────────────────────────────────────────────
 
 test("applies only the addressed slots, preserving existing locales + siblings", () => {
