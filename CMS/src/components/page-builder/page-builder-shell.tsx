@@ -69,6 +69,8 @@ import {
   renameSection,
   parsePropsSchema,
 } from "@/lib/pages/page-blocks";
+import { applyBlockTranslations } from "@/lib/pages/page-translate-missing";
+import type { TranslationSlots } from "@/lib/content/bulk-translate-run";
 import { collectComponentNames, type Block, type FormTarget } from "@/lib/render/tree";
 import { declaredPropNames } from "@/lib/content/binding";
 import type {
@@ -94,6 +96,7 @@ import { ComponentSettings } from "./component-settings";
 import { BindingPanel, ListSettings, FormSettings } from "./binding-panels";
 import { GuestChatSettings } from "./guest-chat-settings";
 import { PageSettings } from "./page-settings";
+import { PageTranslateMissingButton } from "./page-translate-missing";
 import { VersionHistory } from "./version-history";
 
 // Preview frame widths per viewport (desktop = full width). See layout doc.
@@ -757,7 +760,24 @@ export function PageBuilderShell({
     };
   }, []);
 
+  // bulk-translate-missing (AC C7): merge one call's vetted block slots into
+  // the LATEST draft (functional update, so concurrent edits are never
+  // clobbered), then let the normal dirty→autosave path persist them — exactly
+  // like a per-field translate's onChange.
+  function onApplyTranslations(slots: TranslationSlots) {
+    setBlocks((b) =>
+      applyBlockTranslations(b, slots, propsSchemas, {
+        default: contentLocales[0] ?? "",
+        locales: contentLocales,
+      }),
+    );
+    setDirty(true);
+  }
+
   const options = flattenPagesForPicker(pages);
+  // The selected page's full summary (meta maps etc.) — the Page/SEO tabs and
+  // the page-level translate action all key off it.
+  const selectedPage = selected ? pages.find((p) => p.id === selected.id) ?? null : null;
 
   // Re-resolve the selected option against the latest list (e.g. after a create
   // refetch) so its label/publish state stays current; drop it if it's gone.
@@ -856,6 +876,17 @@ export function PageBuilderShell({
             >
               {t(`draftStatus.${draftStatusKey(draftStatus)}`)}
             </span>
+          )}
+          {selectedPage && (
+            <PageTranslateMissingButton
+              key={selectedPage.id}
+              page={selectedPage}
+              blocks={blocks}
+              propsSchemas={propsSchemas}
+              locales={contentLocales}
+              onApplyBlocks={onApplyTranslations}
+              onMetaSaved={() => void refreshPages(selectedPage.id)}
+            />
           )}
           <button
             type="button"
@@ -1275,9 +1306,7 @@ export function PageBuilderShell({
               })()}
             {rightTab === "page" &&
               (() => {
-                const page = selected
-                  ? pages.find((p) => p.id === selected.id) ?? null
-                  : null;
+                const page = selectedPage;
                 return page ? (
                   <div className="space-y-6">
                     <PageSettings
@@ -1307,21 +1336,16 @@ export function PageBuilderShell({
                 );
               })()}
             {rightTab === "seo" &&
-              (() => {
-                const page = selected
-                  ? pages.find((p) => p.id === selected.id) ?? null
-                  : null;
-                return page ? (
-                  <SeoForm
-                    key={page.id}
-                    page={page}
-                    locales={contentLocales}
-                    onSaved={() => void refreshPages(page.id)}
-                  />
-                ) : (
-                  <p className="text-sm text-foreground-muted">{t("seoEmpty")}</p>
-                );
-              })()}
+              (selectedPage ? (
+                <SeoForm
+                  key={selectedPage.id}
+                  page={selectedPage}
+                  locales={contentLocales}
+                  onSaved={() => void refreshPages(selectedPage.id)}
+                />
+              ) : (
+                <p className="text-sm text-foreground-muted">{t("seoEmpty")}</p>
+              ))}
           </div>
         </aside>
         )}

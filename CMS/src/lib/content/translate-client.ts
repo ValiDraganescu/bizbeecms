@@ -18,7 +18,10 @@ export const CLIENT_TIMEOUT_MS = 60_000;
 export async function executeTranslateCall(
   call: TranslateCall,
   opts: {
-    /** Collection table name / component name — the translate log target. */
+    /** Translate log target kind. Default "component" (collection flows);
+     *  the page-builder bulk action sends "page". Log-only under persist:false. */
+    kind?: "page" | "component";
+    /** Collection table name / component name / page slug — the log target. */
     target: string;
     /** The site's default content locale (the source language). */
     fromLocale: string;
@@ -32,7 +35,7 @@ export async function executeTranslateCall(
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       body: JSON.stringify({
-        kind: "component",
+        kind: opts.kind ?? "component",
         target: opts.target,
         fields: call.fields,
         fromLocale: opts.fromLocale,

@@ -1000,6 +1000,10 @@
       "emptyHintShort": "{locale} teksti veel pole.",
       "timeout": "Tõlkimine aegus — mudel ei vastanud. Proovi uuesti."
     },
+    "translateMissing": "Tõlgi puuduvad",
+    "translateMissingNone": "Pole midagi tõlkida — kõik keeled on täidetud.",
+    "translateMissingIncomplete": "{count, plural, one {# tõlge} other {# tõlget}} jäi saamata — proovi uuesti.",
+    "translating": "Tõlgin…",
     "link": {
       "newTab": "Ava uuel vahelehel",
       "pickPage": "Vali leht…"

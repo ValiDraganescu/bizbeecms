@@ -1000,6 +1000,10 @@
       "emptyHintShort": "Ei {locale}-tekstiä vielä.",
       "timeout": "Kääntäminen aikakatkaistiin — malli ei vastannut. Yritä uudelleen."
     },
+    "translateMissing": "Käännä puuttuvat",
+    "translateMissingNone": "Ei käännettävää — kaikki kielet on täytetty.",
+    "translateMissingIncomplete": "{count, plural, one {# käännös} other {# käännöstä}} jäi syntymättä — yritä uudelleen.",
+    "translating": "Käännetään…",
     "link": {
       "newTab": "Avaa uuteen välilehteen",
       "pickPage": "Valitse sivu…"
