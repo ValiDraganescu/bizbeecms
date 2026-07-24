@@ -7,23 +7,29 @@ import { useTranslations } from "next-intl";
 /**
  * Settings sub-sidebar — a page-builder-style second rail with GROUPED links
  * to every settings page, rendered ONCE by the settings layout (content on the
- * right). Replaces the old top tab bar. Groups: Site (locales, export/import),
- * Appearance (theme, brand, icons), AI (AI models, MCP API keys — all AI
- * integration & management), Access (users, Google sign-in).
+ * right). Replaces the old top tab bar. Groups: Site (locales, redirects, 404,
+ * export/import), SEO & Crawlers (SEO audit, robots/llms.txt, verification,
+ * bot rate limiting), Appearance (theme, brand, icons), AI (usage, AI models,
+ * assistant chats, MCP API keys), Access (users, Google sign-in).
  */
 const GROUPS = [
   {
     key: "site",
     items: [
       { key: "contentLocales", href: "/admin/settings/content-locales" },
-      { key: "robots", href: "/admin/settings/robots" },
-      { key: "rateLimit", href: "/admin/settings/rate-limit" },
       { key: "redirects", href: "/admin/settings/redirects" },
-      { key: "llms", href: "/admin/settings/llms" },
-      { key: "seoAudit", href: "/admin/settings/seo-audit" },
-      { key: "verification", href: "/admin/settings/verification" },
       { key: "notFoundPage", href: "/admin/settings/not-found-page" },
       { key: "exportImport", href: "/admin/settings/export-import" },
+    ],
+  },
+  {
+    key: "seoCrawlers",
+    items: [
+      { key: "seoAudit", href: "/admin/settings/seo-audit" },
+      { key: "robots", href: "/admin/settings/robots" },
+      { key: "llms", href: "/admin/settings/llms" },
+      { key: "verification", href: "/admin/settings/verification" },
+      { key: "rateLimit", href: "/admin/settings/rate-limit" },
     ],
   },
   {

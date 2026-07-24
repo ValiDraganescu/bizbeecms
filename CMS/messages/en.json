@@ -318,6 +318,7 @@
     "label": "Settings sections",
     "groups": {
       "site": "Site",
+      "seoCrawlers": "SEO & Crawlers",
       "appearance": "Appearance",
       "ai": "AI",
       "access": "Access"
@@ -330,7 +331,7 @@
     "verification": "Verification",
     "notFoundPage": "404 page",
     "theme": "Theme",
-    "brand": "Brand & AI",
+    "brand": "Brand",
     "apiKeys": "MCP",
     "users": "Users",
     "google": "Google sign-in",

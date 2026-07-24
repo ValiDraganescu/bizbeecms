@@ -318,6 +318,7 @@
     "label": "Seadete jaotised",
     "groups": {
       "site": "Sait",
+      "seoCrawlers": "SEO ja botid",
       "appearance": "Välimus",
       "ai": "AI",
       "access": "Ligipääs"
@@ -330,7 +331,7 @@
     "verification": "Kinnitamine",
     "notFoundPage": "404 leht",
     "theme": "Teema",
-    "brand": "Bränd ja AI",
+    "brand": "Bränd",
     "apiKeys": "MCP",
     "users": "Kasutajad",
     "google": "Google'i sisselogimine",

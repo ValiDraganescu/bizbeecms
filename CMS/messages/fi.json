@@ -318,6 +318,7 @@
     "label": "Asetusosiot",
     "groups": {
       "site": "Sivusto",
+      "seoCrawlers": "SEO ja botit",
       "appearance": "Ulkoasu",
       "ai": "Tekoäly",
       "access": "Käyttöoikeudet"
@@ -330,7 +331,7 @@
     "verification": "Vahvistus",
     "notFoundPage": "404-sivu",
     "theme": "Teema",
-    "brand": "Brändi ja tekoäly",
+    "brand": "Brändi",
     "apiKeys": "MCP",
     "users": "Käyttäjät",
     "google": "Google-kirjautuminen",
