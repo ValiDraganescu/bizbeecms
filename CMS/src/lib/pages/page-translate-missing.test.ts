@@ -26,7 +26,14 @@ const HERO_SCHEMA = JSON.stringify({
   imageUrl: { type: "string" }, // not translatable
   count: { type: "number", translatable: true }, // scalar — translatable ignored
 });
-const SCHEMAS = { Hero: HERO_SCHEMA, Card: HERO_SCHEMA };
+/** RestaurantRow-shaped schema: translatable props with an authored default,
+ *  a blank default, and no default at all. */
+const ROW_SCHEMA = JSON.stringify({
+  bookLabel: { type: "string", translatable: true, default: "Book a table" },
+  hint: { type: "string", translatable: true, default: "  " }, // blank → no source
+  tag: { type: "string", translatable: true }, // no default → no source
+});
+const SCHEMAS = { Hero: HERO_SCHEMA, Card: HERO_SCHEMA, Row: ROW_SCHEMA };
 
 const META_NONE: PageMeta = { metaTitle: {}, metaDescription: {} };
 
@@ -120,6 +127,54 @@ test("List TEMPLATE child: its component schema resolves and a locale-object pro
   assert.deepEqual(pageTranslateEntries(META_NONE, blocks, SCHEMAS, LOCALES), [
     { name: "tpl.title", sourceText: "NEW", targetLocales: ["et"] },
   ]);
+});
+
+test("unset prop with an authored schema default is planned from that default (T11 parity)", () => {
+  // Never-edited block: bookLabel sources from the schema default; hint (blank
+  // default) and tag (no default) have no source → skipped.
+  const blocks = tree({ id: "b1", component: "Row" });
+  assert.deepEqual(pageTranslateEntries(META_NONE, blocks, SCHEMAS, LOCALES), [
+    { name: "b1.bookLabel", sourceText: "Book a table", targetLocales: ["fi", "et"] },
+  ]);
+});
+
+test("stored default-locale text wins over the authored default", () => {
+  const blocks = tree({
+    id: "b1",
+    component: "Row",
+    props: { bookLabel: { en: "Reserve", fi: "Varaa" } }, // et missing
+  });
+  assert.deepEqual(pageTranslateEntries(META_NONE, blocks, SCHEMAS, LOCALES), [
+    { name: "b1.bookLabel", sourceText: "Reserve", targetLocales: ["et"] },
+  ]);
+});
+
+test("defaulted source keeps stored translations: only still-missing locales are targets", () => {
+  // No default-locale text stored, but fi already translated → default is the
+  // source and only et is planned.
+  const blocks = tree({
+    id: "b1",
+    component: "Row",
+    props: { bookLabel: { fi: "Varaa pöytä" } },
+  });
+  assert.deepEqual(pageTranslateEntries(META_NONE, blocks, SCHEMAS, LOCALES), [
+    { name: "b1.bookLabel", sourceText: "Book a table", targetLocales: ["et"] },
+  ]);
+});
+
+test("List TEMPLATE child: a never-edited defaulted prop is visible to the page sweep (T11 parity)", () => {
+  // The parked parity gap: a List template's bookLabel with nothing stored must
+  // be planned exactly like the per-field menu / per-block button would.
+  const blocks = tree({
+    id: "list1",
+    component: "__list__",
+    children: [{ id: "tpl", component: "Row", listRole: "template" }],
+  });
+  assert.deepEqual(pageTranslateEntries(META_NONE, blocks, SCHEMAS, LOCALES), [
+    { name: "tpl.bookLabel", sourceText: "Book a table", targetLocales: ["fi", "et"] },
+  ]);
+  // Single-locale site: the defaulted prop still plans nothing.
+  assert.deepEqual(pageTranslateEntries(META_NONE, blocks, SCHEMAS, SINGLE), []);
 });
 
 test("single-locale site plans nothing (AC10)", () => {
