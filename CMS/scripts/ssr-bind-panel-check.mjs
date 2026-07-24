@@ -100,7 +100,10 @@ const listHtml = render(
     collections: [],
     apiSources,
     propsSchemas: { ApiProbe: '{"v1":{},"v2":{},"v3":{}}' },
+    locales: ["en"],
     onChange: () => {},
+    onProps: () => {},
+    onTemplateProps: () => {},
   }),
 );
 

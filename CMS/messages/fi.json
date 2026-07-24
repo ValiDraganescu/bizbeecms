@@ -695,6 +695,8 @@
       "template": "Kohdekomponentti",
       "pickTemplate": "— valitse komponentti —",
       "map": "Yhdistä kentät kohteen ominaisuuksiin",
+      "translatables": "Kohteen tekstit",
+      "translatablesHint": "Käännettävät ominaisuudet, joita ei ole yhdistetty datakenttään. Jokainen rivi näyttää tämän tekstin, muokattavissa kielittäin.",
       "direction": "Suunta",
       "directionVertical": "Pysty",
       "directionHorizontal": "Vaaka",

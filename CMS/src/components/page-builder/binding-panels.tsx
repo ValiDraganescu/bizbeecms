@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import type { Block, BindingRef, ListSource, ApiBindingParams, FormTarget } from "@/lib/render/tree";
 import { normalizeLabelExpr } from "@/lib/render/tree";
 import { FORM_DEFAULT_SUCCESS, FORM_DEFAULT_ERROR } from "@/lib/render/plan-form";
-import { declaredPropNames, firstBinding } from "@/lib/content/binding";
+import { parsePropsSchema, type BlockPropsUpdater } from "@/lib/pages/page-blocks";
+import { firstBinding } from "@/lib/content/binding";
 import { requestPlaceholders } from "@/lib/data-sources/validate";
 import { apiListElements, samplePaths } from "@/lib/data-sources/bind";
 import {
@@ -19,6 +20,7 @@ import {
 } from "@/lib/page-builder/types";
 import { ctlLabel, ctlInput, SpacingControls, UnitNumberInput } from "./shared";
 import { NumberInput } from "@/components/ui/number-input";
+import { TranslatableField } from "./translatable-field";
 
 // ── Phase-2 binding authoring (Slice C) ──────────────────────────────────────
 //
@@ -684,23 +686,41 @@ export function BindingPanel({
  * each row field → the template's declared props (`listMap`). Empty/dead query →
  * the renderer shows the empty-state slot (or nothing). The template child is set
  * by component NAME (DnD into a List isn't wired this slice — a select is enough).
+ *
+ * list-item-translatables: the template's TRANSLATABLE props that are NOT bound
+ * to a row field surface as per-locale editors (the same TranslatableField the
+ * component inspector uses), stored as locale objects on the TEMPLATE child's
+ * props — the renderer's resolveLocalized picks the visitor's locale per row.
+ * Binding a prop hides its static editor (row data wins); unbinding restores it
+ * with whatever was stored.
  */
 export function ListSettings({
   block,
   collections,
   apiSources,
   propsSchemas,
+  locales,
   onChange,
   onProps,
+  onTemplateProps,
 }: {
   block: Block;
   collections: CollectionMeta[];
   apiSources: ApiSourceMeta[];
   propsSchemas: Record<string, string | null>;
+  /** Site content locales, default (source) first. */
+  locales: string[];
   onChange: (
     patch: Partial<Pick<Block, "listSource" | "listMap">> & { __child?: Block[] },
   ) => void;
   onProps: (patch: Record<string, unknown>) => void;
+  /** Write the TEMPLATE child's props through the T7 updater path: sync edits
+   *  pass the next props object, async translate results pass an UPDATER run
+   *  against the template block's latest props (never a stale snapshot). */
+  onTemplateProps: (
+    templateId: string,
+    props: Record<string, unknown> | BlockPropsUpdater,
+  ) => void;
 }) {
   const t = useTranslations("pageBuilder");
   const source = block.listSource;
@@ -725,8 +745,14 @@ export function ListSettings({
   // The template component is the List's first non-empty-role child.
   const template = (block.children ?? []).find((c) => c.listRole !== "empty") ?? null;
   const templateName = template?.component ?? "";
-  const templateProps = template ? [...declaredPropNames(propsSchemas[template.component])] : [];
+  const templateSchema = template ? parsePropsSchema(propsSchemas[template.component]) : [];
+  const templateProps = templateSchema.map((f) => f.name);
   const componentNames = Object.keys(propsSchemas).sort();
+  // Translatable template props NOT bound to a row field: editable statically,
+  // per locale, on the template child (hidden the moment the prop is mapped).
+  const staticTranslatables = templateSchema.filter(
+    (f) => f.translatable && listMap[f.name] === undefined,
+  );
 
   const presentation = source?.presentation ?? "list";
   // Carry the plain-list LAYOUT config through edits (rebuilt fresh in emitSource).
@@ -1322,6 +1348,27 @@ export function ListSettings({
                 )}
               </div>
             ))}
+
+          {/* Unbound translatable item props: static per-locale text stored on
+              the TEMPLATE child (every row renders it in the visitor's locale).
+              A prop disappears from here the moment it's bound above. */}
+          {template && staticTranslatables.length > 0 && (
+            <div className="space-y-3 border-t border-border pt-4">
+              <span className={ctlLabel}>{t("list.translatables")}</span>
+              <p className="text-xs text-foreground-muted">{t("list.translatablesHint")}</p>
+              {staticTranslatables.map((f) => (
+                <TranslatableField
+                  key={`${template.id}-${f.name}`}
+                  field={f}
+                  schema={templateSchema}
+                  block={template}
+                  props={(template.props ?? {}) as Record<string, unknown>}
+                  locales={locales}
+                  onChange={(p) => onTemplateProps(template.id, p)}
+                />
+              ))}
+            </div>
+          )}
         </>
       )}
     </section>

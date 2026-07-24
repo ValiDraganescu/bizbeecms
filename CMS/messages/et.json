@@ -695,6 +695,8 @@
       "template": "Üksuse komponent",
       "pickTemplate": "— vali komponent —",
       "map": "Seo väljad üksuse atribuutidega",
+      "translatables": "Üksuse tekstid",
+      "translatablesHint": "Tõlgitavad atribuudid, mis pole andmeväljaga seotud. Iga rida näitab seda teksti, muudetav keelte kaupa.",
       "direction": "Suund",
       "directionVertical": "Vertikaalne",
       "directionHorizontal": "Horisontaalne",

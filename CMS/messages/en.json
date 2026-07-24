@@ -695,6 +695,8 @@
       "template": "Item component",
       "pickTemplate": "— pick a component —",
       "map": "Map fields to item props",
+      "translatables": "Item text",
+      "translatablesHint": "Translatable item props not mapped to a data field. Every row shows this text, editable per language.",
       "direction": "Direction",
       "directionVertical": "Vertical",
       "directionHorizontal": "Horizontal",

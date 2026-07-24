@@ -101,6 +101,27 @@ test("nested children (List template) are walked at any depth", () => {
   ]);
 });
 
+test("List TEMPLATE child: its component schema resolves and a locale-object prop plans missing-only", () => {
+  // list-item-translatables AC4: the static per-List text the ListSettings
+  // surface stores on the template child is covered by page-level Translate
+  // missing — schema found by the CHILD's component name, only absent locales.
+  const blocks = tree({
+    id: "list1",
+    component: "__list__",
+    children: [
+      {
+        id: "tpl",
+        component: "Card",
+        listRole: "template",
+        props: { title: { en: "NEW", fi: "UUSI" } }, // et missing
+      },
+    ],
+  });
+  assert.deepEqual(pageTranslateEntries(META_NONE, blocks, SCHEMAS, LOCALES), [
+    { name: "tpl.title", sourceText: "NEW", targetLocales: ["et"] },
+  ]);
+});
+
 test("single-locale site plans nothing (AC10)", () => {
   const meta: PageMeta = { metaTitle: { en: "Home" }, metaDescription: {} };
   const blocks = tree({ id: "b1", component: "Hero", props: { title: "Hello" } });

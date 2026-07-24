@@ -82,8 +82,13 @@ export function BlockInspector({
         collections={collections}
         apiSources={apiSources}
         propsSchemas={propsSchemas}
+        locales={locales}
         onChange={(patch) => editor.onUpdateList(sel.id, patch)}
         onProps={(patch) => editor.onPatchBlockProps(sel.id, patch)}
+        // The TEMPLATE child's props — the T7 updater path (updateBlockProps
+        // tree-walks to the nested template block), so async translate results
+        // merge against its LATEST props.
+        onTemplateProps={editor.onUpdateComponentProps}
       />
     );
   }
