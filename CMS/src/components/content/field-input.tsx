@@ -27,7 +27,6 @@ import {
   type LocalizedDraft,
   draftLocaleText,
   setDraftLocaleText,
-  mergeItemTranslations,
 } from "@/lib/content/item-locale-fields";
 
 const INPUT =
@@ -210,6 +209,7 @@ export function TranslatableFieldInput({
   locales,
   tableName,
   onChange,
+  onMergeTranslations,
 }: {
   field: CollectionField;
   value: LocalizedDraft;
@@ -218,6 +218,10 @@ export function TranslatableFieldInput({
   /** The collection table name — sent as the translate target for logging. */
   tableName: string;
   onChange: (v: LocalizedDraft) => void;
+  /** Merge an /api/translate response for THIS field into the draft. The PARENT
+   *  applies it against the LATEST state (functional update), so several fields
+   *  translating at once never clobber each other (concurrency-safe). */
+  onMergeTranslations: (translations: Record<string, Record<string, string>>) => void;
 }) {
   const t = useTranslations("collections");
   const tp = useTranslations("pageBuilder");
@@ -267,7 +271,10 @@ export function TranslatableFieldInput({
         setError(j.error ?? j.errors?.join("; ") ?? `HTTP ${res.status}`);
         return;
       }
-      onChange(mergeItemTranslations(value, field.name, j.translations, locales));
+      // Hand the raw translations up; the parent merges them into the LATEST
+      // draft state, so a second field translating concurrently can't overwrite
+      // this one (the previous approach merged into the stale `value` prop).
+      onMergeTranslations(j.translations);
       if (!targets.includes(loc)) setActive(targets[0]);
     } catch (err) {
       setError(

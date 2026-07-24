@@ -75,3 +75,36 @@ test("mergeItemTranslations: skips empty/unknown-locale entries", () => {
   // fi empty → skipped; xx not a site locale → skipped; et applied.
   assert.deepEqual(merged, { en: "A", et: "Eesti" });
 });
+
+// ── concurrency: independent field merges compose (no clobber) ───────────────
+// Models the parent's FUNCTIONAL setDraft: two fields translating at once each
+// merge into their OWN slot off the latest state. Proven here by threading a
+// shared `values` map through two sequential merges (the order the functional
+// updates would apply) and asserting BOTH fields survive.
+test("two fields merging into the same values map both persist (no last-write-wins)", () => {
+  let values = { title: "Grill night", description: "A summer grill." };
+  // Field A (title) resolves first.
+  values = {
+    ...values,
+    title: mergeItemTranslations(values.title, "title", { title: { fi: "Grilli-ilta" } }, LOCALES),
+  };
+  // Field B (description) resolves second — must NOT drop A's title translation.
+  values = {
+    ...values,
+    description: mergeItemTranslations(
+      values.description,
+      "description",
+      { description: { fi: "Kesäinen grilli." } },
+      LOCALES,
+    ),
+  };
+  assert.deepEqual(values.title, { en: "Grill night", fi: "Grilli-ilta" });
+  assert.deepEqual(values.description, { en: "A summer grill.", fi: "Kesäinen grilli." });
+});
+
+test("mergeItemTranslations only touches its OWN field's slot (ignores other fields in the response)", () => {
+  // Even if the response carries maps for several fields, merging for one field
+  // reads only that field's map — so a per-field functional update is isolated.
+  const merged = mergeItemTranslations("A", "title", { title: { fi: "AA" }, description: { fi: "ZZ" } }, LOCALES);
+  assert.deepEqual(merged, { en: "A", fi: "AA" });
+});

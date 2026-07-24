@@ -17,13 +17,14 @@
  */
 
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { resolveLocalized, isLocaleObject } from "@/lib/render/localize";
 import type { CollectionView } from "@/db/collection-store";
 import { setActiveCollectionContext } from "@/lib/chat/collection-context";
 import { COLLECTION_FIELD_TYPES, isTranslatableField, type CollectionField } from "@/lib/content/collection-schema";
 import { ITEM_STATUSES } from "@/lib/content/item-write";
 import { blankValueFor, FieldInput, TranslatableFieldInput, type FieldValue } from "./field-input";
-import { toLocalizedDraft, type LocalizedDraft } from "@/lib/content/item-locale-fields";
+import { toLocalizedDraft, mergeItemTranslations, type LocalizedDraft } from "@/lib/content/item-locale-fields";
 import { ConfirmModal } from "./confirm-modal";
 
 const INPUT = "rounded-md border border-border bg-surface px-3 py-2 text-foreground";
@@ -44,6 +45,11 @@ export function CollectionItems({
   contentLocales?: string[];
 }) {
   const t = useTranslations("collections");
+  // The admin's active UI locale (en/fi/et) — used to pick which language of a
+  // translatable field to SHOW in the item list, falling back to the content
+  // default locale (the site's first content locale).
+  const adminLocale = useLocale();
+  const contentDefaultLocale = contentLocales[0] ?? "";
   const [collection, setCollection] = useState(initialCollection);
   const tableName = collection.tableName;
 
@@ -120,6 +126,32 @@ export function CollectionItems({
       status: typeof item.status === "string" ? item.status : "draft",
     });
     setError(null);
+  }
+
+  // Set ONE field's value via a FUNCTIONAL update, so concurrent field edits (and
+  // especially several fields translating at once) compose on the LATEST draft
+  // instead of a stale render-time snapshot — otherwise the last onChange to
+  // resolve overwrites the others and their fields come back empty.
+  function setFieldValue(fieldName: string, v: FieldValue) {
+    setDraft((prev) =>
+      prev ? { ...prev, values: { ...prev.values, [fieldName]: v } } : prev,
+    );
+  }
+
+  // Merge an /api/translate response for ONE field into the draft, computed
+  // against the LATEST value of THAT field (via the functional updater). This is
+  // the concurrency-safe path: two fields translating in parallel each merge into
+  // their own slot off the current state, so neither clobbers the other.
+  function mergeFieldTranslations(
+    fieldName: string,
+    translations: Record<string, Record<string, string>>,
+  ) {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const current = (prev.values[fieldName] as LocalizedDraft) ?? "";
+      const merged = mergeItemTranslations(current, fieldName, translations, contentLocales);
+      return { ...prev, values: { ...prev.values, [fieldName]: merged } };
+    });
   }
 
   async function saveDraft() {
@@ -352,14 +384,15 @@ export function CollectionItems({
                   value={(draft.values[f.name] as LocalizedDraft) ?? ""}
                   locales={contentLocales}
                   tableName={tableName}
-                  onChange={(v) => setDraft({ ...draft, values: { ...draft.values, [f.name]: v } })}
+                  onChange={(v) => setFieldValue(f.name, v)}
+                  onMergeTranslations={(translations) => mergeFieldTranslations(f.name, translations)}
                 />
               ) : (
                 <FieldInput
                   key={f.name}
                   field={f}
                   value={draft.values[f.name] ?? blankValueFor(f.type)}
-                  onChange={(v) => setDraft({ ...draft, values: { ...draft.values, [f.name]: v } })}
+                  onChange={(v) => setFieldValue(f.name, v)}
                 />
               ),
             )}
@@ -413,7 +446,7 @@ export function CollectionItems({
                     <td className="px-3 py-2 font-mono text-foreground-muted">{String(it.slug ?? "")}</td>
                     {collection.fields.slice(0, 4).map((f) => (
                       <td key={f.name} className="px-3 py-2 text-foreground">
-                        {renderCell(it[f.name])}
+                        {renderCell(it[f.name], adminLocale, contentDefaultLocale)}
                       </td>
                     ))}
                     <td className="px-3 py-2 text-foreground-muted">
@@ -823,9 +856,15 @@ function SchemaManager({
   );
 }
 
-function renderCell(v: unknown): string {
+function renderCell(v: unknown, locale: string, defaultLocale: string): string {
   if (v == null) return "";
   if (typeof v === "boolean") return v ? "✓" : "—";
+  // A translatable field is a locale object here — show the admin's active locale
+  // (falling back to the content default), NOT "[object Object]".
+  if (isLocaleObject(v)) {
+    v = resolveLocalized(v, locale, defaultLocale);
+    if (v == null) return "";
+  }
   if (Array.isArray(v)) return v.join(", ");
   const s = String(v);
   // multiselect is stored as a JSON array string — show it readably.
