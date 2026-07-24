@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import {
   validateBlockProps,
   linkNewTabProp,
+  type BlockPropsUpdater,
   type PropField,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
@@ -34,7 +35,10 @@ export function ComponentSettings({
   block: Block;
   schema: PropField[];
   locales: string[];
-  onChange: (props: Record<string, unknown>) => void;
+  /** Sync edits pass the next props; async results (AI translate) pass an
+   *  UPDATER run against the block's latest props, so slow calls can't revert
+   *  concurrent edits (see `BlockPropsUpdater`). */
+  onChange: (props: Record<string, unknown> | BlockPropsUpdater) => void;
   /** The block's component has an unpublished draft (preview ≠ public render). */
   hasDraft?: boolean;
 }) {

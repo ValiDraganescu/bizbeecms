@@ -9,9 +9,10 @@
  * Storage is unchanged — the value is a `{ en, fi, … }` locale object; we read
  * the active locale via `localeFieldValue` and write via `setLocalizedProp`, then
  * hand the merged props up through `onChange` (the same path the editor autosaves).
- * Translate posts the DEFAULT-locale text to `/api/translate` and merges the
- * returned per-locale maps in — the rule is: author the default language, translate
- * out from it. The translate menu is disabled until the default text is non-empty.
+ * Translate posts the DEFAULT-locale text to `/api/translate` and hands `onChange`
+ * an UPDATER that merges the returned per-locale maps into the block's LATEST
+ * props (never this render's snapshot — see `translate`). The rule is: author the
+ * default language, translate out from it; the menu needs non-empty default text.
  *
  * ponytail: native <details> for the translate menu (no popover lib); the lang
  * tabs reuse the LocalePicker look. Per-field state, so many fields coexist.
@@ -25,6 +26,7 @@ import {
   setLocalizedProp,
   mergeTranslations,
   isLongText,
+  type BlockPropsUpdater,
   type PropField,
 } from "@/lib/pages/page-blocks";
 import { executeTranslateCall } from "@/lib/content/translate-client";
@@ -51,7 +53,10 @@ export function TranslatableField({
   props: Record<string, unknown>;
   /** Site content locales, default (source) first. */
   locales: string[];
-  onChange: (props: Record<string, unknown>) => void;
+  /** Sync typing passes the next props; the async translate result passes an
+   *  UPDATER merged against the block's LATEST props at commit time — never a
+   *  full object built from this render's (possibly stale) `props`. */
+  onChange: (props: Record<string, unknown> | BlockPropsUpdater) => void;
 }) {
   const t = useTranslations("pageBuilder");
   const defaultLocale = locales[0] ?? "";
@@ -96,7 +101,12 @@ export function TranslatableField({
       { target: block.component, fromLocale: defaultLocale },
     );
     if (res.ok) {
-      onChange(mergeTranslations(props, res.translations, schema, locales));
+      // UPDATER, not a merged object: `props` here is the click-time snapshot,
+      // and anything that landed while the call ran (another field's translate,
+      // typing in a sibling) would be reverted by writing it back. The editor
+      // runs this against the block's latest props inside setBlocks, so the
+      // result only adds the field×locale slots this call requested.
+      onChange((latest) => mergeTranslations(latest, res.translations, schema, locales));
       // Jump the view to the locale we just filled (or the first target).
       if (!targets.includes(loc)) setActive(targets[0]);
     } else {

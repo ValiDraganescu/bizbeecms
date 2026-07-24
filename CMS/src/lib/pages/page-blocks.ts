@@ -1534,24 +1534,44 @@ export function patchBlockProps(
 }
 
 /**
+ * Updater applied to a block's CURRENT props. This is the anti-stale-snapshot
+ * contract: an async flow (e.g. AI translate) must NOT hand back a full props
+ * object it computed from a click-time snapshot — it hands back an updater, and
+ * the editor runs it against the props at COMMIT time (inside React's functional
+ * `setBlocks`), so a slow result can't revert edits that landed while it ran.
+ */
+export type BlockPropsUpdater = (current: Record<string, unknown>) => Record<string, unknown>;
+
+/**
+ * Apply `update` to the CURRENT `props` of the block `id` wherever it sits in
+ * the tree (immutable). An empty result ({}) drops the key entirely (matches how
+ * the C3 editor stores an unbound block). No-op if `id` is absent (the updater
+ * is never called). PURE — never mutates inputs.
+ */
+export function updateBlockProps(blocks: Block[], id: string, update: BlockPropsUpdater): Block[] {
+  return blocks.map((b) => {
+    if (b.id === id) {
+      const props = update({ ...(b.props ?? {}) });
+      const next: Block = { ...b };
+      if (Object.keys(props).length > 0) next.props = props;
+      else delete next.props;
+      return next;
+    }
+    return b.children ? { ...b, children: updateBlockProps(b.children, id, update) } : b;
+  });
+}
+
+/**
  * Replace the `props` of the block `id` wherever it sits in the tree (immutable).
- * An empty `props` ({}) drops the key entirely (matches how the C3 editor stores
- * an unbound block). No-op if `id` is absent. PURE — never mutates inputs.
+ * The snapshot-overwrite variant of `updateBlockProps` — only safe when `props`
+ * was computed synchronously from the current render (never after an await).
  */
 export function mergeBlockProps(
   blocks: Block[],
   id: string,
   props: Record<string, unknown>,
 ): Block[] {
-  return blocks.map((b) => {
-    if (b.id === id) {
-      const next: Block = { ...b };
-      if (Object.keys(props).length > 0) next.props = props;
-      else delete next.props;
-      return next;
-    }
-    return b.children ? { ...b, children: mergeBlockProps(b.children, id, props) } : b;
-  });
+  return updateBlockProps(blocks, id, () => props);
 }
 
 /** Find a node by id anywhere in the tree (depth-first). */

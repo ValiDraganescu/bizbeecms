@@ -24,8 +24,9 @@ import {
   removeNode,
   targetSectionId,
   moveNode,
-  findBlock,
   mergeBlockProps,
+  updateBlockProps,
+  type BlockPropsUpdater,
   setBlockField,
   setBlockChildren,
   addListToSection,
@@ -128,10 +129,17 @@ export function useBlockEditor(
     setDirty(true);
   }
 
-  // Replace a (nested) component block's full props (tree-walk merge). The Block
+  // Set a (nested) component block's full props (tree-walk merge). The Block
   // tab computes the validated props from its schema-driven form and calls this.
-  function onUpdateComponentProps(blockId: string, props: Record<string, unknown>) {
-    setBlocks((b) => mergeBlockProps(b, blockId, props));
+  // Synchronous edits pass the object; ASYNC results (AI translate) MUST pass an
+  // updater so the merge runs against the block's props at commit time — a full
+  // object computed before an await is a stale snapshot and would revert
+  // whatever landed while the call ran (the two-translates race).
+  function onUpdateComponentProps(
+    blockId: string,
+    props: Record<string, unknown> | BlockPropsUpdater,
+  ) {
+    setBlocks((b) => updateBlockProps(b, blockId, typeof props === "function" ? props : () => props));
     setDirty(true);
   }
 
@@ -188,33 +196,32 @@ export function useBlockEditor(
   }
 
   // Patch-merge one block's own props (column visibility/spacing, List/Form
-  // spacing). Reads the live block, applies the patch (undefined/false deletes
-  // a key), and writes the full props back via the tree-walking mergeBlockProps.
+  // spacing) against the block's CURRENT props (undefined/false deletes a key).
   function onPatchBlockProps(blockId: string, patch: Record<string, unknown>) {
-    setBlocks((b) => {
-      const col = findBlock(b, blockId);
-      const next: Record<string, unknown> = { ...(col?.props ?? {}) };
-      for (const [k, v] of Object.entries(patch)) {
-        if (v === undefined || v === false) delete next[k];
-        else next[k] = v;
-      }
-      return mergeBlockProps(b, blockId, next);
-    });
+    setBlocks((b) =>
+      updateBlockProps(b, blockId, (next) => {
+        for (const [k, v] of Object.entries(patch)) {
+          if (v === undefined || v === false) delete next[k];
+          else next[k] = v;
+        }
+        return next;
+      }),
+    );
     setDirty(true);
   }
 
   // Patch-merge a ROW's own props (behavior, gap, align, background, padding).
   // Only `undefined` deletes a key (a row's `false`/0 values are legitimate).
   function onUpdateRowProps(rowId: string, patch: Record<string, unknown>) {
-    setBlocks((b) => {
-      const row = findBlock(b, rowId);
-      const next: Record<string, unknown> = { ...(row?.props ?? {}) };
-      for (const [k, v] of Object.entries(patch)) {
-        if (v === undefined) delete next[k];
-        else next[k] = v;
-      }
-      return mergeBlockProps(b, rowId, next);
-    });
+    setBlocks((b) =>
+      updateBlockProps(b, rowId, (next) => {
+        for (const [k, v] of Object.entries(patch)) {
+          if (v === undefined) delete next[k];
+          else next[k] = v;
+        }
+        return next;
+      }),
+    );
     setDirty(true);
   }
 

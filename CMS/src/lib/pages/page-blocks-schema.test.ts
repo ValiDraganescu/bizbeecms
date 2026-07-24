@@ -17,6 +17,7 @@ import {
   validateBlockProps,
   findBlock,
   mergeBlockProps,
+  updateBlockProps,
   patchBlockProps,
   isImageProp,
   isLinkProp,
@@ -418,6 +419,65 @@ test("mergeBlockProps: replaces a nested block's props immutably; {} drops props
 
   // missing id → no-op (returns mapped tree, hero unchanged)
   const noop = mergeBlockProps(t, "ghost", { x: 1 });
+  assert.deepEqual(findBlock(noop, "hero-1")!.props, { title: "old" });
+});
+
+// ── updateBlockProps (functional update — the stale-snapshot race fix) ──────
+//
+// Two per-field AI translates started together used to each write back a FULL
+// props object built from their click-time snapshot; the last finisher reverted
+// the other's result (and any typing that landed in between). The fix: async
+// results are applied as UPDATERS against the block's CURRENT props.
+
+test("updateBlockProps: two overlapping translates on different fields BOTH survive", () => {
+  const locales = ["en", "fi"];
+  const schema = headingSchema();
+  const start = tree(); // hero-1 props: { title: "old" }
+  // Give the block both fields, as SectionHeading has.
+  const t0 = mergeBlockProps(start, "hero-1", { title: "Best", subtitle: "Find one" });
+
+  // Both translate calls resolve AFTER t0; each merges only its own field's
+  // slots against whatever the tree holds when it commits.
+  const subtitleDone = updateBlockProps(t0, "hero-1", (latest) =>
+    mergeTranslations(latest, { subtitle: { fi: "Etsi yksi" } }, schema, locales),
+  );
+  const titleDone = updateBlockProps(subtitleDone, "hero-1", (latest) =>
+    mergeTranslations(latest, { title: { fi: "Parhaat" } }, schema, locales),
+  );
+
+  // The second finisher did NOT reset the first finisher's translations.
+  assert.deepEqual(findBlock(titleDone, "hero-1")!.props, {
+    title: { en: "Best", fi: "Parhaat" },
+    subtitle: { en: "Find one", fi: "Etsi yksi" },
+  });
+});
+
+test("updateBlockProps: a translate result preserves text typed into a sibling meanwhile", () => {
+  const locales = ["en", "fi"];
+  const schema = headingSchema();
+  const t0 = mergeBlockProps(tree(), "hero-1", { title: "Best", subtitle: "Find one" });
+  // While title's translate is in flight, the user edits the subtitle.
+  const typed = mergeBlockProps(t0, "hero-1", { title: "Best", subtitle: "Pick yours" });
+
+  const done = updateBlockProps(typed, "hero-1", (latest) =>
+    mergeTranslations(latest, { title: { fi: "Parhaat" } }, schema, locales),
+  );
+
+  assert.deepEqual(findBlock(done, "hero-1")!.props, {
+    title: { en: "Best", fi: "Parhaat" },
+    subtitle: "Pick yours", // the concurrent edit survives the translate commit
+  });
+});
+
+test("updateBlockProps: {} result drops props; absent id never calls the updater", () => {
+  const t = tree();
+  const cleared = updateBlockProps(t, "hero-1", () => ({}));
+  assert.equal("props" in findBlock(cleared, "hero-1")!, false);
+  assert.deepEqual(findBlock(t, "hero-1")!.props, { title: "old" }); // input untouched
+
+  let called = false;
+  const noop = updateBlockProps(t, "ghost", () => ((called = true), { x: 1 }));
+  assert.equal(called, false);
   assert.deepEqual(findBlock(noop, "hero-1")!.props, { title: "old" });
 });
 
