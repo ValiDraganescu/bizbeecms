@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "2.3.0",
-      "tag": "r-2.3.0",
-      "markdown": "# CMS v2.3.0\n\n_2026-07-24 · changes since r-2.2.1_\n\n## Features\n- **The AI assistant follows your selection in the Page Builder.** When you select a section — or a block inside one — the assistant now knows which one you're working on and sees its current contents. You can say \"restyle this section\" or \"change this block\" without @-mentioning it by name. Explicitly @-mentioning the same section still works and isn't duplicated.\n"
+      "version": "2.3.1",
+      "tag": "r-2.3.1",
+      "markdown": "# CMS v2.3.1\n\n_2026-07-24 · changes since r-2.3.0_\n\n## Fixes\n- **AI translation no longer hangs forever.** If the translation model opened its response but then went silent, the Page Builder field's translate spinner would spin indefinitely. It now times out with a clear, actionable message (\"the model stopped responding — try again, or pick a different translation model in Settings → AI models\") instead of hanging. Added on both the server (a 504 after the stream stalls) and the browser (a fetch timeout backstop), so the spinner always clears.\n\n## Other\n- Added structured, greppable logging to the translate endpoint (every step and failure mode) to make diagnosing model/streaming issues straightforward from Worker logs.\n"
     },
     {
       "version": "2.2.1",
