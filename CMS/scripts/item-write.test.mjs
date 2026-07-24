@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 
 import {
   coerceFieldValue,
+  coerceLocalizedText,
   coerceStatus,
   buildInsert,
   buildUpdate,
@@ -168,4 +169,75 @@ test("buildList: defaults live+limit, status filter bound, archived modes, fence
 
   fencedRead(buildList("content_posts", { archived: "archived" }).sql);
   fencedRead(buildList("content_posts", { archived: "all" }).sql);
+});
+
+// ── translatable text fields (translatable-collections Slice 2) ───────────────
+const tField = { name: "title", type: "string", translatable: true };
+
+test("coerceLocalizedText: bare string stored as-is (default-only / legacy)", () => {
+  assert.equal(coerceLocalizedText("Hello", "en"), "Hello");
+});
+
+test("coerceLocalizedText: locale object stringified, empty locales dropped, keys normalized", () => {
+  const out = coerceLocalizedText({ EN: "Cosy bistro", fi: "Viihtyisä", et: "" }, "en");
+  assert.deepEqual(JSON.parse(out), { en: "Cosy bistro", fi: "Viihtyisä" });
+});
+
+test("coerceLocalizedText: single default-locale entry collapses to a bare string", () => {
+  assert.equal(coerceLocalizedText({ en: "Only English" }, "en"), "Only English");
+});
+
+test("coerceLocalizedText: a single NON-default locale stays an object (not collapsed)", () => {
+  const out = coerceLocalizedText({ fi: "Vain suomi" }, "en");
+  assert.deepEqual(JSON.parse(out), { fi: "Vain suomi" });
+});
+
+test("coerceLocalizedText: all-empty object → null", () => {
+  assert.equal(coerceLocalizedText({ en: "", fi: "" }, "en"), null);
+});
+
+test("coerceFieldValue: translatable field accepts a locale object → stored JSON", () => {
+  const res = coerceFieldValue(tField, { en: "A", fi: "B" }, "en");
+  assert.ok(res.ok);
+  assert.deepEqual(JSON.parse(res.value), { en: "A", fi: "B" });
+});
+
+test("coerceFieldValue: translatable field still accepts a bare string", () => {
+  const res = coerceFieldValue(tField, "Plain", "en");
+  assert.deepEqual(res, { ok: true, value: "Plain" });
+});
+
+test("coerceFieldValue: translatable required field rejects an all-empty object", () => {
+  const req = { name: "title", type: "string", required: true, translatable: true };
+  const res = coerceFieldValue(req, { en: "", fi: "" }, "en");
+  assert.equal(res.ok, false);
+  assert.equal(res.status, 400);
+});
+
+test("coerceFieldValue: translatable optional field with all-empty object → null", () => {
+  const res = coerceFieldValue(tField, { en: "" }, "en");
+  assert.deepEqual(res, { ok: true, value: null });
+});
+
+test("coerceFieldValue: a locale object on a NON-translatable field is NOT treated as locales", () => {
+  // Without the flag, {en,fi} is just an object → String(...) fallback, NOT parsed as locales.
+  const plain = { name: "title", type: "string" };
+  const res = coerceFieldValue(plain, { en: "A", fi: "B" }, "en");
+  assert.ok(res.ok);
+  assert.equal(res.value, "[object Object]");
+});
+
+test("buildInsert: threads defaultLocale so a translatable object collapses correctly", () => {
+  const fields = [tField];
+  const built = buildInsert("content_x", fields, { title: { en: "Solo" } }, 1000, () => "id1", "en");
+  assert.ok(built.ok);
+  // title is the 7th column (after 6 system columns); single-default collapses to bare string.
+  assert.equal(built.value.params[6], "Solo");
+});
+
+test("buildUpdate: threads defaultLocale for a translatable field", () => {
+  const built = buildUpdate("content_x", [tField], "id1", { title: { en: "A", fi: "B" } }, 2000, "en");
+  assert.ok(built.ok);
+  const titleParam = built.value.params[0]; // first SET is title
+  assert.deepEqual(JSON.parse(titleParam), { en: "A", fi: "B" });
 });

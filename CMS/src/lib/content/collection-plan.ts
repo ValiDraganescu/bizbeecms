@@ -17,6 +17,7 @@ import {
   buildAddColumnSql,
   tableNameForSlug,
   MAX_COLUMNS,
+  isTranslatableField,
   type CollectionField,
 } from "./collection-schema.ts";
 
@@ -164,6 +165,11 @@ export function normalizeField(raw: unknown): CollectionField | null {
         typeof (x as Record<string, unknown>).value === "string" &&
         typeof (x as Record<string, unknown>).label === "string")
       .map((x) => ({ value: x.value, label: x.label }));
+  }
+  // `translatable` only survives on the text types it's meaningful for (see
+  // isTranslatableField); a stray flag on a number/bool/etc. field is dropped.
+  if (o.translatable === true && isTranslatableField({ type: field.type, translatable: true })) {
+    field.translatable = true;
   }
   return field;
 }

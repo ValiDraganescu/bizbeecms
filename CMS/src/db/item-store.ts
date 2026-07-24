@@ -12,6 +12,8 @@
  */
 import { contentSelect, contentWrite } from "../lib/content/content-db.ts";
 import { getCollection } from "./collection-store.ts";
+import { getContentLocales } from "./settings-store.ts";
+import { parseLocalizedRow, parseLocalizedRows } from "../lib/content/localized-fields.ts";
 import type { PlanResult } from "../lib/content/collection-plan.ts";
 import {
   buildInsert,
@@ -41,7 +43,7 @@ export async function listItems(
   if (!view) return { ok: false, status: 404, error: "collection not found" };
   const { sql, params } = buildList(tableName, opts);
   const rows = await contentSelect<Item>(sql, params);
-  return { ok: true, plan: rows };
+  return { ok: true, plan: parseLocalizedRows(rows, view.fields) };
 }
 
 /** Get one item by id, or 404. */
@@ -51,7 +53,9 @@ export async function getItem(tableName: string, id: string): Promise<PlanResult
   const { sql, params } = buildGet(tableName, id);
   const rows = await contentSelect<Item>(sql, params);
   if (!rows[0]) return { ok: false, status: 404, error: "item not found" };
-  return { ok: true, plan: rows[0] };
+  // Parse translatable columns → locale objects so the admin item editor (Slice
+  // 5) sees per-locale values and a bound single-item render localizes.
+  return { ok: true, plan: parseLocalizedRow(rows[0], view.fields) };
 }
 
 /** Create an item: validate+coerce body → parameterized INSERT (fenced). */
@@ -63,7 +67,8 @@ export async function createItem(
   if (!view) return { ok: false, status: 404, error: "collection not found" };
 
   const now = Date.now();
-  const built = buildInsert(tableName, view.fields, body, now, () => crypto.randomUUID());
+  const { default: defaultLocale } = await getContentLocales();
+  const built = buildInsert(tableName, view.fields, body, now, () => crypto.randomUUID(), defaultLocale);
   if (!built.ok) return built;
 
   await contentWrite(built.value.sql, built.value.params);
@@ -79,7 +84,8 @@ export async function updateItem(
   const view = await loadFields(tableName);
   if (!view) return { ok: false, status: 404, error: "collection not found" };
 
-  const built = buildUpdate(tableName, view.fields, id, body, Date.now());
+  const { default: defaultLocale } = await getContentLocales();
+  const built = buildUpdate(tableName, view.fields, id, body, Date.now(), defaultLocale);
   if (!built.ok) return built;
 
   const changes = await contentWrite(built.value.sql, built.value.params);

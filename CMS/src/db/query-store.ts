@@ -10,6 +10,7 @@
  */
 import { contentSelect } from "../lib/content/content-db.ts";
 import { getCollection } from "./collection-store.ts";
+import { parseLocalizedRows } from "../lib/content/localized-fields.ts";
 import {
   compileQuery,
   compileCount,
@@ -39,9 +40,14 @@ export async function queryCollection(
   const c = compileCount(tableName, view.fields, spec);
   if (!c.ok) return c;
 
-  const items = await contentSelect<QueryRow>(q.plan.sql, q.plan.params);
+  const rawItems = await contentSelect<QueryRow>(q.plan.sql, q.plan.params);
   const countRows = await contentSelect<{ n: number }>(c.plan.sql, c.plan.params);
-  const total = Number(countRows[0]?.n ?? items.length);
+  const total = Number(countRows[0]?.n ?? rawItems.length);
+
+  // The ONE read seam: parse translatable columns → locale objects so the bound
+  // props flow through render-time `resolveLocalized`. No-op when no field is
+  // translatable.
+  const items = parseLocalizedRows(rawItems, view.fields);
 
   return {
     ok: true,

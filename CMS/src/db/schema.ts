@@ -429,9 +429,19 @@ export const invite = sqliteTable(
  * registry row is the SOURCE OF TRUTH for the collection's logical schema — the
  * UI, the AI tools, and the runtime-DDL fence all read this, NOT `sqlite_master`
  * (CAVEAT: registry is canonical). `schema` is the JSON field list (each field:
- * `{ name, type, required, default, label, options? }`, type from the
- * propsSchema-style vocabulary) from which the SYSTEM generates the CREATE TABLE
- * DDL — nobody authors raw DDL. `collection` is on the fence's BUILTIN_DENYLIST,
+ * `{ name, type, required, default, label, options?, translatable? }`, type from
+ * the propsSchema-style vocabulary) from which the SYSTEM generates the CREATE
+ * TABLE DDL — nobody authors raw DDL.
+ *
+ * TRANSLATABLE fields (opt-in `translatable: true`, string/text/richtext only):
+ * the column's DDL is unchanged (still one TEXT column), but the stored VALUE is
+ * a per-locale "locale object" JSON — `{"en":"Cosy bistro","fi":"Viihtyisä"}` —
+ * exactly like `multiselect` stores a JSON array in its TEXT column. The read
+ * seam (`lib/content/localized-fields.ts`) parses it back to an object so it
+ * flows through the render-time `resolveLocalized` walk and picks the active
+ * content locale. Backward compatible: a bare string is a valid value (treated
+ * as the default locale) — no data migration. `collection` is on the fence's
+ * BUILTIN_DENYLIST,
  * so the runtime path can never touch this table. Hard cap of 100 collections
  * per Site is enforced against the row count here BEFORE any CREATE (Slice 2).
  */

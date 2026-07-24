@@ -21,7 +21,38 @@
  *   string/text/richtext/ref/asset → String(value)
  * `required` fields reject null/undefined/empty-string.
  */
-import { SYSTEM_COLUMNS, type CollectionField } from "./collection-schema.ts";
+import { SYSTEM_COLUMNS, isTranslatableField, type CollectionField } from "./collection-schema.ts";
+import { isLocaleObject, normalizeLocaleCode } from "../render/localize.ts";
+
+/**
+ * Coerce a translatable text field's raw value → the string STORED in its TEXT
+ * column. PURE. Mirrors the page-builder `setLocalizedProp` collapse rule so a
+ * value round-trips clean between the two editors:
+ *   - a bare string           → stored as-is (default-only / legacy).
+ *   - a `{loc: text}` object   → normalize locale keys, DROP empty locales, then
+ *       - `{}` (all empty)               → null (nothing to store),
+ *       - a single entry for the default → a bare string (stays simple),
+ *       - otherwise                      → JSON.stringify of the cleaned object.
+ * `defaultLocale` decides the single-default collapse; when unknown ("") no
+ * collapse to bare string happens (the object is kept), which is still correct.
+ * Non-string non-object values fall back to `String(raw)` (belt-and-braces).
+ */
+export function coerceLocalizedText(raw: unknown, defaultLocale: string): string | null {
+  if (typeof raw === "string") return raw;
+  if (isLocaleObject(raw)) {
+    const cleaned: Record<string, string> = {};
+    for (const [loc, text] of Object.entries(raw as Record<string, unknown>)) {
+      const value = typeof text === "string" ? text : text == null ? "" : String(text);
+      if (value === "") continue;
+      cleaned[normalizeLocaleCode(loc)] = value;
+    }
+    const keys = Object.keys(cleaned);
+    if (keys.length === 0) return null;
+    if (keys.length === 1 && keys[0] === defaultLocale) return cleaned[defaultLocale];
+    return JSON.stringify(cleaned);
+  }
+  return String(raw);
+}
 
 /** Per-item status. */
 export const ITEM_STATUSES = ["draft", "published"] as const;
@@ -31,11 +62,30 @@ export type ValidateResult<T> =
   | { ok: true; value: T }
   | { ok: false; status: number; error: string };
 
-/** Coerce+validate ONE value against its field type. PURE. */
+/** Coerce+validate ONE value against its field type. PURE.
+ *
+ * `defaultLocale` is only consulted for TRANSLATABLE text fields (Slice 2): it
+ * decides whether a single-default-locale object collapses to a bare string.
+ * Every other field ignores it, so callers may omit it. */
 export function coerceFieldValue(
   field: CollectionField,
   raw: unknown,
+  defaultLocale = "",
 ): ValidateResult<string | number | null> {
+  // Translatable text field: accept a bare string OR a `{loc: text}` object.
+  // Handled BEFORE the generic empty-check because a locale object is never ""
+  // and its "emptiness" is decided by coerceLocalizedText (all-empty → null).
+  if (isTranslatableField(field) && isLocaleObject(raw)) {
+    const stored = coerceLocalizedText(raw, defaultLocale);
+    if (stored === null || stored === "") {
+      if (field.required) {
+        return { ok: false, status: 400, error: `field "${field.name}" is required` };
+      }
+      return { ok: true, value: null };
+    }
+    return { ok: true, value: stored };
+  }
+
   const missing = raw === undefined || raw === null || raw === "";
   if (missing) {
     if (field.required) {
@@ -135,6 +185,7 @@ export function buildInsert(
   body: Record<string, unknown>,
   now: number,
   idFactory: () => string,
+  defaultLocale = "",
 ): ValidateResult<InsertPlan> {
   const status = coerceStatus(body.status);
   if (!status.ok) return status;
@@ -145,7 +196,7 @@ export function buildInsert(
   const params: unknown[] = [id, slug, status.value, null, now, now];
 
   for (const f of fields) {
-    const res = coerceFieldValue(f, body[f.name]);
+    const res = coerceFieldValue(f, body[f.name], defaultLocale);
     if (!res.ok) return res;
     cols.push(f.name);
     params.push(res.value);
@@ -168,6 +219,7 @@ export function buildUpdate(
   id: string,
   body: Record<string, unknown>,
   now: number,
+  defaultLocale = "",
 ): ValidateResult<BuiltSql> {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -184,7 +236,7 @@ export function buildUpdate(
   }
   for (const f of fields) {
     if (!(f.name in body)) continue;
-    const res = coerceFieldValue(f, body[f.name]);
+    const res = coerceFieldValue(f, body[f.name], defaultLocale);
     if (!res.ok) return res;
     sets.push(`${f.name} = ?`);
     params.push(res.value);

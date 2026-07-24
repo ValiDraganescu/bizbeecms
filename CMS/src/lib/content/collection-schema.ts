@@ -63,6 +63,33 @@ export interface CollectionField {
   label?: string;
   /** select/multiselect only: the allowed options (for the UI; not enforced in DDL v1). */
   options?: { value: string; label: string }[];
+  /**
+   * Opt-in: this text field stores a per-locale "locale object"
+   * (`{"en":"…","fi":"…"}`) JSON-encoded in its existing TEXT column, so a
+   * component bound to the item renders in the active content locale (the same
+   * way component PROPS localize). Meaningful ONLY for string/text/richtext
+   * (see `isTranslatableField`); ignored on every other type. Backward
+   * compatible: a translatable column may still hold a bare string (legacy /
+   * default-only rows) — the read seam treats that as the default locale.
+   */
+  translatable?: boolean;
+}
+
+/** The text field types for which `translatable` is meaningful. */
+const TRANSLATABLE_TYPES: ReadonlySet<CollectionFieldType> = new Set<CollectionFieldType>([
+  "string",
+  "text",
+  "richtext",
+]);
+
+/**
+ * Is this field an OPT-IN translatable text field? True only when
+ * `translatable === true` AND the type is string/text/richtext. PURE — the one
+ * predicate every slice (coerce, read-parse, editor UI, AI tools) shares so the
+ * "translatable" rule can never drift between them. `undefined` type → false.
+ */
+export function isTranslatableField(field: Pick<CollectionField, "type" | "translatable">): boolean {
+  return field.translatable === true && TRANSLATABLE_TYPES.has(field.type);
 }
 
 /**

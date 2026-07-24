@@ -25,6 +25,7 @@ import {
   SYSTEM_COLUMNS,
   MAX_COLUMNS,
   COLLECTION_FIELD_TYPES,
+  isTranslatableField,
 } from "../src/lib/content/collection-schema.ts";
 
 const fences = (sql) => assert.equal(validateStatement(sql, "write").ok, true, `fence should ACCEPT: ${sql}`);
@@ -164,4 +165,30 @@ test("the field-type vocab is the propsSchema set plus data-collection extension
   for (const t of ["text", "int", "bool", "datetime", "multiselect", "ref", "asset"]) {
     assert.ok(COLLECTION_FIELD_TYPES.has(t), `${t} extension should be present`);
   }
+});
+
+// ── isTranslatableField — the opt-in text-only predicate (translatable-collections) ──
+test("isTranslatableField: true only for translatable:true on string/text/richtext", () => {
+  for (const type of ["string", "text", "richtext"]) {
+    assert.equal(isTranslatableField({ type, translatable: true }), true, `${type} + flag → true`);
+    assert.equal(isTranslatableField({ type, translatable: false }), false, `${type} without flag → false`);
+    assert.equal(isTranslatableField({ type }), false, `${type} undefined flag → false`);
+  }
+});
+
+test("isTranslatableField: the flag is IGNORED on non-text types", () => {
+  for (const type of ["number", "int", "bool", "boolean", "select", "multiselect", "date", "datetime", "time", "ref", "asset"]) {
+    assert.equal(
+      isTranslatableField({ type, translatable: true }),
+      false,
+      `translatable must be meaningless on ${type}`,
+    );
+  }
+});
+
+test("buildItemColumns: a translatable text field still generates ONE plain TEXT column (DDL unchanged)", () => {
+  const cols = buildItemColumns([{ name: "title", type: "string", translatable: true }]);
+  const title = cols.find((c) => c.name === "title");
+  assert.ok(title, "title column present");
+  assert.equal(title.sql, "title TEXT", "translatable does not alter the DDL — locale JSON lives in the TEXT column");
 });
