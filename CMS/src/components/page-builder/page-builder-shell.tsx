@@ -762,7 +762,11 @@ export function PageBuilderShell({
               </button>
             ))}
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
+          {/* pb-24: scroll clearance so the panel's LAST controls can scroll
+              fully above the fixed AI-assistant launcher (bottom-6 + h-14 =
+              80px footprint) — otherwise it sits on top of them and steals
+              their clicks. Inert on short panels (content is top-anchored). */}
+          <div className="flex-1 overflow-y-auto p-4 pb-24">
             {rightTab === "block" && (
               <BlockInspector
                 editor={editor}
