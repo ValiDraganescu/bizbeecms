@@ -1464,5 +1464,17 @@
       "locales": "All content locale codes, comma-separated.",
       "pageTree": "The published-page list as Markdown links to each page's .md variant."
     }
+  },
+  "chatAgents": {
+    "exportSelected": "Export selected ({count})",
+    "import": "Import agents",
+    "importing": "Importing…",
+    "selectAgent": "Select {name} for export",
+    "importSummary": "Import finished: {created} created, {failed} failed.",
+    "importedAs": "\"{name}\" imported.",
+    "importedAsCopy": "\"{name}\" imported as \"{as}\" (name already in use).",
+    "importDropped": "Dropped: {detail}",
+    "importFailed": "\"{name}\" was not imported: {errors}",
+    "dismiss": "Dismiss"
   }
 }

@@ -1464,5 +1464,17 @@
       "locales": "Kaikki sisältökielikoodit pilkuin eroteltuna.",
       "pageTree": "Julkaistut sivut Markdown-linkkeinä kunkin sivun .md-versioon."
     }
+  },
+  "chatAgents": {
+    "exportSelected": "Vie valitut ({count})",
+    "import": "Tuo agentit",
+    "importing": "Tuodaan…",
+    "selectAgent": "Valitse {name} vientiin",
+    "importSummary": "Tuonti valmis: {created} luotu, {failed} epäonnistui.",
+    "importedAs": "\"{name}\" tuotu.",
+    "importedAsCopy": "\"{name}\" tuotu nimellä \"{as}\" (nimi oli jo käytössä).",
+    "importDropped": "Pudotettu: {detail}",
+    "importFailed": "\"{name}\" jäi tuomatta: {errors}",
+    "dismiss": "Sulje"
   }
 }

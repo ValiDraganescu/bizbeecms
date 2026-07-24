@@ -18,8 +18,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { ConfirmModal } from "@/components/content/confirm-modal";
 import { AgentEditor } from "@/components/content/chat-agent-editor";
+import { AgentsTransferBar } from "@/components/content/chat-agents-transfer";
 import { setActiveChatAgentsContext } from "@/lib/chat/chat-agents-context";
 import { CHAT_AGENT_MUTATION_EVENT } from "@/lib/chat/page-mutation-signal";
 import {
@@ -33,6 +35,7 @@ import {
 } from "@/components/content/chat-agents-shared";
 
 export function ChatAgentsManager() {
+  const t = useTranslations("chatAgents");
   const [agents, setAgents] = useState<Agent[] | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -40,17 +43,34 @@ export function ChatAgentsManager() {
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<Agent | null>(null);
   const [busy, setBusy] = useState(false);
+  // Export selection, by agent name (unique; the export route selects by name).
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   async function load() {
     setError(null);
     try {
       const res = await fetch("/api/chat-agents");
       if (!res.ok) throw new Error(await readError(res));
-      setAgents((await res.json()) as Agent[]);
+      const rows = (await res.json()) as Agent[];
+      setAgents(rows);
+      // Drop selections whose agent no longer exists (delete / rename).
+      setSelected((prev) => {
+        const names = new Set(rows.map((a) => a.name));
+        return new Set([...prev].filter((n) => names.has(n)));
+      });
     } catch (err) {
       setError((err as Error).message);
       setAgents([]);
     }
+  }
+
+  function toggleSelected(name: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
   }
 
   // Load agents plus the allowlist option sources in parallel — independent reads.
@@ -135,6 +155,8 @@ export function ChatAgentsManager() {
         <p className="text-foreground-muted">No chat agents yet.</p>
       )}
 
+      <AgentsTransferBar selectedNames={[...selected]} onImported={load} />
+
       <ul className="flex flex-col gap-3">
         {agents.map((agent) => (
           <li
@@ -142,7 +164,14 @@ export function ChatAgentsManager() {
             className="rounded-lg border border-border bg-surface-raised p-4"
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
+              <input
+                type="checkbox"
+                className="mt-1.5 shrink-0 accent-primary"
+                aria-label={t("selectAgent", { name: agent.name })}
+                checked={selected.has(agent.name)}
+                onChange={() => toggleSelected(agent.name)}
+              />
+              <div className="min-w-0 flex-1">
                 <p className="font-medium text-foreground">
                   {agent.name}
                   <span

@@ -1464,5 +1464,17 @@
       "locales": "Kõik sisukeele koodid komadega eraldatult.",
       "pageTree": "Avaldatud lehed Markdown-linkidena iga lehe .md-variandile."
     }
+  },
+  "chatAgents": {
+    "exportSelected": "Ekspordi valitud ({count})",
+    "import": "Impordi agendid",
+    "importing": "Imporditakse…",
+    "selectAgent": "Vali {name} ekspordiks",
+    "importSummary": "Import lõpetatud: {created} loodud, {failed} ebaõnnestus.",
+    "importedAs": "\"{name}\" imporditud.",
+    "importedAsCopy": "\"{name}\" imporditud nimega \"{as}\" (nimi oli juba kasutusel).",
+    "importDropped": "Välja jäetud: {detail}",
+    "importFailed": "\"{name}\" jäi importimata: {errors}",
+    "dismiss": "Sule"
   }
 }

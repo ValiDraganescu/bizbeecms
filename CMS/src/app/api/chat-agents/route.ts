@@ -18,11 +18,8 @@ import {
   listChatAgents,
   type ChatAgentRow,
 } from "@/db/chat-agent-store";
-import {
-  parseAgentConfig,
-  validateAgentConfigInput,
-  validateWelcomeMessage,
-} from "@/lib/public-chat/core";
+import { parseAgentConfig } from "@/lib/public-chat/core";
+import { parsePortableAgent, type PortableAgent } from "@/lib/public-chat/portable";
 
 export const dynamic = "force-dynamic";
 
@@ -45,54 +42,40 @@ export function serializeAgent(row: ChatAgentRow) {
 }
 
 /**
+ * Flatten a validated portable agent into the `ChatAgentInput` the store expects
+ * (config columns `JSON.stringify`'d). Shared with the import route so every
+ * write path stores config the same way.
+ */
+export function toAgentInput(
+  agent: PortableAgent,
+): import("@/db/chat-agent-store").ChatAgentInput {
+  return {
+    name: agent.name,
+    systemPrompt: agent.systemPrompt,
+    model: agent.model,
+    enabled: agent.enabled,
+    welcomeMessage: agent.welcomeMessage,
+    limits: JSON.stringify(agent.limits),
+    dataSources: JSON.stringify(agent.dataSources),
+    collections: JSON.stringify(agent.collections),
+  };
+}
+
+/**
  * Validate + normalize a create/update body into the flat `ChatAgentInput` the
- * store expects (config columns already `JSON.stringify`'d). Returns the input on
- * success, or an error payload + status for the route to return verbatim.
+ * store expects. Thin wrapper over the SHARED entry validator
+ * (`parsePortableAgent` — also the agents-import trust boundary), so CRUD and
+ * import can never drift. Returns the input on success, or an error payload +
+ * status for the route to return verbatim.
  */
 export function buildAgentInput(
   body: unknown,
 ):
   | { ok: true; value: import("@/db/chat-agent-store").ChatAgentInput }
   | { ok: false; status: number; payload: { error?: string; errors?: string[] } } {
-  const obj = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-
-  const name = typeof obj.name === "string" ? obj.name.trim() : "";
-  const systemPrompt = typeof obj.systemPrompt === "string" ? obj.systemPrompt.trim() : "";
-  const errors: string[] = [];
-  if (name === "") errors.push("name is required");
-  if (systemPrompt === "") errors.push("systemPrompt is required");
-
-  const checked = validateAgentConfigInput({
-    limits: obj.limits,
-    dataSources: obj.dataSources,
-    collections: obj.collections,
-  });
-  if (!checked.ok) errors.push(...checked.errors);
-  // Plain string or a locale object ({"en":"Hello","fi":"Hei"}) — stored as its
-  // string form; the render walk localizes it per visitor content locale.
-  const welcome = validateWelcomeMessage(obj.welcomeMessage);
-  if (!welcome.ok) errors.push(welcome.error);
-  if (errors.length > 0 || !checked.ok || !welcome.ok) {
-    return { ok: false, status: 400, payload: { errors } };
-  }
-
-  const model =
-    typeof obj.model === "string" && obj.model.trim() !== "" ? obj.model.trim() : null;
-  const welcomeMessage = welcome.value;
-
-  return {
-    ok: true,
-    value: {
-      name,
-      systemPrompt,
-      model,
-      enabled: obj.enabled !== false, // default enabled unless explicitly false
-      welcomeMessage,
-      limits: JSON.stringify(checked.value.limits),
-      dataSources: JSON.stringify(checked.value.dataSources),
-      collections: JSON.stringify(checked.value.collections),
-    },
-  };
+  const parsed = parsePortableAgent(body);
+  if (!parsed.ok) return { ok: false, status: 400, payload: { errors: parsed.errors } };
+  return { ok: true, value: toAgentInput(parsed.agent) };
 }
 
 export async function GET(request: Request): Promise<Response> {
