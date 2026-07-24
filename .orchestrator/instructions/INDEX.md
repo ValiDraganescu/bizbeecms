@@ -5,3 +5,4 @@ Instruction files the PM attaches to worker briefs, plus the PM's own process le
 Format: `- [title](file.md) — attach when <condition>` · mark `**always**` for files the PM itself must read at boot.
 
 - [PM process lessons](pm-process.md) — **always** · brief-writing + gauntlet rules learned from retros.
+- [No raw control chars in source](no-raw-control-chars.md) — attach to every implementation brief · NUL-separator keys turn files binary in git (2 incidents).
