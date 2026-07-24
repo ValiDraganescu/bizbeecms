@@ -113,6 +113,16 @@ test("collectionBodyFromFields keeps declared fields only and FORCES draft statu
   assert.deepEqual(body, { name: "Ada", message: "hi", status: "draft" });
 });
 
+test("collectionBodyFromFields: a submission into a translatable field is a PLAIN string (default locale)", () => {
+  // A public visitor submits ONE language as a flat form value. The body value
+  // stays a bare string — never a locale object — so the write coerce stores it
+  // as the default-locale value (translatable-collections Slice 7B). No object
+  // wrapping happens anywhere on the public submit path.
+  const body = collectionBodyFromFields({ title: "Cosy bistro" }, ["title"]);
+  assert.equal(typeof body.title, "string");
+  assert.equal(body.title, "Cosy bistro");
+});
+
 // ── decideFormRate ───────────────────────────────────────────────────────────
 
 test("decideFormRate locks at the max inside the window, frees as stamps age out", () => {

@@ -23,10 +23,15 @@ function exportColumns(fields: CollectionField[]): string[] {
   return [...KEPT_SYSTEM_COLUMNS, ...fields.map((f) => f.name)];
 }
 
-/** Stringify ONE cell value for CSV/JSON-text export. */
+/** Stringify ONE cell value for CSV/JSON-text export.
+ *  A TRANSLATABLE field arrives here as a PARSED locale object (the export route
+ *  reads rows through the store's parse seam), so it serializes to its canonical
+ *  JSON string `{"en":"…","fi":"…"}` — the SAME shape stored in the column, so it
+ *  re-imports verbatim (the write coerce keeps a JSON string as-is, the read seam
+ *  re-parses it). multiselect (a JSON array) round-trips the same way. */
 function cellToString(v: unknown): string {
   if (v === null || v === undefined) return "";
-  if (typeof v === "object") return JSON.stringify(v); // multiselect already TEXT, but be safe
+  if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }
 

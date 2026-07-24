@@ -20,6 +20,7 @@ import { useTranslations } from "next-intl";
 import { setActiveCollectionContext } from "@/lib/chat/collection-context";
 import {
   COLLECTION_FIELD_TYPES,
+  isTranslatableField,
   type CollectionField,
   type CollectionFieldType,
 } from "@/lib/content/collection-schema";
@@ -30,15 +31,23 @@ const FIELD_TYPES = [...COLLECTION_FIELD_TYPES] as CollectionFieldType[];
 const INPUT = "rounded-md border border-border bg-surface px-3 py-2 text-foreground";
 const NEEDS_OPTIONS = new Set<CollectionFieldType>(["select", "multiselect"]);
 
+/** Whether the "Translatable" toggle is meaningful for this field type — the
+ *  SAME predicate the server uses (`isTranslatableField`), so the UI can never
+ *  offer the flag on a type the write/read seams would ignore. */
+function canTranslate(type: CollectionFieldType): boolean {
+  return isTranslatableField({ type, translatable: true });
+}
+
 type FieldDraft = {
   name: string;
   type: CollectionFieldType;
   required: boolean;
   options: string; // comma-separated values for select/multiselect
+  translatable: boolean;
 };
 
 function blankField(): FieldDraft {
-  return { name: "", type: "string", required: false, options: "" };
+  return { name: "", type: "string", required: false, options: "", translatable: false };
 }
 
 function toCollectionField(d: FieldDraft): CollectionField {
@@ -51,6 +60,9 @@ function toCollectionField(d: FieldDraft): CollectionField {
       .filter(Boolean)
       .map((value) => ({ value, label: value }));
   }
+  // Only persist the flag when it's meaningful for the type (a stale flag left
+  // over from a type switch is dropped, matching normalizeField server-side).
+  if (d.translatable && canTranslate(d.type)) f.translatable = true;
   return f;
 }
 
@@ -329,7 +341,11 @@ function FieldRow({
         <select
           className={INPUT}
           value={draft.type}
-          onChange={(e) => onChange({ ...draft, type: e.target.value as CollectionFieldType })}
+          onChange={(e) => {
+            const type = e.target.value as CollectionFieldType;
+            // Switching away from a text type clears a now-meaningless flag.
+            onChange({ ...draft, type, translatable: draft.translatable && canTranslate(type) });
+          }}
         >
           {FIELD_TYPES.map((ty) => (
             <option key={ty} value={ty}>
@@ -357,6 +373,16 @@ function FieldRow({
         />
         {t("required")}
       </label>
+      {canTranslate(draft.type) && (
+        <label className="flex items-center gap-1 text-sm text-foreground" title={t("translatableHint")}>
+          <input
+            type="checkbox"
+            checked={draft.translatable}
+            onChange={(e) => onChange({ ...draft, translatable: e.target.checked })}
+          />
+          {t("translatable")}
+        </label>
+      )}
       {onRemove && (
         <button
           type="button"

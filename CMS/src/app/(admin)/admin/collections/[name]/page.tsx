@@ -5,6 +5,8 @@ import { getTranslations } from "next-intl/server";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { CollectionItems } from "@/components/content/collection-items";
 import { getCollection, listCollections, type CollectionView } from "@/db/collection-store";
+import { getContentLocales } from "@/db/settings-store";
+import { defaultContentLocales } from "@/lib/render/localize";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +36,14 @@ export default async function CollectionDetailPage({
 
   let collection: CollectionView | null = null;
   let all: CollectionView[] = [];
+  // Site content locales (default first) — drives the per-locale editor for
+  // translatable fields. Falls back to the single default if settings are unset.
+  let contentLocales = defaultContentLocales().locales;
   let bound = true;
   try {
     collection = await getCollection(name);
     all = await listCollections();
+    contentLocales = (await getContentLocales()).locales;
   } catch {
     bound = false; // unbound D1 in this env
   }
@@ -58,7 +64,7 @@ export default async function CollectionDetailPage({
       </header>
 
       {collection ? (
-        <CollectionItems collection={collection} allCollections={all} />
+        <CollectionItems collection={collection} allCollections={all} contentLocales={contentLocales} />
       ) : (
         <p className="rounded-md border border-border bg-surface-raised p-4 text-foreground-muted">
           {t("offline")}

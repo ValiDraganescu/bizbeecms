@@ -54,6 +54,15 @@ export const CREATE_COLLECTION_TOOL = {
               type: { type: "string", description: "One of: string, text, richtext, number, int, bool, date, datetime, time, select, multiselect, ref, asset." },
               required: { type: "boolean", description: "Whether the field must be set on every item." },
               options: { type: "array", items: { type: "string" }, description: "Allowed values for select/multiselect." },
+              translatable: {
+                type: "boolean",
+                description:
+                  "Only valid for string/text/richtext. When true the field holds " +
+                  "per-locale values (a locale object like {\"en\":\"…\",\"fi\":\"…\"}) and " +
+                  "renders in the visitor's active content locale. Use it for guest-" +
+                  "facing text (titles, descriptions, locations); leave off for codes, " +
+                  "slugs, refs, and submission data.",
+              },
             },
             required: ["name", "type"],
           },
@@ -73,7 +82,10 @@ export const ADD_COLLECTION_ITEM_TOOL = {
       "name (use query_collection or the collections list — it looks like " +
       "content_<slug>). Pass `values` as an object of field-name → value matching " +
       "the collection's schema. Multiselect values are arrays; date/datetime are " +
-      "ISO strings. Omit a field to use its default.",
+      "ISO strings. Omit a field to use its default. A TRANSLATABLE field's value " +
+      "may be either a plain string (stored as the default locale) OR a locale " +
+      'object like {"en":"Cosy bistro","fi":"Viihtyisä bistro"} to set several ' +
+      "languages at once.",
     parameters: {
       type: "object",
       properties: {
@@ -92,7 +104,8 @@ export const UPDATE_COLLECTION_ITEM_TOOL = {
     description:
       "Update fields on one existing collection item, addressed by its id. Only " +
       "the fields you pass in `values` change (PATCH semantics); omit the rest. " +
-      "Find item ids with query_collection.",
+      "Find item ids with query_collection. A TRANSLATABLE field's value may be a " +
+      'plain string (default locale) OR a locale object like {"en":"…","fi":"…"}.',
     parameters: {
       type: "object",
       properties: {
@@ -242,6 +255,13 @@ export const ADD_COLLECTION_FIELD_TOOL = {
         type: { type: "string", description: "One of: string, text, richtext, number, int, bool, date, datetime, time, select, multiselect, ref, asset." },
         required: { type: "boolean", description: "Whether the field must be set on every item." },
         options: { type: "array", items: { type: "string" }, description: "Allowed values for select/multiselect." },
+        translatable: {
+          type: "boolean",
+          description:
+            "Only valid for string/text/richtext. When true the field stores per-" +
+            'locale values (a locale object like {"en":"…","fi":"…"}) and renders in ' +
+            "the visitor's active content locale.",
+        },
       },
       required: ["collection", "name", "type"],
     },
@@ -271,6 +291,9 @@ export interface RawCollectionFieldArg {
   type: string;
   required?: boolean;
   options?: string[];
+  /** Opt-in per-locale text. The store's `normalizeField` drops this on any
+   *  non-text type, so passing it through here is safe (no re-gating needed). */
+  translatable?: boolean;
 }
 
 /** create_collection: { name, fields } — fields normalized to {name,type,required?,options?}. */
@@ -297,6 +320,7 @@ export function validateCreateCollection(
     if (Array.isArray(f.options)) {
       out.options = f.options.filter((o): o is string => typeof o === "string");
     }
+    if (f.translatable === true) out.translatable = true;
     fields.push(out);
   }
   return { ok: true, value: { name, fields } };
@@ -380,6 +404,7 @@ export function validateAddField(
   if (Array.isArray(rec.options)) {
     field.options = rec.options.filter((o): o is string => typeof o === "string");
   }
+  if (rec.translatable === true) field.translatable = true;
   return { ok: true, value: { collection, field } };
 }
 

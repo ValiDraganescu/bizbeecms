@@ -20,9 +20,10 @@ import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { useTranslations } from "next-intl";
 import type { CollectionView } from "@/db/collection-store";
 import { setActiveCollectionContext } from "@/lib/chat/collection-context";
-import { COLLECTION_FIELD_TYPES, type CollectionField } from "@/lib/content/collection-schema";
+import { COLLECTION_FIELD_TYPES, isTranslatableField, type CollectionField } from "@/lib/content/collection-schema";
 import { ITEM_STATUSES } from "@/lib/content/item-write";
-import { blankValueFor, FieldInput, type FieldValue } from "./field-input";
+import { blankValueFor, FieldInput, TranslatableFieldInput, type FieldValue } from "./field-input";
+import { toLocalizedDraft, type LocalizedDraft } from "@/lib/content/item-locale-fields";
 import { ConfirmModal } from "./confirm-modal";
 
 const INPUT = "rounded-md border border-border bg-surface px-3 py-2 text-foreground";
@@ -33,10 +34,14 @@ type ArchivedFilter = "live" | "archived" | "all";
 export function CollectionItems({
   collection: initialCollection,
   allCollections = [],
+  contentLocales = [],
 }: {
   collection: CollectionView;
   /** Every collection in the site — for the assistant's cross-collection context. */
   allCollections?: CollectionView[];
+  /** Site content locales, default (source) first — drives the per-locale editor
+   *  for translatable fields. Empty/single → the plain single input. */
+  contentLocales?: string[];
 }) {
   const t = useTranslations("collections");
   const [collection, setCollection] = useState(initialCollection);
@@ -102,7 +107,11 @@ export function CollectionItems({
     const values: Record<string, FieldValue> = {};
     for (const f of collection.fields) {
       const raw = item[f.name];
-      values[f.name] = toFieldValue(f, raw);
+      // A translatable field's loaded value is a locale OBJECT (or a bare string
+      // for a legacy/default-only row) — keep that shape so the per-locale editor
+      // shows every language. Everything else uses the type-aware coercion.
+      values[f.name] =
+        isTranslatableField(f) && contentLocales.length > 1 ? toLocalizedDraft(raw) : toFieldValue(f, raw);
     }
     setDraft({
       id: String(item.id),
@@ -121,9 +130,10 @@ export function CollectionItems({
       const body: Record<string, unknown> = { slug: draft.slug, status: draft.status };
       for (const f of collection.fields) {
         const v = draft.values[f.name];
-        // Omit empty strings on CREATE so column defaults apply; on UPDATE send all
+        // Omit empty values on CREATE so column defaults apply; on UPDATE send all
         // so a cleared field is written through (PATCH semantics on supplied keys).
-        if (v === "" && draft.id === null) continue;
+        // "Empty" covers a bare "" and a translatable field's empty locale object.
+        if (draft.id === null && isEmptyDraftValue(v)) continue;
         body[f.name] = v;
       }
       const url = draft.id
@@ -334,14 +344,25 @@ export function CollectionItems({
                 ))}
               </select>
             </label>
-            {collection.fields.map((f) => (
-              <FieldInput
-                key={f.name}
-                field={f}
-                value={draft.values[f.name] ?? blankValueFor(f.type)}
-                onChange={(v) => setDraft({ ...draft, values: { ...draft.values, [f.name]: v } })}
-              />
-            ))}
+            {collection.fields.map((f) =>
+              isTranslatableField(f) && contentLocales.length > 1 ? (
+                <TranslatableFieldInput
+                  key={f.name}
+                  field={f}
+                  value={(draft.values[f.name] as LocalizedDraft) ?? ""}
+                  locales={contentLocales}
+                  tableName={tableName}
+                  onChange={(v) => setDraft({ ...draft, values: { ...draft.values, [f.name]: v } })}
+                />
+              ) : (
+                <FieldInput
+                  key={f.name}
+                  field={f}
+                  value={draft.values[f.name] ?? blankValueFor(f.type)}
+                  onChange={(v) => setDraft({ ...draft, values: { ...draft.values, [f.name]: v } })}
+                />
+              ),
+            )}
           </div>
 
           <div className="flex gap-2">
@@ -583,9 +604,11 @@ function AddFieldForm({
   const [type, setType] = useState<CollectionField["type"]>("string");
   const [required, setRequired] = useState(false);
   const [options, setOptions] = useState("");
+  const [translatable, setTranslatable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const needsOptions = type === "select" || type === "multiselect";
+  const canTranslate = isTranslatableField({ type, translatable: true });
 
   async function submit() {
     setBusy(true);
@@ -596,6 +619,7 @@ function AddFieldForm({
       if (needsOptions && options.trim()) {
         field.options = options.split(",").map((s) => s.trim()).filter(Boolean).map((v) => ({ value: v, label: v }));
       }
+      if (translatable && canTranslate) field.translatable = true;
       const res = await fetch(`/api/collections/${encodeURIComponent(tableName)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -627,7 +651,16 @@ function AddFieldForm({
       </label>
       <label className="flex flex-col gap-1">
         <span className="text-xs text-foreground-muted">{t("fieldType")}</span>
-        <select className={INPUT} value={type} onChange={(e) => setType(e.target.value as CollectionField["type"])}>
+        <select
+          className={INPUT}
+          value={type}
+          onChange={(e) => {
+            const next = e.target.value as CollectionField["type"];
+            setType(next);
+            // A non-text type can't be translatable — clear a stale flag.
+            if (!isTranslatableField({ type: next, translatable: true })) setTranslatable(false);
+          }}
+        >
           {[...COLLECTION_FIELD_TYPES].map((ty) => (
             <option key={ty} value={ty}>
               {ty}
@@ -645,6 +678,12 @@ function AddFieldForm({
         <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
         {t("required")}
       </label>
+      {canTranslate && (
+        <label className="flex items-center gap-1 text-sm text-foreground" title={t("translatableHint")}>
+          <input type="checkbox" checked={translatable} onChange={(e) => setTranslatable(e.target.checked)} />
+          {t("translatable")}
+        </label>
+      )}
       {error && <p className="w-full text-danger">{error}</p>}
       <div className="flex gap-2">
         <button type="submit" className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50" disabled={busy || !name.trim()}>
@@ -802,6 +841,16 @@ function renderCell(v: unknown): string {
 }
 
 /** Coerce a stored value back into the field-input's expected shape for editing. */
+/** Whether a draft value is "empty" for the CREATE-skip (so column defaults
+ *  apply): a bare "", an empty array, or a translatable field's empty/all-blank
+ *  locale object. Booleans/numbers/non-empty text are never empty. */
+function isEmptyDraftValue(v: FieldValue): boolean {
+  if (v === "" || v == null) return true;
+  if (Array.isArray(v)) return v.length === 0;
+  if (typeof v === "object") return Object.values(v).every((x) => x === "" || x == null);
+  return false;
+}
+
 function toFieldValue(field: CollectionField, raw: unknown): FieldValue {
   if (field.type === "bool" || field.type === "boolean") return Boolean(raw);
   if (field.type === "multiselect") {

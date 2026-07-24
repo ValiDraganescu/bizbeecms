@@ -19,13 +19,29 @@
  * ponytail: native <input type> does the heavy lifting; no date-picker lib.
  */
 
+import { useState } from "react";
+import { useTranslations } from "next-intl";
 import type { CollectionField } from "@/lib/content/collection-schema";
 import { ImagePicker } from "@/components/page-builder/image-picker";
+import {
+  type LocalizedDraft,
+  draftLocaleText,
+  setDraftLocaleText,
+  mergeItemTranslations,
+} from "@/lib/content/item-locale-fields";
 
 const INPUT =
   "rounded-md border border-border bg-surface px-3 py-2 text-foreground";
 
-export type FieldValue = string | boolean | string[];
+export type FieldValue = string | boolean | string[] | LocalizedDraft;
+
+/** Show locale TABS up to this count; beyond it, a compact <select>. Mirrors the
+ *  page-builder TranslatableField threshold. */
+const LOCALE_TABS_MAX = 6;
+
+/** Abort a translate fetch that hasn't resolved by now — a client backstop above
+ *  the server's 45s idle timeout so a real server 504 wins the race. */
+const CLIENT_TIMEOUT_MS = 60_000;
 
 /** A blank value for a field type, matching the input's expected shape. */
 export function blankValueFor(type: CollectionField["type"]): FieldValue {
@@ -178,6 +194,208 @@ export function FieldInput({
         </Labelled>
       );
   }
+}
+
+/**
+ * A translatable text field edited PER LOCALE with an inline language switcher +
+ * an AI-translate menu — the item-editor twin of the page-builder
+ * `TranslatableField`. The value is a locale object (or a bare string for a
+ * default-only value); the parent owns it and sends it as-is (the write path
+ * coerces the object). Translate posts the DEFAULT-locale text to /api/translate
+ * and merges the returned per-locale maps in (author the default, translate out).
+ */
+export function TranslatableFieldInput({
+  field,
+  value,
+  locales,
+  tableName,
+  onChange,
+}: {
+  field: CollectionField;
+  value: LocalizedDraft;
+  /** Site content locales, default (source) first. */
+  locales: string[];
+  /** The collection table name — sent as the translate target for logging. */
+  tableName: string;
+  onChange: (v: LocalizedDraft) => void;
+}) {
+  const t = useTranslations("collections");
+  const tp = useTranslations("pageBuilder");
+  const defaultLocale = locales[0] ?? "";
+  const [active, setActive] = useState(defaultLocale);
+  const loc = locales.includes(active) ? active : defaultLocale;
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const labelText = field.label || field.name;
+  const text = draftLocaleText(value, loc, defaultLocale);
+  const sourceText = draftLocaleText(value, defaultLocale, defaultLocale).trim();
+  const otherLocales = locales.filter((l) => l !== defaultLocale);
+  const isLong = field.type === "text" || field.type === "richtext";
+
+  function setLocaleText(next: string) {
+    onChange(setDraftLocaleText(value, loc, next, locales));
+  }
+
+  async function translate(targets: string[]) {
+    if (sourceText === "" || targets.length === 0) return;
+    setError(null);
+    setBusy(targets.length === 1 ? targets[0] : "all");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          kind: "component",
+          target: tableName,
+          fields: { [field.name]: sourceText },
+          fromLocale: defaultLocale,
+          toLocales: targets,
+          persist: false, // we merge into the draft + save via the item PATCH/POST
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        translations?: Record<string, Record<string, string>>;
+        error?: string;
+        errors?: string[];
+      };
+      if (!res.ok || !j.ok || !j.translations) {
+        setError(j.error ?? j.errors?.join("; ") ?? `HTTP ${res.status}`);
+        return;
+      }
+      onChange(mergeItemTranslations(value, field.name, j.translations, locales));
+      if (!targets.includes(loc)) setActive(targets[0]);
+    } catch (err) {
+      setError(
+        (err as Error).name === "AbortError" ? tp("translateField.timeout") : (err as Error).message,
+      );
+    } finally {
+      clearTimeout(timer);
+      setBusy(null);
+    }
+  }
+
+  const multi = locales.length > 1;
+  const inputCls =
+    "w-full rounded-md border border-border bg-surface px-3 py-2 text-foreground";
+
+  return (
+    <fieldset className="flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm text-foreground-muted">
+          {labelText}
+          {field.required ? " *" : ""}
+        </span>
+        {multi && (
+          <div className="flex items-center gap-1">
+            {locales.length <= LOCALE_TABS_MAX ? (
+              <div className="flex gap-0.5 rounded-md border border-border bg-surface p-0.5">
+                {locales.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setActive(l)}
+                    aria-pressed={l === loc}
+                    className={
+                      "rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide transition-colors " +
+                      (l === loc
+                        ? "bg-primary text-primary-foreground"
+                        : "text-foreground-muted hover:text-foreground")
+                    }
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <select
+                aria-label={t("localeField")}
+                value={loc}
+                onChange={(e) => setActive(e.target.value)}
+                className="rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] uppercase text-foreground"
+              >
+                {locales.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            )}
+            <details className="relative">
+              <summary
+                aria-label={tp("translateField.menuLabel")}
+                title={tp("translateField.menuLabel")}
+                className={
+                  "flex h-7 w-7 cursor-pointer list-none items-center justify-center rounded-md border border-border text-foreground-muted hover:text-foreground " +
+                  (sourceText === "" ? "pointer-events-none opacity-40" : "")
+                }
+              >
+                {busy ? (
+                  <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+                ) : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" />
+                  </svg>
+                )}
+              </summary>
+              <div className="absolute right-0 z-10 mt-1 flex max-h-64 min-w-40 flex-col overflow-y-auto rounded-md border border-border bg-surface-raised py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    (e.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open");
+                    void translate(otherLocales);
+                  }}
+                  className="px-3 py-1.5 text-left text-xs text-foreground hover:bg-surface-muted"
+                >
+                  {tp("translateField.all")}
+                </button>
+                {otherLocales.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={(e) => {
+                      (e.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open");
+                      void translate([l]);
+                    }}
+                    className="px-3 py-1.5 text-left text-xs text-foreground hover:bg-surface-muted"
+                  >
+                    {tp("translateField.one", { locale: l.toUpperCase() })}
+                  </button>
+                ))}
+              </div>
+            </details>
+          </div>
+        )}
+      </div>
+      {isLong ? (
+        <textarea
+          rows={4}
+          className={inputCls}
+          value={text}
+          aria-label={multi ? `${labelText} (${loc})` : labelText}
+          onChange={(e) => setLocaleText(e.target.value)}
+        />
+      ) : (
+        <input
+          type="text"
+          className={inputCls}
+          value={text}
+          aria-label={multi ? `${labelText} (${loc})` : labelText}
+          onChange={(e) => setLocaleText(e.target.value)}
+        />
+      )}
+      {multi && loc !== defaultLocale && text === "" && sourceText !== "" && (
+        <span className="text-[11px] text-foreground-muted">
+          {tp("translateField.emptyHint", { locale: loc.toUpperCase() })}
+        </span>
+      )}
+      {error && <span className="text-[11px] text-danger">{error}</span>}
+    </fieldset>
+  );
 }
 
 function Labelled({

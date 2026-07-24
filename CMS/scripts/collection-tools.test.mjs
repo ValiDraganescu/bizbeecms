@@ -17,7 +17,11 @@ import {
   validateQuery,
   validateDropField,
   validateRenameField,
+  validateAddField,
+  CREATE_COLLECTION_TOOL,
+  ADD_COLLECTION_FIELD_TOOL,
 } from "../src/lib/chat/collection-tools.ts";
+import { normalizeField } from "../src/lib/content/collection-plan.ts";
 
 // ── create_collection ─────────────────────────────────────────────────────────
 test("create_collection: clean name + fields pass, options/required carried", () => {
@@ -154,4 +158,47 @@ test("rename_collection_field: rejects missing collection / field / to", () => {
   assert.equal(validateRenameField({ collection: "content_blog", to: "labels" }).ok, false);
   assert.equal(validateRenameField({ collection: "content_blog", field: "tags" }).ok, false);
   assert.equal(validateRenameField(null).ok, false);
+});
+
+// ── translatable flag (translatable-collections Slice 6) ─────────────────────
+test("create_collection: translatable:true is carried on a field", () => {
+  const r = validateCreateCollection({
+    name: "Restaurants",
+    fields: [
+      { name: "title", type: "string", translatable: true },
+      { name: "code", type: "string" }, // no flag
+    ],
+  });
+  assert.ok(r.ok);
+  assert.equal(r.value.fields[0].translatable, true);
+  assert.equal(r.value.fields[1].translatable, undefined);
+});
+
+test("add_collection_field: translatable:true carried through", () => {
+  const r = validateAddField({ collection: "content_x", name: "bio", type: "richtext", translatable: true });
+  assert.ok(r.ok);
+  assert.equal(r.value.field.translatable, true);
+});
+
+test("the tool schemas advertise a translatable field property", () => {
+  const createProps = CREATE_COLLECTION_TOOL.function.parameters.properties.fields.items.properties;
+  assert.ok(createProps.translatable, "create_collection field schema exposes translatable");
+  assert.equal(createProps.translatable.type, "boolean");
+  const addProps = ADD_COLLECTION_FIELD_TOOL.function.parameters.properties;
+  assert.ok(addProps.translatable, "add_collection_field schema exposes translatable");
+});
+
+test("end-to-end shape: a translatable text field survives normalizeField, a non-text one drops it", () => {
+  // The store runs args through normalizeField — the real gate. A text type keeps
+  // the flag; a number type drops it (translatable is meaningless there).
+  const r = validateCreateCollection({
+    name: "C",
+    fields: [
+      { name: "title", type: "string", translatable: true },
+      { name: "views", type: "int", translatable: true },
+    ],
+  });
+  assert.ok(r.ok);
+  assert.equal(normalizeField(r.value.fields[0]).translatable, true);
+  assert.equal(normalizeField(r.value.fields[1]).translatable, undefined, "flag dropped on a non-text type");
 });

@@ -80,3 +80,30 @@ test("parseImport csv: empty header → error; empty input → empty rows", () =
   assert.deepEqual(parseImport("", "csv").rows, []);
   assert.equal(parseImport(",,\n", "csv").ok, false);
 });
+
+// ── translatable fields (translatable-collections Slice 7) ───────────────────
+// Export pulls rows through the store's parse seam, so a translatable column is a
+// PARSED locale OBJECT at the export boundary. cellToString JSON.stringifies it →
+// the canonical JSON string in the CSV cell → re-imports as that string → the
+// write coerce stores it verbatim → the read seam re-parses it. Round-trips.
+test("export: a translatable field's locale OBJECT serializes to its JSON string", () => {
+  const tFields = [{ name: "name", type: "string", translatable: true }];
+  const rows = [{ slug: "bistro", status: "published", name: { en: "Cosy", fi: "Viihtyisä" } }];
+  const csv = rowsToCsv(rows, tFields);
+  // The name cell holds the JSON string (quoted by CSV because it has commas/quotes).
+  const parsed = parseImport(csv, "csv");
+  assert.ok(parsed.ok);
+  assert.equal(parsed.rows.length, 1);
+  // On import it's a STRING (the JSON) — the write path stores it as-is and the
+  // read seam parses it back, so this round-trips to the same locale object.
+  assert.equal(parsed.rows[0].name, '{"en":"Cosy","fi":"Viihtyisä"}');
+  assert.equal(parsed.rows[0].slug, "bistro");
+});
+
+test("export: a bare-string (untranslated/legacy) translatable value stays a plain string", () => {
+  const tFields = [{ name: "name", type: "string", translatable: true }];
+  const csv = rowsToCsv([{ slug: "x", status: "draft", name: "Legacy" }], tFields);
+  const parsed = parseImport(csv, "csv");
+  assert.ok(parsed.ok);
+  assert.equal(parsed.rows[0].name, "Legacy");
+});
