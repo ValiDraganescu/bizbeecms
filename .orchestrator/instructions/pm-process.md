@@ -20,6 +20,22 @@ client-driven batch/sweep that saves state, require: re-read the base
 immediately before each write (or a functional merge against latest state), and
 make merges fill-only where the invariant is "never overwrite".
 
+## Ask about the parallel surface's levels in Phase 1
+(bulk-translate-missing → list-item-translatables, 2026-07-24) A bulk action was
+briefed at item + collection + page level; the user later expected the same
+action at COMPONENT level ("like collections have") and at LIST level. Rule:
+when a feature adds an action at N levels of one surface (item/collection),
+Phase 1 must ask about every level of each PARALLEL surface (block/page/list)
+— parity expectations are implicit in the user's mental model.
+
+## Browser-QA the last control of scrollable panels
+(list-item-translatables, 2026-07-24) A feature appended a section to the
+inspector panel; the fixed AI-assistant launcher sat exactly on the new last
+control at scroll-bottom, making it unclickable — invisible to review and
+tests, caught only by PM browser QA. Rule: when a feature appends UI to a
+scrollable panel, QA must scroll to the end and CLICK the last control, at
+default viewport sizes; fixed overlays (launchers, toasts) love that corner.
+
 ## Refactor pass is part of the gauntlet
 (user directive, 2026-07-24) After the last implementation task and before code
 review: sweep touched files for simplification; any touched file at/near

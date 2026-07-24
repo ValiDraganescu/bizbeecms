@@ -1,6 +1,6 @@
 # Bulk translate missing translations (one go)
 
-Status: delivered
+Status: delivered (incl. post-release T7 race fix + T8 per-block button, CR2 ship)
 
 ## Brief
 
@@ -20,6 +20,9 @@ Fill every missing translation in one action instead of one click per field. "Mi
 
 **C. Page level (page builder)**
 7. The page builder gets a "Translate missing" action covering the page's meta title/description AND all translatable block props on that page, missing-only, in one go. Writes match the existing per-field page translate: vetted client-side merge into the builder draft (autosave → publish purges cache) for blocks, SEO-form `PUT /api/pages` (edge purge) for meta. [AMENDED 16:37 — brief originally said `applyTranslation`; that path writes live blocks, bypasses drafts, and applies unrequested source-seed slots, violating the never-overwrite guarantee. PM ratified the worker's deviation.]
+
+**C2. Component level (block inspector) — added post-delivery 2026-07-24 18:2x**
+7b. The block inspector shows a per-component "Translate missing" button (parity with the item-level collection button) when the selected block has ≥1 translatable prop with default-locale source text and ≥1 missing target locale. One click fills all missing prop×locale slots for THAT block only, missing-only, merged functionally into the latest editor draft (never-overwrite, T7 merge path). Hidden on single-locale sites and when nothing is missing.
 
 **D. Correctness & limits**
 8. Fields with empty default-locale source are skipped (nothing to translate from).
@@ -71,6 +74,16 @@ Fill every missing translation in one action instead of one click per field. "Mi
 - 2026-07-24 17:10 CR1 re-review: SHIP — all 3 findings verified closed by reading (ref safe via page-id key + alive guard; fresh-fetch base correct via parseLocalizedRow; executor conversion equivalent). cr-review + ft-fixes closed. Status → verifying.
 - 2026-07-24 17:10 TR1 test review dispatched to tr-tests (F1AE97DC, orc-test-review): 3 feature test files, coverage judgment + banned patterns + no-weakening check across 7090c59..a682d3a. QA browser pass will be done by PM (workers lack chrome tools).
 - 2026-07-24 17:11 TR1 verdict: PASS (62 tests, no banned patterns, checklist fully covered, no pre-existing test weakened). Advisory gaps → T6 dispatched to bt-testgap (9F75E056, orc-backend): save-before-abort quota test + unused import. tr-tests closed.
+
+- 2026-07-24 18:18 ESCAPED DEFECT (user repro, post r-2.4.0): two concurrent PER-FIELD translates on one block (title+subtitle) — last finisher resets the first. Root cause: translatable-field.tsx `translate()` merges into click-time `props` snapshot; onUpdateComponentProps replaces full props. Stale-snapshot class, 3rd instance — CR1 audited the new bulk paths but not the pre-existing per-field path. T7 dispatched to ft-race-fix (E47F5473, orc-frontend): functional update against latest block props + pure-helper tests.
+
+- 2026-07-24 18:2x SCOPE MISS (user, post-delivery): expected a per-COMPONENT "translate all missing" button in the block inspector, parity with the collection item-level button — brief only had page-level + per-field for blocks. AC7b added. T8 queued behind T7 (same file surface, sequential): block-inspector button using the planner + T7's functional merge. Retro Q2 lesson due: when a feature adds a bulk action at N levels of one surface, ask about EVERY level of the parallel surface (item↔component parity).
+
+- 2026-07-24 18:23 T7 ACCEPTED (9af666f): pure `updateBlockProps` updater + BlockPropsUpdater contract; translate result now merges against LATEST props inside setBlocks; onPatchBlockProps/onUpdateRowProps unified onto it. PM read full diff, re-ran tsc clean + npm test 2293/2293; race tests assert the exact reported scenario (both concurrent translates survive; typed sibling edit survives). T8 dispatched to same worker (updater-path context fresh).
+
+- 2026-07-24 18:35 T8 ACCEPTED (829540e): per-block button via blockTranslateEntries → planTranslateCalls → runTranslatePlan, commits only via T7 updater, hidden-not-disabled + self-hides, alive-ref unmount guard. PM verified tsc + 2297/2297 + browser QA on /home SectionHeading: one click filled title+subtitle across all missing locales (FI spot-checked), button self-hid, zero console errors. CR2 (review of 9af666f+829540e) dispatched; T9 (list-item-translatables, separate feature file) dispatched to same worker.
+
+- 2026-07-24 18:40 CR2 verdict: SHIP (both 9af666f + 829540e). Race-class audit confirmed exhaustive; updater delete-semantics behavior-preserving; T8 money path vetted (executeTranslateCall-only, pickRequestedSlots, retry-once, alive guard). Advisory (parked): make requested-slot merges fill-only via the T7 updater so a mid-run typed edit into a REQUESTED slot also wins. cr2-review closed. T7+T8 fully closed; status back to delivered (T9 tracks in list-item-translatables.md).
 
 ## Retro
 
