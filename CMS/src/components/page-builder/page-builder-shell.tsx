@@ -1,26 +1,23 @@
 "use client";
 
 /**
- * Page Builder shell (epic: page-builder) — LAYOUT ONLY.
+ * Page Builder shell (epic: page-builder) — the top-level ORCHESTRATOR.
  *
- * Top bar + 3-column shell modeled on aicms `page-builder-v2`
- * (page_builder_v2.tsx / top_bar.tsx / left_rail_components.tsx /
- * center_canvas.tsx / right_rail.tsx), adapted to this project's design system
- * (purpose Tailwind tokens, next-intl EN/FI/ET — see docs/page-builder-layout.md).
+ * Top bar + 3-column shell modeled on aicms `page-builder-v2`, adapted to this
+ * project's design system (purpose Tailwind tokens, next-intl EN/FI/ET — see
+ * docs/page-builder-layout.md). The shell owns:
+ *  - chrome state (viewport, center/right tabs, rail collapse, inspector width);
+ *  - the page list + selection, and the loaded palette/collections/API sources;
+ *  - draft PERSISTENCE (load / debounced auto-save / manual save / publish,
+ *    versioning nonces) and the publish-together dialog;
+ * and composes the extracted pieces around the `useBlockEditor` controller
+ * (block tree + mutation handlers): `LayersPanel`, `PreviewPanel`,
+ * `BlockInspector`, plus the existing rail/settings components.
  *
- * This slice ships the regions, tabs, empty states and responsive frame sizing.
- * No page loading, no drag-to-insert, no reorder, no live preview, no settings
- * logic — those are separate backlog slices that key off this shell. The only
- * state here is pure CHROME state: which viewport is selected, which center tab
- * (Layers/Preview) and which right-rail tab (Block/Page/SEO) is active.
- *
- * REST-only / no server actions (none needed yet). Purpose tokens only.
- *
- * ponytail: local useState for tab + viewport chrome; no store/reducer until a
- * later slice actually has shared editor state to manage.
+ * REST-only / no server actions. Purpose tokens only.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   type InspectorPreset,
@@ -39,40 +36,8 @@ import type { PageSummary } from "@/db/page-store";
 import { setActivePageContext } from "@/lib/chat/page-context";
 import { PAGE_MUTATION_EVENT } from "@/lib/chat/page-mutation-signal";
 import type { ComponentGroup } from "@/lib/components/grouped";
-import {
-  addSection,
-  addComponentToColumn,
-  addRow,
-  deleteRow,
-  setSectionColumns,
-  isSection,
-  isSectionColumn,
-  isSectionRow,
-  mergeSectionProps,
-  deleteColumn,
-  removeNode,
-  targetSectionId,
-  moveNode,
-  findBlock,
-  mergeBlockProps,
-  setBlockField,
-  setBlockChildren,
-  isList,
-  addListToSection,
-  addListBlock,
-  isForm,
-  addFormBlock,
-  isGuestChat,
-  addGuestChatBlock,
-  listSections,
-  sectionName,
-  renameSection,
-  parsePropsSchema,
-} from "@/lib/pages/page-blocks";
-import { applyBlockTranslations } from "@/lib/pages/page-translate-missing";
-import type { TranslationSlots } from "@/lib/content/bulk-translate-run";
-import { collectComponentNames, type Block, type FormTarget } from "@/lib/render/tree";
-import { declaredPropNames } from "@/lib/content/binding";
+import { listSections } from "@/lib/pages/page-blocks";
+import { collectComponentNames, type Block } from "@/lib/render/tree";
 import type {
   Viewport,
   CenterTab,
@@ -81,47 +46,18 @@ import type {
   ApiRequestMeta,
   ApiSourceMeta,
 } from "@/lib/page-builder/types";
-import { readDragPayload } from "@/lib/page-builder/dnd";
-import { wirePreviewOverlay, markSelectedInPreview } from "@/lib/page-builder/preview-overlay";
-import { ViewportIcon, PreviewThemeIcon, CollapseToggle, ICON } from "./shared";
+import { ViewportIcon, CollapseToggle, ICON } from "./shared";
 import { ComponentsRail } from "./components-rail";
 import { PagePicker } from "./page-picker";
-import { LayersTree } from "./layers-tree";
 import { PublishDialog } from "./publish-dialog";
 import { SeoForm } from "./seo-form";
-import { ColumnSettings } from "./column-settings";
-import { SectionSettings } from "./section-settings";
-import { RowSettings } from "./row-settings";
-import { ComponentSettings } from "./component-settings";
-import { BindingPanel, ListSettings, FormSettings } from "./binding-panels";
-import { GuestChatSettings } from "./guest-chat-settings";
 import { PageSettings } from "./page-settings";
 import { PageTranslateMissingButton } from "./page-translate-missing";
 import { VersionHistory } from "./version-history";
-
-// Preview frame widths per viewport (desktop = full width). See layout doc.
-const VIEWPORT_WIDTH: Record<Viewport, string> = {
-  desktop: "100%",
-  tablet: "768px",
-  mobile: "375px",
-};
-
-/**
- * Build the preview-iframe URL: `/preview/<id>` with optional `?theme=` (forced
- * color mode) and `?version=` (Versioning slice 4 — render a past version
- * read-only). "system" theme sends no theme param (inherits OS).
- */
-function previewSrc(
-  id: string,
-  theme: "system" | "light" | "dark",
-  versionId: string | null,
-): string {
-  const params = new URLSearchParams();
-  if (theme !== "system") params.set("theme", theme);
-  if (versionId) params.set("version", versionId);
-  const qs = params.toString();
-  return qs ? `/preview/${id}?${qs}` : `/preview/${id}`;
-}
+import { useBlockEditor } from "./use-block-editor";
+import { LayersPanel } from "./layers-panel";
+import { PreviewPanel, type PreviewTheme } from "./preview-panel";
+import { BlockInspector } from "./block-inspector";
 
 export function PageBuilderShell({
   contentLocales,
@@ -138,7 +74,7 @@ export function PageBuilderShell({
   const [previewNonce, setPreviewNonce] = useState(0);
   // Forces the preview iframe's color mode via /preview/[id]?theme=.
   // "system" = no param (follows OS); "light"/"dark" force data-theme.
-  const [previewTheme, setPreviewTheme] = useState<"system" | "light" | "dark">("system");
+  const [previewTheme, setPreviewTheme] = useState<PreviewTheme>("system");
 
   // page-builder-ux: resizable right-side inspector. The operator picks one of 3
   // preset widths (default/¼/½); we measure the 3-column area and resolve the
@@ -146,11 +82,6 @@ export function PageBuilderShell({
   const [inspectorPreset, setInspectorPreset] = useState<InspectorPreset>("default");
   const [editorW, setEditorW] = useState(0);
   const columnsRef = useRef<HTMLDivElement>(null);
-  // Preview iframe (same-origin) — the selection overlay reaches into its DOM to
-  // outline blocks + report click-to-select. Bumped on every (re)load so the
-  // wiring effect re-attaches to the fresh document.
-  const previewRef = useRef<HTMLIFrameElement>(null);
-  const [previewLoaded, setPreviewLoaded] = useState(0);
   // page-builder-ux: each side rail collapses entirely to widen the canvas;
   // collapsed state persists per side (localStorage). Default-expanded.
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -186,7 +117,7 @@ export function PageBuilderShell({
   }
 
   // Real page list + the operator's current selection. The center/right panels
-  // key off `selected`; later slices load that page's blocks / settings.
+  // key off `selected`; the editor loads that page's blocks / settings.
   const [pages, setPages] = useState<PageSummary[]>([]);
   const [selected, setSelected] = useState<PageOption | null>(null);
 
@@ -233,12 +164,10 @@ export function PageBuilderShell({
   // combined source picker in the binding panels. Graceful: 403/offline → [].
   const [apiSources, setApiSources] = useState<ApiSourceMeta[]>([]);
 
-  // The selected page's block tree (sections + their dropped components) and the
-  // currently-selected node id (drives which section a rail click drops into and,
-  // later, the right rail). Loaded from / persisted to the C3 block REST.
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
+  // The block-tree editing controller: the draft tree, the selected node id, the
+  // dirty flag and one handler per tree operation (see use-block-editor.ts).
+  const editor = useBlockEditor(propsSchemas, contentLocales);
+  const { blocks, selectedBlockId, dirty } = editor;
   const [saving, setSaving] = useState(false);
   // Versioning slice 3: the draft auto-save status badge (saving…/saved/published).
   const [draftStatus, setDraftStatus] = useState<DraftStatus>("saved");
@@ -253,15 +182,13 @@ export function PageBuilderShell({
   // Versioning slice 4: when set, the preview iframe renders this specific past
   // version READ-ONLY (?version=) instead of the live draft. Cleared to go back.
   const [previewVersionId, setPreviewVersionId] = useState<string | null>(null);
-  // True while a draggable rail item hovers the Layers drop zone (blue indicator).
-  const [layersDropActive, setLayersDropActive] = useState(false);
 
   // Load the selected page's blocks (or reset when nothing is selected).
   useEffect(() => {
     if (!selected) {
-      setBlocks([]);
-      setSelectedBlockId(null);
-      setDirty(false);
+      editor.setBlocks([]);
+      editor.setSelectedBlockId(null);
+      editor.setDirty(false);
       setPendingChanges(false);
       return;
     }
@@ -272,19 +199,20 @@ export function PageBuilderShell({
       if (!live) return;
       if (res.ok) {
         const body = (await res.json()) as { blocks?: Block[]; pendingChanges?: boolean };
-        setBlocks(body.blocks ?? []);
+        editor.setBlocks(body.blocks ?? []);
         setPendingChanges(Boolean(body.pendingChanges));
       } else {
-        setBlocks([]);
+        editor.setBlocks([]);
         setPendingChanges(false);
       }
-      setSelectedBlockId(null);
-      setDirty(false);
+      editor.setSelectedBlockId(null);
+      editor.setDirty(false);
       setDraftStatus((s) => nextDraftStatus(s, "loaded"));
     })();
     return () => {
       live = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, draftReloadNonce]);
 
   // Publish the selected page to the AI assistant's inline-context channel, so the
@@ -360,232 +288,6 @@ export function PageBuilderShell({
     return () => window.removeEventListener("focus", onFocus);
   }, [loadPalette]);
 
-  // Names for the Preview hover label: section id → its display name, component
-  // leaf id → its component name. Only the blocks the overlay OUTLINES need an
-  // entry (sections + component leaves; rows/columns aren't outlined). Rebuilt
-  // when the tree changes.
-  const previewLabels = useMemo(() => {
-    const map = new Map<string, string>();
-    listSections(blocks).forEach((s, i) => map.set(s.id, sectionName(s.block, i)));
-    const walk = (list: typeof blocks) => {
-      for (const b of list) {
-        // A component leaf (not a Section/row/column/List primitive) is outlined
-        // as `data-block-wrap` → label it by its component name.
-        if (!isSection(b) && !isSectionColumn(b) && b.component) {
-          if (b.component !== "__section_row__") map.set(b.id, b.component);
-        }
-        if (b.children) walk(b.children);
-      }
-    };
-    walk(blocks);
-    return map;
-  }, [blocks]);
-
-  // Click-to-select inside the Preview iframe: wire the overlay on each iframe
-  // load; a click reports a block id → select it AND show its Block details
-  // (same as a Layers click). Re-runs when the iframe reloads (previewLoaded).
-  useEffect(() => {
-    if (centerTab !== "preview") return;
-    return wirePreviewOverlay(
-      previewRef.current,
-      (id) => {
-        setSelectedBlockId(id);
-        setRightTab("block");
-      },
-      (id) => previewLabels.get(id) ?? null,
-    );
-  }, [previewLoaded, centerTab, previewLabels]);
-
-  // Keep the iframe's selected outline in sync with the editor selection (from a
-  // Preview click OR a Layers click), and after each (re)load.
-  useEffect(() => {
-    if (centerTab !== "preview") return;
-    markSelectedInPreview(previewRef.current, selectedBlockId);
-  }, [selectedBlockId, previewLoaded, centerTab]);
-
-  function onAddSection() {
-    setBlocks((b) => addSection(b));
-    setDirty(true);
-  }
-
-  // Drop a rail component into a specific ROW's COLUMN. No-op if the target isn't a
-  // valid section/row/column (the pure helper guards range).
-  function onDropComponentToColumn(
-    sectionId: string,
-    colIndex: number,
-    component: string,
-    rowId: string,
-  ) {
-    setBlocks((b) => addComponentToColumn(b, sectionId, colIndex, component, rowId));
-    setDirty(true);
-  }
-
-  // Drop the built-in `List` primitive into a specific Section column (DnD).
-  function onDropListToColumn(sectionId: string, colIndex: number, rowId: string) {
-    setBlocks((b) => addListBlock(b, sectionId, colIndex, rowId));
-    setDirty(true);
-  }
-
-  // Drop the built-in `Form` primitive into a specific Section column (DnD).
-  function onDropFormToColumn(sectionId: string, colIndex: number, rowId: string) {
-    setBlocks((b) => addFormBlock(b, sectionId, colIndex, rowId));
-    setDirty(true);
-  }
-
-  // Drop the built-in `GuestChat` leaf into a specific Section column (DnD).
-  function onDropGuestChatToColumn(sectionId: string, colIndex: number, rowId: string) {
-    setBlocks((b) => addGuestChatBlock(b, sectionId, colIndex, rowId));
-    setDirty(true);
-  }
-
-  // Add a row to a Section (migrates a grandfathered section to explicit rows).
-  function onAddRow(sectionId: string) {
-    setBlocks((b) => addRow(b, sectionId));
-    setDirty(true);
-  }
-
-  // Delete a row (and its columns/components); keeps ≥1 row per section.
-  function onDeleteRow(rowId: string) {
-    setBlocks((b) => deleteRow(b, rowId));
-    if (selectedBlockId === rowId) setSelectedBlockId(null);
-    setDirty(true);
-  }
-
-  // Set a specific row's column count (grandfather-safe via rowId).
-  function onSetRowColumns(sectionId: string, n: number, rowId: string) {
-    setBlocks((b) => setSectionColumns(b, sectionId, n, rowId));
-    setDirty(true);
-  }
-
-  // Move a Layers node (DnD slice 3): reorder Sections, reorder within a column,
-  // or move a component across columns/sections. The pure helper guards no-ops.
-  function onMoveNode(dragId: string, targetId: string, position: "before" | "after" | "into") {
-    setBlocks((b) => moveNode(b, dragId, targetId, position));
-    setDirty(true);
-  }
-
-  // Rename a Section (writes props.name; blank resets to the "Section N" default).
-  // Drives the Layers label, the @section autocomplete, and the assistant context.
-  function onRenameSection(sectionId: string, name: string) {
-    setBlocks((b) => renameSection(b, sectionId, name));
-    setDirty(true);
-  }
-
-  // Merge a Section settings patch into the selected Section's props (columns
-  // reflows its column children). Marks dirty; persisted by the existing Save.
-  function onUpdateSection(sectionId: string, patch: Record<string, unknown>) {
-    setBlocks((b) => mergeSectionProps(b, sectionId, patch));
-    setDirty(true);
-  }
-
-  // Replace a (nested) component block's full props (tree-walk merge). The Block
-  // tab computes the validated props from its schema-driven form and calls this.
-  function onUpdateComponentProps(blockId: string, props: Record<string, unknown>) {
-    setBlocks((b) => mergeBlockProps(b, blockId, props));
-    setDirty(true);
-  }
-
-  // Slice C: set a block's NON-prop binding fields (single-item `bindings`, or a
-  // List's `listSource`/`listMap`/`listRole`). An undefined value deletes the key.
-  function onUpdateBlockField(
-    blockId: string,
-    patch: Partial<Pick<Block, "bindings" | "listSource" | "listMap" | "listRole" | "formTarget">>,
-  ) {
-    setBlocks((b) => setBlockField(b, blockId, patch));
-    setDirty(true);
-  }
-
-  // Slice C: insert a built-in `List` block into the selected (or last) Section.
-  // Returns false when there's no Section yet (caller prompts to add one).
-  function onInsertList(): boolean {
-    const target = targetSectionId(blocks, selectedBlockId);
-    if (!target) return false;
-    setBlocks((b) => addListToSection(b, target));
-    setDirty(true);
-    return true;
-  }
-
-  // Slice C: apply a List settings patch — `listSource`/`listMap` go through
-  // setBlockField; the optional `__child` (template/empty children) through
-  // setBlockChildren. One handler so a template change + map reset land together.
-  function onUpdateList(
-    blockId: string,
-    patch: Partial<Pick<Block, "listSource" | "listMap">> & { __child?: Block[] },
-  ) {
-    const { __child, ...fields } = patch;
-    setBlocks((b) => {
-      let next = setBlockField(b, blockId, fields);
-      if (__child) next = setBlockChildren(next, blockId, __child);
-      return next;
-    });
-    setDirty(true);
-  }
-
-  // Form slice (b): apply a Form settings patch — `formTarget` through
-  // setBlockField (undefined deletes → untargeted container); the optional
-  // `__child` (content component) through setBlockChildren, like onUpdateList.
-  function onUpdateForm(
-    blockId: string,
-    patch: { formTarget?: FormTarget; __child?: Block[] },
-  ) {
-    const { __child, ...fields } = patch;
-    setBlocks((b) => {
-      let next = "formTarget" in fields ? setBlockField(b, blockId, fields) : b;
-      if (__child) next = setBlockChildren(next, blockId, __child);
-      return next;
-    });
-    setDirty(true);
-  }
-
-  // Patch-merge one block's own props (column visibility/spacing, List/Form
-  // spacing). Reads the live block, applies the patch (undefined/false deletes
-  // a key), and writes the full props back via the tree-walking mergeBlockProps.
-  function onPatchBlockProps(blockId: string, patch: Record<string, unknown>) {
-    setBlocks((b) => {
-      const col = findBlock(b, blockId);
-      const next: Record<string, unknown> = { ...(col?.props ?? {}) };
-      for (const [k, v] of Object.entries(patch)) {
-        if (v === undefined || v === false) delete next[k];
-        else next[k] = v;
-      }
-      return mergeBlockProps(b, blockId, next);
-    });
-    setDirty(true);
-  }
-
-  // Patch-merge a ROW's own props (behavior, gap, align, background, padding).
-  // Only `undefined` deletes a key (a row's `false`/0 values are legitimate).
-  function onUpdateRowProps(rowId: string, patch: Record<string, unknown>) {
-    setBlocks((b) => {
-      const row = findBlock(b, rowId);
-      const next: Record<string, unknown> = { ...(row?.props ?? {}) };
-      for (const [k, v] of Object.entries(patch)) {
-        if (v === undefined) delete next[k];
-        else next[k] = v;
-      }
-      return mergeBlockProps(b, rowId, next);
-    });
-    setDirty(true);
-  }
-
-  // Delete a SPECIFIC column, discarding its components (distinct from the
-  // COLUMNS control's shrink-reflow). Decrements the Section's columns via the
-  // pure deleteColumn; clears selection if the deleted column was selected.
-  function onDeleteColumn(columnId: string) {
-    setBlocks((b) => deleteColumn(b, columnId));
-    setSelectedBlockId((cur) => (cur === columnId ? null : cur));
-    setDirty(true);
-  }
-
-  // Delete a whole Section (with its columns + components) or a single component
-  // leaf via the pure, nested-safe removeNode. Clears selection if the removed
-  // node was the selected one.
-  function onDeleteNode(nodeId: string) {
-    setBlocks((b) => removeNode(b, nodeId));
-    setSelectedBlockId((cur) => (cur === nodeId ? null : cur));
-    setDirty(true);
-  }
-
   // Persist the current blocks to the page's DRAFT version (saveDraftBlocks).
   // Shared by the debounced auto-save and the manual Save button. Save ALWAYS
   // saves the draft, NEVER publishes. Bumps previewNonce so the preview iframe
@@ -601,7 +303,7 @@ export function PageBuilderShell({
         body: JSON.stringify({ blocks }),
       });
       if (res.ok) {
-        setDirty(false);
+        editor.setDirty(false);
         setDraftStatus((s) => nextDraftStatus(s, "saveDone"));
         setPreviewNonce((n) => n + 1);
         return true;
@@ -758,21 +460,8 @@ export function PageBuilderShell({
     return () => {
       live = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // bulk-translate-missing (AC C7): merge one call's vetted block slots into
-  // the LATEST draft (functional update, so concurrent edits are never
-  // clobbered), then let the normal dirty→autosave path persist them — exactly
-  // like a per-field translate's onChange.
-  function onApplyTranslations(slots: TranslationSlots) {
-    setBlocks((b) =>
-      applyBlockTranslations(b, slots, propsSchemas, {
-        default: contentLocales[0] ?? "",
-        locales: contentLocales,
-      }),
-    );
-    setDirty(true);
-  }
 
   const options = flattenPagesForPicker(pages);
   // The selected page's full summary (meta maps etc.) — the Page/SEO tabs and
@@ -884,7 +573,7 @@ export function PageBuilderShell({
               blocks={blocks}
               propsSchemas={propsSchemas}
               locales={contentLocales}
-              onApplyBlocks={onApplyTranslations}
+              onApplyBlocks={editor.onApplyTranslations}
               onMetaSaved={() => void refreshPages(selectedPage.id)}
             />
           )}
@@ -981,161 +670,30 @@ export function PageBuilderShell({
             ))}
           </div>
 
-          {/* Both panels mounted; toggled by `hidden` so a future iframe stays alive. */}
+          {/* Both panels mounted; toggled by `hidden` so the iframe stays alive. */}
           <div className="relative flex-1 overflow-hidden bg-surface-muted">
-            {/* Layers — drop target for dragging a Section from the LAYOUT rail. */}
-            <div
-              onDragOver={(e) => {
-                if (!selected) return;
-                // Must preventDefault to allow a drop; show the indicator.
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "copy";
-                if (!layersDropActive) setLayersDropActive(true);
+            <LayersPanel
+              hidden={centerTab !== "layers"}
+              selected={selected}
+              draftComponents={draftComponents}
+              editor={editor}
+            />
+            <PreviewPanel
+              hidden={centerTab !== "preview"}
+              selected={selected}
+              viewport={viewport}
+              blocks={blocks}
+              selectedBlockId={selectedBlockId}
+              theme={previewTheme}
+              onThemeChange={setPreviewTheme}
+              previewNonce={previewNonce}
+              onRefresh={() => setPreviewNonce((n) => n + 1)}
+              versionId={previewVersionId}
+              onSelectBlock={(id) => {
+                editor.setSelectedBlockId(id);
+                setRightTab("block");
               }}
-              onDragLeave={(e) => {
-                // Only clear when truly leaving the panel (not entering a child).
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                  setLayersDropActive(false);
-                }
-              }}
-              onDrop={(e) => {
-                setLayersDropActive(false);
-                if (!selected) return;
-                const payload = readDragPayload(e);
-                // The LAYOUT primitives drop onto the Layers panel: a Section
-                // appends a new section; a List adds into the selected/last one.
-                if (payload?.kind === "section") {
-                  e.preventDefault();
-                  onAddSection();
-                } else if (payload?.kind === "list") {
-                  e.preventDefault();
-                  onInsertList();
-                }
-              }}
-              className={
-                "absolute inset-0 overflow-y-auto p-6 " +
-                (centerTab === "layers" ? "" : "hidden")
-              }
-            >
-              {!selected ? (
-                <div className="flex h-full items-center justify-center">
-                  <div className="max-w-sm text-center">
-                    <p className="text-lg font-medium text-foreground">{t("title")}</p>
-                    <p className="mt-1 text-sm text-foreground-muted">{t("emptyCanvas")}</p>
-                  </div>
-                </div>
-              ) : blocks.length === 0 ? (
-                <div className="flex h-full items-center justify-center">
-                  <div className="max-w-sm text-center">
-                    <p className="text-lg font-medium text-foreground">{selected.path}</p>
-                    <p className="mt-1 text-sm text-foreground-muted">{t("layersEmpty")}</p>
-                  </div>
-                </div>
-              ) : (
-                <LayersTree
-                  blocks={blocks}
-                  draftComponents={draftComponents}
-                  pageId={selected.id}
-                  selectedId={selectedBlockId}
-                  onSelect={setSelectedBlockId}
-                  onDropComponent={onDropComponentToColumn}
-                  onDropList={onDropListToColumn}
-                  onDropForm={onDropFormToColumn}
-                  onDropGuestChat={onDropGuestChatToColumn}
-                  onMoveNode={onMoveNode}
-                  onDeleteColumn={onDeleteColumn}
-                  onDeleteNode={onDeleteNode}
-                  onRenameSection={onRenameSection}
-                  onAddRow={onAddRow}
-                  onDeleteRow={onDeleteRow}
-                  onSetRowColumns={onSetRowColumns}
-                />
-              )}
-              {/* Drop indicator: a blue line where the new Section appends. */}
-              {selected && layersDropActive && (
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="h-0.5 flex-1 rounded bg-primary" />
-                  <span className="text-xs font-medium text-primary">
-                    {t("dropSectionHint")}
-                  </span>
-                  <span className="h-0.5 flex-1 rounded bg-primary" />
-                </div>
-              )}
-            </div>
-
-            {/* Preview */}
-            <div
-              className={
-                "absolute inset-0 flex flex-col " + (centerTab === "preview" ? "" : "hidden")
-              }
-            >
-              {/* URL bar + refresh */}
-              <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-surface px-3">
-                <button
-                  type="button"
-                  disabled={!selected}
-                  onClick={() => setPreviewNonce((n) => n + 1)}
-                  title={t("refresh")}
-                  aria-label={t("refresh")}
-                  className="rounded p-1 text-foreground-muted disabled:opacity-50"
-                >
-                  <svg {...ICON} width={14} height={14}>
-                    <path d="M23 4v6h-6" />
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                  </svg>
-                </button>
-                <div className="flex-1 truncate rounded border border-border bg-surface-muted px-2 py-1 text-xs text-foreground-muted">
-                  {selected ? selected.path : t("previewUrlPlaceholder")}
-                </div>
-                {/* Light / system / dark toggle — forces the iframe's color mode
-                    so the operator can SEE dark without changing their OS. */}
-                <div className="flex shrink-0 items-center gap-0.5 rounded border border-border bg-surface-muted p-0.5">
-                  {(["light", "system", "dark"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setPreviewTheme(mode)}
-                      aria-pressed={previewTheme === mode}
-                      title={t(`previewTheme.${mode}`)}
-                      aria-label={t(`previewTheme.${mode}`)}
-                      className={
-                        "rounded px-1.5 py-0.5 " +
-                        (previewTheme === mode
-                          ? "bg-surface text-foreground shadow-sm"
-                          : "text-foreground-muted hover:text-foreground")
-                      }
-                    >
-                      <PreviewThemeIcon kind={mode} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Responsive frame area — draft preview reuses the REAL renderer
-                  via /preview/<id> (any publish status), so it's true-to-site. */}
-              <div className="flex flex-1 justify-center overflow-auto p-4">
-                <div
-                  className="h-full overflow-hidden rounded-md border border-border bg-surface shadow-sm"
-                  style={{ width: VIEWPORT_WIDTH[viewport], maxWidth: "100%" }}
-                >
-                  {selected ? (
-                    <iframe
-                      ref={previewRef}
-                      onLoad={() => setPreviewLoaded((n) => n + 1)}
-                      key={`${selected.id}-${previewNonce}-${previewTheme}-${previewVersionId ?? ""}`}
-                      src={previewSrc(selected.id, previewTheme, previewVersionId)}
-                      title={t("previewIframeTitle")}
-                      className="h-full w-full border-0 bg-surface"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center p-6">
-                      <p className="text-center text-sm text-foreground-muted">
-                        {t("previewEmpty")}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            />
           </div>
         </section>
 
@@ -1205,136 +763,44 @@ export function PageBuilderShell({
             ))}
           </div>
           <div className="flex-1 overflow-y-auto p-4">
-            {rightTab === "block" &&
-              (() => {
-                // Selected node can be nested (a component inside a column), so
-                // tree-walk — a top-level find would miss it.
-                const sel = selectedBlockId ? findBlock(blocks, selectedBlockId) : null;
-                if (sel && isSection(sel)) {
-                  return (
-                    <SectionSettings
-                      key={sel.id}
-                      section={sel}
-                      onChange={(patch) => onUpdateSection(sel.id, patch)}
-                    />
-                  );
-                }
-                // A column shell: show its own settings (per-viewport visibility).
-                if (sel && isSectionColumn(sel)) {
-                  return (
-                    <ColumnSettings
-                      key={sel.id}
-                      column={sel}
-                      onChange={(patch) => onPatchBlockProps(sel.id, patch)}
-                    />
-                  );
-                }
-                // A built-in List block: query + per-row template mapping panel.
-                if (sel && isList(sel)) {
-                  return (
-                    <ListSettings
-                      key={sel.id}
-                      block={sel}
-                      collections={collections}
-                      apiSources={apiSources}
-                      propsSchemas={propsSchemas}
-                      onChange={(patch) => onUpdateList(sel.id, patch)}
-                      onProps={(patch) => onPatchBlockProps(sel.id, patch)}
-                    />
-                  );
-                }
-                // A built-in Form block: target + messages/redirect + content panel.
-                if (sel && isForm(sel)) {
-                  return (
-                    <FormSettings
-                      key={sel.id}
-                      block={sel}
-                      collections={collections}
-                      apiSources={apiSources}
-                      propsSchemas={propsSchemas}
-                      onChange={(patch) => onUpdateForm(sel.id, patch)}
-                      onProps={(patch) => onPatchBlockProps(sel.id, patch)}
-                    />
-                  );
-                }
-                // A built-in GuestChat leaf: agent picker + mode + copy panel.
-                if (sel && isGuestChat(sel)) {
-                  return (
-                    <GuestChatSettings
-                      key={sel.id}
-                      block={sel}
-                      onProps={(patch) => onPatchBlockProps(sel.id, patch)}
-                    />
-                  );
-                }
-                // A ROW shell: its own settings (behavior, gap, align, background,
-                // padding). Column COUNT stays inline on the row in the Layers tree.
-                if (sel && isSectionRow(sel)) {
-                  return (
-                    <RowSettings
-                      key={sel.id}
-                      row={sel}
-                      onChange={(patch) => onUpdateRowProps(sel.id, patch)}
-                    />
-                  );
-                }
-                // A component block (not a Section, row, or column shell): show its
-                // schema-driven settings form + the single-item binding panel.
-                if (sel && !isSectionColumn(sel)) {
-                  return (
-                    <div className="space-y-6">
-                      <ComponentSettings
-                        key={sel.id}
-                        block={sel}
-                        hasDraft={draftComponents.has(sel.component)}
-                        schema={parsePropsSchema(propsSchemas[sel.component])}
-                        locales={contentLocales}
-                        onChange={(props) => onUpdateComponentProps(sel.id, props)}
-                      />
-                      <BindingPanel
-                        key={`bind-${sel.id}`}
-                        block={sel}
-                        collections={collections}
-                        apiSources={apiSources}
-                        declared={[...declaredPropNames(propsSchemas[sel.component])]}
-                        onChange={(bindings) => onUpdateBlockField(sel.id, { bindings })}
-                      />
-                    </div>
-                  );
-                }
-                return <p className="text-sm text-foreground-muted">{t("blockEmpty")}</p>;
-              })()}
+            {rightTab === "block" && (
+              <BlockInspector
+                editor={editor}
+                collections={collections}
+                apiSources={apiSources}
+                propsSchemas={propsSchemas}
+                draftComponents={draftComponents}
+                locales={contentLocales}
+              />
+            )}
             {rightTab === "page" &&
-              (() => {
-                const page = selectedPage;
-                return page ? (
-                  <div className="space-y-6">
-                    <PageSettings
-                      key={page.id}
-                      page={page}
-                      locales={contentLocales}
-                      onChanged={() => void refreshPages(page.id)}
-                      onDeleted={() => {
-                        setSelected(null);
-                        void refreshPages();
-                      }}
-                    />
-                    <VersionHistory
-                      key={`vh-${page.id}-${draftReloadNonce}`}
-                      pageId={page.id}
-                      viewingVersionId={previewVersionId}
-                      onView={(versionId) => {
-                        setPreviewVersionId(versionId);
-                        setCenterTab("preview");
-                      }}
-                      onExitView={() => setPreviewVersionId(null)}
-                      onRestore={onRestoreVersion}
-                    />
-                  </div>
-                ) : (
-                  <p className="text-sm text-foreground-muted">{t("pageEmpty")}</p>
-                );
-              })()}
+              (selectedPage ? (
+                <div className="space-y-6">
+                  <PageSettings
+                    key={selectedPage.id}
+                    page={selectedPage}
+                    locales={contentLocales}
+                    onChanged={() => void refreshPages(selectedPage.id)}
+                    onDeleted={() => {
+                      setSelected(null);
+                      void refreshPages();
+                    }}
+                  />
+                  <VersionHistory
+                    key={`vh-${selectedPage.id}-${draftReloadNonce}`}
+                    pageId={selectedPage.id}
+                    viewingVersionId={previewVersionId}
+                    onView={(versionId) => {
+                      setPreviewVersionId(versionId);
+                      setCenterTab("preview");
+                    }}
+                    onExitView={() => setPreviewVersionId(null)}
+                    onRestore={onRestoreVersion}
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-foreground-muted">{t("pageEmpty")}</p>
+              ))}
             {rightTab === "seo" &&
               (selectedPage ? (
                 <SeoForm
@@ -1361,4 +827,3 @@ export function PageBuilderShell({
     </div>
   );
 }
-
