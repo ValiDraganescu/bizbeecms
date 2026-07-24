@@ -1004,6 +1004,7 @@
     "translateMissingNone": "Pole midagi tõlkida — kõik keeled on täidetud.",
     "translateMissingIncomplete": "{count, plural, one {# tõlge} other {# tõlget}} jäi saamata — proovi uuesti.",
     "translating": "Tõlgin…",
+    "blockTranslateMissingHint": "Täida selle ploki tekstide kõik puuduvad tõlked ühe korraga.",
     "link": {
       "newTab": "Ava uuel vahelehel",
       "pickPage": "Vali leht…"

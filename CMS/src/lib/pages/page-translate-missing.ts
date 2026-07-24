@@ -31,7 +31,7 @@ import { missingLocaleSlots, type PlanEntry } from "../content/bulk-translate-pl
 import type { TranslationSlots } from "../content/bulk-translate-run.ts";
 import { mergeTranslations, parsePropsSchema, type PropField } from "./page-blocks.ts";
 import type { Block } from "../render/tree.ts";
-import type { ContentLocales } from "../render/localize.ts";
+import { isLocaleObject, type ContentLocales } from "../render/localize.ts";
 
 /** The page-level meta fields the action covers — also their entry names. */
 export const PAGE_META_FIELDS = ["metaTitle", "metaDescription"] as const;
@@ -157,4 +157,45 @@ export function applyBlockTranslations(
 function translatableFields(block: Block, schemas: PropsSchemas): PropField[] {
   // `translatable` is already narrowed to string/richtext by parsePropsSchema.
   return parsePropsSchema(schemas[block.component]).filter((f) => f.translatable);
+}
+
+/**
+ * ONE-block entries for the inspector's per-component "Translate missing"
+ * button (AC 7b): every translatable prop of the block × its missing target
+ * locales. Names are PLAIN prop names — the vetted result merges straight into
+ * this block via `mergeTranslations`, so no `<blockId>.` namespace is needed.
+ *
+ * Unlike the page-wide `pageTranslateEntries` above, a prop with nothing
+ * authored in the default locale still gets an entry when the schema carries a
+ * non-empty string `default`: the per-field translate menus right below this
+ * button use exactly that rendered default as their source
+ * (`translatable-field.tsx` `sourceText`), and a summary button must agree
+ * with the menus it summarizes. No stored default-locale text AND no authored
+ * default → no source → no entry (AC8). A single-locale site yields none. PURE.
+ */
+export function blockTranslateEntries(
+  props: Record<string, unknown> | undefined,
+  schema: PropField[],
+  locales: ContentLocales,
+): PlanEntry[] {
+  const entries: PlanEntry[] = [];
+  for (const f of schema) {
+    if (!f.translatable) continue;
+    const raw = props?.[f.name];
+    let { sourceText, missing } = missingLocaleSlots(raw, locales);
+    if (sourceText.trim() === "" && typeof f.default === "string" && f.default.trim() !== "") {
+      // Nothing authored in the default locale — the rendered (and per-field
+      // translatable) source is the schema's authored default; targets keep
+      // whatever real translations the block already stored.
+      sourceText = f.default;
+      const map = isLocaleObject(raw) ? (raw as Record<string, unknown>) : {};
+      missing = locales.locales.filter((code) => {
+        if (code === locales.default) return false;
+        const slot = map[code];
+        return typeof slot !== "string" || slot.trim() === "";
+      });
+    }
+    if (missing.length > 0) entries.push({ name: f.name, sourceText, targetLocales: missing });
+  }
+  return entries;
 }

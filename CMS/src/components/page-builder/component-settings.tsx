@@ -8,6 +8,7 @@ import {
   type PropField,
 } from "@/lib/pages/page-blocks";
 import type { Block } from "@/lib/render/tree";
+import { BlockTranslateMissingButton } from "./block-translate-missing";
 import { PropFieldInput } from "./prop-field-input";
 import { SpacingControls } from "./shared";
 import { TranslatableField } from "./translatable-field";
@@ -45,18 +46,29 @@ export function ComponentSettings({
   const t = useTranslations("pageBuilder");
   const props = (block.props ?? {}) as Record<string, unknown>;
 
+  // Heading row: component name + the per-block "Translate missing" button
+  // (AC 7b — self-hides when the site is single-locale or nothing is missing).
   const heading = (
-    <p className="font-mono text-sm text-foreground">
-      {block.component}
-      {hasDraft && (
-        <span
-          className="ml-1.5 rounded border border-warning bg-warning-subtle px-1 py-px align-middle font-sans text-[10px] font-medium uppercase tracking-wide text-foreground"
-          title={t("draftBadgeHint")}
-        >
-          {t("draftBadge")}
-        </span>
-      )}
-    </p>
+    <div className="flex items-center justify-between gap-2">
+      <p className="font-mono text-sm text-foreground">
+        {block.component}
+        {hasDraft && (
+          <span
+            className="ml-1.5 rounded border border-warning bg-warning-subtle px-1 py-px align-middle font-sans text-[10px] font-medium uppercase tracking-wide text-foreground"
+            title={t("draftBadgeHint")}
+          >
+            {t("draftBadge")}
+          </span>
+        )}
+      </p>
+      <BlockTranslateMissingButton
+        component={block.component}
+        schema={schema}
+        props={props}
+        locales={locales}
+        onChange={onChange}
+      />
+    </div>
   );
 
   const segLabel = "text-xs font-medium uppercase tracking-wide text-foreground-muted";

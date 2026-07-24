@@ -7,11 +7,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   pageTranslateEntries,
+  blockTranslateEntries,
   splitPageSlots,
   mergePageMeta,
   applyBlockTranslations,
   type PageMeta,
 } from "./page-translate-missing.ts";
+import { parsePropsSchema } from "./page-blocks.ts";
 import type { Block } from "../render/tree.ts";
 import type { ContentLocales } from "../render/localize.ts";
 
@@ -103,6 +105,60 @@ test("single-locale site plans nothing (AC10)", () => {
   const meta: PageMeta = { metaTitle: { en: "Home" }, metaDescription: {} };
   const blocks = tree({ id: "b1", component: "Hero", props: { title: "Hello" } });
   assert.deepEqual(pageTranslateEntries(meta, blocks, SCHEMAS, SINGLE), []);
+});
+
+// ── blockTranslateEntries (per-component button, AC 7b) ──────────────────────
+
+/** SectionHeading-shaped schema: two translatable props, one with an authored
+ *  default, plus a non-translatable sibling. */
+const BLOCK_SCHEMA = parsePropsSchema(
+  JSON.stringify({
+    title: { type: "string", translatable: true, default: "Section title" },
+    subtitle: { type: "richtext", translatable: true }, // no authored default
+    imageUrl: { type: "string" }, // not translatable → never an entry
+  }),
+);
+
+test("blockTranslateEntries: missing-only — stored locales are not re-planned", () => {
+  const entries = blockTranslateEntries(
+    {
+      title: { en: "Best", fi: "Parhaat" }, // et missing
+      subtitle: "Find one", // bare string = default-only → fi+et missing
+      imageUrl: "https://x/y.png",
+    },
+    BLOCK_SCHEMA,
+    LOCALES,
+  );
+  assert.deepEqual(entries, [
+    { name: "title", sourceText: "Best", targetLocales: ["et"] },
+    { name: "subtitle", sourceText: "Find one", targetLocales: ["fi", "et"] },
+  ]);
+});
+
+test("blockTranslateEntries: no stored text and no authored default → no source, no entry", () => {
+  // subtitle has no schema default: unset (and blank-target) values plan nothing.
+  assert.deepEqual(blockTranslateEntries({ title: { en: "Hi", fi: "x", et: "x" } }, BLOCK_SCHEMA, LOCALES), []);
+  assert.deepEqual(
+    blockTranslateEntries({ title: { en: "Hi", fi: "x", et: "x" }, subtitle: { fi: "vain fi" } }, BLOCK_SCHEMA, LOCALES),
+    [], // no default-locale source to translate FROM (AC8)
+  );
+});
+
+test("blockTranslateEntries: unset prop falls back to the authored schema default as source", () => {
+  // Parity with the per-field menu: it renders + translates `field.default`
+  // when the page authored nothing, so the button must count those slots too.
+  assert.deepEqual(blockTranslateEntries(undefined, BLOCK_SCHEMA, LOCALES), [
+    { name: "title", sourceText: "Section title", targetLocales: ["fi", "et"] },
+  ]);
+  // A partially translated locale object (no default-locale text) keeps its
+  // stored translations: only the still-missing target is planned.
+  assert.deepEqual(blockTranslateEntries({ title: { fi: "Otsikko" } }, BLOCK_SCHEMA, LOCALES), [
+    { name: "title", sourceText: "Section title", targetLocales: ["et"] },
+  ]);
+});
+
+test("blockTranslateEntries: single-locale site plans nothing (AC10)", () => {
+  assert.deepEqual(blockTranslateEntries({ title: "Hello" }, BLOCK_SCHEMA, SINGLE), []);
 });
 
 // ── splitPageSlots ───────────────────────────────────────────────────────────

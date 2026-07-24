@@ -1004,6 +1004,7 @@
     "translateMissingNone": "Ei käännettävää — kaikki kielet on täytetty.",
     "translateMissingIncomplete": "{count, plural, one {# käännös} other {# käännöstä}} jäi syntymättä — yritä uudelleen.",
     "translating": "Käännetään…",
+    "blockTranslateMissingHint": "Täytä tämän lohkon tekstien kaikki puuttuvat käännökset kerralla.",
     "link": {
       "newTab": "Avaa uuteen välilehteen",
       "pickPage": "Valitse sivu…"
