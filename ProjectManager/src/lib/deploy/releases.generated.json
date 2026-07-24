@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "2.6.0",
+      "tag": "r-2.6.0",
+      "markdown": "# CMS v2.6.0\n\n_2026-07-25 · changes since r-2.5.0_\n\n## Features\n- **AI credits & usage page.** Settings → AI → Credits & usage shows your allocated monthly AI credits, what's been used and what remains — the same numbers the quota enforces on — plus all-time spend, a last-30-days daily chart, and a per-feature breakdown (chat agents, admin assistant, image tools, translation). Daily and per-feature history starts accruing from this release; earlier spend is included in the monthly and all-time totals.\n- **Export & import chat agents.** The Chat agents screen can now export selected agents to a single file (configuration only — no conversations or usage data) and import them on any site. Imported agents are always created as new — a name clash becomes a \"name-2\" copy, never an overwrite — and references to collections or data sources the site doesn't have are dropped with a warning naming exactly what to reconnect.\n"
+    },
+    {
       "version": "2.5.0",
       "tag": "r-2.5.0",
       "markdown": "# CMS v2.5.0\n\n_2026-07-24 · changes since r-2.4.0_\n\n## Features\n- **Per-component \"Translate missing\" button.** The block inspector now has a one-click button next to the component name that fills every missing translation across all of that block's text props at once — it only appears when something is missing and disappears when done.\n- **Lists: translate the item component's fixed texts.** A List's item-component text props that aren't mapped to a data field (e.g. a \"New!\" badge or \"Book a table\" button label) are now editable per language in a new \"Item text\" section of the List settings — with the same language tabs and AI translate as everywhere else. Every row renders them in the visitor's language.\n\n## Fixes\n- Two translations running at the same time on one block (e.g. title and subtitle) no longer overwrite each other — whichever finishes last used to reset the other's result, and could also wipe text typed while a translation ran.\n- The page-level \"Translate missing\" now also covers text props that were never edited and still show their component default — previously those were silently skipped until touched once. All three translate buttons (per field, per block, per page) now use the same rule.\n- The AI-assistant chat bubble no longer covers the last controls of the settings panel — they now scroll clear of it.\n\n## Other\n- The block-binding settings screen was split from one 1600-line file into focused per-panel files (List, Form, binding controls) for maintainability.\n"
@@ -19,11 +24,6 @@
       "version": "2.2.1",
       "tag": "r-2.2.1",
       "markdown": "# CMS v2.2.1\n\n_2026-07-23 · changes since r-2.2.0_\n\n## Fixes\n- **Translating one block field no longer clears its neighbours.** In the Page Builder block inspector, running AI-translate on a field (e.g. a SectionHeading's title) was wiping the block's other translatable fields (e.g. the subtitle) — and the loss was saved, not just visual. Translation now preserves every other prop on the block.\n"
-    },
-    {
-      "version": "2.1.1",
-      "tag": "r-2.1.1",
-      "markdown": "# CMS v2.1.1\n\n_2026-07-23 · changes since r-2.1.0_\n\n## Fixes\n- Security/staleness fix: admin and API responses are now explicitly marked uncacheable at the worker, so no edge or intermediary cache can ever store and re-serve them. Previously, zone-level cache settings could cache an admin API response and serve it stale — and to unauthenticated visitors — until its edge TTL expired (seen as the AI model list not updating after changes in the Project Manager). Public endpoints that deliberately opt into caching (published pages, the markdown page variants, sitemap/llms.txt) are unaffected.\n"
     },
     {
       "version": "1.28.0",
