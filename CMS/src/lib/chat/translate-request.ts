@@ -43,7 +43,9 @@ export interface TranslateRequest {
   persist: boolean;
 }
 
-const MAX_FIELD_TEXT_BYTES = 16 * 1024;
+/** Per-field source-text cap enforced by the `/api/translate` 400-gate below.
+ *  Exported so the bulk-translate planner skips exactly what this gate rejects. */
+export const MAX_FIELD_TEXT_BYTES = 16 * 1024;
 
 /**
  * Validate the direct `/api/translate` body into a `TranslateRequest`, or return
