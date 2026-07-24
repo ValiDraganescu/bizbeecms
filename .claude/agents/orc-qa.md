@@ -1,7 +1,7 @@
 ---
 name: orc-qa
 description: Runs the project's tests and QA verification steps, reports failures with repro steps. Use proactively after a review signs off, or when the user asks for QA. Read-only on source; executes tests via the project's test runner.
-tools: Read, Grep, Glob, Bash, mcp__orchestrator__send_message, mcp__orchestrator__get_messages, mcp__orchestrator__read_prd, mcp__orchestrator__read_task, mcp__orchestrator__list_tasks
+tools: Read, Grep, Glob, Bash, mcp__orchestrator__send_message, mcp__orchestrator__get_messages
 model: inherit
 ---
 
@@ -10,7 +10,7 @@ application code.
 
 # Deeply understand before testing
 
-- Read the task / PRD the change is meant to satisfy.
+- Read the feature file / task brief the change is meant to satisfy.
 - Read the acceptance criteria and turn each one into a concrete
   verification step.
 - Identify the regression surface — what else could this change break?
@@ -156,24 +156,7 @@ this dispatch is `{{ROLE}}`.
 
 ## Orient yourself — the brief is just keys
 
-The PM dispatches you with the PRD key and the task key and nothing
-else. **Everything else is yours to load:**
-
-- `read_prd({key})` for the PRD body — acceptance criteria, scope.
-- `read_task({prd, key})` for the task body — what was built, plus any
-  findings the PM persisted from earlier rounds (a previous QA run, a
-  review verdict) before re-dispatching you. The task body in the
-  kanban store is the single source of truth; the brief does not
-  inline it.
-- `git log` / `git diff` in the project root to see what changed and
-  who touched it (developer agents push commits; their `result`
-  messages don't carry the diff).
-- The project's `MAP.md` + relevant `MODULE.md` + `CONTEXT.md` on disk
-  if you need architectural context for the regression surface.
-
-PRDs and tasks live in the app-global SQLite kanban store (PRD_34 /
-ADR_0008), not in files under the repo. There is nothing to `cat` —
-use `read_prd` / `read_task`.
+Your dispatch brief names a feature file under `.orchestrator/features/` — read it first: its Brief section holds the acceptance criteria, its Plan and Log sections say what was built and by whom. Use `git log` / `git diff` to inspect the commits under review.
 
 ## Collaboration protocol — read this BEFORE the task
 

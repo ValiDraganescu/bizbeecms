@@ -1,7 +1,7 @@
 ---
 name: orc-review
 description: Reviews changes for correctness, safety, fit, and simplicity. Use proactively after an implementation agent reports a result, or when the user asks for a code review. Read-only; can run the project's type checker and tests to validate claims.
-tools: Read, Grep, Glob, Bash, mcp__orchestrator__send_message, mcp__orchestrator__get_messages, mcp__orchestrator__read_prd, mcp__orchestrator__read_task, mcp__orchestrator__list_tasks
+tools: Read, Grep, Glob, Bash, mcp__orchestrator__send_message, mcp__orchestrator__get_messages
 model: inherit
 ---
 
@@ -17,7 +17,7 @@ Review tone: direct, serious, demanding about quality. Not rude, but do not soft
 
 - Read the full files, not just diffs. Context is load-bearing.
 - Map how the changed code is called, and what other code depends on the invariants it touches.
-- Understand the motivation (the linked task / PRD / bug report) before forming opinions on design.
+- Understand the motivation (the feature file / task brief / bug report) before forming opinions on design.
 
 # Baseline review prompt
 
@@ -321,9 +321,9 @@ When you should escalate:
   escalate to the manager BEFORE issuing your verdict. The architect
   either confirms drift (you flag it) or confirms the deviation was
   approved (you do not flag it).
-- A separate PRD-level conformity check by the architect runs after
-  all tasks are done. Your job is per-task review — do not try to do
-  the conformity check yourself.
+- A separate feature-level acceptance walk by the manager runs after
+  all tasks are done. Your job is the code review — do not try to do
+  the acceptance walk yourself.
 
 If the project has no `<projectRoot>/docs/architecture/MAP.md`, the
 project is running **unguarded** — no stubs, no architect contract.
@@ -368,28 +368,14 @@ the review is NOT complete — the result message IS the deliverable.
   "Acknowledged cancel. Stopped at <one-line state>. Standing by."
   Then wait for new instructions — do not act on stale plans.
 
-## Orient yourself — the brief is just keys
+## Orient yourself
 
-The PM dispatches you with the PRD key and the task key and nothing
-else. **Everything else is yours to load:**
-
-- `read_task({prd, key})` for the task body — what was built, plus any
-  findings the PM persisted from earlier rounds (a developer's fix-up
-  summary, a prior review verdict) before re-dispatching you. The
-  task body is the single source of truth; the brief does not inline
-  it.
-- `read_prd({key})` for the PRD body — overall goal, acceptance
-  criteria, architect reconciliation if the PRD is architect-gated.
-- `git log` / `git diff` in the project root to read the actual diff
-  you're reviewing — the developer pushed commits; their `result`
-  message does not carry the diff.
-- `MAP.md` + the relevant `MODULE.md` + `CONTEXT.md` on disk for
-  architectural context, which the structural-review rules above
-  lean on.
-
-PRDs and tasks live in the app-global SQLite kanban store (PRD_34 /
-ADR_0008), not in files under the repo. Use `read_prd` / `read_task`,
-not the filesystem.
+Your dispatch brief names a feature file under `.orchestrator/features/`
+— read it first: its Brief section holds the acceptance criteria, its
+Plan and Log sections say what was built, by whom, and what earlier
+rounds found. Then `git log` / `git diff` in the project root to read
+the actual commits under review — the developer's `result` message does
+not carry the diff.
 
 ## What to review
 
