@@ -25,6 +25,7 @@ import { COLLECTION_FIELD_TYPES, isTranslatableField, type CollectionField } fro
 import { ITEM_STATUSES } from "@/lib/content/item-write";
 import { blankValueFor, FieldInput, TranslatableFieldInput, type FieldValue } from "./field-input";
 import { toLocalizedDraft, mergeItemTranslations, type LocalizedDraft } from "@/lib/content/item-locale-fields";
+import { TranslateAllMissingButton, TranslateMissingButton } from "./bulk-translate";
 import { ConfirmModal } from "./confirm-modal";
 
 const INPUT = "rounded-md border border-border bg-surface px-3 py-2 text-foreground";
@@ -77,6 +78,9 @@ export function CollectionItems({
   const [addingField, setAddingField] = useState(false);
   const [managingSchema, setManagingSchema] = useState(false);
   const [importing, setImporting] = useState(false);
+  // A "Translate all missing" sweep writes items directly — lock item editing
+  // (new/edit/archive/delete) while it runs so the two paths can't race.
+  const [sweeping, setSweeping] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -152,6 +156,13 @@ export function CollectionItems({
       const merged = mergeItemTranslations(current, fieldName, translations, contentLocales);
       return { ...prev, values: { ...prev.values, [fieldName]: merged } };
     });
+  }
+
+  // Bulk "Translate missing" merge: the runner hands over PRE-VETTED slots
+  // (requested field × locale only), each applied through the same per-field
+  // functional merge — React batches the updates, so the draft stays coherent.
+  function mergeDraftTranslations(translations: Record<string, Record<string, string>>) {
+    for (const name of Object.keys(translations)) mergeFieldTranslations(name, translations);
   }
 
   async function saveDraft() {
@@ -265,7 +276,8 @@ export function CollectionItems({
         </label>
         <button
           type="button"
-          className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
+          className="rounded-md bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+          disabled={sweeping}
           onClick={newDraft}
         >
           {t("newItem")}
@@ -303,6 +315,14 @@ export function CollectionItems({
         >
           {t("import")}
         </button>
+        <TranslateAllMissingButton
+          tableName={tableName}
+          fields={collection.fields}
+          locales={contentLocales}
+          disabled={draft !== null || busy}
+          onRunningChange={setSweeping}
+          onDone={() => void load()}
+        />
       </div>
 
       {error && (
@@ -351,7 +371,16 @@ export function CollectionItems({
             void saveDraft();
           }}
         >
-          <h2 className="text-lg font-semibold text-foreground">{draft.id ? t("editItem") : t("newItem")}</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-foreground">{draft.id ? t("editItem") : t("newItem")}</h2>
+            <TranslateMissingButton
+              values={draft.values}
+              fields={collection.fields}
+              locales={contentLocales}
+              tableName={tableName}
+              onMerge={mergeDraftTranslations}
+            />
+          </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
@@ -457,7 +486,7 @@ export function CollectionItems({
                         <button
                           type="button"
                           className="rounded border border-border px-2 py-1 text-foreground-muted hover:text-foreground disabled:opacity-40"
-                          disabled={busy}
+                          disabled={busy || sweeping}
                           onClick={() => editDraft(it)}
                         >
                           {t("edit")}
@@ -465,7 +494,7 @@ export function CollectionItems({
                         <button
                           type="button"
                           className="rounded border border-border px-2 py-1 text-foreground-muted hover:text-foreground disabled:opacity-40"
-                          disabled={busy}
+                          disabled={busy || sweeping}
                           onClick={() => void itemOp(id, isArchived ? "unarchive" : "archive")}
                         >
                           {isArchived ? t("unarchive") : t("archive")}
@@ -473,7 +502,7 @@ export function CollectionItems({
                         <button
                           type="button"
                           className="rounded border border-border px-2 py-1 text-danger disabled:opacity-40"
-                          disabled={busy}
+                          disabled={busy || sweeping}
                           onClick={() => setPendingDelete(id)}
                         >
                           {t("delete")}

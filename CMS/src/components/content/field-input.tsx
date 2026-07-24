@@ -28,6 +28,7 @@ import {
   draftLocaleText,
   setDraftLocaleText,
 } from "@/lib/content/item-locale-fields";
+import { executeTranslateCall } from "@/lib/content/translate-client";
 
 const INPUT =
   "rounded-md border border-border bg-surface px-3 py-2 text-foreground";
@@ -37,10 +38,6 @@ export type FieldValue = string | boolean | string[] | LocalizedDraft;
 /** Show locale TABS up to this count; beyond it, a compact <select>. Mirrors the
  *  page-builder TranslatableField threshold. */
 const LOCALE_TABS_MAX = 6;
-
-/** Abort a translate fetch that hasn't resolved by now — a client backstop above
- *  the server's 45s idle timeout so a real server 504 wins the race. */
-const CLIENT_TIMEOUT_MS = 60_000;
 
 /** A blank value for a field type, matching the input's expected shape. */
 export function blankValueFor(type: CollectionField["type"]): FieldValue {
@@ -245,45 +242,20 @@ export function TranslatableFieldInput({
     if (sourceText === "" || targets.length === 0) return;
     setError(null);
     setBusy(targets.length === 1 ? targets[0] : "all");
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), CLIENT_TIMEOUT_MS);
-    try {
-      const res = await fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          kind: "component",
-          target: tableName,
-          fields: { [field.name]: sourceText },
-          fromLocale: defaultLocale,
-          toLocales: targets,
-          persist: false, // we merge into the draft + save via the item PATCH/POST
-        }),
-      });
-      const j = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        translations?: Record<string, Record<string, string>>;
-        error?: string;
-        errors?: string[];
-      };
-      if (!res.ok || !j.ok || !j.translations) {
-        setError(j.error ?? j.errors?.join("; ") ?? `HTTP ${res.status}`);
-        return;
-      }
+    const res = await executeTranslateCall(
+      { fields: { [field.name]: sourceText }, toLocales: targets },
+      { target: tableName, fromLocale: defaultLocale },
+    );
+    if (res.ok) {
       // Hand the raw translations up; the parent merges them into the LATEST
       // draft state, so a second field translating concurrently can't overwrite
       // this one (the previous approach merged into the stale `value` prop).
-      onMergeTranslations(j.translations);
+      onMergeTranslations(res.translations);
       if (!targets.includes(loc)) setActive(targets[0]);
-    } catch (err) {
-      setError(
-        (err as Error).name === "AbortError" ? tp("translateField.timeout") : (err as Error).message,
-      );
-    } finally {
-      clearTimeout(timer);
-      setBusy(null);
+    } else {
+      setError(res.timeout ? tp("translateField.timeout") : res.message);
     }
+    setBusy(null);
   }
 
   const multi = locales.length > 1;
