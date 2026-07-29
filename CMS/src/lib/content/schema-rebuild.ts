@@ -34,6 +34,7 @@
 import { assertStatement } from "./fence.ts";
 import {
   buildCreateTableSql,
+  defaultValueLiteral,
   COLLECTION_FIELD_TYPES,
   SYSTEM_COLUMNS,
   type CollectionField,
@@ -149,6 +150,12 @@ export function planRebuild(
   // DDL-visible attribute (type / required / default) actually changes —
   // description/label edits are registry-JSON-only (statements: []).
   let needsRebuild = true;
+  // When an "update" makes a field NEWLY required and it (now) has a default,
+  // existing NULL rows are BACKFILLED with that default during the copy —
+  // otherwise the INSERT…SELECT would hit the new NOT NULL and abort. This is
+  // what makes "supply `default` in the same call" (the handler's pre-check
+  // advice) actually work.
+  let backfill: { column: string; literal: string } | null = null;
 
   if (change.op === "drop") {
     for (const f of oldFields) {
@@ -193,6 +200,10 @@ export function planRebuild(
         applied.type !== f.type ||
         (applied.required === true) !== (f.required === true) ||
         applied.default !== f.default;
+      if (applied.required === true && f.required !== true) {
+        const literal = defaultValueLiteral(applied);
+        if (literal) backfill = { column: f.name, literal };
+      }
       newFields.push(applied);
       userCopy.push([f.name, f.name]);
     }
@@ -249,7 +260,12 @@ export function planRebuild(
     if (!COLUMN_NAME_RE.test(oldName) || !COLUMN_NAME_RE.test(newName)) {
       return fail(400, `unsafe column name in copy: ${oldName}->${newName}`);
     }
-    oldCols.push(oldName);
+    // NULL-backfill the newly-required column (validated name + typed literal).
+    oldCols.push(
+      backfill && backfill.column === oldName
+        ? `COALESCE(${oldName}, ${backfill.literal})`
+        : oldName,
+    );
     newCols.push(newName);
   }
   const insertSql =

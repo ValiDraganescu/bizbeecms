@@ -743,6 +743,23 @@ export function describeTypeCoercion(
   return `${rows}: ${oldType} → ${newType} — ${rule}`;
 }
 
+/**
+ * update_collection_field pre-check error (G2 fix): making a field required
+ * while existing rows hold NULL (and no default will backfill them) would
+ * abort the table rebuild with a raw NOT NULL error. Self-correcting: names
+ * the field, the NULL row count, and both fixes.
+ */
+export function requiredWithNullsMessage(field: string, nullCount: number): string {
+  const rows = nullCount === 1 ? "1 existing item has" : `${nullCount} existing items have`;
+  return (
+    `cannot make field "${field}" required: ${rows} no value (NULL) for it. ` +
+    `Either supply a \`default\` in the same update_collection_field call ` +
+    `(existing NULL values are backfilled with it), or set a value on each ` +
+    `item with update_collection_item (find them with query_collection ` +
+    `filtering ${field} is_null), then retry.`
+  );
+}
+
 // ── delete_collection / restore_collection_item / delete_collection_item ─────
 
 /** delete_collection: { collection }. */

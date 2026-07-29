@@ -279,6 +279,38 @@ function targetNoun(target: ScanTarget, targetName: string): string {
 }
 
 /**
+ * A page/component whose STORED content failed to parse while loading the
+ * reference surface. An unreadable page could hide a reference, so the delete
+ * guards FAIL CLOSED on any of these (see `describeScanFailures`).
+ */
+export interface ScanFailure {
+  entity: "page" | "component";
+  /** Human label: page path or component name. */
+  label: string;
+  /** Which stored artifact failed, e.g. `blocks JSON` or `draft blocks JSON`. */
+  detail: string;
+}
+
+/**
+ * The FAIL-CLOSED error: when any page/component content could not be parsed,
+ * the guard cannot PROVE the target is unreferenced — refuse the delete and
+ * name every unparseable entity + the fix. Empty string when no failures.
+ */
+export function describeScanFailures(
+  target: ScanTarget,
+  targetName: string,
+  failures: ScanFailure[],
+): string {
+  if (failures.length === 0) return "";
+  const lines = failures.map((f) => `- ${ENTITY_NOUN[f.entity]} "${f.label}": unparseable ${f.detail}`);
+  return [
+    `Cannot delete ${targetNoun(target, targetName)}: unable to verify it is unreferenced —`,
+    ...lines,
+    "Fix or delete the entities listed above first, then retry the delete.",
+  ].join("\n");
+}
+
+/**
  * The delete guard's error text: names the target, EVERY referencing entity
  * (one line each: entity, where, and the tool that removes the reference),
  * and how to retry. Empty string when nothing references the target (caller

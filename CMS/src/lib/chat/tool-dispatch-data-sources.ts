@@ -10,9 +10,10 @@
  * (encrypted via the Worker's CMS_AUTH_SECRET KEK) but no tool result ever
  * contains it. test_data_source mirrors the Slice-4 test endpoint: live
  * fetch, cache BYPASSED, secret injected server-side. Deletes are BLOCKED
- * while referenced (findSiteReferences → describeReferences names every
- * referencing entity; no force flag) and prune the deleted rows' cache-purge
- * counters, mirroring the Admin REST delete routes.
+ * while referenced (deleteBlockedReason names every referencing entity — and
+ * FAILS CLOSED when the reference surface can't be parsed; no force flag) and
+ * prune the deleted rows' cache-purge counters, mirroring the Admin REST
+ * delete routes.
  */
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import {
@@ -42,8 +43,7 @@ import {
   type SafeDataSourceRequest,
 } from "@/db/data-source-store";
 import { pruneApiCacheVersions } from "@/db/settings-store";
-import { findSiteReferences } from "@/lib/content/reference-scan-load";
-import { describeReferences } from "@/lib/content/reference-scan";
+import { deleteBlockedReason } from "@/lib/content/reference-scan-load";
 import { fetchSource } from "@/lib/data-sources/fetch";
 import { samplePaths } from "@/lib/data-sources/bind";
 import type { AuthType, HttpMethod } from "@/lib/data-sources/validate";
@@ -160,11 +160,11 @@ export async function handleDeleteDataSourceRequest(args: unknown): Promise<Reco
     const resolved = await resolveSourceAndRequest(valid.value.sourceRef, valid.value.requestRef);
     if (!resolved.ok) return { ok: false, errors: [resolved.error] };
     const { source, request } = resolved;
-    const target = { kind: "dataSourceRequest", sourceId: source.id, requestId: request.id } as const;
-    const refs = await findSiteReferences(target);
-    if (refs.length > 0) {
-      return { ok: false, errors: [describeReferences(target, request.name, refs)] };
-    }
+    const blocked = await deleteBlockedReason(
+      { kind: "dataSourceRequest", sourceId: source.id, requestId: request.id },
+      request.name,
+    );
+    if (blocked) return { ok: false, errors: [blocked] };
     const removed = await deleteDataSourceRequest(source.id, request.id);
     if (!removed) return { ok: false, errors: [`saved request "${request.name}" was already deleted — call list_data_sources to see the current state`] };
     await pruneApiCacheVersions({ requestIds: [request.id] });
@@ -183,11 +183,8 @@ export async function handleDeleteDataSource(args: unknown): Promise<Record<stri
     const source = resolved.source;
     // A dataSource target also matches references to ANY of its saved requests
     // (they carry the sourceId), so one scan guards the whole cascade.
-    const target = { kind: "dataSource", sourceId: source.id } as const;
-    const refs = await findSiteReferences(target);
-    if (refs.length > 0) {
-      return { ok: false, errors: [describeReferences(target, source.name, refs)] };
-    }
+    const blocked = await deleteBlockedReason({ kind: "dataSource", sourceId: source.id }, source.name);
+    if (blocked) return { ok: false, errors: [blocked] };
     // Capture the saved-request ids BEFORE the delete — they cascade with it.
     const requestIds = (await listDataSourceRequests(source.id)).map((r) => r.id);
     const removed = await deleteDataSource(source.id);

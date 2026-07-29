@@ -4,8 +4,14 @@
  * + draft blocks, every component's live + draft tree, every chat agent's
  * allowlists — and hands plain JSON to `findReferences`. The delete-guard
  * handlers (delete_data_source / delete_data_source_request / delete_collection)
- * call `findSiteReferences` and, when it returns hits, refuse with
- * `describeReferences`.
+ * call `deleteBlockedReason` and refuse when it returns a message.
+ *
+ * FAIL CLOSED (G2 fix): a page whose blocks JSON does not parse could hide a
+ * reference, so a parse failure does NOT degrade to "no references" — it is
+ * collected as a `ScanFailure` and the guard refuses the delete, naming the
+ * unparseable page (`describeScanFailures`). Component HTML parsing is lenient
+ * (`parseHtml` never throws), so components cannot fail today, but the failure
+ * channel covers both entities.
  *
  * Same surface `site-export.ts`'s route walks; reads D1 ONLY via the `Db` port
  * (sole-reader invariant). Effects only — all matching logic is in the pure
@@ -17,8 +23,10 @@ import { parseJsonColumn } from "../render/tree.ts";
 import { parseHtml } from "../render/parse-html.ts";
 import { listChatAgents } from "../../db/chat-agent-store.ts";
 import {
+  describeReferences,
+  describeScanFailures,
   findReferences,
-  type Reference,
+  type ScanFailure,
   type ScanInput,
   type ScanPage,
   type ScanTarget,
@@ -45,8 +53,24 @@ function pagePath(
 }
 
 /** Load the full reference surface (pages + components + agents) as ScanInput. */
-export async function loadScanInput(injectedDb?: Db): Promise<ScanInput> {
+async function loadScanInput(
+  injectedDb?: Db,
+): Promise<{ input: ScanInput; failures: ScanFailure[] }> {
   const db = injectedDb ?? (await getDb());
+  const failures: ScanFailure[] = [];
+
+  // Parse a blocks JSON column, RECORDING a failure instead of degrading to []
+  // — the caller fails closed on any recorded failure. Empty/NULL is a
+  // legitimately blockless page, not a failure.
+  const parseBlocks = (raw: string | null | undefined, label: string, detail: string): unknown => {
+    if (raw == null || raw === "") return [];
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      failures.push({ entity: "page", label, detail });
+      return [];
+    }
+  };
 
   const pageRows = await db
     .select({
@@ -71,12 +95,14 @@ export async function loadScanInput(injectedDb?: Db): Promise<ScanInput> {
 
   const byId = new Map(pageRows.map((p) => [p.id, p]));
   const pages: ScanPage[] = pageRows.map((p) => {
+    const label = pagePath(p, byId);
     const draftRaw = p.draftVersionId ? draftBlocksById.get(p.draftVersionId) : undefined;
     return {
       id: p.id,
-      title: pagePath(p, byId),
-      blocks: parseJsonColumn<unknown>(p.blocks, []),
-      draftBlocks: draftRaw !== undefined ? parseJsonColumn<unknown>(draftRaw, []) : undefined,
+      title: label,
+      blocks: parseBlocks(p.blocks, label, "blocks JSON"),
+      draftBlocks:
+        draftRaw !== undefined ? parseBlocks(draftRaw, label, "draft blocks JSON") : undefined,
     };
   });
 
@@ -104,16 +130,21 @@ export async function loadScanInput(injectedDb?: Db): Promise<ScanInput> {
     collections: parseAllowlist(a.collections),
   }));
 
-  return { pages, components, chatAgents };
+  return { input: { pages, components, chatAgents }, failures };
 }
 
 /**
- * The one call the delete guards make: every reference to `target` across the
- * site. Empty = safe to delete; non-empty → refuse with `describeReferences`.
+ * The one call the delete guards make. Empty string = safe to delete;
+ * non-empty = the self-correcting refusal message — either the existing
+ * references (`describeReferences`) or, FAIL CLOSED, the pages/components
+ * whose stored content could not be parsed (`describeScanFailures`).
  */
-export async function findSiteReferences(
+export async function deleteBlockedReason(
   target: ScanTarget,
+  targetName: string,
   injectedDb?: Db,
-): Promise<Reference[]> {
-  return findReferences(await loadScanInput(injectedDb), target);
+): Promise<string> {
+  const { input, failures } = await loadScanInput(injectedDb);
+  if (failures.length > 0) return describeScanFailures(target, targetName, failures);
+  return describeReferences(target, targetName, findReferences(input, target));
 }

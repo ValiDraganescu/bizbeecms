@@ -23,6 +23,7 @@ import {
   validateDeleteCollection,
   validateItemRef,
   describeTypeCoercion,
+  requiredWithNullsMessage,
 } from "./collection-tools";
 import {
   createCollection,
@@ -41,8 +42,7 @@ import {
   getItem,
 } from "@/db/item-store";
 import { queryCollection } from "@/db/query-store";
-import { findSiteReferences } from "@/lib/content/reference-scan-load";
-import { describeReferences } from "@/lib/content/reference-scan";
+import { deleteBlockedReason } from "@/lib/content/reference-scan-load";
 import { unknownCollectionMessage } from "./tool-dispatch-shared";
 
 export async function handleCreateCollection(args: unknown): Promise<Record<string, unknown>> {
@@ -183,6 +183,24 @@ export async function handleUpdateCollectionField(args: unknown): Promise<Record
     return { ok: false, errors: [`field "${field}" does not exist on ${collection} — its user fields are: ${have}. Add one with add_collection_field.`] };
   }
   try {
+    // Pre-check BEFORE the rebuild: making the field required while existing
+    // rows hold NULL — with no default to backfill them (the planner backfills
+    // NULLs when one exists) — would abort the rebuild's INSERT…SELECT with a
+    // raw SQLite NOT NULL error. Count the NULLs and explain the fix instead.
+    // Nothing has run yet, so nothing is half-applied.
+    const makingRequired = patch.required === true && existing.required !== true;
+    const resultingDefault = patch.default !== undefined ? patch.default : existing.default;
+    if (makingRequired && resultingDefault == null) {
+      const counted = await queryCollection(collection, {
+        archived: "all",
+        limit: 1,
+        filters: [{ field, op: "is_null" }],
+      });
+      if (!counted.ok) return { ok: false, errors: [counted.error] };
+      if (counted.plan.total > 0) {
+        return { ok: false, errors: [requiredWithNullsMessage(field, counted.plan.total)] };
+      }
+    }
     const res = await rebuildCollectionSchema(collection, { op: "update", field, patch });
     if (!res.ok) return { ok: false, errors: [res.error] };
     const out: Record<string, unknown> = { ok: true, action: "updated_field", collection: res.plan.tableName, field, fields: res.plan.fields };
@@ -211,11 +229,10 @@ export async function handleDeleteCollection(args: unknown): Promise<Record<stri
   const view = await getCollection(collection);
   if (!view) return { ok: false, errors: [await unknownCollectionMessage(collection)] };
   try {
-    const target = { kind: "collection", tableName: view.tableName } as const;
-    const refs = await findSiteReferences(target);
-    if (refs.length > 0) {
-      return { ok: false, errors: [describeReferences(target, view.name, refs)] };
-    }
+    // "" = safe; non-empty = referenced somewhere OR the scan could not be
+    // verified (unparseable page — FAIL CLOSED, never delete on a blind scan).
+    const blocked = await deleteBlockedReason({ kind: "collection", tableName: view.tableName }, view.name);
+    if (blocked) return { ok: false, errors: [blocked] };
     const res = await deleteCollection(collection);
     if (!res.ok) return { ok: false, errors: [res.error] };
     return { ok: true, action: "deleted", collection: view.tableName, collectionName: view.name };

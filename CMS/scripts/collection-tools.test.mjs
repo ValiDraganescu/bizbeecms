@@ -210,6 +210,7 @@ import {
   validateDeleteCollection,
   validateItemRef,
   describeTypeCoercion,
+  requiredWithNullsMessage,
   UPDATE_COLLECTION_TOOL,
   DELETE_COLLECTION_ITEM_TOOL,
   DELETE_COLLECTION_TOOL,
@@ -389,4 +390,19 @@ test("delete tools' descriptions state permanence and the guard", () => {
   assert.match(DELETE_COLLECTION_ITEM_TOOL.function.description, /archive_collection_item/);
   assert.match(DELETE_COLLECTION_TOOL.function.description, /BLOCKED while/);
   assert.match(DELETE_COLLECTION_TOOL.function.description, /no force flag/);
+});
+
+// ── requiredWithNullsMessage (G2 fix: required:true over NULL rows) ──────────
+
+test("requiredWithNullsMessage: names the field, the NULL count, and both fixes", () => {
+  const msg = requiredWithNullsMessage("price", 3);
+  assert.match(msg, /^cannot make field "price" required: 3 existing items have no value \(NULL\) for it\./);
+  assert.match(msg, /supply a `default` in the same update_collection_field call/);
+  assert.match(msg, /backfilled with it/);
+  assert.match(msg, /update_collection_item/);
+  assert.match(msg, /query_collection filtering price is_null/);
+});
+
+test("requiredWithNullsMessage: singular count reads '1 existing item has'", () => {
+  assert.match(requiredWithNullsMessage("price", 1), /1 existing item has no value/);
 });

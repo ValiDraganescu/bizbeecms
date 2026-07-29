@@ -289,3 +289,29 @@ test("update rejections: unknown/system field, bad type, missing patch", () => {
   assert.match(badType.error, /use one of: string, text/);
   assert.equal(err(planRebuild(schema(), { op: "update", field: "title" })).status, 400);
 });
+
+// ---------------------------------------------------------------------------
+// UPDATE — NULL backfill when a field becomes required WITH a default (G2 fix 2)
+// ---------------------------------------------------------------------------
+test("update: newly-required field with a supplied default backfills NULLs via COALESCE", () => {
+  const plan = ok(planRebuild(schema(), { op: "update", field: "body", patch: { required: true, default: "n/a" } }));
+  assert.match(plan.statements[0], /\bbody TEXT NOT NULL DEFAULT 'n\/a'/);
+  assert.match(plan.statements[1], /SELECT .*COALESCE\(body, 'n\/a'\).* FROM content_posts$/);
+  for (const sql of plan.statements) assert.doesNotThrow(() => assertStatement(sql, "write"));
+});
+
+test("update: newly-required rides a STORED default too; typed literal for INTEGER", () => {
+  // views already has default 0 → required:true alone backfills with 0
+  const plan = ok(planRebuild(schema(), { op: "update", field: "views", patch: { required: true } }));
+  assert.match(plan.statements[1], /COALESCE\(views, 0\)/);
+  for (const sql of plan.statements) assert.doesNotThrow(() => assertStatement(sql, "write"));
+});
+
+test("update: no backfill without a default, or when the field was already required", () => {
+  // body has no default anywhere → plain copy (the handler's NULL pre-check owns the error)
+  const none = ok(planRebuild(schema(), { op: "update", field: "body", patch: { required: true } }));
+  assert.doesNotMatch(none.statements[1], /COALESCE/);
+  // title was ALREADY required → no NULLs can exist → plain copy
+  const already = ok(planRebuild(schema(), { op: "update", field: "title", patch: { default: "Untitled" } }));
+  assert.doesNotMatch(already.statements[1], /COALESCE/);
+});

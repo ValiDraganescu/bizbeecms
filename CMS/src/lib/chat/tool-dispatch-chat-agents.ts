@@ -29,6 +29,7 @@ import {
   applyCollectionEntryPatch,
   removeDataSourceEntry,
   removeCollectionEntry,
+  type ArgResult,
   type UpdateChatAgentPatch,
 } from "./chat-agent-patch";
 import { coerceIdArg } from "./read-tools";
@@ -38,8 +39,9 @@ import {
   createChatAgent,
   updateChatAgent,
   deleteChatAgent,
+  type ChatAgentRow,
 } from "@/db/chat-agent-store";
-import { parseAgentConfig } from "@/lib/public-chat/core";
+import { parseAgentConfig, type ChatAgentConfig } from "@/lib/public-chat/core";
 import { getCollection } from "@/db/collection-store";
 import { resolveSourceAndRequest } from "./tool-dispatch-shared";
 
@@ -108,17 +110,8 @@ export async function handleCreateChatAgent(args: unknown): Promise<Record<strin
   }
 }
 
-export async function handleUpdateChatAgent(args: unknown): Promise<Record<string, unknown>> {
-  const valid = validateUpdateChatAgent(args);
-  if (!valid.ok) return { ok: false, errors: [valid.error] };
-  const { ref, patch } = valid.value;
-  try {
-    const res = await persistAgentPatch(ref, patch);
-    if (!res.ok) return res;
-    return { ok: true, action: "updated", changed: Object.keys(patch), agent: res.agent };
-  } catch (err) {
-    return { ok: false, errors: [`failed to update chat agent: ${(err as Error).message}`] };
-  }
+export function handleUpdateChatAgent(args: unknown): Promise<Record<string, unknown>> {
+  return patchAgentTool(args, validateUpdateChatAgent, "update chat agent");
 }
 
 export async function handleDeleteChatAgent(args: unknown): Promise<Record<string, unknown>> {
@@ -149,42 +142,64 @@ export async function handleGetChatAgent(args: unknown): Promise<Record<string, 
 }
 
 // ── Chat-agent patches (update_chat_agent + every granular tool) ──────────────
-// Shared skeleton: resolve the agent, parse its stored config, let the pure
-// merge (chat-agent-patch.ts) produce the full row, persist via the ONE
-// full-row store update (no forked write semantics).
+// Shared skeleton: resolve the agent + parse its stored config ONCE
+// (`loadAgent`), let the pure merge (chat-agent-patch.ts) produce the full
+// row, persist via the ONE full-row store update (no forked write semantics,
+// no re-fetch between read and write).
 
-/** Merge a patch onto the stored row and persist. Never throws. */
-async function persistAgentPatch(
+/** The agent a patch operates on: the stored row + its parsed config. */
+type LoadedAgent = { row: ChatAgentRow; config: ChatAgentConfig };
+
+/** Resolve the agent and parse its config ONCE — threaded through the patch. */
+async function loadAgent(
   ref: string,
+): Promise<{ ok: true; agent: LoadedAgent } | { ok: false; errors: string[] }> {
+  const row = await getChatAgent(ref);
+  if (!row) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+  const config = parseAgentConfig(row.limits, row.dataSources, row.collections);
+  return { ok: true, agent: { row, config } };
+}
+
+/** Merge a patch onto the loaded agent and persist. Never throws. */
+async function persistAgentPatch(
+  agent: LoadedAgent,
   patch: UpdateChatAgentPatch,
 ): Promise<
   | { ok: true; agent: Record<string, unknown> }
   | { ok: false; errors: string[] }
 > {
-  const existing = await getChatAgent(ref);
-  if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
-  const stored = parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
-  const merged = mergeAgentPatch(existing, stored, patch);
-  const res = await updateChatAgent(existing.id, {
+  const merged = mergeAgentPatch(agent.row, agent.config, patch);
+  const res = await updateChatAgent(agent.row.id, {
     ...merged.scalars,
     ...configColumns(merged.config),
   });
-  if (res === null) return { ok: false, errors: [await unknownAgentMessage(ref)] };
+  if (res === null) return { ok: false, errors: [await unknownAgentMessage(agent.row.name)] };
   if (!res.ok) return { ok: false, errors: [res.error] };
   return { ok: true, agent: summarizeAgent(res.agent) };
 }
 
-export async function handleUpdateChatAgentSettings(args: unknown): Promise<Record<string, unknown>> {
-  const valid = validateUpdateChatAgentSettings(args);
+/** The shared update_chat_agent / update_chat_agent_settings handler body. */
+async function patchAgentTool(
+  args: unknown,
+  validate: (args: unknown) => ArgResult<{ ref: string; patch: UpdateChatAgentPatch }>,
+  failLabel: string,
+): Promise<Record<string, unknown>> {
+  const valid = validate(args);
   if (!valid.ok) return { ok: false, errors: [valid.error] };
   const { ref, patch } = valid.value;
   try {
-    const res = await persistAgentPatch(ref, patch);
+    const loaded = await loadAgent(ref);
+    if (!loaded.ok) return loaded;
+    const res = await persistAgentPatch(loaded.agent, patch);
     if (!res.ok) return res;
     return { ok: true, action: "updated", changed: Object.keys(patch), agent: res.agent };
   } catch (err) {
-    return { ok: false, errors: [`failed to update chat agent settings: ${(err as Error).message}`] };
+    return { ok: false, errors: [`failed to ${failLabel}: ${(err as Error).message}`] };
   }
+}
+
+export function handleUpdateChatAgentSettings(args: unknown): Promise<Record<string, unknown>> {
+  return patchAgentTool(args, validateUpdateChatAgentSettings, "update chat agent settings");
 }
 
 export async function handleSetChatAgentLimits(args: unknown): Promise<Record<string, unknown>> {
@@ -192,11 +207,10 @@ export async function handleSetChatAgentLimits(args: unknown): Promise<Record<st
   if (!valid.ok) return { ok: false, errors: [valid.error] };
   const { ref, patch } = valid.value;
   try {
-    const existing = await getChatAgent(ref);
-    if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
-    const config = parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
-    const limits = applyLimitsPatch(config.limits, patch);
-    const res = await persistAgentPatch(ref, { limits });
+    const loaded = await loadAgent(ref);
+    if (!loaded.ok) return loaded;
+    const limits = applyLimitsPatch(loaded.agent.config.limits, patch);
+    const res = await persistAgentPatch(loaded.agent, { limits });
     if (!res.ok) return res;
     return { ok: true, action: "updated", changed: Object.keys(patch), limits, agent: res.agent };
   } catch (err) {
@@ -210,9 +224,9 @@ export async function handleSetChatAgentDataSource(args: unknown): Promise<Recor
   const { ref, toolName } = valid.value;
   let patch = valid.value.patch;
   try {
-    const existing = await getChatAgent(ref);
-    if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
-    const config = parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
+    const loaded = await loadAgent(ref);
+    if (!loaded.ok) return loaded;
+    const config = loaded.agent.config;
     const current = config.dataSources.find((e) => e.toolName === toolName);
     // When the source/request pair is (re)supplied it must reference a REAL
     // source + saved request; accept id OR name refs and store the resolved
@@ -227,7 +241,7 @@ export async function handleSetChatAgentDataSource(args: unknown): Promise<Recor
     }
     const applied = applyDataSourceEntryPatch(config.dataSources, toolName, patch);
     if (!applied.ok) return { ok: false, errors: [applied.error] };
-    const res = await persistAgentPatch(ref, { dataSources: applied.value.list });
+    const res = await persistAgentPatch(loaded.agent, { dataSources: applied.value.list });
     if (!res.ok) return res;
     return { ok: true, action: applied.value.action, toolName, agent: res.agent };
   } catch (err) {
@@ -240,12 +254,11 @@ export async function handleRemoveChatAgentDataSource(args: unknown): Promise<Re
   if (!valid.ok) return { ok: false, errors: [valid.error] };
   const { ref, value: toolName } = valid.value;
   try {
-    const existing = await getChatAgent(ref);
-    if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
-    const config = parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
-    const removed = removeDataSourceEntry(config.dataSources, toolName);
+    const loaded = await loadAgent(ref);
+    if (!loaded.ok) return loaded;
+    const removed = removeDataSourceEntry(loaded.agent.config.dataSources, toolName);
     if (!removed.ok) return { ok: false, errors: [removed.error] };
-    const res = await persistAgentPatch(ref, { dataSources: removed.list });
+    const res = await persistAgentPatch(loaded.agent, { dataSources: removed.list });
     if (!res.ok) return res;
     return { ok: true, action: "removed", toolName, agent: res.agent };
   } catch (err) {
@@ -268,12 +281,11 @@ export async function handleSetChatAgentCollection(args: unknown): Promise<Recor
         ],
       };
     }
-    const existing = await getChatAgent(ref);
-    if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
-    const config = parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
-    const applied = applyCollectionEntryPatch(config.collections, collection, patch);
+    const loaded = await loadAgent(ref);
+    if (!loaded.ok) return loaded;
+    const applied = applyCollectionEntryPatch(loaded.agent.config.collections, collection, patch);
     if (!applied.ok) return { ok: false, errors: [applied.error] };
-    const res = await persistAgentPatch(ref, { collections: applied.value.list });
+    const res = await persistAgentPatch(loaded.agent, { collections: applied.value.list });
     if (!res.ok) return res;
     return { ok: true, action: applied.value.action, collection, agent: res.agent };
   } catch (err) {
@@ -286,12 +298,11 @@ export async function handleRemoveChatAgentCollection(args: unknown): Promise<Re
   if (!valid.ok) return { ok: false, errors: [valid.error] };
   const { ref, value: collection } = valid.value;
   try {
-    const existing = await getChatAgent(ref);
-    if (!existing) return { ok: false, errors: [await unknownAgentMessage(ref)] };
-    const config = parseAgentConfig(existing.limits, existing.dataSources, existing.collections);
-    const removed = removeCollectionEntry(config.collections, collection);
+    const loaded = await loadAgent(ref);
+    if (!loaded.ok) return loaded;
+    const removed = removeCollectionEntry(loaded.agent.config.collections, collection);
     if (!removed.ok) return { ok: false, errors: [removed.error] };
-    const res = await persistAgentPatch(ref, { collections: removed.list });
+    const res = await persistAgentPatch(loaded.agent, { collections: removed.list });
     if (!res.ok) return res;
     return { ok: true, action: "removed", collection, agent: res.agent };
   } catch (err) {

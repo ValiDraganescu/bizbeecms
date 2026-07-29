@@ -10,7 +10,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { findReferences, describeReferences } from "../src/lib/content/reference-scan.ts";
+import {
+  findReferences,
+  describeReferences,
+  describeScanFailures,
+} from "../src/lib/content/reference-scan.ts";
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -341,4 +345,34 @@ test("describeReferences: singular count reads '1 place'", () => {
   });
   const msg = describeReferences(REQ, "get_menu", findReferences(input, REQ));
   assert.match(msg, /^Cannot delete saved request "get_menu": it is still referenced in 1 place:/);
+});
+
+// ── describeScanFailures (FAIL CLOSED — G2 fix 1) ────────────────────────────
+// A page whose stored blocks JSON can't be parsed could hide a reference, so
+// the delete guard must refuse instead of treating it as "no references".
+
+test("describeScanFailures: no failures → empty string (delete may proceed)", () => {
+  assert.equal(describeScanFailures(DS, "Weather API", []), "");
+});
+
+test("describeScanFailures: names every unparseable entity and how to unblock", () => {
+  const msg = describeScanFailures(COL, "Menu", [
+    { entity: "page", label: "/menu", detail: "blocks JSON" },
+    { entity: "page", label: "/home", detail: "draft blocks JSON" },
+  ]);
+  assert.equal(
+    msg.split("\n")[0],
+    'Cannot delete collection "Menu": unable to verify it is unreferenced —',
+  );
+  assert.match(msg, /- page "\/menu": unparseable blocks JSON/);
+  assert.match(msg, /- page "\/home": unparseable draft blocks JSON/);
+  assert.match(msg, /Fix or delete the entities listed above first, then retry the delete\.$/);
+});
+
+test("describeScanFailures: component failures use the component noun", () => {
+  const msg = describeScanFailures(DS, "Weather API", [
+    { entity: "component", label: "Hero", detail: "tree" },
+  ]);
+  assert.match(msg, /^Cannot delete data source "Weather API": unable to verify/);
+  assert.match(msg, /- component "Hero": unparseable tree/);
 });

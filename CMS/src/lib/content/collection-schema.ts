@@ -131,27 +131,37 @@ export function affinityFor(type: CollectionFieldType): "TEXT" | "INTEGER" | "RE
   }
 }
 
-/** Escape a value into a SQL literal for a DEFAULT clause. PURE, type-aware. */
-function defaultLiteral(field: CollectionField): string {
+/**
+ * Escape a field's default value into a bare SQL literal ("" when there is no
+ * default or it can't be represented). PURE, type-aware. Used for the column
+ * DEFAULT clause AND by the rebuild planner's NULL-backfill COALESCE.
+ */
+export function defaultValueLiteral(field: CollectionField): string {
   const v = field.default;
   if (v === undefined || v === null) return "";
   const aff = affinityFor(field.type);
   if (aff === "INTEGER") {
     // bool → 0/1; int → the integer.
     if (field.type === "bool" || field.type === "boolean") {
-      return ` DEFAULT ${v ? 1 : 0}`;
+      return `${v ? 1 : 0}`;
     }
     const n = Number(v);
     if (!Number.isFinite(n)) return "";
-    return ` DEFAULT ${Math.trunc(n)}`;
+    return `${Math.trunc(n)}`;
   }
   if (aff === "REAL") {
     const n = Number(v);
     if (!Number.isFinite(n)) return "";
-    return ` DEFAULT ${n}`;
+    return `${n}`;
   }
   // TEXT — single-quote, escape embedded quotes.
-  return ` DEFAULT '${String(v).replace(/'/g, "''")}'`;
+  return `'${String(v).replace(/'/g, "''")}'`;
+}
+
+/** The ` DEFAULT <literal>` clause for a column definition ("" when none). */
+function defaultLiteral(field: CollectionField): string {
+  const lit = defaultValueLiteral(field);
+  return lit ? ` DEFAULT ${lit}` : "";
 }
 
 /** Validate a field name. Throws on a bad/colliding name. */
