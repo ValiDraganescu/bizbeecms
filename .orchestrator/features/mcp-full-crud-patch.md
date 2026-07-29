@@ -1,6 +1,6 @@
 # Full AI CRUD + patch semantics for collections, data sources, chat agents
 
-Status: building
+Status: delivered
 
 ## Brief
 
@@ -170,7 +170,30 @@ implementation brief.
 - 2026-07-29 21:20 G4 QA dispatched → g4-qa (F6944FF2, orc-qa): full suite + live scratch-entity scenario incl. origin-bug repro, C8 live check, gate re-entry, guard block/unblock cycle.
 - 2026-07-29 21:24 G4 QA: scenarios a/b/c/e/f PASS live (origin bug + C8 confirmed fixed live; guards + coercion + backfill work); DEFECT: AC2 bodyTemplate JSON-with-placeholders gate missing entirely (both write paths accept unbalanced JSON); MINOR: all-unknown-keys limits patch silently resets to defaults. DB left clean.
 - 2026-07-29 21:25 G4-FIX dispatched → g4fix-qa-defects (606CC4DC, orc-backend): shared bodyTemplate gate mirroring fetch.ts placeholder rules; unknown limit keys named. QA terminal kept open for re-test.
+- 2026-07-29 21:28 G4-FIX landed (commit 63f9ba2): bodyTemplateJsonError in shared validate.ts gates ALL write paths incl. Admin REST; unknown limit keys rejected; +4 tests, 2448 green (PM re-ran). Re-test sent to g4-qa.
+
+- 2026-07-29 21:30 G4 re-test PASS (brace-removal rejected + D1 unchanged; valid template accepted; unknown limit key named, stored limits intact). Gauntlet complete.
+- 2026-07-29 21:32 PM final AC walk 1–16: every criterion implemented + independently verified (diff reads, G2 review, G3 test review, G4 live QA). Status → delivered.
 
 ## Retro
 
-(pending)
+**1. Worker corrections?** Two, both actually PM-brief defects, same class: the Brief/briefs
+asserted codebase facts that weren't true — T5 was told "no migrations needed" (collection
+description column didn't exist) and T6/AC2 named a "JSON-with-placeholders gate" in
+validateRequestInput that never validated JSON (QA caught the unbalanced-template write).
+Workers were right to push back / QA to catch it. Lesson: extended the existing
+"verify named implementation paths" entry in pm-process.md to cover ALL asserted codebase
+facts (columns, gates, validators), with the scout explicitly tasked to confirm each Brief
+assumption. No worker-skill gap → no new worker instruction file.
+
+**2. User scope corrections after approval?** None. The pre-approved Brief (scope questions
+answered in the originating session) held for the entire build unchanged.
+
+**3. Process creak?** None worth changing. The risky/core gauntlet earned its cost: G2 caught
+the fail-open guard, G3's "only live-testable" advisory pointed QA straight at the missing
+gate, and G4's live D1 verification caught what three review stages couldn't. Decompose-first
+(T1) kept every later diff small. Sequential single-worker dispatch on the shared registry
+surface produced zero conflicts.
+
+**Delivered:** commits 5d53909..63f9ba2 (10), 2332→2448 tests. Not pushed — release belongs
+to the release manager.

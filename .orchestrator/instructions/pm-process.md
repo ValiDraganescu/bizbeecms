@@ -12,6 +12,18 @@ as "the existing path", read that function first and check it against the
 feature's invariants — or word the AC by OUTCOME ("matches what a manual
 per-field edit does") and let the implementer pick the path.
 
+(mcp-full-crud-patch, 2026-07-29 — recurred ×2, broader than paths) The PM
+told T5 "no migrations needed" (the collection description column didn't
+exist) and briefed AC2 around a "JSON-with-placeholders gate" in
+validateRequestInput that never actually parsed JSON — the missing gate
+shipped three tasks deep and only live QA caught the unbalanced-template
+write. Sharpened rule: EVERY codebase fact a Brief or worker brief asserts —
+columns, validators, gates, "X already handles Y" — is either (a) verified by
+the PM/scout reading the code, or (b) worded as an outcome requirement
+("patched bodyTemplate must be rejected if invalid after placeholder
+substitution — build the gate if none exists"). When scouting, explicitly
+task the scout with confirming each Brief assumption, not just mapping files.
+
 ## Stale-snapshot writes are the default bug in client-orchestrated batches
 (bulk-translate-missing, 2026-07-24) Both never-overwrite breaches code review
 found were the same shape: capture state at click time → long-running async work
