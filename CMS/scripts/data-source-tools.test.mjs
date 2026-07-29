@@ -336,6 +336,14 @@ test("applyRequestPatch: update keeps omitted fields, replaces supplied scalars"
   assert.equal(r.value.request.retryable, true);
 });
 
+test("applyRequestPatch: a patched bodyTemplate re-enters the JSON gate", () => {
+  // QA repro: deleting the closing brace (via set_data_source_request or
+  // edit_text) used to store an unbalanced template silently.
+  const r = applyRequestPatch(STORED_REQUEST, "forecast", { bodyTemplate: '{"q":"{city}"' });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /bodyTemplate must be valid JSON/);
+});
+
 test("applyRequestPatch: null resets a field to its default", () => {
   const r = applyRequestPatch(STORED_REQUEST, "forecast", {
     method: null, bodyTemplate: null, cacheEnabled: null, cacheTtlSec: null, retryable: null,

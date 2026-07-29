@@ -173,6 +173,29 @@ test("request: body allowed on POST/PUT/DELETE (JSON braces legal), not GET", ()
   assert.equal(validateRequestInput({ ...goodRequest, bodyTemplate: body }).ok, false); // GET
 });
 
+test("request: bodyTemplate must be valid JSON once placeholders are filled", () => {
+  const post = (bodyTemplate) =>
+    validateRequestInput({ ...goodRequest, method: "POST", bodyTemplate });
+
+  // Accept: placeholder inside a string, and bare in value position (the
+  // engine inserts a JSON-escaped scalar with no added quotes → a number fits).
+  assert.equal(post('{"note": "hi {name}!", "n": 5}').ok, true);
+  assert.equal(post('{"count": {n}, "ids": [{a}, {b}]}').ok, true);
+  // Accept: empty/absent body stays valid.
+  assert.equal(post("").ok, true);
+  assert.equal(post(undefined).ok, true);
+
+  // Reject: unbalanced brace (the QA repro — a deleted closing brace).
+  const unbalanced = post('{"guests": {n}, "when": "{date}"');
+  assert.equal(unbalanced.ok, false);
+  assert.match(unbalanced.error, /bodyTemplate must be valid JSON/);
+  assert.match(unbalanced.error, /\{placeholder\} tokens are fine/);
+  // Reject: missing comma between members.
+  assert.equal(post('{"a": 1 "b": 2}').ok, false);
+  // Reject: bare non-JSON text.
+  assert.equal(post("guests={n}").ok, false);
+});
+
 test("request: cacheTtlSec bounds; retryable opt-in only when === true", () => {
   assert.equal(validateRequestInput({ ...goodRequest, cacheTtlSec: 0 }).ok, false);
   assert.equal(validateRequestInput({ ...goodRequest, cacheTtlSec: 86401 }).ok, false);

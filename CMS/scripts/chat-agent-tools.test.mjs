@@ -158,6 +158,15 @@ test("update: a supplied limits object replaces ALL limits (omitted keys → def
   assert.equal(r.value.patch.limits.maxToolRounds, DEFAULT_LIMITS.maxToolRounds);
 });
 
+test("update: limits with only unknown keys errors instead of silently resetting", () => {
+  // QA defect: {"maxTurns":5} used to validate as an empty limits object and
+  // wholesale-replace every stored limit with its default.
+  const r = validateUpdateChatAgent({ agent: "id1", limits: { maxTurns: 5 } });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /unknown limit "maxTurns" — valid keys: /);
+  assert.match(r.error, /maxToolRounds/);
+});
+
 test("update: invalid config fields are still rejected by the strict core", () => {
   const bad = validateUpdateChatAgent({
     agent: "id1",

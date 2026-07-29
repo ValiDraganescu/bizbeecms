@@ -337,6 +337,14 @@ export function validateAgentConfigInput(args: unknown): ConfigValidation {
   if (rawLimits === null) {
     errors.push("limits must be an object of limit → number (omit a key to use its default)");
   }
+  // An unknown key would otherwise be silently DROPPED — and since a supplied
+  // limits object replaces the stored one wholesale, a typo like `maxTurns`
+  // would reset every real limit to its default. Reject it by name instead.
+  for (const key of Object.keys(rawLimits ?? {})) {
+    if (!(LIMIT_KEYS as string[]).includes(key)) {
+      errors.push(`unknown limit "${key}" — valid keys: ${LIMIT_KEYS.join(", ")}`);
+    }
+  }
   const limits = {} as ChatAgentLimits;
   for (const key of LIMIT_KEYS) {
     limits[key] = validateLimit(rawLimits?.[key], key, errors);

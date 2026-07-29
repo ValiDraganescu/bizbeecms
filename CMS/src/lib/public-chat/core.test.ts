@@ -108,6 +108,16 @@ test("validateAgentConfigInput names the exact bad limit + its ceiling", () => {
   assert.ok(r.errors.some((e) => /maxTokensPerResponse.*whole number/.test(e)), r.errors.join("|"));
 });
 
+test("validateAgentConfigInput rejects unknown limit keys by name (no silent reset)", () => {
+  const r = validateAgentConfigInput({ limits: { maxTurns: 5 } });
+  assert.ok(!r.ok);
+  if (r.ok) return;
+  assert.ok(
+    r.errors.some((e) => /unknown limit "maxTurns" — valid keys: .*maxToolRounds/.test(e)),
+    r.errors.join("|"),
+  );
+});
+
 test("validateAgentConfigInput rejects a data-source entry missing requestId", () => {
   const r = validateAgentConfigInput({
     dataSources: [{ sourceId: "s1", toolName: "t", description: "d" }],

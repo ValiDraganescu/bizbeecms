@@ -122,6 +122,35 @@ export function requestPlaceholders(request: {
   return [...seen];
 }
 
+/**
+ * A bodyTemplate must be a valid JSON document once its `{placeholder}` tokens
+ * are filled. This mirrors the Slice-2 fetch engine EXACTLY (same
+ * PLACEHOLDER_RE; the engine inserts a JSON-escaped scalar with NO added
+ * quotes), so validation substitutes each token with the dummy scalar `0` —
+ * legal both inside a JSON string (`"a{x}b"` → `"a0b"`) and in bare value
+ * position (`{"n": {x}}` → `{"n": 0}`) — then JSON.parses the result.
+ * Returns a self-correcting error (parse problem + near-text) or null if valid.
+ */
+export function bodyTemplateJsonError(template: string): string | null {
+  const filled = template.replace(PLACEHOLDER_RE, "0");
+  try {
+    JSON.parse(filled);
+    return null;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "invalid JSON";
+    const at = msg.match(/position (\d+)/);
+    const near = at
+      ? ` near \`${filled.slice(Math.max(0, Number(at[1]) - 20), Number(at[1]) + 20).replace(/\s+/g, " ")}\``
+      : "";
+    return (
+      `bodyTemplate must be valid JSON once {placeholder} tokens are filled — ` +
+      `parsing it (each placeholder replaced by a dummy value) failed: ${msg}${near}. ` +
+      `{placeholder} tokens are fine inside strings and in value position; fix the ` +
+      `surrounding JSON (balanced {}/[] pairs, quoted keys and strings, commas between members).`
+    );
+  }
+}
+
 /* --------------------------------------------------------------- source */
 
 export function validateSourceInput(input: unknown): Validated<SourceInput> {
@@ -224,9 +253,12 @@ export function validateRequestInput(input: unknown): Validated<RequestInput> {
     if (obj.bodyTemplate.length > 100_000) {
       return { ok: false, error: "bodyTemplate too long" };
     }
-    // NOTE: no placeholder-syntax check here — a JSON body template's own
-    // structural `{}` braces are legal; the Slice-2 engine substitutes only
-    // well-formed `{name}` tokens and JSON-escapes the values.
+    // No placeholder-syntax check here — a JSON body template's own structural
+    // `{}` braces are legal; the Slice-2 engine substitutes only well-formed
+    // `{name}` tokens. But the FILLED template must parse as JSON (the engine
+    // sends it as content-type application/json).
+    const jsonError = bodyTemplateJsonError(obj.bodyTemplate);
+    if (jsonError) return { ok: false, error: jsonError };
     bodyTemplate = obj.bodyTemplate;
   }
 
