@@ -8,9 +8,10 @@
  *                          welcome message, usage limits, and the allowlist of
  *                          data-source saved requests + collections the guest bot
  *                          may touch.
- *   - update_chat_agent  → FULL-REPLACE the supplied fields of an existing agent
- *                          (addressed by id OR name), same semantics as the other
- *                          update tools — the caller sends the whole config.
+ *   - update_chat_agent  → patch an existing agent (addressed by id OR name)
+ *                          under the one contract: omitted = keep stored,
+ *                          null = clear/reset to default, a supplied array
+ *                          replaces wholesale.
  *   - delete_chat_agent  → remove an agent (by id OR name).
  *
  * Granular edit surface (preferred over full-replace for small changes — a big
@@ -21,19 +22,22 @@
  *                                    model, enabled, welcome) — omitted = kept.
  *   - set_chat_agent_limits        → patch individual limit keys (null = reset
  *                                    to default; omitted = kept).
- *   - set_chat_agent_data_source   → upsert ONE dataSources allowlist entry
- *                                    (matched by toolName); the rest untouched.
+ *   - set_chat_agent_data_source   → MERGE-PATCH ONE dataSources allowlist entry
+ *                                    (matched by toolName; no match adds it);
+ *                                    the rest untouched.
  *   - remove_chat_agent_data_source→ remove ONE entry by toolName.
- *   - set_chat_agent_collection    → upsert ONE collections entry (matched by
- *                                    table name); the rest untouched.
+ *   - set_chat_agent_collection    → MERGE-PATCH ONE collections entry (matched
+ *                                    by table name; no match adds it).
  *   - remove_chat_agent_collection → remove ONE entry by table name.
  *
  * Mirrors `data-source-tools.ts`: the PURE concerns (tool schemas + arg shaping +
  * response formatting) live here so they're unit-tested with dep-free
- * `node --test` (hence the relative `.ts` imports). The CF-coupled work — store
- * CRUD, JSON-column round-trip — is wired in `tool-dispatch.ts`. The config
- * shapes/defaults/ceilings + the strict validator are owned by the pure core in
- * `../public-chat/core.ts`; this module never re-defines them.
+ * `node --test` (hence the relative `.ts` imports). The patch TYPES + APPLIERS
+ * live in `chat-agent-patch.ts` (same purity, split for file size). The
+ * CF-coupled work — store CRUD, JSON-column round-trip — is wired in
+ * `tool-dispatch-chat-agents.ts`. The config shapes/defaults/ceilings + the
+ * strict validator are owned by the pure core in `../public-chat/core.ts`;
+ * this module never re-defines them.
  */
 import {
   validateAgentConfigInput,
@@ -42,9 +46,16 @@ import {
   LIMIT_CEILINGS,
   type ChatAgentConfig,
   type ChatAgentLimits,
-  type DataSourceAllowEntry,
-  type CollectionAllowEntry,
 } from "../public-chat/core.ts";
+import { isValidLocaleCode, normalizeLocaleCode } from "../render/localize.ts";
+import type {
+  AgentSettingsPatch,
+  UpdateChatAgentPatch,
+  WelcomeMessagePatch,
+  LimitsPatch,
+  DataSourceEntryPatch,
+  CollectionEntryPatch,
+} from "./chat-agent-patch.ts";
 
 export type ArgResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -195,21 +206,60 @@ export const UPDATE_CHAT_AGENT_TOOL = {
   function: {
     name: "update_chat_agent",
     description:
-      "FULL-REPLACE update of an existing chat agent, addressed by `agent` (its id " +
-      "OR name) — a heavyweight tool for full reconfigurations ONLY. For anything " +
-      "smaller, prefer the granular tools (update_chat_agent_settings, " +
-      "set_chat_agent_limits, set_chat_agent_data_source, set_chat_agent_collection " +
-      "and their remove_ counterparts): they change only what you pass and cannot " +
-      "clobber the rest of the config. Here, every field you supply replaces the " +
-      "stored value wholesale: pass the WHOLE config (e.g. the entire " +
-      "dataSources/collections allowlist, not a delta) — omitted top-level fields " +
-      "keep their stored value, but a supplied array REPLACES the stored one. Same " +
-      "limit/allowlist shapes as create_chat_agent.",
+      "Update an existing chat agent, addressed by `agent` (its id OR name). " +
+      "PATCH semantics on every top-level field: OMITTED = keep the stored " +
+      "value; NULL = clear/reset to the default (model → the site default, " +
+      "limits → all defaults, welcomeMessage → no greeting, " +
+      "dataSources/collections → empty allowlist); a supplied value replaces. " +
+      "A supplied dataSources/collections ARRAY replaces the stored list " +
+      "WHOLESALE — to touch ONE entry use set_chat_agent_data_source / " +
+      "set_chat_agent_collection; a supplied limits OBJECT replaces ALL limits " +
+      "(its omitted keys fall back to defaults) — to patch single keys use " +
+      "set_chat_agent_limits. welcomeMessage locale objects merge PER-LOCALE " +
+      "(a null locale value removes that locale).",
     parameters: {
       type: "object",
       properties: {
         agent: { type: "string", description: "The target agent's id OR name (list_chat_agents shows both)." },
         ...AGENT_CORE_PROPERTIES,
+        name: { type: "string", description: "New unique agent name (1–100 chars). Omit to keep the current name." },
+        model: {
+          type: ["string", "null"],
+          description: "New model id; null resets to the site's default chat model; omit to keep.",
+        },
+        welcomeMessage: {
+          type: ["string", "object", "null"],
+          description:
+            "Greeting patch: a plain string replaces the greeting; a locale " +
+            "object like {\"fi\":\"Hei\"} merges PER-LOCALE (supplied locales " +
+            "replace, omitted locales stay, a null value removes that locale); " +
+            "null clears the whole greeting; omit to keep.",
+        },
+        limits: {
+          ...LIMITS_SCHEMA,
+          type: ["object", "null"],
+          description:
+            "Replaces ALL limits: omitted keys inside a supplied object fall " +
+            "back to their defaults (patch single keys with set_chat_agent_limits " +
+            "instead); null resets every limit to its default; omit to keep. " +
+            LIMITS_SCHEMA.description,
+        },
+        dataSources: {
+          ...DATA_SOURCES_SCHEMA,
+          type: ["array", "null"],
+          description:
+            "REPLACES the stored allowlist wholesale (null or [] clears it; omit " +
+            "to keep; one entry → set_chat_agent_data_source). " +
+            DATA_SOURCES_SCHEMA.description,
+        },
+        collections: {
+          ...COLLECTIONS_SCHEMA,
+          type: ["array", "null"],
+          description:
+            "REPLACES the stored allowlist wholesale (null or [] clears it; omit " +
+            "to keep; one entry → set_chat_agent_collection). " +
+            COLLECTIONS_SCHEMA.description,
+        },
       },
       required: ["agent"],
     },
@@ -289,35 +339,128 @@ export function validateCreateChatAgent(args: unknown): ArgResult<CreateChatAgen
   return { ok: true, value: { name, systemPrompt, ...fields.value } };
 }
 
-export interface UpdateChatAgentArgs {
-  /** The id-or-name ref the caller supplied to address the agent. */
-  ref: string;
-  name: string;
-  systemPrompt: string;
-  model: string | null;
-  enabled: boolean;
-  welcomeMessage: string | null;
-  config: ChatAgentConfig;
+/**
+ * Shape an incoming welcomeMessage arg into a WelcomeMessagePatch: null clears,
+ * a string replaces (validated/trimmed by the core), a locale object becomes a
+ * normalized per-locale merge record (null value = remove that locale). All
+ * key/value validation happens HERE so the applier is infallible.
+ */
+export function shapeWelcomePatch(raw: unknown): ArgResult<WelcomeMessagePatch> {
+  if (raw === null) return { ok: true, value: null };
+  if (typeof raw === "string") {
+    const w = validateWelcomeMessage(raw);
+    if (!w.ok) return w;
+    return { ok: true, value: w.value };
+  }
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    const out: Record<string, string | null> = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (!isValidLocaleCode(k)) {
+        return {
+          ok: false,
+          error: `welcomeMessage keys must be locale codes (like "en" or "pt-br") — "${k}" is not one`,
+        };
+      }
+      if (v !== null && typeof v !== "string") {
+        return {
+          ok: false,
+          error: `welcomeMessage.${k} must be a string (that locale's greeting), or null to remove the locale`,
+        };
+      }
+      // An empty greeting means "no greeting for this locale" = removal.
+      out[normalizeLocaleCode(k)] = v === null || v.trim() === "" ? null : v.trim();
+    }
+    return { ok: true, value: out };
+  }
+  return {
+    ok: false,
+    error:
+      'welcomeMessage must be a string, a locale object like {"en":"Hello","fi":"Hei"} ' +
+      "(merged per-locale; a null locale value removes it), or null to clear the greeting",
+  };
 }
 
-export function validateUpdateChatAgent(args: unknown): ArgResult<UpdateChatAgentArgs> {
+/** Shared scalar-field shaping for update_chat_agent + update_chat_agent_settings. */
+function shapeSettingsPatch(rec: Record<string, unknown>): ArgResult<AgentSettingsPatch> {
+  const patch: AgentSettingsPatch = {};
+  if (rec.name !== undefined) {
+    if (typeof rec.name !== "string" || rec.name.trim() === "") {
+      return { ok: false, error: "name cannot be cleared — an agent always has a name. Pass a new 1–100 char name, or omit `name` to keep the current one." };
+    }
+    patch.name = rec.name.trim();
+  }
+  if (rec.systemPrompt !== undefined) {
+    if (typeof rec.systemPrompt !== "string" || rec.systemPrompt.trim() === "") {
+      return { ok: false, error: "systemPrompt cannot be cleared — an agent always has a persona. Pass a new prompt, or omit `systemPrompt` to keep the current one." };
+    }
+    patch.systemPrompt = rec.systemPrompt.trim();
+  }
+  if (rec.model !== undefined) {
+    if (rec.model !== null && typeof rec.model !== "string") {
+      return { ok: false, error: "model must be a model-id string, or null for the site default" };
+    }
+    patch.model = rec.model === null || rec.model.trim() === "" ? null : rec.model.trim();
+  }
+  if (rec.enabled !== undefined) {
+    if (rec.enabled !== null && typeof rec.enabled !== "boolean") {
+      return { ok: false, error: "enabled must be true or false (or null to reset to the default, enabled)" };
+    }
+    patch.enabled = rec.enabled ?? true;
+  }
+  if (rec.welcomeMessage !== undefined) {
+    const w = shapeWelcomePatch(rec.welcomeMessage);
+    if (!w.ok) return w;
+    patch.welcomeMessage = w.value;
+  }
+  return { ok: true, value: patch };
+}
+
+/**
+ * update_chat_agent under the one contract: omitted = keep stored, null =
+ * clear/reset to default, supplied = replace (arrays + the limits object
+ * wholesale). Config sections are validated by the strict core HERE; merging
+ * onto the stored row happens in `mergeAgentPatch` (chat-agent-patch.ts).
+ */
+export function validateUpdateChatAgent(
+  args: unknown,
+): ArgResult<{ ref: string; patch: UpdateChatAgentPatch }> {
   const rec = asRecord(args);
-  if (!rec) return { ok: false, error: "expected an object with `agent` (id or name)" };
+  if (!rec) return { ok: false, error: "expected an object with `agent` (id or name) plus the fields to change" };
+  const ref = agentRef(rec);
+  if (!ref.ok) return ref;
 
-  const ref = typeof rec.agent === "string" ? rec.agent.trim() : "";
-  if (!ref) return { ok: false, error: "agent (id or name) is required — list_chat_agents shows them" };
+  const scalars = shapeSettingsPatch(rec);
+  if (!scalars.ok) return scalars;
+  const patch: UpdateChatAgentPatch = { ...scalars.value };
 
-  // Full-replace: name + systemPrompt must still be present (the store row can't
-  // hold an empty name/prompt), matching create's requiredness.
-  const name = typeof rec.name === "string" ? rec.name.trim() : "";
-  if (!name) return { ok: false, error: "name is required (pass the agent's full config on update)" };
-  const systemPrompt = typeof rec.systemPrompt === "string" ? rec.systemPrompt.trim() : "";
-  if (!systemPrompt) return { ok: false, error: "systemPrompt is required (pass the agent's full config on update)" };
+  // Each supplied config section replaces wholesale; null resolves to the
+  // section's default (limits → all defaults, allowlists → empty) by handing
+  // the strict core validator the same "not supplied" / empty input.
+  if (rec.limits !== undefined) {
+    const v = validateAgentConfigInput({ limits: rec.limits ?? undefined });
+    if (!v.ok) return { ok: false, error: v.errors.join("; ") };
+    patch.limits = v.value.limits;
+  }
+  if (rec.dataSources !== undefined) {
+    const v = validateAgentConfigInput({ dataSources: rec.dataSources ?? [] });
+    if (!v.ok) return { ok: false, error: v.errors.join("; ") };
+    patch.dataSources = v.value.dataSources;
+  }
+  if (rec.collections !== undefined) {
+    const v = validateAgentConfigInput({ collections: rec.collections ?? [] });
+    if (!v.ok) return { ok: false, error: v.errors.join("; ") };
+    patch.collections = v.value.collections;
+  }
 
-  const fields = shapeAgentFields(rec);
-  if (!fields.ok) return fields;
-
-  return { ok: true, value: { ref, name, systemPrompt, ...fields.value } };
+  if (Object.keys(patch).length === 0) {
+    return {
+      ok: false,
+      error:
+        "nothing to change — pass at least one of name, systemPrompt, model, enabled, " +
+        "welcomeMessage, limits, dataSources, collections (omitted fields keep their stored values)",
+    };
+  }
+  return { ok: true, value: { ref: ref.value, patch } };
 }
 
 // ── Pure result formatting ────────────────────────────────────────────────────
@@ -438,9 +581,10 @@ export const UPDATE_CHAT_AGENT_SETTINGS_TOOL = {
         welcomeMessage: {
           type: ["string", "object", "null"],
           description:
-            "New widget greeting — a plain string or a locale object " +
-            "{\"en\":\"Hello\",\"fi\":\"Hei\"} shown per visitor content locale " +
-            "— or null to clear it.",
+            "Greeting patch: a plain string replaces the greeting; a locale " +
+            "object like {\"fi\":\"Hei\"} merges PER-LOCALE (supplied locales " +
+            "replace, omitted locales stay, a null value removes that locale); " +
+            "null clears the whole greeting; omit to keep.",
         },
       },
       required: ["agent"],
@@ -455,8 +599,8 @@ export const SET_CHAT_AGENT_LIMITS_TOOL = {
     description:
       "Patch INDIVIDUAL usage limits on a chat agent. Only the keys you pass " +
       "change — pass a number to set a limit, null to reset it to its default; " +
-      "omitted keys keep their stored value (unlike update_chat_agent, which " +
-      "re-defaults omitted keys). Keys (default → ceiling): " +
+      "omitted keys keep their stored value (unlike update_chat_agent, whose " +
+      "supplied limits object replaces ALL limits). Keys (default → ceiling): " +
       `perIpPerMinute (${DEFAULT_LIMITS.perIpPerMinute} → ${LIMIT_CEILINGS.perIpPerMinute}), ` +
       `perIpPerDay (${DEFAULT_LIMITS.perIpPerDay} → ${LIMIT_CEILINGS.perIpPerDay}), ` +
       `siteMessagesPerDay (${DEFAULT_LIMITS.siteMessagesPerDay} → ${LIMIT_CEILINGS.siteMessagesPerDay}), ` +
@@ -494,31 +638,34 @@ export const SET_CHAT_AGENT_DATA_SOURCE_TOOL = {
   function: {
     name: "set_chat_agent_data_source",
     description:
-      "Add or replace ONE data-source tool on a chat agent's allowlist, matched " +
-      "by `toolName` (an existing entry with that toolName is replaced; otherwise " +
-      "the entry is added). Every OTHER allowlist entry is untouched — use this " +
-      "instead of update_chat_agent to grant a single API tool. `sourceId` and " +
-      "`requestId` MUST reference an EXISTING data source + saved request " +
-      "(list_data_sources shows the real ids — never invent them).",
+      "MERGE-PATCH ONE data-source tool on a chat agent's allowlist, matched by " +
+      "`toolName`: when an entry with that toolName exists, ONLY the fields you " +
+      "pass change (omitted = keep, null clears an optional field); no match ADDS " +
+      "an entry — then sourceId, requestId and description are required. Every " +
+      "OTHER allowlist entry is untouched — use this instead of update_chat_agent " +
+      "to touch a single API tool. `sourceId` and `requestId` MUST reference an " +
+      "EXISTING data source + saved request (list_data_sources shows the real " +
+      "ids — never invent them).",
     parameters: {
       type: "object",
       properties: {
         ...AGENT_REF_PROP,
-        sourceId: { type: "string", description: "Existing data source id (from list_data_sources)." },
-        requestId: { type: "string", description: "Existing saved request id on that source (from list_data_sources)." },
-        toolName: { type: "string", description: "Short label for the guest tool (slugified into the bot's `ds_<slug>` tool name); the upsert key." },
-        description: { type: "string", description: "What this tool does — the guest bot reads this to decide when to call it." },
-        maxCallsPerConversation: { type: "number", description: "Optional per-conversation call cap for this tool." },
+        toolName: { type: "string", description: "Short label for the guest tool (slugified into the bot's `ds_<slug>` tool name); the MATCH KEY — to rename, remove the entry and add a new one." },
+        sourceId: { type: "string", description: "Existing data source id (from list_data_sources). Omit to keep the matched entry's source." },
+        requestId: { type: "string", description: "Existing saved request id on that source (from list_data_sources). Omit to keep." },
+        description: { type: "string", description: "What this tool does — the guest bot reads this to decide when to call it. Omit to keep." },
+        maxCallsPerConversation: { type: ["number", "null"], description: "Per-conversation call cap for this tool. Omit to keep; null removes the cap." },
         requiredParams: {
-          type: "array",
+          type: ["array", "null"],
           items: { type: "string" },
           description:
             "Request params the guest bot must always pass NON-EMPTY (\"\" is " +
             "rejected with a self-correcting error). Use to make an unbounded " +
-            "call impossible — e.g. [\"from\",\"to\"] on a search tool.",
+            "call impossible — e.g. [\"from\",\"to\"] on a search tool. " +
+            "Replaces the stored list wholesale; omit to keep; null removes the requirement.",
         },
       },
-      required: ["agent", "sourceId", "requestId", "toolName", "description"],
+      required: ["agent", "toolName"],
     },
   },
 } as const;
@@ -547,29 +694,30 @@ export const SET_CHAT_AGENT_COLLECTION_TOOL = {
   function: {
     name: "set_chat_agent_collection",
     description:
-      "Add or replace ONE collection entry on a chat agent's allowlist, matched " +
-      "by `collection` (the content_<slug> table name — an existing entry for " +
-      "that table is replaced; otherwise the entry is added). Every other entry " +
-      "is untouched. `canQuery` reads PUBLISHED items only; `canCreate` lands new " +
-      "items as DRAFTS; `canUpdate` (requires non-empty `lookupFields`) patches " +
-      "items and forces them back to DRAFT. Discover real table names with " +
-      "query_collection.",
+      "MERGE-PATCH ONE collection entry on a chat agent's allowlist, matched by " +
+      "`collection` (the content_<slug> table name): when an entry for that " +
+      "table exists, ONLY the fields you pass change (omitted = keep, " +
+      "`lookupFields: null` clears them); no match ADDS an entry — then " +
+      "`description` is required. Every other entry is untouched. `canQuery` " +
+      "reads PUBLISHED items only; `canCreate` lands new items as DRAFTS; " +
+      "`canUpdate` (requires non-empty `lookupFields`) patches items and forces " +
+      "them back to DRAFT. Discover real table names with query_collection.",
     parameters: {
       type: "object",
       properties: {
         ...AGENT_REF_PROP,
-        collection: { type: "string", description: "The content_<slug> table name (from query_collection); the upsert key." },
-        description: { type: "string", description: "What the collection holds — the guest bot reads this." },
-        canQuery: { type: "boolean", description: "Allow querying PUBLISHED items. Default false." },
-        canCreate: { type: "boolean", description: "Allow creating items — they land as DRAFTS. Default false." },
-        canUpdate: { type: "boolean", description: "Allow updating items (forced back to DRAFT). Requires lookupFields. Default false." },
+        collection: { type: "string", description: "The content_<slug> table name (from query_collection); the MATCH KEY." },
+        description: { type: "string", description: "What the collection holds — the guest bot reads this. Omit to keep." },
+        canQuery: { type: ["boolean", "null"], description: "Allow querying PUBLISHED items. Omit to keep (default false; null resets to false)." },
+        canCreate: { type: ["boolean", "null"], description: "Allow creating items — they land as DRAFTS. Omit to keep (default false; null resets to false)." },
+        canUpdate: { type: ["boolean", "null"], description: "Allow updating items (forced back to DRAFT). Requires lookupFields. Omit to keep (default false; null resets to false)." },
         lookupFields: {
-          type: "array",
+          type: ["array", "null"],
           items: { type: "string" },
-          description: "Exact-match field names that scope an update to one item. Required when canUpdate is true.",
+          description: "Exact-match field names that scope an update to one item. Required when canUpdate is true. Replaces wholesale; omit to keep; null clears them.",
         },
       },
-      required: ["agent", "collection", "description"],
+      required: ["agent", "collection"],
     },
   },
 } as const;
@@ -601,17 +749,6 @@ function agentRef(rec: Record<string, unknown>): ArgResult<string> {
   return { ok: true, value: ref };
 }
 
-/** Scalar-settings patch: which fields to change (omitted = keep stored). */
-export interface AgentSettingsPatch {
-  name?: string;
-  systemPrompt?: string;
-  /** null = reset to the site default model. */
-  model?: string | null;
-  enabled?: boolean;
-  /** null = clear the greeting. */
-  welcomeMessage?: string | null;
-}
-
 export function validateUpdateChatAgentSettings(
   args: unknown,
 ): ArgResult<{ ref: string; patch: AgentSettingsPatch }> {
@@ -620,36 +757,9 @@ export function validateUpdateChatAgentSettings(
   const ref = agentRef(rec);
   if (!ref.ok) return ref;
 
-  const patch: AgentSettingsPatch = {};
-  if (rec.name !== undefined) {
-    if (typeof rec.name !== "string" || rec.name.trim() === "") {
-      return { ok: false, error: "name must be a non-empty string (omit it to keep the current name)" };
-    }
-    patch.name = rec.name.trim();
-  }
-  if (rec.systemPrompt !== undefined) {
-    if (typeof rec.systemPrompt !== "string" || rec.systemPrompt.trim() === "") {
-      return { ok: false, error: "systemPrompt must be a non-empty string (omit it to keep the current prompt)" };
-    }
-    patch.systemPrompt = rec.systemPrompt.trim();
-  }
-  if (rec.model !== undefined) {
-    if (rec.model !== null && typeof rec.model !== "string") {
-      return { ok: false, error: "model must be a model-id string, or null for the site default" };
-    }
-    patch.model = rec.model === null || rec.model.trim() === "" ? null : rec.model.trim();
-  }
-  if (rec.enabled !== undefined) {
-    if (typeof rec.enabled !== "boolean") {
-      return { ok: false, error: "enabled must be true or false" };
-    }
-    patch.enabled = rec.enabled;
-  }
-  if (rec.welcomeMessage !== undefined) {
-    const w = validateWelcomeMessage(rec.welcomeMessage);
-    if (!w.ok) return { ok: false, error: `${w.error} — or null to clear it` };
-    patch.welcomeMessage = w.value;
-  }
+  const shaped = shapeSettingsPatch(rec);
+  if (!shaped.ok) return shaped;
+  const patch = shaped.value;
 
   if (Object.keys(patch).length === 0) {
     return {
@@ -660,9 +770,6 @@ export function validateUpdateChatAgentSettings(
   }
   return { ok: true, value: { ref: ref.value, patch } };
 }
-
-/** A limits patch: number = set, null = reset to default (omitted keys keep). */
-export type LimitsPatch = Partial<Record<keyof ChatAgentLimits, number | null>>;
 
 const LIMIT_PATCH_KEYS = Object.keys(DEFAULT_LIMITS) as (keyof ChatAgentLimits)[];
 
@@ -711,63 +818,80 @@ export function validateSetChatAgentLimits(
 }
 
 /**
- * Validate ONE data-source allowlist entry via the SAME strict core validator
- * the full-config path uses (no forked rules); the `dataSources[0].` prefix is
- * stripped so errors speak in this tool's flat arg names.
+ * Shape the set_chat_agent_data_source args into a MERGE PATCH keyed by
+ * toolName: omitted = keep the matched entry's value, null clears an optional
+ * field. Field TYPES are checked here; the cross-field rules run in
+ * `applyDataSourceEntryPatch` via the strict core, on the MERGED entry.
  */
 export function validateSetChatAgentDataSource(
   args: unknown,
-): ArgResult<{ ref: string; entry: DataSourceAllowEntry }> {
+): ArgResult<{ ref: string; toolName: string; patch: DataSourceEntryPatch }> {
   const rec = asRecord(args);
-  if (!rec) return { ok: false, error: "expected an object with agent, sourceId, requestId, toolName, description" };
+  if (!rec) return { ok: false, error: "expected an object with agent and toolName plus the fields to change" };
   const ref = agentRef(rec);
   if (!ref.ok) return ref;
-
-  const entry = {
-    sourceId: rec.sourceId,
-    requestId: rec.requestId,
-    toolName: rec.toolName,
-    description: rec.description,
-    ...(rec.maxCallsPerConversation !== undefined
-      ? { maxCallsPerConversation: rec.maxCallsPerConversation }
-      : {}),
-    ...(rec.requiredParams !== undefined ? { requiredParams: rec.requiredParams } : {}),
-  };
-  const config = validateAgentConfigInput({ dataSources: [entry] });
-  if (!config.ok) {
-    return {
-      ok: false,
-      error: config.errors.map((e) => e.replace(/^dataSources\[0\]\./, "").replace(/^dataSources\[0\] /, "")).join("; "),
-    };
+  const toolName = typeof rec.toolName === "string" ? rec.toolName.trim() : "";
+  if (!toolName) {
+    return { ok: false, error: "toolName is required — it is the match key: an existing entry with that toolName is PATCHED, otherwise one is ADDED (get_chat_agent shows the agent's tools)" };
   }
-  return { ok: true, value: { ref: ref.value, entry: config.value.dataSources[0] } };
+
+  const patch: DataSourceEntryPatch = {};
+  for (const key of ["sourceId", "requestId", "description"] as const) {
+    if (!(key in rec)) continue;
+    if (typeof rec[key] !== "string" || (rec[key] as string).trim() === "") {
+      return { ok: false, error: `${key} cannot be cleared — pass a new value, or omit \`${key}\` to keep the current one` };
+    }
+    patch[key] = (rec[key] as string).trim();
+  }
+  if ("maxCallsPerConversation" in rec) {
+    if (rec.maxCallsPerConversation !== null && typeof rec.maxCallsPerConversation !== "number") {
+      return { ok: false, error: "maxCallsPerConversation must be a positive integer, or null to remove the cap" };
+    }
+    patch.maxCallsPerConversation = rec.maxCallsPerConversation as number | null;
+  }
+  if ("requiredParams" in rec) {
+    if (rec.requiredParams !== null && !Array.isArray(rec.requiredParams)) {
+      return { ok: false, error: "requiredParams must be an array of param-name strings, or null to remove the requirement" };
+    }
+    patch.requiredParams = rec.requiredParams as string[] | null;
+  }
+  return { ok: true, value: { ref: ref.value, toolName, patch } };
 }
 
-/** Validate ONE collection allowlist entry (same shared-core strategy). */
+/** Collection twin: a merge patch keyed by the `collection` table name. */
 export function validateSetChatAgentCollection(
   args: unknown,
-): ArgResult<{ ref: string; entry: CollectionAllowEntry }> {
+): ArgResult<{ ref: string; collection: string; patch: CollectionEntryPatch }> {
   const rec = asRecord(args);
-  if (!rec) return { ok: false, error: "expected an object with agent, collection, description" };
+  if (!rec) return { ok: false, error: "expected an object with agent and collection plus the fields to change" };
   const ref = agentRef(rec);
   if (!ref.ok) return ref;
-
-  const entry = {
-    collection: rec.collection,
-    description: rec.description,
-    ...(rec.canQuery !== undefined ? { canQuery: rec.canQuery } : {}),
-    ...(rec.canCreate !== undefined ? { canCreate: rec.canCreate } : {}),
-    ...(rec.canUpdate !== undefined ? { canUpdate: rec.canUpdate } : {}),
-    ...(rec.lookupFields !== undefined ? { lookupFields: rec.lookupFields } : {}),
-  };
-  const config = validateAgentConfigInput({ collections: [entry] });
-  if (!config.ok) {
-    return {
-      ok: false,
-      error: config.errors.map((e) => e.replace(/^collections\[0\]\./, "").replace(/^collections\[0\] /, "")).join("; "),
-    };
+  const collection = typeof rec.collection === "string" ? rec.collection.trim() : "";
+  if (!collection) {
+    return { ok: false, error: "collection is required — it is the match key: an existing entry for that content_<slug> table is PATCHED, otherwise one is ADDED (get_chat_agent shows the agent's entries)" };
   }
-  return { ok: true, value: { ref: ref.value, entry: config.value.collections[0] } };
+
+  const patch: CollectionEntryPatch = {};
+  if ("description" in rec) {
+    if (typeof rec.description !== "string" || rec.description.trim() === "") {
+      return { ok: false, error: "description cannot be cleared — the guest bot reads it. Pass a new one, or omit `description` to keep the current one" };
+    }
+    patch.description = rec.description.trim();
+  }
+  for (const flag of ["canQuery", "canCreate", "canUpdate"] as const) {
+    if (!(flag in rec)) continue;
+    if (rec[flag] !== null && typeof rec[flag] !== "boolean") {
+      return { ok: false, error: `${flag} must be true or false (or null to reset to false)` };
+    }
+    patch[flag] = (rec[flag] as boolean | null) ?? false;
+  }
+  if ("lookupFields" in rec) {
+    if (rec.lookupFields !== null && !Array.isArray(rec.lookupFields)) {
+      return { ok: false, error: "lookupFields must be an array of field-name strings, or null to clear them (rejected while canUpdate stays true)" };
+    }
+    patch.lookupFields = rec.lookupFields as string[] | null;
+  }
+  return { ok: true, value: { ref: ref.value, collection, patch } };
 }
 
 export function validateRemoveKey(
@@ -783,81 +907,5 @@ export function validateRemoveKey(
   return { ok: true, value: { ref: ref.value, value } };
 }
 
-// ── Pure config-patch appliers ────────────────────────────────────────────────
-// Each takes the PARSED stored config and returns a new one; the handler
-// re-persists via the same full-row store update the full-replace path uses.
-
-/** Merge a limits patch onto the stored limits (null resets to the default). */
-export function applyLimitsPatch(
-  current: ChatAgentLimits,
-  patch: LimitsPatch,
-): ChatAgentLimits {
-  const next = { ...current };
-  for (const [key, value] of Object.entries(patch)) {
-    const k = key as keyof ChatAgentLimits;
-    next[k] = value === null ? DEFAULT_LIMITS[k] : (value as number);
-  }
-  return next;
-}
-
-/** Upsert one data-source entry by toolName. Reports whether it added or replaced. */
-export function upsertDataSourceEntry(
-  list: readonly DataSourceAllowEntry[],
-  entry: DataSourceAllowEntry,
-): { list: DataSourceAllowEntry[]; action: "added" | "replaced" } {
-  const at = list.findIndex((e) => e.toolName === entry.toolName);
-  if (at === -1) return { list: [...list, entry], action: "added" };
-  const next = [...list];
-  next[at] = entry;
-  return { list: next, action: "replaced" };
-}
-
-/** Remove one data-source entry by toolName; unknown names get a listing error. */
-export function removeDataSourceEntry(
-  list: readonly DataSourceAllowEntry[],
-  toolName: string,
-): { ok: true; list: DataSourceAllowEntry[] } | { ok: false; error: string } {
-  const next = list.filter((e) => e.toolName !== toolName);
-  if (next.length === list.length) {
-    const names = list.map((e) => `"${e.toolName}"`);
-    return {
-      ok: false,
-      error:
-        names.length === 0
-          ? `no data-source tool "${toolName}" — this agent's allowlist is empty`
-          : `no data-source tool "${toolName}" — this agent's tools: ${names.join(", ")}`,
-    };
-  }
-  return { ok: true, list: next };
-}
-
-/** Upsert one collection entry by table name. Reports added vs replaced. */
-export function upsertCollectionEntry(
-  list: readonly CollectionAllowEntry[],
-  entry: CollectionAllowEntry,
-): { list: CollectionAllowEntry[]; action: "added" | "replaced" } {
-  const at = list.findIndex((e) => e.collection === entry.collection);
-  if (at === -1) return { list: [...list, entry], action: "added" };
-  const next = [...list];
-  next[at] = entry;
-  return { list: next, action: "replaced" };
-}
-
-/** Remove one collection entry by table name; unknown tables get a listing error. */
-export function removeCollectionEntry(
-  list: readonly CollectionAllowEntry[],
-  collection: string,
-): { ok: true; list: CollectionAllowEntry[] } | { ok: false; error: string } {
-  const next = list.filter((e) => e.collection !== collection);
-  if (next.length === list.length) {
-    const names = list.map((e) => `"${e.collection}"`);
-    return {
-      ok: false,
-      error:
-        names.length === 0
-          ? `collection "${collection}" is not on this agent's allowlist — the allowlist is empty`
-          : `collection "${collection}" is not on this agent's allowlist — allowlisted: ${names.join(", ")}`,
-    };
-  }
-  return { ok: true, list: next };
-}
+// The pure patch APPLIERS (mergeAgentPatch, applyLimitsPatch, the allowlist
+// entry merge/remove appliers) live in `chat-agent-patch.ts`.
