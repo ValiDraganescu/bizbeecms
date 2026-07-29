@@ -95,6 +95,11 @@ export const KNOWN_TOOL_NAMES = [
   "list_data_sources",
   "create_data_source",
   "test_data_source",
+  // mcp-full-crud-patch T3: source/request patch + guarded deletes.
+  "update_data_source",
+  "set_data_source_request",
+  "delete_data_source_request",
+  "delete_data_source",
   // external-data-sources Form slice (d): built-in Form block tools.
   "create_form",
   "bind_form",
@@ -296,6 +301,10 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
   "data-sources": [
     "list_data_sources",
     "create_data_source",
+    "update_data_source",
+    "set_data_source_request",
+    "delete_data_source_request",
+    "delete_data_source",
     "test_data_source",
     "get_data_sources_guide",
   ],

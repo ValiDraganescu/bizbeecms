@@ -83,18 +83,19 @@ export async function unknownCollectionMessage(requested: string): Promise<strin
   );
 }
 
+export type ResolvedSource =
+  | { ok: true; source: SafeDataSource }
+  | { ok: false; error: string };
+
 export type ResolvedSourceRequest =
   | { ok: true; source: SafeDataSource; request: SafeDataSourceRequest }
   | { ok: false; error: string };
 
 /**
- * Resolve a source + saved request from the model's refs (id OR name), with
- * self-correcting errors that list what actually exists (AI error philosophy).
+ * Resolve a data source from the model's ref (id OR name), with a
+ * self-correcting error that lists what actually exists (AI error philosophy).
  */
-export async function resolveSourceAndRequest(
-  sourceRef: string,
-  requestRef: string,
-): Promise<ResolvedSourceRequest> {
+export async function resolveSource(sourceRef: string): Promise<ResolvedSource> {
   const sources = await listDataSources();
   const source =
     sources.find((s) => s.id === sourceRef) ?? sources.find((s) => s.name === sourceRef);
@@ -105,12 +106,23 @@ export async function resolveSourceAndRequest(
     const names = sources.map((s) => `${s.name} (${s.id})`).join(", ");
     return { ok: false, error: `no data source "${sourceRef}". Available sources: ${names}` };
   }
+  return { ok: true, source };
+}
+
+/** Resolve a source + saved request (id OR name each), same error discipline. */
+export async function resolveSourceAndRequest(
+  sourceRef: string,
+  requestRef: string,
+): Promise<ResolvedSourceRequest> {
+  const resolved = await resolveSource(sourceRef);
+  if (!resolved.ok) return resolved;
+  const source = resolved.source;
   const requests = await listDataSourceRequests(source.id);
   const request =
     requests.find((r) => r.id === requestRef) ?? requests.find((r) => r.name === requestRef);
   if (!request) {
     if (requests.length === 0) {
-      return { ok: false, error: `source "${source.name}" has no saved requests yet — add one (create_data_source with \`requests\`, or the operator via Data Sources)` };
+      return { ok: false, error: `source "${source.name}" has no saved requests yet — add one with set_data_source_request (or the operator via Data Sources)` };
     }
     const names = requests.map((r) => `${r.name} (${r.id})`).join(", ");
     return { ok: false, error: `no saved request "${requestRef}" on source "${source.name}". Available requests: ${names}` };

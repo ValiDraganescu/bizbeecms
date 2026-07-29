@@ -59,6 +59,10 @@ import { BIND_COMPONENT_TOOL, CREATE_LIST_TOOL, BIND_LIST_TOOL } from "./binding
 import {
   LIST_DATA_SOURCES_TOOL,
   CREATE_DATA_SOURCE_TOOL,
+  UPDATE_DATA_SOURCE_TOOL,
+  SET_DATA_SOURCE_REQUEST_TOOL,
+  DELETE_DATA_SOURCE_REQUEST_TOOL,
+  DELETE_DATA_SOURCE_TOOL,
   TEST_DATA_SOURCE_TOOL,
 } from "./data-source-tools";
 import { CREATE_FORM_TOOL, BIND_FORM_TOOL } from "./form-tools";
@@ -139,6 +143,10 @@ import {
 import {
   handleListDataSources,
   handleCreateDataSource,
+  handleUpdateDataSource,
+  handleSetDataSourceRequest,
+  handleDeleteDataSourceRequest,
+  handleDeleteDataSource,
   handleTestDataSource,
 } from "./tool-dispatch-data-sources";
 import {
@@ -217,6 +225,10 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   generate_image: GENERATE_IMAGE_TOOL,
   list_data_sources: LIST_DATA_SOURCES_TOOL,
   create_data_source: CREATE_DATA_SOURCE_TOOL,
+  update_data_source: UPDATE_DATA_SOURCE_TOOL,
+  set_data_source_request: SET_DATA_SOURCE_REQUEST_TOOL,
+  delete_data_source_request: DELETE_DATA_SOURCE_REQUEST_TOOL,
+  delete_data_source: DELETE_DATA_SOURCE_TOOL,
   test_data_source: TEST_DATA_SOURCE_TOOL,
   create_form: CREATE_FORM_TOOL,
   bind_form: BIND_FORM_TOOL,
@@ -291,6 +303,10 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   generate_image: handleGenerateImage,
   list_data_sources: handleListDataSources,
   create_data_source: handleCreateDataSource,
+  update_data_source: handleUpdateDataSource,
+  set_data_source_request: handleSetDataSourceRequest,
+  delete_data_source_request: handleDeleteDataSourceRequest,
+  delete_data_source: handleDeleteDataSource,
   test_data_source: handleTestDataSource,
   create_form: handleCreateForm,
   bind_form: handleBindForm,

@@ -96,7 +96,16 @@ test("toolsForContext scopes per page (write + Slice 3 read tools)", () => {
   // block surface; binding is a page-builder/pages job).
   assert.deepEqual(
     [...toolsForContext("data-sources")].sort(),
-    ["create_data_source", "get_data_sources_guide", "list_data_sources", "test_data_source"],
+    [
+      "create_data_source",
+      "delete_data_source",
+      "delete_data_source_request",
+      "get_data_sources_guide",
+      "list_data_sources",
+      "set_data_source_request",
+      "test_data_source",
+      "update_data_source",
+    ],
   );
 });
 
