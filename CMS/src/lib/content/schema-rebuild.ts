@@ -1,6 +1,12 @@
 /**
- * content-collections — Phase 2 EXTRA: the drop/rename-field schema-evolution
- * PLANNER (PURE).
+ * content-collections — Phase 2 EXTRA: the drop/rename/update-field
+ * schema-evolution PLANNER (PURE).
+ *
+ * mcp-full-crud-patch T5 adds the "update" op: a partial patch of one field's
+ * type / required / default / description. Type, required and default changes
+ * ride the SAME table-rebuild dance below (existing row values are re-typed by
+ * SQLite's column-affinity rules during the INSERT…SELECT — no bespoke coercion
+ * path); a description-only change emits NO statements (registry-JSON-only).
  *
  * v1 schema evolution was ADD-ONLY (`buildAddColumnSql`, fenced ALTER ADD COLUMN).
  * Dropping or renaming a field can't ride a single safe ALTER on SQLite/D1's
@@ -28,8 +34,10 @@
 import { assertStatement } from "./fence.ts";
 import {
   buildCreateTableSql,
+  COLLECTION_FIELD_TYPES,
   SYSTEM_COLUMNS,
   type CollectionField,
+  type CollectionFieldType,
 } from "./collection-schema.ts";
 
 /** Same strict column charset as the generator — a name can never inject SQL. */
@@ -47,10 +55,25 @@ export interface CollectionSchema {
   fields: CollectionField[];
 }
 
-/** A drop or rename of ONE user field. */
+/**
+ * A partial patch of ONE user field's attributes (mcp-full-crud-patch T5).
+ * Omitted key = keep the stored value; `null` = clear/reset (required → false,
+ * default/description removed). A `type` change re-types the real column via
+ * the table rebuild; the other attributes only change DDL when type/required/
+ * default move (description/label are registry-JSON-only).
+ */
+export interface FieldPatch {
+  type?: CollectionFieldType;
+  required?: boolean | null;
+  default?: string | number | boolean | null;
+  description?: string | null;
+}
+
+/** A drop, rename, or attribute-patch of ONE user field. */
 export type SchemaChange =
   | { op: "drop"; field: string }
-  | { op: "rename"; field: string; to: string };
+  | { op: "rename"; field: string; to: string }
+  | { op: "update"; field: string; patch: FieldPatch };
 
 /** What the planner produces on success. */
 export interface RebuildPlan {
@@ -104,7 +127,7 @@ export function planRebuild(
   const oldNames = new Set(oldFields.map((f) => f && f.name));
 
   // --- validate the change references an existing user field ---
-  if (!change || (change.op !== "drop" && change.op !== "rename")) {
+  if (!change || (change.op !== "drop" && change.op !== "rename" && change.op !== "update")) {
     return fail(400, `unsupported change op: ${JSON.stringify((change as { op?: unknown })?.op)}`);
   }
   if (typeof change.field !== "string" || !change.field) {
@@ -122,11 +145,55 @@ export function planRebuild(
   // carried verbatim; user cols kept/renamed; dropped col omitted).
   const newFields: CollectionField[] = [];
   const userCopy: Array<[string, string]> = [];
+  // drop/rename always rebuild; an attribute "update" rebuilds only when a
+  // DDL-visible attribute (type / required / default) actually changes —
+  // description/label edits are registry-JSON-only (statements: []).
+  let needsRebuild = true;
 
   if (change.op === "drop") {
     for (const f of oldFields) {
       if (f.name === change.field) continue; // drop it
       newFields.push(f);
+      userCopy.push([f.name, f.name]);
+    }
+  } else if (change.op === "update") {
+    const patch = change.patch;
+    if (!patch || typeof patch !== "object") {
+      return fail(400, "change.patch is required");
+    }
+    if (patch.type !== undefined && !COLLECTION_FIELD_TYPES.has(patch.type)) {
+      return fail(400, `unknown field type: ${JSON.stringify(patch.type)} — use one of: ${[...COLLECTION_FIELD_TYPES].join(", ")}`);
+    }
+    for (const f of oldFields) {
+      if (f.name !== change.field) {
+        newFields.push(f);
+        userCopy.push([f.name, f.name]);
+        continue;
+      }
+      const applied: CollectionField = { ...f };
+      if (patch.type !== undefined) applied.type = patch.type;
+      if (patch.required !== undefined) {
+        if (patch.required === true) applied.required = true;
+        else delete applied.required; // false or null → not required (the default)
+      }
+      if (patch.default !== undefined) {
+        if (patch.default === null) delete applied.default;
+        else applied.default = patch.default;
+      }
+      if (patch.description !== undefined) {
+        if (patch.description === null) delete applied.description;
+        else applied.description = patch.description;
+      }
+      // A type move off string/text/richtext makes `translatable` meaningless —
+      // drop the flag so the read seam never tries to locale-parse a number.
+      if (applied.translatable === true && !["string", "text", "richtext"].includes(applied.type)) {
+        delete applied.translatable;
+      }
+      needsRebuild =
+        applied.type !== f.type ||
+        (applied.required === true) !== (f.required === true) ||
+        applied.default !== f.default;
+      newFields.push(applied);
       userCopy.push([f.name, f.name]);
     }
   } else {
@@ -150,6 +217,15 @@ export function planRebuild(
         userCopy.push([f.name, f.name]);
       }
     }
+  }
+
+  // Registry-JSON-only change (e.g. a field description edit): no DDL to run —
+  // the store persists the new schema and skips the batch.
+  if (!needsRebuild) {
+    return {
+      ok: true,
+      plan: { statements: [], newSchema: { tableName, fields: newFields }, tempTableName },
+    };
   }
 
   // --- build the statements ---

@@ -71,6 +71,7 @@ export async function assembleSystemPrompt(
     collections = (await listCollections()).map((c) => ({
       tableName: c.tableName,
       fields: c.fields.map((f) => f.name),
+      description: c.description,
     }));
   } catch {
     /* unbound D1 → no collections */

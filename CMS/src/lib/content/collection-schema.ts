@@ -61,6 +61,8 @@ export interface CollectionField {
   /** Default value (typed); used as the column DEFAULT. Omit for no default. */
   default?: string | number | boolean;
   label?: string;
+  /** Operator/AI-facing description of the field. Display only — never in DDL. */
+  description?: string;
   /** select/multiselect only: the allowed options (for the UI; not enforced in DDL v1). */
   options?: { value: string; label: string }[];
   /**

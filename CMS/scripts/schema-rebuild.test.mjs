@@ -213,3 +213,79 @@ test("a corrupted registry field name in the kept set is rejected, not inlined",
   assert.equal(res.ok, false);
   assert.equal(res.status, 400);
 });
+
+// ---------------------------------------------------------------------------
+// mcp-full-crud-patch T5 — the "update" op (field attribute patch)
+// ---------------------------------------------------------------------------
+test("update: description-only patch emits NO statements (registry-JSON-only)", () => {
+  const plan = ok(planRebuild(schema(), { op: "update", field: "body", patch: { description: "long article body" } }));
+  assert.deepEqual(plan.statements, []);
+  const f = plan.newSchema.fields.find((x) => x.name === "body");
+  assert.equal(f.description, "long article body");
+  assert.equal(f.type, "richtext", "type untouched");
+});
+
+test("update: description null clears it without a rebuild", () => {
+  const withDesc = schema();
+  withDesc.fields[1].description = "old";
+  const plan = ok(planRebuild(withDesc, { op: "update", field: "body", patch: { description: null } }));
+  assert.deepEqual(plan.statements, []);
+  assert.equal("description" in plan.newSchema.fields[1], false);
+});
+
+test("update: a TYPE change plans the full 4-statement fence-safe rebuild", () => {
+  const plan = ok(planRebuild(schema(), { op: "update", field: "views", patch: { type: "text" } }));
+  assert.equal(plan.statements.length, 4);
+  assert.match(plan.statements[0], /^CREATE TABLE content_posts_new /);
+  // new affinity in the CREATE; the column keeps its name and is copied 1:1
+  assert.match(plan.statements[0], /\bviews TEXT\b/);
+  assert.match(plan.statements[1], /\bviews\b/);
+  assert.equal(plan.newSchema.fields.find((f) => f.name === "views").type, "text");
+  for (const sql of plan.statements) assert.doesNotThrow(() => assertStatement(sql, "write"));
+});
+
+test("update: required true adds NOT NULL; null resets required off", () => {
+  const on = ok(planRebuild(schema(), { op: "update", field: "body", patch: { required: true } }));
+  assert.equal(on.statements.length, 4);
+  assert.match(on.statements[0], /\bbody TEXT NOT NULL\b/);
+  const off = ok(planRebuild(schema(), { op: "update", field: "title", patch: { required: null } }));
+  assert.equal(off.statements.length, 4);
+  assert.equal("required" in off.newSchema.fields[0], false);
+});
+
+test("update: default set/clear changes the DDL; a no-op patch plans nothing", () => {
+  const set = ok(planRebuild(schema(), { op: "update", field: "title", patch: { default: "Untitled" } }));
+  assert.equal(set.statements.length, 4);
+  assert.match(set.statements[0], /\btitle TEXT NOT NULL DEFAULT 'Untitled'/);
+  const clear = ok(planRebuild(schema(), { op: "update", field: "views", patch: { default: null } }));
+  assert.equal(clear.statements.length, 4);
+  assert.equal("default" in clear.newSchema.fields[2], false);
+  // patching an attribute to its CURRENT value changes nothing → no statements
+  const noop = ok(planRebuild(schema(), { op: "update", field: "views", patch: { default: 0, required: false } }));
+  assert.deepEqual(noop.statements, []);
+});
+
+test("update: a type move off text drops a stale translatable flag", () => {
+  const s = { tableName: TABLE, fields: [{ name: "title", type: "string", translatable: true }] };
+  const plan = ok(planRebuild(s, { op: "update", field: "title", patch: { type: "int" } }));
+  assert.equal("translatable" in plan.newSchema.fields[0], false);
+  // …but a text→text move keeps it
+  const keep = ok(planRebuild(s, { op: "update", field: "title", patch: { type: "richtext" } }));
+  assert.equal(keep.newSchema.fields[0].translatable, true);
+});
+
+test("update: other fields are untouched and copied verbatim", () => {
+  const plan = ok(planRebuild(schema(), { op: "update", field: "views", patch: { type: "number" } }));
+  assert.deepEqual(plan.newSchema.fields.map((f) => f.name), ["title", "body", "views"]);
+  assert.equal(plan.newSchema.fields[0].required, true);
+  for (const c of SYSTEM_COLUMNS) assert.match(plan.statements[1], new RegExp(`\\b${c}\\b`));
+});
+
+test("update rejections: unknown/system field, bad type, missing patch", () => {
+  assert.equal(err(planRebuild(schema(), { op: "update", field: "nope", patch: { type: "int" } })).status, 404);
+  assert.equal(err(planRebuild(schema(), { op: "update", field: "status", patch: { type: "int" } })).status, 400);
+  const badType = err(planRebuild(schema(), { op: "update", field: "title", patch: { type: "varchar" } }));
+  assert.equal(badType.status, 400);
+  assert.match(badType.error, /use one of: string, text/);
+  assert.equal(err(planRebuild(schema(), { op: "update", field: "title" })).status, 400);
+});

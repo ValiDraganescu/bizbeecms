@@ -54,6 +54,11 @@ import {
   ADD_COLLECTION_FIELD_TOOL,
   DROP_COLLECTION_FIELD_TOOL,
   RENAME_COLLECTION_FIELD_TOOL,
+  UPDATE_COLLECTION_TOOL,
+  UPDATE_COLLECTION_FIELD_TOOL,
+  DELETE_COLLECTION_TOOL,
+  RESTORE_COLLECTION_ITEM_TOOL,
+  DELETE_COLLECTION_ITEM_TOOL,
 } from "./collection-tools";
 import { BIND_COMPONENT_TOOL, CREATE_LIST_TOOL, BIND_LIST_TOOL } from "./binding-tools";
 import {
@@ -139,6 +144,11 @@ import {
   handleAddCollectionField,
   handleDropCollectionField,
   handleRenameCollectionField,
+  handleUpdateCollection,
+  handleUpdateCollectionField,
+  handleDeleteCollection,
+  handleRestoreCollectionItem,
+  handleDeleteCollectionItem,
 } from "./tool-dispatch-collections";
 import {
   handleListDataSources,
@@ -213,6 +223,11 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   add_collection_field: ADD_COLLECTION_FIELD_TOOL,
   drop_collection_field: DROP_COLLECTION_FIELD_TOOL,
   rename_collection_field: RENAME_COLLECTION_FIELD_TOOL,
+  update_collection: UPDATE_COLLECTION_TOOL,
+  update_collection_field: UPDATE_COLLECTION_FIELD_TOOL,
+  delete_collection: DELETE_COLLECTION_TOOL,
+  restore_collection_item: RESTORE_COLLECTION_ITEM_TOOL,
+  delete_collection_item: DELETE_COLLECTION_ITEM_TOOL,
   bind_component: BIND_COMPONENT_TOOL,
   create_list: CREATE_LIST_TOOL,
   bind_list: BIND_LIST_TOOL,
@@ -291,6 +306,11 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   add_collection_field: handleAddCollectionField,
   drop_collection_field: handleDropCollectionField,
   rename_collection_field: handleRenameCollectionField,
+  update_collection: handleUpdateCollection,
+  update_collection_field: handleUpdateCollectionField,
+  delete_collection: handleDeleteCollection,
+  restore_collection_item: handleRestoreCollectionItem,
+  delete_collection_item: handleDeleteCollectionItem,
   bind_component: handleBindComponent,
   create_list: handleCreateList,
   bind_list: handleBindList,

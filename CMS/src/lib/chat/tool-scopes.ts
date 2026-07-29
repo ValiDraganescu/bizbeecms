@@ -73,6 +73,12 @@ export const KNOWN_TOOL_NAMES = [
   "add_collection_field",
   "drop_collection_field",
   "rename_collection_field",
+  // mcp-full-crud-patch T5: meta/field patch, guarded delete, item restore/hard delete.
+  "update_collection",
+  "update_collection_field",
+  "delete_collection",
+  "restore_collection_item",
+  "delete_collection_item",
   // Slice D (content-collections P2-bind): component↔collection binding tools.
   "bind_component",
   "create_list",
@@ -287,11 +293,16 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
   // Collections: define collections + CRUD/query their items (structured only).
   collections: [
     "create_collection",
+    "update_collection",
+    "delete_collection",
     "add_collection_item",
     "update_collection_item",
     "archive_collection_item",
+    "restore_collection_item",
+    "delete_collection_item",
     "query_collection",
     "add_collection_field",
+    "update_collection_field",
     "drop_collection_field",
     "rename_collection_field",
   ],

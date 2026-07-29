@@ -25,6 +25,12 @@
  * they don't re-implement the registry validation.
  */
 import { FILTER_OPS, type FilterOp, type QuerySpec } from "../content/query-compiler.ts";
+import {
+  COLLECTION_FIELD_TYPES,
+  affinityFor,
+  type CollectionFieldType,
+} from "../content/collection-schema.ts";
+import type { FieldPatch } from "../content/schema-rebuild.ts";
 
 // ── Tool schemas (OpenAI/Workers-AI function-calling shape) ───────────────────
 
@@ -268,6 +274,124 @@ export const ADD_COLLECTION_FIELD_TOOL = {
   },
 } as const;
 
+// ── mcp-full-crud-patch T5: collection meta/field patch + guarded delete ──────
+
+export const UPDATE_COLLECTION_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "update_collection",
+    description:
+      "Patch a collection's settings (address it by its content_<slug> table " +
+      "name). Only the fields you pass change: omitted = keep the stored value, " +
+      "null = clear. `label` renames the collection's DISPLAY name (the table " +
+      "name never changes, so bindings and forms keep working). `description` " +
+      "documents what the collection holds (null clears it). `publicSubmissions` " +
+      "toggles whether PUBLIC visitors may submit items via a page Form block — " +
+      "public submissions always land as DRAFTS for operator review regardless " +
+      "of this toggle. To change fields, use update_collection_field / " +
+      "add_collection_field / drop_collection_field / rename_collection_field.",
+    parameters: {
+      type: "object",
+      properties: {
+        collection: { type: "string", description: "The collection's table name (content_<slug>)." },
+        label: { type: "string", description: "New display name. Omit to keep (a collection always has one — it cannot be cleared)." },
+        description: { type: "string", description: "What this collection holds. Omit to keep; null clears it." },
+        publicSubmissions: { type: "boolean", description: "May public visitors submit items via a Form block? Submissions land as drafts regardless. null resets to false." },
+      },
+      required: ["collection"],
+    },
+  },
+} as const;
+
+export const UPDATE_COLLECTION_FIELD_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "update_collection_field",
+    description:
+      "Patch ONE existing field of a collection (by collection table name + " +
+      "field name). Only the attributes you pass change: omitted = keep, null = " +
+      "clear/reset (`required` null → false; `default`/`description` null → " +
+      "removed). Changing `type` re-types the real column via a safe table " +
+      "rebuild — existing row values are converted by SQLite's column-affinity " +
+      "rules and the result names the exact coercion applied to the rows; no " +
+      "data is dropped. Types: " + [...COLLECTION_FIELD_TYPES].join(", ") + ". " +
+      "To rename a field use rename_collection_field; to remove one use " +
+      "drop_collection_field.",
+    parameters: {
+      type: "object",
+      properties: {
+        collection: { type: "string", description: "The collection's table name (content_<slug>)." },
+        field: { type: "string", description: "The name of the user field to patch." },
+        type: { type: "string", description: "New field type (re-types the column; existing values convert by SQLite affinity)." },
+        required: { type: "boolean", description: "Whether the field must be set on every item. null resets to false." },
+        default: { description: "New default value (string/number/boolean). null removes the default." },
+        description: { type: "string", description: "What this field holds. Omit to keep; null clears it." },
+      },
+      required: ["collection", "field"],
+    },
+  },
+} as const;
+
+export const DELETE_COLLECTION_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "delete_collection",
+    description:
+      "PERMANENTLY delete a collection: drops its content_<slug> table with ALL " +
+      "its items and removes it from the registry — no undo. BLOCKED while " +
+      "anything references the collection — a block binding, List, form target, " +
+      "or a chat agent's collections allowlist: the error names every " +
+      "referencing place and the tool that clears each; remove them all, then " +
+      "retry. There is no force flag.",
+    parameters: {
+      type: "object",
+      properties: {
+        collection: { type: "string", description: "The collection's table name (content_<slug>)." },
+      },
+      required: ["collection"],
+    },
+  },
+} as const;
+
+export const RESTORE_COLLECTION_ITEM_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "restore_collection_item",
+    description:
+      "Restore (un-archive) one ARCHIVED collection item by its id, making it " +
+      "live again. Find archived items with query_collection archived:" +
+      "'archived'. The reversal of archive_collection_item.",
+    parameters: {
+      type: "object",
+      properties: {
+        collection: { type: "string", description: "The collection's table name (content_<slug>)." },
+        id: { type: "string", description: "The archived item's id." },
+      },
+      required: ["collection", "id"],
+    },
+  },
+} as const;
+
+export const DELETE_COLLECTION_ITEM_TOOL = {
+  type: "function" as const,
+  function: {
+    name: "delete_collection_item",
+    description:
+      "PERMANENTLY delete one collection item by its id — the row is destroyed " +
+      "for good, with no undo. This is NOT archive_collection_item: archiving " +
+      "is the safe, reversible default — prefer it unless the operator " +
+      "explicitly wants the data gone.",
+    parameters: {
+      type: "object",
+      properties: {
+        collection: { type: "string", description: "The collection's table name (content_<slug>)." },
+        id: { type: "string", description: "The item's id." },
+      },
+      required: ["collection", "id"],
+    },
+  },
+} as const;
+
 // ── Pure arg validation/coercion (no store, no CF — node-testable) ────────────
 
 /** Result of validating a tool's args: a clean payload, or an error message. */
@@ -491,4 +615,150 @@ export function validateQuery(
   else if (typeof rec.offset === "string" && rec.offset.trim() !== "" && Number.isFinite(Number(rec.offset))) spec.offset = Number(rec.offset);
 
   return { ok: true, value: { collection, spec } };
+}
+
+// ── update_collection (patch semantics: omitted=keep, null=clear) ────────────
+
+/** A partial registry-metadata patch (matches the store's CollectionMetaPatch). */
+export interface CollectionMetaPatchArg {
+  name?: string;
+  description?: string | null;
+  publicSubmissions?: boolean;
+}
+
+const COLLECTION_PATCH_KEYS = ["label", "description", "publicSubmissions"] as const;
+
+/** update_collection: { collection, label?, description?, publicSubmissions? }. */
+export function validateUpdateCollection(
+  args: unknown,
+): ArgResult<{ collection: string; patch: CollectionMetaPatchArg }> {
+  const rec = asRecord(args);
+  if (!rec) return { ok: false, error: "expected an object with `collection` (the content_<slug> table name) plus the fields to change" };
+  const collection = str(rec, "collection");
+  if (!collection) return { ok: false, error: "collection (table name) is required" };
+
+  const patch: CollectionMetaPatchArg = {};
+  if ("label" in rec) {
+    if (typeof rec.label !== "string" || rec.label.trim() === "") {
+      return { ok: false, error: "`label` cannot be cleared — a collection always has a display name. Pass a new one, or omit `label` to keep the current one." };
+    }
+    patch.name = rec.label.trim();
+  }
+  if ("description" in rec) {
+    if (rec.description === null || rec.description === "") patch.description = null;
+    else if (typeof rec.description === "string") patch.description = rec.description;
+    else return { ok: false, error: "`description` must be a string (or null to clear it)" };
+  }
+  if ("publicSubmissions" in rec) {
+    if (rec.publicSubmissions !== null && typeof rec.publicSubmissions !== "boolean") {
+      return { ok: false, error: "`publicSubmissions` must be a boolean (or null to reset to false). Public submissions always land as drafts." };
+    }
+    // null = reset to the default (off).
+    patch.publicSubmissions = rec.publicSubmissions === true;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: `nothing to change — pass at least one of ${COLLECTION_PATCH_KEYS.join(", ")} (omitted fields keep their stored values)` };
+  }
+  return { ok: true, value: { collection, patch } };
+}
+
+// ── update_collection_field (attribute patch; type change → table rebuild) ───
+
+const FIELD_PATCH_KEYS = ["type", "required", "default", "description"] as const;
+
+/** update_collection_field: { collection, field, type?, required?, default?, description? }. */
+export function validateUpdateCollectionField(
+  args: unknown,
+): ArgResult<{ collection: string; field: string; patch: FieldPatch }> {
+  const rec = asRecord(args);
+  if (!rec) return { ok: false, error: "expected an object with `collection`, `field`, plus the attributes to change" };
+  const collection = str(rec, "collection");
+  if (!collection) return { ok: false, error: "collection (table name) is required" };
+  const field = str(rec, "field");
+  if (!field) return { ok: false, error: "field (the field's name) is required" };
+
+  const patch: FieldPatch = {};
+  if ("type" in rec) {
+    if (typeof rec.type !== "string" || !COLLECTION_FIELD_TYPES.has(rec.type as CollectionFieldType)) {
+      return { ok: false, error: `\`type\` ${JSON.stringify(rec.type)} is not valid — use one of: ${[...COLLECTION_FIELD_TYPES].join(", ")} (a field always has a type; omit \`type\` to keep the current one)` };
+    }
+    patch.type = rec.type as CollectionFieldType;
+  }
+  if ("required" in rec) {
+    if (rec.required !== null && typeof rec.required !== "boolean") {
+      return { ok: false, error: "`required` must be a boolean (or null to reset to false)" };
+    }
+    patch.required = rec.required as boolean | null;
+  }
+  if ("default" in rec) {
+    const d = rec.default;
+    if (d !== null && typeof d !== "string" && typeof d !== "number" && typeof d !== "boolean") {
+      return { ok: false, error: "`default` must be a string, number, or boolean (or null to remove the default)" };
+    }
+    patch.default = d as string | number | boolean | null;
+  }
+  if ("description" in rec) {
+    if (rec.description === null || rec.description === "") patch.description = null;
+    else if (typeof rec.description === "string") patch.description = rec.description;
+    else return { ok: false, error: "`description` must be a string (or null to clear it)" };
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: `nothing to change on field "${field}" — pass at least one of ${FIELD_PATCH_KEYS.join(", ")} (omitted attributes keep their stored values)` };
+  }
+  return { ok: true, value: { collection, field, patch } };
+}
+
+/**
+ * Name the EXACT coercion a type change applies to existing rows. The rebuild
+ * re-types the column and copies rows with a plain INSERT…SELECT, so the only
+ * conversion is SQLite's column-affinity rule for the NEW type — this formatter
+ * states that rule for the old→new affinity pair (no bespoke coercion path
+ * exists to describe). `rowCount` is the number of copied rows when known.
+ */
+export function describeTypeCoercion(
+  oldType: CollectionFieldType,
+  newType: CollectionFieldType,
+  rowCount: number | null,
+): string {
+  const from = affinityFor(oldType);
+  const to = affinityFor(newType);
+  let rule: string;
+  if (from === to) {
+    rule = `stored values are unchanged (both types are SQLite ${to} columns)`;
+  } else if (to === "TEXT") {
+    rule = `SQLite TEXT affinity re-stores each number as its text form (e.g. ${from === "REAL" ? "42.5 → '42.5'" : "42 → '42'"})`;
+  } else if (from === "TEXT") {
+    rule = `SQLite ${to} affinity converts numeric-looking text to numbers (e.g. '42' → 42); non-numeric text keeps its original text value`;
+  } else if (to === "INTEGER") {
+    rule = "SQLite INTEGER affinity stores whole numbers as integers (42.0 → 42); fractional values keep their REAL value (never rounded)";
+  } else {
+    rule = "SQLite REAL affinity re-stores each integer as floating point (42 → 42.0)";
+  }
+  const rows = rowCount === null ? "existing rows" : `${rowCount} ${rowCount === 1 ? "row" : "rows"}`;
+  return `${rows}: ${oldType} → ${newType} — ${rule}`;
+}
+
+// ── delete_collection / restore_collection_item / delete_collection_item ─────
+
+/** delete_collection: { collection }. */
+export function validateDeleteCollection(args: unknown): ArgResult<{ collection: string }> {
+  const rec = asRecord(args);
+  const collection = rec ? str(rec, "collection") : undefined;
+  if (!collection) return { ok: false, error: "collection (table name) is required" };
+  return { ok: true, value: { collection } };
+}
+
+/** restore_collection_item / delete_collection_item: { collection, id }. */
+export function validateItemRef(
+  args: unknown,
+): ArgResult<{ collection: string; id: string }> {
+  const rec = asRecord(args);
+  if (!rec) return { ok: false, error: "expected an object with collection and id" };
+  const collection = str(rec, "collection");
+  if (!collection) return { ok: false, error: "collection (table name) is required" };
+  const id = str(rec, "id");
+  if (!id) return { ok: false, error: "id is required — find item ids with query_collection" };
+  return { ok: true, value: { collection, id } };
 }

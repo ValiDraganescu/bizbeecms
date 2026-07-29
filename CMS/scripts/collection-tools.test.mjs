@@ -202,3 +202,191 @@ test("end-to-end shape: a translatable text field survives normalizeField, a non
   assert.equal(normalizeField(r.value.fields[0]).translatable, true);
   assert.equal(normalizeField(r.value.fields[1]).translatable, undefined, "flag dropped on a non-text type");
 });
+
+// ── mcp-full-crud-patch T5: update_collection (omitted=keep, null=clear) ──────
+import {
+  validateUpdateCollection,
+  validateUpdateCollectionField,
+  validateDeleteCollection,
+  validateItemRef,
+  describeTypeCoercion,
+  UPDATE_COLLECTION_TOOL,
+  DELETE_COLLECTION_ITEM_TOOL,
+  DELETE_COLLECTION_TOOL,
+} from "../src/lib/chat/collection-tools.ts";
+
+test("update_collection: requires an object and a collection", () => {
+  assert.equal(validateUpdateCollection(null).ok, false);
+  assert.equal(validateUpdateCollection("x").ok, false);
+  const r = validateUpdateCollection({ label: "X" });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /collection .*required/);
+});
+
+test("update_collection: label patches the display name (trimmed)", () => {
+  const r = validateUpdateCollection({ collection: "content_menu", label: "  Menu items  " });
+  assert.ok(r.ok);
+  assert.deepEqual(r.value, { collection: "content_menu", patch: { name: "Menu items" } });
+});
+
+test("update_collection: label cannot be cleared — null/empty get a self-correcting error", () => {
+  for (const bad of [null, "", "   ", 7]) {
+    const r = validateUpdateCollection({ collection: "content_menu", label: bad });
+    assert.equal(r.ok, false, `label ${JSON.stringify(bad)} should be rejected`);
+    assert.match(r.error, /cannot be cleared/);
+    assert.match(r.error, /omit `label` to keep/);
+  }
+});
+
+test("update_collection: description — string sets, null and '' clear, other types rejected", () => {
+  assert.deepEqual(
+    validateUpdateCollection({ collection: "c", description: "Dishes we serve" }).value.patch,
+    { description: "Dishes we serve" },
+  );
+  assert.deepEqual(validateUpdateCollection({ collection: "c", description: null }).value.patch, { description: null });
+  assert.deepEqual(validateUpdateCollection({ collection: "c", description: "" }).value.patch, { description: null });
+  const r = validateUpdateCollection({ collection: "c", description: 7 });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /null to clear/);
+});
+
+test("update_collection: publicSubmissions — boolean sets, null resets to false, other types rejected", () => {
+  assert.deepEqual(validateUpdateCollection({ collection: "c", publicSubmissions: true }).value.patch, { publicSubmissions: true });
+  assert.deepEqual(validateUpdateCollection({ collection: "c", publicSubmissions: false }).value.patch, { publicSubmissions: false });
+  assert.deepEqual(validateUpdateCollection({ collection: "c", publicSubmissions: null }).value.patch, { publicSubmissions: false });
+  const r = validateUpdateCollection({ collection: "c", publicSubmissions: "yes" });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /boolean/);
+});
+
+test("update_collection: an empty patch is rejected with the patchable key list", () => {
+  const r = validateUpdateCollection({ collection: "content_menu" });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /nothing to change/);
+  assert.match(r.error, /label, description, publicSubmissions/);
+});
+
+test("update_collection: omitted keys stay OUT of the patch (omitted = keep)", () => {
+  const r = validateUpdateCollection({ collection: "c", publicSubmissions: true });
+  assert.ok(r.ok);
+  assert.equal("name" in r.value.patch, false);
+  assert.equal("description" in r.value.patch, false);
+});
+
+test("update_collection tool description states submissions land as drafts", () => {
+  assert.match(UPDATE_COLLECTION_TOOL.function.description, /land as DRAFTS/i);
+});
+
+// ── update_collection_field ───────────────────────────────────────────────────
+
+test("update_collection_field: requires collection and field", () => {
+  assert.equal(validateUpdateCollectionField(null).ok, false);
+  assert.match(validateUpdateCollectionField({ field: "x" }).error, /collection .*required/);
+  assert.match(validateUpdateCollectionField({ collection: "c" }).error, /field .*required/);
+});
+
+test("update_collection_field: valid type passes; bad/null type gets the type list", () => {
+  const r = validateUpdateCollectionField({ collection: "c", field: "f", type: "int" });
+  assert.ok(r.ok);
+  assert.deepEqual(r.value.patch, { type: "int" });
+  for (const bad of ["integer", null, 7]) {
+    const e = validateUpdateCollectionField({ collection: "c", field: "f", type: bad });
+    assert.equal(e.ok, false, `type ${JSON.stringify(bad)} should be rejected`);
+    assert.match(e.error, /string, text, richtext, number, int/);
+    assert.match(e.error, /omit `type` to keep/);
+  }
+});
+
+test("update_collection_field: required — boolean or null pass through; others rejected", () => {
+  assert.deepEqual(validateUpdateCollectionField({ collection: "c", field: "f", required: true }).value.patch, { required: true });
+  assert.deepEqual(validateUpdateCollectionField({ collection: "c", field: "f", required: null }).value.patch, { required: null });
+  assert.equal(validateUpdateCollectionField({ collection: "c", field: "f", required: "yes" }).ok, false);
+});
+
+test("update_collection_field: default — scalars and null pass; objects rejected", () => {
+  for (const d of ["x", 7, true, null]) {
+    const r = validateUpdateCollectionField({ collection: "c", field: "f", default: d });
+    assert.ok(r.ok, `default ${JSON.stringify(d)} should pass`);
+    assert.equal(r.value.patch.default, d);
+  }
+  assert.equal(validateUpdateCollectionField({ collection: "c", field: "f", default: {} }).ok, false);
+});
+
+test("update_collection_field: description — string sets, null/'' clear", () => {
+  assert.deepEqual(validateUpdateCollectionField({ collection: "c", field: "f", description: "d" }).value.patch, { description: "d" });
+  assert.deepEqual(validateUpdateCollectionField({ collection: "c", field: "f", description: null }).value.patch, { description: null });
+  assert.deepEqual(validateUpdateCollectionField({ collection: "c", field: "f", description: "" }).value.patch, { description: null });
+});
+
+test("update_collection_field: empty patch names the field and the patchable keys", () => {
+  const r = validateUpdateCollectionField({ collection: "c", field: "price" });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /"price"/);
+  assert.match(r.error, /type, required, default, description/);
+});
+
+// ── describeTypeCoercion (names the SQLite-affinity conversion, verbatim) ────
+
+test("coercion: same affinity → values unchanged", () => {
+  const msg = describeTypeCoercion("string", "richtext", 3);
+  assert.match(msg, /^3 rows: string → richtext — /);
+  assert.match(msg, /unchanged/);
+  assert.match(msg, /TEXT/);
+});
+
+test("coercion: number → text names the text re-store with a REAL example", () => {
+  const msg = describeTypeCoercion("number", "text", 42);
+  assert.match(msg, /^42 rows: number → text — /);
+  assert.match(msg, /TEXT affinity/);
+  assert.match(msg, /42\.5 → '42\.5'/);
+});
+
+test("coercion: int → string uses the integer example", () => {
+  assert.match(describeTypeCoercion("int", "string", 2), /42 → '42'/);
+});
+
+test("coercion: text → int names numeric conversion AND that other text is kept", () => {
+  const msg = describeTypeCoercion("text", "int", 5);
+  assert.match(msg, /INTEGER affinity/);
+  assert.match(msg, /'42' → 42/);
+  assert.match(msg, /non-numeric text keeps its original text value/);
+});
+
+test("coercion: number → int states fractional values are never rounded", () => {
+  const msg = describeTypeCoercion("number", "int", 1);
+  assert.match(msg, /^1 row: number → int — /);
+  assert.match(msg, /42\.0 → 42/);
+  assert.match(msg, /never rounded/);
+});
+
+test("coercion: int → number states the float re-store", () => {
+  assert.match(describeTypeCoercion("int", "number", 2), /42 → 42\.0/);
+});
+
+test("coercion: unknown row count reads 'existing rows'", () => {
+  assert.match(describeTypeCoercion("string", "int", null), /^existing rows: string → int/);
+});
+
+// ── delete_collection / restore_collection_item / delete_collection_item ────
+
+test("delete_collection: requires a collection; passes it through trimmed", () => {
+  assert.equal(validateDeleteCollection(null).ok, false);
+  assert.equal(validateDeleteCollection({}).ok, false);
+  assert.deepEqual(validateDeleteCollection({ collection: " content_menu " }).value, { collection: "content_menu" });
+});
+
+test("item ref (restore/hard delete): requires collection and id, points at query_collection", () => {
+  assert.equal(validateItemRef(null).ok, false);
+  assert.match(validateItemRef({ id: "x" }).error, /collection .*required/);
+  const r = validateItemRef({ collection: "c" });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /query_collection/);
+  assert.deepEqual(validateItemRef({ collection: "c", id: " i1 " }).value, { collection: "c", id: "i1" });
+});
+
+test("delete tools' descriptions state permanence and the guard", () => {
+  assert.match(DELETE_COLLECTION_ITEM_TOOL.function.description, /PERMANENTLY/);
+  assert.match(DELETE_COLLECTION_ITEM_TOOL.function.description, /archive_collection_item/);
+  assert.match(DELETE_COLLECTION_TOOL.function.description, /BLOCKED while/);
+  assert.match(DELETE_COLLECTION_TOOL.function.description, /no force flag/);
+});

@@ -451,6 +451,9 @@ export const collection = sqliteTable(
     id: text("id").primaryKey(),
     // Operator-facing name ("Blog Posts"). Display only.
     name: text("name").notNull(),
+    // Operator/AI-facing description of what the collection holds. Display only
+    // (mcp-full-crud-patch T5); nullable — NULL = no description.
+    description: text("description"),
     // The real D1 table name: always `content_<slug>` (fence-validated). Unique.
     tableName: text("table_name").notNull(),
     // JSON array of field descriptors — the canonical logical schema. The DDL

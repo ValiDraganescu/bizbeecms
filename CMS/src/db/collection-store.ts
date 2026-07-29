@@ -28,6 +28,8 @@ import type { Collection } from "./schema.ts";
 export interface CollectionView {
   id: string;
   name: string;
+  /** Operator/AI-facing description, or null when none is set. */
+  description: string | null;
   tableName: string;
   fields: CollectionField[];
   /** Form-block opt-in: may PUBLIC visitors submit DRAFT items? Default false. */
@@ -47,6 +49,7 @@ function toView(row: Collection): CollectionView {
   return {
     id: row.id,
     name: row.name,
+    description: row.description ?? null,
     tableName: row.tableName,
     fields,
     publicSubmissions: row.publicSubmissions === true,
@@ -71,6 +74,48 @@ export async function setPublicSubmissions(
     .set({ publicSubmissions: enabled, updatedAt: new Date() })
     .where(eq(schema.collection.tableName, tableName));
   return { ok: true, plan: { ...existing, publicSubmissions: enabled } };
+}
+
+/** A partial patch of a collection's registry metadata (mcp-full-crud-patch T5). */
+export interface CollectionMetaPatch {
+  /** New display name. The table name NEVER changes — renames can't break content_<slug>. */
+  name?: string;
+  /** New description; null clears it. */
+  description?: string | null;
+  publicSubmissions?: boolean;
+}
+
+/**
+ * Patch a collection's registry metadata (display name / description /
+ * publicSubmissions). Omitted keys keep their stored values; `tableName` and
+ * the field schema are untouched. 404 for an unknown collection.
+ */
+export async function updateCollectionMeta(
+  tableName: string,
+  patch: CollectionMetaPatch,
+): Promise<PlanResult<CollectionView>> {
+  const existing = await getCollection(tableName);
+  if (!existing) return { ok: false, status: 404, error: "collection not found" };
+
+  const now = new Date();
+  const set: Partial<typeof schema.collection.$inferInsert> = { updatedAt: now };
+  if (patch.name !== undefined) set.name = patch.name;
+  if (patch.description !== undefined) set.description = patch.description;
+  if (patch.publicSubmissions !== undefined) set.publicSubmissions = patch.publicSubmissions;
+
+  const db = await getDb();
+  await db.update(schema.collection).set(set).where(eq(schema.collection.tableName, tableName));
+
+  return {
+    ok: true,
+    plan: {
+      ...existing,
+      name: patch.name ?? existing.name,
+      description: patch.description !== undefined ? patch.description : existing.description,
+      publicSubmissions: patch.publicSubmissions ?? existing.publicSubmissions,
+      updatedAt: now.getTime(),
+    },
+  };
 }
 
 /** List all collections (registry rows), newest first. */
@@ -139,6 +184,7 @@ export async function createCollection(
     plan: {
       id,
       name: plan.name,
+      description: null,
       tableName: plan.tableName,
       fields: plan.fields,
       publicSubmissions: false,
@@ -216,8 +262,12 @@ export async function rebuildCollectionSchema(
   const planned = planRebuild({ tableName, fields: existing.fields }, change);
   if (!planned.ok) return planned;
 
-  // All 4 fenced statements land together or not at all.
-  await contentDdlBatch(planned.plan.statements);
+  // All 4 fenced statements land together or not at all. An "update" op that
+  // changed nothing DDL-visible (description-only) plans ZERO statements —
+  // then only the registry JSON below is written.
+  if (planned.plan.statements.length > 0) {
+    await contentDdlBatch(planned.plan.statements);
+  }
 
   const db = await getDb();
   const now = new Date();
