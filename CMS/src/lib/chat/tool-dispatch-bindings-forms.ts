@@ -385,9 +385,9 @@ async function resolveFormTarget(
       ok: false,
       error:
         `collection "${view.tableName}" exists but has NOT opted in to public form submissions ` +
-        `(publicSubmissions is off), so a visitor form cannot write to it. The operator must enable it ` +
-        `first — PATCH /api/collections/${view.tableName} with {"_op":"set_public_submissions","enabled":true} ` +
-        `(a deliberate operator-only switch; there is no AI tool to flip it). Then retry this tool.`,
+        `(publicSubmissions is off), so a visitor form cannot write to it. Enable it first — ` +
+        `update_collection with { collection: "${view.tableName}", publicSubmissions: true } ` +
+        `(public submissions always land as DRAFTS for operator review). Then retry this tool.`,
     };
   }
   return {

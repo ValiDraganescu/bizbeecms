@@ -9,7 +9,8 @@
  * STATIC content documenting the SHIPPED tool surface (list/get/create/update/
  * delete_chat_agent + the granular update_chat_agent_settings /
  * set_chat_agent_limits / set_chat_agent_data_source / set_chat_agent_collection
- * family) + the config shape, safety model, and placement workflow —
+ * family + edit_text on systemPrompt/welcomeMessage) + the patch contract
+ * (omitted=keep, null=reset), config shape, safety model, and placement workflow —
  * NOT live site data (list_chat_agents / list_data_sources / query_collection
  * cover that). PURE module (no `@/`/React/CF imports) so it runs under the
  * dep-free `node --test` convention; the CF wiring is one trivial handler in
@@ -27,7 +28,9 @@ export const GET_CHAT_AGENTS_GUIDE_TOOL = {
     description:
       "Fetch the complete guest-chatbot (chat agents) playbook: what a chat agent " +
       "is, the config shape (usage limits with defaults + meanings, the dataSources " +
-      "and collections allowlists), the safety model (guests only ever get the " +
+      "and collections allowlists), the editing contract (omitted = keep, null = " +
+      "reset; granular merge patches; edit_text for prompt snippets), the safety " +
+      "model (guests only ever get the " +
       "allowlisted tools; queries see published items; creates/updates land as " +
       "drafts), and how to place a bot on a page (GuestChat block). Call this BEFORE " +
       "non-trivial chat-agent work so you follow the exact shipped workflow instead " +
@@ -60,25 +63,41 @@ export const CHAT_AGENTS_GUIDE = `# Guest-facing chatbots (chat agents) — the 
   optional). Returns the created agent's summary.
 - \`delete_chat_agent\` — remove by \`agent\` (id OR name).
 
-### Editing an existing agent — PREFER the granular tools
-Each changes ONLY what you pass and cannot clobber the rest of the config (the
-failure mode of re-sending a whole config):
+### Editing an existing agent — the patch contract
+Every editing tool follows ONE contract: OMITTED = keep the stored value,
+null = clear/reset to the default, a supplied value replaces. PREFER the
+granular tools — each changes ONLY what you pass and cannot clobber the rest
+of the config (the failure mode of re-sending a whole config):
 - \`update_chat_agent_settings\` — patch scalars: name, systemPrompt, model
   (null → site default), enabled, welcomeMessage (null → clear). Omitted = kept.
 - \`set_chat_agent_limits\` — patch individual limit keys; number sets, null
   resets that key to its default, omitted keys keep their stored value.
-- \`set_chat_agent_data_source\` — upsert ONE dataSources allowlist entry,
-  matched by \`toolName\`; other entries untouched. The source/request refs must
-  resolve to real records (id or name accepted; stored as ids).
+- \`set_chat_agent_data_source\` — MERGE-PATCH ONE dataSources allowlist entry,
+  matched by \`toolName\`: only the fields you pass change; null clears an
+  optional field (maxCallsPerConversation, requiredParams); no match ADDS an
+  entry (then sourceId, requestId and description are required). Other entries
+  untouched. The source/request refs must resolve to real records.
 - \`remove_chat_agent_data_source\` — drop ONE entry by \`toolName\`.
-- \`set_chat_agent_collection\` — upsert ONE collections entry, matched by the
-  \`content_<slug>\` table name; other entries untouched.
+- \`set_chat_agent_collection\` — MERGE-PATCH ONE collections entry, matched by
+  the \`content_<slug>\` table name: only the fields you pass change; null
+  clears \`lookupFields\`; no match adds an entry (then \`description\` is
+  required). Other entries untouched.
 - \`remove_chat_agent_collection\` — drop ONE entry by table name.
+- \`edit_text\` — patch LONG text by snippet instead of resending it: target
+  'chat_agent.systemPrompt' or 'chat_agent.welcomeMessage.<locale>' (e.g.
+  'chat_agent.welcomeMessage.en') with \`agent\` (id or name). Changing a few
+  words in a 9k-char systemPrompt should be an edit_text call, NEVER a full
+  prompt re-send; the patched result is validated like a full update.
 
-\`update_chat_agent\` remains for FULL reconfigurations only: address by \`agent\`
-(id OR name); FULL-REPLACE for supplied fields (pass the WHOLE config — a
-supplied array REPLACES the stored one, it does not merge; omitted top-level
-fields keep their stored value, but name + systemPrompt must always be passed).
+\`update_chat_agent\` (address by \`agent\`, id OR name) also honors the contract
+on every top-level field: omitted = keep (name/systemPrompt included), null =
+reset to the default (model → site default, limits → all defaults,
+welcomeMessage → none, dataSources/collections → empty allowlist). But a
+supplied dataSources/collections ARRAY replaces the stored list WHOLESALE and
+a supplied limits object replaces ALL limits — so reserve it for full
+reconfigurations and use the granular tools above for anything smaller.
+welcomeMessage locale objects merge PER-LOCALE everywhere: supplied locales
+replace, omitted locales stay, a null value removes that locale.
 
 ## limits (abuse prevention — all optional, omit a key for its default)
 Message-count based (the per-response token cap is separate). Each value is clamped

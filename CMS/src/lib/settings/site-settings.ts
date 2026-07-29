@@ -111,6 +111,8 @@ export type PromptBuiltinDef = {
 export type PromptCollectionDef = {
   tableName: string;
   fields: string[];
+  /** Operator description of what the collection holds (shown when set). */
+  description?: string | null;
 };
 
 /** Render one component definition as a compact line: `Name(prop: type!, …)`. */
@@ -384,7 +386,7 @@ export function buildSystemPrompt(opts: {
         "query_collection / bind_component / bind_list — do NOT guess the bare " +
         "label, the tables are prefixed `content_`):\n" +
         shown
-          .map((c) => `- ${c.tableName} (${c.fields.join(", ") || "no user fields"})`)
+          .map((c) => `- ${c.tableName} (${c.fields.join(", ") || "no user fields"})${c.description ? ` — ${c.description}` : ""}`)
           .join("\n") +
         (moreCols > 0
           ? `\n…and ${moreCols} more — query_collection with an unknown table name lists them all.`

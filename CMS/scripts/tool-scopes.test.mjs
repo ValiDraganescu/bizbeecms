@@ -93,13 +93,15 @@ test("toolsForContext scopes per page (write + Slice 3 read tools)", () => {
   // general gets the full catalog.
   assert.deepEqual([...toolsForContext("general")].sort(), [...KNOWN_TOOL_NAMES].sort());
   // data-sources: JUST the source workflow — no binder/page tools (page has no
-  // block surface; binding is a page-builder/pages job).
+  // block surface; binding is a page-builder/pages job). edit_text is here for
+  // its data_request.bodyTemplate target.
   assert.deepEqual(
     [...toolsForContext("data-sources")].sort(),
     [
       "create_data_source",
       "delete_data_source",
       "delete_data_source_request",
+      "edit_text",
       "get_data_sources_guide",
       "list_data_sources",
       "set_data_source_request",
@@ -107,13 +109,50 @@ test("toolsForContext scopes per page (write + Slice 3 read tools)", () => {
       "update_data_source",
     ],
   );
+  // mcp-full-crud-patch: collections got meta/field patch, guarded delete,
+  // restore/hard-delete, and edit_text (collection_item.<field> target).
+  const collections = new Set(toolsForContext("collections"));
+  for (const n of [
+    "update_collection",
+    "update_collection_field",
+    "delete_collection",
+    "restore_collection_item",
+    "delete_collection_item",
+    "edit_text",
+  ]) {
+    assert.ok(collections.has(n), `collections should expose ${n}`);
+  }
+  // chat-agents got edit_text (chat_agent.systemPrompt / welcomeMessage.<locale>).
+  assert.ok(toolsForContext("chat-agents").includes("edit_text"));
 });
 
 test("data-sources contextPrompt leans on the guide, not an inlined playbook", () => {
   const p = contextPrompt("data-sources");
   assert.match(p, /get_data_sources_guide/);
   assert.match(p, /Page Builder/); // redirects binding work to the building contexts
-  assert.ok(p.length < 1200, `keep it short (guide carries the playbook): ${p.length}`);
+  // The full CRUD surface is named (details live in the guide).
+  for (const t of ["update_data_source", "set_data_source_request", "delete_data_source", "edit_text"]) {
+    assert.ok(p.includes(t), `data-sources prompt should mention ${t}`);
+  }
+  assert.ok(p.length < 1900, `keep it short (guide carries the playbook): ${p.length}`);
+});
+
+test("mcp-full-crud-patch prompts document the new surface, stale claims gone", () => {
+  const collections = contextPrompt("collections");
+  for (const t of [
+    "update_collection",
+    "update_collection_field",
+    "delete_collection",
+    "restore_collection_item",
+    "delete_collection_item",
+    "edit_text",
+  ]) {
+    assert.ok(collections.includes(t), `collections prompt should mention ${t}`);
+  }
+  const agents = contextPrompt("chat-agents");
+  assert.ok(agents.includes("edit_text"), "chat-agents prompt should steer to edit_text");
+  // update_chat_agent patches now (omitted = keep) — the old framing is banned.
+  assert.ok(!agents.includes("FULL-REPLACE"), "stale FULL-REPLACE claim in chat-agents prompt");
 });
 
 test("contextPrompt is non-empty and context-specific", () => {

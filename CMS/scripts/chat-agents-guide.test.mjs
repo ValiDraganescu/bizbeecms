@@ -42,6 +42,7 @@ test("guide covers the full shipped chat-agent tool surface", () => {
     "remove_chat_agent_data_source",
     "set_chat_agent_collection",
     "remove_chat_agent_collection",
+    "edit_text", // snippet-patch systemPrompt / welcomeMessage.<locale>
     "list_data_sources",
     "query_collection",
   ]) {
@@ -60,19 +61,39 @@ test("guide covers the full shipped chat-agent tool surface", () => {
     "maxToolRounds",
     "sourceId", // dataSources entry shape
     "requestId",
-    "FULL-REPLACE", // update semantics
+    // mcp-full-crud-patch T4/T6: the editing contract.
+    "OMITTED = keep the stored value", // the one contract
+    "MERGE-PATCH", // set_chat_agent_data_source/_collection entry semantics
+    "PER-LOCALE", // welcomeMessage locale-object merge
+    "WHOLESALE", // a supplied allowlist array still replaces the stored list
+    "chat_agent.systemPrompt", // edit_text target
+    "chat_agent.welcomeMessage.<locale>", // edit_text target
   ]) {
     assert.ok(CHAT_AGENTS_GUIDE.includes(fact), `guide should state: ${fact}`);
   }
+  // update_chat_agent honors the patch contract now (T4) — the old full-replace
+  // framing (name+systemPrompt always required) must never come back.
+  assert.ok(!CHAT_AGENTS_GUIDE.includes("FULL-REPLACE"), "stale claim resurfaced: FULL-REPLACE");
+  assert.ok(
+    !CHAT_AGENTS_GUIDE.includes("must always be passed"),
+    "stale claim resurfaced: name/systemPrompt requiredness on update",
+  );
 });
 
 test("every tool name the guide references exists (no drift on renames)", () => {
   // Admin tool names PLUS the guest-facing builtin the guide documents — imported
   // from its defining module so renaming the builtin breaks this test too.
   const known = new Set([...KNOWN_TOOL_NAMES, LOCAL_TIME_TO_UTC_TOOL]);
+  // The only snake_case token in the guide that is deliberately NOT a tool.
+  const nonTools = new Set([
+    "chat_agent", // the edit_text target prefix (chat_agent.systemPrompt, …)
+  ]);
   const mentioned = CHAT_AGENTS_GUIDE.match(/\b[a-z]+(?:_[a-z]+)+\b/g) ?? [];
   for (const t of mentioned) {
-    assert.ok(known.has(t), `guide mentions unknown tool-like token "${t}" — renamed tool or typo?`);
+    assert.ok(
+      known.has(t) || nonTools.has(t),
+      `guide mentions unknown tool-like token "${t}" — renamed tool or typo?`,
+    );
   }
   // The guide must name the builtin by its REAL model-facing name.
   assert.ok(
