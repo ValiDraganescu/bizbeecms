@@ -201,6 +201,100 @@ export function applyEdit(
   return { ok: false, error: "oldString not found in the text" };
 }
 
+// ── replaceBetween mode ───────────────────────────────────────────────────────
+
+/** Cap a quoted near-miss so an error stays readable. */
+function clip(s: string): string {
+  return s.length > 160 ? s.slice(0, 157) + "…" : s;
+}
+
+/**
+ * Find the nearest NEAR-MISS of `needle` in `content` — the text the caller
+ * probably MEANT when their exact marker didn't match. Reuses the lenient
+ * matcher cascade (line-trimmed → block-anchor → whitespace-normalized), then a
+ * case-insensitive scan, then the longest matchable prefix (≥ 6 chars). Returns
+ * the actual text from `content` (clipped), or null when nothing is close.
+ */
+export function nearestNearMiss(content: string, needle: string): string | null {
+  for (const matcher of [lineTrimmed, blockAnchor, whitespaceNormalized]) {
+    const spans = matcher.find(content, needle);
+    if (spans.length > 0) return clip(content.slice(spans[0][0], spans[0][1]));
+  }
+  const ci = content.toLowerCase().indexOf(needle.toLowerCase());
+  if (ci !== -1) return clip(content.slice(ci, ci + needle.length));
+  for (let len = needle.length - 1; len >= 6; len--) {
+    const at = content.indexOf(needle.slice(0, len));
+    if (at !== -1) return clip(content.slice(at, at + Math.min(needle.length + 24, content.length - at)));
+  }
+  return null;
+}
+
+/** Error-message suffix quoting the nearest near-miss (empty when none). */
+function nearMissSuffix(content: string, needle: string): string {
+  const near = nearestNearMiss(content, needle);
+  return near === null ? "" : ` — nearest near-miss in the text: ${JSON.stringify(near)}`;
+}
+
+/**
+ * Replace the text BETWEEN a `start` and an `end` marker (exact matches — a
+ * marker is something the caller read verbatim, so no lenient cascade; the
+ * near-miss quote guides a correction instead). Semantics: pick the chosen
+ * `start` match (`occurrence`, 1-based; REQUIRED when `start` matches more
+ * than once), then the FIRST `end` after it. `inclusive` replaces the markers
+ * too; the default keeps them and replaces only the span between.
+ */
+export function applyBetween(
+  content: string,
+  start: string,
+  end: string,
+  newString: string,
+  opts: { inclusive?: boolean; occurrence?: number | null } = {},
+): EditResult {
+  if (typeof content !== "string") return { ok: false, error: "content must be a string" };
+  if (typeof start !== "string" || start === "") {
+    return { ok: false, error: "start must be a non-empty string" };
+  }
+  if (typeof end !== "string" || end === "") {
+    return { ok: false, error: "end must be a non-empty string" };
+  }
+  if (typeof newString !== "string") return { ok: false, error: "newString must be a string" };
+
+  const starts = exact.find(content, start);
+  if (starts.length === 0) {
+    return { ok: false, error: `start marker not found in the text${nearMissSuffix(content, start)}` };
+  }
+  const occurrence = opts.occurrence ?? null;
+  if (occurrence === null && starts.length > 1) {
+    return {
+      ok: false,
+      error: `start matches ${starts.length} times — pass occurrence (1-${starts.length}) to pick which match`,
+    };
+  }
+  const nth = occurrence ?? 1;
+  if (!Number.isInteger(nth) || nth < 1 || nth > starts.length) {
+    return {
+      ok: false,
+      error: `occurrence ${nth} is out of range — start matches ${starts.length} ${starts.length === 1 ? "time" : "times"}`,
+    };
+  }
+  const [s0, s1] = starts[nth - 1];
+  const endAt = content.indexOf(end, s1);
+  if (endAt === -1) {
+    return {
+      ok: false,
+      error: `end marker not found after the chosen start marker${nearMissSuffix(content.slice(s1), end)}`,
+    };
+  }
+  const from = opts.inclusive === true ? s0 : s1;
+  const to = opts.inclusive === true ? endAt + end.length : endAt;
+  return {
+    ok: true,
+    content: content.slice(0, from) + newString + content.slice(to),
+    replacements: 1,
+    matcher: "between-exact",
+  };
+}
+
 /** Drop overlapping/duplicate spans (keep the earliest), so counts/replaces are clean. */
 function dedupe(spans: Array<[number, number]>): Array<[number, number]> {
   const sorted = [...spans].sort((a, b) => a[0] - b[0] || a[1] - b[1]);

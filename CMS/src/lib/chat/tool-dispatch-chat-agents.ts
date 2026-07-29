@@ -71,7 +71,7 @@ function summarizeAgent(row: {
 }
 
 /** "no such agent" error listing the existing agent names (AI error philosophy). */
-async function unknownAgentMessage(ref: string): Promise<string> {
+export async function unknownAgentMessage(ref: string): Promise<string> {
   const names = (await listChatAgents()).map((a) => a.name);
   if (names.length === 0) {
     return `no chat agent "${ref}" — this site has no chat agents yet (create one with create_chat_agent).`;
