@@ -394,9 +394,12 @@ export const DELETE_COLLECTION_ITEM_TOOL = {
 
 // ── Pure arg validation/coercion (no store, no CF — node-testable) ────────────
 
-/** Result of validating a tool's args: a clean payload, or an error message. */
-export type ArgResult<T> = { ok: true; value: T } | { ok: false; error: string };
+export type { ArgResult } from "./tool-args.ts";
+import type { ArgResult } from "./tool-args.ts";
 
+// Deliberately LOOSER than the shared `asRecord` (arrays pass through): the
+// validators here answer array args with their field-specific "X is required"
+// errors, which existing behavior/tests pin. Do not swap for the strict one.
 function asRecord(args: unknown): Record<string, unknown> | null {
   return typeof args === "object" && args !== null ? (args as Record<string, unknown>) : null;
 }

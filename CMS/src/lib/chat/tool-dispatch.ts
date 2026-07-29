@@ -87,7 +87,7 @@ import {
   REMOVE_CHAT_AGENT_DATA_SOURCE_TOOL,
   SET_CHAT_AGENT_COLLECTION_TOOL,
   REMOVE_CHAT_AGENT_COLLECTION_TOOL,
-} from "./chat-agent-tools";
+} from "./chat-agent-tool-schemas";
 import { GET_CHAT_AGENTS_GUIDE_TOOL, CHAT_AGENTS_GUIDE } from "./chat-agents-guide";
 import { GET_JSONLD_GUIDE_TOOL, JSONLD_GUIDE } from "./jsonld-guide";
 import {

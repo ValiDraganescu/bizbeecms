@@ -30,14 +30,9 @@ import {
   type RequestInput,
 } from "../data-sources/validate.ts";
 import type { RequestParams } from "../data-sources/fetch.ts";
+import { asRecord, type ArgResult } from "./tool-args.ts";
 
-export type ArgResult<T> = { ok: true; value: T } | { ok: false; error: string };
-
-function asRecord(args: unknown): Record<string, unknown> | null {
-  return typeof args === "object" && args !== null && !Array.isArray(args)
-    ? (args as Record<string, unknown>)
-    : null;
-}
+export type { ArgResult };
 
 // ── Tool schemas (OpenAI/Workers-AI function-calling shape) ───────────────────
 

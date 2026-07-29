@@ -24,8 +24,9 @@ import {
   type DataSourceAllowEntry,
   type CollectionAllowEntry,
 } from "../public-chat/core.ts";
+import type { ArgResult } from "./tool-args.ts";
 
-export type ArgResult<T> = { ok: true; value: T } | { ok: false; error: string };
+export type { ArgResult };
 
 // ── welcomeMessage patch (per-locale merge) ───────────────────────────────────
 
