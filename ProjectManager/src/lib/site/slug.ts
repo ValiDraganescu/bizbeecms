@@ -24,6 +24,20 @@ export function slugify(input: string): string {
     .slice(0, 64);
 }
 
+/**
+ * Sanitize a slug WHILE the user types it: same rules as slugify, but keeps a
+ * single trailing hyphen so "my-" can become "my-site" without the hyphen
+ * being eaten on every keystroke. Leading hyphens and runs are still collapsed.
+ * The final value is re-run through slugify() (trailing hyphen dropped) on
+ * blur/submit, and the route re-validates with isValidSlug.
+ */
+export function slugifyTyping(input: string): string {
+  const trailing = /[^a-z0-9]$/i.test(input) && input.length > 0;
+  const core = slugify(input);
+  if (!core) return "";
+  return trailing && core.length < 64 ? `${core}-` : core;
+}
+
 export function isValidSlug(slug: string): boolean {
   return slug.length > 0 && slug.length <= 64 && SLUG_RE.test(slug);
 }

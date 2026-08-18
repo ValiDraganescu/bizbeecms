@@ -13,12 +13,7 @@ import {
   FieldLabel,
   Input,
 } from "@/components/ui";
-import {
-  routingRecordsForHost,
-  isApex,
-  CUSTOM_DOMAIN_FALLBACK_ORIGIN,
-  CUSTOM_DOMAIN_APEX_IPS,
-} from "@/lib/config/hosts";
+import { routingRecordsForHost, isApex } from "@/lib/config/hosts";
 import type {
   CustomDomainError,
   CustomDomainResult,
@@ -102,10 +97,6 @@ export function CustomDomainForm({
           <AlertBody>{t("notDeployed")}</AlertBody>
         </Alert>
       ) : null}
-
-      {/* Always-visible setup guidance — shown before ANY domain is attached so
-          the operator knows their options up front, not by trial and error. */}
-      <SetupGuide t={t} />
 
       {/* Always-visible list of attached domains + their setup records. */}
       {domains.length > 0 ? (
@@ -221,56 +212,6 @@ export function CustomDomainForm({
           {t("attach")}
         </Button>
       </form>
-    </div>
-  );
-}
-
-/**
- * Always-visible explainer of the DNS options, rendered before any domain is
- * attached. The two common paths (CNAME for a subdomain, A records for the apex)
- * are shown inline with concrete values; the rarer paths (apex CNAME-flattening,
- * AAAA) live in a collapsed <details> so the empty state stays
- * scannable. Native <details> — no JS, no extra dep.
- */
-function SetupGuide({ t }: { t: ReturnType<typeof useTranslations> }) {
-  return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface-muted/40 p-4">
-      <h3 className="text-sm font-semibold">{t("guide.heading")}</h3>
-      <p className="text-sm text-foreground-muted">{t("guide.intro")}</p>
-
-      {/* Recommended: subdomain via CNAME. */}
-      <div className="flex flex-col gap-1">
-        <p className="text-sm font-medium">{t("guide.cnameTitle")}</p>
-        <p className="text-xs text-foreground-muted">{t("guide.cnameBody")}</p>
-        <DnsRow
-          type="CNAME"
-          name="www.example.com"
-          value={CUSTOM_DOMAIN_FALLBACK_ORIGIN}
-        />
-        <p className="text-xs text-foreground-muted">{t("guide.apexRedirect")}</p>
-      </div>
-
-      {/* Apex via A records. */}
-      <div className="flex flex-col gap-1">
-        <p className="text-sm font-medium">{t("guide.apexTitle")}</p>
-        <p className="text-xs text-foreground-muted">{t("guide.apexBody")}</p>
-        {CUSTOM_DOMAIN_APEX_IPS.map((ip) => (
-          <DnsRow key={ip} type="A" name="example.com" value={ip} />
-        ))}
-      </div>
-
-      {/* Less common paths, collapsed by default. */}
-      <details className="text-sm">
-        <summary className="cursor-pointer font-medium text-foreground-muted">
-          {t("guide.moreTitle")}
-        </summary>
-        <ul className="mt-2 flex list-disc flex-col gap-2 pl-5 text-xs text-foreground-muted">
-          <li>{t("guide.moreFlatten")}</li>
-          <li>{t("guide.moreAAAA")}</li>
-        </ul>
-      </details>
-
-      <p className="text-xs text-foreground-muted">{t("guide.certNote")}</p>
     </div>
   );
 }

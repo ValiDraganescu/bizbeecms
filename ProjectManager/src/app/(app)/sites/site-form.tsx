@@ -22,7 +22,7 @@ import {
   GLOBAL_COUNTRY,
   type CountryCode,
 } from "@/lib/auth/countries";
-import { slugify } from "@/lib/site/slug";
+import { isValidSlug, slugify, slugifyTyping } from "@/lib/site/slug";
 import type { SiteErrorKey } from "@/app/api/sites/route";
 
 type ActorCtx = { role: User["role"]; countries: CountryCode[] };
@@ -42,7 +42,10 @@ export type SiteFormValues = {
  * countries and no Global (the route re-enforces this).
  *
  * Slug auto-derives from name until the user edits the slug field, then it stays
- * put. On success the form navigates to the saved Site's detail page.
+ * put. The slug field sanitizes as you type (slugifyTyping) so it can never hold
+ * capitals/spaces/punctuation, and a debounced GET /api/sites/slug-check shows
+ * taken/available live (the route re-checks on write — this is advisory).
+ * On success the form navigates to the saved Site's detail page.
  */
 export function SiteForm({
   siteId,
@@ -142,6 +145,37 @@ export function SiteForm({
   useEffect(() => {
     if (!slugEdited) setSlug(slugify(name));
   }, [name, slugEdited]);
+
+  // Live uniqueness probe, debounced. `null` = nothing to show (empty/invalid/
+  // unchanged-in-edit or still waiting); the create/update route re-checks.
+  const [slugAvail, setSlugAvail] = useState<
+    { slug: string; available: boolean } | null
+  >(null);
+  const [slugChecking, setSlugChecking] = useState(false);
+  useEffect(() => {
+    const candidate = slugify(slug);
+    setSlugAvail(null);
+    if (!isValidSlug(candidate)) { setSlugChecking(false); return; }
+    if (mode === "edit" && candidate === initial?.slug) { setSlugChecking(false); return; }
+    setSlugChecking(true);
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const q = new URLSearchParams({ slug: candidate });
+        if (siteId) q.set("exclude", siteId);
+        const res = await fetch(`/api/sites/slug-check?${q}`, { signal: ctrl.signal });
+        if (!res.ok) return;
+        const data = (await res.json()) as { slug: string; available: boolean };
+        setSlugAvail({ slug: data.slug, available: data.available });
+      } catch {
+        /* aborted / offline — stay silent, the route decides on submit */
+      } finally {
+        if (!ctrl.signal.aborted) setSlugChecking(false);
+      }
+    }, 350);
+    return () => { clearTimeout(timer); ctrl.abort(); };
+  }, [slug, mode, siteId, initial?.slug]);
+  const slugTakenLive = slugAvail !== null && slugAvail.slug === slugify(slug) && !slugAvail.available;
 
   // On success, go to the saved Site's detail page.
   useEffect(() => {
@@ -246,14 +280,17 @@ export function SiteForm({
           required
           value={slug}
           onChange={(e) => {
+            // Sanitize as typed — the field can never hold an invalid slug.
             setSlugEdited(true);
-            setSlug(e.target.value);
+            setSlug(slugifyTyping(e.target.value));
           }}
+          onBlur={() => setSlug((v) => slugify(v))}
           className="font-mono text-sm"
           aria-invalid={
             error === "slugRequired" ||
             error === "slugInvalid" ||
-            error === "slugTaken"
+            error === "slugTaken" ||
+            slugTakenLive
           }
         />
         {fieldError("slugRequired") ||
@@ -264,6 +301,14 @@ export function SiteForm({
               fieldError("slugInvalid") ??
               fieldError("slugTaken")}
           </FieldError>
+        ) : slugTakenLive ? (
+          <FieldError>{t("errors.slugTaken")}</FieldError>
+        ) : slugAvail?.available && slugAvail.slug === slugify(slug) ? (
+          <FieldHint>
+            <span className="text-success">{t("form.slugAvailable")}</span>
+          </FieldHint>
+        ) : slugChecking ? (
+          <FieldHint>{t("form.slugChecking")}</FieldHint>
         ) : (
           <FieldHint>{t("form.slugHint")}</FieldHint>
         )}
@@ -370,7 +415,12 @@ export function SiteForm({
       ) : null}
 
       <div className="flex items-center gap-2">
-        <Button type="submit" loading={pending} className="w-fit">
+        <Button
+          type="submit"
+          loading={pending}
+          disabled={pending || slugTakenLive}
+          className="w-fit"
+        >
           {mode === "create" ? t("form.create") : t("form.save")}
         </Button>
         <Button

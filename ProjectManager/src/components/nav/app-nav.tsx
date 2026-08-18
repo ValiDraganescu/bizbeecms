@@ -56,6 +56,7 @@ export async function AppNav({ user }: { user: User }) {
           {canUserCreateSite(user) ? (
             <NavLink href="/tags" label={tTags("navLink")} />
           ) : null}
+          <NavLink href="/settings/connections" label={tSettings("connections.navLink")} />
         </div>
 
         <div className="ml-auto flex items-center gap-2">

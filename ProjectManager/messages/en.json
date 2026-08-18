@@ -342,7 +342,9 @@
       "openrouterKeyMinted": "A key has been minted for this Site.",
       "create": "Create Site",
       "save": "Save changes",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "slugAvailable": "Slug is available.",
+      "slugChecking": "Checking availability…"
     },
     "detail": {
       "overview": "Overview",
@@ -817,6 +819,46 @@
         "openRouter": "Raw (OpenRouter)",
         "drift": "Drift"
       }
+    },
+    "connections": {
+      "navLink": "MCP",
+      "back": "Back to settings",
+      "title": "MCP connections",
+      "subtitle": "Let Claude Code (or any MCP client) act as you in the ProjectManager — signed in with your own account, no keys to copy.",
+      "open": "Manage MCP connections",
+      "cardDescription": "Connect Claude Code to this ProjectManager as a remote MCP server. Authorization is OAuth: the client opens a browser, you sign in and approve.",
+      "listTitle": "Authorized clients",
+      "listDescription": "Clients that currently hold a grant to act as you. Revoke one and it stops working immediately.",
+      "loading": "Loading…",
+      "empty": "No clients connected yet.",
+      "createdAt": "Authorized {date}",
+      "lastUsedAt": "Last used {date}",
+      "expiresAt": "Expires {date}",
+      "revoke": "Revoke",
+      "cancel": "Cancel",
+      "revokeTitle": "Revoke access?",
+      "revokeConfirm": "Revoke “{client}”? It will have to be authorized again.",
+      "connectTitle": "Connect Claude Code",
+      "connectIntro": "No secrets needed — the client discovers this server’s OAuth endpoints and opens your browser to sign in.",
+      "connectCliLabel": "CLI",
+      "connectJsonLabel": "Or: .mcp.json (safe to commit)",
+      "connectHint": "Then run /mcp in Claude Code, pick bizbee-pm → Authenticate, approve in the browser, and call the whoami tool.",
+      "copy": "Copy"
+    }
+  },
+  "oauth": {
+    "consent": {
+      "title": "{client} wants to act as you",
+      "subtitle": "in the bizbeecms ProjectManager",
+      "actingAs": "Acting as",
+      "canTitle": "It will be able to",
+      "can1": "Manage your sites and deploy websites",
+      "can2": "Change settings you have permission to change",
+      "can3": "Do everything your role allows — nothing more",
+      "footnote": "Only approve clients you started yourself. This request will return to <host></host>. You can revoke access anytime under Settings → MCP.",
+      "approve": "Approve access",
+      "deny": "Deny",
+      "invalidTitle": "Invalid authorization request"
     }
   }
 }

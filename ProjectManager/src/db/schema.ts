@@ -209,6 +209,72 @@ export const deployEvents = sqliteTable("deploy_events", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+/**
+ * OAuth 2.1 authorization server state (pm-mcp Slice 2). The PM is the ONLY
+ * auth for its remote MCP server (`/mcp`): an MCP client (Claude Code, claude.ai,
+ * MCP Inspector) discovers the AS via `/.well-known/…`, registers itself
+ * dynamically (RFC 7591), sends the user through the PM consent page (PKCE
+ * S256 authorization code), and exchanges the code for a bearer access token.
+ * Tokens act AS the granting user — tools enforce their real role/scope.
+ *
+ * Only token/code HASHES are stored. Access tokens are short-lived; refresh
+ * tokens rotate on use. Deleting the user cascades every grant.
+ */
+export const oauthClients = sqliteTable("oauth_clients", {
+  id: text("id").primaryKey(), // the public client_id
+  name: text("name").notNull(),
+  // JSON array of exact-match redirect URIs (RFC 7591 `redirect_uris`).
+  redirectUris: text("redirect_uris").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export const oauthCodes = sqliteTable("oauth_codes", {
+  codeHash: text("code_hash").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => oauthClients.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  scope: text("scope").notNull().default(""),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  usedAt: integer("used_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export const oauthTokens = sqliteTable(
+  "oauth_tokens",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accessHash: text("access_hash").notNull(),
+    refreshHash: text("refresh_hash").notNull(),
+    scope: text("scope").notNull().default(""),
+    accessExpiresAt: integer("access_expires_at", { mode: "timestamp_ms" }).notNull(),
+    refreshExpiresAt: integer("refresh_expires_at", { mode: "timestamp_ms" }).notNull(),
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => [
+    uniqueIndex("oauth_tokens_access_hash_unique").on(t.accessHash),
+    uniqueIndex("oauth_tokens_refresh_hash_unique").on(t.refreshHash),
+  ],
+);
+
 export const siteUsers = sqliteTable(
   "site_users",
   {
@@ -361,4 +427,7 @@ export type NewUserTag = typeof userTags.$inferInsert;
 export type SiteTag = typeof siteTags.$inferSelect;
 export type NewSiteTag = typeof siteTags.$inferInsert;
 export type DeployEvent = typeof deployEvents.$inferSelect;
+export type OauthClient = typeof oauthClients.$inferSelect;
+export type OauthCode = typeof oauthCodes.$inferSelect;
+export type OauthToken = typeof oauthTokens.$inferSelect;
 export type NewDeployEvent = typeof deployEvents.$inferInsert;

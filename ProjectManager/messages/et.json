@@ -342,7 +342,9 @@
       "openrouterKeyMinted": "Sellele saidile on loodud võti.",
       "create": "Loo sait",
       "save": "Salvesta muudatused",
-      "cancel": "Tühista"
+      "cancel": "Tühista",
+      "slugAvailable": "Slug on vaba.",
+      "slugChecking": "Kontrollime saadavust…"
     },
     "detail": {
       "overview": "Ülevaade",
@@ -817,6 +819,46 @@
         "openRouter": "Toorkulu (OpenRouter)",
         "drift": "Hälve"
       }
+    },
+    "connections": {
+      "navLink": "MCP",
+      "back": "Tagasi seadetesse",
+      "title": "MCP-ühendused",
+      "subtitle": "Luba Claude Code’il (või muul MCP-kliendil) tegutseda ProjectManageris sinuna — oma kontoga sisse logituna, ilma kopeeritavate võtmeteta.",
+      "open": "Halda MCP-ühendusi",
+      "cardDescription": "Ühenda Claude Code selle ProjectManageriga kaug-MCP-serverina. Autoriseerimine on OAuth: klient avab brauseri, sina logid sisse ja kinnitad.",
+      "listTitle": "Volitatud kliendid",
+      "listDescription": "Kliendid, kellel on praegu õigus sinuna tegutseda. Tühista õigus ja see lakkab kohe töötamast.",
+      "loading": "Laadimine…",
+      "empty": "Ühendatud kliente veel pole.",
+      "createdAt": "Volitatud {date}",
+      "lastUsedAt": "Viimati kasutatud {date}",
+      "expiresAt": "Aegub {date}",
+      "revoke": "Tühista",
+      "cancel": "Loobu",
+      "revokeTitle": "Kas tühistada juurdepääs?",
+      "revokeConfirm": "Kas tühistada „{client}”? See tuleb uuesti volitada.",
+      "connectTitle": "Ühenda Claude Code",
+      "connectIntro": "Saladusi pole vaja — klient leiab serveri OAuth-otspunktid ja avab sisselogimiseks brauseri.",
+      "connectCliLabel": "CLI",
+      "connectJsonLabel": "Või: .mcp.json (ohutu commit'ida)",
+      "connectHint": "Seejärel käivita Claude Code’is /mcp, vali bizbee-pm → Authenticate, kinnita brauseris ja kutsu tööriist whoami.",
+      "copy": "Kopeeri"
+    }
+  },
+  "oauth": {
+    "consent": {
+      "title": "{client} soovib tegutseda sinuna",
+      "subtitle": "bizbeecms ProjectManageris",
+      "actingAs": "Tegutseb kasutajana",
+      "canTitle": "See saab",
+      "can1": "Hallata sinu saite ja juurutada veebisaite",
+      "can2": "Muuta seadeid, milleks sul on õigus",
+      "can3": "Teha kõike, mida sinu roll lubab — mitte rohkem",
+      "footnote": "Kinnita ainult kliendid, mille ise käivitasid. Taotlus naaseb aadressile <host></host>. Juurdepääsu saad igal ajal tühistada: Seaded → MCP.",
+      "approve": "Luba juurdepääs",
+      "deny": "Keela",
+      "invalidTitle": "Vigane volitustaotlus"
     }
   }
 }

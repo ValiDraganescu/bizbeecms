@@ -342,7 +342,9 @@
       "openrouterKeyMinted": "Tälle sivustolle on luotu avain.",
       "create": "Luo sivusto",
       "save": "Tallenna muutokset",
-      "cancel": "Peruuta"
+      "cancel": "Peruuta",
+      "slugAvailable": "Slug on vapaa.",
+      "slugChecking": "Tarkistetaan saatavuutta…"
     },
     "detail": {
       "overview": "Yleiskatsaus",
@@ -817,6 +819,46 @@
         "openRouter": "Raaka (OpenRouter)",
         "drift": "Poikkeama"
       }
+    },
+    "connections": {
+      "navLink": "MCP",
+      "back": "Takaisin asetuksiin",
+      "title": "MCP-yhteydet",
+      "subtitle": "Anna Claude Coden (tai muun MCP-asiakkaan) toimia sinuna ProjectManagerissa — omalla tililläsi, ilman kopioitavia avaimia.",
+      "open": "Hallitse MCP-yhteyksiä",
+      "cardDescription": "Yhdistä Claude Code tähän ProjectManageriin etä-MCP-palvelimena. Valtuutus on OAuth: asiakas avaa selaimen, kirjaudut ja hyväksyt.",
+      "listTitle": "Valtuutetut asiakkaat",
+      "listDescription": "Asiakkaat, joilla on tällä hetkellä oikeus toimia sinuna. Peru oikeus, niin se lakkaa toimimasta heti.",
+      "loading": "Ladataan…",
+      "empty": "Ei yhdistettyjä asiakkaita.",
+      "createdAt": "Valtuutettu {date}",
+      "lastUsedAt": "Käytetty viimeksi {date}",
+      "expiresAt": "Vanhenee {date}",
+      "revoke": "Peru",
+      "cancel": "Peruuta",
+      "revokeTitle": "Perutaanko käyttöoikeus?",
+      "revokeConfirm": "Perutaanko ”{client}”? Se on valtuutettava uudelleen.",
+      "connectTitle": "Yhdistä Claude Code",
+      "connectIntro": "Salaisuuksia ei tarvita — asiakas löytää palvelimen OAuth-päätepisteet ja avaa selaimen kirjautumista varten.",
+      "connectCliLabel": "CLI",
+      "connectJsonLabel": "Tai: .mcp.json (turvallinen committoida)",
+      "connectHint": "Aja sitten /mcp Claude Codessa, valitse bizbee-pm → Authenticate, hyväksy selaimessa ja kutsu whoami-työkalua.",
+      "copy": "Kopioi"
+    }
+  },
+  "oauth": {
+    "consent": {
+      "title": "{client} haluaa toimia sinuna",
+      "subtitle": "bizbeecms ProjectManagerissa",
+      "actingAs": "Toimii käyttäjänä",
+      "canTitle": "Se voi",
+      "can1": "Hallita sivustojasi ja julkaista verkkosivuja",
+      "can2": "Muuttaa asetuksia, joihin sinulla on oikeus",
+      "can3": "Tehdä kaiken, minkä roolisi sallii — ei enempää",
+      "footnote": "Hyväksy vain itse käynnistämäsi asiakkaat. Pyyntö palaa osoitteeseen <host></host>. Voit perua oikeuden milloin tahansa kohdasta Asetukset → MCP.",
+      "approve": "Salli käyttö",
+      "deny": "Hylkää",
+      "invalidTitle": "Virheellinen valtuutuspyyntö"
     }
   }
 }
