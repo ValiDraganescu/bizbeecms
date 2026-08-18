@@ -13,20 +13,22 @@ import {
   readPoolUsd,
 } from "./curated.ts";
 
-test("seed covers every purpose with one 'standard' alias at margin 30", () => {
+test("seed covers every purpose: 'standard' first, then 'best', unique keys, margin 30", () => {
   assert.deepEqual(Object.keys(SEED_CURATED_PURPOSES).sort(), [...AI_PURPOSES].sort());
   for (const purpose of AI_PURPOSES) {
-    const [entry, ...rest] = SEED_CURATED_PURPOSES[purpose].models;
-    assert.equal(rest.length, 0);
-    assert.equal(entry.key, "standard");
-    assert.equal(entry.label, "Standard");
-    assert.equal(entry.marginPct, 30);
+    const models = SEED_CURATED_PURPOSES[purpose].models;
+    assert.ok(models.length >= 2, `${purpose} has a standard + a best`);
+    assert.equal(models[0].key, "standard");
+    assert.equal(models[0].label, "Standard");
+    assert.ok(models.some((m) => m.key === "best"), `${purpose} has a 'best' alias`);
+    assert.equal(new Set(models.map((m) => m.key)).size, models.length, "keys unique");
+    for (const m of models) {
+      assert.equal(m.marginPct, 30);
+      assert.match(m.model, /^[a-z0-9-]+\/[a-z0-9.:-]+$/i, `${m.model} looks like an OpenRouter id`);
+    }
   }
-  assert.equal(SEED_CURATED_PURPOSES.chatAgent.models[0].model, "openai/gpt-4o-mini");
-  assert.equal(
-    SEED_CURATED_PURPOSES.imageGenerate.models[0].model,
-    "google/gemini-2.5-flash-image",
-  );
+  // Seed survives the same normalize path as a PUT (nothing dropped).
+  assert.equal(normalizeCuratedPurposes(SEED_CURATED_PURPOSES).dropped, 0);
 });
 
 test("aliasKeyFromLabel slugifies to [a-z0-9-]", () => {

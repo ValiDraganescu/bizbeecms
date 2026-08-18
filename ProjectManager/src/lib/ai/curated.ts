@@ -48,17 +48,55 @@ export const AI_CONFIG_VERSION = 1;
 const MAX_ALIAS_KEY_LENGTH = 40;
 const ALIAS_KEY_RE = /^[a-z0-9-]{1,40}$/;
 
-/** Today's de-facto defaults, seeded on first read (design doc, migration §1). */
+/**
+ * Default curated catalog, seeded on first read. Picked from the CMS benchmark
+ * (`CMS/scripts/ai-bench`, RESULTS-2026-08-18.md): `standard` = best
+ * cost/quality/latency in the cheap tier, `cheap` = the budget option that still
+ * passed, `best` = a known SOTA model for when quality matters more than cost.
+ * Alias KEYS are stable (Sites store them); models behind them are swappable.
+ * Assistant aliases must all accept image input.
+ */
 export const SEED_CURATED_PURPOSES: CuratedPurposes = {
-  chatAgent: { models: [standardEntry("openai/gpt-4o-mini")] },
-  assistant: { models: [standardEntry("openai/gpt-4o-mini")] },
-  imageDescribe: { models: [standardEntry("openai/gpt-4o-mini")] },
-  imageGenerate: { models: [standardEntry("google/gemini-2.5-flash-image")] },
-  translate: { models: [standardEntry("openai/gpt-4o-mini")] },
+  chatAgent: {
+    models: [
+      entry("standard", "Standard", "google/gemini-3.7-flash"),
+      entry("best", "Best", "anthropic/claude-sonnet-5"),
+      entry("fast", "Fast", "x-ai/grok-4.3"),
+      entry("cheap", "Cheap", "google/gemini-3.1-flash-lite"),
+    ],
+  },
+  assistant: {
+    models: [
+      entry("standard", "Standard", "qwen/qwen3.7-plus"),
+      entry("best", "Best", "anthropic/claude-opus-5"),
+      entry("careful", "Careful", "google/gemini-3.7-flash"),
+      entry("cheap", "Cheap", "google/gemini-3.1-flash-lite"),
+    ],
+  },
+  imageDescribe: {
+    models: [
+      entry("standard", "Standard", "google/gemma-4-31b-it"),
+      entry("best", "Best", "anthropic/claude-sonnet-5"),
+    ],
+  },
+  imageGenerate: {
+    models: [
+      entry("standard", "Standard", "google/gemini-3.1-flash-lite-image"),
+      entry("best", "Best", "google/gemini-3-pro-image"),
+      entry("premium", "Premium", "google/gemini-3.1-flash-image"),
+    ],
+  },
+  translate: {
+    models: [
+      entry("standard", "Standard", "google/gemini-2.5-flash-lite"),
+      entry("best", "Best", "anthropic/claude-sonnet-5"),
+      entry("cheap", "Cheap", "google/gemma-4-26b-a4b-it"),
+    ],
+  },
 };
 
-function standardEntry(model: string): CuratedModel {
-  return { key: "standard", label: "Standard", model, marginPct: 30 };
+function entry(key: string, label: string, model: string): CuratedModel {
+  return { key, label, model, marginPct: 30 };
 }
 
 /** An empty catalog: every purpose present, no aliases. */

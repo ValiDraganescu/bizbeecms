@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { emptyCuratedPurposes, SEED_CURATED_PURPOSES } from "./curated.ts";
+import { emptyCuratedPurposes, type CuratedPurposes } from "./curated.ts";
 import { addCuratedModel, removeCuratedModel, updateCuratedModel } from "./curated-edit.ts";
+
+/** A one-alias-per-purpose fixture (independent of the shipped seed). */
+const SEED_CURATED_PURPOSES: CuratedPurposes = Object.fromEntries(
+  Object.entries(emptyCuratedPurposes()).map(([p]) => [p, { models: [{ key: "standard", label: "Standard", model: "openai/gpt-4o-mini", marginPct: 30 }] }]),
+) as CuratedPurposes;
 
 test("add derives a deduped key from the label and appends by default", () => {
   const r = addCuratedModel(SEED_CURATED_PURPOSES, "chatAgent", { label: "Standard", model: "x/y" });
