@@ -1,5 +1,6 @@
 import { getSandbox, type Sandbox } from "@cloudflare/sandbox";
 import { chooseAppOrigin } from "./origin-core";
+import { parseDeployHostnames, shouldUpgradeToHttpDcv } from "./dcv-core";
 import {
   parseDeleteSiteBody,
   teardownOk,
@@ -80,6 +81,11 @@ type DeployBody = {
   // global + per-Site settings; absent → deployer falls back to BUILD_TIMEOUT_SEC
   // env, then DEFAULT_BUILD_TIMEOUT_SEC. See resolveBuildTimeoutSec().
   buildTimeoutSec?: number;
+  // ALL custom hostnames attached to the Site (serve + redirect). Best-effort
+  // side task: after the deploy is dispatched, any hostname that is `active`
+  // but still on TXT DCV is switched to HTTP DCV so cert RENEWALS complete
+  // without the customer re-adding _acme-challenge TXTs. See ensureHttpDcv().
+  hostnames?: string[];
 };
 type AttachBody = {
   slug?: string;
@@ -128,7 +134,7 @@ const HOSTNAME_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{
  * returns immediately.
  */
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === "/health") {
@@ -192,6 +198,10 @@ export default {
           { status: 502 },
         );
       }
+      // Cert-renewal hygiene, off the response path (waitUntil): flip any
+      // active TXT-validated custom hostname to HTTP DCV. Never fails a deploy.
+      const hostnames = parseDeployHostnames(body.hostnames);
+      if (hostnames.length > 0) ctx.waitUntil(ensureHttpDcv(env, hostnames));
       return Response.json({ accepted: true, slug });
     }
 
@@ -267,6 +277,47 @@ export default {
     return new Response("Not found", { status: 404 });
   },
 };
+
+/**
+ * For each custom hostname, if it is `active` (DNS on our edge) but its cert
+ * still validates via TXT, PATCH it to `ssl.method: "http"`. Hostnames are
+ * created with TXT so the cert can issue before DNS cutover, but TXT tokens
+ * rotate on every ~90-day renewal and CF can't write them into the customer's
+ * external DNS — the customer gets a "validate your domain to renew" email
+ * each cycle. HTTP DCV renews hands-off once traffic proxies through us.
+ * Best-effort + idempotent (already-http hostnames are skipped); errors are
+ * logged and swallowed — this must never affect the deploy itself.
+ */
+async function ensureHttpDcv(env: Env, hostnames: string[]): Promise<void> {
+  if (!env.CF_ZONE_ID || !env.CF_API_TOKEN) return;
+  const zone = `https://api.cloudflare.com/client/v4/zones/${env.CF_ZONE_ID}/custom_hostnames`;
+  const headers = {
+    Authorization: `Bearer ${env.CF_API_TOKEN}`,
+    "Content-Type": "application/json",
+  };
+  for (const hostname of hostnames) {
+    try {
+      const look = (await (
+        await fetch(`${zone}?hostname=${encodeURIComponent(hostname)}`, { headers })
+      ).json()) as { result?: CfCustomHostname[] };
+      const rec = look.result?.find((r) => r.hostname === hostname);
+      if (!rec || !shouldUpgradeToHttpDcv(rec)) continue;
+      const res = await fetch(`${zone}/${rec.id}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ ssl: { method: "http", type: "dv" } }),
+      });
+      const json = (await res.json()) as { success?: boolean; errors?: { message?: string }[] };
+      if (res.ok && json.success) {
+        console.log(`dcv: ${hostname} switched txt -> http (auto-renew)`);
+      } else {
+        console.warn(`dcv: PATCH failed for ${hostname}: ${res.status} ${JSON.stringify(json.errors ?? [])}`);
+      }
+    } catch (err) {
+      console.warn(`dcv: error for ${hostname}: ${String(err).slice(0, 200)}`);
+    }
+  }
+}
 
 /**
  * Register a customer custom hostname (Cloudflare for SaaS) against the
@@ -577,6 +628,10 @@ type CfCustomHostname = {
   status: string;
   ssl?: {
     status?: string;
+    // Validation method (txt | http | email) + wildcard flag — read by
+    // ensureHttpDcv to decide the TXT -> HTTP upgrade.
+    method?: string;
+    wildcard?: boolean;
     // Legacy top-level DV fields — present on some CF responses.
     txt_name?: string;
     txt_value?: string;

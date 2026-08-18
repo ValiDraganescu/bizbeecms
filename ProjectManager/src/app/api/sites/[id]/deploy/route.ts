@@ -5,6 +5,7 @@ import { canManageSiteByCountry } from "@/lib/site/authz";
 import {
   findSiteById,
   isUserAssignedToSite,
+  listSiteDomains,
   primaryDomainBySite,
   setSiteDeployStatus,
 } from "@/lib/site/site";
@@ -168,6 +169,12 @@ export async function POST(
   const primaryDomain = (await primaryDomainBySite([siteId])).get(siteId);
   const appOrigin = primaryDomain ? `https://${primaryDomain}` : undefined;
 
+  // ALL attached hostnames (serve + redirect): the deployer uses them to flip
+  // active TXT-validated custom hostnames to HTTP DCV so cert renewals stop
+  // requiring the customer to re-add _acme-challenge TXTs (deployer
+  // ensureHttpDcv). Best-effort on the deployer side; absent = skipped.
+  const hostnames = (await listSiteDomains(siteId)).map((d) => d.hostname);
+
   // Latch to `deploying` before dispatching, so a refresh shows progress and
   // re-clicks are guarded by canStartDeploy.
   await setSiteDeployStatus(siteId, "deploying");
@@ -185,6 +192,7 @@ export async function POST(
         buildTimeoutSec,
         ...(ref ? { ref } : {}),
         ...(appOrigin ? { appOrigin } : {}),
+        ...(hostnames.length > 0 ? { hostnames } : {}),
         ...openrouterBody,
       }),
     });

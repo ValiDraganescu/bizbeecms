@@ -292,6 +292,17 @@ right per-Site CMS Worker by `Host`.
   `">"+redirectTo` (redirect). Returns the DNS records the customer must add: routing (`cname` →
   `cf.bizbeecms.com`, or apex `A`/CNAME-flatten), the **DCV delegation `cname`** (auto-renews the
   cert — recommended), and the one-time `txt`. Idempotent (reuses existing on CF error 1406).
+- **TXT → HTTP DCV on deploy** (`deployer/src/index.ts` `ensureHttpDcv`, pure rules in
+  `deployer/src/dcv-core.ts`): hostnames are created with **TXT** DCV so the cert can issue BEFORE
+  the customer cuts DNS over — but TXT tokens rotate on every ~90-day **renewal**, CF can't write
+  them into the customer's external DNS, and the customer gets Cloudflare's "Validate the domain
+  … to renew its SSL certificate" email (seen 2026-08-18 for `www.restovista.com`; the stale
+  issuance TXTs were still in place). Fix: PM's `/api/sites/[id]/deploy` now sends `hostnames`
+  (ALL `site_domains` of the Site); the deployer, in `ctx.waitUntil` after dispatching the build,
+  looks each one up and, if `status: active` + `ssl.method !== http` (+ not wildcard), PATCHes
+  `ssl: {method: "http"}` — HTTP DCV renews hands-off once traffic proxies through us. Best-effort,
+  idempotent, never fails a deploy. A pending renewal stuck on stale TXTs re-validates over HTTP.
+  So: **redeploying a Site is the fix** for that email; the DCV-delegation CNAME stays optional.
 - **PM serve-vs-redirect UI** (`sites/custom-domain-form.tsx` + `/api/sites/<id>/custom-domain`):
   operator picks per hostname — **Serve this Site** or **Redirect to** another host (default
   `www.<apex>` for an apex). Persisted in `site_domains.redirect_to` (migration `0013`; NULL =

@@ -10,3 +10,9 @@ node_modules/
 
 # MCP server config (per-machine; may hold local endpoints/secrets)
 .mcp.json
+
+# prod-connect (scripts/prod-connect.mjs): generated remote-binding config,
+# active-mode marker and per-env secrets — per-machine, never committed.
+wrangler.prod-remote.jsonc
+.prod-remote.json
+.dev.vars.*
