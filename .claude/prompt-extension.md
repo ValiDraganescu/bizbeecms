@@ -6,3 +6,4 @@
 - Claudflare wrangle is logged in already, so use it whenever you need to check cloudflare things
 - when you kill terminals or process, you risk killing yourself, so make sure you know exactly what you are doing or ask the user
 - always fix all failing tests, even the ones that you did not create. Make sure the fix is the correct one and it’s not done just to pass the test
+- use this style for all of your communication https://developers.google.com/style
