@@ -1,6 +1,11 @@
 {
   "releases": [
     {
+      "version": "2.7.0",
+      "tag": "r-2.7.0",
+      "markdown": "# CMS v2.7.0\n\n_2026-08-18 · changes since r-2.6.1_\n\n## Features\n- **Full CRUD over MCP / AI chat**: data sources, saved requests, collections, collection fields, collection items and chat agents can now be *updated* and *deleted* by the AI assistant and MCP clients — not just created. All updates follow one patch contract: omitted = keep, `null` = reset/clear.\n  - `update_data_source` (partial patch, write-only secret rotation, auth transitions), `set_data_source_request` (upsert with per-key query merge, stable ids), `delete_data_source` / `delete_data_source_request`.\n  - `update_chat_agent` no longer resets model/limits when you only change the system prompt; `set_chat_agent_data_source` / `_collection` are merge patches; per-locale welcome messages merge.\n  - `update_collection` (label, description, public submissions), `update_collection_field` (description/required/default/type — type changes ride the schema rebuild and report the exact coercion applied), `delete_collection`, `restore_collection_item`, and permanent `delete_collection_item` (distinct from archive).\n- **Guarded deletes**: deleting a data source, request or collection is refused while pages, components or chat agents still reference it — the error names every referencing entity and the tool that removes the reference. Guards fail closed on unreadable page data.\n- **`edit_text` gets a `replaceBetween` mode** (exact start/end markers, occurrence, near-miss hints) and new targets: chat-agent system prompt / welcome message, data-request body template, and text/richtext collection item fields.\n- **Authoring guides updated** (data sources, chat agents, tool scopes) to describe the patch surface, guarded deletes and the new edit_text targets.\n\n## Fixes\n- `bodyTemplate` on data-source requests is now validated to be valid JSON *after* placeholder substitution, across create/update/edit_text and the Admin REST routes.\n- `update_chat_agent` rejects unknown `limits` keys by name instead of silently resetting every limit.\n- `update_collection_field required:true` over rows with NULLs is pre-checked and back-filled from the supplied default in the same call.\n\n## Other\n- Custom-domain certificates: after each Site deploy, active custom hostnames still on TXT validation are switched to HTTP validation so cert renewals complete without the customer re-adding `_acme-challenge` TXT records (fixes the \"validate your domain to renew\" emails).\n- Operator tooling: `scripts/prod-connect.mjs` / `/prod-connect` skill to run a local CMS/PM against a Site's production D1/R2 for debugging, and restore local.\n- Internal: tool-dispatch split into per-domain handler modules; chat-agent tool schemas separated; shared arg validators.\n"
+    },
+    {
       "version": "2.6.1",
       "tag": "r-2.6.1",
       "markdown": "# CMS v2.6.1\n\n_2026-07-25 · changes since r-2.6.0_\n\n## Other\n- Settings menu reorganized into 5 clearer groups. SEO and crawler tools (SEO audit, robots, llms.txt, verification, rate limiting) now live under a dedicated **SEO & Crawlers** group, and the old \"Brand & AI\" entry is renamed to **Brand**. No pages moved and no links changed — just easier to find things.\n"
@@ -19,11 +24,6 @@
       "version": "2.3.1",
       "tag": "r-2.3.1",
       "markdown": "# CMS v2.3.1\n\n_2026-07-24 · changes since r-2.3.0_\n\n## Fixes\n- **AI translation no longer hangs forever.** If the translation model opened its response but then went silent, the Page Builder field's translate spinner would spin indefinitely. It now times out with a clear, actionable message (\"the model stopped responding — try again, or pick a different translation model in Settings → AI models\") instead of hanging. Added on both the server (a 504 after the stream stalls) and the browser (a fetch timeout backstop), so the spinner always clears.\n\n## Other\n- Added structured, greppable logging to the translate endpoint (every step and failure mode) to make diagnosing model/streaming issues straightforward from Worker logs.\n"
-    },
-    {
-      "version": "2.2.1",
-      "tag": "r-2.2.1",
-      "markdown": "# CMS v2.2.1\n\n_2026-07-23 · changes since r-2.2.0_\n\n## Fixes\n- **Translating one block field no longer clears its neighbours.** In the Page Builder block inspector, running AI-translate on a field (e.g. a SectionHeading's title) was wiping the block's other translatable fields (e.g. the subtitle) — and the loss was saved, not just visual. Translation now preserves every other prop on the block.\n"
     },
     {
       "version": "1.28.0",
