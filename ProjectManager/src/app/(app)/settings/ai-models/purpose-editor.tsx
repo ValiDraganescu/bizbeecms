@@ -3,23 +3,9 @@
 import { useTranslations } from "next-intl";
 import { Button, Field, FieldHint, FieldLabel, Input } from "@/components/ui";
 import type { AiPurpose, CuratedModel } from "@/lib/ai/curated";
-import type { CatalogModel } from "@/lib/ai/model-catalog";
+import { PURPOSE_CAPABILITY_FILTERS, type CatalogModel } from "@/lib/ai/model-catalog";
 import { ModelPicker } from "./model-picker";
 
-/**
- * Capability pre-filters per purpose: the picker only offers models the
- * purpose's runtime can actually use (mirrors the CMS's own pickers).
- */
-const PURPOSE_FILTERS: Record<
-  AiPurpose,
-  { input?: string[]; output?: string[] }
-> = {
-  chatAgent: {},
-  assistant: {},
-  imageDescribe: { input: ["image"] },
-  imageGenerate: { output: ["image"] },
-  translate: {},
-};
 
 /**
  * One purpose's ordered alias list. Order is the preference order — the FIRST
@@ -42,7 +28,7 @@ export function PurposeEditor({
   onAdd: () => void;
 }) {
   const t = useTranslations("settings.aiModels");
-  const filters = PURPOSE_FILTERS[purpose];
+  const filters = PURPOSE_CAPABILITY_FILTERS[purpose];
 
   function patch(index: number, fields: Partial<CuratedModel>) {
     onChange(models.map((m, i) => (i === index ? { ...m, ...fields } : m)));

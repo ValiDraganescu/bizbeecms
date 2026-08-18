@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import {
+  canCurateAiModels,
   normalizeCuratedPurposes,
   parsePoolUsd,
   type CuratedPurposes,
@@ -28,7 +29,7 @@ import {
  */
 async function isAdmin(): Promise<boolean> {
   const user = await getCurrentUser();
-  return user != null && (user.role === "SuperAdmin" || user.role === "Admin");
+  return user != null && canCurateAiModels(user.role);
 }
 
 export type AiModelsSettings = {

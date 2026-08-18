@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/user";
-import { parseModelCatalog } from "@/lib/ai/model-catalog";
+import { canCurateAiModels } from "@/lib/ai/curated";
+import { fetchOpenRouterCatalog } from "@/lib/ai/openrouter-catalog";
 
 /**
  * OpenRouter model catalog, for the curation page's model picker. A thin
@@ -13,20 +14,13 @@ import { parseModelCatalog } from "@/lib/ai/model-catalog";
  * catalog: label, provider, per-token prices, modalities, context window).
  * Upstream failure → 502; the client falls back to free-text entry.
  */
-const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
-
 export async function GET(): Promise<NextResponse> {
   const user = await getCurrentUser();
-  if (!user || (user.role !== "SuperAdmin" && user.role !== "Admin")) {
+  if (!user || !canCurateAiModels(user.role)) {
     return NextResponse.json({ error: "notAllowed" }, { status: 403 });
   }
-
   try {
-    const res = await fetch(OPENROUTER_MODELS_URL);
-    if (!res.ok) {
-      return NextResponse.json({ error: "upstream" }, { status: 502 });
-    }
-    const models = parseModelCatalog(await res.json());
+    const models = await fetchOpenRouterCatalog();
     return NextResponse.json({ models });
   } catch {
     return NextResponse.json({ error: "upstream" }, { status: 502 });

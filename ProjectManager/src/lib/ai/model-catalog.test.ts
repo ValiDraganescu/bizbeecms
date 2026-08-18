@@ -91,3 +91,11 @@ test("pricePerMillion renders USD/token as USD per 1M tokens", () => {
   assert.equal(pricePerMillion(0.00000015), "0.15");
   assert.equal(pricePerMillion(null), null);
 });
+
+test("negative (dynamic-router) prices are treated as unknown", () => {
+  const [m] = parseModelCatalog([
+    { id: "openrouter/auto", pricing: { prompt: "-1", completion: "-1" }, supported_parameters: ["tools"] },
+  ]);
+  assert.equal(m.price, null);
+  assert.equal(m.outputPrice, null);
+});

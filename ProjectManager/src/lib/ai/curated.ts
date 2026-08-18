@@ -223,3 +223,8 @@ export function checkQuotasWithinPool(
 export function oversellMessage(o: QuotaOversell): string {
   return `Site quotas total $${o.totalUsd} but the monthly credit pool is $${o.poolUsd} — $${o.overUsd} over. Raise the pool or lower a site quota.`;
 }
+
+/** Who may edit the curated catalog / credit pool: Admin+ (same gate as the build timeout). */
+export function canCurateAiModels(role: string): boolean {
+  return role === "SuperAdmin" || role === "Admin";
+}

@@ -3,11 +3,12 @@
  * (`ctx.user`) — authz inside handlers must reuse the same lib functions the UI
  * routes use, so MCP can never do more than the user could in the browser.
  *
- * Ships `whoami` (a connection smoke test); site/settings/deploy tools land in
- * the next slices and simply append to this array.
+ * Ships `whoami` (a connection smoke test) + the Settings → AI models tools
+ * (`tools-ai-models.ts`); site/deploy tools simply append to this array.
  */
 import type { User } from "@/db/schema";
 import type { ToolRegistry } from "./mcp-core";
+import { AI_MODEL_TOOLS } from "./tools-ai-models";
 
 export type ToolCtx = { user: User; grantId: string };
 
@@ -26,4 +27,5 @@ export const PM_TOOLS: ToolRegistry<ToolCtx> = [
       user: { id: ctx.user.id, email: ctx.user.email, role: ctx.user.role },
     }),
   },
+  ...AI_MODEL_TOOLS,
 ];

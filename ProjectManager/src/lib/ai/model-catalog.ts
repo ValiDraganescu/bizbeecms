@@ -72,10 +72,14 @@ function supportsTools(m: RawModel): boolean {
   return Array.isArray(p) && p.includes("tools");
 }
 
-/** Coerce a USD-per-token pricing field (string|number) to a finite number, else null. */
+/**
+ * Coerce a USD-per-token pricing field (string|number) to a finite, non-negative
+ * number, else null. OpenRouter advertises `-1` for its dynamic routers
+ * (`openrouter/auto`) — "priced per routed model" — which is unknown, not free.
+ */
 function toPrice(raw: unknown): number | null {
   const n = typeof raw === "string" ? Number(raw) : typeof raw === "number" ? raw : NaN;
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 function priceField(m: RawModel, field: "prompt" | "completion"): number | null {
@@ -212,4 +216,29 @@ export function catalogModalities(catalog: ReadonlyArray<CatalogModel>): string[
   const known = ORDER.filter((o) => seen.has(o));
   const extra = [...seen].filter((s) => !ORDER.includes(s)).sort();
   return [...known, ...extra];
+}
+
+/**
+ * Capability pre-filters per purpose: only models the purpose's runtime can
+ * actually use (mirrors the CMS's own pickers). Shared by the curation page's
+ * picker and the MCP catalog tools.
+ */
+export const PURPOSE_CAPABILITY_FILTERS: Record<
+  "chatAgent" | "assistant" | "imageDescribe" | "imageGenerate" | "translate",
+  { input?: string[]; output?: string[] }
+> = {
+  chatAgent: {},
+  assistant: {},
+  imageDescribe: { input: ["image"] },
+  imageGenerate: { output: ["image"] },
+  translate: {},
+};
+
+/** Apply a purpose's capability filters to the catalog. */
+export function filterCatalogForPurpose(
+  catalog: ReadonlyArray<CatalogModel>,
+  purpose: keyof typeof PURPOSE_CAPABILITY_FILTERS,
+): CatalogModel[] {
+  const f = PURPOSE_CAPABILITY_FILTERS[purpose];
+  return filterByOutputModalities(filterByModalities(catalog, f.input ?? []), f.output ?? []);
 }
