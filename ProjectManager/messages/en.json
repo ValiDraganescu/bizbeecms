@@ -783,6 +783,14 @@
         "done": "{ok} key(s) updated, {failed} failed.",
         "error": "Couldn’t apply the caps. Try again.",
         "failuresIntro": "These Sites’ keys were not updated:"
+      },
+      "price": {
+        "title": "OpenRouter list price for this model, USD per 1M tokens (before margin). Cached input = cache-read price; providers publish no cached-output price.",
+        "perMillion": "Price /1M tokens:",
+        "input": "input",
+        "cachedInput": "cached input",
+        "output": "output",
+        "cacheWrite": "cache write"
       }
     },
     "aiUsage": {

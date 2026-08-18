@@ -27,6 +27,10 @@ export interface CatalogModel {
   inputPrice: number | null;
   /** Per-output-token USD price (`pricing.completion`); null when none. */
   outputPrice: number | null;
+  /** Per-token USD price for a CACHED input read (`pricing.input_cache_read`); null when the provider has none. */
+  cacheReadPrice: number | null;
+  /** Per-token USD price for writing input into the cache (`pricing.input_cache_write`); null when none. */
+  cacheWritePrice: number | null;
   /** Accepted input modalities; defaults to `["text"]`. */
   inputModalities: string[];
   /** Produced output modalities; defaults to `["text"]`. */
@@ -51,7 +55,7 @@ function labelOf(id: string): string {
 interface RawModel {
   id?: unknown;
   name?: unknown;
-  pricing?: { prompt?: unknown; completion?: unknown } | null;
+  pricing?: { prompt?: unknown; completion?: unknown; input_cache_read?: unknown; input_cache_write?: unknown } | null;
   supported_parameters?: unknown;
   architecture?: { input_modalities?: unknown; output_modalities?: unknown } | null;
   context_length?: unknown;
@@ -82,7 +86,10 @@ function toPrice(raw: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-function priceField(m: RawModel, field: "prompt" | "completion"): number | null {
+function priceField(
+  m: RawModel,
+  field: "prompt" | "completion" | "input_cache_read" | "input_cache_write",
+): number | null {
   const p = m.pricing;
   if (!p || typeof p !== "object") return null;
   return toPrice((p as Record<string, unknown>)[field]);
@@ -123,6 +130,8 @@ export function parseModelCatalog(apiJson: unknown): CatalogModel[] {
       price: input,
       inputPrice: input,
       outputPrice: priceField(m, "completion"),
+      cacheReadPrice: priceField(m, "input_cache_read"),
+      cacheWritePrice: priceField(m, "input_cache_write"),
       inputModalities: parseModalities(
         m.architecture && typeof m.architecture === "object"
           ? m.architecture.input_modalities

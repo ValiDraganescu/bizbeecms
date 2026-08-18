@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { Button, Field, FieldHint, FieldLabel, Input } from "@/components/ui";
 import type { AiPurpose, CuratedModel } from "@/lib/ai/curated";
-import { PURPOSE_CAPABILITY_FILTERS, type CatalogModel } from "@/lib/ai/model-catalog";
+import { PURPOSE_CAPABILITY_FILTERS, pricePerMillion, type CatalogModel } from "@/lib/ai/model-catalog";
 import { ModelPicker } from "./model-picker";
 
 
@@ -146,6 +146,8 @@ export function PurposeEditor({
               />
             </Field>
           </div>
+
+          <PriceStrip model={catalog.find((m) => m.id === entry.model)} t={t} />
         </div>
       ))}
 
@@ -156,5 +158,48 @@ export function PurposeEditor({
         <FieldHint>{t("orderHint")}</FieldHint>
       </div>
     </section>
+  );
+}
+
+/**
+ * OpenRouter's list price for the alias's model, per 1M tokens: input, cached
+ * input (cache read), output — and cache write when the provider bills it.
+ * The catalog carries no "cached output" price (no provider has one). Nothing
+ * rendered when the model isn't in the catalog (free-text id or catalog down).
+ */
+/** USD per 1M tokens; sub-cent prices keep enough decimals to not read as $0.00. */
+function fmtPerMillion(usdPerToken: number): string {
+  const perM = usdPerToken * 1_000_000;
+  if (perM === 0) return "0.00";
+  if (perM < 0.01) return perM.toFixed(4);
+  if (perM < 0.1) return perM.toFixed(3);
+  return pricePerMillion(usdPerToken) ?? perM.toFixed(2);
+}
+
+function PriceStrip({
+  model,
+  t,
+}: {
+  model: CatalogModel | undefined;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  if (!model) return null;
+  const cell = (label: string, v: number | null) => (
+    <span className="inline-flex items-baseline gap-1">
+      <span className="text-foreground-muted">{label}</span>
+      <span className="font-mono text-foreground">{v == null ? "—" : `$${fmtPerMillion(v)}`}</span>
+    </span>
+  );
+  return (
+    <div
+      className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs"
+      title={t("price.title")}
+    >
+      <span className="text-foreground-muted">{t("price.perMillion")}</span>
+      {cell(t("price.input"), model.inputPrice)}
+      {cell(t("price.cachedInput"), model.cacheReadPrice)}
+      {cell(t("price.output"), model.outputPrice)}
+      {model.cacheWritePrice != null ? cell(t("price.cacheWrite"), model.cacheWritePrice) : null}
+    </div>
   );
 }

@@ -783,6 +783,14 @@
         "done": "{ok} võtit uuendatud, {failed} ebaõnnestus.",
         "error": "Piiride rakendamine ebaõnnestus. Proovi uuesti.",
         "failuresIntro": "Nende saitide võtmeid ei uuendatud:"
+      },
+      "price": {
+        "title": "OpenRouteri hinnakirjahind sellele mudelile, USD / 1M tokenit (enne juurdehindlust). Vahemälusisend = vahemälu lugemishind; väljundile vahemäluhinda ei avaldata.",
+        "perMillion": "Hind /1M tokenit:",
+        "input": "sisend",
+        "cachedInput": "vahemälusisend",
+        "output": "väljund",
+        "cacheWrite": "vahemällu kirjutamine"
       }
     },
     "aiUsage": {

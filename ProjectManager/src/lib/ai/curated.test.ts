@@ -13,15 +13,12 @@ import {
   readPoolUsd,
 } from "./curated.ts";
 
-test("seed covers every purpose: 'standard' first, then 'best', unique keys, margin 30", () => {
+test("seed: every purpose has exactly fast (default, first), cheap, best at margin 30", () => {
   assert.deepEqual(Object.keys(SEED_CURATED_PURPOSES).sort(), [...AI_PURPOSES].sort());
   for (const purpose of AI_PURPOSES) {
     const models = SEED_CURATED_PURPOSES[purpose].models;
-    assert.ok(models.length >= 2, `${purpose} has a standard + a best`);
-    assert.equal(models[0].key, "standard");
-    assert.equal(models[0].label, "Standard");
-    assert.ok(models.some((m) => m.key === "best"), `${purpose} has a 'best' alias`);
-    assert.equal(new Set(models.map((m) => m.key)).size, models.length, "keys unique");
+    assert.deepEqual(models.map((m) => m.key), ["fast", "cheap", "best"], purpose);
+    assert.deepEqual(models.map((m) => m.label), ["Fast", "Cheap", "Best"], purpose);
     for (const m of models) {
       assert.equal(m.marginPct, 30);
       assert.match(m.model, /^[a-z0-9-]+\/[a-z0-9.:-]+$/i, `${m.model} looks like an OpenRouter id`);

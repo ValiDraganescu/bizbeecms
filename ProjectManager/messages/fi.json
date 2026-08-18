@@ -783,6 +783,14 @@
         "done": "{ok} avainta päivitetty, {failed} epäonnistui.",
         "error": "Kattojen asetus epäonnistui. Yritä uudelleen.",
         "failuresIntro": "Näiden sivustojen avaimia ei päivitetty:"
+      },
+      "price": {
+        "title": "OpenRouterin listahinta tälle mallille, USD / 1M tokenia (ennen katetta). Välimuistisyöte = välimuistin lukuhinta; tulosteelle ei ole välimuistihintaa.",
+        "perMillion": "Hinta /1M tokenia:",
+        "input": "syöte",
+        "cachedInput": "välimuistisyöte",
+        "output": "tuloste",
+        "cacheWrite": "välimuistiin kirjoitus"
       }
     },
     "aiUsage": {

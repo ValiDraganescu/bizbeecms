@@ -99,3 +99,14 @@ test("negative (dynamic-router) prices are treated as unknown", () => {
   assert.equal(m.price, null);
   assert.equal(m.outputPrice, null);
 });
+
+test("cache read/write prices are parsed when present, null otherwise", () => {
+  const [a, b] = parseModelCatalog([
+    { id: "x/a", pricing: { prompt: "0.000001", completion: "0.000002", input_cache_read: "0.0000001", input_cache_write: "0.00000125" }, supported_parameters: ["tools"] },
+    { id: "x/b", pricing: { prompt: "0.000001", completion: "0.000002" }, supported_parameters: ["tools"] },
+  ]);
+  assert.equal(a.cacheReadPrice, 0.0000001);
+  assert.equal(a.cacheWritePrice, 0.00000125);
+  assert.equal(b.cacheReadPrice, null);
+  assert.equal(b.cacheWritePrice, null);
+});
