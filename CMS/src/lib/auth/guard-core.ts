@@ -97,3 +97,37 @@ export function decideFromValidate(
   }
   return { allow: false, reason: "denied" };
 }
+
+/**
+ * Where to send the browser AFTER a successful login. Normally `/admin`; but a
+ * user who was bounced to the login page from the OAuth consent screen
+ * (`/oauth/authorize?…`, an MCP client waiting on the other end) should land
+ * back on that consent request. The consent page stamps its own URL into the
+ * `bb_after_login` cookie; the password/SSO/Google callbacks read it back here.
+ * Only a SAME-ORIGIN consent path is honored — anything else (absolute URLs,
+ * protocol-relative `//evil`, other paths) falls back to /admin, so this can
+ * never become an open redirect.
+ */
+export const AFTER_LOGIN_COOKIE = "bb_after_login";
+
+export function readCookie(cookieHeader: string | null, name: string): string {
+  if (!cookieHeader) return "";
+  for (const part of cookieHeader.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq < 0) continue;
+    if (part.slice(0, eq).trim() === name) {
+      try {
+        return decodeURIComponent(part.slice(eq + 1).trim());
+      } catch {
+        return "";
+      }
+    }
+  }
+  return "";
+}
+
+export function afterLoginTarget(candidate: string | null | undefined): string {
+  const v = (candidate ?? "").trim();
+  if (v.startsWith("/oauth/authorize?") && !v.startsWith("//") && !/[\r\n\\]/.test(v)) return v;
+  return "/admin";
+}

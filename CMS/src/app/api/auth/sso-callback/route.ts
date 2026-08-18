@@ -1,5 +1,11 @@
+import { cookies } from "next/headers";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { cmsValidateUrl, SESSION_COOKIE } from "@/lib/auth/guard-core";
+import {
+  AFTER_LOGIN_COOKIE,
+  afterLoginTarget,
+  cmsValidateUrl,
+  SESSION_COOKIE,
+} from "@/lib/auth/guard-core";
 import { createSession } from "@/db/session-store";
 import { upsertSsoUser } from "@/db/user-store";
 
@@ -103,5 +109,10 @@ export async function GET(request: Request): Promise<Response> {
     return redirectToAdmin();
   }
 
-  return redirectToAdmin();
+  // Back to /admin — or to the OAuth consent request the user was bounced from
+  // (`bb_after_login`, stamped by the consent page; validated, then cleared).
+  const jar = await cookies();
+  const target = afterLoginTarget(jar.get(AFTER_LOGIN_COOKIE)?.value);
+  jar.delete(AFTER_LOGIN_COOKIE);
+  return new Response(null, { status: 302, headers: { location: target } });
 }

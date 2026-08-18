@@ -39,12 +39,15 @@ export function LoginForm({
   ssoUrl,
   showGoogle = false,
   error: initialError = null,
+  returnTo = "/admin",
 }: {
   showSso: boolean;
   ssoUrl: string;
   showGoogle?: boolean;
   /** A callback error code (e.g. "googleDenied") surfaced from the server. */
   error?: string | null;
+  /** Same-origin path to land on after a password login (default /admin). */
+  returnTo?: string;
 }) {
   const t = useTranslations("login");
   const [email, setEmail] = useState("");
@@ -69,7 +72,7 @@ export function LoginForm({
         return;
       }
       // Hard navigation so the server layout re-runs with the new cookie.
-      window.location.href = "/admin";
+      window.location.href = returnTo;
     } catch {
       setError(t("errorNetwork"));
     } finally {

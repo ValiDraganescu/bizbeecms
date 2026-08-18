@@ -102,7 +102,7 @@ export async function POST(request: Request): Promise<Response> {
     await contentDdlBatch(plan.dropContentTables.map((tableName) => `DROP TABLE ${tableName}`));
   }
   // 2 + 3. Delete all rows from every builtin table the wipe touches, in order.
-  // Never touches user/session/invite/password_reset/login_attempt/api_key/
+  // Never touches user/session/invite/password_reset/login_attempt/oauth_*/
   // icon_cache/chat_thread/chat_conversation/usage_counter (not in
   // WIPE_BUILTIN_TABLES — conversation history/analytics survive an import).
   await db.delete(schema.collection);

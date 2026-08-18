@@ -292,36 +292,66 @@ export const promptVersion = sqliteTable("prompt_version", {
 });
 
 /**
- * API key — a per-Site bearer credential for the remote MCP server (cms-mcp).
- * A local agent (Claude Code) authenticates to THIS site's CMS Worker with
- * `Authorization: Bearer <key>`; the key authorizes managing this one Site only
- * (the DB IS the Site boundary). Only the HASH is stored — the plaintext key is
- * shown ONCE at creation and never recoverable. `revokedAt` set = denied.
- * `keyPrefix` is the leading public segment (e.g. `bzb_AbCd…`) for the admin list
- * so an operator can tell keys apart without ever seeing the secret.
+ * OAuth 2.1 authorization server tables (cms-mcp → OAuth). The remote MCP server
+ * at `/mcp` is authenticated ONLY by access tokens this CMS mints itself: an MCP
+ * client registers (RFC 7591), the signed-in CMS user approves on the consent
+ * page, and the client exchanges a PKCE-bound single-use code for a rotating
+ * access+refresh pair. Only HASHES of codes/tokens are stored. A grant acts AS
+ * the approving CMS user (`user_id`), so authorization follows their role.
  */
-export const apiKey = sqliteTable(
-  "api_key",
+export const oauthClient = sqliteTable("oauth_client", {
+  id: text("id").primaryKey(), // the public client_id
+  name: text("name").notNull(),
+  // JSON array of exact-match redirect URIs (RFC 7591 `redirect_uris`).
+  redirectUris: text("redirect_uris").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export const oauthCode = sqliteTable("oauth_code", {
+  codeHash: text("code_hash").primaryKey(),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => oauthClient.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  redirectUri: text("redirect_uri").notNull(),
+  codeChallenge: text("code_challenge").notNull(),
+  scope: text("scope").notNull().default(""),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  usedAt: integer("used_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export const oauthToken = sqliteTable(
+  "oauth_token",
   {
     id: text("id").primaryKey(),
-    // SHA-256 hex of the full plaintext key. NEVER store the plaintext.
-    keyHash: text("key_hash").notNull(),
-    // Public, non-secret leading chars of the key (e.g. "bzb_AbCd1234") for the
-    // admin list. Safe to show; not enough to authenticate.
-    keyPrefix: text("key_prefix").notNull().default(""),
-    // Operator-supplied label ("Vali's laptop"). Free text.
-    label: text("label").notNull().default(""),
-    // PM user id of the admin who minted it (from the cms-validate decision).
-    createdBy: text("created_by"),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => oauthClient.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessHash: text("access_hash").notNull(),
+    refreshHash: text("refresh_hash").notNull(),
+    scope: text("scope").notNull().default(""),
+    accessExpiresAt: integer("access_expires_at", { mode: "timestamp_ms" }).notNull(),
+    refreshExpiresAt: integer("refresh_expires_at", { mode: "timestamp_ms" }).notNull(),
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
-    // Last time this key authenticated a request; null = unused.
-    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
-    // Set when revoked; a non-null value denies the key. Null = active.
-    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
   },
-  (t) => [uniqueIndex("api_key_hash_unique").on(t.keyHash)],
+  (t) => [
+    uniqueIndex("oauth_token_access_hash_unique").on(t.accessHash),
+    uniqueIndex("oauth_token_refresh_hash_unique").on(t.refreshHash),
+  ],
 );
 
 /**
@@ -758,8 +788,9 @@ export type ChatThread = typeof chatThread.$inferSelect;
 export type NewChatThread = typeof chatThread.$inferInsert;
 export type PageVersion = typeof pageVersion.$inferSelect;
 export type NewPageVersion = typeof pageVersion.$inferInsert;
-export type ApiKey = typeof apiKey.$inferSelect;
-export type NewApiKey = typeof apiKey.$inferInsert;
+export type OauthClient = typeof oauthClient.$inferSelect;
+export type OauthCode = typeof oauthCode.$inferSelect;
+export type OauthToken = typeof oauthToken.$inferSelect;
 export type PromptVersion = typeof promptVersion.$inferSelect;
 export type NewPromptVersion = typeof promptVersion.$inferInsert;
 export type User = typeof user.$inferSelect;

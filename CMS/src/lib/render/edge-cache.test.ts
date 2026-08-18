@@ -441,6 +441,9 @@ test("adminApiNoStore stamps /api and /admin responses lacking Cache-Control", (
     "/admin",
     "/admin/settings/media",
     "/API/pages", // case-insensitive segment match
+    "/oauth/authorize?client_id=x", // consent page shows the signed-in user
+    "/oauth/token",
+    "/mcp",
   ]) {
     assert.equal(
       adminApiNoStore({ pathname, hasCacheControl: false }),

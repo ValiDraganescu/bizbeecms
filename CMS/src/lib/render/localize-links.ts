@@ -20,7 +20,7 @@ import type { ElementPlan, LocaleContext } from "./plan-types.ts";
  * the rest are the admin/app surfaces. Exported as the SINGLE source of truth
  * shared with the edge-cache entrypoint's excluded-path list (`edge-cache.ts`).
  */
-export const SKIP_SEGMENTS = new Set(["media", "api", "admin", "preview", "_next"]);
+export const SKIP_SEGMENTS = new Set(["media", "api", "admin", "preview", "_next", "oauth", "mcp"]);
 
 /** The first path segment of an absolute path, decoded + lowercased ("" for "/"). */
 function firstSegment(path: string): string {

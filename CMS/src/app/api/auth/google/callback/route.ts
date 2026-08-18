@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { AFTER_LOGIN_COOKIE, afterLoginTarget } from "@/lib/auth/guard-core";
 import {
   GOOGLE_JWKS_URI,
   GOOGLE_TOKEN_ENDPOINT,
@@ -148,5 +150,10 @@ export async function GET(request: Request): Promise<Response> {
 
   // 6. Mint the CMS-local session (sets the bizbee_session cookie).
   await createSession(user.id);
-  return redirect("/admin");
+  // Back to /admin — or to the OAuth consent request the user was bounced from
+  // (`bb_after_login`, stamped by the consent page; validated, then cleared).
+  const jar = await cookies();
+  const target = afterLoginTarget(jar.get(AFTER_LOGIN_COOKIE)?.value);
+  jar.delete(AFTER_LOGIN_COOKIE);
+  return new Response(null, { status: 302, headers: { location: target } });
 }

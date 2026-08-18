@@ -332,7 +332,6 @@
     "notFoundPage": "404-sivu",
     "theme": "Teema",
     "brand": "Brändi",
-    "apiKeys": "MCP",
     "users": "Käyttäjät",
     "google": "Google-kirjautuminen",
     "media": "AI-mallit",
@@ -340,7 +339,8 @@
     "assistantChats": "Avustajan keskustelut",
     "iconSet": "Kuvakkeet",
     "exportImport": "Vienti / Tuonti",
-    "llms": "llms.txt"
+    "llms": "llms.txt",
+    "connections": "MCP"
   },
   "theme": {
     "title": "Teema",
@@ -1202,31 +1202,42 @@
     },
     "accrualNote": "Päivittäinen ja ominaisuuskohtainen historia alkaa kertyä tämän sivun julkaisusta; aiempi kulutus näkyy vain kuukausi- ja kokonaissummissa."
   },
-  "apiKeys": {
-    "title": "MCP",
-    "subtitle": "Bearer-avaimet etä-MCP-palvelimelle. Jokainen avain antaa täyden ohjelmallisen pääsyn tähän sivustoon — jaa se vain luotetuille työkaluille.",
-    "forbidden": "Sinulla ei ole oikeutta hallita API-avaimia. Pyydä järjestelmänvalvojaa.",
-    "labelPlaceholder": "Avaimen nimi (esim. Claude Code)",
-    "create": "Luo avain",
-    "creating": "Luodaan…",
-    "loading": "Ladataan avaimia…",
-    "empty": "Ei API-avaimia vielä.",
-    "createdAt": "Luotu {date}",
+  "connections": {
+    "title": "MCP-yhteydet",
+    "subtitle": "Anna Claude Coden (tai minkä tahansa MCP-asiakkaan) hallita tätä sivustoa sinuna — omalla tililläsi, ilman kopioitavia avaimia.",
+    "listTitle": "Valtuutetut asiakkaat",
+    "listDescription": "Asiakkaat, joilla on tällä hetkellä oikeus toimia sinuna tällä sivustolla. Peruuta valtuutus, niin se lakkaa toimimasta heti.",
+    "loading": "Ladataan…",
+    "empty": "Ei vielä yhdistettyjä asiakkaita.",
+    "createdAt": "Valtuutettu {date}",
     "lastUsedAt": "Viimeksi käytetty {date}",
+    "expiresAt": "Vanhenee {date}",
     "revoke": "Peruuta",
-    "revoked": "Peruutettu",
     "cancel": "Kumoa",
-    "revokeConfirm": "Peruutetaanko avain ”{label}”? Sitä käyttävät työkalut lakkaavat toimimasta heti.",
-    "mintedTitle": "Kopioi uusi avaimesi nyt",
-    "mintedWarning": "Tämä on ainoa kerta, kun avain näytetään. Kopioi se ja säilytä turvallisessa paikassa — et näe sitä enää.",
-    "copy": "Kopioi",
-    "done": "Valmis",
+    "revokeTitle": "Peruutetaanko käyttöoikeus?",
+    "revokeConfirm": "Peruutetaanko ”{client}”? Se on valtuutettava uudelleen.",
     "connectTitle": "Yhdistä Claude Code",
-    "connectIntro": "Lisää tämä sivusto Claude Codeen etä-MCP-palvelimena. Korvaa bzb_YOUR_KEY yllä luomallasi avaimella — kaikki CMS-avustajan työkalut ilmestyvät tällöin Claude Codeen.",
-    "connectCliLabel": "Komentorivi (suositeltu)",
-    "connectJsonLabel": "Tai lisää se MCP-asetuksiin (.mcp.json):",
-    "connectEndpoint": "MCP-asetukset",
-    "connectHint": "Yksi avain = yksi sivusto. Tämä osoite hallinnoi vain tätä sivustoa. Peruuta avain yllä katkaistaksesi pääsyn heti."
+    "connectIntro": "Salaisuuksia ei tarvita — asiakas löytää tämän sivuston OAuth-päätepisteet ja avaa selaimen kirjautumista ja hyväksyntää varten.",
+    "connectCliLabel": "CLI",
+    "connectJsonLabel": "Tai: .mcp.json (turvallista committoida)",
+    "connectHint": "Aja sitten /mcp Claude Codessa, valitse {server} → Authenticate, hyväksy selaimessa, niin kaikki CMS-avustajan työkalut ilmestyvät. Yksi sivusto = yksi palvelin-URL.",
+    "copy": "Kopioi"
+  },
+  "oauth": {
+    "consent": {
+      "pageTitle": "Valtuuta käyttö",
+      "title": "{client} haluaa toimia sinuna",
+      "subtitle": "sivustolla {site}",
+      "actingAs": "Toimii käyttäjänä",
+      "canTitle": "Se voi",
+      "can1": "Muokata tämän sivuston sivuja, komponentteja, kokoelmia ja mediaa",
+      "can2": "Muuttaa asetuksia, joihin sinulla on oikeus",
+      "can3": "Tehdä kaiken, minkä roolisi sallii — ei enempää",
+      "footnote": "Hyväksy vain itse käynnistämäsi asiakkaat. Pyyntö palaa osoitteeseen <host></host>. Voit peruuttaa käyttöoikeuden milloin tahansa kohdassa Asetukset → MCP.",
+      "approve": "Hyväksy käyttö",
+      "deny": "Hylkää",
+      "invalidTitle": "Virheellinen valtuutuspyyntö"
+    }
   },
   "inviteEmail": {
     "subject": "Sinut on kutsuttu BizbeeCMS:ään",

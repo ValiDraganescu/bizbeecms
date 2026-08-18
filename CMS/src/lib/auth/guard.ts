@@ -17,7 +17,8 @@ import { getSession } from "@/db/session-store";
 import { findUserById } from "@/db/user-store";
 import type { CmsRole } from "@/db/schema";
 import { SESSION_COOKIE, readSessionCookie, type GuardDecision } from "./guard-core";
-import { canManageUsers, canManageApiKeys } from "./roles";
+import { canManageUsers } from "./roles";
+import type { User } from "@/db/schema";
 import { isPmSsoUser } from "./pm-sso";
 import "./build-failsafe"; // throws if the dev backdoor flag leaks into a prod build
 
@@ -147,9 +148,17 @@ export function requireUserManager(request: Request): Promise<Response | null> {
   return requireRole(request, canManageUsers);
 }
 
-/** Convenience: the API-key surface requires Admin+ (`canManageApiKeys`). */
-export function requireApiKeyManager(request: Request): Promise<Response | null> {
-  return requireRole(request, canManageApiKeys);
+/**
+ * The signed-in CMS user row for the current request (cookie session → user),
+ * or null. Used by the OAuth consent + connections surfaces, which need the real
+ * `user` (id/email/role) rather than a bare allow/deny. NOTE: the DEV_IS_ON
+ * backdoor has no user row, so it resolves to null here — OAuth grants need a
+ * real account (they are FK-bound to `user.id`).
+ */
+export async function currentUser(): Promise<User | null> {
+  const session = await getSession();
+  if (!session) return null;
+  return findUserById(session.userId);
 }
 
 /**
@@ -171,4 +180,4 @@ export async function checkRoleFromHeaders(
 
 // Re-exported for callers that still want the raw cookie name/extractor.
 export { SESSION_COOKIE, readSessionCookie };
-export { canManageUsers, canManageApiKeys, canEditContent, canInvite, canRemoveUser, canChangeRole } from "./roles";
+export { canManageUsers, canEditContent, canInvite, canRemoveUser, canChangeRole } from "./roles";

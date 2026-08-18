@@ -46,7 +46,7 @@ const GROUPS = [
       { key: "aiUsage", href: "/admin/settings/ai-usage" },
       { key: "media", href: "/admin/settings/media" },
       { key: "assistantChats", href: "/admin/settings/assistant" },
-      { key: "apiKeys", href: "/admin/settings/api-keys" },
+      { key: "connections", href: "/admin/settings/connections" },
     ],
   },
   {

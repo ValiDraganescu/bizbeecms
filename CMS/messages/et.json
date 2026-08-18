@@ -332,7 +332,6 @@
     "notFoundPage": "404 leht",
     "theme": "Teema",
     "brand": "Bränd",
-    "apiKeys": "MCP",
     "users": "Kasutajad",
     "google": "Google'i sisselogimine",
     "media": "AI mudelid",
@@ -340,7 +339,8 @@
     "assistantChats": "Assistendi vestlused",
     "iconSet": "Ikoonid",
     "exportImport": "Eksport / Import",
-    "llms": "llms.txt"
+    "llms": "llms.txt",
+    "connections": "MCP"
   },
   "theme": {
     "title": "Teema",
@@ -1202,31 +1202,42 @@
     },
     "accrualNote": "Päevane ja funktsioonipõhine ajalugu hakkab kogunema selle lehe väljalaskest; varasem kulu sisaldub ainult kuu- ja kogusummades."
   },
-  "apiKeys": {
-    "title": "MCP",
-    "subtitle": "Bearer-võtmed kaug-MCP-serverile. Iga võti annab täieliku programmilise juurdepääsu sellele saidile — jaga seda ainult usaldusväärsete tööriistadega.",
-    "forbidden": "Sul pole õigust API-võtmeid hallata. Küsi administraatorilt.",
-    "labelPlaceholder": "Võtme nimi (nt Claude Code)",
-    "create": "Loo võti",
-    "creating": "Loomine…",
-    "loading": "Võtmete laadimine…",
-    "empty": "API-võtmeid veel pole.",
-    "createdAt": "Loodud {date}",
+  "connections": {
+    "title": "MCP ühendused",
+    "subtitle": "Luba Claude Code’il (või mis tahes MCP-kliendil) hallata seda saiti sinuna — oma kontoga sisse logituna, ilma kopeeritavate võtmeteta.",
+    "listTitle": "Volitatud kliendid",
+    "listDescription": "Kliendid, kellel on praegu õigus sellel saidil sinuna tegutseda. Tühista volitus ja see lakkab kohe töötamast.",
+    "loading": "Laadimine…",
+    "empty": "Ühtegi klienti pole veel ühendatud.",
+    "createdAt": "Volitatud {date}",
     "lastUsedAt": "Viimati kasutatud {date}",
+    "expiresAt": "Aegub {date}",
     "revoke": "Tühista",
-    "revoked": "Tühistatud",
     "cancel": "Loobu",
-    "revokeConfirm": "Kas tühistada võti „{label}”? Seda kasutavad tööriistad lõpetavad kohe töötamise.",
-    "mintedTitle": "Kopeeri oma uus võti kohe",
-    "mintedWarning": "See on ainus kord, kui võtit näidatakse. Kopeeri see ja hoia turvalises kohas — sa ei näe seda enam.",
-    "copy": "Kopeeri",
-    "done": "Valmis",
+    "revokeTitle": "Kas tühistada juurdepääs?",
+    "revokeConfirm": "Kas tühistada „{client}”? See tuleb uuesti volitada.",
     "connectTitle": "Ühenda Claude Code",
-    "connectIntro": "Lisa see sait Claude Code'i kaug-MCP-serverina. Asenda bzb_YOUR_KEY võtmega, mille lõid ülal — kõik CMS-i abilise tööriistad ilmuvad seejärel Claude Code'i.",
-    "connectCliLabel": "Käsurida (soovituslik)",
-    "connectJsonLabel": "Või lisa see MCP seadistusse (.mcp.json):",
-    "connectEndpoint": "MCP seadistus",
-    "connectHint": "Üks võti = üks sait. See URL haldab ainult seda saiti. Tühista võti ülal, et juurdepääs kohe katkestada."
+    "connectIntro": "Saladusi pole vaja — klient leiab selle saidi OAuth-otspunktid ja avab brauseri sisselogimiseks ja kinnitamiseks.",
+    "connectCliLabel": "CLI",
+    "connectJsonLabel": "Või: .mcp.json (turvaline committida)",
+    "connectHint": "Seejärel käivita Claude Code’is /mcp, vali {server} → Authenticate, kinnita brauseris ja kõik CMS-i assistendi tööriistad ilmuvad. Üks sait = üks serveri URL.",
+    "copy": "Kopeeri"
+  },
+  "oauth": {
+    "consent": {
+      "pageTitle": "Volita juurdepääs",
+      "title": "{client} soovib tegutseda sinuna",
+      "subtitle": "saidil {site}",
+      "actingAs": "Tegutseb kasutajana",
+      "canTitle": "See saab",
+      "can1": "Muuta selle saidi lehti, komponente, kogusid ja meediat",
+      "can2": "Muuta seadeid, mida sul on õigus muuta",
+      "can3": "Teha kõike, mida sinu roll lubab — mitte rohkem",
+      "footnote": "Kinnita ainult kliente, mille ise käivitasid. Päring naaseb aadressile <host></host>. Juurdepääsu saad igal ajal tühistada jaotises Seaded → MCP.",
+      "approve": "Kinnita juurdepääs",
+      "deny": "Keela",
+      "invalidTitle": "Vigane volituspäring"
+    }
   },
   "inviteEmail": {
     "subject": "Sind on kutsutud BizbeeCMS-i",

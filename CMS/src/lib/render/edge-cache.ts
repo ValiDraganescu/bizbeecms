@@ -211,7 +211,10 @@ export function isEdgeCacheCandidate(input: {
 }
 
 /**
- * Default-deny Cache-Control for the admin/API surfaces (`/api/*`, `/admin/*`).
+ * Default-deny Cache-Control for the admin/API surfaces (`/api/*`, `/admin/*`,
+ * plus the OAuth consent/token surface `/oauth/*` and the MCP endpoint `/mcp` —
+ * the consent page renders the signed-in user's identity, and token/JSON-RPC
+ * responses are per-caller).
  * Deployed Sites sit behind the SaaS zone's edge, and a 200 that carries NO
  * Cache-Control can be cached by zone-level cache config the CMS doesn't
  * control — which served a stale, auth-gated `/api/ai-config/aliases` response
@@ -221,13 +224,15 @@ export function isEdgeCacheCandidate(input: {
  * `no-cache, no-transform`), and everything else gets `private, no-store`.
  * Applies to every method and status — an error body is no safer to cache.
  */
+const NO_STORE_SEGMENTS = new Set(["api", "admin", "oauth", "mcp"]);
+
 export function adminApiNoStore(input: {
   pathname: string;
   hasCacheControl: boolean;
 }): string | null {
   if (input.hasCacheControl) return null;
   const first = pathnameSegments(input.pathname)[0]?.trim().toLowerCase() ?? "";
-  if (first !== "api" && first !== "admin") return null;
+  if (!NO_STORE_SEGMENTS.has(first)) return null;
   return "private, no-store";
 }
 

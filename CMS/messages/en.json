@@ -332,7 +332,6 @@
     "notFoundPage": "404 page",
     "theme": "Theme",
     "brand": "Brand",
-    "apiKeys": "MCP",
     "users": "Users",
     "google": "Google sign-in",
     "media": "AI models",
@@ -340,7 +339,8 @@
     "assistantChats": "Assistant chats",
     "iconSet": "Icons",
     "exportImport": "Export / Import",
-    "llms": "llms.txt"
+    "llms": "llms.txt",
+    "connections": "MCP"
   },
   "theme": {
     "title": "Theme",
@@ -1202,31 +1202,42 @@
     },
     "accrualNote": "Daily and per-feature history starts accruing from the release that introduced this page; earlier spend is included in the monthly and all-time totals only."
   },
-  "apiKeys": {
-    "title": "MCP",
-    "subtitle": "Bearer keys for the remote MCP server. Each key gives full programmatic access to this site — share it only with trusted tools.",
-    "forbidden": "You don't have permission to manage API keys. Ask an Admin.",
-    "labelPlaceholder": "Key label (e.g. Claude Code)",
-    "create": "Create key",
-    "creating": "Creating…",
-    "loading": "Loading keys…",
-    "empty": "No API keys yet.",
-    "createdAt": "Created {date}",
+  "connections": {
+    "title": "MCP connections",
+    "subtitle": "Let Claude Code (or any MCP client) manage this site as you — signed in with your own account, no keys to copy.",
+    "listTitle": "Authorized clients",
+    "listDescription": "Clients that currently hold a grant to act as you on this site. Revoke one and it stops working immediately.",
+    "loading": "Loading…",
+    "empty": "No clients connected yet.",
+    "createdAt": "Authorized {date}",
     "lastUsedAt": "Last used {date}",
+    "expiresAt": "Expires {date}",
     "revoke": "Revoke",
-    "revoked": "Revoked",
     "cancel": "Cancel",
-    "revokeConfirm": "Revoke the key “{label}”? Any tool using it will stop working immediately.",
-    "mintedTitle": "Copy your new key now",
-    "mintedWarning": "This is the only time the key is shown. Copy it and store it somewhere safe — you can't see it again.",
-    "copy": "Copy",
-    "done": "Done",
+    "revokeTitle": "Revoke access?",
+    "revokeConfirm": "Revoke “{client}”? It will have to be authorized again.",
     "connectTitle": "Connect Claude Code",
-    "connectIntro": "Add this site to Claude Code as a remote MCP server. Replace bzb_YOUR_KEY with a key you created above — all the CMS assistant tools then appear in Claude Code.",
-    "connectCliLabel": "CLI (recommended)",
-    "connectJsonLabel": "Or add it to your MCP config (.mcp.json):",
-    "connectEndpoint": "MCP config",
-    "connectHint": "One key = one site. This URL manages only this site. Revoke a key above to cut off access immediately."
+    "connectIntro": "No secrets needed — the client discovers this site’s OAuth endpoints and opens your browser to sign in and approve.",
+    "connectCliLabel": "CLI",
+    "connectJsonLabel": "Or: .mcp.json (safe to commit)",
+    "connectHint": "Then run /mcp in Claude Code, pick {server} → Authenticate, approve in the browser, and all the CMS assistant tools appear. One site = one server URL.",
+    "copy": "Copy"
+  },
+  "oauth": {
+    "consent": {
+      "pageTitle": "Authorize access",
+      "title": "{client} wants to act as you",
+      "subtitle": "on {site}",
+      "actingAs": "Acting as",
+      "canTitle": "It will be able to",
+      "can1": "Edit pages, components, collections and media on this site",
+      "can2": "Change settings you have permission to change",
+      "can3": "Do everything your role allows — nothing more",
+      "footnote": "Only approve clients you started yourself. This request will return to <host></host>. You can revoke access anytime under Settings → MCP.",
+      "approve": "Approve access",
+      "deny": "Deny",
+      "invalidTitle": "Invalid authorization request"
+    }
   },
   "inviteEmail": {
     "subject": "You're invited to BizbeeCMS",

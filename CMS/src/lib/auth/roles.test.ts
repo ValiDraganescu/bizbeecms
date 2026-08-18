@@ -9,7 +9,6 @@ import {
   canInvite,
   canInviteRole,
   canManageUsers,
-  canManageApiKeys,
   canEditContent,
   canRemoveUser,
   canChangeRole,
@@ -44,13 +43,6 @@ test("canManageUsers: Manager and above", () => {
   assert.equal(canManageUsers("Admin"), true);
   assert.equal(canManageUsers("Manager"), true);
   assert.equal(canManageUsers("Editor"), false);
-});
-
-test("canManageApiKeys: Admin and above only", () => {
-  assert.equal(canManageApiKeys("SuperAdmin"), true);
-  assert.equal(canManageApiKeys("Admin"), true);
-  assert.equal(canManageApiKeys("Manager"), false);
-  assert.equal(canManageApiKeys("Editor"), false);
 });
 
 test("canEditContent: every CMS user can edit content", () => {

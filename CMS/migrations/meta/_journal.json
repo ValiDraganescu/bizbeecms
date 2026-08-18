@@ -253,6 +253,20 @@
       "when": 1785346117536,
       "tag": "0035_loose_adam_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1787053643029,
+      "tag": "0036_oauth_server",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1787053643448,
+      "tag": "0037_drop_api_key",
+      "breakpoints": true
     }
   ]
 }
