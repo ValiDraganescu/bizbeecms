@@ -70,7 +70,7 @@ export const SEED_CURATED_PURPOSES: CuratedPurposes = {
     models: [
       entry("fast", "Fast", "qwen/qwen3.7-plus"),
       entry("cheap", "Cheap", "google/gemini-3.1-flash-lite"),
-      entry("best", "Best", "anthropic/claude-opus-5"),
+      entry("best", "Best", "x-ai/grok-4.6"),
     ],
   },
   imageDescribe: {
