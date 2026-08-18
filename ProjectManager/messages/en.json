@@ -445,7 +445,7 @@
     "customDomain": {
       "title": "Custom domain",
       "cardDescription": "Point a customer's own domain at this Site.",
-      "description": "Register a domain the customer controls. They add the DNS records shown below at their registrar; Cloudflare issues the HTTPS certificate automatically.",
+      "description": "Register a domain the customer controls. They add the DNS records shown below at their registrar; once the domain resolves to us, Cloudflare issues the HTTPS certificate and renews it automatically — nothing else to add.",
       "label": "Customer domain",
       "hint": "A domain the customer controls, e.g. example.com or www.example.com",
       "attach": "Add domain",
@@ -460,12 +460,9 @@
         "unknown": "Something went wrong. Please try again."
       },
       "step1Routing": "1. Point the domain at us:",
-      "step2Cert": "2. Validate the HTTPS certificate:",
+      "step2Cert": "2. HTTPS certificate:",
       "attachedHeading": "Attached domains",
       "apexUseA": "Apex domain (no subdomain) — can't use a CNAME, so use these A records:",
-      "showValidation": "Show validation records",
-      "txtAdd": "Add this TXT record (one is enough; add all if your provider allows):",
-      "certIssued": "No validation record needed — the certificate is issued.",
       "guide": {
         "heading": "Setting up a custom domain",
         "intro": "The customer adds a DNS record at their registrar that points their domain at us. Pick the path that matches the domain they want to use.",
@@ -477,8 +474,7 @@
         "moreTitle": "Other options",
         "moreFlatten": "Apex CNAME / CNAME flattening (ALIAS/ANAME): registrars like Cloudflare Registrar or Namecheap let the apex CNAME to cf.bizbeecms.com directly — use it instead of A records when available.",
         "moreAAAA": "AAAA records: optional IPv6 addresses alongside the A records; Cloudflare's anycast already answers over IPv6, so they are not required.",
-        "moreDcv": "Certificate validation (DCV): after the domain is added we show a one-time TXT record to prove control. Providers that support DCV delegation can instead delegate via a _acme-challenge CNAME so renewals are automatic.",
-        "certNote": "Once the record resolves to us, Cloudflare issues and renews the HTTPS certificate automatically."
+        "certNote": "Once the record resolves to us, Cloudflare validates the domain over HTTP and issues and renews the HTTPS certificate automatically — the customer never adds validation records."
       },
       "redirectsTo": "Redirects to {target}",
       "apexOrCname": "…or, if your registrar supports a CNAME on the apex (CNAME flattening / ALIAS), use this instead of the A records:",
@@ -491,10 +487,10 @@
         "targetLabel": "Redirect to",
         "targetHint": "The domain to send visitors to, e.g. www.example.com. Defaults to www. for an apex."
       },
-      "dcvRecommended": "Recommended — adds auto-renewal:",
-      "dcvBody": "Add this CNAME to delegate certificate validation to Cloudflare. The certificate then renews automatically forever, with no further DNS changes.",
-      "txtAlternative": "Or, one-time validation (TXT):",
-      "txtOnly": "Validate the certificate:"
+      "certAuto": "Automatic. As soon as the record above resolves to us, Cloudflare validates the domain over HTTP, issues the certificate and renews it forever. No validation records are needed.",
+      "certActive": "Certificate active",
+      "certPending": "Certificate {status} — waiting for the DNS record to reach us (can take a few minutes after you add it).",
+      "checkStatus": "Check status"
     },
     "dangerZone": {
       "title": "Danger zone",

@@ -29,8 +29,6 @@ export type CustomDomainResult = {
       cname: DnsRecord;
       apexA: { name: string; values: string[] };
     };
-    dcv: DnsRecord | null;
-    txt: DnsRecord[];
   };
 };
 
@@ -43,8 +41,9 @@ const HOSTNAME_RE =
  * Attach a customer custom domain to a deployed Site. Authz mirrors deploy: the
  * actor must MANAGE the Site (country reach OR assignment). Delegates to the
  * deployer's `/attach-domain`, which registers the Cloudflare-for-SaaS custom
- * hostname and records Host->slug for the router. Returns the DNS records the
- * customer must add at their registrar.
+ * hostname (HTTP DCV — the cert validates + renews automatically once DNS
+ * resolves to us) and records Host->slug for the router. Returns the ROUTING
+ * records the customer must add at their registrar + hostname/cert status.
  *
  * Requires the Site to be `deployed` — the router proxies the custom hostname to
  * `bizbeecms-cms-<slug>`, which doesn't exist until the Site is live.

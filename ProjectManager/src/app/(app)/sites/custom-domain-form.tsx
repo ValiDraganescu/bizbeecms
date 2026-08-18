@@ -29,7 +29,9 @@ import type {
  * domains (passed in `domains`) are ALWAYS listed with their routing DNS records,
  * so the operator can re-check setup any time — not just transiently after a
  * submit. Adding a domain POSTs to `/api/sites/<id>/custom-domain` (→ deployer
- * `/attach-domain`), which also returns the one-time cert-validation TXT records.
+ * `/attach-domain`, idempotent), which also returns the hostname + certificate
+ * status — re-POSTing is how "Check status" refreshes it. Certificates use HTTP
+ * DCV: no validation records; CF issues + renews once routing DNS resolves to us.
  *
  * Disabled unless the Site is deployed — the router has no proxy target until the
  * per-Site CMS Worker exists.
@@ -50,10 +52,10 @@ export function CustomDomainForm({
   const [redirectTo, setRedirectTo] = useState("");
   const [error, setError] = useState<CustomDomainError | null>(null);
   const [pending, setPending] = useState(false);
-  // The cert-validation records CF returned for the most recent attach, keyed by
-  // hostname. Not persisted (CF-issued, volatile) — fetched on attach / on demand.
-  const [validation, setValidation] = useState<
-    Record<string, CustomDomainResult["dns"]>
+  // Hostname + certificate status from the most recent attach/check, keyed by
+  // hostname. Not persisted (CF-side, volatile) — fetched on attach / on demand.
+  const [certStatus, setCertStatus] = useState<
+    Record<string, { status: string; ssl: string }>
   >({});
 
   // Default redirect target = www.<apex> when the entered host is a bare apex,
@@ -73,7 +75,10 @@ export function CustomDomainForm({
         | CustomDomainResult
         | { error?: CustomDomainError };
       if (res.ok && "ok" in data && data.ok) {
-        if (data.dns) setValidation((v) => ({ ...v, [data.hostname]: data.dns }));
+        setCertStatus((v) => ({
+          ...v,
+          [data.hostname]: { status: data.status, ssl: data.ssl },
+        }));
         setHostname("");
         setRedirectTo("");
         setMode("serve");
@@ -111,8 +116,8 @@ export function CustomDomainForm({
               key={d.hostname}
               host={d.hostname}
               redirectTo={d.redirectTo}
-              validation={validation[d.hostname] ?? null}
-              onShowValidation={() => attach(d.hostname, d.redirectTo)}
+              cert={certStatus[d.hostname] ?? null}
+              onCheckStatus={() => attach(d.hostname, d.redirectTo)}
               busy={pending}
               t={t}
             />
@@ -224,7 +229,7 @@ export function CustomDomainForm({
  * Always-visible explainer of the DNS options, rendered before any domain is
  * attached. The two common paths (CNAME for a subdomain, A records for the apex)
  * are shown inline with concrete values; the rarer paths (apex CNAME-flattening,
- * AAAA, DCV delegation) live in a collapsed <details> so the empty state stays
+ * AAAA) live in a collapsed <details> so the empty state stays
  * scannable. Native <details> — no JS, no extra dep.
  */
 function SetupGuide({ t }: { t: ReturnType<typeof useTranslations> }) {
@@ -262,7 +267,6 @@ function SetupGuide({ t }: { t: ReturnType<typeof useTranslations> }) {
         <ul className="mt-2 flex list-disc flex-col gap-2 pl-5 text-xs text-foreground-muted">
           <li>{t("guide.moreFlatten")}</li>
           <li>{t("guide.moreAAAA")}</li>
-          <li>{t("guide.moreDcv")}</li>
         </ul>
       </details>
 
@@ -274,15 +278,15 @@ function SetupGuide({ t }: { t: ReturnType<typeof useTranslations> }) {
 function DomainCard({
   host,
   redirectTo,
-  validation,
-  onShowValidation,
+  cert,
+  onCheckStatus,
   busy,
   t,
 }: {
   host: string;
   redirectTo: string | null;
-  validation: CustomDomainResult["dns"] | null;
-  onShowValidation: () => void;
+  cert: { status: string; ssl: string } | null;
+  onCheckStatus: () => void;
   busy: boolean;
   t: ReturnType<typeof useTranslations>;
 }) {
@@ -326,54 +330,35 @@ function DomainCard({
         )}
       </dl>
 
-      {/* Cert-validation records — on demand (CF-issued, not stored). Two ways to
-          validate; we show both with the auto-renewing DCV delegation CNAME first
-          (recommended — the cert renews forever with no further action), and the
-          one-time TXT as the alternative. */}
+      {/* Certificate — HTTP DCV: nothing for the customer to add. Once the
+          routing record resolves to us, Cloudflare validates over HTTP, issues
+          the cert and renews it automatically. We only surface the CF-side
+          status (fetched on demand — the idempotent attach call returns it). */}
       <p className="mt-3 text-sm font-medium">{t("step2Cert")}</p>
-      {validation ? (
-        validation.dcv || validation.txt.length > 0 ? (
-          <dl className="mt-1 flex flex-col gap-3">
-            {validation.dcv ? (
-              <div className="flex flex-col gap-1">
-                <p className="text-xs font-medium">{t("dcvRecommended")}</p>
-                <p className="text-xs text-foreground-muted">{t("dcvBody")}</p>
-                <DnsRow
-                  type="CNAME"
-                  name={validation.dcv.name}
-                  value={validation.dcv.value}
-                />
-              </div>
-            ) : null}
-            {validation.txt.length > 0 ? (
-              <div className="flex flex-col gap-1">
-                <p className="text-xs font-medium">
-                  {validation.dcv ? t("txtAlternative") : t("txtOnly")}
-                </p>
-                <p className="text-xs text-foreground-muted">{t("txtAdd")}</p>
-                {validation.txt.map((r) => (
-                  <DnsRow key={r.value} type="TXT" name={r.name} value={r.value} />
-                ))}
-              </div>
-            ) : null}
-          </dl>
-        ) : (
-          <p className="mt-1 text-sm text-foreground-muted">{t("certIssued")}</p>
-        )
-      ) : (
-        <div className="mt-1">
-          <Button
-            type="button"
-            variant="secondary"
-            loading={busy}
-            disabled={busy}
-            onClick={onShowValidation}
-            className="w-fit"
-          >
-            {t("showValidation")}
-          </Button>
-        </div>
-      )}
+      <p className="mt-1 text-xs text-foreground-muted">{t("certAuto")}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        {cert ? (
+          <p className="text-sm">
+            {cert.ssl === "active" ? (
+              <span className="text-success">{t("certActive")}</span>
+            ) : (
+              <span className="text-foreground-muted">
+                {t("certPending", { status: cert.ssl })}
+              </span>
+            )}
+          </p>
+        ) : null}
+        <Button
+          type="button"
+          variant="secondary"
+          loading={busy}
+          disabled={busy}
+          onClick={onCheckStatus}
+          className="w-fit"
+        >
+          {t("checkStatus")}
+        </Button>
+      </div>
     </div>
   );
 }

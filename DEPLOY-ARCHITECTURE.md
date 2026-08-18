@@ -66,15 +66,14 @@ Pointing a customer's own domain (e.g. `www.restovista.com`, registered anywhere
 CF-for-SaaS. It took several wrong turns; this is the verified-working setup. ALL of these are required:
 
 1. **Attach the custom hostname** — PM custom-domain form → deployer `/attach-domain` → CF
-   `custom_hostnames` API (`ssl: {method:"txt", type:"dv"}`) + writes `HOST_MAP[hostname]=slug`.
+   `custom_hostnames` API (`ssl: {method:"http", type:"dv"}` — HTTP DCV, auto-renew) + writes `HOST_MAP[hostname]=slug`.
 2. **Customer adds DNS at their registrar** (the PM UI now shows all of these — see fix in trap #7):
    - **Routing:** `CNAME www.<domain> → cf.bizbeecms.com` (subdomain). An apex can't CNAME → use
      `A @ → 104.21.34.242` + `A @ → 172.67.210.25` (CF anycast).
-   - **Cert validation:** either the **DCV delegation CNAME** (recommended — the PM UI shows it first;
-     it delegates validation to CF so the cert AUTO-RENEWS forever with no further DNS changes), OR the
-     one-time `_acme-challenge.<host>` **TXT** record(s) CF returns (add all). The hostname is created
-     with TXT method, so the TXT validates the initial issue; without the DCV CNAME, renewal relies on
-     CF's HTTP-validation fallback. Cert goes `pending_validation` → `active` within minutes
+   - **Cert validation: nothing.** The hostname is created with **HTTP DCV** — once the routing record
+     resolves to our edge, CF validates over HTTP, issues the cert and auto-renews it forever. No
+     `_acme-challenge` TXT / DCV-delegation CNAME (the old TXT flow broke renewals — see § custom
+     domains). Cert goes `pending_validation` → `active` within minutes of DNS propagating
      (`Pending Deployment` after that = CF rolling the cert to its edge; wait, don't redeploy).
 3. **Fallback Origin = `cf.bizbeecms.com`** (SSL/TLS → Custom Hostnames → Fallback Origin), and its DNS
    record MUST be **originless: `AAAA 100::`, Proxied** — ⚠️ NOT `A 192.0.2.1`. A real IP makes CF
@@ -98,7 +97,9 @@ redundant under `*/*`, kept for clarity). Adding a NEW infra host on the zone? I
 The deployer read `ssl.txt_name` (top-level), but CF returns DV records under `ssl.validation_records[]`
 (+ a DCV-delegation CNAME under `ssl.dcv_delegation_records[]`). So the form showed only the routing
 CNAME and told the operator to "add the TXT record" it never displayed. Fixed: deployer parses both
-shapes; form shows routing (CNAME + apex A) and all validation records.
+shapes; form shows routing (CNAME + apex A) and all validation records. **Superseded 2026-08-18:**
+validation records are gone entirely — hostnames use HTTP DCV (see § custom domains); the form shows
+routing + certificate status only.
 
 ### 8. SSO on a custom domain bounced the user to workers.dev (host-chain) — VERIFIED FIXED
 Logging into a CMS admin at a custom domain (e.g. `restovista.com/admin`) completed SSO but dumped the
@@ -268,7 +269,7 @@ Lets a customer point their own domain (e.g. `restovista.com`) at a deployed Sit
 right per-Site CMS Worker by `Host`.
 
 ```
-  customer.com  (CNAME → cf.bizbeecms.com, + TXT for DV cert)
+  customer.com  (CNAME → cf.bizbeecms.com; cert via HTTP DCV, auto)
      │
      ▼  CF for SaaS custom hostname (cert auto-issued/renewed) → zone bizbeecms.com
   ┌──────────────────────────┐   HOST_MAP KV    ┌──────────────────────────┐
@@ -287,22 +288,27 @@ right per-Site CMS Worker by `Host`.
   service binding — Sites are created at runtime, so a static binding can't exist for them.
 - **Attach** (`deployer/src/index.ts` `POST /attach-domain`, Bearer `DEPLOYER_SECRET`,
   body `{slug, hostname, redirectTo?}`): registers the custom hostname via the CF
-  `zones/<CF_ZONE_ID>/custom_hostnames` API (`ssl: txt/dv`) — ALWAYS, so even a redirect host
-  gets a cert + reaches our edge. Writes `HOST_MAP[hostname]` = the bare `slug` (serve) or
-  `">"+redirectTo` (redirect). Returns the DNS records the customer must add: routing (`cname` →
-  `cf.bizbeecms.com`, or apex `A`/CNAME-flatten), the **DCV delegation `cname`** (auto-renews the
-  cert — recommended), and the one-time `txt`. Idempotent (reuses existing on CF error 1406).
-- **TXT → HTTP DCV on deploy** (`deployer/src/index.ts` `ensureHttpDcv`, pure rules in
-  `deployer/src/dcv-core.ts`): hostnames are created with **TXT** DCV so the cert can issue BEFORE
-  the customer cuts DNS over — but TXT tokens rotate on every ~90-day **renewal**, CF can't write
-  them into the customer's external DNS, and the customer gets Cloudflare's "Validate the domain
-  … to renew its SSL certificate" email (seen 2026-08-18 for `www.restovista.com`; the stale
-  issuance TXTs were still in place). Fix: PM's `/api/sites/[id]/deploy` now sends `hostnames`
-  (ALL `site_domains` of the Site); the deployer, in `ctx.waitUntil` after dispatching the build,
-  looks each one up and, if `status: active` + `ssl.method !== http` (+ not wildcard), PATCHes
-  `ssl: {method: "http"}` — HTTP DCV renews hands-off once traffic proxies through us. Best-effort,
-  idempotent, never fails a deploy. A pending renewal stuck on stale TXTs re-validates over HTTP.
-  So: **redeploying a Site is the fix** for that email; the DCV-delegation CNAME stays optional.
+  `zones/<CF_ZONE_ID>/custom_hostnames` API with **`ssl: {method: "http", type: "dv"}`** — ALWAYS,
+  so even a redirect host gets a cert + reaches our edge. Writes `HOST_MAP[hostname]` = the bare
+  `slug` (serve) or `">"+redirectTo` (redirect). Returns ONLY the routing records the customer must
+  add (`cname` → `cf.bizbeecms.com`, or apex `A`/CNAME-flatten) + hostname/cert status. Idempotent
+  (reuses existing on CF error 1406; a legacy TXT-method record is PATCHed to `http` on reuse).
+- **Certificate validation = HTTP DCV only** (decided 2026-08-18). Once the customer's routing
+  record resolves to our edge, Cloudflare validates over HTTP, issues the cert and **renews it
+  forever with no customer action** — there are NO `_acme-challenge` TXT / DCV-delegation records
+  in the flow anymore, and the PM UI shows none (just "Certificate active / pending" + a
+  **Check status** button, which re-POSTs the idempotent attach). Trade-off accepted: the cert can
+  only issue AFTER DNS points at us (a few minutes of HTTPS errors on a brand-new hostname; a
+  live domain being migrated should be cut over off-peak). Why: hostnames used to be created with
+  **TXT** DCV, and TXT tokens rotate on every ~90-day renewal — CF can't write them into the
+  customer's external DNS, so the customer got Cloudflare's "Validate the domain … to renew its
+  SSL certificate" email each cycle (seen for `www.restovista.com`; the stale issuance TXTs were
+  still in place). Legacy TXT hostnames are upgraded in two places: on re-attach (above) and on
+  every Site deploy — PM's `/api/sites/[id]/deploy` sends `hostnames` (ALL `site_domains`), the
+  deployer's `ensureHttpDcv` (`ctx.waitUntil`, rules in `deployer/src/dcv-core.ts`) PATCHes any
+  `active` non-http, non-wildcard hostname to `http`. Best-effort, idempotent, never fails a deploy.
+  A renewal stuck on stale TXTs re-validates over HTTP within minutes (verified: www.restovista.com
+  got a fresh cert seconds after the first post-fix deploy).
 - **PM serve-vs-redirect UI** (`sites/custom-domain-form.tsx` + `/api/sites/<id>/custom-domain`):
   operator picks per hostname — **Serve this Site** or **Redirect to** another host (default
   `www.<apex>` for an apex). Persisted in `site_domains.redirect_to` (migration `0013`; NULL =

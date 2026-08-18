@@ -445,7 +445,7 @@
     "customDomain": {
       "title": "Kohandatud domeen",
       "cardDescription": "Suuna kliendi enda domeen sellele saidile.",
-      "description": "Registreeri domeen, mida klient haldab. Klient lisab allpool näidatud DNS-kirjed oma registripidaja juures; Cloudflare väljastab HTTPS-sertifikaadi automaatselt.",
+      "description": "Registreeri kliendi hallatav domeen. Klient lisab allpool näidatud DNS-kirjed oma registripidaja juures; kui domeen osutab meile, väljastab Cloudflare HTTPS-sertifikaadi ja uuendab seda automaatselt — midagi muud lisada pole vaja.",
       "label": "Kliendi domeen",
       "hint": "Domeen, mida klient haldab, nt example.com või www.example.com",
       "attach": "Lisa domeen",
@@ -460,12 +460,9 @@
         "unknown": "Midagi läks valesti. Proovige uuesti."
       },
       "step1Routing": "1. Suuna domeen meile:",
-      "step2Cert": "2. Valideeri HTTPS-sertifikaat:",
+      "step2Cert": "2. HTTPS-sertifikaat:",
       "attachedHeading": "Lisatud domeenid",
       "apexUseA": "Tipptaseme domeen (ilma alamdomeenita) — ei saa kasutada CNAME-kirjet, kasuta neid A-kirjeid:",
-      "showValidation": "Näita valideerimiskirjeid",
-      "txtAdd": "Lisa see TXT-kirje (ühest piisab; lisa kõik, kui teenusepakkuja lubab):",
-      "certIssued": "Valideerimiskirjet pole vaja — sertifikaat on väljastatud.",
       "guide": {
         "heading": "Kohandatud domeeni seadistamine",
         "intro": "Klient lisab oma registripidaja juures DNS-kirje, mis suunab tema domeeni meile. Vali tee selle järgi, millist domeeni ta soovib kasutada.",
@@ -477,8 +474,7 @@
         "moreTitle": "Muud valikud",
         "moreFlatten": "Juure CNAME / CNAME-lamendus (ALIAS/ANAME): registripidajad nagu Cloudflare Registrar või Namecheap lubavad juurel CNAME-osutuse otse aadressile cf.bizbeecms.com — kasuta seda A-kirjete asemel, kui see on saadaval.",
         "moreAAAA": "AAAA-kirjed: valikulised IPv6-aadressid A-kirjete kõrval; Cloudflare'i anycast vastab juba IPv6 kaudu, seega need pole nõutavad.",
-        "moreDcv": "Sertifikaadi kinnitamine (DCV): pärast domeeni lisamist näitame ühekordset TXT-kirjet kontrolli tõestamiseks. DCV-delegeerimist toetavad teenusepakkujad saavad delegeerida _acme-challenge CNAME-iga, nii et uuendamine on automaatne.",
-        "certNote": "Kui kirje osutab meile, väljastab ja uuendab Cloudflare HTTPS-sertifikaadi automaatselt."
+        "certNote": "Kui kirje osutab meile, valideerib Cloudflare domeeni HTTP kaudu ning väljastab ja uuendab HTTPS-sertifikaadi automaatselt — klient ei lisa kunagi valideerimiskirjeid."
       },
       "redirectsTo": "Suunatakse ümber aadressile {target}",
       "apexOrCname": "…või kui sinu registripidaja toetab CNAME-kirjet juurdomeenil (CNAME-lamendamine / ALIAS), kasuta seda A-kirjete asemel:",
@@ -491,10 +487,10 @@
         "targetLabel": "Suuna ümber aadressile",
         "targetHint": "Domeen, kuhu külastajad suunatakse, nt www.example.com. Vaikimisi www. juurdomeeni puhul."
       },
-      "dcvRecommended": "Soovitatav — lubab automaatse uuendamise:",
-      "dcvBody": "Lisa see CNAME, mis delegeerib sertifikaadi valideerimise Cloudflare'ile. Seejärel uueneb sertifikaat automaatselt igavesti, ilma edasiste DNS-muudatusteta.",
-      "txtAlternative": "Või ühekordne valideerimine (TXT):",
-      "txtOnly": "Valideeri sertifikaat:"
+      "certAuto": "Automaatne. Niipea kui ülaltoodud kirje osutab meile, valideerib Cloudflare domeeni HTTP kaudu, väljastab sertifikaadi ja uuendab seda pidevalt. Valideerimiskirjeid pole vaja.",
+      "certActive": "Sertifikaat aktiivne",
+      "certPending": "Sertifikaat: {status} — ootame, et DNS-kirje meieni jõuaks (võib pärast lisamist võtta mõne minuti).",
+      "checkStatus": "Kontrolli olekut"
     },
     "dangerZone": {
       "title": "Ohutsoon",

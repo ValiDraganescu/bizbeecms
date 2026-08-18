@@ -445,7 +445,7 @@
     "customDomain": {
       "title": "Mukautettu verkkotunnus",
       "cardDescription": "Osoita asiakkaan oma verkkotunnus tähän sivustoon.",
-      "description": "Rekisteröi asiakkaan hallitsema verkkotunnus. Asiakas lisää alla näkyvät DNS-tietueet rekisteröijälleen; Cloudflare myöntää HTTPS-varmenteen automaattisesti.",
+      "description": "Rekisteröi asiakkaan hallinnoima verkkotunnus. Asiakas lisää alla näkyvät DNS-tietueet rekisterinpitäjänsä palvelussa; kun verkkotunnus osoittaa meille, Cloudflare myöntää HTTPS-varmenteen ja uusii sen automaattisesti — muuta ei tarvitse lisätä.",
       "label": "Asiakkaan verkkotunnus",
       "hint": "Asiakkaan hallitsema verkkotunnus, esim. example.com tai www.example.com",
       "attach": "Lisää verkkotunnus",
@@ -460,12 +460,9 @@
         "unknown": "Jokin meni pieleen. Yritä uudelleen."
       },
       "step1Routing": "1. Osoita verkkotunnus meille:",
-      "step2Cert": "2. Vahvista HTTPS-varmenne:",
+      "step2Cert": "2. HTTPS-varmenne:",
       "attachedHeading": "Liitetyt verkkotunnukset",
       "apexUseA": "Juuriverkkotunnus (ei alidomeenia) — ei voi käyttää CNAME-tietuetta, käytä näitä A-tietueita:",
-      "showValidation": "Näytä vahvistustietueet",
-      "txtAdd": "Lisää tämä TXT-tietue (yksi riittää; lisää kaikki jos palveluntarjoaja sallii):",
-      "certIssued": "Vahvistustietuetta ei tarvita — varmenne on myönnetty.",
       "guide": {
         "heading": "Oman verkkotunnuksen määritys",
         "intro": "Asiakas lisää rekisteröijällään DNS-tietueen, joka osoittaa verkkotunnuksen meille. Valitse polku sen mukaan, mitä verkkotunnusta hän haluaa käyttää.",
@@ -477,8 +474,7 @@
         "moreTitle": "Muut vaihtoehdot",
         "moreFlatten": "Juuren CNAME / CNAME-litistys (ALIAS/ANAME): rekisteröijät kuten Cloudflare Registrar tai Namecheap sallivat juuren CNAME-osoituksen suoraan osoitteeseen cf.bizbeecms.com — käytä sitä A-tietueiden sijaan, kun se on mahdollista.",
         "moreAAAA": "AAAA-tietueet: valinnaiset IPv6-osoitteet A-tietueiden rinnalle; Cloudflaren anycast vastaa jo IPv6:lla, joten niitä ei vaadita.",
-        "moreDcv": "Varmenteen vahvistus (DCV): kun verkkotunnus on lisätty, näytämme kertaluonteisen TXT-tietueen hallinnan todistamiseksi. DCV-delegointia tukevat palveluntarjoajat voivat delegoida _acme-challenge CNAME:lla, jolloin uusiminen on automaattista.",
-        "certNote": "Kun tietue osoittaa meille, Cloudflare myöntää ja uusii HTTPS-varmenteen automaattisesti."
+        "certNote": "Kun tietue osoittaa meille, Cloudflare vahvistaa verkkotunnuksen HTTP:n kautta sekä myöntää ja uusii HTTPS-varmenteen automaattisesti — asiakas ei koskaan lisää vahvistustietueita."
       },
       "redirectsTo": "Uudelleenohjaa osoitteeseen {target}",
       "apexOrCname": "…tai jos rekisteröijäsi tukee CNAME-tietuetta juuriverkkotunnuksessa (CNAME-litistys / ALIAS), käytä tätä A-tietueiden sijaan:",
@@ -491,10 +487,10 @@
         "targetLabel": "Uudelleenohjaa osoitteeseen",
         "targetHint": "Verkkotunnus, johon kävijät ohjataan, esim. www.example.com. Oletuksena www. juuriverkkotunnukselle."
       },
-      "dcvRecommended": "Suositeltu — ottaa käyttöön automaattisen uusinnan:",
-      "dcvBody": "Lisää tämä CNAME, joka delegoi varmenteen vahvistuksen Cloudflarelle. Varmenne uusitaan tämän jälkeen automaattisesti ikuisesti ilman uusia DNS-muutoksia.",
-      "txtAlternative": "Tai kertaluonteinen vahvistus (TXT):",
-      "txtOnly": "Vahvista varmenne:"
+      "certAuto": "Automaattinen. Heti kun yllä oleva tietue osoittaa meille, Cloudflare vahvistaa verkkotunnuksen HTTP:n kautta, myöntää varmenteen ja uusii sen jatkuvasti. Vahvistustietueita ei tarvita.",
+      "certActive": "Varmenne voimassa",
+      "certPending": "Varmenne: {status} — odotetaan, että DNS-tietue tavoittaa meidät (voi kestää muutaman minuutin lisäämisen jälkeen).",
+      "checkStatus": "Tarkista tila"
     },
     "dangerZone": {
       "title": "Vaaravyöhyke",

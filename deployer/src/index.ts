@@ -302,16 +302,8 @@ async function ensureHttpDcv(env: Env, hostnames: string[]): Promise<void> {
       ).json()) as { result?: CfCustomHostname[] };
       const rec = look.result?.find((r) => r.hostname === hostname);
       if (!rec || !shouldUpgradeToHttpDcv(rec)) continue;
-      const res = await fetch(`${zone}/${rec.id}`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ ssl: { method: "http", type: "dv" } }),
-      });
-      const json = (await res.json()) as { success?: boolean; errors?: { message?: string }[] };
-      if (res.ok && json.success) {
+      if (await patchToHttpDcv(zone, headers, rec.id)) {
         console.log(`dcv: ${hostname} switched txt -> http (auto-renew)`);
-      } else {
-        console.warn(`dcv: PATCH failed for ${hostname}: ${res.status} ${JSON.stringify(json.errors ?? [])}`);
       }
     } catch (err) {
       console.warn(`dcv: error for ${hostname}: ${String(err).slice(0, 200)}`);
@@ -322,9 +314,10 @@ async function ensureHttpDcv(env: Env, hostnames: string[]): Promise<void> {
 /**
  * Register a customer custom hostname (Cloudflare for SaaS) against the
  * bizbeecms.com zone and record Host->slug in the router's KV. CF issues + auto-
- * renews the cert. Returns the DNS records the customer must add at THEIR
- * registrar (CNAME to the fallback origin + a TXT for DV validation), plus the
- * current cert status so the PM can poll.
+ * renews the cert (HTTP DCV — validated automatically once the customer's DNS
+ * resolves to us; no TXT/DCV records). Returns the ROUTING records the customer
+ * must add at THEIR registrar (CNAME to the fallback origin / apex A), plus the
+ * current hostname + cert status so the PM can poll.
  *
  * Idempotent: re-attaching an already-registered hostname returns its existing
  * record rather than erroring, so the PM can safely retry.
@@ -374,7 +367,12 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
     headers: cfHeaders,
     body: JSON.stringify({
       hostname,
-      ssl: { method: "txt", type: "dv" },
+      // HTTP DCV: once the customer's DNS resolves to our edge, Cloudflare
+      // validates over HTTP, issues the cert AND renews it forever with no
+      // customer action. This is the ONLY validation flow we support — no
+      // _acme-challenge TXT / DCV-delegation records for the customer to add.
+      // (Legacy hostnames created with "txt" are upgraded below + on deploy.)
+      ssl: { method: "http", type: "dv" },
     }),
   });
   const json = (await res.json()) as {
@@ -404,28 +402,20 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
     if (!record) {
       return Response.json({ error: "cfLookupFailed" }, { status: 502 });
     }
+    // Legacy hostname still on TXT DCV (pending OR active): move it to HTTP so
+    // it validates/renews hands-off like every new one. Best-effort — the
+    // attach still succeeds on the old record if the PATCH fails.
+    if (!isHttpDcv(record) && !record.ssl?.wildcard) {
+      const patched = await patchToHttpDcv(api, cfHeaders, record.id);
+      if (patched) record = patched;
+    }
   }
 
   // Record the route mapping so the router can resolve this Host. A redirect host
   // stores "><target>" (router 301s it); a serving host stores the bare slug.
   await env.HOST_MAP.put(hostname, redirectTo ? `>${redirectTo}` : slug);
 
-  // CF returns DV records under ssl.validation_records[] (and a one-CNAME DCV
-  // delegation under ssl.dcv_delegation_records[]); some responses also carry the
-  // legacy top-level ssl.txt_name. Gather the TXT records from both shapes.
   const ssl = record?.ssl;
-  const txt = [
-    ...(ssl?.txt_name && ssl.txt_value
-      ? [{ name: ssl.txt_name, value: ssl.txt_value }]
-      : []),
-    ...(ssl?.validation_records ?? [])
-      .filter((v) => v.txt_name && v.txt_value)
-      .map((v) => ({ name: v.txt_name as string, value: v.txt_value as string })),
-  ];
-  const dcv = (ssl?.dcv_delegation_records ?? [])
-    .filter((d) => d.cname && d.cname_target)
-    .map((d) => ({ name: d.cname as string, value: d.cname_target as string }));
-
   return Response.json({
     ok: true,
     hostname,
@@ -433,20 +423,46 @@ async function attachDomain(request: Request, env: Env): Promise<Response> {
     redirectTo,
     status: record?.status ?? "pending",
     ssl: ssl?.status ?? "pending",
-    // Every record the customer might add at their registrar:
-    //  - routing: CNAME the hostname to the fallback origin (or A for an apex).
-    //  - dcv: ONE CNAME that delegates cert validation + renewal to CF (best).
-    //  - txt: _acme-challenge TXT(s) — the alternative DV method.
+    // The ONLY records the customer adds at their registrar: routing. The cert
+    // validates over HTTP automatically once routing resolves to us (no DCV
+    // TXT/CNAME — see the create call above).
     dns: {
       // Subdomain → CNAME; apex → A record to CF anycast (can't CNAME an apex).
       routing: {
         cname: { name: hostname, value: CUSTOM_DOMAIN_FALLBACK_ORIGIN },
         apexA: { name: hostname, values: CUSTOM_DOMAIN_APEX_IPS },
       },
-      dcv: dcv[0] ?? null,
-      txt,
     },
   });
+}
+
+function isHttpDcv(rec: CfCustomHostname): boolean {
+  return (rec.ssl?.method ?? "").toLowerCase() === "http";
+}
+
+/** PATCH a custom hostname to HTTP DCV; returns the updated record or null. */
+async function patchToHttpDcv(
+  zoneApi: string,
+  headers: Record<string, string>,
+  id: string,
+): Promise<CfCustomHostname | null> {
+  try {
+    const res = await fetch(`${zoneApi}/${id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ ssl: { method: "http", type: "dv" } }),
+    });
+    const json = (await res.json()) as {
+      success?: boolean;
+      result?: CfCustomHostname;
+      errors?: { message?: string }[];
+    };
+    if (res.ok && json.success && json.result) return json.result;
+    console.warn(`dcv: PATCH ${id} failed: ${res.status} ${JSON.stringify(json.errors ?? [])}`);
+  } catch (err) {
+    console.warn(`dcv: PATCH ${id} error: ${String(err).slice(0, 200)}`);
+  }
+  return null;
 }
 
 /**
@@ -628,23 +644,10 @@ type CfCustomHostname = {
   status: string;
   ssl?: {
     status?: string;
-    // Validation method (txt | http | email) + wildcard flag — read by
-    // ensureHttpDcv to decide the TXT -> HTTP upgrade.
+    // Validation method (txt | http | email) + wildcard flag — read by the
+    // TXT -> HTTP DCV upgrade (attach reuse path + ensureHttpDcv on deploy).
     method?: string;
     wildcard?: boolean;
-    // Legacy top-level DV fields — present on some CF responses.
-    txt_name?: string;
-    txt_value?: string;
-    // The real location of DV records on current CF responses.
-    validation_records?: {
-      txt_name?: string;
-      txt_value?: string;
-      http_url?: string;
-      http_body?: string;
-    }[];
-    // DCV delegation: ONE CNAME the customer adds so CF manages validation +
-    // renewal automatically (the recommended method).
-    dcv_delegation_records?: { cname?: string; cname_target?: string }[];
   };
 };
 
