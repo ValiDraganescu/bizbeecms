@@ -45,6 +45,7 @@ async function chatOnce(apiKey, req, { timeoutMs = 180_000 } = {}) {
   if (req.maxTokens) body.max_tokens = req.maxTokens;
   if (req.modalities) body.modalities = req.modalities;
   if (req.temperature !== undefined) body.temperature = req.temperature;
+  if (req.reasoning) body.reasoning = req.reasoning;
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);

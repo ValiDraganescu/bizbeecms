@@ -63,7 +63,7 @@ export const SEED_CURATED_PURPOSES: CuratedPurposes = {
     models: [
       entry("fast", "Fast", "x-ai/grok-4.3"),
       entry("cheap", "Cheap", "google/gemini-3.1-flash-lite"),
-      entry("best", "Best", "anthropic/claude-sonnet-5"),
+      entry("best", "Best", "x-ai/grok-4.6"),
     ],
   },
   assistant: {
@@ -77,7 +77,7 @@ export const SEED_CURATED_PURPOSES: CuratedPurposes = {
     models: [
       entry("fast", "Fast", "google/gemma-4-31b-it"),
       entry("cheap", "Cheap", "google/gemma-3-12b-it"),
-      entry("best", "Best", "anthropic/claude-sonnet-5"),
+      entry("best", "Best", "x-ai/grok-4.6"),
     ],
   },
   imageGenerate: {
@@ -91,7 +91,7 @@ export const SEED_CURATED_PURPOSES: CuratedPurposes = {
     models: [
       entry("fast", "Fast", "google/gemini-2.5-flash-lite"),
       entry("cheap", "Cheap", "google/gemma-4-26b-a4b-it"),
-      entry("best", "Best", "anthropic/claude-sonnet-5"),
+      entry("best", "Best", "x-ai/grok-4.6"),
     ],
   },
 };

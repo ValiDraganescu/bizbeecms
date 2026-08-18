@@ -78,6 +78,34 @@ test("describeImage surfaces usage.cost for metering and asks for it", async () 
   const out = await describeImage("u", "vendor/model", "k", fakeFetch);
   assert.deepEqual(out, { description: "A cat.", cost: 0.00042 });
   assert.deepEqual(sentBody.usage, { include: true });
+  // Reasoning is switched OFF for alt text — a thinking model would otherwise
+  // burn the 300-token cap on chain-of-thought and return nothing.
+  assert.deepEqual(sentBody.reasoning, { enabled: false });
+  assert.equal(sentBody.max_tokens, 300);
+});
+
+test("describeImage retries ONCE with minimal effort + a bigger cap when reasoning is mandatory", async () => {
+  const bodies = [];
+  const fakeFetch = async (_url, init) => {
+    bodies.push(JSON.parse(init.body));
+    if (bodies.length === 1) {
+      return { ok: false, status: 400, text: async () => JSON.stringify({ error: { message: "Reasoning is mandatory for this endpoint and cannot be disabled.", code: 400 } }) };
+    }
+    return { ok: true, status: 200, text: async () => JSON.stringify({ choices: [{ message: { content: "A gold logo." } }], usage: { cost: 0.001 } }) };
+  };
+  const out = await describeImage("u", "x-ai/grok-4.6", "k", fakeFetch);
+  assert.deepEqual(out, { description: "A gold logo.", cost: 0.001 });
+  assert.equal(bodies.length, 2);
+  assert.deepEqual(bodies[0].reasoning, { enabled: false });
+  assert.deepEqual(bodies[1].reasoning, { effort: "minimal" });
+  assert.equal(bodies[1].max_tokens, 1200);
+});
+
+test("describeImage does NOT retry on other 400s (one request, empty result)", async () => {
+  let calls = 0;
+  const fakeFetch = async () => { calls += 1; return { ok: false, status: 400, text: async () => JSON.stringify({ error: { message: "invalid image" } }) }; };
+  assert.deepEqual(await describeImage("u", "m", "k", fakeFetch), { description: "" });
+  assert.equal(calls, 1);
 });
 
 test("describeImage returns no description/cost on a non-ok response (upload must still succeed)", async () => {

@@ -22,6 +22,28 @@ const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
 /** Cap the stored description so a runaway model reply can't bloat the row. */
 export const MAX_DESCRIPTION_CHARS = 600;
 
+/**
+ * OpenRouter unified `reasoning` control for alt text (measured in
+ * scripts/ai-bench, 2026-08-18):
+ * - `enabled:false` switches thinking OFF and is ignored by non-reasoning
+ *   models — but models whose reasoning is MANDATORY (grok-4.6, gemini-3.7-flash)
+ *   reject the request with 400 "Reasoning is mandatory for this endpoint".
+ * - `effort:"minimal"` is accepted by those, but on models where thinking is
+ *   OPTIONAL it turns thinking ON (gemma-4, qwen3.7-flash went from perfect to
+ *   empty), so it must never be the first attempt.
+ * Hence: try OFF first; on the mandatory-reasoning refusal retry once with
+ * minimal effort and a larger cap so the answer survives the thinking.
+ */
+export const DESCRIBE_REASONING_OFF = { enabled: false } as const;
+export const DESCRIBE_REASONING_MINIMAL = { effort: "minimal" } as const;
+export const DESCRIBE_MAX_TOKENS = 300;
+export const DESCRIBE_MAX_TOKENS_WITH_REASONING = 1200;
+
+/** Does an OpenRouter error body say this model can't switch reasoning off? */
+export function isReasoningMandatoryError(status: number, body: string): boolean {
+  return status === 400 && /reasoning[^"]{0,60}(mandatory|cannot be disabled|required)/i.test(body);
+}
+
 /** Minimal `fetch` surface (so tests can fake it), mirroring OpenRouterAi. */
 export type FetchLike = (
   url: string,
@@ -109,8 +131,8 @@ export async function describeImage(
   fetchImpl: FetchLike = fetch as unknown as FetchLike,
 ): Promise<DescribeResult> {
   if (!key || !model) return { description: "" };
-  try {
-    const res = await fetchImpl(OPENROUTER_CHAT_URL, {
+  const post = (reasoning: unknown, maxTokens: number) =>
+    fetchImpl(OPENROUTER_CHAT_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
@@ -120,12 +142,21 @@ export async function describeImage(
         model,
         messages: buildDescribeMessages(imageUrl),
         stream: false,
-        max_tokens: 300,
+        max_tokens: maxTokens,
+        // Alt text needs no chain-of-thought — see DESCRIBE_REASONING_* above.
+        reasoning,
         // Actual charged cost in the reply body — the metering source of truth.
         usage: { include: true },
       }),
     });
-    if (!res.ok) return { description: "" };
+  try {
+    let res = await post(DESCRIBE_REASONING_OFF, DESCRIBE_MAX_TOKENS);
+    if (!res.ok) {
+      const errBody = await res.text();
+      if (!isReasoningMandatoryError(res.status, errBody)) return { description: "" };
+      res = await post(DESCRIBE_REASONING_MINIMAL, DESCRIBE_MAX_TOKENS_WITH_REASONING);
+      if (!res.ok) return { description: "" };
+    }
     const raw = await res.text();
     const cost = parseUsageCost(raw);
     return { description: parseDescription(raw), ...(cost === undefined ? {} : { cost }) };

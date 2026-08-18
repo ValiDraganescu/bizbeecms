@@ -1,15 +1,14 @@
 /**
- * Purpose `imageDescribe` — alt text / media-search description. Uses the
- * REAL `buildDescribeMessages` + `parseDescription` (+ the same max_tokens
- * 300) on fixture images with known content; scores keyword recall, format
+ * Purpose `imageDescribe` — alt text / media-search description. Calls the
+ * REAL `describeImage()` (prompt, 300-token cap, reasoning-off + mandatory-
+ * reasoning fallback) on fixture images with known content; scores keyword recall, format
  * (1–2 plain sentences, no markdown, ≤600 chars) and factuality via a judge
  * that sees the image.
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { buildDescribeMessages, parseDescription } from "../../../src/lib/chat/describe-image.ts";
-import { chat } from "../openrouter.mjs";
+import { describeImage } from "../../../src/lib/chat/describe-image.ts";
 import { judge } from "../judge.mjs";
 import { check, judgeCheck } from "./shared.mjs";
 
@@ -30,8 +29,20 @@ export const tasks = IMAGES.map((img) => ({
   id: img.id,
   run: async (ctx) => {
     const url = dataUrl(img.file);
-    const res = await chat(ctx.apiKey, { model: ctx.model, messages: buildDescribeMessages(url), maxTokens: 300 });
-    const desc = parseDescription(JSON.stringify(res.raw));
+    // Call the REAL production function (reasoning-off first, mandatory-reasoning
+    // fallback, 300-token cap) — a fetch wrapper only measures latency/tokens.
+    const t0 = performance.now();
+    let promptTokens = 0, completionTokens = 0, requests = 0;
+    const timedFetch = async (input, init) => {
+      requests += 1;
+      const r = await fetch(input, init);
+      const text = await r.text();
+      try { const u = JSON.parse(text).usage; if (u) { promptTokens += u.prompt_tokens ?? 0; completionTokens += u.completion_tokens ?? 0; } } catch { /* ignore */ }
+      return { ok: r.ok, status: r.status, text: async () => text };
+    };
+    const out = await describeImage(url, ctx.model, ctx.apiKey, timedFetch);
+    const res = { usage: { promptTokens, completionTokens, costUsd: out.cost ?? null, costKnown: out.cost != null }, latencyMs: Math.round(performance.now() - t0) };
+    const desc = out.description;
     const sentences = desc.split(/(?<=[.!?])\s+/).filter(Boolean).length;
     const mustHits = img.must.filter((re) => re.test(desc)).length;
     const shouldHits = img.should.filter((re) => re.test(desc)).length;
@@ -48,7 +59,7 @@ export const tasks = IMAGES.map((img) => ({
       imageDataUrl: url,
     });
     checks.push(judgeCheck("judge: factual + complete", j, 3));
-    return { checks, usage: res.usage, latencyMs: res.latencyMs, transcript: { description: desc } };
+    return { checks, usage: res.usage, latencyMs: res.latencyMs, transcript: { description: desc, requests } };
   },
 }));
 
