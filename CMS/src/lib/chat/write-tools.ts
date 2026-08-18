@@ -107,6 +107,9 @@ export const UPDATE_PAGE_BLOCKS_TOOL = {
             "TOP LEVEL IS SECTIONS ONLY: every top-level block must be a Section; never place " +
             "a component directly at the top level — wrap it in a Section " +
             "(Section → __section_column__ → YourComponent). A bare top-level component is rejected.",
+          // Gemini's API rejects an array schema without `items` (INVALID_ARGUMENT);
+          // a free-form object item keeps the recursive block shape unconstrained.
+          items: { type: "object" },
         },
       },
       required: ["id", "blocks"],

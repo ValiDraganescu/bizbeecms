@@ -89,6 +89,9 @@ export const CREATE_PAGE_TOOL = {
           description:
             "JSON array of blocks: { id, component, props?, children? }. Each " +
             "'component' must name a component that exists. Blocks may nest.",
+          // Gemini's API rejects an array schema without `items` (INVALID_ARGUMENT);
+          // a free-form object item keeps the recursive block shape unconstrained.
+          items: { type: "object" },
         },
         metaTitle: {
           type: "object",
