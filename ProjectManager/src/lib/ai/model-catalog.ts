@@ -228,7 +228,9 @@ export const PURPOSE_CAPABILITY_FILTERS: Record<
   { input?: string[]; output?: string[] }
 > = {
   chatAgent: {},
-  assistant: {},
+  // The CMS assistant takes screenshots/reference images in chat — vision is a
+  // hard requirement (product rule, 2026-08-18), not a nice-to-have.
+  assistant: { input: ["image"] },
   imageDescribe: { input: ["image"] },
   imageGenerate: { output: ["image"] },
   translate: {},

@@ -12,6 +12,8 @@ import { CREATE_COMPONENT_TOOL, validateComponentArtifact } from "../../../src/l
 import { UPDATE_COMPONENT_TOOL, UPDATE_PAGE_BLOCKS_TOOL, SET_BLOCK_PROPS_TOOL, builtinBlockTypes } from "../../../src/lib/chat/write-tools.ts";
 import { LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, GET_PAGE_TOOL, LIST_LOCALES_TOOL, SEARCH_ICONS_TOOL, GET_THEME_TOOL } from "../../../src/lib/chat/read-tools.ts";
 import { EDIT_TEXT_TOOL, validateEditText } from "../../../src/lib/chat/edit-text-tool.ts";
+import { GENERATE_IMAGE_TOOL, validateGenerateImage } from "../../../src/lib/chat/generate-image-tool.ts";
+import { LIST_ASSETS_TOOL } from "../../../src/lib/chat/list-assets-tool.ts";
 import { validateBlocks } from "../../../src/lib/pages/page-blocks.ts";
 import { runToolLoop } from "../openrouter.mjs";
 import { check, judgeCheck } from "./shared.mjs";
@@ -99,9 +101,10 @@ const THEME = {
 const TOOLS = [
   LIST_COMPONENTS_TOOL, GET_COMPONENT_TOOL, GET_PAGE_TOOL, LIST_LOCALES_TOOL, SEARCH_ICONS_TOOL, GET_THEME_TOOL,
   CREATE_COMPONENT_TOOL, UPDATE_COMPONENT_TOOL, UPDATE_PAGE_BLOCKS_TOOL, SET_BLOCK_PROPS_TOOL, EDIT_TEXT_TOOL,
+  GENERATE_IMAGE_TOOL, LIST_ASSETS_TOOL,
 ];
 const TOOL_NAMES = TOOLS.map((t) => t.function.name);
-const WRITE_TOOLS = new Set(["create_component", "update_component", "update_page_blocks", "set_block_props", "edit_text"]);
+const WRITE_TOOLS = new Set(["create_component", "update_component", "update_page_blocks", "set_block_props", "edit_text", "generate_image"]);
 
 function systemPrompt(context) {
   return (
@@ -117,7 +120,14 @@ function mockRunTool(name, args) {
     case "get_component": return args?.name === "Hero" ? { ok: true, component: HERO_ARTIFACT } : { ok: false, errors: [`no component named "${args?.name}"`] };
     case "get_page": return args?.id === PAGE_ID ? { ok: true, page: { id: PAGE.id, title: PAGE.title, slug: PAGE.slug }, blocks: PAGE.blocks } : { ok: false, errors: [`no page with id "${args?.id}"`] };
     case "list_locales": return { ok: true, locales: LOCALES };
-    case "search_icons": return { ok: true, icons: ["utensils", "star", "quote", "map-pin", "phone", "clock"] };
+    case "search_icons": {
+      const q = String(args?.query ?? args?.q ?? "").toLowerCase();
+      const all = ["utensils", "star", "quote", "map-pin", "phone", "clock", "leaf", "award", "chef-hat", "wheat", "fish", "flame"];
+      const hits = all.filter((i) => !q || i.includes(q) || q.includes(i.split("-")[0]));
+      return { ok: true, icons: hits.length ? hits : all };
+    }
+    case "list_assets": return { ok: true, assets: [{ url: "/media/hero.jpg", description: "dining room, pale wood tables" }, { url: "/media/pike-perch.jpg", description: "plated pike-perch with dill" }] };
+    case "generate_image": return { ok: true, url: `/media/generated-${Math.random().toString(36).slice(2, 8)}.png`, message: "image generated and saved to the gallery" };
     case "get_theme": return THEME;
     case "create_component": return { ok: true, name: args?.name, message: "component created" };
     case "update_component": return { ok: true, name: args?.name, message: "component updated" };
@@ -247,6 +257,74 @@ export const tasks = [
           check("identifies Hero + MenuItemCard as image-bearing, not Footer", /Hero/.test(t) && /MenuItemCard/.test(t) && !footerHasImage(t), 2),
           check("concise (< 900 chars)", t.length > 0 && t.length < 900, 1),
         ];
+      }),
+  },
+  {
+    id: "set-hero-title-via-set-block-props",
+    run: (ctx) => runTask(ctx, "page-builder",
+      `On the Home page (id ${PAGE_ID}), change the hero's title to "Dinner by the harbour" (English; Finnish "Illallinen sataman äärellä", Estonian "Õhtusöök sadama ääres"). Only the title — leave everything else exactly as it is.`,
+      async (out) => {
+        const sb = writes(out.calls, "set_block_props");
+        const up = writes(out.calls, "update_page_blocks");
+        const uc = writes(out.calls, "update_component");
+        const checks = [
+          check("read the page first (get_page)", out.calls.some((c) => c.name === "get_page"), 1),
+          check("used set_block_props (not update_page_blocks / update_component)", sb.length >= 1 && up.length === 0 && uc.length === 0, 5, `set_block_props=${sb.length} update_page_blocks=${up.length} update_component=${uc.length}`),
+        ];
+        const a = sb[0]?.args;
+        if (a) {
+          checks.push(check("targets page + hero block id", a.id === PAGE_ID && a.blockId === "hero-1", 3, `id=${a.id} blockId=${a.blockId}`));
+          const title = a.props?.title;
+          checks.push(check("props.title given per locale (en/fi/et)", title && typeof title === "object" && title.en === "Dinner by the harbour" && /Illallinen/.test(title.fi ?? "") && /Õhtusöök/.test(title.et ?? ""), 4, JSON.stringify(title)?.slice(0, 120)));
+          checks.push(check("only title touched", a.props && Object.keys(a.props).length === 1, 2, Object.keys(a.props ?? {}).join(",")));
+        } else if (up[0]?.args) {
+          const v = validateBlocks(up[0].args.blocks);
+          const hero = v.ok ? JSON.stringify(v.blocks) : "";
+          checks.push(check("(fallback) full-tree rewrite still correct + intact", v.ok && /Dinner by the harbour/.test(hero) && /sec-footer/.test(hero) && v.blocks.length === 2, 2));
+        }
+        return checks;
+      }),
+  },
+  {
+    id: "icon-feature-component-with-generated-cutout",
+    run: (ctx) => runTask(ctx, "components",
+      "Create a 'FeatureRow' component: three side-by-side features (icon + short title + one-line text each) — 'Local produce', 'Open kitchen', 'Wine pairing'. Use real icons from the icon library for each. Above the row, a small decorative illustration of a chef's hat that sits directly on the section background (no white box) — generate that image. Translatable text.",
+      async (out) => {
+        const cc = writes(out.calls, "create_component");
+        const gi = writes(out.calls, "generate_image");
+        const si = out.calls.filter((c) => c.name === "search_icons");
+        const args = cc[0]?.args;
+        const checks = [
+          check("searched the icon library (search_icons)", si.length >= 1, 2),
+          check("called generate_image", gi.length >= 1, 3),
+          check("called create_component", cc.length >= 1, 3),
+        ];
+        const g = gi[0]?.args;
+        if (g) {
+          const v = validateGenerateImage(g);
+          checks.push(check("generate_image args validate", v.ok, 1, v.ok ? "" : v.error));
+          checks.push(check("transparentBackground:true for an on-background cut-out", g.transparentBackground === true, 3));
+          checks.push(check("prompt mentions a chef's hat", /chef/i.test(String(g.prompt ?? "")), 1));
+        }
+        if (args) {
+          const v = validateComponentArtifact(args);
+          checks.push(check("artifact passes validateComponentArtifact", v.ok, 4, v.ok ? "" : v.errors.join("; ")));
+          const html = String(args.html ?? "");
+          const schema = args.propsSchema && typeof args.propsSchema === "object" ? args.propsSchema : {};
+          // Quoted names {{icon "x"}} + icon-typed props {{icon glyph}} (default = the name).
+          const quoted = [...html.matchAll(/\{\{icon\s+"([^"]+)"\}\}/g)].map((m) => m[1]);
+          const propRefs = [...html.matchAll(/\{\{icon\s+([A-Za-z_]\w*)\}\}/g)].map((m) => m[1]);
+          const propIcons = propRefs.map((k) => schema[k]).filter((p) => p && p.type === "icon").map((p) => String(p.default ?? ""));
+          const icons = [...quoted, ...propIcons];
+          checks.push(check("uses ≥3 {{icon}} slots (quoted or icon-typed props)", icons.length >= 3, 3, icons.join(",")));
+          checks.push(check("icon names come from search results", icons.length > 0 && icons.every((i) => ["utensils", "star", "quote", "map-pin", "phone", "clock", "leaf", "award", "chef-hat", "wheat", "fish", "flame"].includes(i)), 2, icons.join(",")));
+          const genUrl = gi[0]?.result?.url;
+          const usesGenerated = genUrl && (html.includes(genUrl) || JSON.stringify(schema).includes(genUrl));
+          checks.push(check("generated image URL used in the component (html or image prop default)", !!usesGenerated, 3));
+          checks.push(check("theme tokens only (no raw palette/hex)", !RAW_COLOR_RE.test(html), 2, RAW_COLOR_RE.exec(html)?.[0]));
+          checks.push(check("translatable slots {{t …}}", /\{\{t\s+\w+\}\}/.test(html), 2));
+        }
+        return checks;
       }),
   },
 ];

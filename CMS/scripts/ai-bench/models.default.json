@@ -1,5 +1,5 @@
 {
-  "_comment": "Default candidate matrix per purpose — the CHEAP tier only (we know what frontier OpenAI/Anthropic can do; the question is which budget models are good enough). Override with --models a,b,c. Only models eligible for the purpose (tool-calling for text purposes, vision for imageDescribe, image-out for imageGenerate).",
+  "_comment": "Default candidate matrix per purpose \u2014 the CHEAP tier only (we know what frontier OpenAI/Anthropic can do; the question is which budget models are good enough). Override with --models a,b,c. Only models eligible for the purpose (tool-calling for text purposes, vision for imageDescribe, image-out for imageGenerate). The bench also gates by capability at run time (assistant = image input + tools; ineligible models are skipped with a note).",
   "chatAgent": [
     "google/gemini-3.7-flash",
     "google/gemini-3.1-flash-lite",
@@ -23,15 +23,17 @@
     "google/gemini-3.1-flash-lite",
     "openai/gpt-5.4-mini",
     "openai/gpt-5.4-nano",
+    "openai/gpt-4.1-mini",
     "x-ai/grok-4.3",
     "qwen/qwen3.7-plus",
     "qwen/qwen3.6-plus",
-    "deepseek/deepseek-v4-pro",
-    "deepseek/deepseek-v4-flash",
+    "qwen/qwen3.5-plus-20260420",
     "minimax/minimax-m3",
     "moonshotai/kimi-k2.6",
     "z-ai/glm-4.6v",
-    "mistralai/mistral-medium-3.1"
+    "mistralai/mistral-medium-3.1",
+    "meta-llama/llama-4-maverick",
+    "amazon/nova-2-lite-v1"
   ],
   "translate": [
     "google/gemini-3.1-flash-lite",

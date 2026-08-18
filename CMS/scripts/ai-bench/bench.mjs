@@ -62,6 +62,43 @@ function loadKey() {
 const apiKey = loadKey();
 const defaults = JSON.parse(readFileSync(join(HERE, "models.default.json"), "utf8"));
 
+// ── eligibility: hard capability requirements per purpose (mirrors PM's picker
+// filter, PURPOSE_CAPABILITY_FILTERS). A model that can't take image input is
+// NOT an assistant candidate no matter how well it uses tools.
+const REQUIRE = {
+  assistant: { input: ["image"], tools: true },
+  chatAgent: { tools: true },
+  translate: {},
+  imageDescribe: { input: ["image"] },
+  imageGenerate: { output: ["image"] },
+};
+let catalogById = null;
+async function catalog() {
+  if (catalogById) return catalogById;
+  const res = await fetch("https://openrouter.ai/api/v1/models");
+  const json = await res.json();
+  catalogById = new Map((json.data ?? []).map((m) => [m.id, m]));
+  return catalogById;
+}
+async function eligible(purpose, models) {
+  const req = REQUIRE[purpose] ?? {};
+  const cat = await catalog();
+  const keep = [];
+  for (const id of models) {
+    const m = cat.get(id);
+    if (!m) { console.error(`  ⤫ ${id}: not in the OpenRouter catalog — skipped`); continue; }
+    const inMods = m.architecture?.input_modalities ?? ["text"];
+    const outMods = m.architecture?.output_modalities ?? ["text"];
+    const missing = [];
+    for (const x of req.input ?? []) if (!inMods.includes(x)) missing.push(`input:${x}`);
+    for (const x of req.output ?? []) if (!outMods.includes(x)) missing.push(`output:${x}`);
+    if (req.tools && !(m.supported_parameters ?? []).includes("tools")) missing.push("tools");
+    if (missing.length) { console.error(`  ⤫ ${id}: not eligible for ${purpose} (lacks ${missing.join(", ")}) — skipped`); continue; }
+    keep.push(id);
+  }
+  return keep;
+}
+
 // ── run ──────────────────────────────────────────────────────────────────────
 async function pool(items, n, fn) {
   const results = new Array(items.length);
@@ -85,7 +122,7 @@ const all = {};
 for (const purpose of purposes) {
   const mod = await import(`./tasks/${TASK_FILES[purpose]}.mjs`);
   const tasks = mod.tasks.filter((t) => !taskFilter || taskFilter.has(t.id));
-  const models = modelsOverride ?? defaults[purpose] ?? [];
+  const models = await eligible(purpose, modelsOverride ?? defaults[purpose] ?? []);
   console.error(`\n▶ ${purpose}: ${models.length} models × ${tasks.length} tasks × ${repeat} run(s)${judgeModel ? ` · judge ${judgeModel}` : " · no judge"}`);
 
   const cells = [];
