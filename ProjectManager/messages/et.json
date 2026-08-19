@@ -2,7 +2,14 @@
   "app": {
     "name": "bizbeecms",
     "projectManager": "ProjectManager",
-    "tagline": "Cloudflare'i-põhine mitme saidi B2B valgesildi sisuhaldussüsteem"
+    "tagline": "Cloudflare'i-põhine mitme saidi B2B valgesildi sisuhaldussüsteem",
+    "nav": {
+      "label": "Peanavigatsioon",
+      "home": "Avaleht",
+      "sites": "Saidid",
+      "you": "Sina",
+      "account": "Konto"
+    }
   },
   "locale": {
     "label": "Keel",

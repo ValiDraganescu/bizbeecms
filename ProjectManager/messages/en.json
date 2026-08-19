@@ -2,7 +2,14 @@
   "app": {
     "name": "bizbeecms",
     "projectManager": "ProjectManager",
-    "tagline": "Cloudflare-native multi-site B2B whitelabel CMS"
+    "tagline": "Cloudflare-native multi-site B2B whitelabel CMS",
+    "nav": {
+      "label": "Main navigation",
+      "home": "Home",
+      "sites": "Sites",
+      "you": "You",
+      "account": "Account"
+    }
   },
   "locale": {
     "label": "Language",

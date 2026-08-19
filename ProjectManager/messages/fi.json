@@ -2,7 +2,14 @@
   "app": {
     "name": "bizbeecms",
     "projectManager": "ProjectManager",
-    "tagline": "Cloudflare-natiivi monisivustoinen B2B-whitelabel-sisällönhallinta"
+    "tagline": "Cloudflare-natiivi monisivustoinen B2B-whitelabel-sisällönhallinta",
+    "nav": {
+      "label": "Päänavigointi",
+      "home": "Etusivu",
+      "sites": "Sivustot",
+      "you": "Sinä",
+      "account": "Tili"
+    }
   },
   "locale": {
     "label": "Kieli",
