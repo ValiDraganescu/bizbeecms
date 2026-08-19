@@ -1,103 +1,131 @@
 ---
-description: Repo-specific CMS release tooling for bizbeecms. `commit` ships ordinary changes (delegates to /orc-commit). `release` cuts a CMS release end-to-end — commits any pending work (no push yet), drafts release-notes/<x.y.z>.md from commits since the last r-* tag, bumps CMS/package.json, regenerates the PM manifest, commits, annotated-tags r-<x.y.z>, then pushes branch + tag in ONE push (single CI deploy; no confirmation pause).
-argument-hint: "[commit | release [major|minor|patch]] — default: release"
+description: Repo-specific release tooling for bizbeecms (monorepo). `commit` ships ordinary changes (delegates to /orc-commit). `release` cuts a release for EVERY system that changed since its last tag — CMS (r-<x.y.z>), ProjectManager (pm-v<x.y.z>), deployer (deployer-v<x.y.z>), router (router-v<x.y.z>) — commits pending work (no push yet), drafts per-system release notes, bumps each system's package.json, regenerates the PM manifest, ONE release commit, one annotated tag per released system, then pushes branch + tags in ONE push (single CI deploy; no confirmation pause).
+argument-hint: "[commit | release [major|minor|patch] [cms|pm|deployer|router ...]] — default: release (all changed systems)"
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
-# bizbeecms CMS release tool
+# bizbeecms release tool
 
-This is the **repo-specific** release skill. The CMS is deployed per-Site from a
-**git tag** (`r-<x.y.z>`, `r` = release), so cutting a tagged release with editable notes
-is the source of truth for "what PM can deploy". The `r-` prefix is deliberate: the old
-`cms-v*` series had historical collisions (a version number recut onto a different
-commit), so the `r-` scheme starts clean and the deployer keys off `r-*`. Two commands:
+This is the **repo-specific** release skill for a **monorepo with four independently
+deployed systems**. Each system has its own version (its `package.json`) and its own
+tag series — a release tags **every system that changed**, not just the CMS:
+
+| system   | dir              | tag series          | version file                | deployed by                                        |
+|----------|------------------|---------------------|-----------------------------|----------------------------------------------------|
+| cms      | `CMS/`           | `r-<x.y.z>`         | `CMS/package.json`          | per-Site by the deployer container **from the tag** |
+| pm       | `ProjectManager/`| `pm-v<x.y.z>`       | `ProjectManager/package.json` | CI on push to main (path filter `ProjectManager/**`, `CMS/**`) |
+| deployer | `deployer/`      | `deployer-v<x.y.z>` | `deployer/package.json`     | CI on push to main (path filter `deployer/**`)     |
+| router   | `router/`        | `router-v<x.y.z>`   | `router/package.json`       | CI on push to main (path filter `router/**`)       |
+
+Only the CMS tag is *consumed* by machinery (deployer clones `--branch r-<x.y.z>`; PM's
+version picker is built from `release-notes/*.md`). The other tags are the **record of
+what was shipped** — a PM/deployer/router version → commit mapping — so you can diff,
+bisect and roll back per system. The `r-` prefix is deliberate: the old `cms-v*` series
+had historical collisions, so `r-` starts clean and the deployer keys off `r-*`. `cms-v*`
+and the stray `v0` are retired; never cut them.
+
+Two commands:
 
 - `commit` — ship ordinary working-tree changes. **Delegate to `/orc-commit`** (it
   bumps the right version file, commits, pushes). No tagging. Use this for normal work.
-- `release` — cut a CMS release end-to-end: commit pending work → draft notes → bump →
-  tag → one combined push of branch + tag (no pause; single push = single CI deploy).
+- `release` — cut releases end-to-end: commit pending work → detect which systems
+  changed → draft notes → bump → tag each → one combined push of branch + tags (no
+  pause; single push = single CI run).
 
-The first token of `$ARGUMENTS` is the command (`commit` or `release`); default
-`release`. For `release`, an optional second token forces the semver level
-(`major|minor|patch`), overriding the inferred level.
+Arguments: the first token is the command (`commit` or `release`); default `release`.
+For `release`, optional further tokens: a semver level (`major|minor|patch`) forcing
+the level for **all** released systems, and/or system names (`cms pm deployer router`)
+restricting the release to those systems (they are still only released if changed —
+"nothing changed" is reported, not forced).
 
 ---
 
 ## `commit` — ordinary ship
 
-Just run the generic commit/push flow: invoke `/orc-commit`. Done. (It inspects the
-diff, bumps the dominant project's version file, commits with a conventional subject,
-pushes the current branch.) Nothing CMS-release-specific happens here — no tag.
+Just run the generic commit/push flow: invoke `/orc-commit`. Done. No tag.
 
 ---
 
-## `release` — cut a tagged CMS release
-
-The tag scheme is **`r-<x.y.z>`** (`r` = release; CMS-scoped — this is a monorepo and PM
-versions separately). The canonical version file is **`CMS/package.json`** (`"version"`).
-Legacy `cms-v*` tags exist but are retired (historical collisions); always cut and look
-up `r-*` now.
+## `release` — cut tagged releases for every changed system
 
 ### Step 0 — Pre-flight
 Run in parallel:
 - `git rev-parse --show-toplevel` (work from the repo root)
 - `git status --short` (see what's pending — Step 0.5 commits it)
-- `git fetch --tags` (so the "last tag" check sees remote tags)
+- `git fetch --tags` (so the "last tag" checks see remote tags)
 - `git rev-parse --abbrev-ref HEAD` (the branch you'll push)
 
 ### Step 0.5 — Commit any pending work (DO NOT push yet)
 A release must be reproducible from a clean tree, so if `git status --short` shows
-anything, commit it all **before** computing the range — but **do not push here**.
-Pushing now would trigger a CI deploy for the work commit AND a second one for the
-release commit (two deploys per release). All pushing is deferred to Step 4 so the
-branch + tag go up in a single push = one deploy.
+anything, commit it all **before** computing ranges — but **do not push here**.
+Pushing now would trigger a CI deploy for the work commit AND another for the release
+commit. All pushing is deferred to Step 4 (single push = single CI run).
 ```bash
 git add -A
 git commit -m "<conventional subject summarizing the pending work>"   # read the diff to write it
 ```
 Then re-check `git status --short` — it must be clean before Step 1.
 
-### Step 1 — Find the last r-* tag and the commit range
+### Step 1 — Per system: last tag + commit range + "did it change?"
+For each system, find its last tag and the commits since it that touched **its dir**,
+ignoring previous release commits (they touch version files / notes / the manifest and
+must not count as changes):
 ```bash
-LAST=$(git tag -l 'r-*' --sort=-v:refname | head -1)
+last() { git tag -l "$1" --sort=-v:refname | head -1; }
+LAST_CMS=$(last 'r-*');       LAST_PM=$(last 'pm-v*')
+LAST_DEP=$(last 'deployer-v*'); LAST_RTR=$(last 'router-v*')
+
+changes() {  # $1 = last tag (or empty), $2... = paths
+  local from="$1"; shift
+  git log --oneline --no-merges --invert-grep --grep='^chore(release)' \
+    ${from:+"$from"..}HEAD -- "$@"
+}
+changes "$LAST_CMS" CMS
+changes "$LAST_PM"  ProjectManager
+changes "$LAST_DEP" deployer
+changes "$LAST_RTR" router
 ```
-- If `LAST` is empty → this is the **first** `r-` release. The range is "all history"
-  (`git log --oneline`); seed the new version from `CMS/package.json` (don't go
-  backwards). Ignore the retired `cms-v*` tags for the range.
-- Else the range is `"$LAST"..HEAD`:
-  ```bash
-  git log --oneline "$LAST"..HEAD
-  git log --format='%s%n%b' "$LAST"..HEAD   # full subjects+bodies for grouping
-  ```
-- If the range is **empty** (HEAD is already at the last tag), STOP — nothing to
-  release. Tell the user.
+- A system with an **empty** list is **not released** (no bump, no tag). If **all** are
+  empty → STOP, nothing to release; tell the user.
+- **First tag for a system** (`LAST_*` empty — true today for pm/deployer/router until
+  they get their first tag): don't walk all history. Use the last `r-*` tag as the range
+  start for change detection and notes, and seed the version from the system's
+  `package.json` (bump from there; never go backwards).
+- Shared files (`scripts/`, `docs/`, root `*.md`, `.github/`) belong to no system;
+  don't release anything for them alone. Exception: `.github/workflows/deploy.yml`
+  changes count for whichever systems' jobs they touch — use judgement.
+- Read the full subjects+bodies for each non-empty range (`git log --format='%s%n%b'`)
+  — you'll need them for the level and the notes.
 
-### Step 2 — Pick the semver level from the COMMIT RANGE
-Apply `/orc-commit`'s reasoning (breaking → major, additive feature → minor, fix/
-chore/refactor/docs/test → patch) but across the **whole range of commits since the
-last tag**, not a single diff. Take the **highest** level present in the range.
-- Conventional prefixes help: a `feat!:`/`BREAKING CHANGE` → major; any `feat:` →
-  minor; otherwise patch. These commits use `meeseeks(<goal>): ...` subjects, so read
-  the actual content, not just the prefix.
-- Current version = `CMS/package.json` `"version"`. Compute the next:
-  major → `X+1.0.0`, minor → `X.Y+1.0`, patch → `X.Y.Z+1`.
-- The user can override via the `$ARGUMENTS` second token (`major|minor|patch`). If the
-  range is ambiguous (mixes a clear breaking change with unrelated work), ask one sharp
+### Step 2 — Semver level, per system
+Apply `/orc-commit`'s reasoning (breaking → major, additive feature → minor, fix/chore/
+refactor/docs/test → patch) over **that system's** commit range; take the highest level
+present. A `feat:` in `CMS/` bumps the CMS minor but says nothing about the deployer.
+- Current version = the system's `package.json` `"version"`. Compute next: major →
+  `X+1.0.0`, minor → `X.Y+1.0`, patch → `X.Y.Z+1`.
+- A level token in the arguments overrides the inferred level for all released systems.
+  Ambiguous range (clear breaking change mixed with unrelated work) → ask one sharp
   question before choosing.
+- Cross-cutting features (e.g. a PM route + a deployer endpoint) are a `feat` for
+  **each** system they touch.
 
-Call the result `NEW=<x.y.z>`.
+Call the results `NEW_CMS`, `NEW_PM`, `NEW_DEP`, `NEW_RTR` (only for changed systems).
 
-### Step 3 — Write `release-notes/<NEW>.md`
-Create the file `release-notes/<NEW>.md` (create the `release-notes/` dir if missing).
-Group the commits since `LAST` into sections; drop pure-chore/memory commits if they
-add no user value. Template:
+### Step 3 — Release notes, per system
+Notes live under `release-notes/`:
+- **cms** → `release-notes/<NEW_CMS>.md` (root — the PM manifest reads exactly these)
+- **pm** → `release-notes/pm/<NEW_PM>.md`
+- **deployer** → `release-notes/deployer/<NEW_DEP>.md`
+- **router** → `release-notes/router/<NEW_RTR>.md`
+
+Template (title prefix per system: `CMS`, `ProjectManager`, `Deployer`, `Router`):
 ```markdown
-# CMS v<NEW>
+# <System> v<NEW>
 
-_<YYYY-MM-DD> · changes since <LAST or "first release">_
+_<YYYY-MM-DD> · changes since <LAST tag or "first tagged release">_
 
 ## Features
-- <one line per feature, plain language — what a CMS user/operator gets>
+- <one line per feature, plain language — what a user/operator gets>
 
 ## Fixes
 - <bug fixes>
@@ -106,22 +134,19 @@ _<YYYY-MM-DD> · changes since <LAST or "first release">_
 - <refactors, infra, docs worth mentioning>
 ```
 Drafting rules:
-- Translate `meeseeks(goal): ...` subjects into **user-facing** language; don't just
-  paste commit subjects. A release note tells the operator what changed for them.
-- Omit empty sections.
-- Timestamp the line with `date "+%Y-%m-%d"`.
+- Translate commit subjects into **user-facing** language; don't paste subjects.
+- A commit touching two systems appears in **both** notes, phrased for each audience
+  (CMS notes: site editors/AI users; PM notes: operators/admins; deployer/router: infra).
+- Omit empty sections. Timestamp with `date "+%Y-%m-%d"`.
 
-Write the notes, then continue straight to Step 4 — do not pause for confirmation.
-(The user has opted into auto-release: draft → bump → tag → push in one go. They can
-always edit the notes and re-tag afterward if needed.)
+Write the notes, then continue straight on — do not pause for confirmation (the user
+has opted into auto-release; they can edit notes and re-tag afterwards).
 
-### Step 3.6 — Regenerate the releases manifest
-The PM serves the version picker AND the in-app release notes from a **baked-in**
-manifest — `ProjectManager/src/lib/deploy/releases.generated.json` — NOT from the
-deployer (the deployer's `/tags` + `/release-notes` were deleted). So after writing
-`release-notes/<NEW>.md`, regenerate the manifest from ALL `release-notes/*.md`. It is
-**pre-trimmed** (last 3 majors / last 5 minors per major / last patch per minor) and
-**inlines** each note's markdown, so the PM routes are a pure static read. Run:
+### Step 3.6 — Regenerate the PM releases manifest (only when cms is released)
+The PM serves the CMS version picker AND in-app release notes from a **baked-in**
+manifest — `ProjectManager/src/lib/deploy/releases.generated.json`. Regenerate it from
+the **root** `release-notes/*.md` (subdirs are ignored by design). Pre-trimmed (last 3
+majors / last 5 minors per major / last patch per minor), notes inlined:
 ```bash
 node --input-type=module -e '
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -142,53 +167,59 @@ writeFileSync("ProjectManager/src/lib/deploy/releases.generated.json", JSON.stri
 console.log("manifest:", out.map(r=>r.version).join(", "));
 '
 ```
-This is the SINGLE source of truth for "what PM shows". The trim rule lives here AND
-mirrors `trimReleases` in `ProjectManager/src/lib/deploy/cms-releases.ts` (keep them in
-sync if the rule changes).
+The trim rule here mirrors `trimReleases` in
+`ProjectManager/src/lib/deploy/cms-releases.ts` — keep them in sync.
 
-### Step 4 — Bump, commit, annotated-tag, push
-1. Bump `CMS/package.json` `"version"` → `<NEW>` (edit only that field; preserve JSON
-   formatting).
-2. Stage **only** the version file + the notes + the regenerated manifest (never
-   `git add -A`):
+### Step 4 — Bump, ONE commit, one tag per system, ONE push
+1. Bump `"version"` in each released system's `package.json` (edit only that field;
+   preserve formatting). Note `CMS/package.json` `"version"` is the CMS source of truth
+   for `r-*`.
+2. Stage **only** the version files + notes + (if cms) the manifest — never `git add -A`:
    ```bash
-   git add -- CMS/package.json "release-notes/<NEW>.md" \
-     ProjectManager/src/lib/deploy/releases.generated.json
+   git add -- CMS/package.json "release-notes/<NEW_CMS>.md" \
+     ProjectManager/src/lib/deploy/releases.generated.json \
+     ProjectManager/package.json "release-notes/pm/<NEW_PM>.md" \
+     deployer/package.json "release-notes/deployer/<NEW_DEP>.md" \
+     router/package.json "release-notes/router/<NEW_RTR>.md"      # only the ones released
    ```
-3. Commit (conventional subject; match repo log style):
+3. One release commit listing every system released:
    ```bash
    git commit -m "$(cat <<'EOF'
-   chore(release): CMS v<NEW>
+   chore(release): CMS v<NEW_CMS>, PM v<NEW_PM>, deployer v<NEW_DEP>
 
    Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
    EOF
    )"
    ```
-4. Annotated tag on that commit, message = the notes title:
+   (Subject names only the systems actually released — e.g. `chore(release): PM v0.7.0`
+   when nothing else changed.)
+4. One annotated tag **per released system**, all on that commit:
    ```bash
-   git tag -a "r-<NEW>" -m "CMS v<NEW>"
+   git tag -a "r-<NEW_CMS>"         -m "CMS v<NEW_CMS>"
+   git tag -a "pm-v<NEW_PM>"        -m "ProjectManager v<NEW_PM>"
+   git tag -a "deployer-v<NEW_DEP>" -m "Deployer v<NEW_DEP>"
+   git tag -a "router-v<NEW_RTR>"   -m "Router v<NEW_RTR>"
    ```
-5. Push the branch **and** the tag in **one** push — this is the ONLY push in the whole
-   `release` flow (Step 0.5 deliberately didn't push). A single push = a single CI
-   deploy, even when there were pending work commits:
+5. Push the branch **and all new tags** in **one** push — the ONLY push in the flow:
    ```bash
-   git push origin "$(git rev-parse --abbrev-ref HEAD)" "r-<NEW>"
+   git push origin "$(git rev-parse --abbrev-ref HEAD)" r-<NEW_CMS> pm-v<NEW_PM> ...
    ```
-   Do not force-push. If on `main` and the repo's flow requires a PR, push the tag only
-   and tell the user the branch needs its normal review.
+   Do not force-push.
 
 ### Step 5 — Report
-One or two lines: `r-<NEW>` tagged + pushed, notes at `release-notes/<NEW>.md`, the
-chosen level and old→new. The regenerated `releases.generated.json` means PM lists
-`<NEW>` in the picker as soon as PM is redeployed (it's baked into the PM bundle).
+One line per released system: `<tag>` tagged + pushed, old→new + level, notes path.
+Mention systems that were **not** released (unchanged) in one trailing line. If cms was
+released: PM lists `<NEW_CMS>` in the picker once PM is redeployed (baked-in manifest —
+the same push redeploys PM because `CMS/**` and `ProjectManager/**` changed). If
+deployer/router were released: CI redeploys them from this push; recall a deployer
+rollout kills in-flight site deploys — wait a few minutes before redeploying Sites.
 
 ---
 
 ## Notes
-- The deployer clones `--branch "$REF"` where `REF` can be a tag, so PM deploying
-  `r-<NEW>` works once the tag is pushed. This skill only produces tags + notes; the
-  deployer/PM wiring is separate slices.
-- `cms-v*` is CMS-only. If you ever need to version PM, that's a separate scheme — do
-  not reuse `cms-v*` for PM.
-- Notes are auto-drafted and the tag is cut without a confirmation pause. Still draft
-  honest, user-facing notes — the user can edit and re-tag afterward if they want.
+- The deployer clones `--branch "$REF"` where `REF` is an `r-*` tag, so PM deploying
+  `r-<NEW_CMS>` works once the tag is pushed. `pm-v*` / `deployer-v*` / `router-v*` are
+  bookkeeping tags — nothing consumes them; CI deploys from the push to main.
+- Never reuse a version number on a different commit. If a tag must be recut, bump.
+- Notes are auto-drafted and tags are cut without a confirmation pause. Still draft
+  honest, user-facing notes.
