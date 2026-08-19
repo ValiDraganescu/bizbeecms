@@ -8,7 +8,9 @@
       "home": "Home",
       "sites": "Sites",
       "you": "You",
-      "account": "Account"
+      "account": "Account",
+      "product": "BizBeeCMS",
+      "productApp": "Manager"
     }
   },
   "locale": {

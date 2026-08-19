@@ -8,7 +8,9 @@
       "home": "Avaleht",
       "sites": "Saidid",
       "you": "Sina",
-      "account": "Konto"
+      "account": "Konto",
+      "product": "BizBeeCMS",
+      "productApp": "Manager"
     }
   },
   "locale": {

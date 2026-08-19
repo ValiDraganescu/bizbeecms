@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import packageJson from "../../../package.json";
 import type { Role, User } from "@/db/schema";
 import { canUserCreateSite } from "@/lib/site/authz";
 import { AppDock, type DockItem } from "./app-dock";
@@ -49,6 +50,7 @@ export async function AppNav({ user }: { user: User }) {
       items={items}
       email={user.email}
       roleLabel={tRoles(roleKey[user.role])}
+      version={packageJson.version}
     />
   );
 }

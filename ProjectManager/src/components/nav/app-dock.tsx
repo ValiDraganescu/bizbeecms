@@ -24,10 +24,13 @@ export function AppDock({
   items,
   email,
   roleLabel,
+  version,
 }: {
   items: DockItem[];
   email: string;
   roleLabel: string;
+  /** PM app version (package.json), shown in the account menu header. */
+  version: string;
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -77,16 +80,17 @@ export function AppDock({
       >
         {menuOpen ? (
           <div className="absolute bottom-full right-0 mb-2">
-            <AccountMenu email={email} roleLabel={roleLabel} />
+            <AccountMenu email={email} roleLabel={roleLabel} version={version} />
           </div>
         ) : null}
         <div className="flex items-center gap-1 rounded-full border border-border bg-surface-raised/90 p-1.5 shadow-lg backdrop-blur-md">
           <Link
             href="/"
             aria-label={t("home")}
-            className="mr-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground outline-none transition-colors hover:bg-primary-hover focus-visible:ring-2 focus-visible:ring-ring"
+            className="mr-0.5 flex h-9 w-9 items-center justify-center rounded-full outline-none transition-colors hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-ring"
           >
-            b
+            {/* eslint-disable-next-line @next/next/no-img-element -- static 5KB asset, no optimization needed */}
+            <img src="/icon.png" alt="" width={28} height={28} className="h-7 w-7" />
           </Link>
           {items.map((item) => (
             <Link
@@ -131,7 +135,7 @@ export function AppDock({
       >
         {menuOpen ? (
           <div className="absolute inset-x-2 bottom-full mb-2">
-            <AccountMenu email={email} roleLabel={roleLabel} />
+            <AccountMenu email={email} roleLabel={roleLabel} version={version} />
           </div>
         ) : null}
         <div className="flex h-16 items-stretch">
@@ -201,9 +205,11 @@ export function AppDock({
 function AccountMenu({
   email,
   roleLabel,
+  version,
 }: {
   email: string;
   roleLabel: string;
+  version: string;
 }) {
   const t = useTranslations("app.nav");
   const tTheme = useTranslations("theme");
@@ -240,6 +246,29 @@ function AccountMenu({
       aria-label={t("account")}
       className="flex w-full flex-col overflow-hidden rounded-xl border border-border bg-surface-raised shadow-lg md:w-80"
     >
+      <div className="flex items-center gap-2.5 border-b border-border bg-surface-muted px-4 py-3">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static 5KB asset, no optimization needed */}
+        <img
+          src="/icon.png"
+          alt=""
+          width={32}
+          height={32}
+          className="h-8 w-8 shrink-0"
+        />
+        <span className="flex min-w-0 flex-col">
+          <span className="flex items-baseline gap-1.5">
+            <span className="truncate text-sm font-semibold text-foreground">
+              {t("product")}
+            </span>
+            <span className="font-mono text-[10px] text-foreground-muted">
+              v{version}
+            </span>
+          </span>
+          <span className="truncate text-xs text-foreground-muted">
+            {t("productApp")}
+          </span>
+        </span>
+      </div>
       <div className="flex flex-col items-start gap-1.5 border-b border-border px-4 py-3">
         <span className="max-w-full truncate text-sm font-medium text-foreground">
           {email}
