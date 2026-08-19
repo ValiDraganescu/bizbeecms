@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import {
@@ -23,17 +22,18 @@ import {
   isUserAssignedToSite,
   listAssignableUsers,
   listSiteDomains,
+  listSitesForUser,
 } from "@/lib/site/site";
+import { SidebarSections, type SidebarSection } from "@/components/sidebar-sections";
+import { SiteSwitcher } from "@/components/site-switcher";
 import { listTags } from "@/lib/tags/tags";
-import { AssignForm } from "../assign-form";
-import { SiteTagsForm } from "../site-tags-form";
 import { DeployForm } from "../deploy-form";
 import { DeployTimeline } from "../deploy-timeline";
 import { CustomDomainForm } from "../custom-domain-form";
 import { DeleteSiteForm } from "../delete-site-form";
 import { isDeployStuck } from "@/lib/deploy";
 import { getGlobalBuildTimeoutMin } from "@/lib/deploy/settings";
-import { SiteForm } from "../site-form";
+import { GeneralForm, LimitsForm, ScopingForm } from "../edit-site-cards";
 
 const statusTone: Record<SiteStatus, BadgeTone> = {
   draft: "neutral",
@@ -51,10 +51,13 @@ const statusTone: Record<SiteStatus, BadgeTone> = {
  */
 export default async function SiteDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ section?: string }>;
 }) {
   const { id } = await params;
+  const { section } = await searchParams;
   const t = await getTranslations("sites");
 
   const user = (await getCurrentUser())!;
@@ -68,6 +71,8 @@ export default async function SiteDetailPage({
   if (!canManage && !assigned) notFound();
 
   const creator = await findUserById(site.createdBy);
+  // Sibling Sites for the master-detail sidebar (same scoping as /sites).
+  const siblingSites = await listSitesForUser(user);
   const domains = await listSiteDomains(site.id);
   // Shown as the default in the per-Site build-timeout override field.
   const globalBuildTimeoutMin = await getGlobalBuildTimeoutMin();
@@ -84,230 +89,271 @@ export default async function SiteDetailPage({
         : cmsWorkerUrl(site.workerName)
       : null;
 
-  return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-10">
-      <header className="flex flex-col gap-1">
-        <Link
-          href="/sites"
-          className="inline-flex w-fit items-center gap-1.5 rounded-md text-sm font-medium text-foreground-muted outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          {t("back")}
-        </Link>
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{site.name}</h1>
-          <Badge tone={statusTone[site.status]}>
-            {t(`status.${site.status}`)}
-          </Badge>
-        </div>
-        <p className="font-mono text-sm text-foreground-muted">{site.slug}</p>
-      </header>
+  // Scoping data (manage-only sections).
+  const [siteTagIds, assignableUsers, assignedUserIds, allTags] = canManage
+    ? await Promise.all([
+        getSiteTagIds(site.id),
+        listAssignableUsers(site.country as CountryCode | null),
+        getSiteUserIds(site.id),
+        canUserCreateSite(user) ? listTags() : Promise.resolve([]),
+      ])
+    : [[], [], [], []];
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("detail.overview")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-            <Detail label={t("detail.country")}>
-              {site.country ?? t("detail.global")}
-            </Detail>
-            <Detail label={t("detail.workerName")}>
-              {site.workerName ?? (
-                <span className="text-foreground-muted">
-                  {t("detail.workerNamePending")}
-                </span>
-              )}
-            </Detail>
-            <Detail label={t("detail.url")}>
-              {workerUrl ? (
-                <div className="flex flex-col gap-2">
-                  <span className="font-mono text-sm text-foreground-muted break-all">
-                    {workerUrl}
+  const current = {
+    name: site.name,
+    slug: site.slug,
+    country: (site.country as CountryCode | null) ?? null,
+    monthlyLimitUsd: site.openrouterMonthlyLimitUsd,
+    buildTimeoutMin: site.buildTimeoutMin,
+  };
+
+  const sections: SidebarSection[] = [
+    {
+      id: "overview",
+      label: t("detail.overview"),
+      wide: true,
+      content: (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("detail.overview")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
+              <Detail label={t("detail.country")}>
+                {site.country ?? t("detail.global")}
+              </Detail>
+              <Detail label={t("detail.workerName")}>
+                {site.workerName ?? (
+                  <span className="text-foreground-muted">
+                    {t("detail.workerNamePending")}
                   </span>
-                  <div className="flex flex-wrap gap-2">
-                    <a
-                      href={workerUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium bg-surface-muted text-foreground border border-border hover:bg-surface-raised outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {t("detail.openSite")}
-                    </a>
-                    <a
-                      href={`${workerUrl}/admin`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {t("detail.openAdmin")}
-                    </a>
-                  </div>
-                </div>
-              ) : (
-                <span className="text-foreground-muted">
-                  {t("detail.workerNamePending")}
+                )}
+              </Detail>
+              <Detail label={t("detail.url")}>
+                {workerUrl ? (
+                  <a
+                    href={workerUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-sm break-all text-primary hover:text-primary-hover"
+                  >
+                    {workerUrl}
+                  </a>
+                ) : (
+                  <span className="text-foreground-muted">
+                    {t("detail.workerNamePending")}
+                  </span>
+                )}
+              </Detail>
+              <Detail label={t("detail.cmsVersion")}>
+                {displayCmsVersion(site.deployedCmsVersion) ? (
+                  <span className="font-mono tabular-nums">
+                    {displayCmsVersion(site.deployedCmsVersion)}
+                  </span>
+                ) : (
+                  <span className="text-foreground-muted">
+                    {t("detail.cmsVersionNone")}
+                  </span>
+                )}
+              </Detail>
+              <Detail label={t("detail.createdBy")}>
+                {creator?.email ?? "—"}
+              </Detail>
+              <Detail label={t("detail.createdAt")}>
+                <span className="tabular-nums">
+                  {site.createdAt.toISOString().slice(0, 10)}
                 </span>
-              )}
-            </Detail>
-            <Detail label={t("detail.cmsVersion")}>
-              {displayCmsVersion(site.deployedCmsVersion) ? (
-                <span className="font-mono tabular-nums">
-                  {displayCmsVersion(site.deployedCmsVersion)}
-                </span>
-              ) : (
-                <span className="text-foreground-muted">
-                  {t("detail.cmsVersionNone")}
-                </span>
-              )}
-            </Detail>
-            <Detail label={t("detail.createdBy")}>
-              {creator?.email ?? "—"}
-            </Detail>
-            <Detail label={t("detail.createdAt")}>
-              <span className="tabular-nums">
-                {site.createdAt.toISOString().slice(0, 10)}
-              </span>
-            </Detail>
-          </dl>
-        </CardContent>
-      </Card>
+              </Detail>
+            </dl>
+          </CardContent>
+        </Card>
+      ),
+    },
+  ];
 
+  if (canManage) {
+    sections.push(
+      {
+        id: "general",
+        label: t("form.generalTitle"),
+        content: (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("form.generalTitle")}</CardTitle>
+              <CardDescription>{t("form.generalDescription")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <GeneralForm siteId={site.id} current={current} />
+            </CardContent>
+          </Card>
+        ),
+      },
+      {
+        id: "scoping",
+        label: t("scoping.title"),
+        content: (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("scoping.title")}</CardTitle>
+              <CardDescription>{t("scoping.description")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScopingForm
+                siteId={site.id}
+                actor={{ role: user.role, countries: actorCountries }}
+                current={current}
+                tags={allTags.map((tag) => ({ id: tag.id, label: tag.label }))}
+                assignedTagIds={siteTagIds}
+                assignableUsers={assignableUsers}
+                assignedUserIds={assignedUserIds}
+              />
+            </CardContent>
+          </Card>
+        ),
+      },
+      {
+        id: "limits",
+        label: t("limits.title"),
+        content: (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("limits.title")}</CardTitle>
+              <CardDescription>{t("limits.description")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LimitsForm
+                siteId={site.id}
+                current={current}
+                hasMintedOpenrouterKey={site.openrouterKeyHash != null}
+                globalBuildTimeoutMin={globalBuildTimeoutMin}
+              />
+            </CardContent>
+          </Card>
+        ),
+      },
+    );
+  }
+
+  // Deployment: the deploy action and its timeline are one concern.
+  sections.push({
+    id: "deploy",
+    label: t("deploy.title"),
+    wide: true,
+    content: (
       <Card>
         <CardHeader>
           <CardTitle>{t("deploy.title")}</CardTitle>
           <CardDescription>{t("deploy.cardDescription")}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
           <DeployForm
             siteId={site.id}
             status={site.status}
             stuck={isDeployStuck(site)}
           />
+          <div className="border-t border-border pt-4">
+            <DeployTimeline siteId={site.id} initialStatus={site.status} />
+          </div>
         </CardContent>
       </Card>
+    ),
+  });
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("timeline.title")}</CardTitle>
-          <CardDescription>{t("timeline.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DeployTimeline siteId={site.id} initialStatus={site.status} />
-        </CardContent>
-      </Card>
+  if (canManage) {
+    sections.push({
+      id: "domain",
+      label: t("customDomain.title"),
+      content: (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("customDomain.title")}</CardTitle>
+            <CardDescription>{t("customDomain.cardDescription")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CustomDomainForm
+              siteId={site.id}
+              deployed={site.status === "deployed"}
+              domains={domains.map((d) => ({
+                hostname: d.hostname,
+                redirectTo: d.redirectTo,
+              }))}
+            />
+          </CardContent>
+        </Card>
+      ),
+    });
+  }
 
-      {canManage ? (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("customDomain.title")}</CardTitle>
-              <CardDescription>{t("customDomain.cardDescription")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CustomDomainForm
-                siteId={site.id}
-                deployed={site.status === "deployed"}
-                domains={domains.map((d) => ({
-                  hostname: d.hostname,
-                  redirectTo: d.redirectTo,
-                }))}
-              />
-            </CardContent>
-          </Card>
+  if (canManage && canUserCreateSite(user)) {
+    sections.push({
+      id: "danger",
+      label: t("dangerZone.title"),
+      wide: true,
+      content: (
+        <Card className="border-danger/40">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-4">
+            <div className="flex min-w-0 flex-1 basis-80 flex-col gap-1">
+              <CardTitle className="text-danger">
+                {t("dangerZone.title")}
+              </CardTitle>
+              <CardDescription>
+                {t("dangerZone.cardDescription")}
+              </CardDescription>
+            </div>
+            <DeleteSiteForm
+              siteId={site.id}
+              slug={site.slug}
+              siteName={site.name}
+            />
+          </div>
+        </Card>
+      ),
+    });
+  }
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("form.editTitle")}</CardTitle>
-              <CardDescription>{t("form.editDescription")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SiteForm
-                siteId={site.id}
-                actor={{ role: user.role, countries: actorCountries }}
-                mode="edit"
-                initial={{
-                  name: site.name,
-                  slug: site.slug,
-                  country: (site.country as CountryCode | null) ?? null,
-                }}
-                hasMintedOpenrouterKey={site.openrouterKeyHash != null}
-                initialMintingEnabled={site.openrouterMintingEnabled}
-                initialMonthlyLimitUsd={site.openrouterMonthlyLimitUsd}
-                initialBuildTimeoutMin={site.buildTimeoutMin}
-                globalBuildTimeoutMin={globalBuildTimeoutMin}
-              />
-            </CardContent>
-          </Card>
+  return (
+    <main className="flex flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <SiteSwitcher
+              sites={siblingSites.map((s) => ({ id: s.id, name: s.name }))}
+              currentId={site.id}
+              listLabel={t("title")}
+            />
+            <Badge tone={statusTone[site.status]}>
+              {t(`status.${site.status}`)}
+            </Badge>
+          </div>
+          <p className="font-mono text-sm text-foreground-muted">{site.slug}</p>
+        </div>
+        {workerUrl ? (
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={workerUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium bg-surface-muted text-foreground border border-border hover:bg-surface-raised outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {t("detail.openSite")}
+            </a>
+            <a
+              href={`${workerUrl}/admin`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {t("detail.openAdmin")}
+            </a>
+          </div>
+        ) : null}
+      </header>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("assign.title")}</CardTitle>
-              <CardDescription>{t("assign.description")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AssignForm
-                siteId={site.id}
-                assignable={await listAssignableUsers(
-                  site.country as CountryCode | null,
-                )}
-                assigned={await getSiteUserIds(site.id)}
-              />
-            </CardContent>
-          </Card>
-
-          {canUserCreateSite(user) ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("tags.title")}</CardTitle>
-                <CardDescription>{t("tags.description")}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SiteTagsForm
-                  siteId={site.id}
-                  tags={(await listTags()).map((tag) => ({
-                    id: tag.id,
-                    label: tag.label,
-                  }))}
-                  assigned={await getSiteTagIds(site.id)}
-                />
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {canUserCreateSite(user) ? (
-            <Card className="border-danger/40">
-              <CardHeader>
-                <CardTitle className="text-danger">
-                  {t("dangerZone.title")}
-                </CardTitle>
-                <CardDescription>
-                  {t("dangerZone.cardDescription")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DeleteSiteForm
-                  siteId={site.id}
-                  slug={site.slug}
-                  siteName={site.name}
-                />
-              </CardContent>
-            </Card>
-          ) : null}
-        </>
-      ) : null}
+      <SidebarSections
+        allLabel={t("sections.all")}
+        initialId={section}
+        sections={sections}
+      />
     </main>
   );
 }

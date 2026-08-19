@@ -63,20 +63,22 @@ export function BuildTimeoutForm({
       <Field>
         <FieldLabel htmlFor="build-timeout">{t("label")}</FieldLabel>
         <div className="flex items-center gap-2">
-          <Input
-            id="build-timeout"
-            type="number"
-            inputMode="numeric"
-            min={min}
-            max={max}
-            step={1}
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              setState("idle");
-            }}
-            className="w-28"
-          />
+          <div className="w-20">
+            <Input
+              id="build-timeout"
+              type="number"
+              inputMode="numeric"
+              min={min}
+              max={max}
+              step={1}
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                setState("idle");
+              }}
+              className="text-right"
+            />
+          </div>
           <span className="text-sm text-foreground-muted">{t("unit")}</span>
           <Button type="submit" disabled={state === "saving" || value === ""}>
             {state === "saving" ? t("saving") : t("save")}

@@ -7,7 +7,6 @@
     "prebuild": "npm run cf-typegen",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "predeploy": "npm run preflight",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",

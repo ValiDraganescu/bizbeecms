@@ -110,7 +110,7 @@ export function AiModelsForm({
 
   return (
     <form
-      className="flex flex-col gap-8"
+      className="@container flex flex-col gap-8"
       onSubmit={(e) => {
         e.preventDefault();
         void save();
@@ -118,24 +118,26 @@ export function AiModelsForm({
     >
       <Field>
         <FieldLabel htmlFor="ai-credit-pool">{t("pool.label")}</FieldLabel>
-        <Input
-          id="ai-credit-pool"
-          type="number"
-          inputMode="decimal"
-          min={0}
-          step={1}
-          value={poolUsd}
-          onChange={(e) => {
-            setPoolUsd(e.target.value);
-            setState("idle");
-          }}
-          placeholder={t("pool.placeholder")}
-          className="w-40 font-mono text-sm"
-        />
+        <div className="w-40">
+          <Input
+            id="ai-credit-pool"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={1}
+            value={poolUsd}
+            onChange={(e) => {
+              setPoolUsd(e.target.value);
+              setState("idle");
+            }}
+            placeholder={t("pool.placeholder")}
+            className="font-mono text-sm"
+          />
+        </div>
         <FieldHint>{t("pool.hint")}</FieldHint>
       </Field>
 
-      <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-1 items-start gap-6 @5xl:grid-cols-2">
         {AI_PURPOSES.map((purpose) => (
           <PurposeEditor
             key={purpose}

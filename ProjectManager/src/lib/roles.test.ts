@@ -40,7 +40,7 @@ test("no source file references the old SiteManager role token", () => {
     "lib/site/authz.ts",
     "lib/site/site.ts",
     "components/nav/app-nav.tsx",
-    "app/(app)/invite/invite-form.tsx",
+    "app/(app)/users/invite-form.tsx",
   ];
   for (const f of files) {
     const text = readFileSync(join(srcDir, f), "utf8");

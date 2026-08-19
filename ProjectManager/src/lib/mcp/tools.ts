@@ -4,11 +4,12 @@
  * routes use, so MCP can never do more than the user could in the browser.
  *
  * Ships `whoami` (a connection smoke test) + the Settings → AI models tools
- * (`tools-ai-models.ts`); site/deploy tools simply append to this array.
+ * (`tools-ai-models.ts`) + Sites tools (`tools-sites.ts`); more simply append.
  */
 import type { User } from "@/db/schema";
 import type { ToolRegistry } from "./mcp-core";
 import { AI_MODEL_TOOLS } from "./tools-ai-models";
+import { SITE_TOOLS } from "./tools-sites";
 
 export type ToolCtx = { user: User; grantId: string };
 
@@ -28,4 +29,5 @@ export const PM_TOOLS: ToolRegistry<ToolCtx> = [
     }),
   },
   ...AI_MODEL_TOOLS,
+  ...SITE_TOOLS,
 ];

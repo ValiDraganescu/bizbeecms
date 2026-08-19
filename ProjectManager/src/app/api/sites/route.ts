@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { isCountryCode, type CountryCode } from "@/lib/auth/countries";
-import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
-import { authorizeSiteCountry, canUserCreateSite } from "@/lib/site/authz";
-import { createSite, isSlugTaken, isValidSlug } from "@/lib/site/site";
+import { getCurrentUser } from "@/lib/auth/user";
+import { canUserCreateSite } from "@/lib/site/authz";
+import { createSiteForActor } from "@/lib/site/create-flow";
+import { isValidSlug } from "@/lib/site/site";
+import { parseTagRefs } from "@/lib/site/tag-selection";
 import { parseOpenrouterMinting } from "@/lib/site/openrouter-minting";
 import { coerceTimeoutMin } from "@/lib/deploy/build-timeout";
 
@@ -12,6 +14,8 @@ export type SiteErrorKey =
   | "slugInvalid"
   | "slugTaken"
   | "countryInvalid"
+  /** One or more requested tags aren't in the managed vocabulary (MCP strict mode). */
+  | "tagsUnknown"
   | "notAllowed"
   | "countryNotAllowed"
   | "notFound"
@@ -23,6 +27,8 @@ export type SiteBody = {
   name?: unknown;
   slug?: unknown;
   country?: unknown;
+  /** Org tag ids to attach on create (ignored by update — tags have their own route). */
+  tagIds?: unknown;
   /** Whether PM auto-mints a per-Site OpenRouter key (replaces the paste field). */
   openrouterMintingEnabled?: unknown;
   /** Monthly spend cap in whole USD for the minted key, or null for no cap. */
@@ -41,6 +47,8 @@ export type ParsedSite = {
   name: string;
   slug: string;
   country: CountryCode | null;
+  /** Requested org tags (ids), de-duplicated; resolved against the vocabulary on create. */
+  tagIds: string[];
   /** Whether PM auto-mints a per-Site OpenRouter key. */
   openrouterMintingEnabled: boolean;
   /** Monthly spend cap in whole USD for the minted key, or null for no cap. */
@@ -85,6 +93,7 @@ export function parseSiteBody(
       name,
       slug,
       country,
+      tagIds: parseTagRefs(body.tagIds),
       openrouterMintingEnabled,
       openrouterMonthlyLimitUsd,
       buildTimeoutMin,
@@ -114,21 +123,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  const { name, slug, country } = parsed.value;
-
-  const actorCountries = await getUserCountries(user.id);
-  const authzError = authorizeSiteCountry(user, actorCountries, country);
-  if (authzError) {
-    return NextResponse.json({ error: authzError }, { status: 403 });
-  }
-
-  if (await isSlugTaken(slug)) {
-    return NextResponse.json({ error: "slugTaken" }, { status: 409 });
-  }
+  const { name, slug, country, tagIds } = parsed.value;
 
   try {
-    const site = await createSite({ name, slug, country, createdBy: user.id });
-    return NextResponse.json({ savedId: site.id });
+    // Unknown tag ids are dropped (not rejected): the form's options came from
+    // the same vocabulary, so a mismatch only means a tag was deleted meanwhile.
+    const result = await createSiteForActor(user, { name, slug, country, tagRefs: tagIds });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+    return NextResponse.json({ savedId: result.site.id });
   } catch {
     return NextResponse.json({ error: "unknown" }, { status: 500 });
   }

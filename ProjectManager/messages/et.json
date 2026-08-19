@@ -92,6 +92,9 @@
       "countryNotAllowed": "Saad määrata ainult oma ulatuse riike.",
       "tagNotAllowed": "Saad määrata ainult oma ulatuse silte.",
       "unknown": "Midagi läks valesti. Palun proovi uuesti."
+    },
+    "sections": {
+      "all": "Kõik jaotised"
     }
   },
   "tags": {
@@ -131,6 +134,9 @@
       "labelTaken": "Sama nimega silt on juba olemas.",
       "notAllowed": "Sul pole õigust silte hallata.",
       "unknown": "Midagi läks valesti. Palun proovi uuesti."
+    },
+    "sections": {
+      "all": "Kõik jaotised"
     }
   },
   "auth": {
@@ -321,8 +327,10 @@
     "form": {
       "createTitle": "Uus sait",
       "createDescription": "Anna saidile nimi ja vali selle riigi ulatus.",
-      "editTitle": "Muuda saiti",
-      "editDescription": "Uuenda saidi nime, tunnust ja riiki.",
+      "tags": "Sildid",
+      "tagsPlaceholder": "Vali sildid…",
+      "tagsHint": "Organisatsiooni sildid piiritlevad selle saidi halduritele (riik JA silt peavad klappima). Valikuline.",
+      "tagsNone": "Silte pole veel. Loo sildid kõigepealt siltide halduses.",
       "name": "Nimi",
       "namePlaceholder": "Acme Eesti",
       "slug": "Tunnus",
@@ -332,19 +340,19 @@
       "globalCountry": "Globaalne (kõik riigid)",
       "countryHintGlobal": "Vali riik või jäta globaalseks kõigi riikide jaoks.",
       "countryHintScoped": "Vali üks oma riikidest.",
-      "openrouterMinting": "OpenRouteri AI-võti",
-      "openrouterMintingToggle": "Loo sellele saidile automaatselt eraldi OpenRouteri võti",
-      "openrouterMintingHint": "Kui lubatud, luuakse saidipõhine võti automaatselt juurutamisel. Kui keelatud, kasutab sait jagatud AI-teenust.",
-      "openrouterMonthlyLimit": "Kuine kulupiirang (USD)",
-      "openrouterMonthlyLimitPlaceholder": "nt 50",
-      "openrouterMonthlyLimitHint": "Loodud võtmele rakendatav piirang. Jäta tühjaks, kui piirangut pole.",
-      "openrouterKeyDelete": "Kustuta praegune võti",
-      "openrouterKeyMinted": "Sellele saidile on loodud võti.",
+      "openrouterKeyDelete": "Kustuta vana võti",
+      "openrouterKeyMinted": "Sellel saidil on endiselt vana eraldi OpenRouteri võti. Kustuta see, et kasutada jagatud AI-teenust.",
       "create": "Loo sait",
       "save": "Salvesta muudatused",
       "cancel": "Tühista",
       "slugAvailable": "Slug on vaba.",
-      "slugChecking": "Kontrollime saadavust…"
+      "slugChecking": "Kontrollime saadavust…",
+      "aiQuota": "Igakuine AI-krediitide kvoot (USD)",
+      "aiQuotaPlaceholder": "nt 50",
+      "aiQuotaHint": "Pehme igakuine ülempiir selle saidi AI-kuludele, mida sait ise jõustab. Jäta tühjaks, kui piirangut pole.",
+      "generalTitle": "Üldine",
+      "generalDescription": "Nimi ja URL-i tunnus.",
+      "savedGeneral": "Salvestatud."
     },
     "detail": {
       "overview": "Ülevaade",
@@ -437,6 +445,7 @@
       "slugRequired": "Sisesta tunnus.",
       "slugInvalid": "Kasuta ainult väiketähti, numbreid ja sidekriipse.",
       "slugTaken": "See tunnus on juba kasutusel.",
+      "tagsUnknown": "Üks või mitu valitud silti ei ole enam olemas.",
       "countryInvalid": "Vali kehtiv riik.",
       "notAllowed": "Sul pole õigust seda teha.",
       "countryNotAllowed": "Sa ei saa luua saiti sellele riigile.",
@@ -514,6 +523,21 @@
         "deployerUnreachable": "Avaldamisteenusega ei saadud ühendust. Midagi ei kustutatud — proovi uuesti.",
         "unknown": "Midagi läks valesti. Proovi uuesti."
       }
+    },
+    "scoping": {
+      "title": "Kasutajate ulatus",
+      "description": "Kes selle saidini jõuab. Manager näeb seda ainult siis, kui riik klapib JA tal on mõni saidi siltidest.",
+      "save": "Salvesta ulatus",
+      "saved": "Ulatus uuendatud."
+    },
+    "limits": {
+      "title": "AI ja ehitus",
+      "description": "Ainult seda saiti puudutavad piirangud.",
+      "save": "Salvesta piirangud",
+      "saved": "Piirangud uuendatud."
+    },
+    "sections": {
+      "all": "Kõik jaotised"
     }
   },
   "designSystem": {
@@ -704,7 +728,7 @@
       "description": "Maksimaalne aeg, mille jooksul CMS-i ehitus ja juurutus võib töötada, enne kui see peatatakse. Hoiab ära olukorra, kus seiskunud ehitus hoiab konteinerit (ja arveldust) lõputult töös. Rakendub alates järgmisest juurutamisest.",
       "label": "Üldine ehituse ajalõpp",
       "unit": "minutit",
-      "hint": "Vahemikus {min}–{max} minutit. Tavaline ehitus võtab umbes 6 minutit. Sait saab seda enda juurutuste jaoks tõsta, mitte langetada.",
+      "hint": "Vahemikus {min}–{max} minutit. Tavaline ehitus võtab umbes 6 minutit. Saidi enda seadetes saab selle juurutustele määrata kõrgema piiri; madalamad väärtused jäetakse arvesse võtmata.",
       "save": "Salvesta",
       "saving": "Salvestan…",
       "saved": "Salvestatud.",
@@ -852,6 +876,9 @@
       "connectJsonLabel": "Või: .mcp.json (ohutu commit'ida)",
       "connectHint": "Seejärel käivita Claude Code’is /mcp, vali bizbee-pm → Authenticate, kinnita brauseris ja kutsu tööriist whoami.",
       "copy": "Kopeeri"
+    },
+    "sections": {
+      "all": "Kõik seaded"
     }
   },
   "oauth": {

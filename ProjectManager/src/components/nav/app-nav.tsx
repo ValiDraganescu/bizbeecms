@@ -5,7 +5,6 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import type { Role, User } from "@/db/schema";
-import { canUserInvite } from "@/lib/invite/authz";
 import { canUserCreateSite } from "@/lib/site/authz";
 
 const roleKey: Record<Role, string> = {
@@ -44,9 +43,6 @@ export async function AppNav({ user }: { user: User }) {
 
         <div className="flex items-center gap-1">
           <NavLink href="/sites" label={t("manageSites")} />
-          {canUserInvite(user) ? (
-            <NavLink href="/invite" label={t("inviteUsers")} />
-          ) : null}
           {isAdminPlus ? (
             <NavLink href="/users" label={tUsers("navLink")} />
           ) : null}
@@ -56,7 +52,6 @@ export async function AppNav({ user }: { user: User }) {
           {canUserCreateSite(user) ? (
             <NavLink href="/tags" label={tTags("navLink")} />
           ) : null}
-          <NavLink href="/settings/connections" label={tSettings("connections.navLink")} />
         </div>
 
         <div className="ml-auto flex items-center gap-2">

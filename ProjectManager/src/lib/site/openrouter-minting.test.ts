@@ -7,14 +7,11 @@ import { parseOpenrouterMinting } from "./openrouter-minting.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
-test("EN/FI/ET each carry every new sites.form minting string", () => {
+test("EN/FI/ET each carry every sites.form AI-quota string", () => {
   const keys = [
-    "openrouterMinting",
-    "openrouterMintingToggle",
-    "openrouterMintingHint",
-    "openrouterMonthlyLimit",
-    "openrouterMonthlyLimitPlaceholder",
-    "openrouterMonthlyLimitHint",
+    "aiQuota",
+    "aiQuotaPlaceholder",
+    "aiQuotaHint",
     "openrouterKeyDelete",
     "openrouterKeyMinted",
   ];

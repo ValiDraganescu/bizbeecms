@@ -33,7 +33,7 @@ test("deleteInvite store fn only removes PENDING invites", () => {
 });
 
 test("pending table has a revoke control using the shared ConfirmDialog (no window.confirm)", () => {
-  const ui = read("src/app/(app)/invite/pending-invites.tsx");
+  const ui = read("src/app/(app)/users/pending-invites.tsx");
   assert.match(ui, /DELETE/);
   assert.match(ui, /\/api\/invite\//);
   // Confirm is the shared in-app dialog (promoted to components/ui), not a copy.

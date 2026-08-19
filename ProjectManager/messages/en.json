@@ -92,6 +92,9 @@
       "countryNotAllowed": "You can only assign countries within your own scope.",
       "tagNotAllowed": "You can only assign tags within your own scope.",
       "unknown": "Something went wrong. Please try again."
+    },
+    "sections": {
+      "all": "All sections"
     }
   },
   "tags": {
@@ -131,6 +134,9 @@
       "labelTaken": "A tag with that name already exists.",
       "notAllowed": "You don't have permission to manage tags.",
       "unknown": "Something went wrong. Please try again."
+    },
+    "sections": {
+      "all": "All sections"
     }
   },
   "auth": {
@@ -321,8 +327,10 @@
     "form": {
       "createTitle": "New Site",
       "createDescription": "Name the Site and choose its country scope.",
-      "editTitle": "Edit Site",
-      "editDescription": "Update the Site's name, slug, and country.",
+      "tags": "Tags",
+      "tagsPlaceholder": "Pick tags…",
+      "tagsHint": "Org tags scope this Site for Managers (country AND tag must match). Optional.",
+      "tagsNone": "No tags yet. Create tags in Tag management first.",
       "name": "Name",
       "namePlaceholder": "Acme Finland",
       "slug": "Slug",
@@ -332,19 +340,19 @@
       "globalCountry": "Global (all countries)",
       "countryHintGlobal": "Pick a country, or leave as Global for all countries.",
       "countryHintScoped": "Pick one of your countries.",
-      "openrouterMinting": "OpenRouter AI key",
-      "openrouterMintingToggle": "Auto-provision a dedicated OpenRouter key for this Site",
-      "openrouterMintingHint": "When enabled, a per-Site key is minted automatically on deploy. When disabled, the Site falls back to the shared AI provider.",
-      "openrouterMonthlyLimit": "Monthly spend limit (USD)",
-      "openrouterMonthlyLimitPlaceholder": "e.g. 50",
-      "openrouterMonthlyLimitHint": "Cap applied to the minted key. Leave blank for no limit.",
-      "openrouterKeyDelete": "Delete current key",
-      "openrouterKeyMinted": "A key has been minted for this Site.",
+      "openrouterKeyDelete": "Delete legacy key",
+      "openrouterKeyMinted": "This Site still has a legacy dedicated OpenRouter key. Delete it to use the shared AI provider.",
       "create": "Create Site",
       "save": "Save changes",
       "cancel": "Cancel",
       "slugAvailable": "Slug is available.",
-      "slugChecking": "Checking availability…"
+      "slugChecking": "Checking availability…",
+      "aiQuota": "Monthly AI credits quota (USD)",
+      "aiQuotaPlaceholder": "e.g. 50",
+      "aiQuotaHint": "Soft monthly cap on this Site's AI spend, enforced by the Site itself. Leave blank for unlimited.",
+      "generalTitle": "General",
+      "generalDescription": "Name and URL slug.",
+      "savedGeneral": "Saved."
     },
     "detail": {
       "overview": "Overview",
@@ -437,6 +445,7 @@
       "slugRequired": "Enter a slug.",
       "slugInvalid": "Use lowercase letters, numbers, and hyphens only.",
       "slugTaken": "That slug is already in use.",
+      "tagsUnknown": "One or more selected tags no longer exist.",
       "countryInvalid": "Choose a valid country.",
       "notAllowed": "You're not allowed to do that.",
       "countryNotAllowed": "You can't create a Site for that country.",
@@ -514,6 +523,21 @@
         "deployerUnreachable": "The deploy service is unreachable. Nothing was deleted — please try again.",
         "unknown": "Something went wrong. Please try again."
       }
+    },
+    "scoping": {
+      "title": "User scoping",
+      "description": "Who can reach this Site. A Manager sees it only when the country matches AND they carry one of its tags.",
+      "save": "Save scoping",
+      "saved": "Scoping updated."
+    },
+    "limits": {
+      "title": "AI & build",
+      "description": "Limits that apply to this Site only.",
+      "save": "Save limits",
+      "saved": "Limits updated."
+    },
+    "sections": {
+      "all": "All sections"
     }
   },
   "designSystem": {
@@ -704,7 +728,7 @@
       "description": "Maximum time a CMS build+deploy may run before it is killed. Prevents a stalled build from keeping a container running (and billing) indefinitely. Applies starting with the next deploy.",
       "label": "Global build timeout",
       "unit": "minutes",
-      "hint": "Between {min} and {max} minutes. A normal build takes about 6 minutes. A site can raise this for its own deploys, never lower it.",
+      "hint": "Between {min} and {max} minutes. A normal build takes about 6 minutes. A site's own settings can set a higher limit for its deploys; lower values are ignored.",
       "save": "Save",
       "saving": "Saving…",
       "saved": "Saved.",
@@ -852,6 +876,9 @@
       "connectJsonLabel": "Or: .mcp.json (safe to commit)",
       "connectHint": "Then run /mcp in Claude Code, pick bizbee-pm → Authenticate, approve in the browser, and call the whoami tool.",
       "copy": "Copy"
+    },
+    "sections": {
+      "all": "All settings"
     }
   },
   "oauth": {

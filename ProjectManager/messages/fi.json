@@ -92,6 +92,9 @@
       "countryNotAllowed": "Voit määrittää vain oman laajuutesi maita.",
       "tagNotAllowed": "Voit määrittää vain oman laajuutesi tunnisteita.",
       "unknown": "Jotain meni pieleen. Yritä uudelleen."
+    },
+    "sections": {
+      "all": "Kaikki osiot"
     }
   },
   "tags": {
@@ -131,6 +134,9 @@
       "labelTaken": "Samanniminen tunniste on jo olemassa.",
       "notAllowed": "Sinulla ei ole oikeuksia hallita tunnisteita.",
       "unknown": "Jokin meni pieleen. Yritä uudelleen."
+    },
+    "sections": {
+      "all": "Kaikki osiot"
     }
   },
   "auth": {
@@ -321,8 +327,10 @@
     "form": {
       "createTitle": "Uusi sivusto",
       "createDescription": "Nimeä sivusto ja valitse sen maa-alue.",
-      "editTitle": "Muokkaa sivustoa",
-      "editDescription": "Päivitä sivuston nimi, tunnus ja maa.",
+      "tags": "Tunnisteet",
+      "tagsPlaceholder": "Valitse tunnisteet…",
+      "tagsHint": "Organisaatiotunnisteet rajaavat tämän sivuston Managereille (maan JA tunnisteen on täsmättävä). Valinnainen.",
+      "tagsNone": "Ei vielä tunnisteita. Luo tunnisteet ensin tunnisteiden hallinnassa.",
       "name": "Nimi",
       "namePlaceholder": "Acme Suomi",
       "slug": "Tunnus",
@@ -332,19 +340,19 @@
       "globalCountry": "Globaali (kaikki maat)",
       "countryHintGlobal": "Valitse maa tai jätä globaaliksi kaikille maille.",
       "countryHintScoped": "Valitse yksi maistasi.",
-      "openrouterMinting": "OpenRouter-tekoälyavain",
-      "openrouterMintingToggle": "Luo tälle sivustolle automaattisesti oma OpenRouter-avain",
-      "openrouterMintingHint": "Kun käytössä, sivustokohtainen avain luodaan automaattisesti julkaisun yhteydessä. Kun pois käytöstä, sivusto käyttää jaettua tekoälypalvelua.",
-      "openrouterMonthlyLimit": "Kuukausittainen kulutusraja (USD)",
-      "openrouterMonthlyLimitPlaceholder": "esim. 50",
-      "openrouterMonthlyLimitHint": "Luodulle avaimelle asetettava raja. Jätä tyhjäksi, jos rajaa ei ole.",
-      "openrouterKeyDelete": "Poista nykyinen avain",
-      "openrouterKeyMinted": "Tälle sivustolle on luotu avain.",
+      "openrouterKeyDelete": "Poista vanha avain",
+      "openrouterKeyMinted": "Tällä sivustolla on yhä vanha oma OpenRouter-avain. Poista se käyttääksesi jaettua tekoälypalvelua.",
       "create": "Luo sivusto",
       "save": "Tallenna muutokset",
       "cancel": "Peruuta",
       "slugAvailable": "Slug on vapaa.",
-      "slugChecking": "Tarkistetaan saatavuutta…"
+      "slugChecking": "Tarkistetaan saatavuutta…",
+      "aiQuota": "Kuukausittainen tekoälykrediittikiintiö (USD)",
+      "aiQuotaPlaceholder": "esim. 50",
+      "aiQuotaHint": "Pehmeä kuukausikatto tämän sivuston tekoälykuluille, jonka sivusto itse valvoo. Jätä tyhjäksi, jos kiintiötä ei ole.",
+      "generalTitle": "Yleiset",
+      "generalDescription": "Nimi ja URL-tunnus.",
+      "savedGeneral": "Tallennettu."
     },
     "detail": {
       "overview": "Yleiskatsaus",
@@ -437,6 +445,7 @@
       "slugRequired": "Anna tunnus.",
       "slugInvalid": "Käytä vain pieniä kirjaimia, numeroita ja väliviivoja.",
       "slugTaken": "Tunnus on jo käytössä.",
+      "tagsUnknown": "Yksi tai useampi valittu tunniste ei ole enää olemassa.",
       "countryInvalid": "Valitse kelvollinen maa.",
       "notAllowed": "Sinulla ei ole oikeutta tehdä tätä.",
       "countryNotAllowed": "Et voi luoda sivustoa tälle maalle.",
@@ -514,6 +523,21 @@
         "deployerUnreachable": "Julkaisupalveluun ei saatu yhteyttä. Mitään ei poistettu — yritä uudelleen.",
         "unknown": "Jokin meni pieleen. Yritä uudelleen."
       }
+    },
+    "scoping": {
+      "title": "Käyttäjärajaus",
+      "description": "Kuka voi käyttää tätä sivustoa. Manageri näkee sen vain, kun maa täsmää JA hänellä on jokin sivuston tageista.",
+      "save": "Tallenna rajaus",
+      "saved": "Rajaus päivitetty."
+    },
+    "limits": {
+      "title": "Tekoäly ja käännös",
+      "description": "Vain tätä sivustoa koskevat rajat.",
+      "save": "Tallenna rajat",
+      "saved": "Rajat päivitetty."
+    },
+    "sections": {
+      "all": "Kaikki osiot"
     }
   },
   "designSystem": {
@@ -704,7 +728,7 @@
       "description": "Enimmäisaika, jonka CMS-käännös ja -julkaisu saa kestää ennen sen lopettamista. Estää jumiutunutta käännöstä pitämästä konttia käynnissä (ja laskutuksessa) loputtomiin. Tulee voimaan seuraavasta julkaisusta alkaen.",
       "label": "Yleinen käännöksen aikakatkaisu",
       "unit": "minuuttia",
-      "hint": "Välillä {min}–{max} minuuttia. Tavallinen käännös kestää noin 6 minuuttia. Sivusto voi nostaa tätä omille julkaisuilleen, mutta ei laskea.",
+      "hint": "Välillä {min}–{max} minuuttia. Tavallinen käännös kestää noin 6 minuuttia. Sivuston omissa asetuksissa voi asettaa sen julkaisuille korkeamman rajan; matalammat arvot ohitetaan.",
       "save": "Tallenna",
       "saving": "Tallennetaan…",
       "saved": "Tallennettu.",
@@ -852,6 +876,9 @@
       "connectJsonLabel": "Tai: .mcp.json (turvallinen committoida)",
       "connectHint": "Aja sitten /mcp Claude Codessa, valitse bizbee-pm → Authenticate, hyväksy selaimessa ja kutsu whoami-työkalua.",
       "copy": "Kopioi"
+    },
+    "sections": {
+      "all": "Kaikki asetukset"
     }
   },
   "oauth": {

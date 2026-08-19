@@ -26,18 +26,12 @@ import { isValidSlug, slugify, slugifyTyping } from "@/lib/site/slug";
 import type { SiteErrorKey } from "@/app/api/sites/route";
 
 type ActorCtx = { role: User["role"]; countries: CountryCode[] };
-
-export type SiteFormValues = {
-  name: string;
-  slug: string;
-  /** A country code, or null for global. */
-  country: CountryCode | null;
-};
+export type TagOption = { id: string; label: string };
 
 /**
- * Shared create/edit Site form. Submits to the REST endpoints (server actions
- * 500 on OpenNext/Workers): create → POST `/api/sites`; edit → PATCH
- * `/api/sites/<siteId>`. Country is single-select: SuperAdmin / global Admins
+ * Create-Site form (editing moved to the per-card forms in edit-site-cards.tsx).
+ * Submits to POST `/api/sites` (REST — server actions 500 on OpenNext/Workers).
+ * Country is single-select: SuperAdmin / global Admins
  * also get a Global option (null); a country-scoped Admin gets only their own
  * countries and no Global (the route re-enforces this).
  *
@@ -48,34 +42,14 @@ export type SiteFormValues = {
  * On success the form navigates to the saved Site's detail page.
  */
 export function SiteForm({
-  siteId,
   actor,
-  mode,
-  initial,
-  hasMintedOpenrouterKey = false,
-  initialMintingEnabled = false,
-  initialMonthlyLimitUsd = null,
-  initialBuildTimeoutMin = null,
-  globalBuildTimeoutMin,
+  tags,
 }: {
-  /** Required in edit mode — the Site being updated. */
-  siteId?: string;
   actor: ActorCtx;
-  mode: "create" | "edit";
-  initial?: SiteFormValues;
-  /** Edit mode only: whether a key has already been minted (never the key itself). */
-  hasMintedOpenrouterKey?: boolean;
-  /** Edit mode only: initial state of the minting toggle. */
-  initialMintingEnabled?: boolean;
-  /** Edit mode only: initial monthly spend cap (whole USD), or null for no cap. */
-  initialMonthlyLimitUsd?: number | null;
-  /** Edit mode only: initial per-Site build-timeout override (min), or null = global. */
-  initialBuildTimeoutMin?: number | null;
-  /** Edit mode only: the current global build timeout (min), shown as the default. */
-  globalBuildTimeoutMin?: number;
+  /** The managed org-tag vocabulary (empty → the field shows a "none yet" hint). */
+  tags: TagOption[];
 }) {
   const t = useTranslations("sites");
-  const tSettings = useTranslations("settings.siteOverride");
   const router = useRouter();
   const [error, setError] = useState<SiteErrorKey | null>(null);
   // Server-composed detail (currently only the oversell rejection, which needs
@@ -98,49 +72,17 @@ export function SiteForm({
     );
   }, [canBeGlobal, scopeCodes, t]);
 
-  const initialCountryOption =
-    countryOptions.find((o) =>
-      initial?.country == null
-        ? o.id === GLOBAL_COUNTRY
-        : o.id === initial.country,
-    ) ?? null;
-
-  const [name, setName] = useState(initial?.name ?? "");
-  const [slug, setSlug] = useState(initial?.slug ?? "");
-  const [slugEdited, setSlugEdited] = useState(mode === "edit");
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugEdited, setSlugEdited] = useState(false);
   const [country, setCountry] = useState<DefaultOption | null>(
-    initialCountryOption,
+    countryOptions.find((o) => o.id === GLOBAL_COUNTRY) ?? null,
   );
-  // OpenRouter key-minting controls (edit mode). The key value is never
-  // user-entered now — PM mints it on deploy. Here we only set the toggle + cap.
-  const [mintingEnabled, setMintingEnabled] = useState(initialMintingEnabled);
-  const [monthlyLimit, setMonthlyLimit] = useState(
-    initialMonthlyLimitUsd == null ? "" : String(initialMonthlyLimitUsd),
+  const tagOptions: DefaultOption[] = useMemo(
+    () => tags.map((tag) => ({ id: tag.id, label: tag.label })),
+    [tags],
   );
-  // Per-Site build-timeout override (minutes). Blank = use the global.
-  const [buildTimeout, setBuildTimeout] = useState(
-    initialBuildTimeoutMin == null ? "" : String(initialBuildTimeoutMin),
-  );
-  // Locally track whether a minted key exists so the delete button hides after
-  // a successful revoke without a full page reload.
-  const [hasKey, setHasKey] = useState(hasMintedOpenrouterKey);
-  const [deleting, setDeleting] = useState(false);
-
-  async function onDeleteKey() {
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/sites/${siteId}/openrouter-key`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        setHasKey(false);
-        router.refresh();
-      }
-    } finally {
-      setDeleting(false);
-    }
-  }
-
+  const [selectedTags, setSelectedTags] = useState<DefaultOption[]>([]);
   // Auto-derive slug from name until the user takes over the slug field.
   useEffect(() => {
     if (!slugEdited) setSlug(slugify(name));
@@ -156,13 +98,11 @@ export function SiteForm({
     const candidate = slugify(slug);
     setSlugAvail(null);
     if (!isValidSlug(candidate)) { setSlugChecking(false); return; }
-    if (mode === "edit" && candidate === initial?.slug) { setSlugChecking(false); return; }
     setSlugChecking(true);
     const ctrl = new AbortController();
     const timer = setTimeout(async () => {
       try {
         const q = new URLSearchParams({ slug: candidate });
-        if (siteId) q.set("exclude", siteId);
         const res = await fetch(`/api/sites/slug-check?${q}`, { signal: ctrl.signal });
         if (!res.ok) return;
         const data = (await res.json()) as { slug: string; available: boolean };
@@ -174,7 +114,7 @@ export function SiteForm({
       }
     }, 350);
     return () => { clearTimeout(timer); ctrl.abort(); };
-  }, [slug, mode, siteId, initial?.slug]);
+  }, [slug]);
   const slugTakenLive = slugAvail !== null && slugAvail.slug === slugify(slug) && !slugAvail.available;
 
   // On success, go to the saved Site's detail page.
@@ -197,28 +137,14 @@ export function SiteForm({
       name,
       slug,
       country: countryValue,
+      tagIds: selectedTags.map((tag) => String(tag.id)),
     };
-    if (mode === "edit") {
-      payload.openrouterMintingEnabled = mintingEnabled;
-      const trimmed = monthlyLimit.trim();
-      payload.openrouterMonthlyLimitUsd =
-        trimmed === "" ? null : Number(trimmed);
-      const bt = buildTimeout.trim();
-      payload.buildTimeoutMin = bt === "" ? null : Number(bt);
-    }
     try {
-      const res =
-        mode === "edit"
-          ? await fetch(`/api/sites/${siteId}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            })
-          : await fetch("/api/sites", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
+      const res = await fetch("/api/sites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
       const data = (await res.json().catch(() => ({}))) as {
         error?: SiteErrorKey;
         message?: string;
@@ -336,83 +262,25 @@ export function SiteForm({
         )}
       </Field>
 
-      {mode === "edit" ? (
-        <Field>
-          <FieldLabel>{t("form.openrouterMinting")}</FieldLabel>
-          <label className="flex items-start gap-2.5 text-sm text-foreground">
-            <input
-              id="site-openrouter-minting"
-              type="checkbox"
-              checked={mintingEnabled}
-              onChange={(e) => setMintingEnabled(e.target.checked)}
-              className="mt-0.5 size-4 shrink-0 rounded border-border accent-primary outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      <Field>
+        <FieldLabel htmlFor="site-tags">{t("form.tags")}</FieldLabel>
+        {tags.length === 0 ? (
+          <FieldHint>{t("form.tagsNone")}</FieldHint>
+        ) : (
+          <>
+            <Combobox<DefaultOption>
+              id="site-tags"
+              multiple
+              options={tagOptions}
+              value={selectedTags}
+              onChange={setSelectedTags}
+              searchable={tagOptions.length > 6}
+              placeholder={t("form.tagsPlaceholder")}
             />
-            <span>{t("form.openrouterMintingToggle")}</span>
-          </label>
-          <FieldHint>{t("form.openrouterMintingHint")}</FieldHint>
-
-          {mintingEnabled ? (
-            <div className="mt-2 flex flex-col gap-1.5">
-              <FieldLabel htmlFor="site-openrouter-limit">
-                {t("form.openrouterMonthlyLimit")}
-              </FieldLabel>
-              <Input
-                id="site-openrouter-limit"
-                name="openrouterMonthlyLimitUsd"
-                type="number"
-                min={0}
-                step={1}
-                inputMode="numeric"
-                value={monthlyLimit}
-                onChange={(e) => setMonthlyLimit(e.target.value)}
-                placeholder={t("form.openrouterMonthlyLimitPlaceholder")}
-                className="font-mono text-sm"
-              />
-              <FieldHint>{t("form.openrouterMonthlyLimitHint")}</FieldHint>
-            </div>
-          ) : null}
-
-          {hasKey ? (
-            <div className="mt-2 flex items-center gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                loading={deleting}
-                onClick={onDeleteKey}
-              >
-                {t("form.openrouterKeyDelete")}
-              </Button>
-              <FieldHint>{t("form.openrouterKeyMinted")}</FieldHint>
-            </div>
-          ) : null}
-        </Field>
-      ) : null}
-
-      {mode === "edit" ? (
-        <Field>
-          <FieldLabel htmlFor="site-build-timeout">
-            {tSettings("label")}
-          </FieldLabel>
-          <Input
-            id="site-build-timeout"
-            name="buildTimeoutMin"
-            type="number"
-            min={1}
-            max={60}
-            step={1}
-            inputMode="numeric"
-            value={buildTimeout}
-            onChange={(e) => setBuildTimeout(e.target.value)}
-            placeholder={
-              globalBuildTimeoutMin != null
-                ? tSettings("placeholderGlobal", { min: globalBuildTimeoutMin })
-                : undefined
-            }
-            className="w-40 font-mono text-sm"
-          />
-          <FieldHint>{tSettings("hint")}</FieldHint>
-        </Field>
-      ) : null}
+            <FieldHint>{t("form.tagsHint")}</FieldHint>
+          </>
+        )}
+      </Field>
 
       <div className="flex items-center gap-2">
         <Button
@@ -421,7 +289,7 @@ export function SiteForm({
           disabled={pending || slugTakenLive}
           className="w-fit"
         >
-          {mode === "create" ? t("form.create") : t("form.save")}
+          {t("form.create")}
         </Button>
         <Button
           type="button"
