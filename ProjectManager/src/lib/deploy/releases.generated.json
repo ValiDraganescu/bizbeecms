@@ -1,9 +1,9 @@
 {
   "releases": [
     {
-      "version": "3.2.0",
-      "tag": "r-3.2.0",
-      "markdown": "# CMS v3.2.0\n\n_2026-08-20 · changes since r-3.1.2_\n\n## Features\n- Redesigned admin sidebar: pages are grouped under Content / Structure / AI with sub-pages always visible, a BizBeeCMS brand header with the release version, and an account row showing who is signed in.\n- Language picker in the sidebar folds into a compact menu instead of a permanent button row.\n- Built-in design-system library: ready-made visual identities (design tokens + styling guidance, starting with a Nordic fine-dining look). The AI assistant and MCP clients can browse them (`list_design_systems`), fetch one (`get_design_system`), and apply its colors and fonts to the site theme — overriding accents and fonts with the client's own brand.\n- The admin now ships proper app icons (favicon, home-screen and Apple touch icons).\n\n## Other\n- Local development: the connect script was renamed to `connect.mjs` and can now run several local test Sites side by side, each with its own separate local data.\n"
+      "version": "3.2.1",
+      "tag": "r-3.2.1",
+      "markdown": "# CMS v3.2.1\n\n_2026-08-20 · changes since r-3.2.0_\n\n## Other\n- Maintenance re-cut of v3.2.0 to exercise the new fleet rollout pipeline.\n  No functional changes for site editors.\n"
     },
     {
       "version": "3.1.2",
