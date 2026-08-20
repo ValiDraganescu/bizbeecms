@@ -1,33 +1,23 @@
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import {
   Alert,
   AlertBody,
   AlertTitle,
-  Badge,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
 } from "@/components/ui";
 import { getCurrentUser, getUserCountries } from "@/lib/auth/user";
 import { canUserCreateSite } from "@/lib/site/authz";
 import { listSitesForUser, primaryDomainBySite } from "@/lib/site/site";
 import { listTags } from "@/lib/tags/tags";
 import { cmsWorkerUrl } from "@/lib/deploy/worker-url";
-import { displayCmsVersion } from "@/lib/deploy/cms-version";
-import { isUpdateAvailable } from "@/lib/deploy/cms-releases";
 import { fetchCmsReleases } from "@/lib/deploy/cms-releases-server";
 import { SidebarSections } from "@/components/sidebar-sections";
 import { SiteForm } from "./site-form";
-import { DeployStatusBadge } from "./deploy-status-badge";
+import { SitesTable, type SiteRow } from "./sites-table";
 
 /**
  * Sites list + create. The list is scoped server-side to what the user may see
@@ -49,8 +39,9 @@ export default async function SitesPage({
   const tags = canCreate ? await listTags() : [];
   const sites = await listSitesForUser(user);
 
-  // Slice 6: fetch the release list ONCE (no N+1) so we can flag sites running
-  // an older CMS than the latest tag. Empty/unreachable → no badges anywhere.
+  // Slice 6: fetch the release list ONCE (no N+1) — it flags outdated sites
+  // AND feeds the per-row/fleet version pickers (fleet-deploy). Empty →
+  // no badges, no pickers.
   const releases = await fetchCmsReleases();
   const latestVersion = releases[0]?.version ?? null;
 
@@ -90,6 +81,18 @@ export default async function SitesPage({
     </Alert>
   );
 
+  // Serializable rows for the client table (fleet-deploy): plain data only —
+  // the client owns selection/rollout state, the server stays the data source.
+  const rows: SiteRow[] = sites.map((site) => ({
+    id: site.id,
+    name: site.name,
+    slug: site.slug,
+    country: site.country,
+    status: site.status,
+    deployedCmsVersion: site.deployedCmsVersion,
+    url: urls.get(site.id) ?? null,
+  }));
+
   const listCard = (
     <Card>
       <CardHeader>
@@ -102,93 +105,16 @@ export default async function SitesPage({
             {canCreate ? t("list.empty") : t("list.emptyAssigned")}
           </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("list.name")}</TableHead>
-                <TableHead>{t("list.slug")}</TableHead>
-                <TableHead>{t("list.country")}</TableHead>
-                <TableHead>{t("list.status")}</TableHead>
-                <TableHead>{t("list.cmsVersion")}</TableHead>
-                <TableHead className="text-right">{t("list.open")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sites.map((site) => (
-                <TableRow key={site.id}>
-                  <TableCell>
-                    <Link
-                      href={`/sites/${site.id}`}
-                      className="font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {site.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-foreground-muted">
-                    {site.slug}
-                  </TableCell>
-                  <TableCell>{site.country ?? t("list.global")}</TableCell>
-                  <TableCell>
-                    <DeployStatusBadge
-                      siteId={site.id}
-                      initialStatus={site.status}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {displayCmsVersion(site.deployedCmsVersion) ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="font-mono text-xs tabular-nums">
-                          {displayCmsVersion(site.deployedCmsVersion)}
-                        </span>
-                        {isUpdateAvailable(site.deployedCmsVersion, latestVersion) ? (
-                          <Badge tone="warning" dot title={t("list.cmsUpdateAvailable")}>
-                            {t("list.cmsUpdateAvailable")}
-                          </Badge>
-                        ) : null}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-foreground-muted">
-                        {t("list.cmsVersionNone")}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {urls.get(site.id) ? (
-                      <a
-                        href={urls.get(site.id)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded-md text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        {t("list.open")}
-                        <svg
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                          <path d="M15 3h6v6" />
-                          <path d="M10 14 21 3" />
-                        </svg>
-                      </a>
-                    ) : (
-                      <span className="text-foreground-muted">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <SitesTable
+            sites={rows}
+            releases={releases}
+            latestVersion={latestVersion}
+          />
         )}
       </CardContent>
     </Card>
   );
+
 
   return (
     <main className="flex flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">

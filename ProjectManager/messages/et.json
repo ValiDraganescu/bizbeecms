@@ -447,6 +447,71 @@
         "close": "Sulge"
       }
     },
+    "rollout": {
+      "selected": "{count} valitud",
+      "clear": "Tühjenda",
+      "selectOutdated": "Vali ainult aegunud ({count})",
+      "selectAll": "Vali kõik saidid",
+      "versionLabel": "Versioon",
+      "parallelLabel": "Paralleelsed ehitused",
+      "maxParallel": "kuni {max}",
+      "deployCount": "Juuruta {count} saiti…",
+      "deployColumn": "Juurutus",
+      "rowDeploy": "Juuruta",
+      "rowRedeploy": "Juuruta uuesti",
+      "queuedBadge": "Järjekorras",
+      "confirmTitle": "Juuruta CMS {version}",
+      "confirmSummary": "{total} valitud · {deploy} juurutatakse, {skip} jäetakse vahele · {parallelism} paralleelselt · ≈ {minutes} min kokku",
+      "confirmQueueNote": "Käivitab {parallelism} ehitust korraga. Ülejäänud ootavad järjekorras ja alustavad, kui kohti vabaneb. Ebaõnnestumised ei peata järjekorda — saad neid lõpus uuesti proovida.",
+      "fromNotDeployed": "juurutamata",
+      "alreadyOn": "juba versioonil {version}",
+      "action": {
+        "install": "Paigaldus",
+        "upgrade": "Uuendus",
+        "move_to_tag": "Liigub märgistatud väljalaskele",
+        "skip_up_to_date": "Vahele jäetud · ajakohane",
+        "skip_newer": "Vahele jäetud · uuem kui {version}"
+      },
+      "start": "Alusta juurutust ({count})",
+      "cancel": "Tühista",
+      "cardTitle": "Juurutus — CMS {version}",
+      "summaryLine": "Juurutatakse CMS {version} · {parallelism} paralleelset ehitust · järjekorras olevad alustavad, kui kohti vabaneb",
+      "status": {
+        "running": "Töös",
+        "paused": "Peatatud",
+        "stopped": "Seisatud",
+        "finished": "Valmis",
+        "failedItem": "Ebaõnnestus"
+      },
+      "progress": "{done}/{total} valmis",
+      "etaLeft": "≈ {minutes} min jäänud",
+      "counts": {
+        "building": "{count} ehituses",
+        "queued": "{count} järjekorras",
+        "deployed": "{count} juurutatud",
+        "failed": "{count} ebaõnnestus",
+        "skipped": "{count} vahele jäetud · ajakohane",
+        "cancelled": "{count} tühistatud"
+      },
+      "breakerTitle": "Peatatud automaatselt — {count} järjestikust ebaõnnestumist",
+      "breakerBody": "See väljalase paistab katki. Järjekorras olevad saidid ootavad ja uusi ei alustata; töös olevad ehitused lõpetavad ja raporteerivad. Jätka, või seiska ja proovi parandatud versiooniga.",
+      "pausedBody": "Juurutus on peatatud. Järjekorras olevad saidid ootavad; töös olevad ehitused lõpetavad ja raporteerivad.",
+      "failedLabel": "Ebaõnnestunud",
+      "retryFailed": "Proovi uuesti ({count})",
+      "pause": "Peata",
+      "resume": "Jätka juurutust",
+      "stop": "Seiska juurutus",
+      "stopNote": "Seiskamine eemaldab järjekorras olevad saidid ja tühistab töös olevad ehitused. Valminud saidid jäävad versioonile {version}.",
+      "dismiss": "Sule",
+      "errors": {
+        "notAllowed": "Sul pole õigust nende saitide juurutust alustada.",
+        "invalidVersion": "Valitud versioon ei ole tuntud väljalase.",
+        "invalidParallelism": "Paralleelsete ehituste arv peab olema täisarv vahemikus 1–10.",
+        "noSites": "Sa ei saa ühtegi valitud saiti juurutada.",
+        "alreadyRunning": "Juurutus on juba käimas. Oota selle lõppu või seiska see enne.",
+        "unknown": "Midagi läks valesti. Proovi uuesti."
+      }
+    },
     "created": "Sait loodud.",
     "updated": "Sait uuendatud.",
     "errors": {

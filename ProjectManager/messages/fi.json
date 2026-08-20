@@ -447,6 +447,71 @@
         "close": "Sulje"
       }
     },
+    "rollout": {
+      "selected": "{count} valittu",
+      "clear": "Tyhjennä",
+      "selectOutdated": "Valitse vain vanhentuneet ({count})",
+      "selectAll": "Valitse kaikki sivustot",
+      "versionLabel": "Versio",
+      "parallelLabel": "Rinnakkaiset käännökset",
+      "maxParallel": "enintään {max}",
+      "deployCount": "Julkaise {count} sivustoa…",
+      "deployColumn": "Julkaisu",
+      "rowDeploy": "Julkaise",
+      "rowRedeploy": "Julkaise uudelleen",
+      "queuedBadge": "Jonossa",
+      "confirmTitle": "Julkaise CMS {version}",
+      "confirmSummary": "{total} valittu · {deploy} julkaistaan, {skip} ohitetaan · {parallelism} rinnakkain · ≈ {minutes} min yhteensä",
+      "confirmQueueNote": "Ajaa {parallelism} käännöstä kerrallaan. Loput odottavat jonossa ja käynnistyvät, kun paikkoja vapautuu. Epäonnistumiset eivät pysäytä jonoa — voit yrittää niitä uudelleen lopuksi.",
+      "fromNotDeployed": "ei julkaistu",
+      "alreadyOn": "jo versiossa {version}",
+      "action": {
+        "install": "Asennus",
+        "upgrade": "Päivitys",
+        "move_to_tag": "Siirtyy julkaisuversioon",
+        "skip_up_to_date": "Ohitetaan · ajan tasalla",
+        "skip_newer": "Ohitetaan · uudempi kuin {version}"
+      },
+      "start": "Aloita julkaisu ({count})",
+      "cancel": "Peruuta",
+      "cardTitle": "Julkaisu — CMS {version}",
+      "summaryLine": "Julkaistaan CMS {version} · {parallelism} rinnakkaista käännöstä · jonossa olevat käynnistyvät, kun paikkoja vapautuu",
+      "status": {
+        "running": "Käynnissä",
+        "paused": "Keskeytetty",
+        "stopped": "Pysäytetty",
+        "finished": "Valmis",
+        "failedItem": "Epäonnistui"
+      },
+      "progress": "{done}/{total} valmiina",
+      "etaLeft": "≈ {minutes} min jäljellä",
+      "counts": {
+        "building": "{count} käännöksessä",
+        "queued": "{count} jonossa",
+        "deployed": "{count} julkaistu",
+        "failed": "{count} epäonnistui",
+        "skipped": "{count} ohitettu · ajan tasalla",
+        "cancelled": "{count} peruutettu"
+      },
+      "breakerTitle": "Keskeytetty automaattisesti — {count} peräkkäistä epäonnistumista",
+      "breakerBody": "Tämä julkaisu näyttää rikkinäiseltä. Jonossa olevat sivustot odottavat eikä uusia käynnisty; käynnissä olevat käännökset valmistuvat ja raportoivat. Jatka, tai pysäytä ja yritä korjatulla versiolla.",
+      "pausedBody": "Julkaisu on keskeytetty. Jonossa olevat sivustot odottavat; käynnissä olevat käännökset valmistuvat ja raportoivat.",
+      "failedLabel": "Epäonnistuneet",
+      "retryFailed": "Yritä uudelleen ({count})",
+      "pause": "Keskeytä",
+      "resume": "Jatka julkaisua",
+      "stop": "Pysäytä julkaisu",
+      "stopNote": "Pysäyttäminen poistaa jonossa olevat sivustot ja peruuttaa käynnissä olevat käännökset. Valmistuneet sivustot jäävät versioon {version}.",
+      "dismiss": "Sulje",
+      "errors": {
+        "notAllowed": "Sinulla ei ole oikeutta aloittaa julkaisua näille sivustoille.",
+        "invalidVersion": "Valittu versio ei ole tunnettu julkaisu.",
+        "invalidParallelism": "Rinnakkaisten käännösten määrän on oltava kokonaisluku väliltä 1–10.",
+        "noSites": "Et voi julkaista yhtäkään valituista sivustoista.",
+        "alreadyRunning": "Julkaisu on jo käynnissä. Odota sen valmistumista tai pysäytä se ensin.",
+        "unknown": "Jokin meni pieleen. Yritä uudelleen."
+      }
+    },
     "created": "Sivusto luotu.",
     "updated": "Sivusto päivitetty.",
     "errors": {

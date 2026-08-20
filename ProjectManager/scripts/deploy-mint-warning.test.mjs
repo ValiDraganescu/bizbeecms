@@ -13,14 +13,21 @@ import { dirname, join } from "node:path";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(join(root, p), "utf8");
 
-test("deploy route flags mint failure and returns mintWarning", () => {
+test("deploy dispatch flags mint failure and the route returns mintWarning", () => {
+  // The dispatch core moved to the shared lib (rollout runner reuses it): the
+  // lib records the failure and surfaces it in its result; the route threads
+  // that into the response.
+  const lib = read("src/lib/deploy/dispatch.ts");
+  assert.match(lib, /mintFailed\s*=\s*true/, "mint catch must set mintFailed");
+  assert.match(
+    lib,
+    /mintWarning:\s*mintFailed/,
+    "dispatch result must carry mintWarning",
+  );
   const src = read("src/app/api/sites/[id]/deploy/route.ts");
-  // The catch block of the mint attempt records the failure.
-  assert.match(src, /mintFailed\s*=\s*true/, "mint catch must set mintFailed");
-  // The success response includes mintWarning only when minting failed.
   assert.match(
     src,
-    /mintFailed\s*\?\s*\{\s*mintWarning:\s*true\s*\}/,
+    /result\.mintWarning\s*\?\s*\{\s*mintWarning:\s*true\s*\}/,
     "response must conditionally include mintWarning",
   );
 });
@@ -35,12 +42,17 @@ test("deploy form reads mintWarning and renders the alert", () => {
 // be decrypted (bad/rotated SITE_SECRET_KEY, corrupt blob) used to only
 // console.warn; now the deploy returns `keyWarning: true` and the form shows a
 // localized `sites.deploy.keyWarning` notice. Graceful degrade is unchanged.
-test("deploy route flags decrypt degrade and returns keyWarning", () => {
+test("deploy dispatch flags decrypt degrade and the route returns keyWarning", () => {
+  const lib = read("src/lib/deploy/dispatch.ts");
+  assert.match(
+    lib,
+    /keyWarning:\s*degraded/,
+    "dispatch result must carry keyWarning",
+  );
   const src = read("src/app/api/sites/[id]/deploy/route.ts");
-  // The success response includes keyWarning only when the key was degraded.
   assert.match(
     src,
-    /degraded\s*\?\s*\{\s*keyWarning:\s*true\s*\}/,
+    /result\.keyWarning\s*\?\s*\{\s*keyWarning:\s*true\s*\}/,
     "response must conditionally include keyWarning",
   );
 });

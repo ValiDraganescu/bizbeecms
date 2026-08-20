@@ -25,7 +25,9 @@ function unionKeys(file, typeName) {
 // (real opennextjs build + wrangler deploy), so the old in-Worker engine keys
 // no longer drive the UI.
 const routeKeys = unionKeys(
-  "src/app/api/sites/[id]/deploy/route.ts",
+  // The union moved to the shared dispatch lib (rollout runner reuses it); the
+  // route re-exports it for the client form's import path.
+  "src/lib/deploy/dispatch.ts",
   "DeployError",
 );
 const formExtra = new Set(["uploadFailed"]);
@@ -37,6 +39,32 @@ test("sanity: extracted the known deploy error keys", () => {
     assert.ok(expected.has(k), `expected to extract "${k}" from source`);
   }
 });
+
+// Same guard for the rollout routes (fleet-deploy): every key in the create
+// route's `RolloutError` union must have a `sites.rollout.errors.<key>` string
+// in EN/FI/ET — and no extras.
+const rolloutKeys = unionKeys("src/app/api/rollouts/route.ts", "RolloutError");
+
+test("sanity: extracted the known rollout error keys", () => {
+  for (const k of ["invalidVersion", "alreadyRunning", "noSites"]) {
+    assert.ok(rolloutKeys.has(k), `expected to extract "${k}" from source`);
+  }
+});
+
+for (const locale of ["en", "fi", "et"]) {
+  test(`${locale} catalog has exactly the rollout error keys`, () => {
+    const msgs = JSON.parse(readFileSync(join(root, `messages/${locale}.json`), "utf8"));
+    const errs = msgs?.sites?.rollout?.errors ?? {};
+    const have = new Set(Object.keys(errs));
+    for (const k of rolloutKeys) {
+      assert.ok(have.has(k), `${locale}: missing sites.rollout.errors.${k}`);
+      assert.ok(String(errs[k]).trim().length > 0, `${locale}: empty sites.rollout.errors.${k}`);
+    }
+    for (const k of have) {
+      assert.ok(rolloutKeys.has(k), `${locale}: stale sites.rollout.errors.${k} (no source key)`);
+    }
+  });
+}
 
 for (const locale of ["en", "fi", "et"]) {
   test(`${locale} catalog has exactly the deploy error keys`, () => {

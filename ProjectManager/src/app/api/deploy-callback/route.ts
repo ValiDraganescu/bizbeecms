@@ -7,6 +7,7 @@ import {
   pruneLogRows,
 } from "@/lib/deploy/deploy-events";
 import { deployedVersionFromCallback } from "@/lib/deploy/cms-version";
+import { onSiteDeployResolved } from "@/lib/deploy/rollout-runner";
 
 type Body = {
   siteId?: unknown;
@@ -97,6 +98,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     workerName ?? undefined,
     deployedCmsVersion,
   );
+
+  // Rollout bookkeeping (fleet-deploy): if this Site is a building item of the
+  // active rollout, settle it — breaker, finished detection, and the dispatch
+  // of the next queued Site all happen inside. Best-effort: rollout errors
+  // must NEVER break the status latch above (the deployer won't retry).
+  try {
+    await onSiteDeployResolved(
+      siteId,
+      status,
+      status === "failed" ? String(body.error ?? "buildFailed") : null,
+    );
+  } catch (e) {
+    console.error(`[deploy-callback] rollout bookkeeping failed: ${String(e)}`);
+  }
 
   // Prune-on-resolve (deploy-log-stream): the live-console `status:"log"` rows
   // have served their purpose now the run is terminal; drop them so the trail

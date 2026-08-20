@@ -447,6 +447,71 @@
         "close": "Close"
       }
     },
+    "rollout": {
+      "selected": "{count} selected",
+      "clear": "Clear",
+      "selectOutdated": "Select outdated only ({count})",
+      "selectAll": "Select all sites",
+      "versionLabel": "Version",
+      "parallelLabel": "Parallel builds",
+      "maxParallel": "max {max}",
+      "deployCount": "Deploy {count} sites…",
+      "deployColumn": "Deploy",
+      "rowDeploy": "Deploy",
+      "rowRedeploy": "Redeploy",
+      "queuedBadge": "Queued",
+      "confirmTitle": "Deploy CMS {version}",
+      "confirmSummary": "{total} selected · {deploy} will deploy, {skip} skipped · {parallelism} in parallel · ≈ {minutes} min total",
+      "confirmQueueNote": "Runs {parallelism} builds at a time. The rest wait in a queue and start as slots free up. Failures don't stop the queue — you can retry them at the end.",
+      "fromNotDeployed": "not deployed",
+      "alreadyOn": "already on {version}",
+      "action": {
+        "install": "Install",
+        "upgrade": "Upgrade",
+        "move_to_tag": "Moves to tagged release",
+        "skip_up_to_date": "Skipped · up to date",
+        "skip_newer": "Skipped · newer than {version}"
+      },
+      "start": "Start rollout ({count})",
+      "cancel": "Cancel",
+      "cardTitle": "Rollout — CMS {version}",
+      "summaryLine": "Deploying CMS {version} · {parallelism} parallel builds · queued sites start as slots free up",
+      "status": {
+        "running": "Running",
+        "paused": "Paused",
+        "stopped": "Stopped",
+        "finished": "Finished",
+        "failedItem": "Failed"
+      },
+      "progress": "{done} of {total} finished",
+      "etaLeft": "≈ {minutes} min left",
+      "counts": {
+        "building": "{count} building",
+        "queued": "{count} queued",
+        "deployed": "{count} deployed",
+        "failed": "{count} failed",
+        "skipped": "{count} skipped · up to date",
+        "cancelled": "{count} cancelled"
+      },
+      "breakerTitle": "Paused automatically — {count} consecutive failures",
+      "breakerBody": "This release looks broken. Queued sites are on hold and nothing new starts; running builds finish and report. Resume to continue, or stop and retry with a fixed tag.",
+      "pausedBody": "The rollout is paused. Queued sites are on hold; running builds finish and report.",
+      "failedLabel": "Failed",
+      "retryFailed": "Retry {count} failed",
+      "pause": "Pause",
+      "resume": "Resume rollout",
+      "stop": "Stop rollout",
+      "stopNote": "Stopping removes queued sites and cancels running builds. Finished sites stay on {version}.",
+      "dismiss": "Dismiss",
+      "errors": {
+        "notAllowed": "You're not allowed to start a rollout for these sites.",
+        "invalidVersion": "The chosen version is not a known release.",
+        "invalidParallelism": "Parallel builds must be a whole number between 1 and 10.",
+        "noSites": "None of the selected sites can be deployed by you.",
+        "alreadyRunning": "A rollout is already in progress. Wait for it to finish or stop it first.",
+        "unknown": "Something went wrong. Try again."
+      }
+    },
     "created": "Site created.",
     "updated": "Site updated.",
     "errors": {

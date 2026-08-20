@@ -12,6 +12,7 @@ import {
   buildFailedCallbackEvent,
 } from "@/lib/deploy/deploy-events";
 import { shouldReapDeploy } from "@/lib/deploy/deploy-state";
+import { onSiteDeployResolved } from "@/lib/deploy/rollout-runner";
 import { effectiveBuildTimeoutMin } from "@/lib/deploy/build-timeout";
 import { getGlobalBuildTimeoutMin } from "@/lib/deploy/settings";
 
@@ -91,6 +92,13 @@ export async function GET(
         );
       } catch {
         // best-effort: the status flip above is what unwedges the Site
+      }
+      // Rollout bookkeeping (fleet-deploy): a reaped Site that was a building
+      // rollout item settles as failed — same seam the deploy-callback uses.
+      try {
+        await onSiteDeployResolved(site.id, "failed", "buildTimedOut");
+      } catch (e) {
+        console.error(`[deploy-events] rollout bookkeeping failed: ${String(e)}`);
       }
     }
   }

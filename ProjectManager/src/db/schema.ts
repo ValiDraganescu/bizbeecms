@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  index,
   integer,
   primaryKey,
   sqliteTable,
@@ -402,8 +403,80 @@ export const AI_CURATED_MODELS_KEY = "ai_curated_models";
 // quotas must not oversell it.
 export const AI_CREDIT_POOL_USD_KEY = "ai_credit_pool_usd";
 
+/**
+ * Bulk CMS rollouts (fleet deploy). One rollout = one operator action: "deploy
+ * version X to these sites, N builds at a time". Items are the per-site queue;
+ * the deployer's callback (or the reaper) resolves a `building` item and the
+ * rollout runner dispatches the next `queued` one — the queue lives HERE, in
+ * D1, deliberately not in Cloudflare Queues (a queue-consumer invocation caps
+ * at 15 min wall clock and can't hold a slot for a 6–60 min out-of-band build).
+ * At most one rollout is `running|paused` at a time (enforced in the create
+ * route, not SQL). "Rollout" is the domain term — "fleet" already means
+ * AI-usage aggregation in this codebase.
+ */
+export type RolloutStatus = "running" | "paused" | "stopped" | "finished";
+export type RolloutItemStatus =
+  | "queued"
+  | "building"
+  | "deployed"
+  | "failed"
+  | "skipped"
+  | "cancelled";
+
+export const rollouts = sqliteTable("rollouts", {
+  id: text("id").primaryKey(),
+  status: text("status").notNull().$type<RolloutStatus>().default("running"),
+  // Bare semver of the chosen release (e.g. `3.2.0`) — for display/compare.
+  targetVersion: text("target_version").notNull(),
+  // The git ref actually deployed (e.g. `r-3.2.0`).
+  targetRef: text("target_ref").notNull(),
+  // Concurrent build slots for this rollout, clamped 1..10 (the deployer's
+  // container `max_instances: 10` is the hard infra ceiling).
+  parallelism: integer("parallelism").notNull(),
+  // Circuit breaker: consecutive (not total) failures; success resets it. At
+  // 3 the rollout auto-pauses; resume resets the counter.
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+  createdBy: text("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+  // Set when the rollout reaches a terminal status (stopped/finished).
+  finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+});
+
+export const rolloutItems = sqliteTable(
+  "rollout_items",
+  {
+    id: text("id").primaryKey(),
+    rolloutId: text("rollout_id")
+      .notNull()
+      .references(() => rollouts.id, { onDelete: "cascade" }),
+    siteId: text("site_id")
+      .notNull()
+      .references(() => sites.id, { onDelete: "cascade" }),
+    status: text("status")
+      .notNull()
+      .$type<RolloutItemStatus>()
+      .default("queued"),
+    // Queue order within the rollout; dispatch is strictly by position.
+    position: integer("position").notNull(),
+    // Why a `skipped` item never ran: `up_to_date` (already on the target) or
+    // `newer` (upgrade-only rule — downgrades are blocked). Null otherwise.
+    skipReason: text("skip_reason"),
+    // Failure detail for `failed` items (e.g. `alreadyDeploying`, build error).
+    error: text("error"),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }),
+    finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("rollout_items_rollout_idx").on(t.rolloutId, t.status)],
+);
+
 export type AppSetting = typeof appSettings.$inferSelect;
 export type NewAppSetting = typeof appSettings.$inferInsert;
+export type Rollout = typeof rollouts.$inferSelect;
+export type NewRollout = typeof rollouts.$inferInsert;
+export type RolloutItem = typeof rolloutItems.$inferSelect;
+export type NewRolloutItem = typeof rolloutItems.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Invite = typeof invites.$inferSelect;

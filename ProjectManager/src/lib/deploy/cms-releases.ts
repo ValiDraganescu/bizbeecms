@@ -22,8 +22,8 @@ function semverParts(v: string): [number, number, number] {
   return [a, b, c];
 }
 
-/** Descending semver: newer first. */
-function cmpSemverDesc(a: string, b: string): number {
+/** Descending semver: newer first. Exported for the rollout planner. */
+export function cmpSemverDesc(a: string, b: string): number {
   const pa = semverParts(a);
   const pb = semverParts(b);
   for (let i = 0; i < 3; i++) {
