@@ -561,13 +561,12 @@
     "errorTooMany": "Liiga palju sisselogimiskatseid. Palun oota mõni minut ja proovi uuesti."
   },
   "adminNav": {
-    "brand": "CMS-i haldus",
+    "brand": "BizBeeCMS",
     "home": "Avaleht",
     "expand": "Laienda külgriba",
     "collapse": "Ahenda külgriba",
     "viewSite": "Vaata saiti",
     "logout": "Logi välja",
-    "version": "Väljalase {version}",
     "theme": {
       "label": "Teema",
       "light": "Hele",
@@ -593,7 +592,13 @@
     "componentsImportExport": "Import / eksport",
     "componentsDevelop": "Arenda",
     "dataSources": "Andmeallikad",
-    "chatAgents": "Vestlusagendid"
+    "chatAgents": "Vestlusagendid",
+    "groups": {
+      "content": "Sisu",
+      "structure": "Struktuur",
+      "ai": "AI"
+    },
+    "account": "Konto"
   },
   "pageBuilder": {
     "title": "Lehe koostaja",

@@ -2,14 +2,22 @@
 
 ## Database & D1
 
-- **`npm run dev` (port 3602) reads the LOCAL D1** at `.wrangler/state/v3/d1` (gitignored
-  miniflare SQLite). `wrangler.jsonc` has a placeholder `database_id`
-  (`00000000-…`) and no `experimental.remoteBindings`, so the `DB` binding is local.
+- **`npm run dev` (port 3602) reads a LOCAL D1** (gitignored miniflare SQLite). `wrangler.jsonc`
+  has a placeholder `database_id` (`00000000-…`) and no `experimental.remoteBindings`, so the
+  `DB` binding is local.
+- **Multiple local test Sites** — `npm run site -- <slug>` (= `scripts/connect.mjs cms <slug>`
+  at the repo root; `/connect` skill) points the local CMS at a Site that exists in the LOCAL
+  PM: it sets `SITE_ID` in `.dev.vars`, writes the `.local-site.json` marker and gives that
+  Site its own state dir `.wrangler/sites/<slug>/` (own D1/R2, migrated on first use).
+  `scripts/connect.mjs status` / `sites`; `cms prod <slug>` binds to a PRODUCTION Site
+  instead. Restart `npm run dev` after switching. Without the marker wrangler's default
+  `.wrangler/state/` is used. `wrangler d1 execute … --local` needs
+  `--persist-to .wrangler/sites/<slug>` to hit the active Site's DB.
 - The **AI binding is always remote** — the "⎔ Establishing remote connection" line in
   the dev log is the AI binding (and incurs charges), NOT D1. Don't read it as "D1 is remote".
 - **Production / deployed Sites** get their own real D1, provisioned by the deployer Worker,
   which injects the real `database_id` at deploy time. That id is not in this repo.
-- To inspect/seed the dev DB: `npx wrangler d1 execute bizbeecms-cms --local --command "…"`.
+- To inspect/seed the dev DB: `npx wrangler d1 execute bizbeecms-cms --local --persist-to .wrangler/sites/<slug> --command "…"`.
 - **The local D1 was originally seeded from a copy of a remote snapshot.** That snapshot
   carried the schema/data but not a matching `d1_migrations` ledger, so the ledger can lag
   the actual schema (the source of any "duplicate column" drift). Fix by reconciling the

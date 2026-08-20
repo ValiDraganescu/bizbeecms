@@ -561,13 +561,12 @@
     "errorTooMany": "Too many sign-in attempts. Please wait a few minutes and try again."
   },
   "adminNav": {
-    "brand": "CMS admin",
+    "brand": "BizBeeCMS",
     "home": "Home",
     "expand": "Expand sidebar",
     "collapse": "Collapse sidebar",
     "viewSite": "View site",
     "logout": "Sign out",
-    "version": "Release {version}",
     "theme": {
       "label": "Theme",
       "light": "Light",
@@ -593,7 +592,13 @@
     "componentsImportExport": "Import / Export",
     "componentsDevelop": "Develop",
     "dataSources": "Data sources",
-    "chatAgents": "Chat agents"
+    "chatAgents": "Chat agents",
+    "groups": {
+      "content": "Content",
+      "structure": "Structure",
+      "ai": "AI"
+    },
+    "account": "Account"
   },
   "pageBuilder": {
     "title": "Page Builder",

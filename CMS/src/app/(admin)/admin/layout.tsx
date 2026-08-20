@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 import { checkAdminFromHeaders } from "@/lib/auth/guard";
+import { findUserById } from "@/db/user-store";
 import { SidebarShell } from "@/components/admin-sidebar";
 import { LoginGate } from "@/components/login-gate";
 
@@ -24,7 +25,14 @@ export const dynamic = "force-dynamic";
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const decision = await checkAdminFromHeaders();
   if (decision.allow) {
-    return <SidebarShell>{children}</SidebarShell>;
+    // Account row data for the sidebar footer. The dev backdoor has no user
+    // row; fall back to a synthetic identity so the shell still renders.
+    const user = decision.userId ? await findUserById(decision.userId) : null;
+    const account = {
+      email: user?.email ?? "dev@localhost",
+      role: user?.role ?? decision.role ?? null,
+    };
+    return <SidebarShell account={account}>{children}</SidebarShell>;
   }
 
   if (decision.reason === "denied") {

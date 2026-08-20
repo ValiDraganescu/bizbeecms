@@ -1,0 +1,16 @@
+{
+  // Standalone tsconfig so IDEs type-check these zero-dependency scripts
+  // correctly (node:fs, modern lib) — the folder is outside CMS/PM projects.
+  // Node ≥23 runs the .ts files directly (type stripping); nothing is emitted.
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "typeRoots": ["../../../../CMS/node_modules/@types"]
+  },
+  "include": ["*.ts"]
+}

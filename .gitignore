@@ -11,8 +11,14 @@ node_modules/
 # MCP server config (per-machine; may hold local endpoints/secrets)
 .mcp.json
 
-# prod-connect (scripts/prod-connect.mjs): generated remote-binding config,
+# connect (scripts/connect.mjs): generated remote-binding config,
 # active-mode marker and per-env secrets — per-machine, never committed.
 wrangler.prod-remote.jsonc
 .prod-remote.json
 .dev.vars.*
+
+# connect (scripts/connect.mjs): active local Site marker — per-machine.
+.local-site.json
+
+# restaurant-website-creator skill: per-restaurant gathered research data (client data, per-machine)
+restaurant-research/

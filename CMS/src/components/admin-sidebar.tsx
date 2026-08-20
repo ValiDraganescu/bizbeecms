@@ -1,29 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { LocaleSwitcher } from "@/components/locale-switcher";
+import { usePathname, useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { ADMIN_SECTIONS, type AdminSection } from "@/components/admin-sections";
 import { ChatWidget } from "@/components/chat/chat-widget";
+import { localeNames, locales, LOCALE_COOKIE } from "@/i18n/routing";
 
 /**
- * Collapsible admin shell — sidebar nav + scrollable content area, adapted from
- * the aicms layout to the CMS's stack: `next/navigation` (no i18n routing),
- * `ADMIN_SECTIONS` + next-intl labels (adminNav.<key>), and the CMS OKLCH
- * purpose tokens (surface / foreground / primary / border). No session client
- * here — sign-in is driven by the PM SSO handoff — so the footer is the locale
- * switcher + a "view site" link rather than a user menu.
+ * Collapsible admin shell — sidebar nav + scrollable content area ("Option A ·
+ * Grouped" redesign, 2026-08-20). One visual shape for everything:
  *
- * Layout lives entirely in this client component (the server layout just gates
- * auth and renders <SidebarShell>{children}</SidebarShell>).
+ * - Brand header: bee + BizBeeCMS + release version.
+ * - Nav rows grouped under uppercase labels (Content / Structure / AI);
+ *   sub-pages are ALWAYS visible as quiet indented rows — no disclosure
+ *   chevrons to manage.
+ * - Settings + View site sit at the bottom of the nav.
+ * - Footer: ONE account row whose popover carries the identity, the language
+ *   disclosure list (scales past 4 locales), the theme pills, and sign out —
+ *   the same account-menu pattern as the PM dock.
+ *
+ * Layout lives entirely in this client component (the server layout gates auth
+ * and passes the signed-in account down).
  */
+
+export type SidebarAccount = { email: string; role: string | null };
 
 type IconKey =
   | "home"
-  | "chat"
-  | "pages"
   | "pageBuilder"
   | "components"
   | "collections"
@@ -34,8 +39,8 @@ type IconKey =
 
 function NavIcon({ name }: { name: IconKey }) {
   const common = {
-    width: 18,
-    height: 18,
+    width: 17,
+    height: 17,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
@@ -49,21 +54,6 @@ function NavIcon({ name }: { name: IconKey }) {
           <rect x="14" y="3" width="7" height="5" rx="1" />
           <rect x="14" y="12" width="7" height="9" rx="1" />
           <rect x="3" y="16" width="7" height="5" rx="1" />
-        </svg>
-      );
-    case "chat":
-      return (
-        <svg {...common}>
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-      );
-    case "pages":
-      return (
-        <svg {...common}>
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" x2="8" y1="13" y2="13" />
-          <line x1="16" x2="8" y1="17" y2="17" />
         </svg>
       );
     case "pageBuilder":
@@ -92,7 +82,6 @@ function NavIcon({ name }: { name: IconKey }) {
         </svg>
       );
     case "dataSources":
-      // Plug glyph (external APIs plug into the site) — same Lucide-style set.
       return (
         <svg {...common}>
           <path d="M12 22v-5" />
@@ -102,7 +91,6 @@ function NavIcon({ name }: { name: IconKey }) {
         </svg>
       );
     case "chatAgents":
-      // Bot glyph (guest-facing chatbots) — same Lucide-style set.
       return (
         <svg {...common}>
           <path d="M12 8V4H8" />
@@ -131,7 +119,15 @@ function NavIcon({ name }: { name: IconKey }) {
   }
 }
 
-/* ── Theme toggle (3-way: light / system / dark) ─────────────────────────
+const ExternalLinkIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
+  </svg>
+);
+
+/* ── Theme (3-way: light / system / dark) ─────────────────────────────────
  * Writes `data-theme` on <html> and persists to localStorage. globals.css keys
  * the dark palette off [data-theme="dark"] and the OS preference off
  * [data-theme="system"], so this just sets the attribute. */
@@ -143,7 +139,8 @@ function applyTheme(mode: ThemeMode) {
   document.documentElement.setAttribute("data-theme", mode);
 }
 
-function ThemeToggle({ collapsed }: { collapsed: boolean }) {
+/** Label + compact pill group, rendered inside the account menu. */
+function ThemePillsRow() {
   const t = useTranslations("adminNav.theme");
   const [mode, setMode] = useState<ThemeMode>("system");
 
@@ -159,111 +156,133 @@ function ThemeToggle({ collapsed }: { collapsed: boolean }) {
     applyTheme(next);
   };
 
-  const options: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
-    { value: "light", label: t("light"), icon: <SunIcon /> },
-    { value: "system", label: t("system"), icon: <MonitorIcon /> },
-    { value: "dark", label: t("dark"), icon: <MoonIcon /> },
-  ];
-
-  if (collapsed) {
-    const next: Record<ThemeMode, ThemeMode> = {
-      system: "light",
-      light: "dark",
-      dark: "system",
-    };
-    const current = options.find((o) => o.value === mode) ?? options[1];
-    return (
-      <button
-        type="button"
-        onClick={() => set(next[mode])}
-        title={`${t("label")}: ${current.label}`}
-        className="flex w-full items-center justify-center rounded-md py-2.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
-      >
-        {current.icon}
-      </button>
-    );
-  }
+  const options: ThemeMode[] = ["light", "system", "dark"];
 
   return (
-    <div className="flex overflow-hidden rounded-md border border-border">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => set(opt.value)}
-          title={opt.label}
-          aria-pressed={mode === opt.value}
-          className={
-            "flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[11px] transition-colors " +
-            (mode === opt.value
-              ? "bg-surface font-medium text-foreground"
-              : "bg-surface-muted text-foreground-muted hover:text-foreground")
-          }
-        >
-          {opt.icon}
-          <span className="hidden xl:inline">{opt.label}</span>
-        </button>
-      ))}
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+      <span className="text-xs font-medium text-foreground-muted">{t("label")}</span>
+      <div
+        role="group"
+        aria-label={t("label")}
+        className="flex gap-1 rounded-lg border border-border bg-surface-muted p-0.5"
+      >
+        {options.map((value) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={mode === value}
+            onClick={() => set(value)}
+            className={
+              "rounded-md px-2 py-1 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring " +
+              (mode === value
+                ? "bg-primary font-semibold text-primary-foreground"
+                : "font-medium text-foreground-muted hover:text-foreground")
+            }
+          >
+            {t(value)}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-const iconProps = {
-  width: 14,
-  height: 14,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.5,
-} as const;
+/** Language disclosure row + radio list — scales to any number of locales. */
+function LanguageRow() {
+  const t = useTranslations("locale");
+  const activeLocale = useLocale();
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
 
-const SunIcon = () => (
-  <svg {...iconProps}>
-    <circle cx="12" cy="12" r="5" />
-    <line x1="12" y1="1" x2="12" y2="3" />
-    <line x1="12" y1="21" x2="12" y2="23" />
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-    <line x1="1" y1="12" x2="3" y2="12" />
-    <line x1="21" y1="12" x2="23" y2="12" />
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-  </svg>
-);
-const MonitorIcon = () => (
-  <svg {...iconProps}>
-    <rect x="2" y="3" width="20" height="14" rx="2" />
-    <line x1="8" y1="21" x2="16" y2="21" />
-    <line x1="12" y1="17" x2="12" y2="21" />
-  </svg>
-);
-const MoonIcon = () => (
-  <svg {...iconProps}>
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-  </svg>
-);
-const ExternalLinkIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    <polyline points="15 3 21 3 21 9" />
-    <line x1="10" y1="14" x2="21" y2="3" />
-  </svg>
-);
-const LogoutIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
+  function pick(code: (typeof locales)[number]) {
+    setOpen(false);
+    if (code === activeLocale) return;
+    document.cookie = `${LOCALE_COOKIE}=${code};path=/;max-age=31536000;samesite=lax`;
+    startTransition(() => {
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="-mx-1 flex items-center justify-between gap-3 rounded-md px-1 py-0.5 outline-none transition-colors hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="text-xs font-medium text-foreground-muted">{t("label")}</span>
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-foreground">
+          {localeNames[activeLocale as (typeof locales)[number]]}
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className={
+              "text-foreground-muted transition-transform " + (open ? "rotate-180" : "")
+            }
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </span>
+      </button>
+      {open ? (
+        <div
+          role="radiogroup"
+          aria-label={t("label")}
+          className="flex max-h-48 flex-col overflow-y-auto rounded-md border border-border bg-surface"
+        >
+          {locales.map((code) => (
+            <button
+              key={code}
+              type="button"
+              role="radio"
+              aria-checked={code === activeLocale}
+              onClick={() => pick(code)}
+              className={
+                "flex shrink-0 items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring " +
+                (code === activeLocale
+                  ? "bg-primary-subtle font-semibold text-primary"
+                  : "font-medium text-foreground hover:bg-surface-muted")
+              }
+            >
+              {localeNames[code]}
+              {code === activeLocale ? (
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /**
- * Sign out: POST /api/auth/logout invalidates the session server-side (deletes
- * the D1 row + clears the cookie), then hard-navigate to /admin so the layout
- * re-gates and shows the login page. Hard nav (not router.push) drops all
- * client cache.
+ * Account popover: identity, language, theme, sign out. Sign out POSTs
+ * /api/auth/logout (deletes the D1 session row + clears the cookie) then
+ * hard-navigates to /admin so the layout re-gates; hard nav drops client cache.
  */
-function LogoutButton({ collapsed }: { collapsed: boolean }) {
+function AccountMenu({ account }: { account: SidebarAccount }) {
   const t = useTranslations("adminNav");
   const [busy, setBusy] = useState(false);
 
@@ -279,98 +298,163 @@ function LogoutButton({ collapsed }: { collapsed: boolean }) {
   };
 
   return (
-    <button
-      type="button"
-      onClick={signOut}
-      disabled={busy}
-      title={collapsed ? t("logout") : undefined}
-      className={
-        "flex w-full items-center rounded-md text-sm text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground disabled:opacity-50 " +
-        (collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5")
-      }
+    <div
+      role="menu"
+      aria-label={t("account")}
+      className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface-raised shadow-lg"
     >
-      <span className="shrink-0">
-        <LogoutIcon />
-      </span>
-      {!collapsed && t("logout")}
-    </button>
+      <div className="flex flex-col items-start gap-1.5 border-b border-border px-4 py-3">
+        <span className="max-w-full truncate text-sm font-medium text-foreground">
+          {account.email}
+        </span>
+        {account.role ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-subtle px-2.5 py-0.5 text-xs font-medium text-primary">
+            <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+            {account.role}
+          </span>
+        ) : null}
+      </div>
+      <div className="flex flex-col gap-2.5 border-b border-border px-4 py-3">
+        <LanguageRow />
+        <ThemePillsRow />
+      </div>
+      <button
+        type="button"
+        onClick={signOut}
+        disabled={busy}
+        className="flex items-center gap-2 px-4 py-3 text-left text-sm font-medium text-danger outline-none transition-colors hover:bg-danger-subtle focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <path d="M16 17l5-5-5-5" />
+          <path d="M21 12H9" />
+        </svg>
+        {t("logout")}
+      </button>
+    </div>
   );
 }
 
-/** Disclosure chevron for parent items with sub-menus; rotates down when open. */
-const ChevronIcon = ({ open }: { open: boolean }) => (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    className={"transition-transform duration-200 " + (open ? "rotate-90" : "")}
-  >
-    <path d="M9 6l6 6-6 6" />
-  </svg>
-);
+/** "vali.draganescu88@…" → "VD"; single-segment locals fall back to 2 chars. */
+function initialsFromEmail(email: string): string {
+  const local = email.split("@")[0] ?? "";
+  const parts = local.split(/[._-]+/).filter(Boolean);
+  const raw =
+    parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}` : local.slice(0, 2) || "?";
+  return raw.toUpperCase();
+}
 
-const OPEN_SECTIONS_KEY = "cms-sidebar-open-sections";
+/** Nav groups: label key (adminNav.groups.<label>) + section keys, in order. */
+const NAV_GROUPS: { label: string | null; keys: string[] }[] = [
+  { label: null, keys: ["home"] },
+  { label: "content", keys: ["pageBuilder", "media"] },
+  { label: "structure", keys: ["components", "collections", "dataSources"] },
+  { label: "ai", keys: ["chatAgents"] },
+];
 
-export function SidebarShell({ children }: { children: React.ReactNode }) {
+const HOME_SECTION: AdminSection = { key: "home", href: "/admin" };
+
+export function SidebarShell({
+  account,
+  children,
+}: {
+  account: SidebarAccount;
+  children: React.ReactNode;
+}) {
   const t = useTranslations("adminNav");
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  // Manually-toggled open sub-menus, persisted across refresh. The active section
-  // is always shown open regardless (see `isOpen`), so this only governs sections
-  // you're NOT currently inside.
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const [menuOpen, setMenuOpen] = useState(false);
+  const footerRef = useRef<HTMLDivElement>(null);
 
+  // Close the account menu on outside pointerdown / Escape.
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(OPEN_SECTIONS_KEY);
-      if (saved) setOpenSections(new Set(JSON.parse(saved) as string[]));
-    } catch {
-      /* corrupt/absent → start closed */
+    if (!menuOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (!footerRef.current?.contains(e.target as Node)) setMenuOpen(false);
     }
-  }, []);
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
 
-  const toggleSection = (key: string) => {
-    setOpenSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      localStorage.setItem(OPEN_SECTIONS_KEY, JSON.stringify([...next]));
-      return next;
-    });
-  };
-
-  const links: (AdminSection & { key: IconKey })[] = [
-    { key: "home", href: "/admin" },
-    ...(ADMIN_SECTIONS as (AdminSection & { key: IconKey })[]),
-  ];
+  const sectionByKey = new Map<string, AdminSection>([
+    [HOME_SECTION.key, HOME_SECTION],
+    ...ADMIN_SECTIONS.map((s) => [s.key, s] as const),
+  ]);
 
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
-
-  // When you visit a section with sub-menus, record it as open so it STAYS open
-  // after you navigate away (otherwise a section that was only expanded by being
-  // active silently collapses on the next page). Toggling the chevron can still
-  // close it later. Runs on pathname change.
-  useEffect(() => {
-    const activeParent = (ADMIN_SECTIONS as AdminSection[]).find(
-      (s) =>
-        s.children?.length &&
-        (s.href === "/admin" ? pathname === "/admin" : pathname.startsWith(s.href)),
-    );
-    if (!activeParent) return;
-    setOpenSections((prev) => {
-      if (prev.has(activeParent.key)) return prev;
-      const next = new Set(prev).add(activeParent.key);
-      localStorage.setItem(OPEN_SECTIONS_KEY, JSON.stringify([...next]));
-      return next;
-    });
-  }, [pathname]);
   // A child link is exact-match (so the parent's Import/Export and its Develop
   // child don't both light up on /admin/components/develop).
   const isExact = (href: string) => pathname === href;
+
+  const settings = ADMIN_SECTIONS.find((s) => s.key === "settings")!;
+
+  function navRow(section: AdminSection) {
+    const active = isActive(section.href);
+    return (
+      <div key={section.href}>
+        <Link
+          href={section.href}
+          title={collapsed ? t(section.key) : undefined}
+          aria-current={active ? "page" : undefined}
+          className={
+            "flex items-center rounded-md text-sm transition-colors " +
+            (collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2") +
+            " " +
+            (active
+              ? "bg-primary-subtle font-medium text-primary"
+              : "text-foreground-muted hover:bg-surface-muted hover:text-foreground")
+          }
+        >
+          <span className="shrink-0">
+            <NavIcon name={section.key as IconKey} />
+          </span>
+          {!collapsed && t(section.key)}
+        </Link>
+        {/* Sub-pages: always visible (expanded sidebar only) — no chevrons. */}
+        {!collapsed && section.children ? (
+          <div className="mt-0.5 mb-1 ml-[19px] flex flex-col gap-0.5 border-l border-border pl-3">
+            {section.children.map((child) => {
+              const childActive = isExact(child.href);
+              return (
+                <Link
+                  key={child.href}
+                  href={child.href}
+                  aria-current={childActive ? "page" : undefined}
+                  className={
+                    "rounded-md px-2.5 py-1.5 text-[13px] transition-colors " +
+                    (childActive
+                      ? "bg-primary-subtle font-medium text-primary"
+                      : "text-foreground-muted hover:bg-surface-muted hover:text-foreground")
+                  }
+                >
+                  {t(child.key)}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 flex bg-surface">
@@ -383,22 +467,30 @@ export function SidebarShell({ children }: { children: React.ReactNode }) {
         {/* Brand + collapse toggle */}
         <div
           className={
-            "flex h-16 items-center border-b border-border " +
-            (collapsed ? "justify-center px-0" : "gap-2 px-5")
+            "flex h-14 shrink-0 items-center border-b border-border " +
+            (collapsed ? "justify-center px-0" : "gap-2.5 px-4")
           }
         >
           {!collapsed && (
-            <Link href="/admin" className="font-semibold text-foreground">
-              {t("brand")}
+            <Link href="/admin" className="flex min-w-0 flex-1 items-center gap-2.5">
+              {/* eslint-disable-next-line @next/next/no-img-element -- static 5KB asset */}
+              <img src="/icon.png" alt="" width={26} height={26} className="h-[26px] w-[26px] shrink-0" />
+              <span className="flex min-w-0 items-baseline gap-1.5">
+                <span className="truncate text-sm font-semibold text-foreground">
+                  {t("brand")}
+                </span>
+                {process.env.NEXT_PUBLIC_CMS_VERSION && (
+                  <span className="font-mono text-[10px] text-foreground-muted">
+                    v{process.env.NEXT_PUBLIC_CMS_VERSION}
+                  </span>
+                )}
+              </span>
             </Link>
           )}
           <button
             type="button"
             onClick={() => setCollapsed((c) => !c)}
-            className={
-              "flex items-center justify-center rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground " +
-              (collapsed ? "" : "ml-auto")
-            }
+            className="flex items-center justify-center rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
             aria-label={collapsed ? t("expand") : t("collapse")}
           >
             <svg
@@ -418,109 +510,108 @@ export function SidebarShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        {/* Nav */}
+        {/* Nav: grouped rows; Settings + View site pinned at the bottom. */}
         <nav
-          className="flex-1 space-y-1 overflow-y-auto p-3"
+          className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3"
           aria-label={t("brand")}
         >
-          {/* View site — first, prominent, opens the public site in a new tab */}
-          <a
-            href="/"
-            target="_blank"
-            rel="noopener noreferrer"
-            title={collapsed ? t("viewSite") : undefined}
-            className={
-              "mb-1 flex items-center rounded-md border border-border bg-surface text-sm font-medium text-foreground transition-colors hover:bg-surface-muted " +
-              (collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5")
-            }
-          >
-            <span className="shrink-0">
-              <ExternalLinkIcon />
-            </span>
-            {!collapsed && t("viewSite")}
-          </a>
-
-          {links.map(({ key, href, children }) => {
-            const active = isActive(href);
-            const hasChildren = Boolean(children?.length);
-            // Children render when the section is the current route OR the user has
-            // manually expanded it. Active wins so you can always reach sibling
-            // sub-pages of the page you're on, even if you'd collapsed the section.
-            const open = active || openSections.has(key);
-            return (
-              <div key={href}>
-                <div className="flex items-center">
-                  <Link
-                    href={href}
-                    title={collapsed ? t(key) : undefined}
-                    aria-current={active ? "page" : undefined}
-                    className={
-                      "flex flex-1 items-center rounded-md text-sm transition-colors " +
-                      (collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2.5") +
-                      " " +
-                      (active
-                        ? "bg-primary-subtle font-medium text-primary"
-                        : "text-foreground-muted hover:bg-surface-muted hover:text-foreground")
-                    }
-                  >
-                    <span className="shrink-0">
-                      <NavIcon name={key} />
-                    </span>
-                    {!collapsed && t(key)}
-                  </Link>
-                  {/* Disclosure toggle — only for parents with sub-menus, expanded
-                      sidebar only. Separate from the Link so the parent still
-                      navigates while the chevron toggles open/close. */}
-                  {!collapsed && hasChildren && (
-                    <button
-                      type="button"
-                      onClick={() => toggleSection(key)}
-                      aria-expanded={open}
-                      aria-label={open ? t("collapse") : t("expand")}
-                      className="ml-0.5 flex shrink-0 items-center justify-center rounded-md p-1.5 text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
-                    >
-                      <ChevronIcon open={open} />
-                    </button>
-                  )}
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label ?? "top"} className="flex flex-col gap-0.5">
+              {group.label && !collapsed ? (
+                <div className="px-2.5 pt-3.5 pb-1 text-[10px] font-semibold tracking-[0.08em] text-foreground-muted uppercase">
+                  {t(`groups.${group.label}`)}
                 </div>
-                {/* Sub-pages, shown when the section is open (expanded sidebar only). */}
-                {!collapsed && children && open && (
-                  <div className="mt-1 ml-4 flex flex-col gap-1 border-l border-border pl-3">
-                    {children.map((child) => {
-                      const childActive = isExact(child.href);
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          aria-current={childActive ? "page" : undefined}
-                          className={
-                            "rounded-md px-3 py-1.5 text-sm transition-colors " +
-                            (childActive
-                              ? "bg-primary-subtle font-medium text-primary"
-                              : "text-foreground-muted hover:bg-surface-muted hover:text-foreground")
-                          }
-                        >
-                          {t(child.key)}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              ) : null}
+              {group.label && collapsed ? (
+                <div aria-hidden="true" className="mx-3 my-2 h-px bg-border" />
+              ) : null}
+              {group.keys.map((key) => {
+                const section = sectionByKey.get(key);
+                return section ? navRow(section) : null;
+              })}
+            </div>
+          ))}
+
+          <div className="mt-auto flex flex-col gap-0.5 pt-3">
+            {navRow(settings)}
+            <a
+              href="/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title={collapsed ? t("viewSite") : undefined}
+              className={
+                "flex items-center rounded-md text-sm text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground " +
+                (collapsed ? "justify-center px-0 py-2.5" : "gap-2.5 px-2.5 py-2")
+              }
+            >
+              <span className="shrink-0">
+                <ExternalLinkIcon />
+              </span>
+              {!collapsed && t("viewSite")}
+            </a>
+          </div>
         </nav>
 
-        {/* Footer — theme toggle + locale + release version (view site moved to top of nav) */}
-        <div className="space-y-2 border-t border-border p-3">
-          <ThemeToggle collapsed={collapsed} />
-          {!collapsed && <LocaleSwitcher />}
-          <LogoutButton collapsed={collapsed} />
-          {!collapsed && process.env.NEXT_PUBLIC_CMS_VERSION && (
-            <p className="px-3 pt-1 text-[11px] text-foreground-muted">
-              {t("version", { version: process.env.NEXT_PUBLIC_CMS_VERSION })}
-            </p>
-          )}
+        {/* Footer: one account row; the popover carries language/theme/logout. */}
+        <div ref={footerRef} className="relative shrink-0 border-t border-border p-3">
+          {menuOpen ? (
+            <div
+              className={
+                "absolute z-20 " +
+                (collapsed
+                  ? "bottom-2 left-full ml-2 w-72"
+                  : "bottom-full left-3 right-3 mb-2")
+              }
+            >
+              <AccountMenu account={account} />
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label={t("account")}
+            className={
+              "flex w-full items-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring " +
+              (collapsed
+                ? "justify-center px-0 py-1.5 hover:bg-surface-muted"
+                : "gap-2.5 border border-border bg-surface px-2.5 py-2 hover:bg-surface-muted")
+            }
+          >
+            <span
+              className={
+                "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold " +
+                (menuOpen
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-primary-subtle text-primary")
+              }
+            >
+              {initialsFromEmail(account.email)}
+            </span>
+            {!collapsed && (
+              <>
+                <span className="min-w-0 flex-1 truncate text-left text-xs text-foreground">
+                  {account.email}
+                </span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                  className={
+                    "shrink-0 text-foreground-muted transition-transform " +
+                    (menuOpen ? "rotate-180" : "")
+                  }
+                >
+                  <path d="m6 15 6-6 6 6" />
+                </svg>
+              </>
+            )}
+          </button>
         </div>
       </aside>
 

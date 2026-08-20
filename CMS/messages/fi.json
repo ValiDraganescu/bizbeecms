@@ -561,13 +561,12 @@
     "errorTooMany": "Liian monta kirjautumisyritystä. Odota muutama minuutti ja yritä uudelleen."
   },
   "adminNav": {
-    "brand": "CMS-hallinta",
+    "brand": "BizBeeCMS",
     "home": "Etusivu",
     "expand": "Laajenna sivupalkki",
     "collapse": "Tiivistä sivupalkki",
     "viewSite": "Näytä sivusto",
     "logout": "Kirjaudu ulos",
-    "version": "Julkaisu {version}",
     "theme": {
       "label": "Teema",
       "light": "Vaalea",
@@ -593,7 +592,13 @@
     "componentsImportExport": "Tuonti / vienti",
     "componentsDevelop": "Kehitä",
     "dataSources": "Tietolähteet",
-    "chatAgents": "Chat-agentit"
+    "chatAgents": "Chat-agentit",
+    "groups": {
+      "content": "Sisältö",
+      "structure": "Rakenne",
+      "ai": "AI"
+    },
+    "account": "Tili"
   },
   "pageBuilder": {
     "title": "Sivurakentaja",

@@ -89,6 +89,12 @@ import {
   REMOVE_CHAT_AGENT_COLLECTION_TOOL,
 } from "./chat-agent-tool-schemas";
 import { GET_CHAT_AGENTS_GUIDE_TOOL, CHAT_AGENTS_GUIDE } from "./chat-agents-guide";
+import {
+  LIST_DESIGN_SYSTEMS_TOOL,
+  GET_DESIGN_SYSTEM_TOOL,
+  listDesignSystems,
+  getDesignSystem,
+} from "./design-system-tools";
 import { GET_JSONLD_GUIDE_TOOL, JSONLD_GUIDE } from "./jsonld-guide";
 import {
   LIST_PROMPTS_TOOL,
@@ -249,6 +255,8 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   bind_form: BIND_FORM_TOOL,
   get_data_sources_guide: GET_DATA_SOURCES_GUIDE_TOOL,
   get_jsonld_guide: GET_JSONLD_GUIDE_TOOL,
+  list_design_systems: LIST_DESIGN_SYSTEMS_TOOL,
+  get_design_system: GET_DESIGN_SYSTEM_TOOL,
   list_chat_agents: LIST_CHAT_AGENTS_TOOL,
   create_chat_agent: CREATE_CHAT_AGENT_TOOL,
   update_chat_agent: UPDATE_CHAT_AGENT_TOOL,
@@ -345,6 +353,9 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   get_data_sources_guide: async () => ({ ok: true, guide: DATA_SOURCES_GUIDE }),
   get_jsonld_guide: async () => ({ ok: true, guide: JSONLD_GUIDE }),
   get_chat_agents_guide: async () => ({ ok: true, guide: CHAT_AGENTS_GUIDE }),
+  // Design-system library — bundled static content, no store/CF work.
+  list_design_systems: async () => listDesignSystems(),
+  get_design_system: async (args) => getDesignSystem(args),
 };
 
 /**

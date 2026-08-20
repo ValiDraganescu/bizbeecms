@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Badge, cn } from "@/components/ui";
 import { useTheme, type Theme } from "@/components/theme/theme-provider";
-import { locales, LOCALE_COOKIE } from "@/i18n/routing";
+import { localeNames, locales, LOCALE_COOKIE } from "@/i18n/routing";
 
 export type DockItemId = "sites" | "users" | "settings" | "tags";
 export type DockItem = { id: DockItemId; href: string; label: string };
@@ -220,8 +220,10 @@ function AccountMenu({
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [signingOut, setSigningOut] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
 
   function pickLocale(code: (typeof locales)[number]) {
+    setLangOpen(false);
     if (code === activeLocale) return;
     document.cookie = `${LOCALE_COOKIE}=${code};path=/;max-age=31536000;samesite=lax`;
     startTransition(() => {
@@ -276,33 +278,77 @@ function AccountMenu({
         <Badge tone="primary">{roleLabel}</Badge>
       </div>
       <div className="flex flex-col gap-2.5 border-b border-border px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-          <span className="text-xs font-medium text-foreground-muted">
-            {tLocale("label")}
-          </span>
-          <div
-            role="group"
-            aria-label={tLocale("label")}
-            className="flex gap-1 rounded-lg border border-border bg-surface-muted p-0.5"
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => setLangOpen((o) => !o)}
+            aria-expanded={langOpen}
+            className="-mx-1 flex items-center justify-between gap-3 rounded-md px-1 py-0.5 outline-none transition-colors hover:bg-surface-muted focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {locales.map((code) => (
-              <button
-                key={code}
-                type="button"
-                aria-pressed={code === activeLocale}
-                onClick={() => pickLocale(code)}
-                title={tLocale(code)}
+            <span className="text-xs font-medium text-foreground-muted">
+              {tLocale("label")}
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-foreground">
+              {localeNames[activeLocale as (typeof locales)[number]]}
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
                 className={cn(
-                  "rounded-md px-2 py-1 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                  code === activeLocale
-                    ? "bg-primary font-semibold text-primary-foreground"
-                    : "font-medium text-foreground-muted hover:text-foreground",
+                  "text-foreground-muted transition-transform",
+                  langOpen ? "rotate-180" : "",
                 )}
               >
-                {code.toUpperCase()}
-              </button>
-            ))}
-          </div>
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </span>
+          </button>
+          {langOpen ? (
+            <div
+              role="radiogroup"
+              aria-label={tLocale("label")}
+              className="flex max-h-48 flex-col overflow-y-auto rounded-md border border-border bg-surface"
+            >
+              {locales.map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  role="radio"
+                  aria-checked={code === activeLocale}
+                  onClick={() => pickLocale(code)}
+                  className={cn(
+                    "flex shrink-0 items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                    code === activeLocale
+                      ? "bg-primary-subtle font-semibold text-primary"
+                      : "font-medium text-foreground hover:bg-surface-muted",
+                  )}
+                >
+                  {localeNames[code]}
+                  {code === activeLocale ? (
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
           <span className="text-xs font-medium text-foreground-muted">
