@@ -10,3 +10,6 @@ next-env.d.ts
 cloudflare-env.d.ts
 worker-configuration.d.ts
 *.tsbuildinfo
+
+# ALTCHA widget bundle — copied from node_modules by scripts/copy-altcha.mjs (postinstall)
+public/altcha.min.js

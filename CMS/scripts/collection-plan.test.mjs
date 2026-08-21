@@ -113,4 +113,7 @@ test("normalizeField/normalizeFields drop junk and keep valid descriptors", () =
   const f = normalizeField({ name: "s", type: "select", default: "x", options: [{ value: "x", label: "X" }, { bad: 1 }] });
   assert.equal(f.default, "x");
   assert.deepEqual(f.options, [{ value: "x", label: "X" }]);
+  // bare-string options (the MCP/assistant tool contract) normalize to {value,label}
+  const g = normalizeField({ name: "s", type: "select", options: ["a", "b", 7] });
+  assert.deepEqual(g.options, [{ value: "a", label: "a" }, { value: "b", label: "b" }]);
 });

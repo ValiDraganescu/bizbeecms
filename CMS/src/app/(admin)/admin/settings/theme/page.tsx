@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { ThemeEditor } from "@/components/settings/theme-editor";
+import { LogoEditor } from "@/components/settings/logo-editor";
 import { FontsEditor } from "@/components/settings/fonts-editor";
 import {
+  getSiteLogo,
   getThemeFonts,
   getThemeOverrides,
   getThemeOverridesDark,
@@ -29,11 +31,13 @@ export default async function ThemePage() {
   let initial = emptyThemeOverrides();
   let initialDark = emptyThemeOverrides();
   let initialFonts = emptyThemeFonts();
+  let initialLogo = "";
   try {
-    [initial, initialDark, initialFonts] = await Promise.all([
+    [initial, initialDark, initialFonts, initialLogo] = await Promise.all([
       getThemeOverrides(),
       getThemeOverridesDark(),
       getThemeFonts(),
+      getSiteLogo(),
     ]);
   } catch {
     /* unbound D1 in this env — render defaults */
@@ -45,6 +49,7 @@ export default async function ThemePage() {
         <h1 className="text-2xl font-semibold text-foreground">{t("title")}</h1>
         <p className="mt-1 text-foreground-muted">{t("subtitle")}</p>
       </header>
+      <LogoEditor initial={initialLogo} />
       <ThemeEditor initial={initial} initialDark={initialDark} />
       <FontsEditor initial={initialFonts} />
     </main>

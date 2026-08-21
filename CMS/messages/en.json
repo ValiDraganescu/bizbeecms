@@ -410,7 +410,15 @@
       "selfHostNote": "On save, the font files are downloaded once and self-hosted with your site — visitors never connect to Google Fonts.",
       "save": "Save fonts"
     },
-    "saveColors": "Save colors"
+    "saveColors": "Save colors",
+    "logo": {
+      "title": "Logo",
+      "subtitle": "Pick or upload the site's logo from the media library. Components and the AI assistant can reference it as the brand mark.",
+      "save": "Save logo",
+      "saved": "Logo saved.",
+      "onLight": "On light",
+      "onDark": "On dark"
+    }
   },
   "media": {
     "title": "Media library",
@@ -952,6 +960,7 @@
     "rowSettings": "Row",
     "rowVerticalAlign": "Align columns",
     "rowVAlign": {
+      "stretch": "Stretch",
       "top": "Top",
       "center": "Center",
       "bottom": "Bottom"
@@ -1014,6 +1023,14 @@
     "translateMissingIncomplete": "{count, plural, one {# translation} other {# translations}} couldn't be produced — try again.",
     "translating": "Translating…",
     "blockTranslateMissingHint": "Fill every missing translation of this block's text in one go.",
+    "translateMissingDialog": {
+      "title": "Translate missing",
+      "intro": "{count, plural, one {# item is} other {# items are}} missing translations in these languages:",
+      "metaTitle": "Meta title",
+      "metaDescription": "Meta description",
+      "confirm": "Translate",
+      "cancel": "Cancel"
+    },
     "link": {
       "newTab": "Open in new tab",
       "pickPage": "Pick a page…"

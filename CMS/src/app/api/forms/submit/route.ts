@@ -19,7 +19,15 @@
  *    (`public_submissions`); only declared schema fields are kept; the item is
  *    FORCED to draft status (operator reviews before it can render anywhere).
  *  - caps: body size / field count / value length; per-IP sliding-window rate
- *    limit riding the existing login_attempt table (kind "form").
+ *    limit riding the existing login_attempt table (kind "form") — ONE
+ *    successful submission per window; the second gets a 429 with a
+ *    guest-visible message.
+ *  - BOT PROTECTION: every submission must carry a solved ALTCHA
+ *    proof-of-work payload, minted by `/api/forms/challenge` and verified
+ *    here (HMAC-only — no PBKDF2 on this path). A verified challenge is
+ *    BURNED single-use through the same login_attempt table (`altcha:<id>`),
+ *    so a solved payload can't be replayed across IPs. This makes JS
+ *    REQUIRED for form submission — a no-JS native post is refused.
  *
  * Failures are DELIBERATE responses (4xx JSON / error redirect) — never 500s
  * for bad input; a real exception still degrades to the generic error shape.
@@ -40,7 +48,19 @@ import {
   wantsJson,
   formRedirectUrl,
   MAX_FORM_BODY_BYTES,
+  FORM_RATE_LIMIT_ERROR,
 } from "@/lib/forms/submit-core";
+import {
+  altchaReplayKey,
+  altchaSecrets,
+  pickGuestMessage,
+  ALTCHA_MISSING_ERROR,
+  ALTCHA_FAILED_ERROR,
+} from "@/lib/forms/altcha-core";
+import { readContentLocaleCookie } from "@/lib/ai-quota/message";
+import { getContentLocales } from "@/db/settings-store";
+import { verify as verifyAltcha } from "altcha-lib/frameworks/shared";
+import { deriveKey as altchaDeriveKey } from "altcha-lib/algorithms/pbkdf2";
 import { FORM_DEFAULT_ERROR } from "@/lib/render/plan-form";
 import {
   recentFailureTimestamps,
@@ -128,17 +148,69 @@ export async function POST(request: Request): Promise<Response> {
       return respond(request, target, { ok: false, status: parsed.status, error: parsed.error });
     }
 
-    // ── Rate limit (per IP, sliding window on the login_attempt table) ──────
+    // Bot-protection refusals are rendered VERBATIM to the visitor, so they
+    // ship pre-translated: active content locale (the cookie the page itself
+    // rendered in) → the Site's default → English. A settings-read failure
+    // must not turn a refusal into a 500 — fall back to English.
+    const guestLocale = readContentLocaleCookie(request.headers.get("cookie"));
+    const siteDefaultLocale = await getContentLocales()
+      .then((l) => l.default)
+      .catch(() => "en");
+    const guestMessage = (dict: Parameters<typeof pickGuestMessage>[0]) =>
+      pickGuestMessage(dict, guestLocale, siteDefaultLocale);
+
+    // ── Rate limit (per IP, sliding window on the login_attempt table).
+    // READ-ONLY here: the attempt is recorded only when the submission
+    // SUCCEEDS, so a visitor whose submit failed validation can retry. ──────
     const rateKey = `form:${clientIp(request)}`;
     const stamps = await recentFailureTimestamps(rateKey, Date.now(), "form");
     if (decideFormRate(stamps).locked) {
       return respond(request, target, {
         ok: false,
         status: 429,
-        error: "too many submissions — please try again later",
+        error: guestMessage(FORM_RATE_LIMIT_ERROR),
       });
     }
-    await recordFailure(rateKey, Date.now(), "form");
+
+    // ── ALTCHA proof-of-work gate (bot protection). The payload is verified
+    // (expiry + challenge signature + key signature, HMAC-only) and its
+    // challenge id is BURNED single-use via the login_attempt table — a
+    // solved payload replayed from another IP is refused. ────────────────────
+    if (!parsed.altcha) {
+      return respond(request, target, {
+        ok: false,
+        status: 403,
+        error: guestMessage(ALTCHA_MISSING_ERROR),
+      });
+    }
+    const secrets = altchaSecrets(await kek());
+    const replayStore = {
+      get: async (id: string) =>
+        (await recentFailureTimestamps(altchaReplayKey(id), Date.now(), "form")).length > 0,
+      set: async (id: string) => {
+        await recordFailure(altchaReplayKey(id), Date.now(), "form");
+      },
+    };
+    const altcha = await verifyAltcha(
+      parsed.altcha,
+      altchaDeriveKey,
+      secrets.signature,
+      secrets.key,
+      replayStore,
+    );
+    if (altcha.error || !altcha.verification?.verified) {
+      // ALTCHA's exact reason is not surfaced; the visitor gets one stable,
+      // self-correcting, localized refusal.
+      return respond(request, target, {
+        ok: false,
+        status: 403,
+        error: guestMessage(ALTCHA_FAILED_ERROR),
+      });
+    }
+
+    /** Count this IP's ONE successful submission for the window — call just
+     *  before each success response. */
+    const recordSubmission = () => recordFailure(rateKey, Date.now(), "form");
 
     // ── Resolve the target from the PUBLISHED page (never from the client) ──
     const db = await getDb();
@@ -180,6 +252,7 @@ export async function POST(request: Request): Promise<Response> {
       if (!result.ok) {
         return respond(request, target, { ok: false, status: result.status, error: result.error });
       }
+      await recordSubmission();
       return respond(request, target, { ok: true, status: 200 });
     }
 
@@ -237,6 +310,7 @@ export async function POST(request: Request): Promise<Response> {
       // engine's internals (those stay in the JSON `error` for debugging).
       return respond(request, target, { ok: false, status: 502, error: result.error });
     }
+    await recordSubmission();
     return respond(request, target, { ok: true, status: 200 });
   } catch (err) {
     return respond(request, target, {

@@ -73,7 +73,7 @@ export function RowSettings({
       <div className="flex flex-col gap-1.5">
         <span className={label}>{t("rowVerticalAlign")}</span>
         <div className="flex gap-1">
-          {(["top", "center", "bottom"] as const).map((v) => (
+          {(["top", "center", "bottom", "stretch"] as const).map((v) => (
             <button
               key={v}
               type="button"

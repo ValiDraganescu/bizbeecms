@@ -26,7 +26,8 @@ import {
   type BlockPropsUpdater,
   type PropField,
 } from "@/lib/pages/page-blocks";
-import { blockTranslateEntries } from "@/lib/pages/page-translate-missing";
+import { blockTranslateEntries, describeBlockEntries } from "@/lib/pages/page-translate-missing";
+import { TranslateMissingDialog } from "./translate-missing-dialog";
 import { planTranslateCalls } from "@/lib/content/bulk-translate-plan";
 import { runTranslatePlan } from "@/lib/content/bulk-translate-run";
 import { executeTranslateCall } from "@/lib/content/translate-client";
@@ -64,15 +65,17 @@ export function BlockTranslateMissingButton({
     };
   }, []);
 
+  // What's missing (prop + locales), shown in the confirmation dialog before
+  // any call is made — the run consumes what the operator confirmed seeing.
+  const [confirming, setConfirming] = useState(false);
+
   // Re-planned from the live props, so the button appears/disappears as the
   // operator types or per-field translates fill slots. Cheap string scans.
-  const plan = useMemo(
-    () =>
-      planTranslateCalls(
-        blockTranslateEntries(props, schema, { default: locales[0] ?? "", locales }),
-      ),
+  const entries = useMemo(
+    () => blockTranslateEntries(props, schema, { default: locales[0] ?? "", locales }),
     [props, schema, locales],
   );
+  const plan = useMemo(() => planTranslateCalls(entries), [entries]);
 
   if (plan.calls.length === 0 && !busy && error === null) return null;
 
@@ -114,11 +117,21 @@ export function BlockTranslateMissingButton({
         className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-surface-muted disabled:opacity-50"
         disabled={busy || plan.calls.length === 0}
         title={t("blockTranslateMissingHint")}
-        onClick={() => void run()}
+        onClick={() => setConfirming(true)}
       >
         {busy && <Spinner />}
         {busy ? t("translating") : t("translateMissing")}
       </button>
+      {confirming && (
+        <TranslateMissingDialog
+          rows={describeBlockEntries(entries, component, schema)}
+          onConfirm={() => {
+            setConfirming(false);
+            void run();
+          }}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
     </div>
   );
 }

@@ -97,6 +97,8 @@ export const KNOWN_TOOL_NAMES = [
   "get_authoring_guide",
   // Generate an image from a text prompt into the gallery (text→image).
   "generate_image",
+  // Upload base64 file bytes into the gallery (chiefly for MCP clients).
+  "upload_asset",
   // external-data-sources Slice 6: external API data-source tools.
   "list_data_sources",
   "create_data_source",
@@ -300,8 +302,8 @@ const TOOLS_BY_CONTEXT: Record<AdminPageContext, readonly ToolName[]> = {
     "list_design_systems",
     "get_design_system",
   ],
-  // Media library: list assets + generate new ones into the gallery.
-  media: ["list_assets", "generate_image"],
+  // Media library: list assets, generate new ones, or upload supplied bytes.
+  media: ["list_assets", "generate_image", "upload_asset"],
   // Collections: define collections + CRUD/query their items (structured only).
   collections: [
     "create_collection",
@@ -379,7 +381,7 @@ const CONTEXT_PROMPTS: Record<AdminPageContext, string> = {
 
   settings: `You are on the Settings page. Read the current configuration first (get_brand_identity, get_theme, list_locales). You can UPDATE the brand identity (update_brand_identity — read it first, then pass the full object) and the theme colors (update_theme — pass light and/or dark token→color maps). For a coherent whole-site look, pick a built-in design-system archetype (list_design_systems / get_design_system) and apply its colors and fonts via update_theme, overriding accent colors and font families with the client's own brand. You can also translate existing content into the site's content locales (translate).`,
 
-  media: `You are in the Media library. Help the operator find and reference uploaded assets (list_assets) by their /media/<key> URLs.`,
+  media: `You are in the Media library. Help the operator find and reference uploaded assets (list_assets) by their /media/<key> URLs, generate new images into the gallery (generate_image), or store a file whose bytes you hold as base64 (upload_asset).`,
 
   collections: `You are in Collections — the site's structured data. You can define a new typed collection (create_collection: name + typed fields; each collection gets system fields id/slug/status/created_at/updated_at automatically). You can add, update, archive/restore/delete items (add_collection_item / update_collection_item / archive_collection_item / restore_collection_item / delete_collection_item — archiving is the reversible default, delete is PERMANENT), snippet-patch a long text/richtext item field in place (edit_text target collection_item.<field>), and find items with structured filters/sort/search (query_collection — collections are addressed by their content_<slug> table name). You can patch a collection's settings (update_collection — label/description/publicSubmissions; public submissions always land as drafts) and delete one (delete_collection — permanent, BLOCKED while any binding, List, form, or chat agent references it; the error lists each reference and its fix). You can also evolve a collection's schema: add a new field (add_collection_field — one call per field; this is how you add a property to an EXISTING collection, never create_collection again), patch one (update_collection_field — description/required/default/type; a type change names the exact coercion applied to existing rows), drop a user field (drop_collection_field — permanent, data lost), or rename one keeping its data (rename_collection_field). System fields can't be dropped or renamed. TRANSLATABLE fields: a string/text/richtext field can be marked \`translatable: true\` (on create_collection or add_collection_field) so it stores PER-LOCALE text and a bound component renders it in the visitor's active content locale — use it for guest-facing text (titles, descriptions, locations), never for codes/slugs/refs/submission data. A translatable field's value in add_collection_item/update_collection_item may be a plain string (stored as the default locale) OR a locale object like {"en":"Cosy bistro","fi":"Viihtyisä bistro"}; query_collection returns such a field as that locale object (or a bare string for untranslated/legacy rows). Prefer query_collection to discover a collection's table name and item ids before editing. Prefer archiving over deleting.`,
 

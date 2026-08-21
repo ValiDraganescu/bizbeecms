@@ -165,9 +165,12 @@ function translatableFields(block: Block, schemas: PropsSchemas): PropField[] {
 /**
  * One translatable prop's source + missing target locales, with the SHARED
  * source semantics (see the module doc): stored default-locale text wins; a
- * prop with nothing authored falls back to the schema's non-empty string
- * `default` — targets then keep whatever real translations are already stored.
- * No source → no missing slots. PURE.
+ * prop with nothing stored falls back to the schema's authored default —
+ * targets then keep whatever real translations are already stored. An authored
+ * PER-LOCALE default object (`{ fi:"…", en:"…" }`) counts as filling the
+ * locales it names: the renderer resolves it per locale, so those slots are
+ * not missing on the live site and must not be re-translated. No source → no
+ * missing slots. PURE.
  */
 function propMissingSlots(
   raw: unknown,
@@ -175,14 +178,28 @@ function propMissingSlots(
   locales: ContentLocales,
 ): { sourceText: string; missing: string[] } {
   const slots = missingLocaleSlots(raw, locales);
-  if (slots.sourceText.trim() !== "" || field.default.trim() === "") return slots;
+  if (slots.sourceText.trim() !== "") return slots;
+  // No stored source — fall back to the authored default. A per-locale object
+  // sources from ITS default-locale text (field.default is only the editor's
+  // first-locale display string).
+  const authored = isLocaleObject(field.defaultValue)
+    ? (field.defaultValue as Record<string, unknown>)
+    : undefined;
+  const authoredDefault = authored?.[locales.default];
+  const sourceText =
+    typeof authoredDefault === "string" && authoredDefault.trim() !== ""
+      ? authoredDefault
+      : field.default;
+  if (sourceText.trim() === "") return slots;
   const map = isLocaleObject(raw) ? (raw as Record<string, unknown>) : {};
   const missing = locales.locales.filter((code) => {
     if (code === locales.default) return false;
-    const slot = map[code];
-    return typeof slot !== "string" || slot.trim() === "";
+    const stored = map[code];
+    if (typeof stored === "string" && stored.trim() !== "") return false;
+    const def = authored?.[code];
+    return !(typeof def === "string" && def.trim() !== "");
   });
-  return { sourceText: field.default, missing };
+  return { sourceText, missing };
 }
 
 /**
@@ -205,4 +222,80 @@ export function blockTranslateEntries(
     if (missing.length > 0) entries.push({ name: f.name, sourceText, targetLocales: missing });
   }
   return entries;
+}
+
+/**
+ * One HUMAN-readable row of the pre-run confirmation dialog: what is missing
+ * and in which languages. `kind:"meta"` rows carry the meta field name in
+ * `field` (the UI localizes it); `kind:"block"` rows carry the block's
+ * component name + the prop's label (else its name) — enough for an operator
+ * to recognize the item without knowing block ids.
+ */
+export interface TranslateEntryRow {
+  /** The plan entry's name — stable list key. */
+  name: string;
+  kind: "meta" | "block";
+  /** Block rows only: the component name of the owning block. */
+  component?: string;
+  /** Meta field name (`metaTitle`/`metaDescription`) or the prop label/name. */
+  field: string;
+  /** The locales this entry is missing (never the default locale). */
+  locales: string[];
+}
+
+/**
+ * Describe page-level plan entries (`pageTranslateEntries` output) for the
+ * confirmation dialog. Resolves each `<blockId>.<prop>` name against the block
+ * tree + schemas to the component name and the prop's human label. An entry
+ * whose block or field can no longer be resolved (shouldn't happen — same
+ * inputs) falls back to the raw name. PURE.
+ */
+export function describePageEntries(
+  entries: PlanEntry[],
+  blocks: Block[],
+  schemas: PropsSchemas,
+): TranslateEntryRow[] {
+  const byId = new Map<string, Block>();
+  const visit = (list: Block[]) => {
+    for (const b of list) {
+      byId.set(b.id, b);
+      if (b.children?.length) visit(b.children);
+    }
+  };
+  visit(blocks);
+
+  return entries.map((e) => {
+    if ((PAGE_META_FIELDS as readonly string[]).includes(e.name)) {
+      return { name: e.name, kind: "meta" as const, field: e.name, locales: e.targetLocales };
+    }
+    const dot = e.name.indexOf(".");
+    const block = byId.get(e.name.slice(0, dot));
+    const propName = e.name.slice(dot + 1);
+    const field = block
+      ? parsePropsSchema(schemas[block.component]).find((f) => f.name === propName)
+      : undefined;
+    return {
+      name: e.name,
+      kind: "block" as const,
+      component: block?.component ?? "?",
+      field: field?.label ?? propName,
+      locales: e.targetLocales,
+    };
+  });
+}
+
+/** Describe ONE block's plan entries (`blockTranslateEntries` output) for the
+ *  confirmation dialog — prop labels only, the block is already selected. PURE. */
+export function describeBlockEntries(
+  entries: PlanEntry[],
+  component: string,
+  schema: PropField[],
+): TranslateEntryRow[] {
+  return entries.map((e) => ({
+    name: e.name,
+    kind: "block" as const,
+    component,
+    field: schema.find((f) => f.name === e.name)?.label ?? e.name,
+    locales: e.targetLocales,
+  }));
 }

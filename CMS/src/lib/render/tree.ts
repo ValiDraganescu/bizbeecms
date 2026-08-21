@@ -48,7 +48,12 @@ import { planTree, declaredProps, schemaDefaults, bindTree, type IconMap } from 
 import { buildJsonLdComponent, bindJsonLdObject, buildItemListJsonLd } from "./jsonld-component.ts";
 import { planSection, planColumn, planRow } from "./plan-section.ts";
 import { planList, LIST_AUTOSCROLL_ASSET_KEY, LIST_AUTOSCROLL_SCRIPT } from "./plan-list.ts";
-import { planForm, FORM_ENHANCE_ASSET_KEY, FORM_ENHANCE_SCRIPT } from "./plan-form.ts";
+import {
+  planForm,
+  FORM_ENHANCE_ASSET_KEY,
+  FORM_ENHANCE_SCRIPT,
+  ALTCHA_LOADER_SCRIPT,
+} from "./plan-form.ts";
 import {
   planLanguageSwitcher,
   LANGUAGE_SWITCHER_SCRIPT,
@@ -60,7 +65,7 @@ import {
   GUEST_CHAT_CSS,
   GUEST_CHAT_ASSET_KEY,
 } from "./plan-guest-chat.ts";
-import { resolveLocalized } from "./localize.ts";
+import { resolveLocalizedProps } from "./localize.ts";
 import { localizePlanLinks } from "./localize-links.ts";
 import { applyImageHygiene } from "./image-hygiene.ts";
 
@@ -222,6 +227,9 @@ export function planPage(
   function useFormAssets(): void {
     if (seenAssets.has(FORM_ENHANCE_ASSET_KEY)) return;
     seenAssets.add(FORM_ENHANCE_ASSET_KEY);
+    // ALTCHA custom-element loader first — the enhance script's solve-on-
+    // submit fallback needs the widget upgraded by the time it runs.
+    scripts.push(ALTCHA_LOADER_SCRIPT);
     scripts.push(FORM_ENHANCE_SCRIPT);
   }
 
@@ -263,8 +271,10 @@ export function planPage(
       ...schemaDefaults(artifact.propsSchema),
       ...(props && typeof props === "object" ? props : {}),
     };
+    // resolveLocalizedProps: `merged` is a prop bag keyed by prop NAMES — never
+    // itself a locale object, even when all its keys are 2-3 letters (src/alt).
     return locale
-      ? (resolveLocalized(merged, locale.locale, locale.fallback) as Record<string, unknown>)
+      ? resolveLocalizedProps(merged, locale.locale, locale.fallback)
       : merged;
   }
 
@@ -399,10 +409,7 @@ export function planPage(
         block.props && typeof block.props === "object" ? block.props : {};
       const merged = { ...schemaDefaults(artifact.propsSchema), ...blockProps };
       const values = locale
-        ? (resolveLocalized(merged, locale.locale, locale.fallback) as Record<
-            string,
-            unknown
-          >)
+        ? resolveLocalizedProps(merged, locale.locale, locale.fallback)
         : merged;
       tree = bindTree(tree, values, declared);
     }

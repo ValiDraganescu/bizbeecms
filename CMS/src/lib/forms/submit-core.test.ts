@@ -17,6 +17,7 @@ import {
   MAX_FIELD_VALUE_LEN,
   FORM_RATE_MAX,
   FORM_RATE_WINDOW_MS,
+  FORM_RATE_LIMIT_ERROR,
 } from "./submit-core.ts";
 import type { Block } from "../render/plan-types.ts";
 
@@ -34,6 +35,26 @@ test("collectSubmission splits identity fields from visitor fields", () => {
   assert.equal(r.pageId, "p1");
   assert.equal(r.blockId, "b1");
   assert.deepEqual(r.fields, { name: "Ada", email: "ada@example.com" });
+});
+
+test("collectSubmission splits the altcha payload out of the visitor fields", () => {
+  const r = collectSubmission([
+    ["__bb_page", "p1"],
+    ["__bb_block", "b1"],
+    ["altcha", "base64payload=="],
+    ["name", "Ada"],
+  ]);
+  assert.ok(r.ok);
+  if (!r.ok) return;
+  assert.equal(r.altcha, "base64payload==");
+  // Never a visitor field — can't leak into a collection body or api params.
+  assert.deepEqual(r.fields, { name: "Ada" });
+  // Absent widget (no JS) → empty payload, the route refuses it.
+  const noJs = collectSubmission([
+    ["__bb_page", "p1"],
+    ["__bb_block", "b1"],
+  ]);
+  assert.ok(noJs.ok && noJs.altcha === "");
 });
 
 test("collectSubmission rejects missing identity, skips non-strings (files)", () => {
@@ -132,6 +153,21 @@ test("decideFormRate locks at the max inside the window, frees as stamps age out
   assert.equal(decideFormRate(full.slice(1), now).locked, false);
   const aged = full.map(() => now - FORM_RATE_WINDOW_MS - 1);
   assert.equal(decideFormRate(aged, now).locked, false);
+});
+
+test("the rate-limit refusal ships the full translation coverage (en/fi/et)", () => {
+  for (const code of ["en", "fi", "et"]) {
+    assert.equal(typeof FORM_RATE_LIMIT_ERROR[code], "string");
+    assert.ok(FORM_RATE_LIMIT_ERROR[code].length > 0);
+  }
+});
+
+test("ONE submission per window: the second is locked (USER DECISION 2026-08-20)", () => {
+  assert.equal(FORM_RATE_MAX, 1);
+  const now = 1_000_000_000;
+  assert.equal(decideFormRate([], now).locked, false);
+  assert.equal(decideFormRate([now - 1], now).locked, true);
+  assert.equal(decideFormRate([now - FORM_RATE_WINDOW_MS - 1], now).locked, false);
 });
 
 // ── wantsJson / formRedirectUrl ──────────────────────────────────────────────

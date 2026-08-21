@@ -20,6 +20,7 @@ import {
   getContentLocales,
   getSiteIdentity,
   getThemeFonts,
+  getSiteLogo,
   getThemeOverrides,
   getThemeOverridesDark,
   getIconSet,
@@ -206,10 +207,11 @@ export async function handleSearchIcons(args: unknown): Promise<Record<string, u
 
 export async function handleGetTheme(): Promise<Record<string, unknown>> {
   try {
-    const [light, dark, fonts] = await Promise.all([
+    const [light, dark, fonts, logo] = await Promise.all([
       getThemeOverrides(),
       getThemeOverridesDark(),
       getThemeFonts(),
+      getSiteLogo(),
     ]);
     // Return the EFFECTIVE theme (defaults + overrides) so the model sees the
     // real color of every token — an empty override map is the DEFAULT theme,
@@ -228,6 +230,8 @@ export async function handleGetTheme(): Promise<Record<string, unknown>> {
       fonts: Object.fromEntries(
         FONT_SLOTS.map((s) => [s, fonts.slots[s]?.family ?? null]),
       ),
+      // The Site's logo asset URL (Theme settings), null when unset.
+      logo: logo || null,
     };
   } catch (err) {
     return { ok: false, errors: [`failed to get theme: ${(err as Error).message}`] };

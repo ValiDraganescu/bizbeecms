@@ -17,6 +17,7 @@
  */
 import { FORM_COMPONENT, type Block, type FormTarget } from "../render/plan-types.ts";
 import { FORM_PAGE_FIELD, FORM_BLOCK_FIELD } from "../render/plan-form.ts";
+import { ALTCHA_FIELD, type GuestMessageDict } from "./altcha-core.ts";
 
 // ── Trust-boundary caps ──────────────────────────────────────────────────────
 /** Reject request bodies larger than this before parsing (Content-Length). */
@@ -27,9 +28,22 @@ export const MAX_FORM_FIELDS = 100;
 export const MAX_FIELD_VALUE_LEN = 8_192;
 
 // ── Rate limit (per client IP, sliding window) ───────────────────────────────
+// ONE submission per window (bot-protection layer 2, USER DECISION 2026-08-20).
+// Only SUCCESSFUL submissions count — a visitor whose submit failed validation
+// can fix it and retry; the ALTCHA proof-of-work gates the failure spam.
 // ponytail: per-IP fixed budget; per-form budgets only if a real site needs them.
-export const FORM_RATE_MAX = 20;
+export const FORM_RATE_MAX = 1;
 export const FORM_RATE_WINDOW_MS = 10 * 60 * 1000;
+
+/** Guest-visible refusal for the second submission inside the window, shown
+ *  verbatim by the enhancement script on a 429 — so it ships pre-translated
+ *  per content locale (resolve via `pickGuestMessage`). The "10 minutes" is
+ *  FORM_RATE_WINDOW_MS spelled out; keep them in sync. */
+export const FORM_RATE_LIMIT_ERROR: GuestMessageDict = {
+  en: "Only one submission is allowed every 10 minutes. Please try again later.",
+  fi: "Vain yksi lähetys on sallittu 10 minuutin välein. Yritä myöhemmin uudelleen.",
+  et: "Lubatud on ainult üks saatmine iga 10 minuti järel. Palun proovi hiljem uuesti.",
+};
 
 /** Locked once `timestamps` holds FORM_RATE_MAX entries inside the window. */
 export function decideFormRate(
@@ -49,6 +63,8 @@ export type ParsedSubmission =
       blockId: string;
       /** Visitor fields (identity fields stripped; string values only). */
       fields: Record<string, string>;
+      /** Solved ALTCHA payload (base64), "" when the widget never ran (no JS). */
+      altcha: string;
     }
   | { ok: false; status: number; error: string };
 
@@ -63,6 +79,7 @@ export function collectSubmission(
   const fields: Record<string, string> = {};
   let pageId = "";
   let blockId = "";
+  let altcha = "";
   let count = 0;
   for (const [name, raw] of entries) {
     const value =
@@ -83,6 +100,12 @@ export function collectSubmission(
       blockId = value;
       continue;
     }
+    if (name === ALTCHA_FIELD) {
+      // Bot-protection payload, not a visitor field — never reaches a
+      // collection body or an api placeholder.
+      altcha = value;
+      continue;
+    }
     count += 1;
     if (count > MAX_FORM_FIELDS) {
       return { ok: false, status: 413, error: "too many fields" };
@@ -92,7 +115,7 @@ export function collectSubmission(
   if (!pageId || !blockId) {
     return { ok: false, status: 400, error: "missing form identity" };
   }
-  return { ok: true, pageId, blockId, fields };
+  return { ok: true, pageId, blockId, fields, altcha };
 }
 
 // ── Target resolution ────────────────────────────────────────────────────────

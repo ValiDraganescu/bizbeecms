@@ -33,9 +33,11 @@ import { applyTranslation } from "@/db/translate-store";
 import {
   getContentLocales,
   setSiteIdentity,
+  setSiteLogo,
   setThemeOverrides,
   setThemeOverridesDark,
 } from "@/db/settings-store";
+import { normalizeSiteLogoUrl, SITE_LOGO_URL_ERROR } from "@/lib/settings/site-logo";
 import { localeSlugConflicts } from "@/lib/render/localize";
 import { notifyIndexNowForPage } from "@/lib/render/indexnow-notify";
 import { purgeEdgeTags } from "@/lib/render/purge-edge";
@@ -348,14 +350,32 @@ export async function handleUpdateBrandIdentity(args: unknown): Promise<Record<s
   }
 }
 
-/** Update the Site's theme overrides (light and/or dark; normalize to known tokens). */
+/** Update the Site's theme overrides (light and/or dark; normalize to known
+ *  tokens) and/or its logo (a /media/<key> asset URL; "" clears). */
 export async function handleUpdateTheme(args: unknown): Promise<Record<string, unknown>> {
   const { light, dark, any } = splitThemeArgs(args);
-  if (!any) return { ok: false, errors: ["supply 'light' and/or 'dark' as a token→color object"] };
+  const rawLogo = (typeof args === "object" && args !== null
+    ? (args as Record<string, unknown>).logo
+    : undefined);
+  if (!any && rawLogo === undefined) {
+    return {
+      ok: false,
+      errors: [
+        "supply 'light' and/or 'dark' as a token→color object, and/or 'logo' as a /media/<key> URL (\"\" clears it)",
+      ],
+    };
+  }
+  let logo: string | undefined;
+  if (rawLogo !== undefined) {
+    const normalized = normalizeSiteLogoUrl(rawLogo);
+    if (normalized === null) return { ok: false, errors: [SITE_LOGO_URL_ERROR] };
+    logo = normalized;
+  }
   try {
     const result: Record<string, unknown> = {};
     if (light !== undefined) result.light = await setThemeOverrides(light);
     if (dark !== undefined) result.dark = await setThemeOverridesDark(dark);
+    if (logo !== undefined) result.logo = await setSiteLogo(logo);
     return { ok: true, action: "updated", theme: result };
   } catch (err) {
     return { ok: false, errors: [`failed to save theme: ${(err as Error).message}`] };

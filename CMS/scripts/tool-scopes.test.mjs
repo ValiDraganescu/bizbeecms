@@ -75,8 +75,8 @@ test("toolsForContext scopes per page (write + Slice 3 read tools)", () => {
   for (const n of ["create_component", "create_page", "list_components", "get_page"]) {
     assert.ok(pb.has(n), `page-builder should expose ${n}`);
   }
-  // media: browse assets + generate new ones into the gallery.
-  assert.deepEqual([...toolsForContext("media")], ["list_assets", "generate_image"]);
+  // media: browse assets, generate new ones, or upload supplied bytes.
+  assert.deepEqual([...toolsForContext("media")], ["list_assets", "generate_image", "upload_asset"]);
   // settings reads brand/theme/locales + translate (no create tools).
   const settings = new Set(toolsForContext("settings"));
   for (const n of ["translate", "list_locales", "get_brand_identity", "get_theme"]) {

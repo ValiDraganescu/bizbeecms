@@ -2,7 +2,6 @@
 name: cms-components
 description: Build and iterate on reusable UI components for a bizbeecms CMS Site via its MCP tools (mcp__<site>__create_component etc.). Use when the user asks to add/redesign a component or hero, create design variations, or match a reference screenshot. Covers the author→preview→fix loop, generating images (incl. transparent cut-outs), and the hard rules (theme tokens only, real glyphs, full-height layout) learned the hard way.
 argument-hint: "[what to build, e.g. 'a hero like this screenshot, two variations']"
-allowed-tools: Read, Bash, mcp__local-site__get_authoring_guide, mcp__local-site__get_theme, mcp__local-site__get_brand_identity, mcp__local-site__list_components, mcp__local-site__get_component, mcp__local-site__create_component, mcp__local-site__update_component, mcp__local-site__list_assets, mcp__local-site__generate_image, mcp__claude-in-chrome__navigate, mcp__claude-in-chrome__computer
 ---
 
 # Building CMS components

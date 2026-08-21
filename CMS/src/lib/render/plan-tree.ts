@@ -8,7 +8,7 @@
  * no React, no I/O (a DATA WALK, never eval/Function — blocked on Workers).
  */
 
-import { resolveLocalized } from "./localize.ts";
+import { resolveLocalizedProps } from "./localize.ts";
 import { resolveDynamicIconSlots, splitIconText } from "./icons.ts";
 import {
   type TreeNode,
@@ -172,12 +172,10 @@ export function planTree(
   return {
     kind: "element",
     tag: node.tag,
-    props: locale
-      ? (resolveLocalized(props, locale.locale, locale.fallback) as Record<
-          string,
-          unknown
-        >)
-      : props,
+    // resolveLocalizedProps, NOT resolveLocalized: props is an ATTRIBUTE bag —
+    // a bag with only 2-3 letter keys (src/alt, id, rel…) must not be mistaken
+    // for a locale object and collapsed to a single value.
+    props: locale ? resolveLocalizedProps(props, locale.locale, locale.fallback) : props,
     children: planChildren(node.children, locale, compose),
   };
 }
@@ -219,10 +217,7 @@ function planComponentTag(
     const declared = declaredProps(artifact.propsSchema);
     if (declared.size > 0) {
       const values = locale
-        ? (resolveLocalized(rawProps, locale.locale, locale.fallback) as Record<
-            string,
-            unknown
-          >)
+        ? resolveLocalizedProps(rawProps, locale.locale, locale.fallback)
         : rawProps;
       tree = bindTree(tree, values, declared);
     }

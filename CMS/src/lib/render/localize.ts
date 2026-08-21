@@ -169,3 +169,24 @@ export function resolveLocalized(
   }
   return out;
 }
+
+/**
+ * Resolve every VALUE of a prop/attribute bag, without ever treating the bag
+ * ITSELF as a locale object. A bag's keys are prop or attribute NAMES — but a
+ * bag like `{ src: …, alt: … }` (or `{ id: … }`, `{ rel: …, for: … }`) has only
+ * 2-3 letter keys, so `resolveLocalized` would misread it as a locale object and
+ * collapse the whole bag to one value (the src/alt slot-collision bug). Use this
+ * for any top-level map keyed by prop/attr names; individual values still
+ * resolve normally (they MAY be locale objects, at any depth).
+ */
+export function resolveLocalizedProps(
+  bag: Record<string, unknown>,
+  locale: string,
+  fallback: string = FALLBACK_DEFAULT_LOCALE,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(bag)) {
+    out[k] = resolveLocalized(v, locale, fallback);
+  }
+  return out;
+}

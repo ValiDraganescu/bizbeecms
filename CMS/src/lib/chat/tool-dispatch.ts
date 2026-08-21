@@ -104,6 +104,7 @@ import {
 } from "./prompt-tools";
 import { EDIT_TEXT_TOOL } from "./edit-text-tool";
 import { GENERATE_IMAGE_TOOL } from "./generate-image-tool";
+import { UPLOAD_ASSET_TOOL } from "./upload-asset-tool";
 import {
   toolsForContext,
   type AdminPageContext,
@@ -192,7 +193,7 @@ import {
   handleDeletePrompt,
 } from "./tool-dispatch-prompts";
 import { handleEditText } from "./tool-dispatch-edit-text";
-import { handleGenerateImage } from "./tool-dispatch-media";
+import { handleGenerateImage, handleUploadAsset } from "./tool-dispatch-media";
 
 export type { DispatchResult } from "./tool-dispatch-core";
 
@@ -244,6 +245,7 @@ export const TOOL_BY_NAME: Record<ToolName, unknown> = {
   edit_text: EDIT_TEXT_TOOL,
   get_authoring_guide: GET_AUTHORING_GUIDE_TOOL,
   generate_image: GENERATE_IMAGE_TOOL,
+  upload_asset: UPLOAD_ASSET_TOOL,
   list_data_sources: LIST_DATA_SOURCES_TOOL,
   create_data_source: CREATE_DATA_SOURCE_TOOL,
   update_data_source: UPDATE_DATA_SOURCE_TOOL,
@@ -329,6 +331,7 @@ const HANDLERS: Record<ToolName, ToolHandler> = {
   edit_text: handleEditText,
   get_authoring_guide: handleGetAuthoringGuide,
   generate_image: handleGenerateImage,
+  upload_asset: handleUploadAsset,
   list_data_sources: handleListDataSources,
   create_data_source: handleCreateDataSource,
   update_data_source: handleUpdateDataSource,

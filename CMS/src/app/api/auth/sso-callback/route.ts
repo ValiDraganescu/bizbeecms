@@ -49,6 +49,15 @@ export async function GET(request: Request): Promise<Response> {
   const { env } = await getCloudflareContext({ async: true });
   const e = env as unknown as Record<string, unknown>;
   const pmOrigin = typeof e.PM_ORIGIN === "string" ? e.PM_ORIGIN : "";
+  // Server-to-server PM calls (nonce exchange, cms-validate) may need a
+  // different origin than the BROWSER-facing PM_ORIGIN: in local dev the
+  // browser reaches PM through the Caddy TLS proxy (https://bizbee.localhost)
+  // whose internal CA Node's fetch doesn't trust — the backend talks plain
+  // http://localhost:3601 instead. Unset → falls back to PM_ORIGIN (prod).
+  const pmInternal =
+    typeof e.PM_INTERNAL_ORIGIN === "string" && e.PM_INTERNAL_ORIGIN
+      ? e.PM_INTERNAL_ORIGIN
+      : pmOrigin;
   const secret = typeof e.CMS_AUTH_SECRET === "string" ? e.CMS_AUTH_SECRET : "";
   const siteId = typeof e.SITE_ID === "string" ? e.SITE_ID : "";
 
@@ -59,7 +68,7 @@ export async function GET(request: Request): Promise<Response> {
   // 1. nonce → PM sid.
   let sid = "";
   try {
-    const res = await fetch(`${pmOrigin.replace(/\/+$/, "")}/api/auth/cms-sso-exchange`, {
+    const res = await fetch(`${pmInternal.replace(/\/+$/, "")}/api/auth/cms-sso-exchange`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
       body: JSON.stringify({ nonce }),
@@ -77,7 +86,7 @@ export async function GET(request: Request): Promise<Response> {
   let pmUserId = "";
   let pmEmail: string | null = null;
   try {
-    const res = await fetch(cmsValidateUrl(pmOrigin), {
+    const res = await fetch(cmsValidateUrl(pmInternal), {
       method: "POST",
       headers: {
         "content-type": "application/json",

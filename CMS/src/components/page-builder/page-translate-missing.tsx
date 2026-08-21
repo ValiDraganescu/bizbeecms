@@ -21,11 +21,13 @@ import { useTranslations } from "next-intl";
 import type { PageSummary } from "@/db/page-store";
 import { buildSeoMetaBody } from "@/lib/pages/page-meta";
 import {
+  describePageEntries,
   mergePageMeta,
   pageTranslateEntries,
   splitPageSlots,
   type PropsSchemas,
 } from "@/lib/pages/page-translate-missing";
+import { TranslateMissingDialog } from "./translate-missing-dialog";
 import { planTranslateCalls } from "@/lib/content/bulk-translate-plan";
 import { runTranslatePlan, type TranslationSlots } from "@/lib/content/bulk-translate-run";
 import { executeTranslateCall } from "@/lib/content/translate-client";
@@ -79,20 +81,23 @@ export function PageTranslateMissingButton({
     latestPage.current = page;
   });
 
+  // What's missing (item + locales), shown in the confirmation dialog before
+  // any call is made — the run consumes what the operator confirmed seeing.
+  const [confirming, setConfirming] = useState(false);
+
   // Re-planned from the live draft + page meta, so the button enables/disables
   // as edits or per-field translates fill slots. Cheap string scans.
-  const plan = useMemo(
+  const entries = useMemo(
     () =>
-      planTranslateCalls(
-        pageTranslateEntries(
-          { metaTitle: page.metaTitle, metaDescription: page.metaDescription },
-          blocks,
-          propsSchemas,
-          { default: locales[0] ?? "", locales },
-        ),
+      pageTranslateEntries(
+        { metaTitle: page.metaTitle, metaDescription: page.metaDescription },
+        blocks,
+        propsSchemas,
+        { default: locales[0] ?? "", locales },
       ),
     [page.metaTitle, page.metaDescription, blocks, propsSchemas, locales],
   );
+  const plan = useMemo(() => planTranslateCalls(entries), [entries]);
 
   if (locales.length < 2) return null;
 
@@ -181,11 +186,21 @@ export function PageTranslateMissingButton({
         className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm text-foreground disabled:opacity-50"
         disabled={busy || plan.calls.length === 0}
         title={plan.calls.length === 0 ? t("translateMissingNone") : undefined}
-        onClick={() => void run()}
+        onClick={() => setConfirming(true)}
       >
         {busy && <Spinner />}
         {busy ? t("translating") : t("translateMissing")}
       </button>
+      {confirming && (
+        <TranslateMissingDialog
+          rows={describePageEntries(entries, blocks, propsSchemas)}
+          onConfirm={() => {
+            setConfirming(false);
+            void run();
+          }}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
     </div>
   );
 }

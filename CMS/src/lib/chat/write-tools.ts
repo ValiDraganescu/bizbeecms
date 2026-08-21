@@ -182,11 +182,13 @@ export const UPDATE_THEME_TOOL = {
   function: {
     name: "update_theme",
     description:
-      "Update the site's theme color token overrides for light and/or dark mode. " +
-      "Read current values with get_theme first. Pass 'light' and/or 'dark' as a " +
-      "map of { tokenName: cssColor }. Only known design tokens and safe color " +
-      "values are kept (others are dropped server-side). Omit a mode to leave it " +
-      "unchanged.",
+      "Update the site's theme color token overrides for light and/or dark mode, " +
+      "and/or its logo. Read current values with get_theme first. Pass 'light' " +
+      "and/or 'dark' as a map of { tokenName: cssColor }. Only known design " +
+      "tokens and safe color values are kept (others are dropped server-side). " +
+      "Omit a mode to leave it unchanged. Pass 'logo' as a /media/<key> URL of " +
+      "an uploaded asset (see list_assets / upload_asset) to set the site logo, " +
+      "or \"\" to clear it.",
     parameters: {
       type: "object",
       properties: {
@@ -197,6 +199,11 @@ export const UPDATE_THEME_TOOL = {
         dark: {
           type: "object",
           description: "Dark-mode token→color overrides (same shape).",
+        },
+        logo: {
+          type: "string",
+          description:
+            "Site logo: a /media/<key> asset URL (upload or pick one first), or \"\" to clear.",
         },
       },
       required: [],

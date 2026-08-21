@@ -10,6 +10,7 @@ import {
   listSiteDomains,
   updateSite,
 } from "@/lib/site/site";
+import { cleanupLocalSiteData } from "@/lib/site/local-cleanup";
 import { getProvisioningKey, syncKeyCap } from "@/lib/openrouter/key-cap";
 import { deleteKey } from "@/lib/openrouter/provision";
 import { isDeployStuck } from "@/lib/deploy";
@@ -244,5 +245,11 @@ export async function DELETE(
   } catch {
     return NextResponse.json({ error: "unknown" }, { status: 500 });
   }
+
+  // `next dev` only: also drop the Site's local CMS state (its Miniflare
+  // D1/R2 under CMS/.wrangler/sites/<slug>/) so the local CMS can't keep
+  // serving a Site the PM no longer has. No-op in production.
+  await cleanupLocalSiteData(site.slug);
+
   return NextResponse.json({ ok: true, ...(warnings.length ? { warnings } : {}) });
 }

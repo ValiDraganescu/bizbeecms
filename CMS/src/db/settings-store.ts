@@ -25,6 +25,7 @@ import {
   emptyThemeFonts,
   normalizeThemeFonts,
 } from "../lib/render/fonts.ts";
+import { normalizeSiteLogoUrl } from "../lib/settings/site-logo.ts";
 import {
   type SiteIdentity,
   emptySiteIdentity,
@@ -62,6 +63,7 @@ const THEME_OVERRIDES_KEY = "theme_overrides";
 const THEME_OVERRIDES_DARK_KEY = "theme_overrides_dark";
 const THEME_FONTS_KEY = "theme_fonts";
 const SITE_IDENTITY_KEY = "site_identity";
+const SITE_LOGO_KEY = "site_logo";
 const MODEL_CATALOG_KEY = "model_catalog";
 const AI_CONFIG_KEY = "ai_config";
 const IMAGE_MODEL_KEY = "image_model";
@@ -643,4 +645,30 @@ export async function getRateLimitPresetCached(
   } catch {
     return DEFAULT_RATE_LIMIT_PRESET;
   }
+}
+
+/** Read the Site's logo asset URL, or "" when unset/garbage. */
+export async function getSiteLogo(): Promise<string> {
+  const db = await getDb();
+  const rows = await db
+    .select({ value: schema.siteSettings.value })
+    .from(schema.siteSettings)
+    .where(eq(schema.siteSettings.key, SITE_LOGO_KEY))
+    .limit(1);
+  const raw = rows[0]?.value;
+  if (!raw) return "";
+  try {
+    return normalizeSiteLogoUrl(JSON.parse(raw)) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** Upsert the Site's logo URL ("" clears). Throws on a non-media URL — callers
+ *  validate first (route/tool) so this is a belt-and-braces guard, not a path. */
+export async function setSiteLogo(url: string): Promise<string> {
+  const normalized = normalizeSiteLogoUrl(url);
+  if (normalized === null) throw new Error("invalid logo URL");
+  await upsertSetting(SITE_LOGO_KEY, JSON.stringify(normalized));
+  return normalized;
 }

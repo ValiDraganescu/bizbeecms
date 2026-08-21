@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import {
   pageTranslateEntries,
   blockTranslateEntries,
+  describePageEntries,
+  describeBlockEntries,
   splitPageSlots,
   mergePageMeta,
   applyBlockTranslations,
@@ -323,4 +325,117 @@ test("untouched sibling blocks keep their reference; touched subtree is new", ()
   const col = next[0].children![0].children![0];
   assert.deepEqual(col.children![0].props?.title, { en: "Hello", fi: "Hei" });
   assert.equal(col.children![1], b); // sibling untouched by reference
+});
+
+// ── describePageEntries / describeBlockEntries ──────────────────────────────
+
+test("describePageEntries: meta rows + block rows with component and prop label", () => {
+  const blocks = tree({
+    id: "b1",
+    component: "Hero",
+    props: { title: { en: "Hello" } },
+  });
+  const labeled = {
+    Hero: JSON.stringify({ title: { type: "string", translatable: true, label: "Headline" } }),
+  };
+  const entries = pageTranslateEntries(
+    { metaTitle: { en: "Home" }, metaDescription: {} },
+    blocks,
+    labeled,
+    LOCALES,
+  );
+  const rows = describePageEntries(entries, blocks, labeled);
+  assert.deepEqual(rows, [
+    { name: "metaTitle", kind: "meta", field: "metaTitle", locales: ["fi", "et"] },
+    { name: "b1.title", kind: "block", component: "Hero", field: "Headline", locales: ["fi", "et"] },
+  ]);
+});
+
+test("describePageEntries: unlabeled prop falls back to its name", () => {
+  const blocks = tree({ id: "b1", component: "Hero", props: { title: { en: "Hi" } } });
+  const entries = pageTranslateEntries(META_NONE, blocks, SCHEMAS, LOCALES);
+  const row = describePageEntries(entries, blocks, SCHEMAS).find((r) => r.name === "b1.title");
+  assert.deepEqual(row, {
+    name: "b1.title",
+    kind: "block",
+    component: "Hero",
+    field: "title",
+    locales: ["fi", "et"],
+  });
+});
+
+test("describeBlockEntries: prop label else name, component attached", () => {
+  const schema = parsePropsSchema(
+    JSON.stringify({
+      title: { type: "string", translatable: true, label: "Headline" },
+      body: { type: "richtext", translatable: true },
+    }),
+  );
+  const entries = blockTranslateEntries(
+    { title: { en: "Hello" }, body: { en: "World", fi: "Maailma" } },
+    schema,
+    LOCALES,
+  );
+  const rows = describeBlockEntries(entries, "Hero", schema);
+  assert.deepEqual(rows, [
+    { name: "title", kind: "block", component: "Hero", field: "Headline", locales: ["fi", "et"] },
+    { name: "body", kind: "block", component: "Hero", field: "body", locales: ["et"] },
+  ]);
+});
+
+// ── per-locale authored defaults (SiteFooter regression) ────────────────────
+
+const LOCALE_DEFAULT_SCHEMA = parsePropsSchema(
+  JSON.stringify({
+    // Authored per-locale default covering en+fi — only et is truly missing.
+    linkMenu: { type: "string", translatable: true, default: { en: "Menu", fi: "Menu" } },
+    // Authored default covering only the default locale — en+et missing.
+    note: { type: "string", translatable: true, default: { en: "Hello" } },
+  }),
+);
+
+test("authored per-locale default fills its locales — they are NOT missing", () => {
+  const entries = blockTranslateEntries({}, LOCALE_DEFAULT_SCHEMA, LOCALES);
+  assert.deepEqual(entries, [
+    { name: "linkMenu", sourceText: "Menu", targetLocales: ["et"] },
+    { name: "note", sourceText: "Hello", targetLocales: ["fi", "et"] },
+  ]);
+});
+
+test("authored per-locale default sources from the site DEFAULT locale slot", () => {
+  const schema = parsePropsSchema(
+    JSON.stringify({
+      // fi authored first — but the site default is en, so en must be the source.
+      label: { type: "string", translatable: true, default: { fi: "Varaa", en: "Book" } },
+    }),
+  );
+  const entries = blockTranslateEntries({}, schema, LOCALES);
+  assert.deepEqual(entries, [{ name: "label", sourceText: "Book", targetLocales: ["et"] }]);
+});
+
+test("stored translations still count next to a per-locale authored default", () => {
+  const entries = blockTranslateEntries(
+    { note: { et: "Tere" } },
+    LOCALE_DEFAULT_SCHEMA,
+    LOCALES,
+  );
+  // linkMenu: only et missing (authored covers en+fi); note: fi missing, et stored.
+  assert.deepEqual(entries, [
+    { name: "linkMenu", sourceText: "Menu", targetLocales: ["et"] },
+    { name: "note", sourceText: "Hello", targetLocales: ["fi"] },
+  ]);
+});
+
+test("stored default-locale text overrides — authored default no longer fills targets", () => {
+  // Operator overrode the en source; the authored en/fi default no longer
+  // matches, and the renderer would fall back to the STORED en for fi/et.
+  const entries = blockTranslateEntries(
+    { linkMenu: { en: "Our menu" } },
+    LOCALE_DEFAULT_SCHEMA,
+    LOCALES,
+  );
+  assert.deepEqual(entries, [
+    { name: "linkMenu", sourceText: "Our menu", targetLocales: ["fi", "et"] },
+    { name: "note", sourceText: "Hello", targetLocales: ["fi", "et"] },
+  ]);
 });

@@ -107,7 +107,13 @@ function hygieneProps(
     const isObjStyle = style != null && typeof style === "object" && !Array.isArray(style);
     // A non-object style (a raw CSS string, unusual here — parse-html emits objects)
     // is left ALONE: we won't clobber it, so no aspect-ratio for that rare case.
-    if (style == null || isObjStyle) {
+    // An author-pinned aspect UTILITY (`aspect-[4/3]`, `md:aspect-square`, …) also
+    // wins: an inline style would override the class (uniform card images would
+    // silently fall back to each photo's intrinsic ratio), so skip the fill then —
+    // the class already reserves the CLS box.
+    const cls = typeof props.className === "string" ? props.className : "";
+    const classAspect = /(?:^|[\s:])aspect-/.test(cls);
+    if ((style == null || isObjStyle) && !classAspect) {
       const styleObj = isObjStyle ? (style as Record<string, unknown>) : null;
       const hasAspect =
         styleObj !== null &&

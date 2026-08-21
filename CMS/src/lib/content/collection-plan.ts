@@ -159,12 +159,21 @@ export function normalizeField(raw: unknown): CollectionField | null {
     field.default = o.default;
   }
   if (Array.isArray(o.options)) {
+    // Accept both shapes: {value,label} objects (admin UI) and bare strings
+    // (the MCP/assistant tools document a plain string array).
     field.options = o.options
-      .filter((x): x is { value: string; label: string } =>
-        !!x && typeof x === "object" &&
-        typeof (x as Record<string, unknown>).value === "string" &&
-        typeof (x as Record<string, unknown>).label === "string")
-      .map((x) => ({ value: x.value, label: x.label }));
+      .map((x): { value: string; label: string } | null => {
+        if (typeof x === "string") return { value: x, label: x };
+        if (
+          !!x && typeof x === "object" &&
+          typeof (x as Record<string, unknown>).value === "string" &&
+          typeof (x as Record<string, unknown>).label === "string"
+        ) {
+          return { value: (x as { value: string }).value, label: (x as { label: string }).label };
+        }
+        return null;
+      })
+      .filter((x): x is { value: string; label: string } => x !== null);
   }
   // `translatable` only survives on the text types it's meaningful for (see
   // isTranslatableField); a stray flag on a number/bool/etc. field is dropped.

@@ -155,3 +155,17 @@ test("non-img elements untouched; identity no-op when no images", () => {
   const plans = [box(box())];
   assert.equal(applyImageHygiene(plans), plans); // same reference
 });
+
+test("aspect utility class blocks the inline aspect-ratio fill (class must win)", () => {
+  const plans = [
+    img({
+      src: "/media/assets/a_1_x.jpg?w=1400&h=700",
+      className: "w-full aspect-[4/3] object-cover",
+    }),
+  ];
+  const [out] = applyImageHygiene(plans);
+  const p = (out as { props: Record<string, unknown> }).props;
+  assert.equal(p.style, undefined);
+  // srcset still emitted — only the ratio fill is skipped.
+  assert.match(String(p.srcset), /320w/);
+});

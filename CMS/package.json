@@ -3,6 +3,7 @@
   "version": "3.2.1",
   "private": true,
   "scripts": {
+    "postinstall": "node scripts/copy-altcha.mjs",
     "dev": "next dev --port 3602",
     "site": "node ../scripts/connect.mjs cms",
     "test": "node --test scripts/*.test.mjs 'src/**/*.test.ts'",
@@ -23,6 +24,8 @@
     "@codemirror/language": "^6.12.4",
     "@codemirror/state": "^6.7.0",
     "@codemirror/view": "^6.43.3",
+    "altcha": "^3.2.2",
+    "altcha-lib": "^2.3.2",
     "drizzle-orm": "^0.45.2",
     "fflate": "^0.8.3",
     "modern-screenshot": "^4.7.0",

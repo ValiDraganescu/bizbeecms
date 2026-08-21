@@ -14,7 +14,9 @@ import {
   FORM_DEFAULT_SUCCESS,
   FORM_DEFAULT_ERROR,
   FORM_ENHANCE_SCRIPT,
+  ALTCHA_LOADER_SCRIPT,
 } from "./plan-form.ts";
+import { ALTCHA_FIELD, FORM_CHALLENGE_PATH } from "../forms/altcha-core.ts";
 import { planPage } from "./tree.ts";
 import type { Block, ElementPlan } from "./plan-types.ts";
 
@@ -56,6 +58,14 @@ test("targeted Form renders a <form> with method/action + identity inputs + stat
   assert.ok(el.children.some((c) => c.kind === "element" && c.props["data-child"] === "c1"));
   const last = el.children[el.children.length - 1];
   assert.ok(last.kind === "element" && last.props["data-form-status"] === "");
+
+  // Bot protection: the ALTCHA widget rides inside every targeted form,
+  // fetching from the Worker's own challenge endpoint (self-hosted).
+  const widget = el.children.find((c) => c.kind === "element" && c.tag === "altcha-widget");
+  assert.ok(widget && widget.kind === "element");
+  if (!widget || widget.kind !== "element") return;
+  assert.equal(widget.props.challenge, FORM_CHALLENGE_PATH);
+  assert.equal(widget.props.name, ALTCHA_FIELD);
 });
 
 test("authored success/error messages override the defaults", () => {
@@ -100,6 +110,13 @@ test("stampFormPageId stamps nested Form blocks and no-ops without one", () => {
 test("planPage ships the enhancement script once for a targeted Form, none otherwise", () => {
   const withForm = planPage([targeted, { ...targeted, id: "f2" }], new Map());
   assert.equal(withForm.scripts.filter((s) => s === FORM_ENHANCE_SCRIPT).length, 1);
+  // The ALTCHA custom-element loader ships alongside it, BEFORE the enhance
+  // script (the solve-on-submit fallback needs the widget upgraded first).
+  assert.equal(withForm.scripts.filter((s) => s === ALTCHA_LOADER_SCRIPT).length, 1);
+  assert.ok(
+    withForm.scripts.indexOf(ALTCHA_LOADER_SCRIPT) < withForm.scripts.indexOf(FORM_ENHANCE_SCRIPT),
+  );
   const withoutTarget = planPage([{ ...targeted, formTarget: undefined }], new Map());
   assert.equal(withoutTarget.scripts.includes(FORM_ENHANCE_SCRIPT), false);
+  assert.equal(withoutTarget.scripts.includes(ALTCHA_LOADER_SCRIPT), false);
 });

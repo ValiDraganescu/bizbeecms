@@ -410,7 +410,15 @@
       "selfHostNote": "Salvestamisel laaditakse fondifailid üks kord alla ja neid serveeritakse sinu saidilt — külastajad ei ühendu kunagi Google Fontsiga.",
       "save": "Salvesta fondid"
     },
-    "saveColors": "Salvesta värvid"
+    "saveColors": "Salvesta värvid",
+    "logo": {
+      "title": "Logo",
+      "subtitle": "Vali või laadi saidi logo meediakogust. Komponendid ja AI-abiline saavad seda brändimärgina kasutada.",
+      "save": "Salvesta logo",
+      "saved": "Logo salvestatud.",
+      "onLight": "Heledal",
+      "onDark": "Tumedal"
+    }
   },
   "media": {
     "title": "Meediateek",
@@ -952,6 +960,7 @@
     "rowSettings": "Rida",
     "rowVerticalAlign": "Joonda veerud",
     "rowVAlign": {
+      "stretch": "Venita",
       "top": "Üles",
       "center": "Keskele",
       "bottom": "Alla"
@@ -1014,6 +1023,14 @@
     "translateMissingIncomplete": "{count, plural, one {# tõlge} other {# tõlget}} jäi saamata — proovi uuesti.",
     "translating": "Tõlgin…",
     "blockTranslateMissingHint": "Täida selle ploki tekstide kõik puuduvad tõlked ühe korraga.",
+    "translateMissingDialog": {
+      "title": "Tõlgi puuduvad",
+      "intro": "{count, plural, one {# üksusel} other {# üksusel}} puuduvad tõlked nendes keeltes:",
+      "metaTitle": "Meta pealkiri",
+      "metaDescription": "Meta kirjeldus",
+      "confirm": "Tõlgi",
+      "cancel": "Tühista"
+    },
     "link": {
       "newTab": "Ava uuel vahelehel",
       "pickPage": "Vali leht…"

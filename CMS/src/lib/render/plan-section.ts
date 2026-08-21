@@ -25,6 +25,11 @@ const ALIGN_ITEMS: Record<string, string> = {
   top: "flex-start",
   center: "center",
   bottom: "flex-end",
+  // Equal-height columns: grid items fill the row's height, and each block
+  // wrapper inside grows (see wrapBlockWidth's `stretch`) so a card with
+  // `h-full` on its root fills the column. This is how repeated card rows
+  // (reviews, dish teasers) keep one uniform size regardless of copy length.
+  stretch: "stretch",
 };
 const JUSTIFY: Record<string, string> = {
   left: "flex-start",
@@ -279,7 +284,9 @@ export function planColumn(
     // Each dropped block is wrapped so it can be told to FILL the column width or
     // WRAP to its content (per-block `props.width`). The wrapper also keeps a
     // text-root component (which can't take a style) layout-controllable.
-    children: (col.children ?? []).map((b) => wrapBlockWidth(b, planBlock(b))),
+    children: (col.children ?? []).map((b) =>
+      wrapBlockWidth(b, planBlock(b), alignItems === "stretch"),
+    ),
   };
 }
 
@@ -297,7 +304,7 @@ export function planColumn(
  * A fill block with a horizontal margin drops `width:100%` and relies on
  * `align-self:stretch` (which subtracts margins) so it never overflows.
  */
-export function wrapBlockWidth(block: Block, el: ElementPlan): ElementPlan {
+export function wrapBlockWidth(block: Block, el: ElementPlan, stretch = false): ElementPlan {
   const p = block.props ?? {};
   const fill = str(p.width, "fill") !== "auto";
   const spacing: Record<string, string> = {};
@@ -315,6 +322,10 @@ export function wrapBlockWidth(block: Block, el: ElementPlan): ElementPlan {
         ...(fill
           ? { ...(hMargin ? {} : { width: "100%" }), alignSelf: "stretch" }
           : { width: "auto", maxWidth: "100%", alignSelf: "auto" }),
+        // Under a stretched column (verticalAlign "stretch"), full-width blocks
+        // share the column's extra height so `h-full` roots can fill it. Only
+        // in that mode — default columns size to content and grow is a no-op.
+        ...(stretch && fill ? { flexGrow: 1 } : {}),
         ...spacing,
       },
     },

@@ -26,10 +26,17 @@ async function readEnv(): Promise<
     const { env } = await getCloudflareContext({ async: true });
     const e = env as unknown as Record<string, unknown>;
     const pmOrigin = typeof e.PM_ORIGIN === "string" ? e.PM_ORIGIN : "";
+    // Server-to-server: prefer PM_INTERNAL_ORIGIN when set (local dev — the
+    // browser-facing PM_ORIGIN sits behind the Caddy TLS proxy whose internal
+    // CA Node's fetch doesn't trust). Unset → PM_ORIGIN (prod).
+    const pmInternal =
+      typeof e.PM_INTERNAL_ORIGIN === "string" && e.PM_INTERNAL_ORIGIN
+        ? e.PM_INTERNAL_ORIGIN
+        : pmOrigin;
     const siteId = typeof e.SITE_ID === "string" ? e.SITE_ID : "";
     const secret = typeof e.CMS_AUTH_SECRET === "string" ? e.CMS_AUTH_SECRET : "";
-    if (!pmOrigin || !siteId || !secret) return null;
-    return { pmOrigin: pmOrigin.replace(/\/+$/, ""), siteId, secret };
+    if (!pmInternal || !siteId || !secret) return null;
+    return { pmOrigin: pmInternal.replace(/\/+$/, ""), siteId, secret };
   } catch {
     // No CF context (local dev without bindings) → behave as "not configured".
     return null;

@@ -171,7 +171,9 @@ export const GET_THEME_TOOL = {
       "defaults, which is normal, not a misconfiguration). `fonts` maps the " +
       "font slots (body/heading/accent → the font-body/font-heading/font-accent " +
       "utilities) to their picked family, or null for the system default; " +
-      "families are read-only here (picked in Theme settings).",
+      "families are read-only here (picked in Theme settings). `logo` is " +
+      "the site's logo asset URL (/media/<key>), or null when none is set — " +
+      "use it wherever a header/footer/brand mark needs the real logo.",
     parameters: { type: "object", properties: {}, required: [] },
   },
 } as const;
